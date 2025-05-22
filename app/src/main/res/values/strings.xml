@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">PoolProtractor</string>
+    <string name="zoom_icon">Zoom Icon</string>
+    <string name="reset_view">Reset View</string>
+        <string name="toggle_help_lines">Toggle Help Lines</string>
+    <string name="toggle_theme">Toggle Theme</string>
+
+</resources>
