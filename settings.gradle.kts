@@ -12,7 +12,6 @@ pluginManagement {
   }
   plugins {
     id("com.android.application") version "8.10.0"
-    id("com.android.library") version "8.9.3"
     id("org.jetbrains.kotlin.android") version "2.1.20"
   }
 }
@@ -23,7 +22,5 @@ dependencyResolutionManagement {
     mavenCentral()
   }
 }
-
-rootProject.name = "CueDetat"
 
 include(":app")

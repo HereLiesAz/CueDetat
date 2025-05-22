@@ -13,10 +13,3 @@
 .externalNativeBuild
 .cxx
 local.properties
-.PoolProtractor_Full_Archive.txt
-.PoolProtractor-Lite_Full_Archive.txt
-.archive-it.ps1
-/.kotlin
-/app/src/androidTest
-/app/src/test
-PoolProtractor_Full_Archive.txt

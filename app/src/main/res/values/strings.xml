@@ -1,12 +1,5 @@
 <resources>
-    <string name="app_name">Cue D’état</string> <!-- Changed this for launcher -->
-    <string name="app_display_title">Cue D’état</string> <!-- New for in-app title -->
     <string name="zoom_icon">Zoom Icon</string>
     <string name="reset_view">Reset View</string>
-    <!-- Removed toggle_help_lines as it's now in menu -->
     <string name="toggle_theme">Toggle Theme</string>
-    <string name="zoom_cycle">Cycle Zoom</string>
-    <string name="cue_d_tat">Cue D’état</string>
-    <string name="wtf_is_all_this">WTF is all this?</string>
-    <string name="check_for_updates">Check for Updates</string> <!-- New string for the menu item -->
 </resources>

@@ -1,54 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Animation style for PopupMenu - MOVED HERE, ONLY DEFINED ONCE -->
-    <style name="PopupMenuAnimation">
-        <item name="android:windowEnterAnimation">@anim/popup_menu_enter</item>
-        <item name="android:windowExitAnimation">@anim/popup_menu_exit</item>
-    </style>
-
-    <!-- Base application theme. - MOVED HERE, ONLY DEFINED ONCE -->
     <style name="Theme.PoolProtractor" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Primary brand color. These will be overridden by the Compose theme's colorScheme in MainActivity -->
-        <item name="colorPrimary">@color/app_black</item>
-        <item name="colorOnPrimary">@color/app_yellow</item>
-
         <!-- Secondary brand color. -->
-        <item name="colorSecondary">@color/app_black</item>
-        <item name="colorOnSecondary">@color/app_yellow</item>
-
-        <!-- Tertiary color -->
-        <item name="colorTertiary">@color/app_medium_gray</item>
-        <item name="colorOnTertiary">@color/app_white</item>
-
-        <!-- Container colors for FABs etc. -->
-        <item name="colorPrimaryContainer">@color/app_dark_gray</item>
-        <item name="colorOnPrimaryContainer">@color/app_yellow</item>
-        <item name="colorSecondaryContainer">@color/app_dark_gray</item>
-        <item name="colorOnSecondaryContainer">@color/app_yellow</item>
-        <item name="colorTertiaryContainer">@color/app_medium_gray</item>
-        <item name="colorOnTertiaryContainer">@color/app_white</item>
-
-        <!-- Background/Surface colors -->
-        <item name="android:colorBackground">@color/app_yellow</item>
-        <item name="colorSurface">@color/app_yellow</item>
-        <item name="colorOnSurface">@color/app_black</item>
-        <item name="colorSurfaceVariant">@color/app_dark_yellow</item>
-        <item name="colorOnSurfaceVariant">@color/app_black</item>
-
-        <!-- Error colors -->
-        <item name="colorError">@color/app_error_red</item>
-        <item name="colorOnError">@color/app_black</item>
-        <item name="colorErrorContainer">@color/app_error_red</item>
-        <item name="colorOnErrorContainer">@color/app_black</item>
-
-        <!-- Outline color -->
-        <item name="colorOutline">@color/app_black</item>
-
         <!-- Status bar color. -->
-        <item name="android:statusBarColor">@color/app_yellow</item>
-
-        <!-- Custom PopupMenu style -->
-        <item name="popupMenuStyle">@style/AppTheme.PopupMenu</item>
-        <!-- Custom animation for the PopupMenu -->
-        <item name="android:popupAnimationStyle">@style/PopupMenuAnimation</item>
     </style>
 </resources>

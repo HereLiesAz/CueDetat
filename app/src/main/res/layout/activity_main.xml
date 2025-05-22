@@ -13,45 +13,13 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <com.hereliesaz.cuedetat.view.MainOverlayView
         android:id="@+id/protractorOverlayView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
     <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/controls_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
-
-        <FrameLayout
-            android:id="@+id/appTitleContainer"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            android:layout_marginTop="16dp"
-            android:layout_marginStart="16dp">
-
-            <TextView
-                android:id="@+id/appTitleTextView"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/cue_d_tat"
-                android:textSize="48sp"
-                android:textColor="@color/app_yellow"
-                android:visibility="visible" />
-
-            <ImageView
-                android:id="@+id/appTitleLogoImageView"
-                android:layout_width="wrap_content"
-                android:layout_height="60dp"
-                android:src="@drawable/logo_cue_detat"
-                android:contentDescription="@string/app_name"
-                android:visibility="gone"
-                android:adjustViewBounds="true"
-                android:scaleType="fitStart" />
-        </FrameLayout>
-
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/zoomControlsLayout"
@@ -67,29 +35,19 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintVertical_bias="0.497">
 
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/zoomCycleButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:contentDescription="@string/zoom_cycle"
                 android:src="@drawable/ic_zoom_in_24"
-                app:backgroundTint="?attr/colorSecondaryContainer"
-                app:fabSize="mini"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent"
-                app:tint="?attr/colorOnSecondaryContainer" />
 
             <SeekBar
                 android:id="@+id/zoomSlider"
-                android:layout_width="400dp"
-                android:layout_height="25dp"
-                android:layout_marginBottom="200dp"
                 android:max="100"
                 android:progress="50"
                 android:progressDrawable="@drawable/seekbar_custom_track"
                 android:rotation="90"
-                android:thumbTint="?attr/colorPrimary"
                 android:visibility="visible"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
@@ -112,7 +70,6 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:tint="?attr/colorOnPrimaryContainer" />
 
-        <!-- helpButton removed -->
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
