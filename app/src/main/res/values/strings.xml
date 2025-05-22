@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Cue D’état</string> <!-- Changed this for launcher -->
+    <string name="app_display_title">Cue D’état</string> <!-- New for in-app title -->
+    <string name="zoom_icon">Zoom Icon</string>
+    <string name="reset_view">Reset View</string>
+    <string name="toggle_help_lines">Toggle Help Lines</string>
+    <string name="toggle_theme">Toggle Theme</string>
+    <string name="zoom_cycle">Cycle Zoom</string>
+    <string name="cue_d_tat">Cue D’état</string>
+</resources>
