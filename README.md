@@ -1,7 +1,7 @@
 # Cue D’état - Pool Protractor & Aiming Assistant
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-![GitHub Release](https://img.shields.io/github/v/release/hereliesaz/CueDetat)
+![GitHub Release](https://img.shields.io/github/v/release/hereliesaz/CueDetat?include_prereleases&display_name=release)
 
 
 **_May your aim be truer than your excuses._**
