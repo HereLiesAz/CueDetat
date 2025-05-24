@@ -1,4 +1,4 @@
-# Cue D’état - Pool Protractor & Aiming Assistant for Android
+# Cue D’état - An IRL Billiards Aiming Assistant for Android
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![GitHub Release](https://img.shields.io/github/v/release/hereliesaz/CueDetat?include_prereleases&display_name=release)
