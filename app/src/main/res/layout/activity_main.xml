@@ -13,10 +13,12 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <com.hereliesaz.cuedetat.protractor.ProtractorOverlayView
+    <!-- THIS IS THE LINE TO CHANGE -->
+    <com.hereliesaz.cuedetat.view.MainOverlayView
         android:id="@+id/protractorOverlayView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+    <!-- END OF CHANGE -->
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/controls_layout"
@@ -39,17 +41,17 @@
                 android:text="@string/cue_d_tat"
                 android:textSize="48sp"
                 android:textColor="@color/app_yellow"
-            android:visibility="visible" />
+                android:visibility="visible" />
 
             <ImageView
                 android:id="@+id/appTitleLogoImageView"
                 android:layout_width="wrap_content"
                 android:layout_height="60dp"
-            android:src="@drawable/logo_cue_detat"
-            android:contentDescription="@string/app_name"
-            android:visibility="gone"
-            android:adjustViewBounds="true"
-            android:scaleType="fitStart" />
+                android:src="@drawable/logo_cue_detat"
+                android:contentDescription="@string/app_name"
+                android:visibility="gone"
+                android:adjustViewBounds="true"
+                android:scaleType="fitStart" />
         </FrameLayout>
 
 

@@ -25,18 +25,19 @@ object ProtractorConfig {
     const val MIN_GHOST_BALL_TEXT_SIZE = 22f
     const val MAX_GHOST_BALL_TEXT_SIZE = 75f
 
-    const val HELPER_TEXT_BASE_SIZE = 40f
+    const val HELPER_TEXT_BASE_SIZE = 40f // Base size for ProtractorPlaneTextDrawer labels
     const val HELPER_TEXT_MIN_SIZE_FACTOR = 0.65f
     const val HELPER_TEXT_MAX_SIZE_FACTOR = 1.5f
 
-    const val POCKET_AIM_TEXT_BASE_SIZE_FACTOR = 1.25f
+    const val POCKET_AIM_TEXT_BASE_SIZE_FACTOR = 1.25f // Multiplier for HELPER_TEXT_BASE_SIZE
 
-    const val CENTER_CUE_INSTRUCTION_SIZE_FACTOR = 0.9f
-    const val CUE_BALL_PATH_TEXT_SIZE_FACTOR = 0.75f
-    const val TANGENT_LINE_TEXT_SIZE_FACTOR = 0.5f
+    const val CENTER_CUE_INSTRUCTION_SIZE_FACTOR = 0.9f // Multiplier for BASE_GHOST_BALL_TEXT_SIZE
+    // Increased factors for Tangent and Cue Ball Path lines
+    const val CUE_BALL_PATH_TEXT_SIZE_FACTOR = 1.1f // Was 0.75f, applied to HELPER_TEXT_BASE_SIZE
+    const val TANGENT_LINE_TEXT_SIZE_FACTOR = 1.1f  // Was 0.5f, applied to HELPER_TEXT_BASE_SIZE
 
     const val WARNING_TEXT_BASE_SIZE = 200f
-    const val SPECIAL_WARNING_TEXT_SMALLER_SIZE = 110f // Significantly reduced from 145f
+    const val SPECIAL_WARNING_TEXT_SMALLER_SIZE = 110f
 
     // Paint Strokes
     const val O_NEAR_DEFAULT_STROKE = 4f

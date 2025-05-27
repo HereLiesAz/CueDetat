@@ -2,11 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.hereliesaz.cuedetat">
 
+    <!-- Permissions required for camera and sensors -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera.any" />
     <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.compass" android:required="false" />
+    <!-- Optional: OpenCV might need internet for first-time download if not bundled -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".MyApplication"

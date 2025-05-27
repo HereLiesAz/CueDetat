@@ -1,23 +1,23 @@
-package com.hereliesaz.cuedetat.protractor.drawer
+package com.hereliesaz.cuedetat.protractor.drawer // Adjusted package
 
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.ui.graphics.toArgb
-import com.hereliesaz.cuedetat.protractor.calculator.ProtractorGeometryCalculator
-import com.hereliesaz.cuedetat.protractor.ProtractorConfig
-import com.hereliesaz.cuedetat.protractor.ProtractorPaints
-import com.hereliesaz.cuedetat.protractor.ProtractorState
-import com.hereliesaz.cuedetat.ui.theme.AppPurple
-import com.hereliesaz.cuedetat.ui.theme.AppWhite
-import com.hereliesaz.cuedetat.protractor.calculator.AimingLineLogicalCoords
+import com.hereliesaz.cuedetat.protractor.calculator.ProtractorGeometryCalculator // Adjusted package
+import com.hereliesaz.cuedetat.protractor.ProtractorConfig // Adjusted package
+import com.hereliesaz.cuedetat.protractor.ProtractorPaints // Adjusted package
+import com.hereliesaz.cuedetat.protractor.ProtractorState // Adjusted package
+import com.hereliesaz.cuedetat.ui.theme.AppPurple // Adjusted package
+import com.hereliesaz.cuedetat.ui.theme.AppWhite // Adjusted package
+import com.hereliesaz.cuedetat.protractor.calculator.AimingLineLogicalCoords // Adjusted package
 
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
-import kotlin.random.Random // Import Random
+// import kotlin.random.Random // No longer needed for warning selection
 
 class ProtractorDrawingCoordinator(
     private val state: ProtractorState,
@@ -33,10 +33,12 @@ class ProtractorDrawingCoordinator(
     private val ghostBallDrawer = GhostBallDrawer()
     private val helperTextDrawer = HelperTextDrawer(viewWidthProvider, viewHeightProvider)
 
-    // State for managing warning text display
     private var currentWarningText: String? = null
-    private var wasPreviouslyInvalid: Boolean = false
-    private var lastRandomWarningIndex: Int = -1
+    // private var wasPreviouslyInvalid: Boolean = false // No longer needed for random selection
+    // private var lastRandomWarningIndex: Int = -1 // No longer needed
+
+    // Static text for the repurposed warning
+    private val REPURPOSED_WARNING_TEXT = "Hold phone over the cue ball,\ndirectly below this."
 
 
     fun onDraw(canvas: Canvas) {
@@ -62,32 +64,23 @@ class ProtractorDrawingCoordinator(
         val isCueOnFarSide = calculator.isCueOnFarSide(state, aimingLineLogicalCoordsFromCalc)
 
         val isDeflectionDominantAngle = (state.protractorRotationAngle > 90.5f && state.protractorRotationAngle < 269.5f)
-        val isCurrentlyInvalid = isCueOnFarSide || isDeflectionDominantAngle // This is useErrorColorForCueCircleAndShotGuide
+        val isCurrentlyInvalid = isCueOnFarSide || isDeflectionDominantAngle
         val showWarningStyleForGhostsAndYellowTargetLine = isPhysicalOverlap || isCueOnFarSide
 
 
-        // Manage warning text selection
+        // Manage warning text display - now static content
         if (isCurrentlyInvalid) {
-            if (!wasPreviouslyInvalid) { // Transitioned from valid to invalid
-                var randomIndex = Random.nextInt(ProtractorConfig.INSULTING_WARNINGS.size)
-                if (ProtractorConfig.INSULTING_WARNINGS.size > 1) {
-                    while (randomIndex == lastRandomWarningIndex) {
-                        randomIndex = Random.nextInt(ProtractorConfig.INSULTING_WARNINGS.size)
-                    }
-                }
-                currentWarningText = ProtractorConfig.INSULTING_WARNINGS[randomIndex]
-                lastRandomWarningIndex = randomIndex
-            }
+            currentWarningText = REPURPOSED_WARNING_TEXT
         } else {
             currentWarningText = null // Clear warning when state is valid
         }
-        wasPreviouslyInvalid = isCurrentlyInvalid
+        // wasPreviouslyInvalid = isCurrentlyInvalid // No longer needed
 
 
         if (showWarningStyleForGhostsAndYellowTargetLine) { paints.yellowTargetLinePaint.apply { strokeWidth = config.O_YELLOW_TARGET_LINE_STROKE + config.BOLD_STROKE_INCREASE; setShadowLayer(config.GLOW_RADIUS_FIXED, 0f, 0f, paints.m3GlowColor) }
         } else { paints.yellowTargetLinePaint.apply { strokeWidth = config.O_YELLOW_TARGET_LINE_STROKE; clearShadowLayer() } }
 
-        if (isCurrentlyInvalid) { // Use isCurrentlyInvalid for paint colors
+        if (isCurrentlyInvalid) {
             paints.aimingAssistNearPaint.apply { color = paints.M3_COLOR_ERROR; clearShadowLayer(); strokeWidth = config.O_FAR_DEFAULT_STROKE }
             paints.aimingAssistFarPaint.apply { color = paints.M3_COLOR_ERROR; clearShadowLayer(); strokeWidth = config.O_FAR_DEFAULT_STROKE }
         } else {
@@ -101,13 +94,13 @@ class ProtractorDrawingCoordinator(
         val currentAimingCoords = aimingLineLogicalCoordsFromCalc ?: AimingLineLogicalCoords(0f,0f,0f,0f,0f,0f,0f,0f)
 
         planeDrawer.drawPlaneVisuals(
-            canvas, state, paints, config, isCurrentlyInvalid, // Pass isCurrentlyInvalid
+            canvas, state, paints, config, isCurrentlyInvalid,
             currentAimingCoords.startX, currentAimingCoords.startY, currentAimingCoords.cueX, currentAimingCoords.cueY, currentAimingCoords.endX, currentAimingCoords.endY,
             deflectionParams
         )
         canvas.restore()
 
-        if (state.areTextLabelsVisible && hasInverse) {
+        if (state.areTextLabelsVisible && hasInverse) { // This state.areTextLabelsVisible will now also control plane texts
             canvas.save()
             canvas.concat(state.mPitchMatrix)
             val textPlaneYLiftBase = -state.currentLogicalRadius * 0.3f
@@ -116,7 +109,7 @@ class ProtractorDrawingCoordinator(
 
             helperTextDrawer.drawOnProtractorPlane(
                 canvas, state, paints, config,
-                currentAimingCoords.startX, currentAimingCoords.startY, currentAimingCoords.cueX, currentAimingCoords.cueY,
+                currentAimingCoords.startX, currentAimingCoords.startY, currentAimingCoords.cueX, currentAimingCoords.cueY, // Pass cueX/Y
                 currentAimingCoords.normDirX, currentAimingCoords.normDirY,
                 deflectionParams.unitVecX, deflectionParams.unitVecY
             )
@@ -143,8 +136,8 @@ class ProtractorDrawingCoordinator(
             canvas, state, paints, config,
             projectedScreenData.targetProjected.x, targetGhostDrawnCenterY, projectedScreenData.targetScreenRadius,
             projectedScreenData.cueProjected.x, cueGhostDrawnCenterY, projectedScreenData.cueScreenRadius,
-            isCurrentlyInvalid, // Pass isCurrentlyInvalid
-            currentWarningText // Pass the selected warning text
+            isCurrentlyInvalid,
+            currentWarningText // This is now the repurposed "Hold phone over..." or null
         )
     }
 

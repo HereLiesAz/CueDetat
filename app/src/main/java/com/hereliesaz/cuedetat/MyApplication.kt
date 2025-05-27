@@ -1,13 +1,24 @@
+// app/src/main/java/com/hereliesaz/cuedetat/MyApplication.kt
 package com.hereliesaz.cuedetat
 
 import android.app.Application
 import androidx.appcompat.app.AppCompatDelegate
 import android.util.Log
+import com.hereliesaz.cuedetat.config.AppConfig // For TAG
+import org.opencv.android.OpenCVLoader // Import OpenCVLoader
 
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        Log.d("PoolProtractorApp", "MyApplication onCreate: Forcing Light Theme (MODE_NIGHT_NO).")
+        Log.i(AppConfig.TAG, "MyApplication onCreate: Forcing Light Theme (MODE_NIGHT_NO).")
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+
+        // Initialize OpenCV library globally
+        if (!OpenCVLoader.initDebug()) { // initDebug is for development, initAsync is better for production
+            Log.e(AppConfig.TAG, "Failed to initialize OpenCV!")
+            // Consider showing a user-friendly message or disabling features if OpenCV is crucial
+        } else {
+            Log.i(AppConfig.TAG, "OpenCV initialized successfully.")
+        }
     }
 }

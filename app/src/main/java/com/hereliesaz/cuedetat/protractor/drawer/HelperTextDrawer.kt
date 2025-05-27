@@ -2,23 +2,30 @@ package com.hereliesaz.cuedetat.protractor.drawer
 
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.PointF
 import android.graphics.RectF
 import com.hereliesaz.cuedetat.protractor.ProtractorConfig
 import com.hereliesaz.cuedetat.protractor.ProtractorPaints
 import com.hereliesaz.cuedetat.protractor.ProtractorState
 import com.hereliesaz.cuedetat.protractor.drawer.element.ProtractorPlaneTextDrawer
 import com.hereliesaz.cuedetat.protractor.drawer.element.ScreenSpaceTextDrawer
+import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 class HelperTextDrawer(
     private val viewWidthProvider: () -> Int,
     private val viewHeightProvider: () -> Int
 ) {
     private val drawnTextBounds = mutableListOf<RectF>()
+    private val MAX_NUDGE_ATTEMPTS = 5
+    private val NUDGE_DISTANCE_STEP = 30.0f // Temporarily increased from 15.0f
 
-    private val attemptTextDrawLambda: (Canvas, String, Float, Float, Paint, Float) -> Boolean =
-        { canvas, text, x, y, paint, rotationDegrees ->
-            attemptToDrawTextInternal(canvas, text, x, y, paint, rotationDegrees)
+    private val attemptTextDrawLambda: (canvas: Canvas, text: String, x: Float, y: Float, paint: Paint, rotationDegrees: Float, targetCenter: PointF) -> Boolean =
+        { canvas, text, x, y, paint, rotationDegrees, targetCenter ->
+            attemptToDrawTextWithNudging(canvas, text, x, y, paint, rotationDegrees, targetCenter)
         }
 
     private val planeTextDrawer = ProtractorPlaneTextDrawer(attemptTextDrawLambda, viewWidthProvider, viewHeightProvider)
@@ -28,44 +35,45 @@ class HelperTextDrawer(
         drawnTextBounds.clear()
     }
 
-    private fun attemptToDrawTextInternal(canvas: Canvas, text: String, x: Float, y: Float, paint: Paint, rotationDegrees: Float = 0f): Boolean {
+    private fun calculateBounds(text: String, currentX: Float, currentY: Float, paint: Paint, rotationDegrees: Float): RectF {
         val lines = text.split('\n')
         val textWidth = lines.maxOfOrNull { paint.measureText(it) } ?: 0f
         val lineHeight = paint.descent() - paint.ascent()
         val textHeight = lineHeight * lines.size + (paint.fontSpacing - lineHeight) * (lines.size -1).coerceAtLeast(0)
 
-        val bounds: RectF
-        if (rotationDegrees == 0f) {
-            var top = y + paint.ascent()
-            var bottom = y + paint.descent()
+        return if (rotationDegrees == 0f) {
+            var top = currentY + paint.ascent()
+            var bottom = currentY + paint.descent()
             if (lines.size > 1) {
                 if (paint.textAlign == Paint.Align.CENTER) {
-                    val blockTop = y - (textHeight / 2f) + lineHeight - paint.descent()
-                    top = blockTop + paint.ascent()
-                    bottom = blockTop + textHeight - lineHeight + paint.descent()
+                    val blockTop = currentY - (textHeight / 2f)
+                    top = blockTop
+                    bottom = blockTop + textHeight
                 } else {
-                    top = y + paint.ascent()
-                    bottom = y + textHeight - lineHeight + paint.descent()
+                    top = currentY + paint.ascent()
+                    bottom = currentY + (textHeight - lineHeight) + paint.descent()
                 }
             }
-            bounds = when (paint.textAlign) {
-                Paint.Align.CENTER -> RectF(x - textWidth / 2, top, x + textWidth / 2, bottom)
-                Paint.Align.LEFT -> RectF(x, top, x + textWidth, bottom)
-                Paint.Align.RIGHT -> RectF(x - textWidth, top, x, bottom)
-                else -> RectF(x,y,x,y)
+            when (paint.textAlign) {
+                Paint.Align.CENTER -> RectF(currentX - textWidth / 2, top, currentX + textWidth / 2, bottom)
+                Paint.Align.LEFT -> RectF(currentX, top, currentX + textWidth, bottom)
+                Paint.Align.RIGHT -> RectF(currentX - textWidth, top, currentX, bottom)
+                else -> RectF(currentX, currentY, currentX, currentY)
             }
         } else {
-            val maxDim = max(textWidth, textHeight) * 1.3f
-            bounds = RectF(x - maxDim / 2, y - maxDim / 2, x + maxDim / 2, y + maxDim / 2)
+            val maxDim = max(textWidth, textHeight) * 1.4f
+            RectF(currentX - maxDim / 2, currentY - maxDim / 2, currentX + maxDim / 2, currentY + maxDim / 2)
         }
+    }
 
-        for (existingBound in drawnTextBounds) {
-            if (RectF.intersects(bounds, existingBound)) { return false }
-        }
+    private fun drawTextAtPosition(canvas: Canvas, text: String, x: Float, y: Float, paint: Paint, rotationDegrees: Float) {
+        val lines = text.split('\n')
+        val lineHeight = paint.descent() - paint.ascent()
+        val textHeight = lineHeight * lines.size + (paint.fontSpacing - lineHeight) * (lines.size -1).coerceAtLeast(0)
 
         if (rotationDegrees != 0f) {
             canvas.save()
-            canvas.translate(x,y)
+            canvas.translate(x, y)
             canvas.rotate(rotationDegrees)
             var lineOffsetY = -(textHeight / 2f) + (lineHeight / 2f)
             lines.forEach { line ->
@@ -82,13 +90,56 @@ class HelperTextDrawer(
         } else {
             var currentYBaseline = y
             if (lines.size > 1 && paint.textAlign == Paint.Align.CENTER) {
-                currentYBaseline = y - (textHeight / 2f) + (lineHeight / 2f) - paint.ascent()
+                currentYBaseline = (y - textHeight / 2f) - paint.ascent()
             }
             lines.forEachIndexed { index, line ->
-                canvas.drawText(line, x, currentYBaseline + index * paint.fontSpacing, paint)
+                val actualDrawY = if (index == 0) currentYBaseline else currentYBaseline + (index * paint.fontSpacing)
+                canvas.drawText(line, x, actualDrawY, paint)
             }
         }
-        drawnTextBounds.add(bounds)
+    }
+
+    private fun attemptToDrawTextWithNudging(
+        canvas: Canvas, text: String,
+        preferredX: Float, preferredY: Float,
+        paint: Paint, rotationDegrees: Float,
+        targetCenter: PointF
+    ): Boolean {
+        var currentX = preferredX
+        var currentY = preferredY
+        var currentBounds: RectF
+
+        for (attempt in 0..MAX_NUDGE_ATTEMPTS) {
+            currentBounds = calculateBounds(text, currentX, currentY, paint, rotationDegrees)
+            var collisionDetected = false
+            for (existingBound in drawnTextBounds) {
+                if (RectF.intersects(currentBounds, existingBound)) {
+                    collisionDetected = true
+                    break
+                }
+            }
+
+            if (!collisionDetected) {
+                drawTextAtPosition(canvas, text, currentX, currentY, paint, rotationDegrees)
+                drawnTextBounds.add(currentBounds)
+                return true
+            }
+
+            if (attempt < MAX_NUDGE_ATTEMPTS) {
+                val dx = currentX - targetCenter.x
+                val dy = currentY - targetCenter.y
+                val dist = sqrt(dx * dx + dy * dy)
+                if (dist > 0.01f) {
+                    currentX += (dx / dist) * NUDGE_DISTANCE_STEP
+                    currentY += (dy / dist) * NUDGE_DISTANCE_STEP
+                } else {
+                    currentY -= NUDGE_DISTANCE_STEP
+                }
+            }
+        }
+        currentBounds = calculateBounds(text, currentX, currentY, paint, rotationDegrees)
+        drawTextAtPosition(canvas, text, currentX, currentY, paint, rotationDegrees)
+        drawnTextBounds.add(currentBounds)
         return true
     }
 
@@ -98,20 +149,16 @@ class HelperTextDrawer(
         aimLineNormDirX: Float, aimLineNormDirY: Float,
         deflectionVectorX: Float, deflectionVectorY: Float
     ) {
-        if (!state.areTextLabelsVisible) return // This guard is now primarily for non-warning plane text
         planeTextDrawer.draw(canvas, state, paints, config, aimLineStartX, aimLineStartY, aimLineCueX, aimLineCueY, aimLineNormDirX, aimLineNormDirY, deflectionVectorX, deflectionVectorY)
     }
 
-    // Update signature here
     fun drawScreenSpace(
         canvas: Canvas, state: ProtractorState, paints: ProtractorPaints, config: ProtractorConfig,
         targetGhostCenterX: Float, targetGhostCenterY: Float, targetGhostRadius: Float,
         cueGhostCenterX: Float, cueGhostCenterY: Float, cueGhostRadius: Float,
         isShotCurrentlyInvalid: Boolean,
-        warningToDisplay: String? // Added parameter
+        warningToDisplay: String?
     ) {
-        // The ScreenSpaceTextDrawer.draw method itself will check state.areTextLabelsVisible
-        // for its non-warning components, and warningToDisplay for the warning.
         screenSpaceTextDrawer.draw(
             canvas, state, paints, config,
             targetGhostCenterX, targetGhostCenterY, targetGhostRadius,

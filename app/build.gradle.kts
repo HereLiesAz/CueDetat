@@ -1,3 +1,4 @@
+// app/build.gradle.kts
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -84,4 +85,6 @@ dependencies {
     implementation(libs.androidx.foundation)
     // ... other compose dependencies
 
+    // OpenCV Library for ball detection
+    implementation("org.opencv:opencv-android:4.9.0") // Using version 4.9.0, adjust as needed
 }

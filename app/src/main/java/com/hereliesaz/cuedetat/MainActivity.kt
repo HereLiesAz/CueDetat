@@ -1,15 +1,40 @@
+// app/src/main/java/com/hereliesaz/cuedetat/MainActivity.kt
 package com.hereliesaz.cuedetat
 
+/**
+ * **DEVELOPER NOTE (MANDATORY - READ AND ADHERE):**
+ *
+ * ALL DISTINCT PIECES OF LOGIC, ALGORITHMS, OR SIGNIFICANT HELPER FUNCTIONALITIES
+ * MUST BE EXTRACTED INTO THEIR OWN DEDICATED FILES. THESE FILES SHOULD RESIDE
+ * WITHIN APPROPRIATELY NAMED DIRECTORIES/PACKAGES THAT REFLECT THEIR PURPOSE.
+ *
+ * DO NOT ADD COMPLEX, REUSABLE, OR SUBSTANTIAL LOGIC BLOCKS AS PRIVATE METHODS
+ * WITHIN THIS ACTIVITY OR OTHER LARGE CLASSES (e.g., MainOverlayView) IF THEY
+ * CAN BE PROPERLY MODULARIZED.
+ *
+ * THE GOAL IS SINGLE RESPONSIBILITY AND HIGH COHESION AT THE FILE LEVEL.
+ * THIS PRINCIPLE APPLIES RETROACTIVELY TO ANY EXISTING LOGIC THAT HAS NOT YET
+ * BEEN MODULARIZED AND IS A STRICT REQUIREMENT FOR ALL FUTURE DEVELOPMENT.
+ *
+ * MAKE LOGIC:
+ * 1. OBVIOUS IN ITS LOCATION.
+ * 2. EASILY FINDABLE.
+ * 3. MODULAR AND INDEPENDENT WHERE POSSIBLE.
+ *
+ * THE ZoomSliderLogic.kt FILE IS AN EXAMPLE OF THIS PRINCIPLE IN ACTION.
+ * ALL SIMILARLY COMPLEX OR DISTINCT LOGIC SETS MUST FOLLOW THIS PATTERN.
+ * FAILURE TO DO SO WILL RESULT IN CODE REJECTION/REWORK.
+ */
+
 import android.content.res.Resources
-import android.app.Application
 import android.os.Bundle
 import android.util.Log
-import android.view.View // Import View for visibility
+import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.ImageView // Import ImageView
+import android.widget.ImageView
 import android.widget.SeekBar
-import android.widget.TextView // Import TextView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.view.PreviewView
@@ -17,69 +42,62 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.ComposeView
 import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.core.content.res.ResourcesCompat // Import for font loading
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.updatePadding
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import com.hereliesaz.cuedetat.protractor.ProtractorOverlayView
+import com.hereliesaz.cuedetat.config.AppConfig
+import com.hereliesaz.cuedetat.system.CameraManager // Use new CameraManager
+import com.hereliesaz.cuedetat.system.PitchSensor
 import com.hereliesaz.cuedetat.ui.theme.PoolProtractorTheme
-import com.hereliesaz.cuedetat.protractor.ProtractorConfig
-import com.hereliesaz.cuedetat.system.AppCameraManager
-import com.hereliesaz.cuedetat.system.DevicePitchSensor
-import com.hereliesaz.cuedetat.R
+import com.hereliesaz.cuedetat.view.MainOverlayView
+import com.hereliesaz.cuedetat.view.utility.ZoomSliderLogic
 import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.min
 
-class MainActivity : AppCompatActivity(), ProtractorOverlayView.ProtractorStateListener {
+class MainActivity : AppCompatActivity(), MainOverlayView.AppStateListener {
 
     private companion object {
-        private const val TAG = "PoolProtractorApp"
-        private const val USER_PREFERRED_MAX_ZOOM_FRACTION_OF_TOTAL_RANGE = 0.3f
-        private const val SLIDER_PROGRESS_DEDICATED_TO_PREFERRED_RANGE = 95.0f
+        private val TAG = AppConfig.TAG + "_MainActivity"
     }
 
     private lateinit var cameraPreviewView: PreviewView
-    private lateinit var protractorOverlayView: ProtractorOverlayView
+    private lateinit var mainOverlayView: MainOverlayView
     private lateinit var zoomSlider: SeekBar
     private lateinit var resetButton: FloatingActionButton
     private lateinit var zoomCycleButton: FloatingActionButton
     private lateinit var helpButton: FloatingActionButton
     private lateinit var controlsLayout: ConstraintLayout
 
-    // Title Views
     private lateinit var appTitleTextView: TextView
     private lateinit var appTitleLogoImageView: ImageView
 
-    private lateinit var appCameraManager: AppCameraManager
-    private lateinit var devicePitchSensor: DevicePitchSensor
+    private lateinit var cameraManager: CameraManager
+    private lateinit var pitchSensor: PitchSensor
 
     private var valuesChangedSinceLastReset = false
-    private var helpTextCurrentlyVisible = true // Track state for title toggling
+    private var helpTextCurrentlyVisible = true
 
     private enum class ZoomCycleState { MIN_ZOOM, MAX_ZOOM }
     private var nextZoomCycleState: ZoomCycleState = ZoomCycleState.MIN_ZOOM
-
-    private val totalZoomFactorRange = ProtractorConfig.MAX_ZOOM_FACTOR - ProtractorConfig.MIN_ZOOM_FACTOR
-    private val sliderEffectiveMaxZoomFactor = ProtractorConfig.MIN_ZOOM_FACTOR + (totalZoomFactorRange * USER_PREFERRED_MAX_ZOOM_FRACTION_OF_TOTAL_RANGE)
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Configure window for full-screen immersive mode
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val windowInsetsController = WindowInsetsControllerCompat(window, window.decorView)
         windowInsetsController.hide(WindowInsetsCompat.Type.statusBars())
         windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) // Keep screen on
 
         setContentView(R.layout.activity_main)
-        findViewById<FrameLayout>(R.id.activity_main_root)
         controlsLayout = findViewById(R.id.controls_layout)
 
+        // Apply system bar insets as padding to the controls layout to avoid overlap
         ViewCompat.setOnApplyWindowInsetsListener(controlsLayout) { view, windowInsets ->
             val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
             view.updatePadding(
@@ -91,18 +109,17 @@ class MainActivity : AppCompatActivity(), ProtractorOverlayView.ProtractorStateL
             WindowInsetsCompat.CONSUMED
         }
 
+        // Initialize UI components
         cameraPreviewView = findViewById(R.id.cameraPreviewView)
-        protractorOverlayView = findViewById(R.id.protractorOverlayView)
+        mainOverlayView = findViewById(R.id.protractorOverlayView)
         zoomSlider = findViewById(R.id.zoomSlider)
         resetButton = findViewById(R.id.resetButton)
         zoomCycleButton = findViewById(R.id.zoomCycleButton)
         helpButton = findViewById(R.id.helpButton)
-
-        // Initialize Title Views
         appTitleTextView = findViewById(R.id.appTitleTextView)
         appTitleLogoImageView = findViewById(R.id.appTitleLogoImageView)
 
-        // Apply custom font to TextView title
+        // Set custom font for the app title
         try {
             val archivoBlackTypeface = ResourcesCompat.getFont(this, R.font.archivo_black_regular)
             appTitleTextView.typeface = archivoBlackTypeface
@@ -110,93 +127,66 @@ class MainActivity : AppCompatActivity(), ProtractorOverlayView.ProtractorStateL
             Log.e(TAG, "Archivo Black font not found for title, using default.", e)
         }
 
+        mainOverlayView.listener = this // Set MainActivity as the listener for MainOverlayView events
+        helpTextCurrentlyVisible = mainOverlayView.getAreHelperTextsVisible() // Get initial visibility state
+        updateTitleVisibility() // Update title/logo based on initial visibility
 
-        protractorOverlayView.listener = this
-        helpTextCurrentlyVisible = protractorOverlayView.getAreTextLabelsVisible() // Sync initial state
-        updateTitleVisibility() // Set initial title/logo state
+        // Initialize CameraManager and PitchSensor
+        cameraManager = CameraManager(this, this, cameraPreviewView, mainOverlayView) // Pass mainOverlayView for camera frames
+        pitchSensor = PitchSensor(
+            this,
+            AppConfig.FORWARD_TILT_AS_FLAT_OFFSET_DEGREES, // Use offset from AppConfig
+            { pitchAngle ->
+                mainOverlayView.setDevicePitchAngle(pitchAngle) // Update overlay with pitch angle
+            }
+        )
 
-        appCameraManager = AppCameraManager(this, this, cameraPreviewView)
-        devicePitchSensor = DevicePitchSensor(this) { pitchAngle ->
-            protractorOverlayView.setPitchAngle(pitchAngle)
-        }
-
+        // Setup ComposeView for Material 3 theming (colors applied to legacy View system)
         val composeViewForTheme = findViewById<ComposeView>(R.id.composeThemeView)
         composeViewForTheme.setContent {
             PoolProtractorTheme {
                 val currentColorScheme = MaterialTheme.colorScheme
                 SideEffect {
-                    protractorOverlayView.applyMaterialYouColors(currentColorScheme)
+                    // Pass the current Material 3 color scheme to the custom view for its paints
+                    mainOverlayView.applyMaterialYouColors(currentColorScheme)
                 }
             }
         }
 
-        appCameraManager.checkPermissionsAndSetupCamera()
-        setupControls()
+        cameraManager.checkPermissionsAndSetupCamera() // Request camera permissions and start camera
+        setupControls() // Set up UI control listeners
     }
 
-    private fun convertSliderProgressToZoomFactor(progressInt: Int): Float {
-        val progress = progressInt.toFloat()
-        val targetZoom: Float
-
-        if (progress <= SLIDER_PROGRESS_DEDICATED_TO_PREFERRED_RANGE) {
-            val t = if (SLIDER_PROGRESS_DEDICATED_TO_PREFERRED_RANGE == 0f) {
-                if (progress == 0f) 0f else 1f
-            } else {
-                progress / SLIDER_PROGRESS_DEDICATED_TO_PREFERRED_RANGE
-            }
-            val preferredZoomRange = sliderEffectiveMaxZoomFactor - ProtractorConfig.MIN_ZOOM_FACTOR
-            targetZoom = ProtractorConfig.MIN_ZOOM_FACTOR + t * preferredZoomRange
-        } else {
-            targetZoom = sliderEffectiveMaxZoomFactor
-        }
-        return targetZoom.coerceIn(ProtractorConfig.MIN_ZOOM_FACTOR, max(sliderEffectiveMaxZoomFactor, ProtractorConfig.MIN_ZOOM_FACTOR))
-    }
-
-    private fun convertZoomFactorToSliderProgress(zoomFactorVal: Float): Int {
-        val currentZoomFactor = zoomFactorVal.coerceIn(ProtractorConfig.MIN_ZOOM_FACTOR, ProtractorConfig.MAX_ZOOM_FACTOR)
-        val progress: Int
-
-        if (currentZoomFactor <= sliderEffectiveMaxZoomFactor) {
-            val preferredZoomRange = sliderEffectiveMaxZoomFactor - ProtractorConfig.MIN_ZOOM_FACTOR
-            val t = if (preferredZoomRange <= 0.0001f) {
-                if (currentZoomFactor <= ProtractorConfig.MIN_ZOOM_FACTOR + 0.00005f) 0f else 1f
-            } else {
-                (currentZoomFactor - ProtractorConfig.MIN_ZOOM_FACTOR) / preferredZoomRange
-            }
-            progress = (t * SLIDER_PROGRESS_DEDICATED_TO_PREFERRED_RANGE).toInt()
-        } else {
-            progress = 100
-        }
-        return progress.coerceIn(0, 100)
-    }
-
-
+    /**
+     * Configures listeners for UI controls (zoom slider, buttons).
+     */
     private fun setupControls() {
-        updateZoomSliderFromFactor(protractorOverlayView.getZoomFactor())
+        updateZoomSliderFromFactor(mainOverlayView.getZoomFactor()) // Sync slider with initial zoom
 
         zoomSlider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
-                    val zoomValue = convertSliderProgressToZoomFactor(progress)
-                    protractorOverlayView.setZoomFactor(zoomValue)
-                    nextZoomCycleState = ZoomCycleState.MIN_ZOOM
-                    onUserInteraction()
+                    val zoomValue = ZoomSliderLogic.convertSliderProgressToZoomFactor(progress)
+                    mainOverlayView.setZoomFactor(zoomValue)
+                    nextZoomCycleState = ZoomCycleState.MIN_ZOOM // Reset cycle state when slider is used
                 }
             }
-            override fun onStartTrackingTouch(seekBar: SeekBar) {}
+            override fun onStartTrackingTouch(seekBar: SeekBar) {
+                this@MainActivity.onUserInteraction() // Notify of user interaction
+            }
             override fun onStopTrackingTouch(seekBar: SeekBar) {}
         })
 
         resetButton.setOnClickListener { handleResetAction() }
         helpButton.setOnClickListener {
-            protractorOverlayView.toggleHelpersVisibility()
-            helpTextCurrentlyVisible = protractorOverlayView.getAreTextLabelsVisible() // Update local state
-            updateTitleVisibility() // Toggle title/logo
-            onUserInteraction() // General interaction
+            mainOverlayView.toggleHelperTextVisibility() // Toggle visibility via overlay view
         }
         zoomCycleButton.setOnClickListener { handleZoomCycleAction() }
     }
 
+    /**
+     * Updates the visibility of the app title text or logo based on helper text visibility.
+     */
     private fun updateTitleVisibility() {
         if (helpTextCurrentlyVisible) {
             appTitleTextView.visibility = View.VISIBLE
@@ -207,61 +197,95 @@ class MainActivity : AppCompatActivity(), ProtractorOverlayView.ProtractorStateL
         }
     }
 
-
+    /**
+     * Handles cycling through predefined zoom levels (min/max).
+     */
     private fun handleZoomCycleAction() {
-        when (nextZoomCycleState) {
+        val targetZoom = when (nextZoomCycleState) {
             ZoomCycleState.MIN_ZOOM -> {
-                protractorOverlayView.setZoomFactor(ProtractorConfig.MIN_ZOOM_FACTOR)
                 nextZoomCycleState = ZoomCycleState.MAX_ZOOM
+                AppConfig.MIN_ZOOM_FACTOR
             }
             ZoomCycleState.MAX_ZOOM -> {
-                protractorOverlayView.setZoomFactor(ProtractorConfig.MAX_ZOOM_FACTOR)
                 nextZoomCycleState = ZoomCycleState.MIN_ZOOM
+                AppConfig.MAX_ZOOM_FACTOR
             }
         }
-        onUserInteraction()
+        mainOverlayView.setZoomFactor(targetZoom) // Set zoom via overlay view
     }
 
-
+    /**
+     * Resets the overlay view to its default interaction state.
+     */
     private fun handleResetAction() {
-        protractorOverlayView.resetToDefaults()
-        helpTextCurrentlyVisible = protractorOverlayView.getAreTextLabelsVisible() // Reset visibility state
-        updateTitleVisibility() // Update title based on reset state
-        nextZoomCycleState = ZoomCycleState.MIN_ZOOM
+        mainOverlayView.resetInteractionsToDefaults() // Reset view state
+        nextZoomCycleState = ZoomCycleState.MIN_ZOOM // Reset zoom cycle state
         Toast.makeText(this, "View reset to defaults", Toast.LENGTH_SHORT).show()
-        valuesChangedSinceLastReset = false
     }
+
+    // --- MainOverlayView.AppStateListener implementations ---
 
     override fun onZoomChanged(newZoomFactor: Float) {
-        updateZoomSliderFromFactor(newZoomFactor)
-        if (abs(newZoomFactor - ProtractorConfig.MIN_ZOOM_FACTOR) < 0.01f) {
+        updateZoomSliderFromFactor(newZoomFactor) // Sync slider with new zoom
+        // Update zoom cycle state based on current zoom factor
+        if (abs(newZoomFactor - AppConfig.MIN_ZOOM_FACTOR) < 0.01f) {
             nextZoomCycleState = ZoomCycleState.MAX_ZOOM
-        } else if (abs(newZoomFactor - ProtractorConfig.MAX_ZOOM_FACTOR) < 0.01f) {
+        } else if (abs(newZoomFactor - AppConfig.MAX_ZOOM_FACTOR) < 0.01f) {
             nextZoomCycleState = ZoomCycleState.MIN_ZOOM
         }
-        onUserInteraction()
+        valuesChangedSinceLastReset = true // Mark that user interaction occurred
     }
 
     override fun onRotationChanged(newRotationAngle: Float) {
-        onUserInteraction()
+        valuesChangedSinceLastReset = true // Mark that user interaction occurred
     }
 
     override fun onUserInteraction() {
-        valuesChangedSinceLastReset = true
+        valuesChangedSinceLastReset = true // Mark that user interaction occurred
+        // Check if helper text visibility changed and update title
+        val currentOverlayVisibility = mainOverlayView.getAreHelperTextsVisible()
+        if (helpTextCurrentlyVisible != currentOverlayVisibility) {
+            helpTextCurrentlyVisible = currentOverlayVisibility
+            updateTitleVisibility()
+        }
     }
 
+    /**
+     * New listener callback for when a target ball is selected or deselected.
+     * @param ballId The ID of the selected ball, or null if deselected.
+     */
+    override fun onTargetBallSelected(ballId: String?) {
+        val message = if (ballId != null) "Target ball selected: $ballId" else "Target ball deselected."
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * Updates the zoom slider's progress based on a given zoom factor.
+     * @param factor The zoom factor to convert to slider progress.
+     */
     private fun updateZoomSliderFromFactor(factor: Float) {
-        val progress = convertZoomFactorToSliderProgress(factor)
-        zoomSlider.progress = progress
+        val progress = ZoomSliderLogic.convertZoomFactorToSliderProgress(factor)
+        // Only update if different to avoid infinite loops with onProgressChanged
+        if (zoomSlider.progress != progress) {
+            zoomSlider.progress = progress
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        devicePitchSensor.register()
+        pitchSensor.register() // Register pitch sensor listener
+        Log.d(TAG, "MainActivity onResume, PitchSensor registered.")
     }
 
     override fun onPause() {
         super.onPause()
-        devicePitchSensor.unregister()
+        pitchSensor.unregister() // Unregister pitch sensor listener
+        Log.d(TAG, "MainActivity onPause, PitchSensor unregistered.")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        cameraManager.shutdown() // Ensure camera resources are released
+        Log.d(TAG, "MainActivity onDestroy, CameraManager shutdown.")
     }
 }
