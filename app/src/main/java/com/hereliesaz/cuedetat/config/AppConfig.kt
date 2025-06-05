@@ -40,7 +40,7 @@ object AppConfig {
     const val TEXT_MIN_SCALE_FACTOR = 0.65f
     const val TEXT_MAX_SCALE_FACTOR = 1.5f
 
-    // New: Default helper text color ARGB value
+    // Default helper text color ARGB value
     const val DEFAULT_HELP_TEXT_COLOR_ARGB = 0xFFD1C4E9.toInt()
 
     // Paint Stroke Widths
@@ -61,6 +61,12 @@ object AppConfig {
     const val CURVE_CONTROL_POINT_FACTOR = 0.6f // Controls "bow" (0.0-1.0)
     const val PATH_DRAW_LENGTH_FACTOR = 0.7f    // Length of paths relative to deflection line length
     const val PATH_OPACITY_ALPHA = 180          // Opacity for these paths
+
+    // GitHub Release Updater Configuration
+    const val GITHUB_REPO_OWNER = "HereLiesAz" // Updated to match the provided URL
+    const val GITHUB_REPO_NAME = "CueDetat" // Updated to match the provided URL
+    const val GITHUB_RELEASE_ASSET_NAME_REGEX = ".*\\.apk" // Regex to match your APK asset name
+
 
     // Warning Strings
     const val WARNING_MRS_CALLED = "Your Mrs. called, she wants her title back."

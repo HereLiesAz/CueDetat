@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Define external-files-path for downloading APKs to app-specific external storage -->
+    <external-files-path name="updates" path="updates/" />
+    <!-- Using "files-path" if you prefer internal storage:
+    <files-path name="updates" path="updates/" />
+    -->
+</paths>

@@ -15,8 +15,8 @@ android {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 3 // THIS IS YOUR APP'S CURRENT VERSION CODE
+        versionName = "0.3.1" // THIS IS YOUR APP'S CURRENT VERSION NAME
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -85,4 +85,8 @@ dependencies {
     implementation(libs.androidx.activity.compose)
 
     implementation(libs.object1.detection) // ML Kit Object Detection Dependency
+
+    // For GitHubUpdater - OkHttp for network requests, and JSON parsing
+    implementation(libs.okhttp) // Using a recent stable version
+    implementation(libs.json) // For JSONObject
 }
