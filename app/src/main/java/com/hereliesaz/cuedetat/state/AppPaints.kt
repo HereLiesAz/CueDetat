@@ -1,4 +1,3 @@
-// FILE: app\src\main\java\com\hereliesaz\cuedetat\state\AppPaints.kt
 package com.hereliesaz.cuedetat.state
 
 import android.content.Context
@@ -41,9 +40,20 @@ class AppPaints(private val context: Context, private val config: AppConfig) {
     val shotGuideNearPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = config.STROKE_AIM_LINE_NEAR }
     val shotGuideFarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = config.STROKE_AIM_LINE_FAR }
 
-    val ghostCueOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = config.STROKE_GHOST_BALL_OUTLINE }
-    val ghostTargetOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = config.STROKE_GHOST_BALL_OUTLINE }
-    val ghostCueAimingSightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = config.STROKE_AIMING_SIGHT; style = Paint.Style.STROKE }
+    // Paints for the actual ball overlays (draggable, with sight on cue)
+    val actualCueBallOverlayOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = config.STROKE_MAIN_CIRCLES }
+    val actualCueBallAimingSightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = config.STROKE_AIMING_SIGHT; style = Paint.Style.STROKE }
+    val actualTargetBallOverlayOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = config.STROKE_MAIN_CIRCLES }
+
+    // Removed: Floating ghost ball paints are no longer needed here
+
+
+    // Paint for indicating detected but unselected balls
+    val detectedBallOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 3f // Can be a config constant
+        color = AppPurple.toArgb() // A neutral color
+    }
 
     // Corrected paint names for Follow and Draw paths
     val followPathPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -68,18 +78,17 @@ class AppPaints(private val context: Context, private val config: AppConfig) {
     val ghostCueNamePaint = createBaseHelperTextPaint().apply { color = AppHelpTextGhostBallLabel.toArgb() }
     val fitTargetInstructionPaint = createBaseHelperTextPaint().apply { color = AppHelpTextYellow.toArgb(); textAlign = Paint.Align.LEFT }
     val placeCueInstructionPaint = createBaseHelperTextPaint().apply { color = AppHelpTextPocketAim.toArgb() }
-    // Update these two lines to use the AppConfig constant
     val panHintPaint = createBaseHelperTextPaint().apply { color = AndroidColor.argb(
-        AndroidColor.alpha(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
-        AndroidColor.red(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
-        AndroidColor.green(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
-        AndroidColor.blue(config.DEFAULT_HELP_TEXT_COLOR_ARGB)
+        AndroidColor.alpha(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.red(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.green(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.blue(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB)
     ); textAlign = Paint.Align.LEFT }
     val pinchHintPaint = createBaseHelperTextPaint().apply { color = AndroidColor.argb(
-        AndroidColor.alpha(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
-        AndroidColor.red(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
-        AndroidColor.green(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
-        AndroidColor.blue(config.DEFAULT_HELP_TEXT_COLOR_ARGB)
+        AndroidColor.alpha(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.red(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.green(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.blue(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB)
     ); textAlign = Paint.Align.LEFT }
 
     // New instruction paint for selection modes
@@ -91,7 +100,7 @@ class AppPaints(private val context: Context, private val config: AppConfig) {
 
     init {
         targetCirclePaint.color = AppYellow.toArgb()
-        cueCirclePaint.color = AppWhite.toArgb()
+        cueCirclePaint.color = AppWhite.toArgb() // This is for the *logical* cue ball on the plane
         centerMarkPaint.color = AppBlack.toArgb()
         protractorAngleLinePaint.color = AppMediumGray.toArgb()
         targetLineGuidePaint.color = AppYellow.toArgb()
@@ -99,9 +108,13 @@ class AppPaints(private val context: Context, private val config: AppConfig) {
         deflectionSolidPaint.color = AppWhite.toArgb()
         shotGuideNearPaint.color = AppWhite.toArgb()
         shotGuideFarPaint.color = AppPurple.toArgb()
-        ghostTargetOutlinePaint.color = AppYellow.toArgb()
-        ghostCueOutlinePaint.color = AppWhite.toArgb()
-        ghostCueAimingSightPaint.color = AppYellow.toArgb()
+
+        // Colors for the *actual* cue ball overlay and its aiming sight
+        actualCueBallOverlayOutlinePaint.color = AppWhite.toArgb()
+        actualCueBallAimingSightPaint.color = AppYellow.toArgb()
+        // Color for the *actual* target ball overlay
+        actualTargetBallOverlayOutlinePaint.color = AppYellow.toArgb()
+
 
         // Using AppConfig constants for opacity
         val followColorRGB = AppErrorRed.toArgb()
@@ -135,11 +148,17 @@ class AppPaints(private val context: Context, private val config: AppConfig) {
         invalidShotWarningPaint.setShadowLayer(3f, 2f, 2f, M3_TEXT_SHADOW_COLOR)
 
         // Update Follow/Draw path colors if they should be themed, using config.PATH_OPACITY_ALPHA
-        // Example: Using M3 secondary and tertiary
-        val themedFollowColor = colorScheme.secondary.toArgb() // Or error, etc.
+        val themedFollowColor = colorScheme.secondary.toArgb()
         followPathPaint.color = AndroidColor.argb(config.PATH_OPACITY_ALPHA, AndroidColor.red(themedFollowColor), AndroidColor.green(themedFollowColor), AndroidColor.blue(themedFollowColor))
-        val themedDrawColor = colorScheme.tertiary.toArgb() // Or primary, etc.
+        val themedDrawColor = colorScheme.tertiary.toArgb()
         drawPathPaint.color = AndroidColor.argb(config.PATH_OPACITY_ALPHA, AndroidColor.red(themedDrawColor), AndroidColor.green(themedDrawColor), AndroidColor.blue(themedDrawColor))
+
+        // Update actual cue/target ball overlay paints based on theme
+        actualCueBallOverlayOutlinePaint.color = colorScheme.onBackground.toArgb() // White on yellow background
+        actualCueBallAimingSightPaint.color = colorScheme.onSurface.toArgb() // Black on yellow surface
+        actualTargetBallOverlayOutlinePaint.color = colorScheme.onSurface.toArgb() // Black on yellow surface
+
+        // Removed: Floating ghost ball paints
     }
     fun resetDynamicPaintProperties() {
         targetLineGuidePaint.apply { strokeWidth = config.STROKE_TARGET_LINE_GUIDE; color = AppYellow.toArgb(); clearShadowLayer() }

@@ -54,7 +54,7 @@ class TangentLineTextDrawer(private val textLayoutHelper: TextLayoutHelper) {
 
         val angleRad = atan2(chosenVectorY, chosenVectorX)
         val rotationDegrees = getReadableRotation(Math.toDegrees(angleRad.toDouble()).toFloat())
-        val distance = appState.currentLogicalRadius * 3.4f // Keep consistent distance
+        val distance = (appState.logicalBallRadius * appState.zoomFactor) * 3.4f // Use logicalBallRadius and scale by zoomFactor
 
         val preferredX = appState.cueCircleCenter.x + cos(angleRad) * distance
         val preferredY = appState.cueCircleCenter.y + sin(angleRad) * distance

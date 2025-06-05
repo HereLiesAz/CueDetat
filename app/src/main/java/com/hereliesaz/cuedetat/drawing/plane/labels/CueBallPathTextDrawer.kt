@@ -54,7 +54,7 @@ class CueBallPathTextDrawer(private val textLayoutHelper: TextLayoutHelper) {
         val angleRad = atan2(chosenVectorY, chosenVectorX)
         // Cue Ball Path is intrinsically flipped, then made readable
         val rotationDegrees = getReadableRotation(Math.toDegrees(angleRad.toDouble()).toFloat() + 180f)
-        val distance = appState.currentLogicalRadius * 3.4f
+        val distance = (appState.logicalBallRadius * appState.zoomFactor) * 3.4f // Use logicalBallRadius and scale by zoomFactor
 
         val preferredX = appState.cueCircleCenter.x + cos(angleRad) * distance
         val preferredY = appState.cueCircleCenter.y + sin(angleRad) * distance

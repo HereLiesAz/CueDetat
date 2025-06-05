@@ -2,172 +2,177 @@ package com.hereliesaz.cuedetat.geometry
 
 import android.graphics.Matrix
 import android.graphics.PointF
-import com.hereliesaz.cuedetat.state.AppState // Using new AppState
-import com.hereliesaz.cuedetat.geometry.models.* // Import new data models
-import kotlin.math.max
-import kotlin.math.pow
-import kotlin.math.sqrt
+import com.hereliesaz.cuedetat.geometry.models.AimingLineLogicalCoords
+import com.hereliesaz.cuedetat.geometry.models.DeflectionLineParams
+import com.hereliesaz.cuedetat.geometry.models.ActualBallOverlayCoords
+import com.hereliesaz.cuedetat.state.AppState
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.min
+import kotlin.math.sin
 
 class GeometryCalculator(
     private val viewWidthProvider: () -> Int,
     private val viewHeightProvider: () -> Int
 ) {
+    /**
+     * Calculates the screen coordinates and radius for the visual overlays that are drawn
+     * *on top of the actual detected/manual balls* visible through the camera feed.
+     * The radii of these overlays will be `appState.logicalBallRadius` (unscaled) for consistent sizing.
+     */
+    fun calculateActualBallOverlayCoords(appState: AppState): ActualBallOverlayCoords {
+        // For the overlay on the *actual* target ball, use its tracked/manual position.
+        // Its visual radius should be the same as the logical radius for consistency.
+        val targetOverlayX = appState.selectedTargetBall?.x ?: appState.targetCircleCenter.x
+        val targetOverlayY = appState.selectedTargetBall?.y ?: appState.targetCircleCenter.y
+        val targetOverlayRadius = appState.logicalBallRadius // Force to logical radius
 
-    // Helper to map a single logical point to screen/projected space using a given matrix
-    private fun mapPoint(logicalPoint: PointF, matrixToUse: Matrix): PointF {
-        val pointArray = floatArrayOf(logicalPoint.x, logicalPoint.y)
-        matrixToUse.mapPoints(pointArray)
-        return PointF(pointArray[0], pointArray[1])
-    }
+        // For the overlay on the *actual* cue ball, use its tracked/manual position.
+        // Its visual radius should be the same as the logical radius for consistency.
+        val cueOverlayX = appState.selectedCueBall?.x ?: appState.cueCircleCenter.x
+        val cueOverlayY = appState.selectedCueBall?.y ?: appState.cueCircleCenter.y
+        val cueOverlayRadius = appState.logicalBallRadius // Force to logical radius
 
-    // Calculates Euclidean distance between two PointF objects
-    fun distance(p1: PointF, p2: PointF): Float {
-        val dx = (p1.x - p2.x).toDouble()
-        val dy = (p1.y - p2.y).toDouble()
-        return sqrt(dx.pow(2) + dy.pow(2)).toFloat()
-    }
-
-    // Calculates Euclidean distance between two (x,y) pairs
-    private fun distance(x1: Float, y1: Float, x2: Float, y2: Float): Float {
-        val dx = (x1 - x2).toDouble()
-        val dy = (y1 - y2).toDouble()
-        return sqrt(dx.pow(2) + dy.pow(2)).toFloat()
-    }
-
-    // Calculates projected screen coordinates and radii for cue and target circles
-    fun calculateProjectedScreenData(appState: AppState): ProjectedCoords {
-        val targetProjectedCenter = mapPoint(appState.targetCircleCenter, appState.pitchMatrix)
-        val cueProjectedCenter = mapPoint(appState.cueCircleCenter, appState.pitchMatrix)
-
-        // To calculate screen radius, project 4 cardinal points of each logical circle's circumference
-        // and find the max distance between opposite projected points.
-        val logicalRadius = appState.currentLogicalRadius
-
-        // Target circle screen radius
-        val tL = mapPoint(PointF(appState.targetCircleCenter.x - logicalRadius, appState.targetCircleCenter.y), appState.pitchMatrix)
-        val tR = mapPoint(PointF(appState.targetCircleCenter.x + logicalRadius, appState.targetCircleCenter.y), appState.pitchMatrix)
-        val tT = mapPoint(PointF(appState.targetCircleCenter.x, appState.targetCircleCenter.y - logicalRadius), appState.pitchMatrix)
-        val tB = mapPoint(PointF(appState.targetCircleCenter.x, appState.targetCircleCenter.y + logicalRadius), appState.pitchMatrix)
-        val targetScreenRadius = max(distance(tL, tR), distance(tT, tB)) / 2f
-
-        // Cue circle screen radius
-        val cL = mapPoint(PointF(appState.cueCircleCenter.x - logicalRadius, appState.cueCircleCenter.y), appState.pitchMatrix)
-        val cR = mapPoint(PointF(appState.cueCircleCenter.x + logicalRadius, appState.cueCircleCenter.y), appState.pitchMatrix)
-        val cT = mapPoint(PointF(appState.cueCircleCenter.x, appState.cueCircleCenter.y - logicalRadius), appState.pitchMatrix)
-        val cB = mapPoint(PointF(appState.cueCircleCenter.x, appState.cueCircleCenter.y + logicalRadius), appState.pitchMatrix)
-        val cueScreenRadius = max(distance(cL, cR), distance(cT, cB)) / 2f
-
-        return ProjectedCoords(
-            targetProjected = targetProjectedCenter,
-            cueProjected = cueProjectedCenter,
-            targetScreenRadius = targetScreenRadius,
-            cueScreenRadius = cueScreenRadius
+        return ActualBallOverlayCoords(
+            actualTargetOverlayPosition = PointF(targetOverlayX, targetOverlayY),
+            actualCueOverlayPosition = PointF(cueOverlayX, cueOverlayY),
+            actualTargetOverlayRadius = targetOverlayRadius,
+            actualCueOverlayRadius = cueOverlayRadius
         )
     }
 
-    // Calculates the logical coordinates for the aiming line (shot guide)
-    // The aiming line now starts from the *tracked actual cue ball's screen position*
-    fun calculateAimingLineLogicalCoords(appState: AppState, hasInversePitchMatrix: Boolean): AimingLineLogicalCoords? {
-        if (!hasInversePitchMatrix || appState.selectedCueBallScreenCenter == null) return null
+    /**
+     * Calculates the logical coordinates for the main aiming line, which extends from the actual cue ball
+     * (if selected) to the ghost cue ball, and then projects indefinitely.
+     * The `startX, startY` in `AimingLineLogicalCoords` should be the actual cue ball's projected screen position.
+     * `cueX, cueY` is the logical ghost cue ball position.
+     */
+    fun calculateAimingLineLogicalCoords(appState: AppState, hasInversePitchMatrix: Boolean): AimingLineLogicalCoords {
+        val viewWidth = viewWidthProvider()
+        val viewHeight = viewHeightProvider()
 
-        // The start of the aiming line is the tracked actual cue ball's screen position
-        val actualCueScreenX = appState.selectedCueBallScreenCenter!!.x
-        val actualCueScreenY = appState.selectedCueBallScreenCenter!!.y
+        // Start point of the line: This is now taken directly from the selectedCueBall
+        val startX = appState.selectedCueBall?.x ?: (viewWidth / 2f)
+        val startY = appState.selectedCueBall?.y ?: (viewHeight * 0.9f) // Start near the bottom of the screen
 
-        // Map this screen point back to the logical protractor plane
-        val actualCuePointScreenCoords = floatArrayOf(actualCueScreenX, actualCueScreenY)
-        val actualCuePointLogicalCoordsArray = FloatArray(2)
-        appState.inversePitchMatrix.mapPoints(actualCuePointLogicalCoordsArray, actualCuePointScreenCoords)
-        val logicalStartX = actualCuePointLogicalCoordsArray[0]
-        val logicalStartY = actualCuePointLogicalCoordsArray[1]
+        val cueX = appState.cueCircleCenter.x
+        val cueY = appState.cueCircleCenter.y
 
-        // The line passes through the logical ghost cue ball position (appState.cueCircleCenter)
-        val logicalGhostCueX = appState.cueCircleCenter.x
-        val logicalGhostCueY = appState.cueCircleCenter.y
+        // Calculate the direction vector from the logical ghost cue ball (cueX, cueY) towards the logical target ball,
+        // and extend it far beyond the target.
+        val dx = appState.targetCircleCenter.x - cueX
+        val dy = appState.targetCircleCenter.y - cueY
 
-        val aimDirectionX = logicalGhostCueX - logicalStartX
-        val aimDirectionY = logicalGhostCueY - logicalStartY
-        val magnitudeSquared = aimDirectionX * aimDirectionX + aimDirectionY * aimDirectionY
+        val distance = hypot(dx, dy)
+        val normDirX = if (distance > 0) dx / distance else 0f
+        val normDirY = if (distance > 0) dy / distance else 0f
 
-        if (magnitudeSquared <= 0.0001f) { // Avoid division by zero or near-zero magnitude
-            return AimingLineLogicalCoords(logicalStartX, logicalStartY, logicalGhostCueX, logicalGhostCueY, logicalGhostCueX, logicalGhostCueY, 0f, 0f)
-        }
-
-        val magnitude = sqrt(magnitudeSquared)
-        val normalizedAimDirX = aimDirectionX / magnitude
-        val normalizedAimDirY = aimDirectionY / magnitude
-
-        // Extend the line far off-screen for drawing purposes
-        val extendLengthFactor = max(viewWidthProvider(), viewHeightProvider()) * 5f // Arbitrary large factor
-        val logicalEndX = logicalGhostCueX + normalizedAimDirX * extendLengthFactor
-        val logicalEndY = logicalGhostCueY + normalizedAimDirY * extendLengthFactor
+        // Extend the line to a point far off-screen
+        val lineExtensionLength = maxOf(viewWidth, viewHeight) * 1.5f // Extend far enough
+        val endX = cueX + normDirX * lineExtensionLength
+        val endY = cueY + normDirY * lineExtensionLength
 
         return AimingLineLogicalCoords(
-            startX = logicalStartX, startY = logicalStartY,
-            cueX = logicalGhostCueX, cueY = logicalGhostCueY, // cueX/Y here refers to the GHOST cue ball's position on the plane
-            endX = logicalEndX, endY = logicalEndY,
-            normDirX = normalizedAimDirX, normDirY = normalizedAimDirY
+            startX = startX,
+            startY = startY,
+            cueX = cueX,
+            cueY = cueY,
+            endX = endX,
+            endY = endY,
+            normDirX = normDirX,
+            normDirY = normDirY
         )
     }
 
-    // Calculates parameters for drawing deflection lines (tangent and cue ball path)
+    /**
+     * Calculates parameters for drawing the deflection lines.
+     * These lines extend perpendicularly from the cue-to-target line at the logical ghost cue ball.
+     */
     fun calculateDeflectionLineParams(appState: AppState): DeflectionLineParams {
-        val deltaX_CueToTarget = appState.targetCircleCenter.x - appState.cueCircleCenter.x
-        val deltaY_CueToTarget = appState.targetCircleCenter.y - appState.cueCircleCenter.y
-        val magnitude_CueToTarget = sqrt(deltaX_CueToTarget * deltaX_CueToTarget + deltaY_CueToTarget * deltaY_CueToTarget)
+        val cueCenterX = appState.cueCircleCenter.x
+        val cueCenterY = appState.cueCircleCenter.y
+        val targetCenterX = appState.targetCircleCenter.x
+        val targetCenterY = appState.targetCircleCenter.y
+        val radius = appState.logicalBallRadius // Use logicalBallRadius
 
-        var unitPerpendicularX = 0f
-        var unitPerpendicularY = 0f
+        // Vector from logical cue to logical target
+        val dx = targetCenterX - cueCenterX
+        val dy = targetCenterY - cueCenterY
+        val cueToTargetDistance = hypot(dx, dy)
 
-        if (magnitude_CueToTarget > 0.001f) {
-            // Normalized vector from logical cue to logical target
-            val normCueToTargetX = deltaX_CueToTarget / magnitude_CueToTarget
-            val normCueToTargetY = deltaY_CueToTarget / magnitude_CueToTarget
-            // Perpendicular vector (one direction of tangent)
-            unitPerpendicularX = -normCueToTargetY
-            unitPerpendicularY = normCueToTargetX
-        }
+        // Perpendicular vector (unit vector)
+        val perpX = -dy // Rotate (dx, dy) by 90 degrees counter-clockwise to get (-dy, dx) or (dy, -dx)
+        val perpY = dx
 
-        val drawLength = max(viewWidthProvider(), viewHeightProvider()) * 1.5f // How far to draw deflection lines
+        val perpDistance = hypot(perpX, perpY)
+        val unitPerpX = if (perpDistance > 0) perpX / perpDistance else 0f
+        val unitPerpY = if (perpDistance > 0) perpY / perpDistance else 0f
+
+        // Visual length of the deflection lines
+        val visualDrawLength = radius * 3f // A multiple of the ball radius
 
         return DeflectionLineParams(
-            cueToTargetDistance = magnitude_CueToTarget,
-            unitPerpendicularX = unitPerpendicularX,
-            unitPerpendicularY = unitPerpendicularY,
-            visualDrawLength = drawLength
+            cueToTargetDistance = cueToTargetDistance,
+            unitPerpendicularX = unitPerpX,
+            unitPerpendicularY = unitPerpY,
+            visualDrawLength = visualDrawLength
         )
     }
 
-    // Checks if the logical cue ball (ghost ball) is on the "far side" of the logical target ball
-    // relative to the aiming line's origin (which is now the actual cue ball).
-    // This logic ensures the target isn't "behind" the actual cue ball along the shot path.
-    fun isGhostCueOnFarSide(appState: AppState, aimingLineCoords: AimingLineLogicalCoords?): Boolean {
-        if (aimingLineCoords == null || appState.selectedCueBallScreenCenter == null) return false
+    /**
+     * Checks if the logical ghost cue ball is "behind" the target ball relative to the current aiming line,
+     * indicating an invalid shot (e.g., trying to pull the cue ball through the target).
+     * This uses the *actual* start point of the aiming line (from the actual cue ball's screen position) as reference.
+     */
+    fun isGhostCueOnFarSide(appState: AppState, aimingLineCoords: AimingLineLogicalCoords): Boolean {
+        // Line vector is from startX, startY (actual cue ball) to endX, endY (extended line)
+        val lineVecX = aimingLineCoords.endX - aimingLineCoords.startX
+        val lineVecY = aimingLineCoords.endY - aimingLineCoords.startY
 
-        // `aimingLineCoords.startX, startY` is now the actual cue ball's logical position.
-        // `aimingLineCoords.cueX, cueY` is the logical ghost cue ball's position.
-        // `appState.targetCircleCenter.x, y` is the logical target ball's position.
+        // Vector from line start (actual cue ball) to logical ghost cue ball
+        val actualToGhostX = aimingLineCoords.cueX - aimingLineCoords.startX
+        val actualToGhostY = aimingLineCoords.cueY - aimingLineCoords.startY
 
-        // Vector from actual cue (line start) to ghost cue
-        val vecActualCueToGhostCueX = aimingLineCoords.cueX - aimingLineCoords.startX
-        val vecActualCueToGhostCueY = aimingLineCoords.cueY - aimingLineCoords.startY
-        val distActualToGhostCue = distance(aimingLineCoords.startX, aimingLineCoords.startY, aimingLineCoords.cueX, aimingLineCoords.cueY)
+        // Vector from line start (actual cue ball) to target ball
+        val actualToTargetX = (appState.selectedTargetBall?.x ?: appState.targetCircleCenter.x) - aimingLineCoords.startX
+        val actualToTargetY = (appState.selectedTargetBall?.y ?: appState.targetCircleCenter.y) - aimingLineCoords.startY
 
-        // Vector from actual cue (line start) to target ball
-        val vecActualCueToTargetX = appState.targetCircleCenter.x - aimingLineCoords.startX
-        val vecActualCueToTargetY = appState.targetCircleCenter.y - aimingLineCoords.startY
+        val dotProduct = (actualToTargetX * actualToGhostX) + (actualToTargetY * actualToGhostY)
 
-        // Project the target ball onto the aiming line (line from actual cue through ghost cue)
-        // Dot product to find projected length
-        val projectedTargetLength = if (distActualToGhostCue > 0.001f) {
-            (vecActualCueToTargetX * vecActualCueToGhostCueX + vecActualCueToTargetY * vecActualCueToGhostCueY) / distActualToGhostCue
+        val magActualToTargetSq = (actualToTargetX * actualToTargetX) + (actualToTargetY * actualToTargetY)
+        val magActualToGhostSq = (actualToGhostX * actualToGhostX) + (actualToGhostY * actualToGhostY)
+
+        if (magActualToTargetSq < 0.1f || magActualToGhostSq < 0.1f) return false // Avoid division by zero or near-zero magnitudes
+
+        // If dot product is negative or magnitude of actualToGhost is less than actualToTarget,
+        // it means the logical ghost ball is 'behind' or 'not far enough' along the line relative to the target.
+        // Specifically, for "far side", we mean the logical ghost ball is beyond the target.
+        // If the dot product is negative, it means the angle between the two vectors is > 90 degrees.
+        // We want them to be roughly in the same direction, and actualToGhost to be longer.
+
+        val distActualToTarget = hypot(actualToTargetX, actualToTargetY)
+        val distActualToGhost = hypot(actualToGhostX, actualToGhostY)
+
+        // Check for alignment: if dot product is positive and sufficient (e.g. cos(theta) > 0.8)
+        val alignmentThreshold = 0.9f // Cosine of ~25 degrees
+        val cosTheta = if (distActualToTarget > 0.1f && distActualToGhost > 0.1f) {
+            dotProduct / (distActualToTarget * distActualToGhost)
         } else {
-            // If ghost cue is at actual cue, line has no direction, so target can't be "behind" it this way
             0f
         }
 
-        // The target is on the "far side" if its projection along the aiming line is less than 0,
-        // meaning it's "behind" the actual cue ball relative to the ghost cue ball's direction.
-        return projectedTargetLength < 0
+        // isGhostCueOnFarSide means the ghost ball is positioned such that the actual cue ball would need to pass
+        // *through* the target ball to hit the ghost ball, or the ghost ball is too close/behind the target.
+        // The condition (distActualToGhost < distActualToTarget - appState.logicalBallRadius / 2f)
+        // checks if the ghost ball is effectively "inside" the target ball's projected area from the actual cue.
+        return (distActualToGhost < distActualToTarget - appState.logicalBallRadius / 2f) && (cosTheta > alignmentThreshold)
+    }
+
+    /**
+     * Calculates the distance between two PointF objects.
+     */
+    fun distance(p1: PointF, p2: PointF): Float {
+        return hypot(p1.x - p2.x, p1.y - p2.y)
     }
 }

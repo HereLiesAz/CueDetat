@@ -498,6 +498,7 @@ object AppConfig {
     // Pitch Sensor and Angle Configuration
     const val PITCH_SMOOTHING_FACTOR = 0.15f
     const val FORWARD_TILT_AS_FLAT_OFFSET_DEGREES = 15.0f
+    const val PITCH_OFFSET_POWER = 2.0f // <--- ADD THIS LINE (use an appropriate value)
 
     // Protractor Visuals Configuration
     val PROTRACTOR_ANGLES = floatArrayOf(0f, 14f, 30f, 36f, 43f, 48f)
@@ -508,6 +509,14 @@ object AppConfig {
 
     // General Graphics Configuration
     const val GLOW_RADIUS_FIXED = 8f
+
+    // Ball Detection & Manual Placement
+    const val DEFAULT_MANUAL_BALL_RADIUS = 25f
+    const val BALL_RADIUS_SCALE_FACTOR = 0.6f // New: Scale factor for detected ball radii
+
+    // Drag and Snap Configuration
+    const val DRAG_TOUCH_TOLERANCE = 30f // Extra pixels around ball for easier grabbing
+    const val SNAP_RADIUS_FACTOR = 1.2f // Factor of ball radius for snap distance (e.g., 1.2 * radius)
 
     // Text Size Configuration
     const val GHOST_BALL_NAME_BASE_SIZE = 40f
@@ -540,31 +549,31 @@ object AppConfig {
     const val STROKE_MAIN_CIRCLES = 5f
     const val STROKE_PROTRACTOR_ANGLE_LINES = 3f
     const val STROKE_AIMING_SIGHT = 2f
-    const val STROKE_FOLLOW_DRAW_PATH = 3f // Correct constant name
+    const val STROKE_FOLLOW_DRAW_PATH = 3f
 
     // Follow/Draw Path Visuals Configuration
-    const val FOLLOW_EFFECT_DEVIATION_DEGREES = -25.0f // Negative for one side of tangent
-    const val DRAW_EFFECT_DEVIATION_DEGREES = 25.0f    // Positive for the other side
-    const val CURVE_CONTROL_POINT_FACTOR = 0.6f // Controls "bow" (0.0-1.0)
-    const val PATH_DRAW_LENGTH_FACTOR = 0.7f    // Length of paths relative to deflection line length
-    const val PATH_OPACITY_ALPHA = 180          // Opacity for these paths
+    const val FOLLOW_EFFECT_DEVIATION_DEGREES = -25.0f
+    const val DRAW_EFFECT_DEVIATION_DEGREES = 25.0f
+    const val CURVE_CONTROL_POINT_FACTOR = 0.6f
+    const val PATH_DRAW_LENGTH_FACTOR = 0.7f
+    const val PATH_OPACITY_ALPHA = 180
 
     // GitHub Release Updater Configuration
-    const val GITHUB_REPO_OWNER = "HereLiesAz" // Updated to match the provided URL
-    const val GITHUB_REPO_NAME = "CueDetat" // Updated to match the provided URL
-    const val GITHUB_RELEASE_ASSET_NAME_REGEX = ".*\\.apk" // Regex to match your APK asset name
+    const val GITHUB_REPO_OWNER = "HereLiesAz"
+    const val GITHUB_REPO_NAME = "CueDetat"
+    const val GITHUB_RELEASE_ASSET_NAME_REGEX = ".*\\.apk"
 
 
     // Warning Strings
     const val WARNING_MRS_CALLED = "Your Mrs. called, she wants her title back."
     const val WARNING_YODA_SAYS = "Yoda says, 'A do not, this is.'"
-    val INSULTING_WARNING_STRINGS = listOf( // Ensure this is used if random warnings are active
+    val INSULTING_WARNING_STRINGS = listOf(
         "Nope.", "Not happening.", "Won't work.", "Please try harder.", "No.",
         "Physics says no.", WARNING_MRS_CALLED,
         "Hey batter, batter...", "In the beginning, God created a better shot.",
         WARNING_YODA_SAYS, "Am I crying from laughing, or is this just sad?",
         "Are you even trying?", "That's... an angle. Not a good one.",
-        "My disappointment is immeasurable.", "Consult a physicist. Or a therapist."
+        "I'm more disappointed than your father.", "Consult a physicist. Or a therapist."
     )
 }
 
@@ -578,13 +587,13 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.config.AppConfig
-import com.hereliesaz.cuedetat.tracking.ball_detector.Ball // Import Ball class
+import com.hereliesaz.cuedetat.tracking.ball_detector.Ball
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
-class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
+class AppState(val config: AppConfig) {
 
     // --- View Dimensions & Initialization ---
     var viewWidth: Int = 0
@@ -600,38 +609,23 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
     var frameHeight: Int = 0
 
     // --- Selected Ball Data (Screen-space, in MainOverlayView pixels) ---
-    var selectedCueBallId: String? = null
+    var selectedCueBall: Ball? = null
         private set
-    var selectedCueBallScreenCenter: PointF? = null
-        private set
-    var selectedCueBallScreenRadius: Float = 0f
-        private set
-
-    var selectedTargetBallId: String? = null
-        private set
-    var selectedTargetBallScreenCenter: PointF? = null
-        private set
-    var selectedTargetBallScreenRadius: Float = 0f
+    var selectedTargetBall: Ball? = null
         private set
 
     // --- Protractor Plane Elements (Logical, derived from selected balls) ---
-    // targetCircleCenter and cueCircleCenter are the *logical centers* of the protractor's balls
-    // which represent the ghost balls on the 2D plane.
     var targetCircleCenter: PointF = PointF()
         private set
     var cueCircleCenter: PointF = PointF()
         private set
-    // currentLogicalRadius now represents the effective radius of the target ball in logical units.
-    // Its size directly reflects the detected pixel radius, as CameraX zoom controls the overall scale.
-    var currentLogicalRadius: Float = 1f
+    var logicalBallRadius: Float = 1f // Renamed from currentLogicalRadius
         private set
 
 
     // --- User Interaction State ---
-    // This zoomFactor now directly controls CameraX's zoom ratio (1.0f is no optical zoom).
-    var zoomFactor: Float = 1.0f // Default camera zoom is 1.0x (no optical zoom)
+    var zoomFactor: Float = config.DEFAULT_ZOOM_FACTOR
         private set
-    // CameraX capabilities
     var minCameraZoomRatio: Float = 1.0f
         private set
     var maxCameraZoomRatio: Float = 1.0f
@@ -639,7 +633,7 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
 
     var protractorRotationAngle: Float = config.DEFAULT_ROTATION_ANGLE
         private set
-    var currentMode: SelectionMode = SelectionMode.SELECTING_CUE_BALL // New: Initial selection mode
+    var currentMode: SelectionMode = SelectionMode.SELECTING_CUE_BALL
 
     // --- Device Orientation State ---
     var currentPitchAngle: Float = 0.0f
@@ -653,7 +647,7 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
     val inversePitchMatrix: Matrix = Matrix()
 
     // --- UI State ---
-    var areHelperTextsVisible: Boolean = true // Default to ON for user guidance
+    var areHelperTextsVisible: Boolean = false // Changed default to false
         private set
 
     enum class SelectionMode {
@@ -664,7 +658,8 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
 
     /**
      * Initializes or re-initializes the AppState with current view dimensions.
-     * Sets default positions and radius if no ball is tracked or selected.
+     * Ensures default manual ball placement if no balls are currently selected.
+     * Sets `logicalBallRadius` based on the selected target ball or default.
      */
     fun initialize(width: Int, height: Int) {
         if (width <= 0 || height <= 0) return
@@ -672,24 +667,45 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
         viewWidth = width
         viewHeight = height
 
-        // Update protractor's logical base based on selected target ball if available,
-        // otherwise default to screen center.
-        if (selectedTargetBallScreenCenter != null && selectedTargetBallScreenRadius > 0f) {
-            targetCircleCenter.set(selectedTargetBallScreenCenter!!.x, selectedTargetBallScreenCenter!!.y)
-            // currentLogicalRadius is now just the detected screen radius, as camera zoom handles scale.
-            currentLogicalRadius = selectedTargetBallScreenRadius
+        // Initialize logicalBallRadius first, as it dictates the size of manually placed balls
+        // and also the base size for the protractor plane.
+        if (selectedTargetBall != null) {
+            logicalBallRadius = selectedTargetBall!!.radius
+        } else if (selectedCueBall != null) { // If only cue ball is selected, use its radius
+            logicalBallRadius = selectedCueBall!!.radius
         } else {
-            targetCircleCenter.set(viewWidth / 2f, viewHeight / 2f) // Default to screen center
-            // Default logical radius is a percentage of view size (if no ball is selected).
-            currentLogicalRadius = min(viewWidth, viewHeight) * 0.15f
+            logicalBallRadius = config.DEFAULT_MANUAL_BALL_RADIUS
+        }
+
+        // Initialize target ball if not already selected.
+        // If it's a new manual placement, its radius will use the newly set logicalBallRadius.
+        if (selectedTargetBall == null) {
+            setManualTargetBall(viewWidth / 2f, viewHeight * 0.25f) // Default position
+        } else {
+            // Update logical center based on existing selectedTargetBall
+            targetCircleCenter.set(selectedTargetBall!!.x, selectedTargetBall!!.y)
+            // Ensure its radius is consistent with logicalBallRadius if it changed
+            if (selectedTargetBall!!.radius != logicalBallRadius) {
+                selectedTargetBall = selectedTargetBall!!.copy(radius = logicalBallRadius)
+            }
+        }
+
+        // Initialize cue ball if not already selected.
+        if (selectedCueBall == null) {
+            setManualCueBall(viewWidth / 2f, viewHeight * 0.75f) // Default position
+        } else {
+            // Ensure its radius is consistent with logicalBallRadius if it changed
+            if (selectedCueBall!!.radius != logicalBallRadius) {
+                selectedCueBall = selectedCueBall!!.copy(radius = logicalBallRadius)
+            }
         }
 
         // Ensure a minimum radius to prevent division by zero or infinitesimally small elements
-        if (currentLogicalRadius <= 0.01f) currentLogicalRadius = 0.01f
+        if (logicalBallRadius <= 0.01f) logicalBallRadius = 0.01f
 
-        smoothedPitchAngle = currentPitchAngle // Initialize smoothed pitch
+        smoothedPitchAngle = currentPitchAngle
         isInitialized = true
-        updateCueBallPlanePosition() // Position logical cue ball relative to the (potentially tracked) target
+        updateCueBallPlanePosition()
     }
 
     /**
@@ -698,105 +714,114 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
     fun updateCameraZoomCapabilities(minZoom: Float, maxZoom: Float) {
         minCameraZoomRatio = minZoom
         maxCameraZoomRatio = maxZoom
-        // Ensure current zoom is within new bounds if capabilities change mid-app
-        zoomFactor = zoomFactor.coerceIn(minCameraZoomRatio, maxCameraZoomRatio)
+        zoomFactor = zoomFactor.coerceIn(minZoom, maxZoom)
     }
 
     /**
      * Updates the selected cue ball's tracked data.
+     * Updates `logicalBallRadius` to match the new detected ball's size.
      * @param ball The selected cue ball.
      */
     fun updateSelectedCueBall(ball: Ball) {
-        selectedCueBallId = ball.id
-        selectedCueBallScreenCenter = PointF(ball.x, ball.y)
-        selectedCueBallScreenRadius = ball.radius
-    }
-
-    /**
-     * Clears the selected cue ball data.
-     */
-    fun clearSelectedCueBall() {
-        selectedCueBallId = null
-        selectedCueBallScreenCenter = null
-        selectedCueBallScreenRadius = 0f
-    }
-
-    /**
-     * Updates the selected target ball's tracked data and repositions the protractor.
-     * @param ball The selected target ball.
-     */
-    fun updateSelectedTargetBall(ball: Ball) {
-        selectedTargetBallId = ball.id
-        selectedTargetBallScreenCenter = PointF(ball.x, ball.y)
-        selectedTargetBallScreenRadius = ball.radius
-
-        // Re-initialize protractor base (logical target center and radius) to match the new target ball
+        selectedCueBall = ball
+        // Update logicalBallRadius to match the new detected ball's radius
+        logicalBallRadius = ball.radius
+        // Re-initialize to ensure all logical elements resize based on this new radius
         initialize(viewWidth, viewHeight)
     }
 
     /**
+     * Clears the selected cue ball data.
+     * Resets `logicalBallRadius` to default if no other ball is selected.
+     */
+    fun clearSelectedCueBall() {
+        selectedCueBall = null
+        // If target ball is also cleared or not selected, revert to default radius
+        if (selectedTargetBall == null) {
+            logicalBallRadius = config.DEFAULT_MANUAL_BALL_RADIUS
+        }
+        initialize(viewWidth, viewHeight) // Re-initialize to set defaults/recalculate
+    }
+
+    /**
+     * Sets the cue ball data based on a manual tap location.
+     * Uses `logicalBallRadius` for its size.
+     */
+    fun setManualCueBall(x: Float, y: Float) {
+        selectedCueBall = Ball("MANUAL_CUE_BALL_${System.currentTimeMillis()}", x, y, logicalBallRadius)
+        initialize(viewWidth, viewHeight) // Re-initialize to ensure consistency
+    }
+
+    /**
+     * Updates the selected target ball's tracked data and repositions the protractor.
+     * Updates `logicalBallRadius` to match the new detected ball's size.
+     * @param ball The selected target ball.
+     */
+    fun updateSelectedTargetBall(ball: Ball) {
+        selectedTargetBall = ball
+        // Update logicalBallRadius to match the new detected ball's radius
+        logicalBallRadius = ball.radius
+        initialize(viewWidth, viewHeight) // Re-initialize to update logical target center and radius
+    }
+
+    /**
      * Clears the selected target ball data and resets protractor position to default.
+     * Resets `logicalBallRadius` to default if no other ball is selected.
      */
     fun clearSelectedTargetBall() {
-        selectedTargetBallId = null
-        selectedTargetBallScreenCenter = null
-        selectedTargetBallScreenRadius = 0f
+        selectedTargetBall = null
+        // If cue ball is also cleared or not selected, revert to default radius
+        if (selectedCueBall == null) {
+            logicalBallRadius = config.DEFAULT_MANUAL_BALL_RADIUS
+        }
         initialize(viewWidth, viewHeight) // Re-initialize to set defaults if no tracked ball
     }
 
+    /**
+     * Sets the target ball data based on a manual tap location.
+     * Uses `logicalBallRadius` for its size.
+     */
+    fun setManualTargetBall(x: Float, y: Float) {
+        selectedTargetBall = Ball("MANUAL_TARGET_BALL_${System.currentTimeMillis()}", x, y, logicalBallRadius)
+        initialize(viewWidth, viewHeight) // Re-initialize to update logical target center and radius
+    }
 
     /**
-     * Updates the camera zoom factor. This value is clamped by camera capabilities.
-     * @param newFactor The new desired camera zoom factor (e.g., 1.0f for no optical zoom).
-     * @return True if the zoom factor changed significantly, false otherwise.
+     * Updates the camera zoom factor.
      */
     fun updateZoomFactor(newFactor: Float): Boolean {
         val coercedFactor = newFactor.coerceIn(minCameraZoomRatio, maxCameraZoomRatio)
-        // Only update if there's a significant change to prevent unnecessary CameraX calls
         if (abs(zoomFactor - coercedFactor) < 0.001f) return false
-
         zoomFactor = coercedFactor
-        // currentLogicalRadius is NOT updated here, it's updated in initialize() or setTrackedTargetBallData()
-        // when a ball is detected/selected, using its *current detected pixel radius*.
-        // The camera zoom *already* affects the detected pixel radius.
+        // Invalidate to trigger redraw with new zoom, which affects logicalBallRadius's visual size
         return true
     }
 
     /**
      * Updates the rotation angle of the protractor.
-     *
-     * @param newAngle The new desired rotation angle in degrees.
-     * @return True if the rotation angle changed significantly, false otherwise.
      */
     fun updateProtractorRotationAngle(newAngle: Float): Boolean {
         var normalizedAngle = newAngle % 360f
-        if (normalizedAngle < 0) normalizedAngle += 360f // Normalize angle to 0-360 degrees
-
-        // Only update if there's a significant change
+        if (normalizedAngle < 0) normalizedAngle += 360f
         if (abs(protractorRotationAngle - normalizedAngle) < 0.01f) return false
-
         protractorRotationAngle = normalizedAngle
-        updateCueBallPlanePosition() // Recalculate logical cue ball position as rotation changed
+        updateCueBallPlanePosition()
         return true
     }
 
     /**
      * Updates the device's pitch angle, applying a smoothing factor.
-     *
-     * @param newRawPitch The raw pitch angle from the sensor.
-     * @return True if the smoothed pitch angle changed significantly, false otherwise.
      */
     fun updateDevicePitchAngle(newRawPitch: Float): Boolean {
         val newSmoothedPitch = (config.PITCH_SMOOTHING_FACTOR * newRawPitch) +
                 ((1.0f - config.PITCH_SMOOTHING_FACTOR) * smoothedPitchAngle)
 
-        // Only update if there's a significant change to prevent excessive redraws
         if (abs(currentPitchAngle - newSmoothedPitch) > 0.05f) {
             currentPitchAngle = newSmoothedPitch
             smoothedPitchAngle = newSmoothedPitch
             return true
         }
-        smoothedPitchAngle = newSmoothedPitch // Always update smoothed value for next iteration
+        smoothedPitchAngle = newSmoothedPitch
         return false
     }
 
@@ -805,27 +830,28 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
      * position, logical radius, and protractor rotation.
      */
     private fun updateCueBallPlanePosition() {
-        if (!isInitialized || currentLogicalRadius <= 0.01f) return
+        if (!isInitialized || logicalBallRadius <= 0.01f) return
 
         val angleRad = Math.toRadians(protractorRotationAngle.toDouble())
-        val distanceFromTarget = 2 * currentLogicalRadius // Logical cue ball is positioned two radii away from the target
+        val distanceFromTarget = 2 * logicalBallRadius
 
-        // Calculate logical cue ball's position relative to the logical target ball's center,
-        // rotated by the protractor's current angle.
         cueCircleCenter.x = targetCircleCenter.x - (distanceFromTarget * sin(angleRad)).toFloat()
         cueCircleCenter.y = targetCircleCenter.y + (distanceFromTarget * cos(angleRad)).toFloat()
     }
 
     /**
-     * Resets user-controlled interaction states (zoom, rotation, and target ball selection)
+     * Resets user-controlled interaction states (zoom, rotation, and ball selection)
      * to their default values defined in `AppConfig`.
      */
     fun resetInteractions() {
-        clearSelectedCueBall()
-        clearSelectedTargetBall() // This calls initialize internally to reset targetCircleCenter etc.
-        currentMode = SelectionMode.SELECTING_CUE_BALL // Reset to initial mode
-        // Reset camera zoom to default (1.0f)
-        updateZoomFactor(1.0f) // This will trigger CameraX zoom reset
+        selectedCueBall = null
+        selectedTargetBall = null
+        // Reset logicalBallRadius before re-initializing
+        logicalBallRadius = config.DEFAULT_MANUAL_BALL_RADIUS
+        initialize(viewWidth, viewHeight) // Re-initialize to set default manual balls
+
+        currentMode = SelectionMode.SELECTING_CUE_BALL
+        updateZoomFactor(config.DEFAULT_ZOOM_FACTOR)
         updateProtractorRotationAngle(config.DEFAULT_ROTATION_ANGLE)
     }
 
@@ -841,7 +867,6 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
 ================================================================================
 FILE: app\src\main\java\com\hereliesaz\cuedetat\state\AppPaints.kt
 ================================================================================
-// FILE: app\src\main\java\com\hereliesaz\cuedetat\state\AppPaints.kt
 package com.hereliesaz.cuedetat.state
 
 import android.content.Context
@@ -884,9 +909,20 @@ class AppPaints(private val context: Context, private val config: AppConfig) {
     val shotGuideNearPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = config.STROKE_AIM_LINE_NEAR }
     val shotGuideFarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = config.STROKE_AIM_LINE_FAR }
 
-    val ghostCueOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = config.STROKE_GHOST_BALL_OUTLINE }
-    val ghostTargetOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = config.STROKE_GHOST_BALL_OUTLINE }
-    val ghostCueAimingSightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = config.STROKE_AIMING_SIGHT; style = Paint.Style.STROKE }
+    // Paints for the actual ball overlays (draggable, with sight on cue)
+    val actualCueBallOverlayOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = config.STROKE_MAIN_CIRCLES }
+    val actualCueBallAimingSightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = config.STROKE_AIMING_SIGHT; style = Paint.Style.STROKE }
+    val actualTargetBallOverlayOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = config.STROKE_MAIN_CIRCLES }
+
+    // Removed: Floating ghost ball paints are no longer needed here
+
+
+    // Paint for indicating detected but unselected balls
+    val detectedBallOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 3f // Can be a config constant
+        color = AppPurple.toArgb() // A neutral color
+    }
 
     // Corrected paint names for Follow and Draw paths
     val followPathPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -911,18 +947,17 @@ class AppPaints(private val context: Context, private val config: AppConfig) {
     val ghostCueNamePaint = createBaseHelperTextPaint().apply { color = AppHelpTextGhostBallLabel.toArgb() }
     val fitTargetInstructionPaint = createBaseHelperTextPaint().apply { color = AppHelpTextYellow.toArgb(); textAlign = Paint.Align.LEFT }
     val placeCueInstructionPaint = createBaseHelperTextPaint().apply { color = AppHelpTextPocketAim.toArgb() }
-    // Update these two lines to use the AppConfig constant
     val panHintPaint = createBaseHelperTextPaint().apply { color = AndroidColor.argb(
-        AndroidColor.alpha(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
-        AndroidColor.red(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
-        AndroidColor.green(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
-        AndroidColor.blue(config.DEFAULT_HELP_TEXT_COLOR_ARGB)
+        AndroidColor.alpha(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.red(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.green(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.blue(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB)
     ); textAlign = Paint.Align.LEFT }
     val pinchHintPaint = createBaseHelperTextPaint().apply { color = AndroidColor.argb(
-        AndroidColor.alpha(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
-        AndroidColor.red(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
-        AndroidColor.green(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
-        AndroidColor.blue(config.DEFAULT_HELP_TEXT_COLOR_ARGB)
+        AndroidColor.alpha(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.red(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.green(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.blue(AppConfig.DEFAULT_HELP_TEXT_COLOR_ARGB)
     ); textAlign = Paint.Align.LEFT }
 
     // New instruction paint for selection modes
@@ -934,7 +969,7 @@ class AppPaints(private val context: Context, private val config: AppConfig) {
 
     init {
         targetCirclePaint.color = AppYellow.toArgb()
-        cueCirclePaint.color = AppWhite.toArgb()
+        cueCirclePaint.color = AppWhite.toArgb() // This is for the *logical* cue ball on the plane
         centerMarkPaint.color = AppBlack.toArgb()
         protractorAngleLinePaint.color = AppMediumGray.toArgb()
         targetLineGuidePaint.color = AppYellow.toArgb()
@@ -942,9 +977,13 @@ class AppPaints(private val context: Context, private val config: AppConfig) {
         deflectionSolidPaint.color = AppWhite.toArgb()
         shotGuideNearPaint.color = AppWhite.toArgb()
         shotGuideFarPaint.color = AppPurple.toArgb()
-        ghostTargetOutlinePaint.color = AppYellow.toArgb()
-        ghostCueOutlinePaint.color = AppWhite.toArgb()
-        ghostCueAimingSightPaint.color = AppYellow.toArgb()
+
+        // Colors for the *actual* cue ball overlay and its aiming sight
+        actualCueBallOverlayOutlinePaint.color = AppWhite.toArgb()
+        actualCueBallAimingSightPaint.color = AppYellow.toArgb()
+        // Color for the *actual* target ball overlay
+        actualTargetBallOverlayOutlinePaint.color = AppYellow.toArgb()
+
 
         // Using AppConfig constants for opacity
         val followColorRGB = AppErrorRed.toArgb()
@@ -978,11 +1017,17 @@ class AppPaints(private val context: Context, private val config: AppConfig) {
         invalidShotWarningPaint.setShadowLayer(3f, 2f, 2f, M3_TEXT_SHADOW_COLOR)
 
         // Update Follow/Draw path colors if they should be themed, using config.PATH_OPACITY_ALPHA
-        // Example: Using M3 secondary and tertiary
-        val themedFollowColor = colorScheme.secondary.toArgb() // Or error, etc.
+        val themedFollowColor = colorScheme.secondary.toArgb()
         followPathPaint.color = AndroidColor.argb(config.PATH_OPACITY_ALPHA, AndroidColor.red(themedFollowColor), AndroidColor.green(themedFollowColor), AndroidColor.blue(themedFollowColor))
-        val themedDrawColor = colorScheme.tertiary.toArgb() // Or primary, etc.
+        val themedDrawColor = colorScheme.tertiary.toArgb()
         drawPathPaint.color = AndroidColor.argb(config.PATH_OPACITY_ALPHA, AndroidColor.red(themedDrawColor), AndroidColor.green(themedDrawColor), AndroidColor.blue(themedDrawColor))
+
+        // Update actual cue/target ball overlay paints based on theme
+        actualCueBallOverlayOutlinePaint.color = colorScheme.onBackground.toArgb() // White on yellow background
+        actualCueBallAimingSightPaint.color = colorScheme.onSurface.toArgb() // Black on yellow surface
+        actualTargetBallOverlayOutlinePaint.color = colorScheme.onSurface.toArgb() // Black on yellow surface
+
+        // Removed: Floating ghost ball paints
     }
     fun resetDynamicPaintProperties() {
         targetLineGuidePaint.apply { strokeWidth = config.STROKE_TARGET_LINE_GUIDE; color = AppYellow.toArgb(); clearShadowLayer() }
@@ -1189,27 +1234,26 @@ object ZoomSliderLogic {
 ================================================================================
 FILE: app\src\main\java\com\hereliesaz\cuedetat\view\MainOverlayView.kt
 ================================================================================
-// FILE: app\src\main\java\com\hereliesaz\cuedetat\view\MainOverlayView.kt
-// app/src/main/java/com/hereliesaz/cuedetat/view/MainOverlayView.kt
 package com.hereliesaz.cuedetat.view
 
 import android.content.Context
-import android.graphics.Canvas // Android Canvas
+import android.graphics.Canvas
 import android.graphics.PointF
 import android.util.AttributeSet
 import android.util.Log
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration // Import ViewConfiguration
 import androidx.compose.material3.ColorScheme
 import com.hereliesaz.cuedetat.config.AppConfig
 import com.hereliesaz.cuedetat.state.AppPaints
 import com.hereliesaz.cuedetat.state.AppState
-import com.hereliesaz.cuedetat.state.AppState.SelectionMode // Import SelectionMode
+import com.hereliesaz.cuedetat.state.AppState.SelectionMode
 import com.hereliesaz.cuedetat.drawing.DrawingCoordinator
 import com.hereliesaz.cuedetat.view.gesture.GestureHandler
-import com.hereliesaz.cuedetat.tracking.ball_detector.Ball // Import the Ball data class
-import com.hereliesaz.cuedetat.system.CameraManager // Import CameraManager
+import com.hereliesaz.cuedetat.tracking.ball_detector.Ball
+import com.hereliesaz.cuedetat.system.CameraManager
 import kotlin.math.hypot
 import kotlin.math.min
 
@@ -1221,45 +1265,63 @@ class MainOverlayView @JvmOverloads constructor(
 
     private val TAG = AppConfig.TAG + "_MainOverlayView"
 
-    /**
-     * Listener interface for external components (like MainActivity) to react to state changes
-     * originating from user interaction with MainOverlayView.
-     */
     interface AppStateListener {
         fun onZoomChanged(newZoomFactor: Float)
         fun onRotationChanged(newRotationAngle: Float)
-        fun onUserInteraction() // Generic interaction event
-        fun onCueBallSelected(ballId: String?) // New: Notify when a cue ball is selected or deselected
-        fun onTargetBallSelected(ballId: String?) // New: Notify when a target ball is selected or deselected
-        fun onSelectionModeChanged(mode: SelectionMode) // New: Notify when selection mode changes
+        fun onUserInteraction()
+        fun onCueBallSelected(ballId: String?)
+        fun onTargetBallSelected(ballId: String?)
+        fun onSelectionModeChanged(mode: SelectionMode)
     }
 
     var listener: AppStateListener? = null
 
-    // Initialize with default AppConfig, AppState, AppPaints.
-    // These will be fully setup once view dimensions are known and M3 colors applied.
-    private val config = AppConfig // Direct object reference
+    private val config = AppConfig
     private val appState = AppState(config)
     private val appPaints = AppPaints(context, config)
 
     private lateinit var gestureHandler: GestureHandler
     private lateinit var drawingCoordinator: DrawingCoordinator
-    private lateinit var gestureDetector: GestureDetector // For handling single taps
-    private lateinit var cameraManagerRef: CameraManager // Reference to CameraManager for zoom control
 
-    // Flag to ensure components are initialized only once after size is known
+    // Gesture detection for taps
+    private lateinit var gestureDetector: GestureDetector
+    private var touchSlop: Int = 0 // Threshold for detecting a drag vs. a tap
+
+    // State for dragging ghost balls
+    private var isDraggingConfirmed = false // Whether a drag gesture has been confirmed (moved beyond touch slop)
+    private var initialDraggedBall: Ball? = null // Store the ball identified at ACTION_DOWN
+    private var dragOffsetX: Float = 0f // Touch point relative to ball center X
+    private var dragOffsetY: Float = 0f // Touch point relative to ball center Y
+    private var initialTouchDownX: Float = 0f // Initial touch X for drag threshold
+    private var initialTouchDownY: Float = 0f // Initial touch Y for drag threshold
+
+    private var cameraManagerRef: CameraManager? = null
     private var areComponentsInitialized = false
 
-    /**
-     * Initializes core drawing and interaction components.
-     * This is called once the view dimensions are available.
-     * @param cameraManager A reference to the CameraManager for camera zoom control.
-     */
-    fun initializeComponents(cameraManager: CameraManager) {
-        Log.d(TAG, "initializeComponents called. areComponentsInitialized was $areComponentsInitialized, width=$width, height=$height")
-        if (areComponentsInitialized || width == 0 || height == 0) return // Already initialized or no dimensions
+    init {
+        // Get the system-defined touch slop
+        val vc = ViewConfiguration.get(context)
+        touchSlop = vc.scaledTouchSlop
+    }
 
-        cameraManagerRef = cameraManager // Store reference
+    fun setCameraManager(cameraManager: CameraManager) {
+        this.cameraManagerRef = cameraManager
+        Log.d(TAG, "setCameraManager: CameraManager reference received.")
+        if (!areComponentsInitialized && width > 0 && height > 0) {
+            initializeComponents()
+        }
+    }
+
+    private fun initializeComponents() {
+        Log.d(TAG, "initializeComponents executing full setup. areComponentsInitialized was $areComponentsInitialized, width=$width, height=$height")
+        if (areComponentsInitialized) {
+            Log.w(TAG, "initializeComponents: Already initialized. Skipping.")
+            return
+        }
+        if (cameraManagerRef == null || width == 0 || height == 0) {
+            Log.w(TAG, "initializeComponents: Pre-conditions not met (cameraManagerRef=${cameraManagerRef != null}, width=$width, height=$height). Skipping.")
+            return
+        }
 
         gestureHandler = GestureHandler(
             context, appState, config, listener,
@@ -1273,15 +1335,44 @@ class MainOverlayView @JvmOverloads constructor(
 
         drawingCoordinator = DrawingCoordinator(
             appState, appPaints, config,
-            viewWidthProvider = { width }, // Provide current view width
-            viewHeightProvider = { height } // Provide current view height
+            viewWidthProvider = { width },
+            viewHeightProvider = { height }
         )
 
-        // Initialize GestureDetector for tap events
         gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapUp(e: MotionEvent): Boolean {
-                handleSingleTap(e.x, e.y) // Handle tap for ball selection
+                // If a drag was confirmed, this method should not be called by the overall onTouchEvent logic.
+                // If we reach here, it means it's a tap, either on a ball or empty space.
+                Log.d(TAG, "onSingleTapUp detected at (${e.x}, ${e.y}). Calling handleSingleTap.")
+                handleSingleTap(e.x, e.y)
+                return true // Consume all single taps handled here
+            }
+
+            override fun onDown(e: MotionEvent): Boolean {
+                // We return true here to ensure GestureDetector processes the full gesture (for taps, scrolls, long presses).
+                // Our custom drag logic in onTouchEvent handles the consumption for drag starts.
                 return true
+            }
+
+            override fun onScroll(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                distanceX: Float,
+                distanceY: Float
+            ): Boolean {
+                // This method is called by GestureDetector for scrolling motions.
+                // If we have an initial touch on a ball and haven't confirmed a drag yet,
+                // check if this scroll signifies a drag.
+                if (initialDraggedBall != null && !isDraggingConfirmed) {
+                    val dx = e2.x - initialTouchDownX
+                    val dy = e2.y - initialTouchDownY
+                    if (hypot(dx.toDouble(), dy.toDouble()) > touchSlop) {
+                        isDraggingConfirmed = true // Confirm drag here
+                        Log.d(TAG, "onScroll: Drag confirmed due to movement exceeding touchSlop.")
+                    }
+                }
+                // Return false to allow our main onTouchEvent to continue processing for pan/zoom and ball drag updates.
+                return false
             }
         })
 
@@ -1290,364 +1381,423 @@ class MainOverlayView @JvmOverloads constructor(
     }
 
 
-    /**
-     * Applies Material 3 color scheme to the custom drawing paints.
-     * This should be called after `onSizeChanged` or once view dimensions are set.
-     *
-     * @param colorScheme The Material 3 ColorScheme from Compose.
-     */
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        Log.d(TAG, "onSizeChanged: w=$w, h=$h. Calling appState.initialize.")
+        if (w > 0 && h > 0) {
+            appState.initialize(w, h)
+            if (!areComponentsInitialized && cameraManagerRef != null) {
+                initializeComponents()
+            }
+            invalidate()
+        }
+    }
+
     fun applyMaterialYouColors(colorScheme: ColorScheme) {
-        // Ensure components are ready before applying colors.
-        // If initializeComponents has not been called externally yet,
-        // it cannot proceed here.
         if (!areComponentsInitialized) {
             Log.w(TAG, "applyMaterialYouColors called before components initialized. Skipping.")
             return
         }
         appPaints.applyMaterialYouColors(colorScheme)
-        invalidate() // Redraw with new colors
+        invalidate()
     }
 
-    /**
-     * Called when the size of the view changes. Initializes or re-initializes
-     * components that depend on view dimensions.
-     */
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        Log.d(TAG, "onSizeChanged: w=$w, h=$h. Calling appState.initialize.")
-        if (w > 0 && h > 0) {
-            // NOTE: initializeComponents must be called by MainActivity AFTER CameraManager is ready
-            // because it now depends on cameraManagerRef.
-            // We just ensure appState is initialized/updated with new dimensions here.
-            appState.initialize(w, h)
-            invalidate() // Request a redraw
-        }
-    }
-
-    /**
-     * The main drawing dispatch method. Calls the DrawingCoordinator to render elements.
-     */
-    override fun onDraw(canvas: Canvas) { // android.graphics.Canvas
+    override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        Log.d(TAG, "onDraw called. areComponentsInitialized=$areComponentsInitialized, appState.isInitialized=${appState.isInitialized}, appState.currentLogicalRadius=${appState.currentLogicalRadius}, appState.currentMode=${appState.currentMode}")
-        // Guard against drawing before components are ready
         if (!areComponentsInitialized || !appState.isInitialized) {
             Log.w(TAG, "onDraw returning early: areComponentsInitialized=$areComponentsInitialized, appState.isInitialized=${appState.isInitialized}")
-            // Cannot call initializeComponents here as it requires cameraManagerRef now.
-            // MainActivity is responsible for calling it.
             return
         }
-
         drawingCoordinator.onDraw(canvas)
     }
 
-    /**
-     * Handles touch events for gestures (pan, zoom, tap).
-     */
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        // Guard against uninitialized state
-        if (!areComponentsInitialized || !appState.isInitialized) return false
-
-        // Pass touch events to GestureDetector first for tap detection
-        val gestureHandled = gestureDetector.onTouchEvent(event)
-        // Then pass to custom GestureHandler for pan/zoom.
-        // Only allow pan/zoom gestures if in AIMING mode.
-        val panZoomHandled = if (appState.currentMode == SelectionMode.AIMING) {
-            gestureHandler.onTouchEvent(event)
-        } else {
-            false
+        if (!areComponentsInitialized || !appState.isInitialized) {
+            Log.w(TAG, "onTouchEvent returning early: components not initialized.")
+            return false
         }
 
+        // Pass to GestureDetector first for tap detection and to trigger onScroll for drag confirmation.
+        // We capture its return value to potentially consume the event if GestureDetector handles it,
+        // but we prioritize our custom drag and pan/zoom logic.
+        val gestureDetectorConsumed = gestureDetector.onTouchEvent(event)
 
-        // Consume event if either handler processed it, or fall back to super
-        return gestureHandled || panZoomHandled || super.onTouchEvent(event)
+        val x = event.x
+        val y = event.y
+
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                // Reset drag state for new touch sequence.
+                isDraggingConfirmed = false
+                initialDraggedBall = null // Ensure it's null before potential assignment
+                dragOffsetX = 0f
+                dragOffsetY = 0f
+                initialTouchDownX = x
+                initialTouchDownY = y
+
+                // Check if tap is on selected cue ball for potential drag
+                appState.selectedCueBall?.let { ball ->
+                    // Use the logicalBallRadius scaled by zoomFactor for hit test, as overlays are now scaled by it.
+                    val effectiveRadius = appState.logicalBallRadius * appState.zoomFactor
+                    if (hypot(x - ball.x, y - ball.y) <= effectiveRadius + config.DRAG_TOUCH_TOLERANCE) {
+                        initialDraggedBall = ball
+                        dragOffsetX = x - ball.x
+                        dragOffsetY = y - ball.y
+                        listener?.onUserInteraction()
+                        Log.d(TAG, "ACTION_DOWN: Cue ball hit for potential drag.")
+                        return true // Consume DOWN to track subsequent MOVE/UP events.
+                    }
+                }
+
+                // Check if tap is on selected target ball (only if not already decided to drag cue)
+                if (initialDraggedBall == null) { // Only if cue ball was not touched
+                    appState.selectedTargetBall?.let { ball ->
+                        // Use the logicalBallRadius scaled by zoomFactor for hit test, as overlays are now scaled by it.
+                        val effectiveRadius = appState.logicalBallRadius * appState.zoomFactor
+                        if (hypot(x - ball.x, y - ball.y) <= effectiveRadius + config.DRAG_TOUCH_TOLERANCE) {
+                            initialDraggedBall = ball
+                            dragOffsetX = x - ball.x
+                            dragOffsetY = y - ball.y
+                            listener?.onUserInteraction()
+                            Log.d(TAG, "ACTION_DOWN: Target ball hit for potential drag.")
+                            return true // Consume DOWN to track subsequent MOVE/UP events.
+                        }
+                    }
+                }
+                // If no ball was hit for a potential drag, allow pan/zoom or tap-empty-space.
+                // We've already passed to GestureDetector, so it might consume.
+                // We also pass to gestureHandler (pan/zoom) if in AIMING mode.
+                val panZoomHandled = if (appState.currentMode == SelectionMode.AIMING) {
+                    gestureHandler.onTouchEvent(event)
+                } else {
+                    false
+                }
+                return panZoomHandled || gestureDetectorConsumed || super.onTouchEvent(event)
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                if (initialDraggedBall != null) { // Only proceed if a ball was initially touched
+                    // The onScroll method of GestureDetector will set `isDraggingConfirmed` if movement exceeds slop.
+                    if (isDraggingConfirmed) { // Only update position if drag is confirmed
+                        val newCenterX = x - dragOffsetX
+                        val newCenterY = y - dragOffsetY
+
+                        val updatedBall = initialDraggedBall!!.copy(x = newCenterX, y = newCenterY)
+                        if (initialDraggedBall?.id == appState.selectedCueBall?.id) {
+                            appState.updateSelectedCueBall(updatedBall)
+                        } else if (initialDraggedBall?.id == appState.selectedTargetBall?.id) {
+                            appState.updateSelectedTargetBall(updatedBall)
+                        }
+                        invalidate()
+                        return true // Consume event for dragging
+                    }
+                }
+                // If not actively dragging a ball (either no ball was touched, or drag is not confirmed yet),
+                // then pan/zoom might handle it.
+                val panZoomHandled = if (appState.currentMode == SelectionMode.AIMING) {
+                    gestureHandler.onTouchEvent(event)
+                } else {
+                    false
+                }
+                return panZoomHandled || gestureDetectorConsumed || super.onTouchEvent(event)
+            }
+
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                val wasConfirmedDrag = isDraggingConfirmed // Capture state before reset
+                val ballToProcess = initialDraggedBall // Capture the ball reference
+
+                // Reset all drag state regardless of outcome
+                isDraggingConfirmed = false
+                initialDraggedBall = null
+                dragOffsetX = 0f
+                dragOffsetY = 0f
+                initialTouchDownX = 0f // Reset for next touch sequence
+                initialTouchDownY = 0f // Reset for next touch sequence
+
+                if (wasConfirmedDrag && ballToProcess != null) { // This was a confirmed drag
+                    val finalX = x - dragOffsetX
+                    val finalY = y - dragOffsetY
+                    handleSnapOnRelease(finalX, finalY, ballToProcess) // ballToProcess is guaranteed non-null here
+                    Log.d(TAG, "ACTION_UP/CANCEL: Confirmed drag ended for ${ballToProcess.id}.")
+                    return true // Consume event
+                } else if (ballToProcess != null) { // Was a potential drag (ball touched), but not confirmed (i.e., a tap on a ball)
+                    Log.d(TAG, "ACTION_UP/CANCEL: Potential drag was a tap on ball (${ballToProcess.id}). Calling handleSingleTap.")
+                    // Use the coordinates from the UP event for the tap detection
+                    handleSingleTap(x, y)
+                    return true // Consume event as it's handled as a tap
+                }
+                // If neither drag nor tap on ball handled, let gestureDetector's processing result or pan/zoom handle it
+                val panZoomHandled = if (appState.currentMode == SelectionMode.AIMING) {
+                    gestureHandler.onTouchEvent(event)
+                } else {
+                    false
+                }
+                return panZoomHandled || gestureDetectorConsumed || super.onTouchEvent(event)
+            }
+        }
+        return gestureDetectorConsumed || super.onTouchEvent(event) // Fallback for other events
     }
 
-    // --- New methods for ball tracking integration ---
-
-    /**
-     * Receives a list of detected balls and camera frame dimensions from the CameraManager.
-     * Updates AppState.trackedBalls and attempts to manage selected balls.
-     *
-     * @param balls The list of detected Ball objects (with coordinates in camera frame pixels).
-     * @param frameWidth The width of the camera frame in pixels.
-     * @param frameHeight The height of the camera frame in pixels.
-     */
     fun updateTrackedBalls(balls: List<Ball>, frameWidth: Int, frameHeight: Int) {
-        Log.d(TAG, "updateTrackedBalls received: balls.size=${balls.size}, frame=${frameWidth}x${frameHeight}")
+        Log.d(TAG, "updateTrackedBalls received: balls.size=${balls.size}, frame=${frameWidth}x${frameHeight}. Current view size: ${this.width}x${this.height}")
         if (!appState.isInitialized || this.width == 0 || this.height == 0 || frameWidth == 0 || frameHeight == 0) {
             Log.w(TAG, "updateTrackedBalls: view/frame dimensions not ready or zero, skipping. View: ${this.width}x${this.height}, Frame: ${frameWidth}x${frameHeight}")
-            // If frame dimensions are 0, this indicates a problem with the camera or analyzer.
-            // Clear tracked balls to ensure no stale data causes issues.
             appState.trackedBalls = emptyList()
-            // Invalidate to clear any previous drawings if current frame data is invalid.
             invalidate()
             return
         }
 
-        // Calculate scaling factors to map camera frame coordinates to MainOverlayView coordinates
         val scaleX = this.width.toFloat() / frameWidth.toFloat()
         val scaleY = this.height.toFloat() / frameHeight.toFloat()
-        // Use the smaller scale factor to ensure the entire camera frame fits within the view,
-        // preventing parts of the image from being cropped. This creates a "letterbox" effect
-        // if aspect ratios differ.
         val scaleFactor = min(scaleX, scaleY)
 
-        // Calculate offsets to center the scaled camera frame content within the MainOverlayView
         val scaledFrameWidth = frameWidth * scaleFactor
         val scaledFrameHeight = frameHeight * scaleFactor
         val offsetX = (this.width - scaledFrameWidth) / 2f
         val offsetY = (this.height - scaledFrameHeight) / 2f
 
+        // Apply AppConfig.BALL_RADIUS_SCALE_FACTOR only at the detection level (BallDetector.kt).
+        // Here, we just scale the detected pixels to screen pixels.
         val scaledBalls = balls.map { ball ->
             Ball(
                 id = ball.id,
                 x = ball.x * scaleFactor + offsetX,
                 y = ball.y * scaleFactor + offsetY,
-                radius = ball.radius * scaleFactor
+                radius = ball.radius * scaleFactor // Radius is already scaled by frame-to-view scale here
             )
         }
-        appState.trackedBalls = scaledBalls // Store the scaled balls
-        Log.d(TAG, "updateTrackedBalls: Scaled ${scaledBalls.size} balls.")
+        appState.trackedBalls = scaledBalls
+        Log.d(TAG, "updateTrackedBalls: Scaled ${scaledBalls.size} balls. First ball (scaled): ${scaledBalls.firstOrNull()}")
 
-        // Re-evaluate current selected balls based on the scaled, currently tracked balls.
-        // This ensures selected balls are always represented by the latest scaled data
-        // and deselected if they disappear from tracking.
-        val currentSelectedCueBall = scaledBalls.firstOrNull { it.id == appState.selectedCueBallId }
-        if (currentSelectedCueBall != null) {
-            appState.updateSelectedCueBall(currentSelectedCueBall)
-            Log.d(TAG, "updateTrackedBalls: Selected cue ball ${appState.selectedCueBallId} updated.")
-        } else if (appState.selectedCueBallId != null) {
-            // If previously selected cue ball is no longer tracked, deselect it
-            appState.clearSelectedCueBall()
-            listener?.onCueBallSelected(null)
-            Log.d(TAG, "updateTrackedBalls: Previously selected cue ball disappeared, deselected.")
-        }
 
-        val currentSelectedTargetBall = scaledBalls.firstOrNull { it.id == appState.selectedTargetBallId }
-        if (currentSelectedTargetBall != null) {
-            appState.updateSelectedTargetBall(currentSelectedTargetBall)
-            Log.d(TAG, "updateTrackedBalls: Selected target ball ${appState.selectedTargetBallId} updated.")
-        } else if (appState.selectedTargetBallId != null) {
-            // If previously selected target ball is no longer tracked, deselect it
-            appState.clearSelectedTargetBall()
-            listener?.onTargetBallSelected(null)
-            Log.d(TAG, "updateTrackedBalls: Previously selected target ball disappeared, deselected.")
-        }
-
-        // Auto-select if currently in a selection mode and no ball is selected
-        when (appState.currentMode) {
-            SelectionMode.SELECTING_CUE_BALL -> {
-                if (appState.selectedCueBallId == null) {
-                    val firstBall = scaledBalls.firstOrNull()
-                    if (firstBall != null) {
-                        appState.updateSelectedCueBall(firstBall)
-                        listener?.onCueBallSelected(firstBall.id)
-                        Log.d(TAG, "Auto-selected cue ball: ${firstBall.id}")
-                    } else {
-                        Log.d(TAG, "No balls detected for auto-selection of cue ball.")
-                    }
+        appState.selectedCueBall?.let { selectedCue ->
+            if (!selectedCue.id.startsWith("MANUAL_")) {
+                scaledBalls.firstOrNull { it.id == selectedCue.id }?.let { latestCue ->
+                    appState.updateSelectedCueBall(latestCue)
+                    Log.d(TAG, "updateTrackedBalls: Selected detected cue ball ${latestCue.id} updated.")
+                } ?: run {
+                    Log.d(TAG, "updateTrackedBalls: Previously selected DETECTED cue ball disappeared from tracking, but remains selected.")
                 }
             }
-            SelectionMode.SELECTING_TARGET_BALL -> {
-                if (appState.selectedTargetBallId == null) {
-                    // Try to auto-select a target ball that isn't the cue ball
-                    val firstNonCueBall = scaledBalls.firstOrNull { it.id != appState.selectedCueBallId }
-                    if (firstNonCueBall != null) {
-                        appState.updateSelectedTargetBall(firstNonCueBall)
-                        listener?.onTargetBallSelected(firstNonCueBall.id)
-                        Log.d(TAG, "Auto-selected target ball: ${firstNonCueBall.id}")
-                    } else {
-                        Log.d(TAG, "No non-cue balls detected for auto-selection of target ball.")
-                    }
-                }
-            }
-            else -> { /* In AIMING mode, no auto-selection */ }
         }
 
-        invalidate() // Request a redraw to show updated positions
+        appState.selectedTargetBall?.let { selectedTarget ->
+            if (!selectedTarget.id.startsWith("MANUAL_")) {
+                scaledBalls.firstOrNull { it.id == selectedTarget.id }?.let { latestTarget ->
+                    appState.updateSelectedTargetBall(latestTarget)
+                    Log.d(TAG, "updateTrackedBalls: Selected detected target ball ${latestTarget.id} updated.")
+                } ?: run {
+                    Log.d(TAG, "updateTrackedBalls: Previously selected DETECTED target ball disappeared from tracking, but remains selected.")
+                }
+            }
+        }
+
+        invalidate()
     }
 
-    /**
-     * Sets the camera's zoom capabilities in AppState.
-     */
     fun updateCameraZoomCapabilities(minZoom: Float, maxZoom: Float) {
         appState.updateCameraZoomCapabilities(minZoom, maxZoom)
     }
 
     /**
-     * Handles a single tap event on the overlay for ball selection.
-     * @param tapX The X-coordinate of the tap in MainOverlayView pixels.
-     * @param tapY The Y-coordinate of the tap in MainOverlayView pixels.
+     * Handles a single tap event on the overlay for ball selection or manual placement.
      */
     private fun handleSingleTap(tapX: Float, tapY: Float) {
-        var closestBall: Ball? = null
-        var minDistance = Float.MAX_VALUE
+        var closestDetectedBall: Ball? = null
+        var minDistanceToDetected = Float.MAX_VALUE
 
         for (ball in appState.trackedBalls) {
+            // Apply zoom factor to the ball's radius for hit testing.
+            val effectiveRadius = ball.radius * appState.zoomFactor
             val dist = hypot(tapX - ball.x, tapY - ball.y)
-            if (dist <= ball.radius + 20f) { // Add 20 pixels tolerance for easier tapping
-                if (dist < minDistance) {
-                    minDistance = dist
-                    closestBall = ball
+            if (dist <= effectiveRadius + 20f) { // Use effectiveRadius for hit test
+                if (dist < minDistanceToDetected) {
+                    minDistanceToDetected = dist
+                    closestDetectedBall = ball
                 }
             }
         }
 
         val previousMode = appState.currentMode
         var modeChanged = false
+        Log.d(TAG, "handleSingleTap: Tap at (${tapX}, ${tapY}), closestDetectedBall: ${closestDetectedBall?.id ?: "NONE"}. Current mode: ${appState.currentMode}")
+
 
         when (appState.currentMode) {
             SelectionMode.SELECTING_CUE_BALL -> {
-                if (closestBall != null) {
-                    appState.updateSelectedCueBall(closestBall)
+                if (closestDetectedBall != null) {
+                    appState.updateSelectedCueBall(closestDetectedBall)
                     appState.currentMode = SelectionMode.SELECTING_TARGET_BALL
-                    listener?.onCueBallSelected(closestBall.id)
-                    Log.d(TAG, "User selected cue ball: ${closestBall.id}. Mode changed to ${appState.currentMode}")
+                    listener?.onCueBallSelected(closestDetectedBall.id)
+                    Log.d(TAG, "User selected detected cue ball: ${closestDetectedBall.id}. Mode changed to ${appState.currentMode}")
                     modeChanged = true
                 } else {
-                    Log.d(TAG, "Tap ignored: No ball found, expecting cue ball selection.")
+                    appState.setManualCueBall(tapX, tapY)
+                    appState.currentMode = SelectionMode.SELECTING_TARGET_BALL
+                    listener?.onCueBallSelected(appState.selectedCueBall?.id)
+                    Log.d(TAG, "User manually placed cue ball at (${tapX}, ${tapY}). Mode changed to ${appState.currentMode}")
+                    modeChanged = true
                 }
             }
             SelectionMode.SELECTING_TARGET_BALL -> {
-                if (closestBall != null) {
-                    if (closestBall.id == appState.selectedCueBallId) {
-                        // Tapped on cue ball again while selecting target, reset everything
-                        appState.clearSelectedCueBall()
-                        appState.clearSelectedTargetBall()
-                        appState.currentMode = SelectionMode.SELECTING_CUE_BALL
-                        listener?.onCueBallSelected(null)
-                        listener?.onTargetBallSelected(null)
-                        Log.d(TAG, "User tapped cue ball again, resetting selection. Mode changed to ${appState.currentMode}")
-                        modeChanged = true
-                    } else {
-                        // Tapped a different ball, select as target
-                        appState.updateSelectedTargetBall(closestBall)
-                        appState.currentMode = SelectionMode.AIMING
-                        listener?.onTargetBallSelected(closestBall.id)
-                        Log.d(TAG, "User selected target ball: ${closestBall.id}. Mode changed to ${appState.currentMode}")
-                        modeChanged = true
-                    }
+                val selectedCueCenter = appState.selectedCueBall?.let { PointF(it.x, it.y) }
+                // Use logicalBallRadius scaled by zoomFactor for hit test on selected cue.
+                val selectedCueEffectiveRadius = appState.logicalBallRadius * appState.zoomFactor
+                val distToSelectedCue = selectedCueCenter?.let { hypot(tapX - it.x, tapY - it.y) } ?: Float.MAX_VALUE
+
+                if (distToSelectedCue <= selectedCueEffectiveRadius + 20f) { // Use effective radius
+                    appState.clearSelectedCueBall()
+                    appState.clearSelectedTargetBall()
+                    appState.currentMode = SelectionMode.SELECTING_CUE_BALL
+                    listener?.onCueBallSelected(null)
+                    listener?.onTargetBallSelected(null)
+                    Log.d(TAG, "User tapped current cue ball, resetting selection. Mode changed to ${appState.currentMode}")
+                    modeChanged = true
+                } else if (closestDetectedBall != null && closestDetectedBall.id != appState.selectedCueBall?.id) {
+                    appState.updateSelectedTargetBall(closestDetectedBall)
+                    appState.currentMode = SelectionMode.AIMING
+                    listener?.onTargetBallSelected(closestDetectedBall.id)
+                    Log.d(TAG, "User selected detected target ball: ${closestDetectedBall.id}. Mode changed to ${appState.currentMode}")
+                    modeChanged = true
                 } else {
-                    // Tapped empty space, deselect target (if any) and go back to selecting cue
-                    if (appState.selectedTargetBallId != null) {
-                        appState.clearSelectedTargetBall()
-                        listener?.onTargetBallSelected(null)
-                        Log.d(TAG, "User deselected target ball. Still expecting target selection.")
-                        modeChanged = true // Mode changed back to selecting target.
-                    } else {
-                        Log.d(TAG, "Tap ignored: No ball found, expecting target ball selection.")
-                    }
+                    appState.setManualTargetBall(tapX, tapY)
+                    appState.currentMode = SelectionMode.AIMING
+                    listener?.onTargetBallSelected(appState.selectedTargetBall?.id)
+                    Log.d(TAG, "User manually placed target ball at (${tapX}, ${tapY}). Mode changed to ${appState.currentMode}")
+                    modeChanged = true
                 }
             }
             SelectionMode.AIMING -> {
-                if (closestBall != null) {
-                    if (closestBall.id == appState.selectedCueBallId) {
-                        // Tapped on cue ball, reset entire selection flow
-                        appState.clearSelectedCueBall()
-                        appState.clearSelectedTargetBall()
-                        appState.currentMode = SelectionMode.SELECTING_CUE_BALL
-                        listener?.onCueBallSelected(null)
-                        listener?.onTargetBallSelected(null)
-                        Log.d(TAG, "User tapped cue ball during aiming, resetting selection. Mode changed to ${appState.currentMode}")
-                        modeChanged = true
-                    } else if (closestBall.id == appState.selectedTargetBallId) {
-                        // Tapped on current target ball, deselect it and go back to selecting target
-                        appState.clearSelectedTargetBall()
-                        appState.currentMode = SelectionMode.SELECTING_TARGET_BALL
-                        listener?.onTargetBallSelected(null)
-                        Log.d(TAG, "User deselected target ball. Mode changed to ${appState.currentMode}")
-                        modeChanged = true
-                    } else {
-                        // Tapped a new ball, select as new target
-                        appState.updateSelectedTargetBall(closestBall)
-                        listener?.onTargetBallSelected(closestBall.id)
-                        Log.d(TAG, "User selected new target ball: ${closestBall.id}.")
-                        // Mode doesn't change from AIMING to AIMING
-                    }
+                val selectedTargetBallCenter = appState.selectedTargetBall?.let { PointF(it.x, it.y) }
+                val selectedTargetEffectiveRadius = appState.logicalBallRadius * appState.zoomFactor // Use effective radius
+                val distToSelectedTarget = selectedTargetBallCenter?.let { hypot(tapX - it.x, tapY - it.y) } ?: Float.MAX_VALUE
+
+                val selectedCueBallCenter = appState.selectedCueBall?.let { PointF(it.x, it.y) }
+                val selectedCueEffectiveRadius = appState.logicalBallRadius * appState.zoomFactor // Use effective radius
+                val distToSelectedCue = selectedCueBallCenter?.let { hypot(tapX - it.x, tapY - it.y) } ?: Float.MAX_VALUE
+
+
+                if (distToSelectedCue <= selectedCueEffectiveRadius + 20f) { // Use effective radius
+                    appState.clearSelectedCueBall()
+                    appState.clearSelectedTargetBall()
+                    appState.currentMode = SelectionMode.SELECTING_CUE_BALL
+                    listener?.onCueBallSelected(null)
+                    listener?.onTargetBallSelected(null)
+                    Log.d(TAG, "User tapped selected cue ball during aiming, resetting selection. Mode changed to ${appState.currentMode}")
+                    modeChanged = true
+                } else if (distToSelectedTarget <= selectedTargetEffectiveRadius + 20f) { // Use effective radius
+                    appState.clearSelectedTargetBall()
+                    appState.currentMode = SelectionMode.SELECTING_TARGET_BALL
+                    listener?.onTargetBallSelected(null)
+                    Log.d(TAG, "User tapped selected target ball, deselecting. Mode changed to ${appState.currentMode}")
+                    modeChanged = true
+                } else if (closestDetectedBall != null && closestDetectedBall.id != appState.selectedCueBall?.id) {
+                    appState.updateSelectedTargetBall(closestDetectedBall)
+                    listener?.onTargetBallSelected(closestDetectedBall.id)
+                    Log.d(TAG, "User selected new detected target ball: ${closestDetectedBall.id}.")
                 } else {
-                    // Tapped empty space, deselect target and go back to selecting target
-                    if (appState.selectedTargetBallId != null) {
-                        appState.clearSelectedTargetBall()
-                        appState.currentMode = SelectionMode.SELECTING_TARGET_BALL
-                        listener?.onTargetBallSelected(null)
-                        Log.d(TAG, "User tapped empty space, deselected target ball. Mode changed to ${appState.currentMode}")
-                        modeChanged = true
-                    } else {
-                        Log.d(TAG, "Tap ignored: No ball found, already in AIMING mode with no target selected.")
-                    }
+                    appState.setManualTargetBall(tapX, tapY)
+                    listener?.onTargetBallSelected(appState.selectedTargetBall?.id)
+                    Log.d(TAG, "User manually re-placed target ball at (${tapX}, ${tapY}). Mode remains ${appState.currentMode}")
                 }
             }
         }
         if (modeChanged) {
             listener?.onSelectionModeChanged(appState.currentMode)
         }
-        listener?.onUserInteraction() // Always notify of user interaction
-        invalidate() // Redraw after selection change
+        listener?.onUserInteraction()
+        invalidate()
     }
 
-    // --- Public API for controlling the view's state (now proxying to CameraManager for zoom) ---
-
     /**
-     * Sets the camera zoom factor. This will be clamped by camera capabilities.
-     * @param factor The desired zoom factor (e.g., 1.0f for no optical zoom).
+     * Handles snapping a dragged ball to a nearby detected ball on release.
      */
+    private fun handleSnapOnRelease(finalX: Float, finalY: Float, draggedBall: Ball) {
+        var snapped = false
+        // Use the logicalBallRadius for snap tolerance calculation, scaled by zoomFactor for screen space.
+        val snapTolerance = (appState.logicalBallRadius * appState.zoomFactor) * config.SNAP_RADIUS_FACTOR
+
+        for (detectedBall in appState.trackedBalls) {
+            // Avoid snapping a detected ball back to itself (it's already tracking)
+            // A manually placed ball that snaps to a detected ball should get the detected ball's ID.
+            // A previously detected ball should not snap to itself if it's still being tracked.
+            if (draggedBall.id == detectedBall.id && !draggedBall.id.startsWith("MANUAL_")) {
+                continue
+            }
+
+            val distance = hypot(finalX - detectedBall.x, finalY - detectedBall.y)
+            if (distance <= snapTolerance) {
+                // Snap to this detected ball
+                val newBall = detectedBall.copy()
+                if (draggedBall.id == appState.selectedCueBall?.id) {
+                    appState.updateSelectedCueBall(newBall)
+                    listener?.onCueBallSelected(newBall.id)
+                    Log.d(TAG, "Cue ball snapped to detected ball: ${newBall.id}")
+                } else if (draggedBall.id == appState.selectedTargetBall?.id) {
+                    appState.updateSelectedTargetBall(newBall)
+                    listener?.onTargetBallSelected(newBall.id)
+                    Log.d(TAG, "Target ball snapped to detected ball: ${newBall.id}")
+                }
+                snapped = true
+                break
+            }
+        }
+
+        if (!snapped) {
+            // If not snapped, just update its position to the final drag location as a manual ball
+            // Ensure the radius remains the current logical radius (same as target/ghost balls)
+            val finalBall = draggedBall.copy(x = finalX, y = finalY, radius = appState.logicalBallRadius) // Use logicalBallRadius
+            if (draggedBall.id == appState.selectedCueBall?.id) {
+                appState.updateSelectedCueBall(finalBall)
+                listener?.onCueBallSelected(finalBall.id)
+                Log.d(TAG, "Cue ball placed manually after drag, maintaining logical radius.")
+            } else if (draggedBall.id == appState.selectedTargetBall?.id) {
+                appState.updateSelectedTargetBall(finalBall)
+                listener?.onTargetBallSelected(finalBall.id)
+                Log.d(TAG, "Target ball placed manually after drag, maintaining logical radius.")
+            }
+        }
+    }
+
     fun setZoomFactor(factor: Float) {
         setZoomFactorInternal(factor, false)
     }
 
-    /**
-     * Internal method to set the camera zoom factor, with a flag for user-initiated changes.
-     */
     private fun setZoomFactorInternal(factor: Float, isUserInitiatedInView: Boolean) {
-        if (!areComponentsInitialized || !appState.isInitialized) return
+        if (!areComponentsInitialized || !appState.isInitialized) {
+            Log.w(TAG, "setZoomFactorInternal returning early: components not initialized.")
+            return
+        }
 
-        // Update AppState's zoomFactor (which now represents camera zoom ratio)
         if (appState.updateZoomFactor(factor)) {
-            // Apply the new zoom ratio to the CameraX camera
-            if (::cameraManagerRef.isInitialized) {
-                cameraManagerRef.setCameraZoomRatio(appState.zoomFactor)
-            }
+            cameraManagerRef?.setCameraZoomRatio(appState.zoomFactor)
+            Log.d(TAG, "Camera zoom ratio set to: ${appState.zoomFactor}")
+
             if (isUserInitiatedInView) {
                 listener?.onZoomChanged(appState.zoomFactor)
                 listener?.onUserInteraction()
             } else {
                 listener?.onZoomChanged(appState.zoomFactor)
             }
-            invalidate() // Request a redraw
+            invalidate()
+        } else {
+            Log.d(TAG, "setZoomFactorInternal: Zoom factor not significantly changed. Skipping update.")
         }
     }
 
-    /**
-     * Gets the current camera zoom factor.
-     * @return The current camera zoom factor.
-     */
-    fun getZoomFactor(): Float = if (appState.isInitialized) appState.zoomFactor else 1.0f
-
-    /**
-     * Gets the minimum supported camera zoom factor.
-     */
+    fun getZoomFactor(): Float = if (appState.isInitialized) appState.zoomFactor else config.DEFAULT_ZOOM_FACTOR
     fun getMinCameraZoomFactor(): Float = if (appState.isInitialized) appState.minCameraZoomRatio else 1.0f
-
-    /**
-     * Gets the maximum supported camera zoom factor.
-     */
     fun getMaxCameraZoomFactor(): Float = if (appState.isInitialized) appState.maxCameraZoomRatio else 1.0f
 
-
-    /**
-     * Sets the rotation angle of the protractor overlay.
-     * @param angle The desired rotation angle in degrees.
-     */
     fun setProtractorRotationAngle(angle: Float) {
         setProtractorRotationAngleInternal(angle, false)
     }
 
-    /**
-     * Internal method to set the rotation angle, with a flag for user-initiated changes.
-     */
     private fun setProtractorRotationAngleInternal(angle: Float, isUserInitiatedInView: Boolean) {
-        if (!areComponentsInitialized || !appState.isInitialized) return
+        if (!areComponentsInitialized || !appState.isInitialized) {
+            Log.w(TAG, "setProtractorRotationAngleInternal returning early: components not initialized.")
+            return
+        }
 
         if (appState.updateProtractorRotationAngle(angle)) {
             if (isUserInitiatedInView) {
@@ -1657,91 +1807,68 @@ class MainOverlayView @JvmOverloads constructor(
                 listener?.onRotationChanged(appState.protractorRotationAngle)
             }
             invalidate()
+        } else {
+            Log.d(TAG, "setProtractorRotationAngleInternal: Rotation angle not significantly changed. Skipping update.")
         }
     }
 
-    /**
-     * Gets the current rotation angle of the protractor overlay.
-     * @return The current rotation angle in degrees.
-     */
     fun getProtractorRotationAngle(): Float = if (appState.isInitialized) appState.protractorRotationAngle else config.DEFAULT_ROTATION_ANGLE
 
-    /**
-     * Sets the device pitch angle. This influences the 3D projection of the protractor.
-     * @param rawPitchAngle The raw pitch angle from the device sensor.
-     */
     fun setDevicePitchAngle(rawPitchAngle: Float) {
-        if (!areComponentsInitialized || !appState.isInitialized) return
+        if (!areComponentsInitialized || !appState.isInitialized) {
+            Log.w(TAG, "setDevicePitchAngle returning early: components not initialized.")
+            return
+        }
 
         if (appState.updateDevicePitchAngle(rawPitchAngle)) {
-            invalidate() // Request redraw if pitch changed significantly
+            invalidate()
         }
     }
 
-    /**
-     * Gets the current effective pitch angle.
-     * @return The current pitch angle in degrees.
-     */
     fun getCurrentPitchAngle(): Float = if (appState.isInitialized) appState.currentPitchAngle else 0.0f
-
-    /**
-     * Gets the current center point of the protractor's target circle in view coordinates.
-     * @return A PointF representing the target circle's center.
-     */
     fun getPlaneTargetCenter(): PointF = if (appState.isInitialized) PointF(appState.targetCircleCenter.x, appState.targetCircleCenter.y) else PointF()
 
-    /**
-     * Resets all user interactions (zoom, rotation) and ball selections to defaults.
-     */
     fun resetInteractionsToDefaults() {
+        Log.d(TAG, "resetInteractionsToDefaults called.")
+        if (!areComponentsInitialized && width > 0 && height > 0 && cameraManagerRef != null) {
+            Log.d(TAG, "resetInteractionsToDefaults: Attempting late initialization.")
+            initializeComponents()
+        }
+
         if (!areComponentsInitialized || !appState.isInitialized) {
-            // If not initialized, try to initialize it now (e.g., if reset is pressed very early)
-            if (width > 0 && height > 0 && ::cameraManagerRef.isInitialized) {
-                initializeComponents(cameraManagerRef) // Re-initialize with known cameraManagerRef
-                appState.initialize(width, height)
-            } else {
-                return // Cannot reset if not sized and CameraManager not ready
-            }
+            Log.w(TAG, "resetInteractionsToDefaults: Cannot reset if components are not initialized or app state is not ready.")
+            return
         }
 
-        appState.resetInteractions() // Reset AppState's interaction properties
-        appPaints.resetDynamicPaintProperties() // Reset any dynamic paint states (e.g., error colors, glows)
+        appState.resetInteractions()
+        appPaints.resetDynamicPaintProperties()
 
-        // Ensure camera zoom is reset to default (1.0f)
-        if (::cameraManagerRef.isInitialized) {
-            cameraManagerRef.setCameraZoomRatio(1.0f)
-        }
+        cameraManagerRef?.setCameraZoomRatio(config.DEFAULT_ZOOM_FACTOR)
+        Log.d(TAG, "Camera zoom ratio reset to ${config.DEFAULT_ZOOM_FACTOR}.")
 
-        // Notify listeners of the reset state
         listener?.onZoomChanged(appState.zoomFactor)
         listener?.onRotationChanged(appState.protractorRotationAngle)
-        listener?.onCueBallSelected(appState.selectedCueBallId)
-        listener?.onTargetBallSelected(appState.selectedTargetBallId) // Notify about deselection
+        listener?.onCueBallSelected(appState.selectedCueBall?.id)
+        listener?.onTargetBallSelected(appState.selectedTargetBall?.id)
         listener?.onSelectionModeChanged(appState.currentMode)
         listener?.onUserInteraction()
         invalidate()
+        Log.d(TAG, "resetInteractionsToDefaults complete. App state mode: ${appState.currentMode}")
     }
 
-    /**
-     * Toggles the visibility of helper text labels on the overlay.
-     */
     fun toggleHelperTextVisibility() {
-        if (!areComponentsInitialized || !appState.isInitialized) return
+        if (!areComponentsInitialized || !appState.isInitialized) {
+            Log.w(TAG, "toggleHelperTextVisibility returning early: components not initialized.")
+            return
+        }
 
         appState.toggleHelperTextVisibility()
-        listener?.onUserInteraction() // Mark as user interaction for UI updates
+        listener?.onUserInteraction()
         invalidate()
+        Log.d(TAG, "Helper text visibility toggled to: ${appState.areHelperTextsVisible}")
     }
 
-    /**
-     * Gets the current visibility state of helper texts.
-     * @return True if helper texts are visible, false otherwise.
-     */
-    fun getAreHelperTextsVisible(): Boolean = if (appState.isInitialized) appState.areHelperTextsVisible else true
-
-    /**
-     * Gets the current selection mode.
-     */
+    fun getAreHelperTextsVisible(): Boolean = if (appState.isInitialized) appState.areHelperTextsVisible else false // Default to false
     fun getSelectionMode(): SelectionMode = if (appState.isInitialized) appState.currentMode else SelectionMode.SELECTING_CUE_BALL
 }
 
@@ -1790,8 +1917,206 @@ data class DeflectionLineParams(
 
 
 ================================================================================
+FILE: app\src\main\java\com\hereliesaz\cuedetat\geometry\models\ActualBallOverlayCoords.kt
+================================================================================
+package com.hereliesaz.cuedetat.geometry.models
+
+import android.graphics.PointF
+
+/**
+ * Represents the screen coordinates and radius for the visual overlays drawn
+ * *on top of the actual detected/manual balls* visible through the camera feed.
+ * The radii here are intended to be `appState.currentLogicalRadius` for consistent sizing.
+ */
+data class ActualBallOverlayCoords(
+    val actualTargetOverlayPosition: PointF,
+    val actualCueOverlayPosition: PointF,
+    val actualTargetOverlayRadius: Float,
+    val actualCueOverlayRadius: Float
+)
+
+
+================================================================================
 FILE: app\src\main\java\com\hereliesaz\cuedetat\geometry\GeometryCalculator.kt
 ================================================================================
+package com.hereliesaz.cuedetat.geometry
+
+import android.graphics.Matrix
+import android.graphics.PointF
+import com.hereliesaz.cuedetat.geometry.models.AimingLineLogicalCoords
+import com.hereliesaz.cuedetat.geometry.models.DeflectionLineParams
+import com.hereliesaz.cuedetat.geometry.models.ActualBallOverlayCoords
+import com.hereliesaz.cuedetat.state.AppState
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.min
+import kotlin.math.sin
+
+class GeometryCalculator(
+    private val viewWidthProvider: () -> Int,
+    private val viewHeightProvider: () -> Int
+) {
+    /**
+     * Calculates the screen coordinates and radius for the visual overlays that are drawn
+     * *on top of the actual detected/manual balls* visible through the camera feed.
+     * The radii of these overlays will be `appState.logicalBallRadius` (unscaled) for consistent sizing.
+     */
+    fun calculateActualBallOverlayCoords(appState: AppState): ActualBallOverlayCoords {
+        // For the overlay on the *actual* target ball, use its tracked/manual position.
+        // Its visual radius should be the same as the logical radius for consistency.
+        val targetOverlayX = appState.selectedTargetBall?.x ?: appState.targetCircleCenter.x
+        val targetOverlayY = appState.selectedTargetBall?.y ?: appState.targetCircleCenter.y
+        val targetOverlayRadius = appState.logicalBallRadius // Force to logical radius
+
+        // For the overlay on the *actual* cue ball, use its tracked/manual position.
+        // Its visual radius should be the same as the logical radius for consistency.
+        val cueOverlayX = appState.selectedCueBall?.x ?: appState.cueCircleCenter.x
+        val cueOverlayY = appState.selectedCueBall?.y ?: appState.cueCircleCenter.y
+        val cueOverlayRadius = appState.logicalBallRadius // Force to logical radius
+
+        return ActualBallOverlayCoords(
+            actualTargetOverlayPosition = PointF(targetOverlayX, targetOverlayY),
+            actualCueOverlayPosition = PointF(cueOverlayX, cueOverlayY),
+            actualTargetOverlayRadius = targetOverlayRadius,
+            actualCueOverlayRadius = cueOverlayRadius
+        )
+    }
+
+    /**
+     * Calculates the logical coordinates for the main aiming line, which extends from the actual cue ball
+     * (if selected) to the ghost cue ball, and then projects indefinitely.
+     * The `startX, startY` in `AimingLineLogicalCoords` should be the actual cue ball's projected screen position.
+     * `cueX, cueY` is the logical ghost cue ball position.
+     */
+    fun calculateAimingLineLogicalCoords(appState: AppState, hasInversePitchMatrix: Boolean): AimingLineLogicalCoords {
+        val viewWidth = viewWidthProvider()
+        val viewHeight = viewHeightProvider()
+
+        // Start point of the line: This is now taken directly from the selectedCueBall
+        val startX = appState.selectedCueBall?.x ?: (viewWidth / 2f)
+        val startY = appState.selectedCueBall?.y ?: (viewHeight * 0.9f) // Start near the bottom of the screen
+
+        val cueX = appState.cueCircleCenter.x
+        val cueY = appState.cueCircleCenter.y
+
+        // Calculate the direction vector from the logical ghost cue ball (cueX, cueY) towards the logical target ball,
+        // and extend it far beyond the target.
+        val dx = appState.targetCircleCenter.x - cueX
+        val dy = appState.targetCircleCenter.y - cueY
+
+        val distance = hypot(dx, dy)
+        val normDirX = if (distance > 0) dx / distance else 0f
+        val normDirY = if (distance > 0) dy / distance else 0f
+
+        // Extend the line to a point far off-screen
+        val lineExtensionLength = maxOf(viewWidth, viewHeight) * 1.5f // Extend far enough
+        val endX = cueX + normDirX * lineExtensionLength
+        val endY = cueY + normDirY * lineExtensionLength
+
+        return AimingLineLogicalCoords(
+            startX = startX,
+            startY = startY,
+            cueX = cueX,
+            cueY = cueY,
+            endX = endX,
+            endY = endY,
+            normDirX = normDirX,
+            normDirY = normDirY
+        )
+    }
+
+    /**
+     * Calculates parameters for drawing the deflection lines.
+     * These lines extend perpendicularly from the cue-to-target line at the logical ghost cue ball.
+     */
+    fun calculateDeflectionLineParams(appState: AppState): DeflectionLineParams {
+        val cueCenterX = appState.cueCircleCenter.x
+        val cueCenterY = appState.cueCircleCenter.y
+        val targetCenterX = appState.targetCircleCenter.x
+        val targetCenterY = appState.targetCircleCenter.y
+        val radius = appState.logicalBallRadius // Use logicalBallRadius
+
+        // Vector from logical cue to logical target
+        val dx = targetCenterX - cueCenterX
+        val dy = targetCenterY - cueCenterY
+        val cueToTargetDistance = hypot(dx, dy)
+
+        // Perpendicular vector (unit vector)
+        val perpX = -dy // Rotate (dx, dy) by 90 degrees counter-clockwise to get (-dy, dx) or (dy, -dx)
+        val perpY = dx
+
+        val perpDistance = hypot(perpX, perpY)
+        val unitPerpX = if (perpDistance > 0) perpX / perpDistance else 0f
+        val unitPerpY = if (perpDistance > 0) perpY / perpDistance else 0f
+
+        // Visual length of the deflection lines
+        val visualDrawLength = radius * 3f // A multiple of the ball radius
+
+        return DeflectionLineParams(
+            cueToTargetDistance = cueToTargetDistance,
+            unitPerpendicularX = unitPerpX,
+            unitPerpendicularY = unitPerpY,
+            visualDrawLength = visualDrawLength
+        )
+    }
+
+    /**
+     * Checks if the logical ghost cue ball is "behind" the target ball relative to the current aiming line,
+     * indicating an invalid shot (e.g., trying to pull the cue ball through the target).
+     * This uses the *actual* start point of the aiming line (from the actual cue ball's screen position) as reference.
+     */
+    fun isGhostCueOnFarSide(appState: AppState, aimingLineCoords: AimingLineLogicalCoords): Boolean {
+        // Line vector is from startX, startY (actual cue ball) to endX, endY (extended line)
+        val lineVecX = aimingLineCoords.endX - aimingLineCoords.startX
+        val lineVecY = aimingLineCoords.endY - aimingLineCoords.startY
+
+        // Vector from line start (actual cue ball) to logical ghost cue ball
+        val actualToGhostX = aimingLineCoords.cueX - aimingLineCoords.startX
+        val actualToGhostY = aimingLineCoords.cueY - aimingLineCoords.startY
+
+        // Vector from line start (actual cue ball) to target ball
+        val actualToTargetX = (appState.selectedTargetBall?.x ?: appState.targetCircleCenter.x) - aimingLineCoords.startX
+        val actualToTargetY = (appState.selectedTargetBall?.y ?: appState.targetCircleCenter.y) - aimingLineCoords.startY
+
+        val dotProduct = (actualToTargetX * actualToGhostX) + (actualToTargetY * actualToGhostY)
+
+        val magActualToTargetSq = (actualToTargetX * actualToTargetX) + (actualToTargetY * actualToTargetY)
+        val magActualToGhostSq = (actualToGhostX * actualToGhostX) + (actualToGhostY * actualToGhostY)
+
+        if (magActualToTargetSq < 0.1f || magActualToGhostSq < 0.1f) return false // Avoid division by zero or near-zero magnitudes
+
+        // If dot product is negative or magnitude of actualToGhost is less than actualToTarget,
+        // it means the logical ghost ball is 'behind' or 'not far enough' along the line relative to the target.
+        // Specifically, for "far side", we mean the logical ghost ball is beyond the target.
+        // If the dot product is negative, it means the angle between the two vectors is > 90 degrees.
+        // We want them to be roughly in the same direction, and actualToGhost to be longer.
+
+        val distActualToTarget = hypot(actualToTargetX, actualToTargetY)
+        val distActualToGhost = hypot(actualToGhostX, actualToGhostY)
+
+        // Check for alignment: if dot product is positive and sufficient (e.g. cos(theta) > 0.8)
+        val alignmentThreshold = 0.9f // Cosine of ~25 degrees
+        val cosTheta = if (distActualToTarget > 0.1f && distActualToGhost > 0.1f) {
+            dotProduct / (distActualToTarget * distActualToGhost)
+        } else {
+            0f
+        }
+
+        // isGhostCueOnFarSide means the ghost ball is positioned such that the actual cue ball would need to pass
+        // *through* the target ball to hit the ghost ball, or the ghost ball is too close/behind the target.
+        // The condition (distActualToGhost < distActualToTarget - appState.logicalBallRadius / 2f)
+        // checks if the ghost ball is effectively "inside" the target ball's projected area from the actual cue.
+        return (distActualToGhost < distActualToTarget - appState.logicalBallRadius / 2f) && (cosTheta > alignmentThreshold)
+    }
+
+    /**
+     * Calculates the distance between two PointF objects.
+     */
+    fun distance(p1: PointF, p2: PointF): Float {
+        return hypot(p1.x - p2.x, p1.y - p2.y)
+    }
+}
 
 
 ================================================================================
@@ -1814,11 +2139,11 @@ class CueCircleDrawer {
         useErrorColor: Boolean
     ) {
         // Draw the *logical* cue ball (ghost ball on the plane)
-        if (!appState.isInitialized || appState.currentLogicalRadius <= 0.01f) return
+        if (!appState.isInitialized || appState.logicalBallRadius <= 0.01f) return
 
         val centerX = appState.cueCircleCenter.x
         val centerY = appState.cueCircleCenter.y
-        val radius = appState.currentLogicalRadius
+        val radius = appState.logicalBallRadius
         val centerMarkRadius = radius / 5f
 
         appPaints.cueCirclePaint.color = if (useErrorColor) {
@@ -1868,11 +2193,11 @@ class TargetCircleDrawer {
         appPaints: AppPaints
     ) {
         // Only draw if initialized and radius is meaningful
-        if (!appState.isInitialized || appState.currentLogicalRadius <= 0.01f) return
+        if (!appState.isInitialized || appState.logicalBallRadius <= 0.01f) return
 
         val centerX = appState.targetCircleCenter.x
         val centerY = appState.targetCircleCenter.y
-        val radius = appState.currentLogicalRadius // Use the dynamically calculated currentLogicalRadius
+        val radius = appState.logicalBallRadius // Use the dynamically calculated currentLogicalRadius
         val centerMarkRadius = radius / 5f // Center mark is 1/5th of the main circle radius
 
         // Draw the target circle outline (typically yellow)
@@ -2181,80 +2506,106 @@ class FollowDrawPathsDrawer {
 
 
 ================================================================================
-FILE: app\src\main\java\com\hereliesaz\cuedetat\drawing\plane\labels\ProjectedShotTextDrawer.kt
+FILE: app\src\main\java\com\hereliesaz\cuedetat\drawing\plane\elements\PlaneTargetBallDrawer.kt
 ================================================================================
-package com.hereliesaz.cuedetat.drawing.plane.labels
+package com.hereliesaz.cuedetat.drawing.plane.elements
 
 import android.graphics.Canvas
-import android.graphics.PointF
-import com.hereliesaz.cuedetat.config.AppConfig
+import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.state.AppPaints
 import com.hereliesaz.cuedetat.state.AppState
-import com.hereliesaz.cuedetat.drawing.utility.TextLayoutHelper
-import com.hereliesaz.cuedetat.geometry.models.AimingLineLogicalCoords
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
+import com.hereliesaz.cuedetat.ui.theme.AppBlack
+import com.hereliesaz.cuedetat.ui.theme.AppYellow
 
-class ProjectedShotTextDrawer(private val textLayoutHelper: TextLayoutHelper) {
-
-    private val TEXT_STRING = "Projected Shot Line"
-
+/**
+ * Draws the main target circle on the protractor plane.
+ * The position and radius are sourced from `AppState`, which reflects the tracked ball.
+ *
+ * @param canvas The canvas to draw on.
+ * @param appState The current state of the application.
+ * @param appPaints The collection of paints used for drawing.
+ */
+class PlaneTargetBallDrawer {
     fun draw(
         canvas: Canvas,
         appState: AppState,
-        appPaints: AppPaints,
-        config: AppConfig,
-        aimingLineCoords: AimingLineLogicalCoords
+        appPaints: AppPaints
     ) {
-        // Only draw if in AIMING mode and helper texts are visible
-        if (!appState.isInitialized || !appState.areHelperTextsVisible || appState.currentMode != AppState.SelectionMode.AIMING) return
-        if (aimingLineCoords.normDirX == 0f && aimingLineCoords.normDirY == 0f) return // No direction
+        // Only draw if initialized and radius is meaningful
+        if (!appState.isInitialized || appState.logicalBallRadius <= 0.01f) return
 
-        val paint = appPaints.projectedShotTextPaint
-        paint.textSize = getPlaneSpaceTextSize( // Using a local/adapted version for plane labels
-            config.PLANE_LABEL_BASE_SIZE,
-            appState.zoomFactor,
-            config,
-            true, // isHelperLineLabel
-            config.PROJECTED_SHOT_TEXT_SIZE_FACTOR
-        )
+        val centerX = appState.targetCircleCenter.x
+        val centerY = appState.targetCircleCenter.y
+        val radius = appState.logicalBallRadius * appState.zoomFactor // Scale by zoomFactor
+        val centerMarkRadius = radius / 5f // Center mark is 1/5th of the main circle radius
 
-        // The angle of the line segment from logical ghost cue to line end
-        val angleRad = atan2(aimingLineCoords.normDirY, aimingLineCoords.normDirX)
-        val rotationDegrees = Math.toDegrees(angleRad.toDouble()).toFloat()
+        // Draw the target circle outline (typically yellow)
+        appPaints.targetCirclePaint.color = AppYellow.toArgb()
+        canvas.drawCircle(centerX, centerY, radius, appPaints.targetCirclePaint)
 
-        // Position text along the line, starting from the logical ghost cue ball
-        val distanceFromGhostCueCenter = appState.currentLogicalRadius * 1.5f // Adjusted distance from ghost cue
-        val preferredX = aimingLineCoords.cueX + aimingLineCoords.normDirX * distanceFromGhostCueCenter
-        val preferredY = aimingLineCoords.cueY + aimingLineCoords.normDirY * distanceFromGhostCueCenter
-
-        // Add a small perpendicular offset to tuck it alongside the line
-        val perpendicularOffsetAmount = 20f / appState.zoomFactor.coerceAtLeast(0.5f)
-        val perpOffsetX = sin(angleRad) * perpendicularOffsetAmount
-        val perpOffsetY = -cos(angleRad) * perpendicularOffsetAmount
-
-        val finalX = preferredX + perpOffsetX
-        val finalY = preferredY + perpOffsetY
-
-        // Nudge reference: center of the logical cue ball (ghost ball on plane)
-        textLayoutHelper.layoutAndDrawText(
-            canvas, TEXT_STRING, finalX, finalY, paint, rotationDegrees, appState.cueCircleCenter
-        )
-    }
-
-    // Helper function for dynamic text sizing, adapted from old ProtractorPlaneTextDrawer
-    private fun getPlaneSpaceTextSize(
-        baseSize: Float, zoomFactor: Float, config: AppConfig,
-        isHelperLineLabel: Boolean = false, sizeMultiplier: Float = 1f
-    ): Float {
-        val effectiveZoom = if (isHelperLineLabel) zoomFactor.coerceIn(0.7f, 1.3f) else zoomFactor
-        return (baseSize * sizeMultiplier * effectiveZoom.coerceIn(config.TEXT_MIN_SCALE_FACTOR, config.TEXT_MAX_SCALE_FACTOR))
-            .coerceAtLeast(baseSize * sizeMultiplier * config.TEXT_MIN_SCALE_FACTOR * 0.7f)
+        // Draw the center mark for the target circle (typically black)
+        val originalCenterMarkPaintColor = appPaints.centerMarkPaint.color // Save original color
+        appPaints.centerMarkPaint.color = AppBlack.toArgb() // Set to black for target's center mark
+        canvas.drawCircle(centerX, centerY, centerMarkRadius, appPaints.centerMarkPaint)
+        appPaints.centerMarkPaint.color = originalCenterMarkPaintColor // Restore original color
     }
 }
 
 
+================================================================================
+FILE: app\src\main\java\com\hereliesaz\cuedetat\drawing\plane\elements\PlaneCueBallDrawer.kt
+================================================================================
+package com.hereliesaz.cuedetat.drawing.plane.elements
+
+import android.graphics.Canvas
+import androidx.compose.ui.graphics.toArgb
+import com.hereliesaz.cuedetat.state.AppPaints
+import com.hereliesaz.cuedetat.state.AppState
+import com.hereliesaz.cuedetat.ui.theme.AppBlack
+import com.hereliesaz.cuedetat.ui.theme.AppWhite
+
+/**
+ * Draws the *logical* cue ball (ghost ball) on the protractor plane.
+ * This element is fixed relative to the target ball on the plane.
+ * It does NOT draw the aiming sight, as that is part of the actual cue ball overlay.
+ */
+class PlaneCueBallDrawer {
+    fun draw(
+        canvas: Canvas,
+        appState: AppState,
+        appPaints: AppPaints,
+        useErrorColor: Boolean
+    ) {
+        // Draw the *logical* cue ball (ghost ball on the plane)
+        if (!appState.isInitialized || appState.logicalBallRadius <= 0.01f) return
+
+        val centerX = appState.cueCircleCenter.x
+        val centerY = appState.cueCircleCenter.y
+        val radius = appState.logicalBallRadius * appState.zoomFactor // Scale by zoomFactor
+        val centerMarkRadius = radius / 5f
+
+        appPaints.cueCirclePaint.color = if (useErrorColor) {
+            appPaints.M3_COLOR_ERROR
+        } else {
+            AppWhite.toArgb()
+        }
+        canvas.drawCircle(centerX, centerY, radius, appPaints.cueCirclePaint)
+
+        val originalCenterMarkPaintColor = appPaints.centerMarkPaint.color
+        appPaints.centerMarkPaint.color = if (useErrorColor) {
+            AppWhite.toArgb()
+        } else {
+            AppBlack.toArgb()
+        }
+        canvas.drawCircle(centerX, centerY, centerMarkRadius, appPaints.centerMarkPaint)
+        appPaints.centerMarkPaint.color = originalCenterMarkPaintColor
+    }
+}
+
+
+================================================================================
+FILE: app\src\main\java\com\hereliesaz\cuedetat\drawing\plane\labels\ProjectedShotTextDrawer.kt
+================================================================================
 ================================================================================
 FILE: app\src\main\java\com\hereliesaz\cuedetat\drawing\plane\labels\TangentLineTextDrawer.kt
 ================================================================================
@@ -2314,7 +2665,7 @@ class TangentLineTextDrawer(private val textLayoutHelper: TextLayoutHelper) {
 
         val angleRad = atan2(chosenVectorY, chosenVectorX)
         val rotationDegrees = getReadableRotation(Math.toDegrees(angleRad.toDouble()).toFloat())
-        val distance = appState.currentLogicalRadius * 3.4f // Keep consistent distance
+        val distance = (appState.logicalBallRadius * appState.zoomFactor) * 3.4f // Use logicalBallRadius and scale by zoomFactor
 
         val preferredX = appState.cueCircleCenter.x + cos(angleRad) * distance
         val preferredY = appState.cueCircleCenter.y + sin(angleRad) * distance
@@ -2400,7 +2751,7 @@ class CueBallPathTextDrawer(private val textLayoutHelper: TextLayoutHelper) {
         val angleRad = atan2(chosenVectorY, chosenVectorX)
         // Cue Ball Path is intrinsically flipped, then made readable
         val rotationDegrees = getReadableRotation(Math.toDegrees(angleRad.toDouble()).toFloat() + 180f)
-        val distance = appState.currentLogicalRadius * 3.4f
+        val distance = (appState.logicalBallRadius * appState.zoomFactor) * 3.4f // Use logicalBallRadius and scale by zoomFactor
 
         val preferredX = appState.cueCircleCenter.x + cos(angleRad) * distance
         val preferredY = appState.cueCircleCenter.y + sin(angleRad) * distance
@@ -2435,6 +2786,7 @@ package com.hereliesaz.cuedetat.drawing.plane.labels
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PointF
+import android.text.TextPaint
 import com.hereliesaz.cuedetat.config.AppConfig
 import com.hereliesaz.cuedetat.state.AppPaints
 import com.hereliesaz.cuedetat.state.AppState
@@ -2471,7 +2823,7 @@ class PocketAimTextDrawer(private val textLayoutHelper: TextLayoutHelper) {
 
         // So, coordinates are relative to the targetCircleCenter, along the protractor's current 0-degree axis.
         val preferredX = 0f // Center of the text block should be on the protractor's 0-degree line
-        val preferredY = -(appState.currentLogicalRadius + (35f / appState.zoomFactor.coerceAtLeast(0.5f))) // Slightly increased offset
+        val preferredY = -(appState.logicalBallRadius * appState.zoomFactor + (35f / appState.zoomFactor.coerceAtLeast(0.5f))) // Use logicalBallRadius and scale by zoomFactor
         val rotationDegrees = 90f // Text itself is rotated 90 degrees to be perpendicular to the line
 
         // The nudge reference is (0,0) in this *local, already transformed* canvas space,
@@ -2502,31 +2854,36 @@ import android.graphics.Canvas
 import com.hereliesaz.cuedetat.config.AppConfig
 import com.hereliesaz.cuedetat.state.AppPaints
 import com.hereliesaz.cuedetat.state.AppState
-import com.hereliesaz.cuedetat.state.AppState.SelectionMode // Import SelectionMode
+import com.hereliesaz.cuedetat.state.AppState.SelectionMode
 import com.hereliesaz.cuedetat.geometry.models.AimingLineLogicalCoords
 import com.hereliesaz.cuedetat.geometry.models.DeflectionLineParams
-import com.hereliesaz.cuedetat.drawing.plane.elements.* // Imports all element drawers
-import com.hereliesaz.cuedetat.drawing.plane.labels.*   // Imports all label drawers
+import com.hereliesaz.cuedetat.drawing.plane.elements.PlaneCueBallDrawer
+import com.hereliesaz.cuedetat.drawing.plane.elements.PlaneTargetBallDrawer
+import com.hereliesaz.cuedetat.drawing.plane.elements.ProtractorAnglesDrawer
+import com.hereliesaz.cuedetat.drawing.plane.elements.DeflectionLinesDrawer
+import com.hereliesaz.cuedetat.drawing.plane.elements.ShotGuideLineDrawer
+import com.hereliesaz.cuedetat.drawing.plane.elements.FollowDrawPathsDrawer
+import com.hereliesaz.cuedetat.drawing.plane.labels.*
 import com.hereliesaz.cuedetat.drawing.utility.TextLayoutHelper
 import kotlin.math.atan2
 import kotlin.math.abs
-import android.graphics.PointF // Import PointF
+import android.graphics.PointF
 
 class PlaneRenderer(
     private val textLayoutHelper: TextLayoutHelper,
     private val viewWidthProvider: () -> Int,
     private val viewHeightProvider: () -> Int
 ) {
-    private val cueCircleDrawer = CueCircleDrawer()
-    private val targetCircleDrawer = TargetCircleDrawer()
+    private val planeCueBallDrawer = PlaneCueBallDrawer()
+    private val planeTargetBallDrawer = PlaneTargetBallDrawer()
     private val protractorAnglesDrawer = ProtractorAnglesDrawer(viewWidthProvider, viewHeightProvider)
     private val deflectionLinesDrawer = DeflectionLinesDrawer()
     private val shotGuideLineDrawer = ShotGuideLineDrawer()
-    private val followDrawPathsDrawer = FollowDrawPathsDrawer() // Using the correct drawer name
+    private val followDrawPathsDrawer = FollowDrawPathsDrawer()
 
     private val projectedShotTextDrawer = ProjectedShotTextDrawer(textLayoutHelper)
-    private val tangentLineTextDrawer = TangentLineTextDrawer(textLayoutHelper) // Label for the Tangent Line itself
-    private val cueBallPathTextDrawer = CueBallPathTextDrawer(textLayoutHelper) // Label for the other (dotted) deflection line
+    private val tangentLineTextDrawer = TangentLineTextDrawer(textLayoutHelper)
+    private val cueBallPathTextDrawer = CueBallPathTextDrawer(textLayoutHelper)
     private val pocketAimTextDrawer = PocketAimTextDrawer(textLayoutHelper)
 
 
@@ -2538,16 +2895,21 @@ class PlaneRenderer(
         aimingLineCoords: AimingLineLogicalCoords,
         deflectionParams: DeflectionLineParams,
         useErrorColor: Boolean,
-        actualCueBallScreenCenter: PointF? // New parameter
+        actualCueBallScreenCenter: PointF? // This is the screen position of the actual cue ball (unadjusted Y)
     ) {
-        // Only draw protractor plane visuals if in AIMING mode
-        if (appState.currentMode != SelectionMode.AIMING) return
+        // The protractor plane visuals (circles, lines, etc.) are now always drawn
+        // if appState is initialized and balls are selected (or manually placed defaults)
 
-        targetCircleDrawer.draw(canvas, appState, appPaints)
-        cueCircleDrawer.draw(canvas, appState, appPaints, useErrorColor)
+        // Only draw if both selected balls exist (even if manually placed)
+        if (appState.selectedCueBall == null || appState.selectedTargetBall == null) return
+
+        planeTargetBallDrawer.draw(canvas, appState, appPaints)
+        planeCueBallDrawer.draw(canvas, appState, appPaints, useErrorColor)
         protractorAnglesDrawer.draw(canvas, appState, appPaints, config)
-        shotGuideLineDrawer.draw(canvas, appPaints, aimingLineCoords, actualCueBallScreenCenter) // Pass actual cue ball position
+        shotGuideLineDrawer.draw(canvas, appPaints, aimingLineCoords, actualCueBallScreenCenter)
 
+        // Deflection and Follow/Draw lines/labels are conditional on AIMING mode
+        // and a non-straight shot.
         val protractorAngle = appState.protractorRotationAngle
         val dxCueToTarget = appState.targetCircleCenter.x - appState.cueCircleCenter.x
         val dyCueToTarget = appState.targetCircleCenter.y - appState.cueCircleCenter.y
@@ -2561,15 +2923,15 @@ class PlaneRenderer(
         if (angleDiff > 180) angleDiff = 360 - angleDiff
         val isStraightShot = angleDiff < 1.5f
 
-        val showDeflectionAndFollowDrawLines = !isStraightShot &&
+        // Show deflection/follow/draw lines and their labels ONLY in AIMING mode AND if not a straight shot
+        val showDeflectionAndFollowDrawLines = appState.currentMode == SelectionMode.AIMING &&
+                !isStraightShot &&
                 deflectionParams.cueToTargetDistance > 0.1f &&
                 !useErrorColor
 
         if (showDeflectionAndFollowDrawLines) {
-            // This draws the main solid/dotted TANGENT lines
             deflectionLinesDrawer.draw(canvas, appState, appPaints, deflectionParams, false)
 
-            // Determine the angle of the VISUALLY SOLID deflection line (this is the Tangent Line)
             val alphaDeg = appState.protractorRotationAngle
             val epsilon = 0.5f
             val isPositiveDeflectionVectorSolid = (alphaDeg > epsilon && alphaDeg < (180f - epsilon)) ||
@@ -2581,27 +2943,31 @@ class PlaneRenderer(
                 atan2(-deflectionParams.unitPerpendicularY.toDouble(), -deflectionParams.unitPerpendicularX.toDouble())
             }
 
-            val basePathLength = deflectionParams.visualDrawLength // Use this as base for scaling path length
+            val basePathLength = deflectionParams.visualDrawLength
 
             followDrawPathsDrawer.draw(
                 canvas, appState, appPaints, config,
                 basePathLength,
                 tangentLineAngleRad
-                // The FollowDrawPathsDrawer itself will use config values for specific deflection angles
             )
         }
 
-        // Draw plane-specific helper texts only if in AIMING mode and helper texts are visible
+        // Draw plane-specific helper texts only if helper texts are visible
+        // And for some labels, only in AIMING mode.
         if (appState.areHelperTextsVisible) {
             canvas.save()
-            val textPlaneYLift = -appState.currentLogicalRadius * 0.15f / appState.zoomFactor.coerceAtLeast(0.3f)
+            // Text Y lift depends on base logical radius and zoom for consistency with plane elements
+            val textPlaneYLift = -appState.logicalBallRadius * appState.zoomFactor * 0.15f / appState.zoomFactor.coerceAtLeast(0.3f)
             canvas.translate(0f, textPlaneYLift)
             projectedShotTextDrawer.draw(canvas, appState, appPaints, config, aimingLineCoords)
             if (showDeflectionAndFollowDrawLines) { // Only show these labels if lines are visible
                 tangentLineTextDrawer.draw(canvas, appState, appPaints, config, deflectionParams)
                 cueBallPathTextDrawer.draw(canvas, appState, appPaints, config, deflectionParams)
             }
-            pocketAimTextDrawer.draw(canvas, appState, appPaints, config)
+            // Pocket aim text only visible in AIMING mode
+            if (appState.currentMode == SelectionMode.AIMING) {
+                pocketAimTextDrawer.draw(canvas, appState, appPaints, config)
+            }
             canvas.restore()
         }
     }
@@ -2609,81 +2975,124 @@ class PlaneRenderer(
 
 
 ================================================================================
-FILE: app\src\main\java\com\hereliesaz\cuedetat\drawing\screen\elements\GhostCueBallDrawer.kt
+FILE: app\src\main\java\com\hereliesaz\cuedetat\drawing\screen\elements\DetectedBallOutlineDrawer.kt
 ================================================================================
 package com.hereliesaz.cuedetat.drawing.screen.elements
 
 import android.graphics.Canvas
-import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.state.AppPaints
-import com.hereliesaz.cuedetat.ui.theme.AppWhite // Default color
+import com.hereliesaz.cuedetat.state.AppState // Import AppState
+import com.hereliesaz.cuedetat.tracking.ball_detector.Ball
 
-class GhostCueBallDrawer {
+class DetectedBallOutlineDrawer {
+    /**
+     * Draws an outline around each ball in the provided list.
+     * @param canvas The canvas to draw on.
+     * @param appPaints The collection of paints.
+     * @param balls The list of balls to draw outlines for.
+     * @param zoomFactor The current zoom factor to apply to the ball radii.
+     */
     fun draw(
         canvas: Canvas,
         appPaints: AppPaints,
-        centerX: Float,
-        centerY: Float,
-        radius: Float,
-        showErrorStyle: Boolean
+        balls: List<Ball>,
+        zoomFactor: Float // Added zoomFactor parameter
     ) {
-        if (radius <= 0.01f) return
-
-        // Ghost Cue Ball Outline
-        appPaints.ghostCueOutlinePaint.color = if (showErrorStyle) {
-            appPaints.M3_COLOR_ERROR
-        } else {
-            AppWhite.toArgb()
+        for (ball in balls) {
+            // Apply zoom factor to the ball's radius before drawing
+            val scaledRadius = ball.radius * zoomFactor
+            if (scaledRadius > 0.01f) { // Only draw if radius is meaningful
+                canvas.drawCircle(ball.x, ball.y, scaledRadius, appPaints.detectedBallOutlinePaint)
+            }
         }
-        canvas.drawCircle(centerX, centerY, radius, appPaints.ghostCueOutlinePaint)
-
-        // Aiming Sight (Yellow) on Ghost Cue Ball
-        // Sight color is usually fixed (e.g., yellow), not affected by error state of cue ball outline
-        appPaints.ghostCueAimingSightPaint.color = appPaints.targetCirclePaint.color // Match target circle color (AppYellow)
-        val sightArmLength = radius * 0.6f
-        canvas.drawLine(centerX - sightArmLength, centerY, centerX + sightArmLength, centerY, appPaints.ghostCueAimingSightPaint)
-        canvas.drawLine(centerX, centerY - sightArmLength, centerX, centerY + sightArmLength, appPaints.ghostCueAimingSightPaint)
-        canvas.drawCircle(centerX, centerY, sightArmLength * 0.15f, appPaints.ghostCueAimingSightPaint)
     }
 }
 
 
 ================================================================================
-FILE: app\src\main\java\com\hereliesaz\cuedetat\drawing\screen\elements\GhostTargetBallDrawer.kt
+FILE: app\src\main\java\com\hereliesaz\cuedetat\drawing\screen\elements\ActualCueBallOverlayDrawer.kt
 ================================================================================
-// app/src/main/java/com/hereliesaz/cuedetat/drawing/screen/elements/GhostTargetBallDrawer.kt
 package com.hereliesaz.cuedetat.drawing.screen.elements
 
 import android.graphics.Canvas
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.state.AppPaints
-import com.hereliesaz.cuedetat.ui.theme.AppYellow // Target is always yellow
+import com.hereliesaz.cuedetat.ui.theme.AppBlack
+import com.hereliesaz.cuedetat.ui.theme.AppWhite
 
-class GhostTargetBallDrawer {
-    /**
-     * Draws the "ghost" (projected) target ball. This is drawn in screen space
-     * and represents the visual projection of the tracked target ball.
-     *
-     * @param canvas The canvas to draw on.
-     * @param appPaints The collection of paints used for drawing.
-     * @param centerX The X-coordinate of the ghost ball's center in screen pixels.
-     * @param centerY The Y-coordinate of the ghost ball's center in screen pixels.
-     * @param radius The radius of the ghost ball in screen pixels.
-     */
+/**
+ * Draws the visual overlay (circle and aiming sight) on the *actual* cue ball's screen position.
+ * This is the visual aid that the user places over the real cue ball seen through the camera.
+ * Its size is determined by the `logicalRadius` for consistency with the target ball.
+ */
+class ActualCueBallOverlayDrawer {
     fun draw(
         canvas: Canvas,
         appPaints: AppPaints,
         centerX: Float,
         centerY: Float,
-        radius: Float // This `radius` is already the projected screen radius, suitable for drawing.
+        radius: Float, // This radius is expected to be appState.logicalBallRadius * appState.zoomFactor
+        showErrorStyle: Boolean
     ) {
-        if (radius <= 0.01f) return // Only draw if radius is meaningful
+        if (radius <= 0.01f) return
 
-        // Ghost Target Ball Outline (Always yellow as per 8-ball aesthetic)
-        appPaints.ghostTargetOutlinePaint.color = AppYellow.toArgb()
-        canvas.drawCircle(centerX, centerY, radius, appPaints.ghostTargetOutlinePaint)
+        // Outline for the actual cue ball overlay
+        appPaints.actualCueBallOverlayOutlinePaint.color = if (showErrorStyle) {
+            appPaints.M3_COLOR_ERROR
+        } else {
+            AppWhite.toArgb()
+        }
+        canvas.drawCircle(centerX, centerY, radius, appPaints.actualCueBallOverlayOutlinePaint)
 
-        // No aiming sight needed on the target ghost ball itself typically
+        // Center mark for the actual cue ball overlay
+        val centerMarkRadius = radius / 5f
+        val originalCenterMarkPaintColor = appPaints.centerMarkPaint.color
+        appPaints.centerMarkPaint.color = if (showErrorStyle) {
+            AppWhite.toArgb() // White center mark on error
+        } else {
+            AppBlack.toArgb() // Black center mark
+        }
+        canvas.drawCircle(centerX, centerY, centerMarkRadius, appPaints.centerMarkPaint)
+        appPaints.centerMarkPaint.color = originalCenterMarkPaintColor // Restore original
+
+        // Aiming Sight (Yellow) on the actual cue ball overlay
+        // Sight color is usually fixed (e.g., yellow/black), not affected by error state of cue ball outline
+        appPaints.actualCueBallAimingSightPaint.color = appPaints.targetCirclePaint.color // Match target circle color (AppYellow)
+        val sightArmLength = radius * 0.6f
+        canvas.drawLine(centerX - sightArmLength, centerY, centerX + sightArmLength, centerY, appPaints.actualCueBallAimingSightPaint)
+        canvas.drawLine(centerX, centerY - sightArmLength, centerX, centerY + sightArmLength, appPaints.actualCueBallAimingSightPaint)
+        canvas.drawCircle(centerX, centerY, sightArmLength * 0.15f, appPaints.actualCueBallAimingSightPaint)
+    }
+}
+
+
+================================================================================
+FILE: app\src\main\java\com\hereliesaz\cuedetat\drawing\screen\elements\ActualTargetBallOverlayOutlinePaint.kt
+================================================================================
+package com.hereliesaz.cuedetat.drawing.screen.elements
+
+import android.graphics.Canvas
+import androidx.compose.ui.graphics.toArgb // Explicitly import toArgb
+import com.hereliesaz.cuedetat.state.AppPaints
+import com.hereliesaz.cuedetat.ui.theme.AppYellow
+
+/**
+ * Draws the visual overlay (circle only, no sight) on the *actual* target ball's screen position.
+ * Its size is determined by the `logicalRadius` for consistency with other elements.
+ */
+class ActualTargetBallOverlayDrawer { // Corrected class name
+    fun draw(
+        canvas: Canvas,
+        appPaints: AppPaints, // Added parameter
+        centerX: Float,
+        centerY: Float,
+        radius: Float
+    ) {
+        if (radius <= 0.01f) return
+
+        // The paint is already defined in AppPaints, just use it to draw the circle.
+        appPaints.actualTargetBallOverlayOutlinePaint.color = AppYellow.toArgb()
+        canvas.drawCircle(centerX, centerY, radius, appPaints.actualTargetBallOverlayOutlinePaint)
     }
 }
 
@@ -2782,8 +3191,8 @@ class GhostTargetNameDrawer(private val textLayoutHelper: TextLayoutHelper) {
         ghostRadius: Float,
         verticalOffsetAdjustment: Float = 0f
     ) {
-        // Only draw if in AIMING mode and helper texts are visible
-        if (!appState.isInitialized || !appState.areHelperTextsVisible || appState.currentMode != AppState.SelectionMode.AIMING) return
+        // Only draw if initialized and helper texts are visible (removed AIMING mode check)
+        if (!appState.isInitialized || !appState.areHelperTextsVisible) return
         if (ghostRadius <= 0.01f) return
 
         val paint = appPaints.ghostTargetNamePaint // textAlign is CENTER
@@ -2853,8 +3262,8 @@ class GhostCueNameDrawer(private val textLayoutHelper: TextLayoutHelper) {
         ghostRadius: Float,
         verticalOffsetAdjustment: Float = 0f // This will be ADDED to the calculated Y. Negative pushes up.
     ) {
-        // Only draw if in AIMING mode and helper texts are visible
-        if (!appState.isInitialized || !appState.areHelperTextsVisible || appState.currentMode != AppState.SelectionMode.AIMING) return
+        // Only draw if initialized and helper texts are visible (removed AIMING mode check)
+        if (!appState.isInitialized || !appState.areHelperTextsVisible) return
         if (ghostRadius <= 0.01f) return
 
         val paint = appPaints.ghostCueNamePaint // textAlign is CENTER
@@ -3213,17 +3622,22 @@ import com.hereliesaz.cuedetat.state.AppPaints
 import com.hereliesaz.cuedetat.state.AppState
 import com.hereliesaz.cuedetat.state.AppState.SelectionMode
 import com.hereliesaz.cuedetat.drawing.utility.TextLayoutHelper
-import com.hereliesaz.cuedetat.drawing.screen.elements.*
+import com.hereliesaz.cuedetat.drawing.screen.elements.ActualCueBallOverlayDrawer
+import com.hereliesaz.cuedetat.drawing.screen.elements.ActualTargetBallOverlayDrawer
+import com.hereliesaz.cuedetat.drawing.screen.elements.DetectedBallOutlineDrawer
 import com.hereliesaz.cuedetat.drawing.screen.labels.*
-import kotlin.math.abs // For horizontal distance check
+import kotlin.math.abs
 
 class ScreenRenderer(
     private val textLayoutHelper: TextLayoutHelper,
     private val viewWidthProvider: () -> Int,
     private val viewHeightProvider: () -> Int
 ) {
-    private val ghostCueBallDrawer = GhostCueBallDrawer()
-    private val ghostTargetBallDrawer = GhostTargetBallDrawer()
+    private val actualCueBallOverlayDrawer = ActualCueBallOverlayDrawer()
+    private val actualTargetBallOverlayDrawer = ActualTargetBallOverlayDrawer()
+    // Removed: private val floatingGhostCueBallDrawer = FloatingGhostCueBallDrawer()
+    // Removed: private val floatingGhostTargetBallDrawer = FloatingGhostTargetBallDrawer()
+    private val detectedBallOutlineDrawer = DetectedBallOutlineDrawer()
 
     private val invalidShotWarningDrawer = InvalidShotWarningDrawer(textLayoutHelper, viewWidthProvider, viewHeightProvider)
     private val ghostTargetNameDrawer = GhostTargetNameDrawer(textLayoutHelper)
@@ -3233,88 +3647,100 @@ class ScreenRenderer(
     private val panHintDrawer = PanHintDrawer(textLayoutHelper, viewWidthProvider, viewHeightProvider)
     private val pinchHintDrawer = PinchHintDrawer(textLayoutHelper, viewWidthProvider, viewHeightProvider)
 
-    private val selectionInstructionDrawer = SelectionInstructionDrawer(viewWidthProvider, viewHeightProvider) // New drawer
+    private val selectionInstructionDrawer = SelectionInstructionDrawer(viewWidthProvider, viewHeightProvider)
 
-    // Threshold for horizontal proximity to trigger vertical offset adjustment
-    private val GHOST_LABEL_HORIZONTAL_PROXIMITY_THRESHOLD_FACTOR = 1.5f // e.g., 1.5 * (sum of radii)
-    private val GHOST_LABEL_VERTICAL_ADJUSTMENT_AMOUNT_DP = 10f // DP to adjust by
+    private val GHOST_LABEL_HORIZONTAL_PROXIMITY_THRESHOLD_FACTOR = 1.5f
+    private val GHOST_LABEL_VERTICAL_ADJUSTMENT_AMOUNT_DP = 10f
 
     fun draw(
         canvas: Canvas,
         appState: AppState,
         appPaints: AppPaints,
         config: AppConfig,
-        projectedTargetGhostCenter: PointF,
-        targetGhostRadius: Float,
-        projectedCueGhostCenter: PointF,
-        cueGhostRadius: Float,
+        actualTargetOverlayPosition: PointF, // Position for overlay on actual target ball (pitch-adjusted Y)
+        actualTargetOverlayRadius: Float,    // Radius for overlay on actual target ball (pitch-scaled)
+        actualCueOverlayPosition: PointF,    // Position for overlay on actual cue ball (pitch-adjusted Y)
+        actualCueOverlayRadius: Float,       // Radius for overlay on actual cue ball (pitch-scaled)
         showErrorStyleForGhostBalls: Boolean,
         invalidShotWarningString: String?
     ) {
         if (!appState.isInitialized) return
 
-        // 1. Draw Screen Space Visual Elements (Ghost Balls)
-        // These are drawn regardless of mode, as they represent the projection of tracked balls.
-        ghostTargetBallDrawer.draw(
-            canvas, appPaints,
-            projectedTargetGhostCenter.x, projectedTargetGhostCenter.y, targetGhostRadius
-        )
-        ghostCueBallDrawer.draw(
-            canvas, appPaints,
-            projectedCueGhostCenter.x, projectedCueGhostCenter.y, cueGhostRadius,
-            showErrorStyleForGhostBalls
-        )
+        // 1. Draw Outlines for ALL currently detected balls (except selected ones)
+        val selectedCueId = appState.selectedCueBall?.id
+        val selectedTargetId = appState.selectedTargetBall?.id
+        val unselectedDetectedBalls = appState.trackedBalls.filter {
+            it.id != selectedCueId && it.id != selectedTargetId
+        }
+        // Pass zoomFactor to DetectedBallOutlineDrawer
+        detectedBallOutlineDrawer.draw(canvas, appPaints, unselectedDetectedBalls, appState.zoomFactor)
 
-        // 2. Draw Screen Space Text Labels
-        // Warning text for invalid shots (only in AIMING mode)
+
+        // 2. Draw Screen Space Visual Elements (Overlays on actual balls)
+        if (appState.selectedTargetBall != null) {
+            // Draw overlay on the actual target ball (this is now the "floating" element for the target)
+            actualTargetBallOverlayDrawer.draw(
+                canvas, appPaints,
+                actualTargetOverlayPosition.x, actualTargetOverlayPosition.y, actualTargetOverlayRadius
+            )
+        }
+        if (appState.selectedCueBall != null) {
+            // Draw overlay on the actual cue ball (this is now the "floating" element for the cue)
+            actualCueBallOverlayDrawer.draw(
+                canvas, appPaints,
+                actualCueOverlayPosition.x, actualCueOverlayPosition.y, actualCueOverlayRadius,
+                showErrorStyleForGhostBalls
+            )
+        }
+
+        // 3. Draw Screen Space Text Labels
         invalidShotWarningDrawer.draw(
             canvas, appState, appPaints, config, invalidShotWarningString
         )
 
-        // Conditional drawing of instructions based on selection mode
         if (appState.areHelperTextsVisible) {
             selectionInstructionDrawer.draw(canvas, appState, appPaints, config)
 
-            when (appState.currentMode) {
-                SelectionMode.AIMING -> {
-                    // Only draw aiming-related labels in AIMING mode
-                    var targetLabelVerticalOffset = 0f
-                    var cueLabelVerticalOffset = 0f
+            var targetLabelVerticalOffset = 0f
+            var cueLabelVerticalOffset = 0f
 
-                    // Simple overlap avoidance for ghost ball labels
-                    if (targetGhostRadius > 0 && cueGhostRadius > 0) {
-                        val horizontalDistance = abs(projectedTargetGhostCenter.x - projectedCueGhostCenter.x)
-                        val proximityThreshold = (targetGhostRadius + cueGhostRadius) * GHOST_LABEL_HORIZONTAL_PROXIMITY_THRESHOLD_FACTOR
+            // Adjust label positions if balls are horizontally close
+            if (appState.selectedTargetBall != null && appState.selectedCueBall != null &&
+                actualTargetOverlayRadius > 0 && actualCueOverlayRadius > 0) {
+                val horizontalDistance = abs(actualTargetOverlayPosition.x - actualCueOverlayPosition.x)
+                val proximityThreshold = (actualTargetOverlayRadius + actualCueOverlayRadius) * GHOST_LABEL_HORIZONTAL_PROXIMITY_THRESHOLD_FACTOR
 
-                        if (horizontalDistance < proximityThreshold) {
-                            val adjustmentPixels = (GHOST_LABEL_VERTICAL_ADJUSTMENT_AMOUNT_DP / appState.zoomFactor.coerceAtLeast(0.3f))
-                            cueLabelVerticalOffset = -adjustmentPixels
-                            targetLabelVerticalOffset = adjustmentPixels / 2f
-                        }
-                    }
-
-                    ghostTargetNameDrawer.draw(
-                        canvas, appState, appPaints, config,
-                        projectedTargetGhostCenter, targetGhostRadius,
-                        targetLabelVerticalOffset
-                    )
-                    ghostCueNameDrawer.draw(
-                        canvas, appState, appPaints, config,
-                        projectedCueGhostCenter, cueGhostRadius,
-                        cueLabelVerticalOffset
-                    )
-                    fitTargetInstructionDrawer.draw(
-                        canvas, appState, appPaints, config,
-                        projectedTargetGhostCenter, targetGhostRadius
-                    )
-                    placeCueInstructionDrawer.draw(canvas, appState, appPaints, config)
-                    panHintDrawer.draw(canvas, appState, appPaints, config)
-                    pinchHintDrawer.draw(canvas, appState, appPaints, config)
-                }
-                SelectionMode.SELECTING_CUE_BALL, SelectionMode.SELECTING_TARGET_BALL -> {
-                    // No other labels are drawn during selection modes, only the instruction text
+                if (horizontalDistance < proximityThreshold) {
+                    val adjustmentPixels = (GHOST_LABEL_VERTICAL_ADJUSTMENT_AMOUNT_DP / appState.zoomFactor.coerceAtLeast(0.3f))
+                    cueLabelVerticalOffset = -adjustmentPixels
+                    targetLabelVerticalOffset = adjustmentPixels / 2f
                 }
             }
+
+            if (appState.selectedTargetBall != null) {
+                // Label for the pitch-adjusted actual target overlay.
+                ghostTargetNameDrawer.draw(
+                    canvas, appState, appPaints, config,
+                    actualTargetOverlayPosition, actualTargetOverlayRadius, // Use pitch-adjusted position and radius
+                    targetLabelVerticalOffset
+                )
+            }
+            if (appState.selectedCueBall != null) {
+                // Label for the pitch-adjusted actual cue overlay.
+                ghostCueNameDrawer.draw(
+                    canvas, appState, appPaints, config,
+                    actualCueOverlayPosition, actualCueOverlayRadius, // Use pitch-adjusted position and radius
+                    cueLabelVerticalOffset
+                )
+            }
+
+            fitTargetInstructionDrawer.draw(
+                canvas, appState, appPaints, config,
+                actualTargetOverlayPosition, actualTargetOverlayRadius
+            )
+            placeCueInstructionDrawer.draw(canvas, appState, appPaints, config)
+            panHintDrawer.draw(canvas, appState, appPaints, config)
+            pinchHintDrawer.draw(canvas, appState, appPaints, config)
         }
     }
 }
@@ -3502,6 +3928,7 @@ package com.hereliesaz.cuedetat.drawing.utility
 import com.hereliesaz.cuedetat.state.AppState
 import com.hereliesaz.cuedetat.geometry.GeometryCalculator
 import com.hereliesaz.cuedetat.geometry.models.AimingLineLogicalCoords
+import android.graphics.PointF
 
 /**
  * Evaluates various visual states based on the application and geometry state.
@@ -3517,13 +3944,13 @@ object VisualStateLogic {
         appState: AppState,
         geometryCalculator: GeometryCalculator,
         aimingLineCoords: AimingLineLogicalCoords?,
-        logicalCueCenter: android.graphics.PointF,
-        logicalTargetCenter: android.graphics.PointF
+        logicalCueCenter: PointF,
+        logicalTargetCenter: PointF
     ): EvaluatedVisualStates {
 
         // Check for physical overlap of logical cue and logical target circles on the plane
         val logicalDistanceBetweenCenters = geometryCalculator.distance(logicalCueCenter, logicalTargetCenter)
-        val isPhysicalOverlap = logicalDistanceBetweenCenters < (appState.currentLogicalRadius * 2 - 0.1f)
+        val isPhysicalOverlap = logicalDistanceBetweenCenters < (appState.logicalBallRadius * 2 - 0.1f) // Use logicalBallRadius
 
         // Check if logical target ball is on the "far side" relative to the aiming line's origin (actual cue ball)
         val isCueOnFarSide = if (aimingLineCoords != null) {
@@ -3536,8 +3963,8 @@ object VisualStateLogic {
         // This indicates a cut shot that ML Kit is not designed for, or an extreme angle.
         val isDeflectionDominantAngle = (appState.protractorRotationAngle > 90.5f && appState.protractorRotationAngle < 269.5f)
 
-        // The shot is considered invalid if the logical target is on the far side or the angle is deflection-dominant
-        val isInvalidShot = isCueOnFarSide || isDeflectionDominantAngle
+        // The shot is considered invalid if there's physical overlap OR if the logical target is on the far side OR the angle is deflection-dominant
+        val isInvalidShot = isPhysicalOverlap || isCueOnFarSide || isDeflectionDominantAngle
 
         // Warning style for ghost balls and yellow target line is applied if there's physical overlap or if the logical target is on the far side.
         val showGhostWarning = isPhysicalOverlap || isCueOnFarSide
@@ -3553,7 +3980,6 @@ object VisualStateLogic {
 ================================================================================
 FILE: app\src\main\java\com\hereliesaz\cuedetat\drawing\DrawingCoordinator.kt
 ================================================================================
-// app/src/main/java/com/hereliesaz/cuedetat/drawing/DrawingCoordinator.kt
 package com.hereliesaz.cuedetat.drawing
 
 import android.graphics.Canvas
@@ -3565,7 +3991,8 @@ import com.hereliesaz.cuedetat.state.AppState
 import com.hereliesaz.cuedetat.state.AppState.SelectionMode
 import com.hereliesaz.cuedetat.geometry.GeometryCalculator
 import com.hereliesaz.cuedetat.geometry.models.AimingLineLogicalCoords
-import com.hereliesaz.cuedetat.geometry.models.ProjectedCoords
+import com.hereliesaz.cuedetat.geometry.models.DeflectionLineParams
+import com.hereliesaz.cuedetat.geometry.models.ActualBallOverlayCoords
 import com.hereliesaz.cuedetat.drawing.plane.PlaneRenderer
 import com.hereliesaz.cuedetat.drawing.screen.ScreenRenderer
 import com.hereliesaz.cuedetat.drawing.utility.TextLayoutHelper
@@ -3573,6 +4000,7 @@ import com.hereliesaz.cuedetat.drawing.utility.VisualStateLogic
 import com.hereliesaz.cuedetat.ui.theme.AppPurple
 import com.hereliesaz.cuedetat.ui.theme.AppWhite
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.random.Random
@@ -3580,11 +4008,11 @@ import kotlin.random.Random
 class DrawingCoordinator(
     private val appState: AppState,
     private val appPaints: AppPaints,
-    private val config: AppConfig, // AppConfig instance is correctly passed
+    private val config: AppConfig,
     private val viewWidthProvider: () -> Int,
     private val viewHeightProvider: () -> Int
 ) {
-    private val pitchOffsetPower = 2.0f // Controls the intensity of the pitch-based Y-offset for ghost balls
+    private val pitchOffsetPower = 2.0f
 
     private val geometryCalculator = GeometryCalculator(viewWidthProvider, viewHeightProvider)
     private val textLayoutHelper = TextLayoutHelper(viewWidthProvider, viewHeightProvider)
@@ -3592,66 +4020,53 @@ class DrawingCoordinator(
     private val screenRenderer = ScreenRenderer(textLayoutHelper, viewWidthProvider, viewHeightProvider)
 
     private var currentWarningTextToDisplay: String? = null
-    private var wasPreviouslyInvalidSetup: Boolean = false // Tracks if the previous frame was invalid
-    private var lastRandomWarningIndex: Int = -1 // Stores index of last displayed random warning
+    private var wasPreviouslyInvalidSetup: Boolean = false
+    private var lastRandomWarningIndex: Int = -1
 
-    // Exposed for MainOverlayView to use for tap detection
-    private var lastProjectedScreenData: ProjectedCoords? = null
+    private var lastActualBallOverlayCoords: ActualBallOverlayCoords? = null
 
     /**
-     * Provides the last calculated projected screen coordinates and radii.
-     * This is useful for hit testing in MainOverlayView (e.g., ball selection).
+     * Provides the last calculated actual ball overlay coordinates and radii.
      */
-    fun getProjectedScreenData(): ProjectedCoords? {
-        return lastProjectedScreenData
+    fun getActualBallOverlayCoords(): ActualBallOverlayCoords? {
+        return lastActualBallOverlayCoords
     }
 
     /**
      * Main drawing function called by MainOverlayView on each frame.
-     * Orchestrates all drawing operations for the protractor plane and screen-space elements.
-     *
-     * @param canvas The Android Canvas to draw on.
      */
     fun onDraw(canvas: Canvas) {
-        // Do not draw if AppState is not initialized or if logical radius is negligible
-        if (!appState.isInitialized || appState.currentLogicalRadius <= 0.01f) {
+        // Ensure selected balls exist (even if default manual ones) before proceeding with drawing calculations
+        if (appState.selectedCueBall == null || appState.selectedTargetBall == null || !appState.isInitialized || appState.logicalBallRadius <= 0.01f) {
+            // These logs are useful if the default manual balls aren't being set for some reason
+            // Log.w(TAG, "onDraw returning early: selected balls not initialized or radius too small.")
             return
         }
 
-        // Clear text bounds for the new frame to allow for fresh collision detection
         textLayoutHelper.prepareForNewFrame()
 
-        // --- Apply 3D Pitch Transformation to the Canvas ---
         appState.graphicsCamera.save()
-        appState.graphicsCamera.rotateX(appState.currentPitchAngle) // Rotate around X-axis based on device pitch
-        appState.graphicsCamera.getMatrix(appState.pitchMatrix) // Get the transformation matrix
+        appState.graphicsCamera.rotateX(appState.currentPitchAngle)
+        appState.graphicsCamera.getMatrix(appState.pitchMatrix)
         appState.graphicsCamera.restore()
-        // Pre-translate to pivot around the targetCircleCenter, then post-translate back
         appState.pitchMatrix.preTranslate(-appState.targetCircleCenter.x, -appState.targetCircleCenter.y)
         appState.pitchMatrix.postTranslate(appState.targetCircleCenter.x, appState.targetCircleCenter.y)
-        // Attempt to invert the matrix; useful for mapping screen points back to logical plane
         val hasInversePitchMatrix = appState.pitchMatrix.invert(appState.inversePitchMatrix)
 
+        // Get base (un-pitched) coordinates for the overlays on the *actual* balls on screen
+        val baseActualBallOverlayCoords = geometryCalculator.calculateActualBallOverlayCoords(appState)
+        lastActualBallOverlayCoords = baseActualBallOverlayCoords // Store the base coordinates
 
-        // --- Calculate Geometrical Data for Drawing ---
-        val projectedScreenData = geometryCalculator.calculateProjectedScreenData(appState)
-        lastProjectedScreenData = projectedScreenData // Store for external access (e.g., tap detection)
         val aimingLineLogicalCoords = geometryCalculator.calculateAimingLineLogicalCoords(appState, hasInversePitchMatrix)
         val deflectionParams = geometryCalculator.calculateDeflectionLineParams(appState)
 
-        // --- Evaluate Current Visual States (e.g., valid shot, warnings) ---
-        // Only evaluate complex shot states if in AIMING mode
-        val visualStates = if (appState.currentMode == SelectionMode.AIMING) {
-            VisualStateLogic.evaluate(
-                appState, geometryCalculator, aimingLineLogicalCoords,
-                appState.cueCircleCenter, appState.targetCircleCenter
-            )
-        } else {
-            VisualStateLogic.EvaluatedVisualStates(isCurrentlyInvalidShotSetup = false, showWarningStyleForGhostBalls = false)
-        }
+        // Evaluate visual states unconditionally, as drawing is now always on.
+        val visualStates = VisualStateLogic.evaluate(
+            appState, geometryCalculator, aimingLineLogicalCoords,
+            appState.cueCircleCenter, appState.targetCircleCenter
+        )
 
-
-        // --- Manage Warning Text Display (only in AIMING mode) ---
+        // Manage Warning Text Display (still only in AIMING mode)
         if (appState.currentMode == SelectionMode.AIMING) {
             if (visualStates.isCurrentlyInvalidShotSetup) {
                 if (!wasPreviouslyInvalidSetup) {
@@ -3665,20 +4080,19 @@ class DrawingCoordinator(
                         currentWarningTextToDisplay = config.INSULTING_WARNING_STRINGS[randomIndex]
                         lastRandomWarningIndex = randomIndex
                     } else {
-                        currentWarningTextToDisplay = "Invalid Shot Setup" // Fallback warning
+                        currentWarningTextToDisplay = "Invalid Shot Setup"
                     }
                 }
             } else {
-                currentWarningTextToDisplay = null // Clear warning when state is valid
+                currentWarningTextToDisplay = null
             }
         } else {
-            currentWarningTextToDisplay = null // No warnings outside AIMING mode
+            currentWarningTextToDisplay = null
         }
-        wasPreviouslyInvalidSetup = visualStates.isCurrentlyInvalidShotSetup // Update state for next frame
+        wasPreviouslyInvalidSetup = visualStates.isCurrentlyInvalidShotSetup
 
 
-        // --- Adjust Paint Properties based on Visual State ---
-        // Adjust the yellow target line (main aiming line) based on warning style
+        // Adjust Paint Properties based on Visual State
         if (visualStates.showWarningStyleForGhostBalls) {
             appPaints.targetLineGuidePaint.apply {
                 strokeWidth = config.STROKE_TARGET_LINE_GUIDE + config.STROKE_DEFLECTION_LINE_BOLD_INCREASE
@@ -3686,57 +4100,63 @@ class DrawingCoordinator(
             }
         } else {
             appPaints.targetLineGuidePaint.apply {
-                strokeWidth = config.STROKE_TARGET_LINE_GUIDE // Use normal stroke
-                clearShadowLayer() // Remove any glow
+                strokeWidth = config.STROKE_TARGET_LINE_GUIDE
+                clearShadowLayer()
             }
         }
 
-        // Adjust the aiming assist line colors based on validity
-        // Only modify if in AIMING mode
-        if (appState.currentMode == SelectionMode.AIMING) {
-            val isPhysicalOverlap = geometryCalculator.distance(appState.cueCircleCenter, appState.targetCircleCenter) < (appState.currentLogicalRadius * 2 - 0.1f)
-            if (visualStates.isCurrentlyInvalidShotSetup) {
-                appPaints.shotGuideNearPaint.apply { color = appPaints.M3_COLOR_ERROR; clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_FAR }
-                appPaints.shotGuideFarPaint.apply { color = appPaints.M3_COLOR_ERROR; clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_FAR }
-            } else {
-                appPaints.shotGuideNearPaint.apply { color = AppWhite.toArgb(); strokeWidth = config.STROKE_AIM_LINE_NEAR }
-                appPaints.shotGuideFarPaint.apply { color = AppPurple.toArgb(); strokeWidth = if (!isPhysicalOverlap) config.STROKE_AIM_LINE_NEAR else config.STROKE_AIM_LINE_FAR}
-            }
+        // Adjust the aiming assist line colors based on validity (still only in AIMING mode for color change)
+        val isPhysicalOverlap = geometryCalculator.distance(appState.cueCircleCenter, appState.targetCircleCenter) < (appState.logicalBallRadius * 2 - 0.1f)
+        if (appState.currentMode == SelectionMode.AIMING && visualStates.isCurrentlyInvalidShotSetup) {
+            appPaints.shotGuideNearPaint.apply { color = appPaints.M3_COLOR_ERROR; clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_FAR }
+            appPaints.shotGuideFarPaint.apply { color = appPaints.M3_COLOR_ERROR; clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_FAR }
         } else {
-            // If not in AIMING mode, lines are either not drawn or drawn with a neutral style
-            // Ensure they are not drawn with error color when not in AIMING mode.
-            appPaints.shotGuideNearPaint.apply { color = AppWhite.toArgb(); clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_NEAR }
-            appPaints.shotGuideFarPaint.apply { color = AppPurple.toArgb(); clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_FAR }
+            appPaints.shotGuideNearPaint.apply { color = AppWhite.toArgb(); strokeWidth = config.STROKE_AIM_LINE_NEAR }
+            appPaints.shotGuideFarPaint.apply { color = AppPurple.toArgb(); strokeWidth = if (!isPhysicalOverlap) config.STROKE_AIM_LINE_NEAR else config.STROKE_AIM_LINE_FAR}
         }
 
 
-        // --- Draw Protractor Plane Elements ---
+        // Render plane elements (logical balls, protractor lines, shot guide)
         canvas.save()
-        canvas.concat(appState.pitchMatrix) // Apply the 3D pitch transformation
+        canvas.concat(appState.pitchMatrix)
         planeRenderer.draw(
             canvas, appState, appPaints, config,
-            aimingLineCoords = aimingLineLogicalCoords ?: AimingLineLogicalCoords(0f,0f,0f,0f,0f,0f,0f,0f),
+            aimingLineCoords = aimingLineLogicalCoords,
             deflectionParams = deflectionParams,
             useErrorColor = visualStates.isCurrentlyInvalidShotSetup,
-            actualCueBallScreenCenter = appState.selectedCueBallScreenCenter // Pass actual cue ball screen position
+            actualCueBallScreenCenter = baseActualBallOverlayCoords.actualCueOverlayPosition // Pass actual cue's original screen position (unadjusted Y)
         )
-        canvas.restore() // Restore canvas to original (non-pitched) state for screen-space drawing
+        canvas.restore()
 
-        // --- Calculate Y-offset for Ghost Balls for Pseudo-3D Effect ---
-        // This makes ghost balls appear to "float" above the plane based on pitch.
+        // Calculate pitch-affected positions and radii for the *actual ball overlays*
         val pitchRadians = Math.toRadians(appState.currentPitchAngle.toDouble())
         val basePitchFactor = abs(sin(pitchRadians)).toFloat()
-        val pitchScaleFactor = basePitchFactor.pow(pitchOffsetPower)
-        val targetGhostDrawnCenterY = projectedScreenData.targetProjected.y - (pitchScaleFactor * projectedScreenData.targetScreenRadius)
-        val cueGhostDrawnCenterY = projectedScreenData.cueProjected.y - (pitchScaleFactor * projectedScreenData.cueScreenRadius)
+        val pitchYOffsetFactor = basePitchFactor.pow(config.PITCH_OFFSET_POWER) // Use config constant for power
 
-        // --- Draw Screen Space Elements (Ghost Balls and Labels) ---
+        // Cosine for radius scaling: radius scales down as ball tilts "away" from viewer
+        val radiusPerspectiveScaleFactor = abs(cos(pitchRadians)).toFloat().coerceAtLeast(0.5f) // Ensure minimum size
+        val combinedRadiusScale = appState.zoomFactor * radiusPerspectiveScaleFactor
+
+
+        // Pitch-adjusted Y and scaled radius for the actual target overlay
+        val actualTargetOverlayDrawnCenterY = baseActualBallOverlayCoords.actualTargetOverlayPosition.y -
+                (pitchYOffsetFactor * (appState.logicalBallRadius * appState.zoomFactor)) // Apply logical radius * zoom for Y offset
+        val actualTargetOverlayScaledRadius = appState.logicalBallRadius * combinedRadiusScale // Apply logical radius * combined scale
+
+
+        // Pitch-adjusted Y and scaled radius for the actual cue overlay
+        val actualCueOverlayDrawnCenterY = baseActualBallOverlayCoords.actualCueOverlayPosition.y -
+                (pitchYOffsetFactor * (appState.logicalBallRadius * appState.zoomFactor)) // Apply logical radius * zoom for Y offset
+        val actualCueOverlayScaledRadius = appState.logicalBallRadius * combinedRadiusScale // Apply logical radius * combined scale
+
+
+        // Render screen elements (actual ball overlays, labels)
         screenRenderer.draw(
             canvas, appState, appPaints, config,
-            projectedTargetGhostCenter = PointF(projectedScreenData.targetProjected.x, targetGhostDrawnCenterY),
-            targetGhostRadius = projectedScreenData.targetScreenRadius,
-            projectedCueGhostCenter = PointF(projectedScreenData.cueProjected.x, cueGhostDrawnCenterY),
-            cueGhostRadius = projectedScreenData.cueScreenRadius,
+            actualTargetOverlayPosition = PointF(baseActualBallOverlayCoords.actualTargetOverlayPosition.x, actualTargetOverlayDrawnCenterY),
+            actualTargetOverlayRadius = actualTargetOverlayScaledRadius,
+            actualCueOverlayPosition = PointF(baseActualBallOverlayCoords.actualCueOverlayPosition.x, actualCueOverlayDrawnCenterY),
+            actualCueOverlayRadius = actualCueOverlayScaledRadius,
             showErrorStyleForGhostBalls = visualStates.showWarningStyleForGhostBalls,
             invalidShotWarningString = currentWarningTextToDisplay
         )
@@ -3768,8 +4188,6 @@ data class Ball(
 ================================================================================
 FILE: app\src\main\java\com\hereliesaz\cuedetat\tracking\ball_detector\BallDetector.kt
 ================================================================================
-// FILE: app\src\main\java\com\hereliesaz\cuedetat\tracking\ball_detector\BallDetector.kt
-// app/src/main/java/com/hereliesaz/cuedetat/tracking/ball_detector/BallDetector.kt
 package com.hereliesaz.cuedetat.tracking.ball_detector
 
 import android.graphics.Rect
@@ -3779,6 +4197,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
+import com.hereliesaz.cuedetat.config.AppConfig // Import AppConfig
 import kotlin.math.max
 import kotlin.math.min
 
@@ -3826,26 +4245,19 @@ class BallDetector {
                     val trackingId = detectedObject.trackingId
                     val confidence = detectedObject.labels.firstOrNull()?.confidence ?: 0f
 
-                    // Filter based on shape (aspect ratio close to 1:1) and confidence if needed
-                    // A simple heuristic for a ball is a bounding box that is roughly square.
+                    // Filter based on shape (aspect ratio close to 1:1) and confidence
                     val aspectRatio = boundingBox.width().toFloat() / boundingBox.height().toFloat()
                     val isRoughlySquare = aspectRatio > 0.7 && aspectRatio < 1.3 // Allow some leeway
 
-                    // You might want to filter by classification label if available and relevant (e.g., "ball")
-                    // For general objects, classification might not be specific enough for pool balls.
-                    val isBall = detectedObject.labels.any { label ->
-                        label.text.equals("ball", ignoreCase = true) || // Common label for round objects
-                                label.text.equals("sphere", ignoreCase = true) ||
-                                label.text.equals("sport", ignoreCase = true) // General sports object
-                        // Add more specific labels if ML Kit provides them for pool balls
-                    }
-
+                    // Removed the explicit 'isBall' classification check for more permissive detection
+                    // This allows any roughly square, confident detection to be a 'ball' for now.
                     if (isRoughlySquare && confidence > 0.5) { // Confidence threshold
                         // Map ML Kit bounding box to our simplified Ball model
                         val centerX = boundingBox.centerX().toFloat()
                         val centerY = boundingBox.centerY().toFloat()
                         // Use average of half width and half height as radius for a circular representation
-                        val radius = (boundingBox.width() + boundingBox.height()) / 4f
+                        // Apply the BALL_RADIUS_SCALE_FACTOR to adjust the size
+                        val radius = ((boundingBox.width() + boundingBox.height()) / 4f) * AppConfig.BALL_RADIUS_SCALE_FACTOR
 
                         // Ensure radius is positive to avoid issues with drawing/logic
                         if (radius > 0) {
@@ -3894,7 +4306,7 @@ import android.os.Environment
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import com.hereliesaz.cuedetat.config.AppConfig
+import com.hereliesaz.cuedetat.config.AppConfig // Ensure this import is present
 import okhttp3.*
 import org.json.JSONObject
 import java.io.File
@@ -3986,6 +4398,7 @@ class GitHubUpdater(
                         for (i in 0 until assets.length()) {
                             val asset = assets.getJSONObject(i)
                             val assetName = asset.getString("name")
+                            // Corrected: use AppConfig.GITHUB_RELEASE_ASSET_NAME_REGEX
                             if (assetName.matches(Regex(AppConfig.GITHUB_RELEASE_ASSET_NAME_REGEX))) {
                                 apkDownloadUrl = asset.getString("browser_download_url")
                                 break
@@ -4189,8 +4602,6 @@ class GitHubUpdater(
 ================================================================================
 FILE: app\src\main\java\com\hereliesaz\cuedetat\MainActivity.kt
 ================================================================================
-// FILE: app\src\main\java\com\hereliesaz\cuedetat\MainActivity.kt
-// app/src/main/java/com/hereliesaz/cuedetat/MainActivity.kt
 package com.hereliesaz.cuedetat
 
 /**
@@ -4251,7 +4662,7 @@ import com.hereliesaz.cuedetat.config.AppConfig
 import com.hereliesaz.cuedetat.state.AppState.SelectionMode
 import com.hereliesaz.cuedetat.system.CameraManager
 import com.hereliesaz.cuedetat.system.PitchSensor
-import com.hereliesaz.cuedetat.ui.theme.PoolProtractorTheme // Added import
+import com.hereliesaz.cuedetat.ui.theme.PoolProtractorTheme
 import com.hereliesaz.cuedetat.updater.GitHubUpdater
 import com.hereliesaz.cuedetat.view.MainOverlayView
 import com.hereliesaz.cuedetat.view.MainOverlayView.AppStateListener
@@ -4269,20 +4680,19 @@ class MainActivity : AppCompatActivity(), AppStateListener, GitHubUpdater.Callba
     private lateinit var zoomSlider: SeekBar
     private lateinit var resetButton: FloatingActionButton
     private lateinit var zoomCycleButton: FloatingActionButton
-    // Removed helpButton from declaration
     private lateinit var controlsLayout: ConstraintLayout
-    private lateinit var appTitleContainer: FrameLayout // Reference to the FrameLayout wrapping title/logo
+    private lateinit var appTitleContainer: FrameLayout
 
     private lateinit var appTitleTextView: TextView
     private lateinit var appTitleLogoImageView: ImageView
 
     private lateinit var cameraManager: CameraManager
     private lateinit var pitchSensor: PitchSensor
-    private lateinit var gitHubUpdater: GitHubUpdater // GitHubUpdater instance
+    private lateinit var gitHubUpdater: GitHubUpdater
 
     private var valuesChangedSinceLastReset = false
-    private var helpTextCurrentlyVisible = false // Default to false
-    private var currentSelectionMode: SelectionMode = SelectionMode.SELECTING_CUE_BALL // Track mode in Activity
+    private var helpTextCurrentlyVisible = false
+    private var currentSelectionMode: SelectionMode = SelectionMode.SELECTING_CUE_BALL
 
     private enum class ZoomCycleState { MIN_ZOOM, MAX_ZOOM }
     private var nextZoomCycleState: ZoomCycleState = ZoomCycleState.MIN_ZOOM
@@ -4292,44 +4702,38 @@ class MainActivity : AppCompatActivity(), AppStateListener, GitHubUpdater.Callba
         super.onCreate(savedInstanceState)
         Log.d(TAG, "MainActivity onCreate started.")
 
-        // Configure window for full-screen immersive mode
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val windowInsetsController = WindowInsetsControllerCompat(window, window.decorView)
         windowInsetsController.hide(WindowInsetsCompat.Type.statusBars())
         windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) // Keep screen on
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         setContentView(R.layout.activity_main)
         controlsLayout = findViewById(R.id.controls_layout)
 
-        // Apply system bar insets as padding to the controls layout to avoid overlap
         ViewCompat.setOnApplyWindowInsetsListener(controlsLayout) { view, windowInsets ->
             val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
             view.updatePadding(
                 left = insets.left,
-                top = insets.top, // Fixed typo: 'inets' to 'insets'
+                top = insets.top,
                 right = insets.right,
                 bottom = insets.bottom
             )
             WindowInsetsCompat.CONSUMED
         }
 
-        // Initialize UI components
         cameraPreviewView = findViewById(R.id.cameraPreviewView)
         mainOverlayView = findViewById(R.id.protractorOverlayView)
         zoomSlider = findViewById(R.id.zoomSlider)
         resetButton = findViewById(R.id.resetButton)
         zoomCycleButton = findViewById(R.id.zoomCycleButton)
-        // Removed helpButton from findViewById
-        appTitleContainer = findViewById(R.id.appTitleContainer) // Get reference to the FrameLayout
+        appTitleContainer = findViewById(R.id.appTitleContainer)
         appTitleTextView = findViewById(R.id.appTitleTextView)
         appTitleLogoImageView = findViewById(R.id.appTitleLogoImageView)
 
         Log.d(TAG, "mainOverlayView found: ${::mainOverlayView.isInitialized}")
         Log.d(TAG, "appTitleTextView visibility (XML default): ${appTitleTextView.visibility}")
 
-
-        // Set custom font for the app title
         try {
             val archivoBlackTypeface = ResourcesCompat.getFont(this, R.font.archivo_black_regular)
             appTitleTextView.typeface = archivoBlackTypeface
@@ -4337,68 +4741,54 @@ class MainActivity : AppCompatActivity(), AppStateListener, GitHubUpdater.Callba
             Log.e(TAG, "Archivo Black font not found for title, using default.", e)
         }
 
-        mainOverlayView.listener = this // Set MainActivity as the listener for MainOverlayView events
-        helpTextCurrentlyVisible = mainOverlayView.getAreHelperTextsVisible() // Get initial visibility state (will be false from AppState default)
-        currentSelectionMode = mainOverlayView.getSelectionMode() // Get initial selection mode
-        updateUiVisibilityForSelectionMode() // Update UI based on initial mode
-        updateTitleVisibility() // Update title/logo based on initial visibility
+        mainOverlayView.listener = this
+        helpTextCurrentlyVisible = mainOverlayView.getAreHelperTextsVisible()
+        currentSelectionMode = mainOverlayView.getSelectionMode()
+        updateUiVisibilityForSelectionMode()
+        updateTitleVisibility()
 
-        // Initialize CameraManager and PitchSensor
-        cameraManager = CameraManager(this, this, cameraPreviewView, mainOverlayView) // Pass mainOverlayView for camera frames
+        cameraManager = CameraManager(this, this, cameraPreviewView, mainOverlayView)
         pitchSensor = PitchSensor(
             this,
-            AppConfig.FORWARD_TILT_AS_FLAT_OFFSET_DEGREES, // Use offset from AppConfig
+            AppConfig.FORWARD_TILT_AS_FLAT_OFFSET_DEGREES,
             { pitchAngle ->
-                mainOverlayView.setDevicePitchAngle(pitchAngle) // Update overlay with pitch angle
+                mainOverlayView.setDevicePitchAngle(pitchAngle)
             }
         )
 
-        // Initialize MainOverlayView's components here, passing CameraManager
-        // This must be called after the view has been measured (in onSizeChanged)
-        // For Compose theme application, ensure this call is made when view is ready.
-        // It's safe to call here, but MainOverlayView itself might defer internal setup if w/h are 0.
-        mainOverlayView.initializeComponents(cameraManager)
+        mainOverlayView.setCameraManager(cameraManager)
+        mainOverlayView.setZoomFactor(AppConfig.DEFAULT_ZOOM_FACTOR)
 
 
-        // Initialize GitHubUpdater
         val currentAppVersionCode = try {
             packageManager.getPackageInfo(packageName, 0).versionCode
         } catch (e: PackageManager.NameNotFoundException) {
             Log.e(TAG, "Package name not found for version code lookup: ${e.message}")
-            0 // Default to 0 if not found
+            0
         }
         gitHubUpdater = GitHubUpdater(
             this,
             AppConfig.GITHUB_REPO_OWNER,
             AppConfig.GITHUB_REPO_NAME,
             currentAppVersionCode,
-            this // MainActivity implements GitHubUpdater.Callback
+            this
         )
 
-
-        // Setup ComposeView for Material 3 theming (colors applied to legacy View system)
         val composeViewForTheme = findViewById<ComposeView>(R.id.composeThemeView)
         composeViewForTheme.setContent {
-            // Fix: PoolProtractorTheme is a @Composable function, it must be called inside a @Composable scope.
-            // The setContent block itself is a @Composable scope.
             PoolProtractorTheme {
                 val currentColorScheme = MaterialTheme.colorScheme
                 SideEffect {
-                    // Pass the current Material 3 color scheme to the custom view for its paints
                     mainOverlayView.applyMaterialYouColors(currentColorScheme)
                 }
             }
         }
 
-        cameraManager.checkPermissionsAndSetupCamera() // Request camera permissions and start camera
-        setupControls() // Set up UI control listeners
+        cameraManager.checkPermissionsAndSetupCamera()
+        setupControls()
     }
 
-    /**
-     * Configures listeners for UI controls (zoom slider, buttons).
-     */
     private fun setupControls() {
-        // Use CameraManager's current zoom to initialize slider
         updateZoomSliderFromFactor(mainOverlayView.getZoomFactor())
 
         zoomSlider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -4408,33 +4798,26 @@ class MainActivity : AppCompatActivity(), AppStateListener, GitHubUpdater.Callba
                     val maxZoom = mainOverlayView.getMaxCameraZoomFactor()
                     val zoomValue = ZoomSliderLogic.convertSliderProgressToZoomFactor(progress, minZoom, maxZoom)
                     mainOverlayView.setZoomFactor(zoomValue)
-                    nextZoomCycleState = ZoomCycleState.MIN_ZOOM // Reset cycle state when slider is used
+                    nextZoomCycleState = ZoomCycleState.MIN_ZOOM
                 }
             }
             override fun onStartTrackingTouch(seekBar: SeekBar) {
-                this@MainActivity.onUserInteraction() // Notify of user interaction
+                this@MainActivity.onUserInteraction()
             }
             override fun onStopTrackingTouch(seekBar: SeekBar) {}
         })
 
         resetButton.setOnClickListener { handleResetAction() }
-        // Removed helpButton.setOnClickListener {}
         zoomCycleButton.setOnClickListener { handleZoomCycleAction() }
 
-        // Set up click listener for the app title/logo to show popup menu
         appTitleContainer.setOnClickListener { view ->
             showAppMenu(view)
         }
     }
 
-    /**
-     * Displays a popup menu when the app title/logo is tapped.
-     */
     private fun showAppMenu(view: View) {
-        // Create a ContextThemeWrapper to apply the custom PopupMenu style
         val wrapper = ContextThemeWrapper(this, R.style.AppTheme_PopupMenu)
-        // Use ContextThemeWrapper for PopupMenu constructor
-        val popup = PopupMenu(wrapper, view, Gravity.END) // Anchor to the right of the view
+        val popup = PopupMenu(wrapper, view, Gravity.END)
         popup.menuInflater.inflate(R.menu.main_menu, popup.menu)
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -4443,7 +4826,7 @@ class MainActivity : AppCompatActivity(), AppStateListener, GitHubUpdater.Callba
                     gitHubUpdater.checkForUpdate()
                     true
                 }
-                R.id.action_toggle_help -> { // Handle the new help toggle menu item
+                R.id.action_toggle_help -> {
                     mainOverlayView.toggleHelperTextVisibility()
                     true
                 }
@@ -4453,10 +4836,6 @@ class MainActivity : AppCompatActivity(), AppStateListener, GitHubUpdater.Callba
         popup.show()
     }
 
-
-    /**
-     * Updates the visibility of the app title text or logo based on helper text visibility.
-     */
     private fun updateTitleVisibility() {
         if (helpTextCurrentlyVisible) {
             appTitleTextView.visibility = View.VISIBLE
@@ -4469,24 +4848,14 @@ class MainActivity : AppCompatActivity(), AppStateListener, GitHubUpdater.Callba
         }
     }
 
-    /**
-     * Updates the visibility of UI controls based on the current selection mode.
-     * Only zoom and rotate interactions are enabled in AIMING mode.
-     */
     private fun updateUiVisibilityForSelectionMode() {
-        val controlsVisibleInAiming = currentSelectionMode == SelectionMode.AIMING
-        zoomSlider.visibility = if (controlsVisibleInAiming) View.VISIBLE else View.INVISIBLE
-        zoomCycleButton.visibility = if (controlsVisibleInAiming) View.VISIBLE else View.INVISIBLE
-        Log.d(TAG, "UI visibility updated for mode: $currentSelectionMode. Zoom controls visible: $controlsVisibleInAiming")
-        // Help and Reset buttons are always visible, but their actions might be restricted by MainOverlayView
-        // Their visibility logic is separate.
+        // Zoom slider and button are now always visible
+        zoomSlider.visibility = View.VISIBLE
+        zoomCycleButton.visibility = View.VISIBLE
+        Log.d(TAG, "UI visibility updated. Zoom controls are always visible.")
     }
 
-    /**
-     * Handles cycling through predefined zoom levels (min/max).
-     */
     private fun handleZoomCycleAction() {
-        // Only allow zoom cycling if in AIMING mode
         if (currentSelectionMode != SelectionMode.AIMING) return
 
         val currentZoom = mainOverlayView.getZoomFactor()
@@ -4503,24 +4872,17 @@ class MainActivity : AppCompatActivity(), AppStateListener, GitHubUpdater.Callba
                 maxZoom
             }
         }
-        mainOverlayView.setZoomFactor(targetZoom) // Set zoom via overlay view
+        mainOverlayView.setZoomFactor(targetZoom)
     }
 
-    /**
-     * Resets the overlay view to its default interaction state.
-     */
     private fun handleResetAction() {
-        mainOverlayView.resetInteractionsToDefaults() // Reset view state
-        nextZoomCycleState = ZoomCycleState.MIN_ZOOM // Reset zoom cycle state
+        mainOverlayView.resetInteractionsToDefaults()
+        nextZoomCycleState = ZoomCycleState.MIN_ZOOM
         Toast.makeText(this, "View reset to defaults", Toast.LENGTH_SHORT).show()
     }
 
-    // --- MainOverlayView.AppStateListener implementations ---
-
     override fun onZoomChanged(newZoomFactor: Float) {
-        // Update the slider to reflect the actual camera zoom ratio, which might be slightly different from requested
         updateZoomSliderFromFactor(newZoomFactor)
-        // Update zoom cycle state based on current zoom factor
         val minZoom = mainOverlayView.getMinCameraZoomFactor()
         val maxZoom = mainOverlayView.getMaxCameraZoomFactor()
         if (abs(newZoomFactor - minZoom) < 0.01f) {
@@ -4528,16 +4890,15 @@ class MainActivity : AppCompatActivity(), AppStateListener, GitHubUpdater.Callba
         } else if (abs(newZoomFactor - maxZoom) < 0.01f) {
             nextZoomCycleState = ZoomCycleState.MIN_ZOOM
         }
-        valuesChangedSinceLastReset = true // Mark that user interaction occurred
+        valuesChangedSinceLastReset = true
     }
 
     override fun onRotationChanged(newRotationAngle: Float) {
-        valuesChangedSinceLastReset = true // Mark that user interaction occurred
+        valuesChangedSinceLastReset = true
     }
 
     override fun onUserInteraction() {
-        valuesChangedSinceLastReset = true // Mark that user interaction occurred
-        // Check if helper text visibility changed and update title
+        valuesChangedSinceLastReset = true
         val currentOverlayVisibility = mainOverlayView.getAreHelperTextsVisible()
         if (helpTextCurrentlyVisible != currentOverlayVisibility) {
             helpTextCurrentlyVisible = currentOverlayVisibility
@@ -4557,7 +4918,7 @@ class MainActivity : AppCompatActivity(), AppStateListener, GitHubUpdater.Callba
 
     override fun onSelectionModeChanged(mode: SelectionMode) {
         currentSelectionMode = mode
-        updateUiVisibilityForSelectionMode() // Update UI based on new mode
+        updateUiVisibilityForSelectionMode()
         val message = when (mode) {
             SelectionMode.SELECTING_CUE_BALL -> "Please tap the cue ball."
             SelectionMode.SELECTING_TARGET_BALL -> "Now tap the target ball."
@@ -4567,24 +4928,17 @@ class MainActivity : AppCompatActivity(), AppStateListener, GitHubUpdater.Callba
         Log.d(TAG, "Selection Mode changed to: $mode")
     }
 
-    /**
-     * Updates the zoom slider's progress based on a given zoom factor.
-     * @param factor The zoom factor to convert to slider progress.
-     */
     private fun updateZoomSliderFromFactor(factor: Float) {
         val minZoom = mainOverlayView.getMinCameraZoomFactor()
         val maxZoom = mainOverlayView.getMaxCameraZoomFactor()
         val progress = ZoomSliderLogic.convertZoomFactorToSliderProgress(factor, minZoom, maxZoom)
-        // Only update if different to avoid infinite loops with onProgressChanged
         if (zoomSlider.progress != progress) {
             zoomSlider.progress = progress
         }
     }
 
-    // --- GitHubUpdater.Callback implementations ---
     override fun onUpdateCheckComplete(latestRelease: GitHubUpdater.ReleaseInfo?, isNewer: Boolean) {
         if (latestRelease == null) {
-            // Error already handled by onError from updater
             return
         }
 
@@ -4623,7 +4977,7 @@ class MainActivity : AppCompatActivity(), AppStateListener, GitHubUpdater.Callba
     override fun onUpdateDownloadComplete(downloadId: Long) {
         runOnUiThread {
             Toast.makeText(this, "Download complete. Installing...", Toast.LENGTH_LONG).show()
-            gitHubUpdater.installUpdate(downloadId) // Pass the downloadId to installUpdate
+            gitHubUpdater.installUpdate(downloadId)
         }
     }
 
@@ -4634,9 +4988,6 @@ class MainActivity : AppCompatActivity(), AppStateListener, GitHubUpdater.Callba
     }
 
     fun onNoUpdateAvailable() {
-        // This callback is now redundant if onUpdateCheckComplete handles `isNewer` flag.
-        // If `latestRelease` is null, onError already handles it.
-        // If `latestRelease` is not null and `isNewer` is false, `onUpdateCheckComplete` shows reinstall dialog.
         Log.d(TAG, "No newer update found (handled by onUpdateCheckComplete).")
     }
 
@@ -4646,22 +4997,21 @@ class MainActivity : AppCompatActivity(), AppStateListener, GitHubUpdater.Callba
         }
     }
 
-
     override fun onResume() {
         super.onResume()
-        pitchSensor.register() // Register pitch sensor listener
+        pitchSensor.register()
         Log.d(TAG, "MainActivity onResume, PitchSensor registered.")
     }
 
     override fun onPause() {
         super.onPause()
-        pitchSensor.unregister() // Unregister pitch sensor listener
+        pitchSensor.unregister()
         Log.d(TAG, "MainActivity onPause, PitchSensor unregistered.")
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        cameraManager.shutdown() // Ensure camera resources are released
+        cameraManager.shutdown()
         Log.d(TAG, "MainActivity onDestroy, CameraManager shutdown.")
     }
 }
@@ -5516,7 +5866,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 3 // THIS IS YOUR APP'S CURRENT VERSION CODE
-        versionName = "0.3.1" // THIS IS YOUR APP'S CURRENT VERSION NAME
+        versionName = "0.3.2" // THIS IS YOUR APP'S CURRENT VERSION NAME
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

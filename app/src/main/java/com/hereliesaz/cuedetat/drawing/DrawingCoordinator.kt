@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/drawing/DrawingCoordinator.kt
 package com.hereliesaz.cuedetat.drawing
 
 import android.graphics.Canvas
@@ -10,7 +9,8 @@ import com.hereliesaz.cuedetat.state.AppState
 import com.hereliesaz.cuedetat.state.AppState.SelectionMode
 import com.hereliesaz.cuedetat.geometry.GeometryCalculator
 import com.hereliesaz.cuedetat.geometry.models.AimingLineLogicalCoords
-import com.hereliesaz.cuedetat.geometry.models.ProjectedCoords
+import com.hereliesaz.cuedetat.geometry.models.DeflectionLineParams
+import com.hereliesaz.cuedetat.geometry.models.ActualBallOverlayCoords
 import com.hereliesaz.cuedetat.drawing.plane.PlaneRenderer
 import com.hereliesaz.cuedetat.drawing.screen.ScreenRenderer
 import com.hereliesaz.cuedetat.drawing.utility.TextLayoutHelper
@@ -18,6 +18,7 @@ import com.hereliesaz.cuedetat.drawing.utility.VisualStateLogic
 import com.hereliesaz.cuedetat.ui.theme.AppPurple
 import com.hereliesaz.cuedetat.ui.theme.AppWhite
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.random.Random
@@ -25,11 +26,11 @@ import kotlin.random.Random
 class DrawingCoordinator(
     private val appState: AppState,
     private val appPaints: AppPaints,
-    private val config: AppConfig, // AppConfig instance is correctly passed
+    private val config: AppConfig,
     private val viewWidthProvider: () -> Int,
     private val viewHeightProvider: () -> Int
 ) {
-    private val pitchOffsetPower = 2.0f // Controls the intensity of the pitch-based Y-offset for ghost balls
+    private val pitchOffsetPower = 2.0f
 
     private val geometryCalculator = GeometryCalculator(viewWidthProvider, viewHeightProvider)
     private val textLayoutHelper = TextLayoutHelper(viewWidthProvider, viewHeightProvider)
@@ -37,66 +38,53 @@ class DrawingCoordinator(
     private val screenRenderer = ScreenRenderer(textLayoutHelper, viewWidthProvider, viewHeightProvider)
 
     private var currentWarningTextToDisplay: String? = null
-    private var wasPreviouslyInvalidSetup: Boolean = false // Tracks if the previous frame was invalid
-    private var lastRandomWarningIndex: Int = -1 // Stores index of last displayed random warning
+    private var wasPreviouslyInvalidSetup: Boolean = false
+    private var lastRandomWarningIndex: Int = -1
 
-    // Exposed for MainOverlayView to use for tap detection
-    private var lastProjectedScreenData: ProjectedCoords? = null
+    private var lastActualBallOverlayCoords: ActualBallOverlayCoords? = null
 
     /**
-     * Provides the last calculated projected screen coordinates and radii.
-     * This is useful for hit testing in MainOverlayView (e.g., ball selection).
+     * Provides the last calculated actual ball overlay coordinates and radii.
      */
-    fun getProjectedScreenData(): ProjectedCoords? {
-        return lastProjectedScreenData
+    fun getActualBallOverlayCoords(): ActualBallOverlayCoords? {
+        return lastActualBallOverlayCoords
     }
 
     /**
      * Main drawing function called by MainOverlayView on each frame.
-     * Orchestrates all drawing operations for the protractor plane and screen-space elements.
-     *
-     * @param canvas The Android Canvas to draw on.
      */
     fun onDraw(canvas: Canvas) {
-        // Do not draw if AppState is not initialized or if logical radius is negligible
-        if (!appState.isInitialized || appState.currentLogicalRadius <= 0.01f) {
+        // Ensure selected balls exist (even if default manual ones) before proceeding with drawing calculations
+        if (appState.selectedCueBall == null || appState.selectedTargetBall == null || !appState.isInitialized || appState.logicalBallRadius <= 0.01f) {
+            // These logs are useful if the default manual balls aren't being set for some reason
+            // Log.w(TAG, "onDraw returning early: selected balls not initialized or radius too small.")
             return
         }
 
-        // Clear text bounds for the new frame to allow for fresh collision detection
         textLayoutHelper.prepareForNewFrame()
 
-        // --- Apply 3D Pitch Transformation to the Canvas ---
         appState.graphicsCamera.save()
-        appState.graphicsCamera.rotateX(appState.currentPitchAngle) // Rotate around X-axis based on device pitch
-        appState.graphicsCamera.getMatrix(appState.pitchMatrix) // Get the transformation matrix
+        appState.graphicsCamera.rotateX(appState.currentPitchAngle)
+        appState.graphicsCamera.getMatrix(appState.pitchMatrix)
         appState.graphicsCamera.restore()
-        // Pre-translate to pivot around the targetCircleCenter, then post-translate back
         appState.pitchMatrix.preTranslate(-appState.targetCircleCenter.x, -appState.targetCircleCenter.y)
         appState.pitchMatrix.postTranslate(appState.targetCircleCenter.x, appState.targetCircleCenter.y)
-        // Attempt to invert the matrix; useful for mapping screen points back to logical plane
         val hasInversePitchMatrix = appState.pitchMatrix.invert(appState.inversePitchMatrix)
 
+        // Get base (un-pitched) coordinates for the overlays on the *actual* balls on screen
+        val baseActualBallOverlayCoords = geometryCalculator.calculateActualBallOverlayCoords(appState)
+        lastActualBallOverlayCoords = baseActualBallOverlayCoords // Store the base coordinates
 
-        // --- Calculate Geometrical Data for Drawing ---
-        val projectedScreenData = geometryCalculator.calculateProjectedScreenData(appState)
-        lastProjectedScreenData = projectedScreenData // Store for external access (e.g., tap detection)
         val aimingLineLogicalCoords = geometryCalculator.calculateAimingLineLogicalCoords(appState, hasInversePitchMatrix)
         val deflectionParams = geometryCalculator.calculateDeflectionLineParams(appState)
 
-        // --- Evaluate Current Visual States (e.g., valid shot, warnings) ---
-        // Only evaluate complex shot states if in AIMING mode
-        val visualStates = if (appState.currentMode == SelectionMode.AIMING) {
-            VisualStateLogic.evaluate(
-                appState, geometryCalculator, aimingLineLogicalCoords,
-                appState.cueCircleCenter, appState.targetCircleCenter
-            )
-        } else {
-            VisualStateLogic.EvaluatedVisualStates(isCurrentlyInvalidShotSetup = false, showWarningStyleForGhostBalls = false)
-        }
+        // Evaluate visual states unconditionally, as drawing is now always on.
+        val visualStates = VisualStateLogic.evaluate(
+            appState, geometryCalculator, aimingLineLogicalCoords,
+            appState.cueCircleCenter, appState.targetCircleCenter
+        )
 
-
-        // --- Manage Warning Text Display (only in AIMING mode) ---
+        // Manage Warning Text Display (still only in AIMING mode)
         if (appState.currentMode == SelectionMode.AIMING) {
             if (visualStates.isCurrentlyInvalidShotSetup) {
                 if (!wasPreviouslyInvalidSetup) {
@@ -110,20 +98,19 @@ class DrawingCoordinator(
                         currentWarningTextToDisplay = config.INSULTING_WARNING_STRINGS[randomIndex]
                         lastRandomWarningIndex = randomIndex
                     } else {
-                        currentWarningTextToDisplay = "Invalid Shot Setup" // Fallback warning
+                        currentWarningTextToDisplay = "Invalid Shot Setup"
                     }
                 }
             } else {
-                currentWarningTextToDisplay = null // Clear warning when state is valid
+                currentWarningTextToDisplay = null
             }
         } else {
-            currentWarningTextToDisplay = null // No warnings outside AIMING mode
+            currentWarningTextToDisplay = null
         }
-        wasPreviouslyInvalidSetup = visualStates.isCurrentlyInvalidShotSetup // Update state for next frame
+        wasPreviouslyInvalidSetup = visualStates.isCurrentlyInvalidShotSetup
 
 
-        // --- Adjust Paint Properties based on Visual State ---
-        // Adjust the yellow target line (main aiming line) based on warning style
+        // Adjust Paint Properties based on Visual State
         if (visualStates.showWarningStyleForGhostBalls) {
             appPaints.targetLineGuidePaint.apply {
                 strokeWidth = config.STROKE_TARGET_LINE_GUIDE + config.STROKE_DEFLECTION_LINE_BOLD_INCREASE
@@ -131,57 +118,63 @@ class DrawingCoordinator(
             }
         } else {
             appPaints.targetLineGuidePaint.apply {
-                strokeWidth = config.STROKE_TARGET_LINE_GUIDE // Use normal stroke
-                clearShadowLayer() // Remove any glow
+                strokeWidth = config.STROKE_TARGET_LINE_GUIDE
+                clearShadowLayer()
             }
         }
 
-        // Adjust the aiming assist line colors based on validity
-        // Only modify if in AIMING mode
-        if (appState.currentMode == SelectionMode.AIMING) {
-            val isPhysicalOverlap = geometryCalculator.distance(appState.cueCircleCenter, appState.targetCircleCenter) < (appState.currentLogicalRadius * 2 - 0.1f)
-            if (visualStates.isCurrentlyInvalidShotSetup) {
-                appPaints.shotGuideNearPaint.apply { color = appPaints.M3_COLOR_ERROR; clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_FAR }
-                appPaints.shotGuideFarPaint.apply { color = appPaints.M3_COLOR_ERROR; clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_FAR }
-            } else {
-                appPaints.shotGuideNearPaint.apply { color = AppWhite.toArgb(); strokeWidth = config.STROKE_AIM_LINE_NEAR }
-                appPaints.shotGuideFarPaint.apply { color = AppPurple.toArgb(); strokeWidth = if (!isPhysicalOverlap) config.STROKE_AIM_LINE_NEAR else config.STROKE_AIM_LINE_FAR}
-            }
+        // Adjust the aiming assist line colors based on validity (still only in AIMING mode for color change)
+        val isPhysicalOverlap = geometryCalculator.distance(appState.cueCircleCenter, appState.targetCircleCenter) < (appState.logicalBallRadius * 2 - 0.1f)
+        if (appState.currentMode == SelectionMode.AIMING && visualStates.isCurrentlyInvalidShotSetup) {
+            appPaints.shotGuideNearPaint.apply { color = appPaints.M3_COLOR_ERROR; clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_FAR }
+            appPaints.shotGuideFarPaint.apply { color = appPaints.M3_COLOR_ERROR; clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_FAR }
         } else {
-            // If not in AIMING mode, lines are either not drawn or drawn with a neutral style
-            // Ensure they are not drawn with error color when not in AIMING mode.
-            appPaints.shotGuideNearPaint.apply { color = AppWhite.toArgb(); clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_NEAR }
-            appPaints.shotGuideFarPaint.apply { color = AppPurple.toArgb(); clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_FAR }
+            appPaints.shotGuideNearPaint.apply { color = AppWhite.toArgb(); strokeWidth = config.STROKE_AIM_LINE_NEAR }
+            appPaints.shotGuideFarPaint.apply { color = AppPurple.toArgb(); strokeWidth = if (!isPhysicalOverlap) config.STROKE_AIM_LINE_NEAR else config.STROKE_AIM_LINE_FAR}
         }
 
 
-        // --- Draw Protractor Plane Elements ---
+        // Render plane elements (logical balls, protractor lines, shot guide)
         canvas.save()
-        canvas.concat(appState.pitchMatrix) // Apply the 3D pitch transformation
+        canvas.concat(appState.pitchMatrix)
         planeRenderer.draw(
             canvas, appState, appPaints, config,
-            aimingLineCoords = aimingLineLogicalCoords ?: AimingLineLogicalCoords(0f,0f,0f,0f,0f,0f,0f,0f),
+            aimingLineCoords = aimingLineLogicalCoords,
             deflectionParams = deflectionParams,
             useErrorColor = visualStates.isCurrentlyInvalidShotSetup,
-            actualCueBallScreenCenter = appState.selectedCueBallScreenCenter // Pass actual cue ball screen position
+            actualCueBallScreenCenter = baseActualBallOverlayCoords.actualCueOverlayPosition // Pass actual cue's original screen position (unadjusted Y)
         )
-        canvas.restore() // Restore canvas to original (non-pitched) state for screen-space drawing
+        canvas.restore()
 
-        // --- Calculate Y-offset for Ghost Balls for Pseudo-3D Effect ---
-        // This makes ghost balls appear to "float" above the plane based on pitch.
+        // Calculate pitch-affected positions and radii for the *actual ball overlays*
         val pitchRadians = Math.toRadians(appState.currentPitchAngle.toDouble())
         val basePitchFactor = abs(sin(pitchRadians)).toFloat()
-        val pitchScaleFactor = basePitchFactor.pow(pitchOffsetPower)
-        val targetGhostDrawnCenterY = projectedScreenData.targetProjected.y - (pitchScaleFactor * projectedScreenData.targetScreenRadius)
-        val cueGhostDrawnCenterY = projectedScreenData.cueProjected.y - (pitchScaleFactor * projectedScreenData.cueScreenRadius)
+        val pitchYOffsetFactor = basePitchFactor.pow(config.PITCH_OFFSET_POWER) // Use config constant for power
 
-        // --- Draw Screen Space Elements (Ghost Balls and Labels) ---
+        // Cosine for radius scaling: radius scales down as ball tilts "away" from viewer
+        val radiusPerspectiveScaleFactor = abs(cos(pitchRadians)).toFloat().coerceAtLeast(0.5f) // Ensure minimum size
+        val combinedRadiusScale = appState.zoomFactor * radiusPerspectiveScaleFactor
+
+
+        // Pitch-adjusted Y and scaled radius for the actual target overlay
+        val actualTargetOverlayDrawnCenterY = baseActualBallOverlayCoords.actualTargetOverlayPosition.y -
+                (pitchYOffsetFactor * (appState.logicalBallRadius * appState.zoomFactor)) // Apply logical radius * zoom for Y offset
+        val actualTargetOverlayScaledRadius = appState.logicalBallRadius * combinedRadiusScale // Apply logical radius * combined scale
+
+
+        // Pitch-adjusted Y and scaled radius for the actual cue overlay
+        val actualCueOverlayDrawnCenterY = baseActualBallOverlayCoords.actualCueOverlayPosition.y -
+                (pitchYOffsetFactor * (appState.logicalBallRadius * appState.zoomFactor)) // Apply logical radius * zoom for Y offset
+        val actualCueOverlayScaledRadius = appState.logicalBallRadius * combinedRadiusScale // Apply logical radius * combined scale
+
+
+        // Render screen elements (actual ball overlays, labels)
         screenRenderer.draw(
             canvas, appState, appPaints, config,
-            projectedTargetGhostCenter = PointF(projectedScreenData.targetProjected.x, targetGhostDrawnCenterY),
-            targetGhostRadius = projectedScreenData.targetScreenRadius,
-            projectedCueGhostCenter = PointF(projectedScreenData.cueProjected.x, cueGhostDrawnCenterY),
-            cueGhostRadius = projectedScreenData.cueScreenRadius,
+            actualTargetOverlayPosition = PointF(baseActualBallOverlayCoords.actualTargetOverlayPosition.x, actualTargetOverlayDrawnCenterY),
+            actualTargetOverlayRadius = actualTargetOverlayScaledRadius,
+            actualCueOverlayPosition = PointF(baseActualBallOverlayCoords.actualCueOverlayPosition.x, actualCueOverlayDrawnCenterY),
+            actualCueOverlayRadius = actualCueOverlayScaledRadius,
             showErrorStyleForGhostBalls = visualStates.showWarningStyleForGhostBalls,
             invalidShotWarningString = currentWarningTextToDisplay
         )

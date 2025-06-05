@@ -16,7 +16,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 3 // THIS IS YOUR APP'S CURRENT VERSION CODE
-        versionName = "0.3.1" // THIS IS YOUR APP'S CURRENT VERSION NAME
+        versionName = "0.3.2" // THIS IS YOUR APP'S CURRENT VERSION NAME
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

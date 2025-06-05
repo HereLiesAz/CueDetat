@@ -12,7 +12,7 @@ import android.os.Environment
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import com.hereliesaz.cuedetat.config.AppConfig
+import com.hereliesaz.cuedetat.config.AppConfig // Ensure this import is present
 import okhttp3.*
 import org.json.JSONObject
 import java.io.File
@@ -104,6 +104,7 @@ class GitHubUpdater(
                         for (i in 0 until assets.length()) {
                             val asset = assets.getJSONObject(i)
                             val assetName = asset.getString("name")
+                            // Corrected: use AppConfig.GITHUB_RELEASE_ASSET_NAME_REGEX
                             if (assetName.matches(Regex(AppConfig.GITHUB_RELEASE_ASSET_NAME_REGEX))) {
                                 apkDownloadUrl = asset.getString("browser_download_url")
                                 break

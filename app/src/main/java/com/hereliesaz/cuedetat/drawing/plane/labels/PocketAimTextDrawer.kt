@@ -3,6 +3,7 @@ package com.hereliesaz.cuedetat.drawing.plane.labels
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PointF
+import android.text.TextPaint
 import com.hereliesaz.cuedetat.config.AppConfig
 import com.hereliesaz.cuedetat.state.AppPaints
 import com.hereliesaz.cuedetat.state.AppState
@@ -39,7 +40,7 @@ class PocketAimTextDrawer(private val textLayoutHelper: TextLayoutHelper) {
 
         // So, coordinates are relative to the targetCircleCenter, along the protractor's current 0-degree axis.
         val preferredX = 0f // Center of the text block should be on the protractor's 0-degree line
-        val preferredY = -(appState.currentLogicalRadius + (35f / appState.zoomFactor.coerceAtLeast(0.5f))) // Slightly increased offset
+        val preferredY = -(appState.logicalBallRadius * appState.zoomFactor + (35f / appState.zoomFactor.coerceAtLeast(0.5f))) // Use logicalBallRadius and scale by zoomFactor
         val rotationDegrees = 90f // Text itself is rotated 90 degrees to be perpendicular to the line
 
         // The nudge reference is (0,0) in this *local, already transformed* canvas space,

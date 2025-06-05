@@ -7,6 +7,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
+import com.hereliesaz.cuedetat.config.AppConfig // Import AppConfig
 import kotlin.math.max
 import kotlin.math.min
 
@@ -65,7 +66,8 @@ class BallDetector {
                         val centerX = boundingBox.centerX().toFloat()
                         val centerY = boundingBox.centerY().toFloat()
                         // Use average of half width and half height as radius for a circular representation
-                        val radius = (boundingBox.width() + boundingBox.height()) / 4f
+                        // Apply the BALL_RADIUS_SCALE_FACTOR to adjust the size
+                        val radius = ((boundingBox.width() + boundingBox.height()) / 4f) * AppConfig.BALL_RADIUS_SCALE_FACTOR
 
                         // Ensure radius is positive to avoid issues with drawing/logic
                         if (radius > 0) {

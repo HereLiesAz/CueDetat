@@ -15,11 +15,11 @@ class CueCircleDrawer {
         useErrorColor: Boolean
     ) {
         // Draw the *logical* cue ball (ghost ball on the plane)
-        if (!appState.isInitialized || appState.currentLogicalRadius <= 0.01f) return
+        if (!appState.isInitialized || appState.logicalBallRadius <= 0.01f) return
 
         val centerX = appState.cueCircleCenter.x
         val centerY = appState.cueCircleCenter.y
-        val radius = appState.currentLogicalRadius
+        val radius = appState.logicalBallRadius
         val centerMarkRadius = radius / 5f
 
         appPaints.cueCirclePaint.color = if (useErrorColor) {

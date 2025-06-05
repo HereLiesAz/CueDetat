@@ -1,24 +1,23 @@
-// FILE: app\src\main\java\com\hereliesaz\cuedetat\view\MainOverlayView.kt
-// app/src/main/java/com/hereliesaz/cuedetat/view/MainOverlayView.kt
 package com.hereliesaz.cuedetat.view
 
 import android.content.Context
-import android.graphics.Canvas // Android Canvas
+import android.graphics.Canvas
 import android.graphics.PointF
 import android.util.AttributeSet
 import android.util.Log
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration // Import ViewConfiguration
 import androidx.compose.material3.ColorScheme
 import com.hereliesaz.cuedetat.config.AppConfig
 import com.hereliesaz.cuedetat.state.AppPaints
 import com.hereliesaz.cuedetat.state.AppState
-import com.hereliesaz.cuedetat.state.AppState.SelectionMode // Import SelectionMode
+import com.hereliesaz.cuedetat.state.AppState.SelectionMode
 import com.hereliesaz.cuedetat.drawing.DrawingCoordinator
 import com.hereliesaz.cuedetat.view.gesture.GestureHandler
-import com.hereliesaz.cuedetat.tracking.ball_detector.Ball // Import the Ball data class
-import com.hereliesaz.cuedetat.system.CameraManager // Import CameraManager
+import com.hereliesaz.cuedetat.tracking.ball_detector.Ball
+import com.hereliesaz.cuedetat.system.CameraManager
 import kotlin.math.hypot
 import kotlin.math.min
 
@@ -30,45 +29,63 @@ class MainOverlayView @JvmOverloads constructor(
 
     private val TAG = AppConfig.TAG + "_MainOverlayView"
 
-    /**
-     * Listener interface for external components (like MainActivity) to react to state changes
-     * originating from user interaction with MainOverlayView.
-     */
     interface AppStateListener {
         fun onZoomChanged(newZoomFactor: Float)
         fun onRotationChanged(newRotationAngle: Float)
-        fun onUserInteraction() // Generic interaction event
-        fun onCueBallSelected(ballId: String?) // New: Notify when a cue ball is selected or deselected
-        fun onTargetBallSelected(ballId: String?) // New: Notify when a target ball is selected or deselected
-        fun onSelectionModeChanged(mode: SelectionMode) // New: Notify when selection mode changes
+        fun onUserInteraction()
+        fun onCueBallSelected(ballId: String?)
+        fun onTargetBallSelected(ballId: String?)
+        fun onSelectionModeChanged(mode: SelectionMode)
     }
 
     var listener: AppStateListener? = null
 
-    // Initialize with default AppConfig, AppState, AppPaints.
-    // These will be fully setup once view dimensions are known and M3 colors applied.
-    private val config = AppConfig // Direct object reference
+    private val config = AppConfig
     private val appState = AppState(config)
     private val appPaints = AppPaints(context, config)
 
     private lateinit var gestureHandler: GestureHandler
     private lateinit var drawingCoordinator: DrawingCoordinator
-    private lateinit var gestureDetector: GestureDetector // For handling single taps
-    private lateinit var cameraManagerRef: CameraManager // Reference to CameraManager for zoom control
 
-    // Flag to ensure components are initialized only once after size is known
+    // Gesture detection for taps
+    private lateinit var gestureDetector: GestureDetector
+    private var touchSlop: Int = 0 // Threshold for detecting a drag vs. a tap
+
+    // State for dragging ghost balls
+    private var isDraggingConfirmed = false // Whether a drag gesture has been confirmed (moved beyond touch slop)
+    private var initialDraggedBall: Ball? = null // Store the ball identified at ACTION_DOWN
+    private var dragOffsetX: Float = 0f // Touch point relative to ball center X
+    private var dragOffsetY: Float = 0f // Touch point relative to ball center Y
+    private var initialTouchDownX: Float = 0f // Initial touch X for drag threshold
+    private var initialTouchDownY: Float = 0f // Initial touch Y for drag threshold
+
+    private var cameraManagerRef: CameraManager? = null
     private var areComponentsInitialized = false
 
-    /**
-     * Initializes core drawing and interaction components.
-     * This is called once the view dimensions are available.
-     * @param cameraManager A reference to the CameraManager for camera zoom control.
-     */
-    fun initializeComponents(cameraManager: CameraManager) {
-        Log.d(TAG, "initializeComponents called. areComponentsInitialized was $areComponentsInitialized, width=$width, height=$height")
-        if (areComponentsInitialized || width == 0 || height == 0) return // Already initialized or no dimensions
+    init {
+        // Get the system-defined touch slop
+        val vc = ViewConfiguration.get(context)
+        touchSlop = vc.scaledTouchSlop
+    }
 
-        cameraManagerRef = cameraManager // Store reference
+    fun setCameraManager(cameraManager: CameraManager) {
+        this.cameraManagerRef = cameraManager
+        Log.d(TAG, "setCameraManager: CameraManager reference received.")
+        if (!areComponentsInitialized && width > 0 && height > 0) {
+            initializeComponents()
+        }
+    }
+
+    private fun initializeComponents() {
+        Log.d(TAG, "initializeComponents executing full setup. areComponentsInitialized was $areComponentsInitialized, width=$width, height=$height")
+        if (areComponentsInitialized) {
+            Log.w(TAG, "initializeComponents: Already initialized. Skipping.")
+            return
+        }
+        if (cameraManagerRef == null || width == 0 || height == 0) {
+            Log.w(TAG, "initializeComponents: Pre-conditions not met (cameraManagerRef=${cameraManagerRef != null}, width=$width, height=$height). Skipping.")
+            return
+        }
 
         gestureHandler = GestureHandler(
             context, appState, config, listener,
@@ -82,15 +99,44 @@ class MainOverlayView @JvmOverloads constructor(
 
         drawingCoordinator = DrawingCoordinator(
             appState, appPaints, config,
-            viewWidthProvider = { width }, // Provide current view width
-            viewHeightProvider = { height } // Provide current view height
+            viewWidthProvider = { width },
+            viewHeightProvider = { height }
         )
 
-        // Initialize GestureDetector for tap events
         gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
             override fun onSingleTapUp(e: MotionEvent): Boolean {
-                handleSingleTap(e.x, e.y) // Handle tap for ball selection
+                // If a drag was confirmed, this method should not be called by the overall onTouchEvent logic.
+                // If we reach here, it means it's a tap, either on a ball or empty space.
+                Log.d(TAG, "onSingleTapUp detected at (${e.x}, ${e.y}). Calling handleSingleTap.")
+                handleSingleTap(e.x, e.y)
+                return true // Consume all single taps handled here
+            }
+
+            override fun onDown(e: MotionEvent): Boolean {
+                // We return true here to ensure GestureDetector processes the full gesture (for taps, scrolls, long presses).
+                // Our custom drag logic in onTouchEvent handles the consumption for drag starts.
                 return true
+            }
+
+            override fun onScroll(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                distanceX: Float,
+                distanceY: Float
+            ): Boolean {
+                // This method is called by GestureDetector for scrolling motions.
+                // If we have an initial touch on a ball and haven't confirmed a drag yet,
+                // check if this scroll signifies a drag.
+                if (initialDraggedBall != null && !isDraggingConfirmed) {
+                    val dx = e2.x - initialTouchDownX
+                    val dy = e2.y - initialTouchDownY
+                    if (hypot(dx.toDouble(), dy.toDouble()) > touchSlop) {
+                        isDraggingConfirmed = true // Confirm drag here
+                        Log.d(TAG, "onScroll: Drag confirmed due to movement exceeding touchSlop.")
+                    }
+                }
+                // Return false to allow our main onTouchEvent to continue processing for pan/zoom and ball drag updates.
+                return false
             }
         })
 
@@ -99,364 +145,423 @@ class MainOverlayView @JvmOverloads constructor(
     }
 
 
-    /**
-     * Applies Material 3 color scheme to the custom drawing paints.
-     * This should be called after `onSizeChanged` or once view dimensions are set.
-     *
-     * @param colorScheme The Material 3 ColorScheme from Compose.
-     */
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        Log.d(TAG, "onSizeChanged: w=$w, h=$h. Calling appState.initialize.")
+        if (w > 0 && h > 0) {
+            appState.initialize(w, h)
+            if (!areComponentsInitialized && cameraManagerRef != null) {
+                initializeComponents()
+            }
+            invalidate()
+        }
+    }
+
     fun applyMaterialYouColors(colorScheme: ColorScheme) {
-        // Ensure components are ready before applying colors.
-        // If initializeComponents has not been called externally yet,
-        // it cannot proceed here.
         if (!areComponentsInitialized) {
             Log.w(TAG, "applyMaterialYouColors called before components initialized. Skipping.")
             return
         }
         appPaints.applyMaterialYouColors(colorScheme)
-        invalidate() // Redraw with new colors
+        invalidate()
     }
 
-    /**
-     * Called when the size of the view changes. Initializes or re-initializes
-     * components that depend on view dimensions.
-     */
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        Log.d(TAG, "onSizeChanged: w=$w, h=$h. Calling appState.initialize.")
-        if (w > 0 && h > 0) {
-            // NOTE: initializeComponents must be called by MainActivity AFTER CameraManager is ready
-            // because it now depends on cameraManagerRef.
-            // We just ensure appState is initialized/updated with new dimensions here.
-            appState.initialize(w, h)
-            invalidate() // Request a redraw
-        }
-    }
-
-    /**
-     * The main drawing dispatch method. Calls the DrawingCoordinator to render elements.
-     */
-    override fun onDraw(canvas: Canvas) { // android.graphics.Canvas
+    override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        Log.d(TAG, "onDraw called. areComponentsInitialized=$areComponentsInitialized, appState.isInitialized=${appState.isInitialized}, appState.currentLogicalRadius=${appState.currentLogicalRadius}, appState.currentMode=${appState.currentMode}")
-        // Guard against drawing before components are ready
         if (!areComponentsInitialized || !appState.isInitialized) {
             Log.w(TAG, "onDraw returning early: areComponentsInitialized=$areComponentsInitialized, appState.isInitialized=${appState.isInitialized}")
-            // Cannot call initializeComponents here as it requires cameraManagerRef now.
-            // MainActivity is responsible for calling it.
             return
         }
-
         drawingCoordinator.onDraw(canvas)
     }
 
-    /**
-     * Handles touch events for gestures (pan, zoom, tap).
-     */
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        // Guard against uninitialized state
-        if (!areComponentsInitialized || !appState.isInitialized) return false
-
-        // Pass touch events to GestureDetector first for tap detection
-        val gestureHandled = gestureDetector.onTouchEvent(event)
-        // Then pass to custom GestureHandler for pan/zoom.
-        // Only allow pan/zoom gestures if in AIMING mode.
-        val panZoomHandled = if (appState.currentMode == SelectionMode.AIMING) {
-            gestureHandler.onTouchEvent(event)
-        } else {
-            false
+        if (!areComponentsInitialized || !appState.isInitialized) {
+            Log.w(TAG, "onTouchEvent returning early: components not initialized.")
+            return false
         }
 
+        // Pass to GestureDetector first for tap detection and to trigger onScroll for drag confirmation.
+        // We capture its return value to potentially consume the event if GestureDetector handles it,
+        // but we prioritize our custom drag and pan/zoom logic.
+        val gestureDetectorConsumed = gestureDetector.onTouchEvent(event)
 
-        // Consume event if either handler processed it, or fall back to super
-        return gestureHandled || panZoomHandled || super.onTouchEvent(event)
+        val x = event.x
+        val y = event.y
+
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                // Reset drag state for new touch sequence.
+                isDraggingConfirmed = false
+                initialDraggedBall = null // Ensure it's null before potential assignment
+                dragOffsetX = 0f
+                dragOffsetY = 0f
+                initialTouchDownX = x
+                initialTouchDownY = y
+
+                // Check if tap is on selected cue ball for potential drag
+                appState.selectedCueBall?.let { ball ->
+                    // Use the logicalBallRadius scaled by zoomFactor for hit test, as overlays are now scaled by it.
+                    val effectiveRadius = appState.logicalBallRadius * appState.zoomFactor
+                    if (hypot(x - ball.x, y - ball.y) <= effectiveRadius + config.DRAG_TOUCH_TOLERANCE) {
+                        initialDraggedBall = ball
+                        dragOffsetX = x - ball.x
+                        dragOffsetY = y - ball.y
+                        listener?.onUserInteraction()
+                        Log.d(TAG, "ACTION_DOWN: Cue ball hit for potential drag.")
+                        return true // Consume DOWN to track subsequent MOVE/UP events.
+                    }
+                }
+
+                // Check if tap is on selected target ball (only if not already decided to drag cue)
+                if (initialDraggedBall == null) { // Only if cue ball was not touched
+                    appState.selectedTargetBall?.let { ball ->
+                        // Use the logicalBallRadius scaled by zoomFactor for hit test, as overlays are now scaled by it.
+                        val effectiveRadius = appState.logicalBallRadius * appState.zoomFactor
+                        if (hypot(x - ball.x, y - ball.y) <= effectiveRadius + config.DRAG_TOUCH_TOLERANCE) {
+                            initialDraggedBall = ball
+                            dragOffsetX = x - ball.x
+                            dragOffsetY = y - ball.y
+                            listener?.onUserInteraction()
+                            Log.d(TAG, "ACTION_DOWN: Target ball hit for potential drag.")
+                            return true // Consume DOWN to track subsequent MOVE/UP events.
+                        }
+                    }
+                }
+                // If no ball was hit for a potential drag, allow pan/zoom or tap-empty-space.
+                // We've already passed to GestureDetector, so it might consume.
+                // We also pass to gestureHandler (pan/zoom) if in AIMING mode.
+                val panZoomHandled = if (appState.currentMode == SelectionMode.AIMING) {
+                    gestureHandler.onTouchEvent(event)
+                } else {
+                    false
+                }
+                return panZoomHandled || gestureDetectorConsumed || super.onTouchEvent(event)
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                if (initialDraggedBall != null) { // Only proceed if a ball was initially touched
+                    // The onScroll method of GestureDetector will set `isDraggingConfirmed` if movement exceeds slop.
+                    if (isDraggingConfirmed) { // Only update position if drag is confirmed
+                        val newCenterX = x - dragOffsetX
+                        val newCenterY = y - dragOffsetY
+
+                        val updatedBall = initialDraggedBall!!.copy(x = newCenterX, y = newCenterY)
+                        if (initialDraggedBall?.id == appState.selectedCueBall?.id) {
+                            appState.updateSelectedCueBall(updatedBall)
+                        } else if (initialDraggedBall?.id == appState.selectedTargetBall?.id) {
+                            appState.updateSelectedTargetBall(updatedBall)
+                        }
+                        invalidate()
+                        return true // Consume event for dragging
+                    }
+                }
+                // If not actively dragging a ball (either no ball was touched, or drag is not confirmed yet),
+                // then pan/zoom might handle it.
+                val panZoomHandled = if (appState.currentMode == SelectionMode.AIMING) {
+                    gestureHandler.onTouchEvent(event)
+                } else {
+                    false
+                }
+                return panZoomHandled || gestureDetectorConsumed || super.onTouchEvent(event)
+            }
+
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                val wasConfirmedDrag = isDraggingConfirmed // Capture state before reset
+                val ballToProcess = initialDraggedBall // Capture the ball reference
+
+                // Reset all drag state regardless of outcome
+                isDraggingConfirmed = false
+                initialDraggedBall = null
+                dragOffsetX = 0f
+                dragOffsetY = 0f
+                initialTouchDownX = 0f // Reset for next touch sequence
+                initialTouchDownY = 0f // Reset for next touch sequence
+
+                if (wasConfirmedDrag && ballToProcess != null) { // This was a confirmed drag
+                    val finalX = x - dragOffsetX
+                    val finalY = y - dragOffsetY
+                    handleSnapOnRelease(finalX, finalY, ballToProcess) // ballToProcess is guaranteed non-null here
+                    Log.d(TAG, "ACTION_UP/CANCEL: Confirmed drag ended for ${ballToProcess.id}.")
+                    return true // Consume event
+                } else if (ballToProcess != null) { // Was a potential drag (ball touched), but not confirmed (i.e., a tap on a ball)
+                    Log.d(TAG, "ACTION_UP/CANCEL: Potential drag was a tap on ball (${ballToProcess.id}). Calling handleSingleTap.")
+                    // Use the coordinates from the UP event for the tap detection
+                    handleSingleTap(x, y)
+                    return true // Consume event as it's handled as a tap
+                }
+                // If neither drag nor tap on ball handled, let gestureDetector's processing result or pan/zoom handle it
+                val panZoomHandled = if (appState.currentMode == SelectionMode.AIMING) {
+                    gestureHandler.onTouchEvent(event)
+                } else {
+                    false
+                }
+                return panZoomHandled || gestureDetectorConsumed || super.onTouchEvent(event)
+            }
+        }
+        return gestureDetectorConsumed || super.onTouchEvent(event) // Fallback for other events
     }
 
-    // --- New methods for ball tracking integration ---
-
-    /**
-     * Receives a list of detected balls and camera frame dimensions from the CameraManager.
-     * Updates AppState.trackedBalls and attempts to manage selected balls.
-     *
-     * @param balls The list of detected Ball objects (with coordinates in camera frame pixels).
-     * @param frameWidth The width of the camera frame in pixels.
-     * @param frameHeight The height of the camera frame in pixels.
-     */
     fun updateTrackedBalls(balls: List<Ball>, frameWidth: Int, frameHeight: Int) {
-        Log.d(TAG, "updateTrackedBalls received: balls.size=${balls.size}, frame=${frameWidth}x${frameHeight}")
+        Log.d(TAG, "updateTrackedBalls received: balls.size=${balls.size}, frame=${frameWidth}x${frameHeight}. Current view size: ${this.width}x${this.height}")
         if (!appState.isInitialized || this.width == 0 || this.height == 0 || frameWidth == 0 || frameHeight == 0) {
             Log.w(TAG, "updateTrackedBalls: view/frame dimensions not ready or zero, skipping. View: ${this.width}x${this.height}, Frame: ${frameWidth}x${frameHeight}")
-            // If frame dimensions are 0, this indicates a problem with the camera or analyzer.
-            // Clear tracked balls to ensure no stale data causes issues.
             appState.trackedBalls = emptyList()
-            // Invalidate to clear any previous drawings if current frame data is invalid.
             invalidate()
             return
         }
 
-        // Calculate scaling factors to map camera frame coordinates to MainOverlayView coordinates
         val scaleX = this.width.toFloat() / frameWidth.toFloat()
         val scaleY = this.height.toFloat() / frameHeight.toFloat()
-        // Use the smaller scale factor to ensure the entire camera frame fits within the view,
-        // preventing parts of the image from being cropped. This creates a "letterbox" effect
-        // if aspect ratios differ.
         val scaleFactor = min(scaleX, scaleY)
 
-        // Calculate offsets to center the scaled camera frame content within the MainOverlayView
         val scaledFrameWidth = frameWidth * scaleFactor
         val scaledFrameHeight = frameHeight * scaleFactor
         val offsetX = (this.width - scaledFrameWidth) / 2f
         val offsetY = (this.height - scaledFrameHeight) / 2f
 
+        // Apply AppConfig.BALL_RADIUS_SCALE_FACTOR only at the detection level (BallDetector.kt).
+        // Here, we just scale the detected pixels to screen pixels.
         val scaledBalls = balls.map { ball ->
             Ball(
                 id = ball.id,
                 x = ball.x * scaleFactor + offsetX,
                 y = ball.y * scaleFactor + offsetY,
-                radius = ball.radius * scaleFactor
+                radius = ball.radius * scaleFactor // Radius is already scaled by frame-to-view scale here
             )
         }
-        appState.trackedBalls = scaledBalls // Store the scaled balls
-        Log.d(TAG, "updateTrackedBalls: Scaled ${scaledBalls.size} balls.")
+        appState.trackedBalls = scaledBalls
+        Log.d(TAG, "updateTrackedBalls: Scaled ${scaledBalls.size} balls. First ball (scaled): ${scaledBalls.firstOrNull()}")
 
-        // Re-evaluate current selected balls based on the scaled, currently tracked balls.
-        // This ensures selected balls are always represented by the latest scaled data
-        // and deselected if they disappear from tracking.
-        val currentSelectedCueBall = scaledBalls.firstOrNull { it.id == appState.selectedCueBallId }
-        if (currentSelectedCueBall != null) {
-            appState.updateSelectedCueBall(currentSelectedCueBall)
-            Log.d(TAG, "updateTrackedBalls: Selected cue ball ${appState.selectedCueBallId} updated.")
-        } else if (appState.selectedCueBallId != null) {
-            // If previously selected cue ball is no longer tracked, deselect it
-            appState.clearSelectedCueBall()
-            listener?.onCueBallSelected(null)
-            Log.d(TAG, "updateTrackedBalls: Previously selected cue ball disappeared, deselected.")
-        }
 
-        val currentSelectedTargetBall = scaledBalls.firstOrNull { it.id == appState.selectedTargetBallId }
-        if (currentSelectedTargetBall != null) {
-            appState.updateSelectedTargetBall(currentSelectedTargetBall)
-            Log.d(TAG, "updateTrackedBalls: Selected target ball ${appState.selectedTargetBallId} updated.")
-        } else if (appState.selectedTargetBallId != null) {
-            // If previously selected target ball is no longer tracked, deselect it
-            appState.clearSelectedTargetBall()
-            listener?.onTargetBallSelected(null)
-            Log.d(TAG, "updateTrackedBalls: Previously selected target ball disappeared, deselected.")
-        }
-
-        // Auto-select if currently in a selection mode and no ball is selected
-        when (appState.currentMode) {
-            SelectionMode.SELECTING_CUE_BALL -> {
-                if (appState.selectedCueBallId == null) {
-                    val firstBall = scaledBalls.firstOrNull()
-                    if (firstBall != null) {
-                        appState.updateSelectedCueBall(firstBall)
-                        listener?.onCueBallSelected(firstBall.id)
-                        Log.d(TAG, "Auto-selected cue ball: ${firstBall.id}")
-                    } else {
-                        Log.d(TAG, "No balls detected for auto-selection of cue ball.")
-                    }
+        appState.selectedCueBall?.let { selectedCue ->
+            if (!selectedCue.id.startsWith("MANUAL_")) {
+                scaledBalls.firstOrNull { it.id == selectedCue.id }?.let { latestCue ->
+                    appState.updateSelectedCueBall(latestCue)
+                    Log.d(TAG, "updateTrackedBalls: Selected detected cue ball ${latestCue.id} updated.")
+                } ?: run {
+                    Log.d(TAG, "updateTrackedBalls: Previously selected DETECTED cue ball disappeared from tracking, but remains selected.")
                 }
             }
-            SelectionMode.SELECTING_TARGET_BALL -> {
-                if (appState.selectedTargetBallId == null) {
-                    // Try to auto-select a target ball that isn't the cue ball
-                    val firstNonCueBall = scaledBalls.firstOrNull { it.id != appState.selectedCueBallId }
-                    if (firstNonCueBall != null) {
-                        appState.updateSelectedTargetBall(firstNonCueBall)
-                        listener?.onTargetBallSelected(firstNonCueBall.id)
-                        Log.d(TAG, "Auto-selected target ball: ${firstNonCueBall.id}")
-                    } else {
-                        Log.d(TAG, "No non-cue balls detected for auto-selection of target ball.")
-                    }
-                }
-            }
-            else -> { /* In AIMING mode, no auto-selection */ }
         }
 
-        invalidate() // Request a redraw to show updated positions
+        appState.selectedTargetBall?.let { selectedTarget ->
+            if (!selectedTarget.id.startsWith("MANUAL_")) {
+                scaledBalls.firstOrNull { it.id == selectedTarget.id }?.let { latestTarget ->
+                    appState.updateSelectedTargetBall(latestTarget)
+                    Log.d(TAG, "updateTrackedBalls: Selected detected target ball ${latestTarget.id} updated.")
+                } ?: run {
+                    Log.d(TAG, "updateTrackedBalls: Previously selected DETECTED target ball disappeared from tracking, but remains selected.")
+                }
+            }
+        }
+
+        invalidate()
     }
 
-    /**
-     * Sets the camera's zoom capabilities in AppState.
-     */
     fun updateCameraZoomCapabilities(minZoom: Float, maxZoom: Float) {
         appState.updateCameraZoomCapabilities(minZoom, maxZoom)
     }
 
     /**
-     * Handles a single tap event on the overlay for ball selection.
-     * @param tapX The X-coordinate of the tap in MainOverlayView pixels.
-     * @param tapY The Y-coordinate of the tap in MainOverlayView pixels.
+     * Handles a single tap event on the overlay for ball selection or manual placement.
      */
     private fun handleSingleTap(tapX: Float, tapY: Float) {
-        var closestBall: Ball? = null
-        var minDistance = Float.MAX_VALUE
+        var closestDetectedBall: Ball? = null
+        var minDistanceToDetected = Float.MAX_VALUE
 
         for (ball in appState.trackedBalls) {
+            // Apply zoom factor to the ball's radius for hit testing.
+            val effectiveRadius = ball.radius * appState.zoomFactor
             val dist = hypot(tapX - ball.x, tapY - ball.y)
-            if (dist <= ball.radius + 20f) { // Add 20 pixels tolerance for easier tapping
-                if (dist < minDistance) {
-                    minDistance = dist
-                    closestBall = ball
+            if (dist <= effectiveRadius + 20f) { // Use effectiveRadius for hit test
+                if (dist < minDistanceToDetected) {
+                    minDistanceToDetected = dist
+                    closestDetectedBall = ball
                 }
             }
         }
 
         val previousMode = appState.currentMode
         var modeChanged = false
+        Log.d(TAG, "handleSingleTap: Tap at (${tapX}, ${tapY}), closestDetectedBall: ${closestDetectedBall?.id ?: "NONE"}. Current mode: ${appState.currentMode}")
+
 
         when (appState.currentMode) {
             SelectionMode.SELECTING_CUE_BALL -> {
-                if (closestBall != null) {
-                    appState.updateSelectedCueBall(closestBall)
+                if (closestDetectedBall != null) {
+                    appState.updateSelectedCueBall(closestDetectedBall)
                     appState.currentMode = SelectionMode.SELECTING_TARGET_BALL
-                    listener?.onCueBallSelected(closestBall.id)
-                    Log.d(TAG, "User selected cue ball: ${closestBall.id}. Mode changed to ${appState.currentMode}")
+                    listener?.onCueBallSelected(closestDetectedBall.id)
+                    Log.d(TAG, "User selected detected cue ball: ${closestDetectedBall.id}. Mode changed to ${appState.currentMode}")
                     modeChanged = true
                 } else {
-                    Log.d(TAG, "Tap ignored: No ball found, expecting cue ball selection.")
+                    appState.setManualCueBall(tapX, tapY)
+                    appState.currentMode = SelectionMode.SELECTING_TARGET_BALL
+                    listener?.onCueBallSelected(appState.selectedCueBall?.id)
+                    Log.d(TAG, "User manually placed cue ball at (${tapX}, ${tapY}). Mode changed to ${appState.currentMode}")
+                    modeChanged = true
                 }
             }
             SelectionMode.SELECTING_TARGET_BALL -> {
-                if (closestBall != null) {
-                    if (closestBall.id == appState.selectedCueBallId) {
-                        // Tapped on cue ball again while selecting target, reset everything
-                        appState.clearSelectedCueBall()
-                        appState.clearSelectedTargetBall()
-                        appState.currentMode = SelectionMode.SELECTING_CUE_BALL
-                        listener?.onCueBallSelected(null)
-                        listener?.onTargetBallSelected(null)
-                        Log.d(TAG, "User tapped cue ball again, resetting selection. Mode changed to ${appState.currentMode}")
-                        modeChanged = true
-                    } else {
-                        // Tapped a different ball, select as target
-                        appState.updateSelectedTargetBall(closestBall)
-                        appState.currentMode = SelectionMode.AIMING
-                        listener?.onTargetBallSelected(closestBall.id)
-                        Log.d(TAG, "User selected target ball: ${closestBall.id}. Mode changed to ${appState.currentMode}")
-                        modeChanged = true
-                    }
+                val selectedCueCenter = appState.selectedCueBall?.let { PointF(it.x, it.y) }
+                // Use logicalBallRadius scaled by zoomFactor for hit test on selected cue.
+                val selectedCueEffectiveRadius = appState.logicalBallRadius * appState.zoomFactor
+                val distToSelectedCue = selectedCueCenter?.let { hypot(tapX - it.x, tapY - it.y) } ?: Float.MAX_VALUE
+
+                if (distToSelectedCue <= selectedCueEffectiveRadius + 20f) { // Use effective radius
+                    appState.clearSelectedCueBall()
+                    appState.clearSelectedTargetBall()
+                    appState.currentMode = SelectionMode.SELECTING_CUE_BALL
+                    listener?.onCueBallSelected(null)
+                    listener?.onTargetBallSelected(null)
+                    Log.d(TAG, "User tapped current cue ball, resetting selection. Mode changed to ${appState.currentMode}")
+                    modeChanged = true
+                } else if (closestDetectedBall != null && closestDetectedBall.id != appState.selectedCueBall?.id) {
+                    appState.updateSelectedTargetBall(closestDetectedBall)
+                    appState.currentMode = SelectionMode.AIMING
+                    listener?.onTargetBallSelected(closestDetectedBall.id)
+                    Log.d(TAG, "User selected detected target ball: ${closestDetectedBall.id}. Mode changed to ${appState.currentMode}")
+                    modeChanged = true
                 } else {
-                    // Tapped empty space, deselect target (if any) and go back to selecting cue
-                    if (appState.selectedTargetBallId != null) {
-                        appState.clearSelectedTargetBall()
-                        listener?.onTargetBallSelected(null)
-                        Log.d(TAG, "User deselected target ball. Still expecting target selection.")
-                        modeChanged = true // Mode changed back to selecting target.
-                    } else {
-                        Log.d(TAG, "Tap ignored: No ball found, expecting target ball selection.")
-                    }
+                    appState.setManualTargetBall(tapX, tapY)
+                    appState.currentMode = SelectionMode.AIMING
+                    listener?.onTargetBallSelected(appState.selectedTargetBall?.id)
+                    Log.d(TAG, "User manually placed target ball at (${tapX}, ${tapY}). Mode changed to ${appState.currentMode}")
+                    modeChanged = true
                 }
             }
             SelectionMode.AIMING -> {
-                if (closestBall != null) {
-                    if (closestBall.id == appState.selectedCueBallId) {
-                        // Tapped on cue ball, reset entire selection flow
-                        appState.clearSelectedCueBall()
-                        appState.clearSelectedTargetBall()
-                        appState.currentMode = SelectionMode.SELECTING_CUE_BALL
-                        listener?.onCueBallSelected(null)
-                        listener?.onTargetBallSelected(null)
-                        Log.d(TAG, "User tapped cue ball during aiming, resetting selection. Mode changed to ${appState.currentMode}")
-                        modeChanged = true
-                    } else if (closestBall.id == appState.selectedTargetBallId) {
-                        // Tapped on current target ball, deselect it and go back to selecting target
-                        appState.clearSelectedTargetBall()
-                        appState.currentMode = SelectionMode.SELECTING_TARGET_BALL
-                        listener?.onTargetBallSelected(null)
-                        Log.d(TAG, "User deselected target ball. Mode changed to ${appState.currentMode}")
-                        modeChanged = true
-                    } else {
-                        // Tapped a new ball, select as new target
-                        appState.updateSelectedTargetBall(closestBall)
-                        listener?.onTargetBallSelected(closestBall.id)
-                        Log.d(TAG, "User selected new target ball: ${closestBall.id}.")
-                        // Mode doesn't change from AIMING to AIMING
-                    }
+                val selectedTargetBallCenter = appState.selectedTargetBall?.let { PointF(it.x, it.y) }
+                val selectedTargetEffectiveRadius = appState.logicalBallRadius * appState.zoomFactor // Use effective radius
+                val distToSelectedTarget = selectedTargetBallCenter?.let { hypot(tapX - it.x, tapY - it.y) } ?: Float.MAX_VALUE
+
+                val selectedCueBallCenter = appState.selectedCueBall?.let { PointF(it.x, it.y) }
+                val selectedCueEffectiveRadius = appState.logicalBallRadius * appState.zoomFactor // Use effective radius
+                val distToSelectedCue = selectedCueBallCenter?.let { hypot(tapX - it.x, tapY - it.y) } ?: Float.MAX_VALUE
+
+
+                if (distToSelectedCue <= selectedCueEffectiveRadius + 20f) { // Use effective radius
+                    appState.clearSelectedCueBall()
+                    appState.clearSelectedTargetBall()
+                    appState.currentMode = SelectionMode.SELECTING_CUE_BALL
+                    listener?.onCueBallSelected(null)
+                    listener?.onTargetBallSelected(null)
+                    Log.d(TAG, "User tapped selected cue ball during aiming, resetting selection. Mode changed to ${appState.currentMode}")
+                    modeChanged = true
+                } else if (distToSelectedTarget <= selectedTargetEffectiveRadius + 20f) { // Use effective radius
+                    appState.clearSelectedTargetBall()
+                    appState.currentMode = SelectionMode.SELECTING_TARGET_BALL
+                    listener?.onTargetBallSelected(null)
+                    Log.d(TAG, "User tapped selected target ball, deselecting. Mode changed to ${appState.currentMode}")
+                    modeChanged = true
+                } else if (closestDetectedBall != null && closestDetectedBall.id != appState.selectedCueBall?.id) {
+                    appState.updateSelectedTargetBall(closestDetectedBall)
+                    listener?.onTargetBallSelected(closestDetectedBall.id)
+                    Log.d(TAG, "User selected new detected target ball: ${closestDetectedBall.id}.")
                 } else {
-                    // Tapped empty space, deselect target and go back to selecting target
-                    if (appState.selectedTargetBallId != null) {
-                        appState.clearSelectedTargetBall()
-                        appState.currentMode = SelectionMode.SELECTING_TARGET_BALL
-                        listener?.onTargetBallSelected(null)
-                        Log.d(TAG, "User tapped empty space, deselected target ball. Mode changed to ${appState.currentMode}")
-                        modeChanged = true
-                    } else {
-                        Log.d(TAG, "Tap ignored: No ball found, already in AIMING mode with no target selected.")
-                    }
+                    appState.setManualTargetBall(tapX, tapY)
+                    listener?.onTargetBallSelected(appState.selectedTargetBall?.id)
+                    Log.d(TAG, "User manually re-placed target ball at (${tapX}, ${tapY}). Mode remains ${appState.currentMode}")
                 }
             }
         }
         if (modeChanged) {
             listener?.onSelectionModeChanged(appState.currentMode)
         }
-        listener?.onUserInteraction() // Always notify of user interaction
-        invalidate() // Redraw after selection change
+        listener?.onUserInteraction()
+        invalidate()
     }
 
-    // --- Public API for controlling the view's state (now proxying to CameraManager for zoom) ---
-
     /**
-     * Sets the camera zoom factor. This will be clamped by camera capabilities.
-     * @param factor The desired zoom factor (e.g., 1.0f for no optical zoom).
+     * Handles snapping a dragged ball to a nearby detected ball on release.
      */
+    private fun handleSnapOnRelease(finalX: Float, finalY: Float, draggedBall: Ball) {
+        var snapped = false
+        // Use the logicalBallRadius for snap tolerance calculation, scaled by zoomFactor for screen space.
+        val snapTolerance = (appState.logicalBallRadius * appState.zoomFactor) * config.SNAP_RADIUS_FACTOR
+
+        for (detectedBall in appState.trackedBalls) {
+            // Avoid snapping a detected ball back to itself (it's already tracking)
+            // A manually placed ball that snaps to a detected ball should get the detected ball's ID.
+            // A previously detected ball should not snap to itself if it's still being tracked.
+            if (draggedBall.id == detectedBall.id && !draggedBall.id.startsWith("MANUAL_")) {
+                continue
+            }
+
+            val distance = hypot(finalX - detectedBall.x, finalY - detectedBall.y)
+            if (distance <= snapTolerance) {
+                // Snap to this detected ball
+                val newBall = detectedBall.copy()
+                if (draggedBall.id == appState.selectedCueBall?.id) {
+                    appState.updateSelectedCueBall(newBall)
+                    listener?.onCueBallSelected(newBall.id)
+                    Log.d(TAG, "Cue ball snapped to detected ball: ${newBall.id}")
+                } else if (draggedBall.id == appState.selectedTargetBall?.id) {
+                    appState.updateSelectedTargetBall(newBall)
+                    listener?.onTargetBallSelected(newBall.id)
+                    Log.d(TAG, "Target ball snapped to detected ball: ${newBall.id}")
+                }
+                snapped = true
+                break
+            }
+        }
+
+        if (!snapped) {
+            // If not snapped, just update its position to the final drag location as a manual ball
+            // Ensure the radius remains the current logical radius (same as target/ghost balls)
+            val finalBall = draggedBall.copy(x = finalX, y = finalY, radius = appState.logicalBallRadius) // Use logicalBallRadius
+            if (draggedBall.id == appState.selectedCueBall?.id) {
+                appState.updateSelectedCueBall(finalBall)
+                listener?.onCueBallSelected(finalBall.id)
+                Log.d(TAG, "Cue ball placed manually after drag, maintaining logical radius.")
+            } else if (draggedBall.id == appState.selectedTargetBall?.id) {
+                appState.updateSelectedTargetBall(finalBall)
+                listener?.onTargetBallSelected(finalBall.id)
+                Log.d(TAG, "Target ball placed manually after drag, maintaining logical radius.")
+            }
+        }
+    }
+
     fun setZoomFactor(factor: Float) {
         setZoomFactorInternal(factor, false)
     }
 
-    /**
-     * Internal method to set the camera zoom factor, with a flag for user-initiated changes.
-     */
     private fun setZoomFactorInternal(factor: Float, isUserInitiatedInView: Boolean) {
-        if (!areComponentsInitialized || !appState.isInitialized) return
+        if (!areComponentsInitialized || !appState.isInitialized) {
+            Log.w(TAG, "setZoomFactorInternal returning early: components not initialized.")
+            return
+        }
 
-        // Update AppState's zoomFactor (which now represents camera zoom ratio)
         if (appState.updateZoomFactor(factor)) {
-            // Apply the new zoom ratio to the CameraX camera
-            if (::cameraManagerRef.isInitialized) {
-                cameraManagerRef.setCameraZoomRatio(appState.zoomFactor)
-            }
+            cameraManagerRef?.setCameraZoomRatio(appState.zoomFactor)
+            Log.d(TAG, "Camera zoom ratio set to: ${appState.zoomFactor}")
+
             if (isUserInitiatedInView) {
                 listener?.onZoomChanged(appState.zoomFactor)
                 listener?.onUserInteraction()
             } else {
                 listener?.onZoomChanged(appState.zoomFactor)
             }
-            invalidate() // Request a redraw
+            invalidate()
+        } else {
+            Log.d(TAG, "setZoomFactorInternal: Zoom factor not significantly changed. Skipping update.")
         }
     }
 
-    /**
-     * Gets the current camera zoom factor.
-     * @return The current camera zoom factor.
-     */
-    fun getZoomFactor(): Float = if (appState.isInitialized) appState.zoomFactor else 1.0f
-
-    /**
-     * Gets the minimum supported camera zoom factor.
-     */
+    fun getZoomFactor(): Float = if (appState.isInitialized) appState.zoomFactor else config.DEFAULT_ZOOM_FACTOR
     fun getMinCameraZoomFactor(): Float = if (appState.isInitialized) appState.minCameraZoomRatio else 1.0f
-
-    /**
-     * Gets the maximum supported camera zoom factor.
-     */
     fun getMaxCameraZoomFactor(): Float = if (appState.isInitialized) appState.maxCameraZoomRatio else 1.0f
 
-
-    /**
-     * Sets the rotation angle of the protractor overlay.
-     * @param angle The desired rotation angle in degrees.
-     */
     fun setProtractorRotationAngle(angle: Float) {
         setProtractorRotationAngleInternal(angle, false)
     }
 
-    /**
-     * Internal method to set the rotation angle, with a flag for user-initiated changes.
-     */
     private fun setProtractorRotationAngleInternal(angle: Float, isUserInitiatedInView: Boolean) {
-        if (!areComponentsInitialized || !appState.isInitialized) return
+        if (!areComponentsInitialized || !appState.isInitialized) {
+            Log.w(TAG, "setProtractorRotationAngleInternal returning early: components not initialized.")
+            return
+        }
 
         if (appState.updateProtractorRotationAngle(angle)) {
             if (isUserInitiatedInView) {
@@ -466,90 +571,67 @@ class MainOverlayView @JvmOverloads constructor(
                 listener?.onRotationChanged(appState.protractorRotationAngle)
             }
             invalidate()
+        } else {
+            Log.d(TAG, "setProtractorRotationAngleInternal: Rotation angle not significantly changed. Skipping update.")
         }
     }
 
-    /**
-     * Gets the current rotation angle of the protractor overlay.
-     * @return The current rotation angle in degrees.
-     */
     fun getProtractorRotationAngle(): Float = if (appState.isInitialized) appState.protractorRotationAngle else config.DEFAULT_ROTATION_ANGLE
 
-    /**
-     * Sets the device pitch angle. This influences the 3D projection of the protractor.
-     * @param rawPitchAngle The raw pitch angle from the device sensor.
-     */
     fun setDevicePitchAngle(rawPitchAngle: Float) {
-        if (!areComponentsInitialized || !appState.isInitialized) return
+        if (!areComponentsInitialized || !appState.isInitialized) {
+            Log.w(TAG, "setDevicePitchAngle returning early: components not initialized.")
+            return
+        }
 
         if (appState.updateDevicePitchAngle(rawPitchAngle)) {
-            invalidate() // Request redraw if pitch changed significantly
+            invalidate()
         }
     }
 
-    /**
-     * Gets the current effective pitch angle.
-     * @return The current pitch angle in degrees.
-     */
     fun getCurrentPitchAngle(): Float = if (appState.isInitialized) appState.currentPitchAngle else 0.0f
-
-    /**
-     * Gets the current center point of the protractor's target circle in view coordinates.
-     * @return A PointF representing the target circle's center.
-     */
     fun getPlaneTargetCenter(): PointF = if (appState.isInitialized) PointF(appState.targetCircleCenter.x, appState.targetCircleCenter.y) else PointF()
 
-    /**
-     * Resets all user interactions (zoom, rotation) and ball selections to defaults.
-     */
     fun resetInteractionsToDefaults() {
+        Log.d(TAG, "resetInteractionsToDefaults called.")
+        if (!areComponentsInitialized && width > 0 && height > 0 && cameraManagerRef != null) {
+            Log.d(TAG, "resetInteractionsToDefaults: Attempting late initialization.")
+            initializeComponents()
+        }
+
         if (!areComponentsInitialized || !appState.isInitialized) {
-            // If not initialized, try to initialize it now (e.g., if reset is pressed very early)
-            if (width > 0 && height > 0 && ::cameraManagerRef.isInitialized) {
-                initializeComponents(cameraManagerRef) // Re-initialize with known cameraManagerRef
-                appState.initialize(width, height)
-            } else {
-                return // Cannot reset if not sized and CameraManager not ready
-            }
+            Log.w(TAG, "resetInteractionsToDefaults: Cannot reset if components are not initialized or app state is not ready.")
+            return
         }
 
-        appState.resetInteractions() // Reset AppState's interaction properties
-        appPaints.resetDynamicPaintProperties() // Reset any dynamic paint states (e.g., error colors, glows)
+        appState.resetInteractions()
+        appPaints.resetDynamicPaintProperties()
 
-        // Ensure camera zoom is reset to default (1.0f)
-        if (::cameraManagerRef.isInitialized) {
-            cameraManagerRef.setCameraZoomRatio(1.0f)
-        }
+        cameraManagerRef?.setCameraZoomRatio(config.DEFAULT_ZOOM_FACTOR)
+        Log.d(TAG, "Camera zoom ratio reset to ${config.DEFAULT_ZOOM_FACTOR}.")
 
-        // Notify listeners of the reset state
         listener?.onZoomChanged(appState.zoomFactor)
         listener?.onRotationChanged(appState.protractorRotationAngle)
-        listener?.onCueBallSelected(appState.selectedCueBallId)
-        listener?.onTargetBallSelected(appState.selectedTargetBallId) // Notify about deselection
+        listener?.onCueBallSelected(appState.selectedCueBall?.id)
+        listener?.onTargetBallSelected(appState.selectedTargetBall?.id)
         listener?.onSelectionModeChanged(appState.currentMode)
         listener?.onUserInteraction()
         invalidate()
+        Log.d(TAG, "resetInteractionsToDefaults complete. App state mode: ${appState.currentMode}")
     }
 
-    /**
-     * Toggles the visibility of helper text labels on the overlay.
-     */
     fun toggleHelperTextVisibility() {
-        if (!areComponentsInitialized || !appState.isInitialized) return
+        if (!areComponentsInitialized || !appState.isInitialized) {
+            Log.w(TAG, "toggleHelperTextVisibility returning early: components not initialized.")
+            return
+        }
 
         appState.toggleHelperTextVisibility()
-        listener?.onUserInteraction() // Mark as user interaction for UI updates
+        listener?.onUserInteraction()
         invalidate()
+        Log.d(TAG, "Helper text visibility toggled to: ${appState.areHelperTextsVisible}")
     }
 
-    /**
-     * Gets the current visibility state of helper texts.
-     * @return True if helper texts are visible, false otherwise.
-     */
-    fun getAreHelperTextsVisible(): Boolean = if (appState.isInitialized) appState.areHelperTextsVisible else true
-
-    /**
-     * Gets the current selection mode.
-     */
+    fun getAreHelperTextsVisible(): Boolean = if (appState.isInitialized) appState.areHelperTextsVisible else false // Default to false
     fun getSelectionMode(): SelectionMode = if (appState.isInitialized) appState.currentMode else SelectionMode.SELECTING_CUE_BALL
 }

@@ -23,11 +23,11 @@ class TargetCircleDrawer {
         appPaints: AppPaints
     ) {
         // Only draw if initialized and radius is meaningful
-        if (!appState.isInitialized || appState.currentLogicalRadius <= 0.01f) return
+        if (!appState.isInitialized || appState.logicalBallRadius <= 0.01f) return
 
         val centerX = appState.targetCircleCenter.x
         val centerY = appState.targetCircleCenter.y
-        val radius = appState.currentLogicalRadius // Use the dynamically calculated currentLogicalRadius
+        val radius = appState.logicalBallRadius // Use the dynamically calculated currentLogicalRadius
         val centerMarkRadius = radius / 5f // Center mark is 1/5th of the main circle radius
 
         // Draw the target circle outline (typically yellow)

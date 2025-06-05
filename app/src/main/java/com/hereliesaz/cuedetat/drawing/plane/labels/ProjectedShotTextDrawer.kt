@@ -40,7 +40,7 @@ class ProjectedShotTextDrawer(private val textLayoutHelper: TextLayoutHelper) {
         val rotationDegrees = Math.toDegrees(angleRad.toDouble()).toFloat()
 
         // Position text along the line, starting from the logical ghost cue ball
-        val distanceFromGhostCueCenter = appState.currentLogicalRadius * 1.5f // Adjusted distance from ghost cue
+        val distanceFromGhostCueCenter = (appState.logicalBallRadius * appState.zoomFactor) * 1.5f // Use logicalBallRadius and scale by zoomFactor
         val preferredX = aimingLineCoords.cueX + aimingLineCoords.normDirX * distanceFromGhostCueCenter
         val preferredY = aimingLineCoords.cueY + aimingLineCoords.normDirY * distanceFromGhostCueCenter
 
