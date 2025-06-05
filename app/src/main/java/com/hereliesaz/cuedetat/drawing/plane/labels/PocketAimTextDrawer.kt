@@ -19,7 +19,8 @@ class PocketAimTextDrawer(private val textLayoutHelper: TextLayoutHelper) {
         config: AppConfig
         // No need to pass canvas transforms here, PlaneRenderer handles the main one
     ) {
-        if (!appState.isInitialized || !appState.areHelperTextsVisible) return
+        // Only draw if in AIMING mode and helper texts are visible
+        if (!appState.isInitialized || !appState.areHelperTextsVisible || appState.currentMode != AppState.SelectionMode.AIMING) return
 
         val paint = appPaints.pocketAimTextPaint // textAlign is CENTER
         paint.textSize = getDynamicTextSizePPD(

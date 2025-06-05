@@ -32,7 +32,9 @@ class FitTargetInstructionDrawer(
         targetGhostCenter: PointF,
         targetGhostRadius: Float
     ) {
-        if (!appState.isInitialized || !appState.areHelperTextsVisible || targetGhostRadius <= 0.01f) return
+        // Only draw if in AIMING mode and helper texts are visible
+        if (!appState.isInitialized || !appState.areHelperTextsVisible || appState.currentMode != AppState.SelectionMode.AIMING) return
+        if (targetGhostRadius <= 0.01f) return
 
         val paint = TextPaint(appPaints.fitTargetInstructionPaint)
         val baseSize = config.GHOST_BALL_NAME_BASE_SIZE * config.FIT_TARGET_INSTRUCTION_BASE_SIZE_FACTOR
@@ -62,6 +64,11 @@ class FitTargetInstructionDrawer(
         val lineHeight = paint.fontSpacing
         val numLines = 2
         val blockHeight = (fm.descent - fm.ascent) * numLines + lineHeight * (numLines - 1)
+        // For TextAlign.LEFT, the Y given to drawText is the baseline of the first line.
+        // We want the whole block centered vertically on targetGhostCenter.y.
+        // So, vertical center of block = targetGhostCenter.y
+        // Top of block = targetGhostCenter.y - (blockHeight / 2f)
+        // Baseline of first line = Top of block - fm.ascent
         val preferredY = targetGhostCenter.y - (blockHeight / 2f) - fm.ascent
 
         textLayoutHelper.layoutAndDrawText(

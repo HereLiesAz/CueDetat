@@ -66,26 +66,31 @@ class GeometryCalculator(
     }
 
     // Calculates the logical coordinates for the aiming line (shot guide)
+    // The aiming line now starts from the *tracked actual cue ball's screen position*
     fun calculateAimingLineLogicalCoords(appState: AppState, hasInversePitchMatrix: Boolean): AimingLineLogicalCoords? {
-        if (!hasInversePitchMatrix) return null
+        if (!hasInversePitchMatrix || appState.selectedCueBallScreenCenter == null) return null
 
-        // The "start" of the aiming line is considered to be at the bottom center of the screen.
-        // We need to map this screen point back to the logical protractor plane.
-        val screenAimPointScreenCoords = floatArrayOf(viewWidthProvider() / 2f, viewHeightProvider().toFloat())
-        val screenAimPointLogicalCoordsArray = FloatArray(2)
-        appState.inversePitchMatrix.mapPoints(screenAimPointLogicalCoordsArray, screenAimPointScreenCoords)
+        // The start of the aiming line is the tracked actual cue ball's screen position
+        val actualCueScreenX = appState.selectedCueBallScreenCenter!!.x
+        val actualCueScreenY = appState.selectedCueBallScreenCenter!!.y
 
-        val logicalStartX = screenAimPointLogicalCoordsArray[0]
-        val logicalStartY = screenAimPointLogicalCoordsArray[1]
-        val logicalCueX = appState.cueCircleCenter.x
-        val logicalCueY = appState.cueCircleCenter.y
+        // Map this screen point back to the logical protractor plane
+        val actualCuePointScreenCoords = floatArrayOf(actualCueScreenX, actualCueScreenY)
+        val actualCuePointLogicalCoordsArray = FloatArray(2)
+        appState.inversePitchMatrix.mapPoints(actualCuePointLogicalCoordsArray, actualCuePointScreenCoords)
+        val logicalStartX = actualCuePointLogicalCoordsArray[0]
+        val logicalStartY = actualCuePointLogicalCoordsArray[1]
 
-        val aimDirectionX = logicalCueX - logicalStartX
-        val aimDirectionY = logicalCueY - logicalStartY
+        // The line passes through the logical ghost cue ball position (appState.cueCircleCenter)
+        val logicalGhostCueX = appState.cueCircleCenter.x
+        val logicalGhostCueY = appState.cueCircleCenter.y
+
+        val aimDirectionX = logicalGhostCueX - logicalStartX
+        val aimDirectionY = logicalGhostCueY - logicalStartY
         val magnitudeSquared = aimDirectionX * aimDirectionX + aimDirectionY * aimDirectionY
 
         if (magnitudeSquared <= 0.0001f) { // Avoid division by zero or near-zero magnitude
-            return AimingLineLogicalCoords(logicalStartX, logicalStartY, logicalCueX, logicalCueY, logicalCueX, logicalCueY, 0f, 0f)
+            return AimingLineLogicalCoords(logicalStartX, logicalStartY, logicalGhostCueX, logicalGhostCueY, logicalGhostCueX, logicalGhostCueY, 0f, 0f)
         }
 
         val magnitude = sqrt(magnitudeSquared)
@@ -94,12 +99,12 @@ class GeometryCalculator(
 
         // Extend the line far off-screen for drawing purposes
         val extendLengthFactor = max(viewWidthProvider(), viewHeightProvider()) * 5f // Arbitrary large factor
-        val logicalEndX = logicalCueX + normalizedAimDirX * extendLengthFactor
-        val logicalEndY = logicalCueY + normalizedAimDirY * extendLengthFactor
+        val logicalEndX = logicalGhostCueX + normalizedAimDirX * extendLengthFactor
+        val logicalEndY = logicalGhostCueY + normalizedAimDirY * extendLengthFactor
 
         return AimingLineLogicalCoords(
             startX = logicalStartX, startY = logicalStartY,
-            cueX = logicalCueX, cueY = logicalCueY,
+            cueX = logicalGhostCueX, cueY = logicalGhostCueY, // cueX/Y here refers to the GHOST cue ball's position on the plane
             endX = logicalEndX, endY = logicalEndY,
             normDirX = normalizedAimDirX, normDirY = normalizedAimDirY
         )
@@ -115,7 +120,7 @@ class GeometryCalculator(
         var unitPerpendicularY = 0f
 
         if (magnitude_CueToTarget > 0.001f) {
-            // Normalized vector from cue to target
+            // Normalized vector from logical cue to logical target
             val normCueToTargetX = deltaX_CueToTarget / magnitude_CueToTarget
             val normCueToTargetY = deltaY_CueToTarget / magnitude_CueToTarget
             // Perpendicular vector (one direction of tangent)
@@ -133,38 +138,36 @@ class GeometryCalculator(
         )
     }
 
-    // Checks if the cue ball is logically on the "far side" of the target ball relative to the aiming line's origin
-    fun isCueOnFarSide(appState: AppState, aimingLineCoords: AimingLineLogicalCoords?): Boolean {
-        if (aimingLineCoords == null) return false
+    // Checks if the logical cue ball (ghost ball) is on the "far side" of the logical target ball
+    // relative to the aiming line's origin (which is now the actual cue ball).
+    // This logic ensures the target isn't "behind" the actual cue ball along the shot path.
+    fun isGhostCueOnFarSide(appState: AppState, aimingLineCoords: AimingLineLogicalCoords?): Boolean {
+        if (aimingLineCoords == null || appState.selectedCueBallScreenCenter == null) return false
 
-        val targetLogicalX = appState.targetCircleCenter.x
-        val targetLogicalY = appState.targetCircleCenter.y
+        // `aimingLineCoords.startX, startY` is now the actual cue ball's logical position.
+        // `aimingLineCoords.cueX, cueY` is the logical ghost cue ball's position.
+        // `appState.targetCircleCenter.x, y` is the logical target ball's position.
 
-        // Use the normalized direction of the aiming line (from screen bottom towards cue ball)
-        val normAimDirX = aimingLineCoords.normDirX
-        val normAimDirY = aimingLineCoords.normDirY
+        // Vector from actual cue (line start) to ghost cue
+        val vecActualCueToGhostCueX = aimingLineCoords.cueX - aimingLineCoords.startX
+        val vecActualCueToGhostCueY = aimingLineCoords.cueY - aimingLineCoords.startY
+        val distActualToGhostCue = distance(aimingLineCoords.startX, aimingLineCoords.startY, aimingLineCoords.cueX, aimingLineCoords.cueY)
 
-        // If aiming line has no direction (e.g., cue is exactly at screen bottom projected point)
-        if (normAimDirX == 0f && normAimDirY == 0f &&
-            aimingLineCoords.startX == aimingLineCoords.cueX && aimingLineCoords.startY == aimingLineCoords.cueY) {
-            return false
+        // Vector from actual cue (line start) to target ball
+        val vecActualCueToTargetX = appState.targetCircleCenter.x - aimingLineCoords.startX
+        val vecActualCueToTargetY = appState.targetCircleCenter.y - aimingLineCoords.startY
+
+        // Project the target ball onto the aiming line (line from actual cue through ghost cue)
+        // Dot product to find projected length
+        val projectedTargetLength = if (distActualToGhostCue > 0.001f) {
+            (vecActualCueToTargetX * vecActualCueToGhostCueX + vecActualCueToTargetY * vecActualCueToGhostCueY) / distActualToGhostCue
+        } else {
+            // If ghost cue is at actual cue, line has no direction, so target can't be "behind" it this way
+            0f
         }
 
-        // Vector from aiming line start (screen bottom projected) to cue ball
-        val vecScreenToCueX = aimingLineCoords.cueX - aimingLineCoords.startX
-        val vecScreenToCueY = aimingLineCoords.cueY - aimingLineCoords.startY
-        // Distance along the aiming line from its start to the cue ball
-        val distToCueProjected = vecScreenToCueX * normAimDirX + vecScreenToCueY * normAimDirY
-
-
-        // Vector from aiming line start to target ball
-        val vecScreenToTargetX = targetLogicalX - aimingLineCoords.startX
-        val vecScreenToTargetY = targetLogicalY - aimingLineCoords.startY
-        // Distance along the aiming line from its start to the target ball's projection on the line
-        val distToTargetProjected = vecScreenToTargetX * normAimDirX + vecScreenToTargetY * normAimDirY
-
-        // Cue is on the "far side" if its projected distance is greater than target's,
-        // and target's projected distance is positive (meaning target is "in front" of aiming start point).
-        return distToCueProjected > distToTargetProjected && distToTargetProjected > 0
+        // The target is on the "far side" if its projection along the aiming line is less than 0,
+        // meaning it's "behind" the actual cue ball relative to the ghost cue ball's direction.
+        return projectedTargetLength < 0
     }
 }

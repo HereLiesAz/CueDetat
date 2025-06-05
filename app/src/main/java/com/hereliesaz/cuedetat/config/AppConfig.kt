@@ -40,6 +40,9 @@ object AppConfig {
     const val TEXT_MIN_SCALE_FACTOR = 0.65f
     const val TEXT_MAX_SCALE_FACTOR = 1.5f
 
+    // New: Default helper text color ARGB value
+    const val DEFAULT_HELP_TEXT_COLOR_ARGB = 0xFFD1C4E9.toInt()
+
     // Paint Stroke Widths
     const val STROKE_AIM_LINE_NEAR = 4f
     const val STROKE_AIM_LINE_FAR = 2f

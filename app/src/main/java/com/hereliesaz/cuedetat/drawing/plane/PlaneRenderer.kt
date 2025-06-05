@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import com.hereliesaz.cuedetat.config.AppConfig
 import com.hereliesaz.cuedetat.state.AppPaints
 import com.hereliesaz.cuedetat.state.AppState
+import com.hereliesaz.cuedetat.state.AppState.SelectionMode // Import SelectionMode
 import com.hereliesaz.cuedetat.geometry.models.AimingLineLogicalCoords
 import com.hereliesaz.cuedetat.geometry.models.DeflectionLineParams
 import com.hereliesaz.cuedetat.drawing.plane.elements.* // Imports all element drawers
@@ -11,6 +12,7 @@ import com.hereliesaz.cuedetat.drawing.plane.labels.*   // Imports all label dra
 import com.hereliesaz.cuedetat.drawing.utility.TextLayoutHelper
 import kotlin.math.atan2
 import kotlin.math.abs
+import android.graphics.PointF // Import PointF
 
 class PlaneRenderer(
     private val textLayoutHelper: TextLayoutHelper,
@@ -37,12 +39,16 @@ class PlaneRenderer(
         config: AppConfig,
         aimingLineCoords: AimingLineLogicalCoords,
         deflectionParams: DeflectionLineParams,
-        useErrorColor: Boolean
+        useErrorColor: Boolean,
+        actualCueBallScreenCenter: PointF? // New parameter
     ) {
+        // Only draw protractor plane visuals if in AIMING mode
+        if (appState.currentMode != SelectionMode.AIMING) return
+
         targetCircleDrawer.draw(canvas, appState, appPaints)
         cueCircleDrawer.draw(canvas, appState, appPaints, useErrorColor)
         protractorAnglesDrawer.draw(canvas, appState, appPaints, config)
-        shotGuideLineDrawer.draw(canvas, appPaints, aimingLineCoords)
+        shotGuideLineDrawer.draw(canvas, appPaints, aimingLineCoords, actualCueBallScreenCenter) // Pass actual cue ball position
 
         val protractorAngle = appState.protractorRotationAngle
         val dxCueToTarget = appState.targetCircleCenter.x - appState.cueCircleCenter.x
@@ -87,6 +93,7 @@ class PlaneRenderer(
             )
         }
 
+        // Draw plane-specific helper texts only if in AIMING mode and helper texts are visible
         if (appState.areHelperTextsVisible) {
             canvas.save()
             val textPlaneYLift = -appState.currentLogicalRadius * 0.15f / appState.zoomFactor.coerceAtLeast(0.3f)

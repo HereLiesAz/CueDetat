@@ -8,6 +8,8 @@ import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.Camera
+import androidx.camera.core.CameraInfo
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -19,7 +21,6 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.google.common.util.concurrent.ListenableFuture
 import com.hereliesaz.cuedetat.config.AppConfig
-import com.hereliesaz.cuedetat.system.*
 import com.hereliesaz.cuedetat.tracking.ball_detector.BallDetector
 import com.hereliesaz.cuedetat.view.MainOverlayView
 import kotlinx.coroutines.guava.await
@@ -45,6 +46,8 @@ class CameraManager(
 
     private val analysisExecutor = Executors.newSingleThreadExecutor() // Single thread for image analysis to avoid frame drops
     private lateinit var ballDetector: BallDetector
+
+    private var activeCamera: Camera? = null // Store the active camera instance
 
     init {
         requestCameraPermissionLauncher = activity.registerForActivityResult(
@@ -89,7 +92,6 @@ class CameraManager(
             try {
                 val cameraProvider = cameraProviderFuture.await()
                 bindCameraUseCases(cameraProvider)
-                Log.i(TAG, "Camera initialized and use cases bound.")
             } catch (e: Exception) {
                 Log.e(TAG, "Error initializing camera provider or binding use cases: ", e)
                 Toast.makeText(activity, "Could not initialize camera: ${e.message}", Toast.LENGTH_LONG).show()
@@ -103,11 +105,9 @@ class CameraManager(
             .requireLensFacing(CameraSelector.LENS_FACING_BACK) // Use back camera
             .build()
 
-        // Connect the Preview use case to the PreviewView
         preview.surfaceProvider = previewView.surfaceProvider
 
-        // Set up ImageAnalysis for processing camera frames
-        val imageAnalysis = ImageAnalysis.Builder()
+        val imageAnalysis: ImageAnalysis = ImageAnalysis.Builder()
             .setTargetResolution(Size(IMAGE_ANALYSIS_WIDTH, IMAGE_ANALYSIS_HEIGHT))
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST) // Only analyze the most recent frame
             .build()
@@ -117,17 +117,59 @@ class CameraManager(
 
         try {
             cameraProvider.unbindAll() // Unbind use cases before rebinding to prevent errors
-            cameraProvider.bindToLifecycle(
+            activeCamera = cameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 cameraSelector,
                 preview,
                 imageAnalysis // Bind ImageAnalysis along with Preview
             )
             Log.i(TAG, "Camera preview and image analysis bound to lifecycle.")
+
+            // Update AppState with camera zoom capabilities
+            val cameraInfo = activeCamera?.cameraInfo
+            if (cameraInfo != null) {
+                mainOverlayView.updateCameraZoomCapabilities(
+                    cameraInfo.zoomState.value?.minZoomRatio ?: 1.0f,
+                    cameraInfo.zoomState.value?.maxZoomRatio ?: 1.0f
+                )
+                Log.d(TAG, "Camera Zoom Capabilities: Min=${cameraInfo.zoomState.value?.minZoomRatio}, Max=${cameraInfo.zoomState.value?.maxZoomRatio}")
+            }
+
         } catch (exception: Exception) {
             Log.e(TAG, "Use case binding failed for camera: ", exception)
             Toast.makeText(activity, "Camera binding failed: ${exception.message}", Toast.LENGTH_LONG).show()
         }
+    }
+
+    /**
+     * Sets the camera's zoom ratio.
+     * @param ratio The desired zoom ratio. Will be clamped between min and max supported ratios.
+     */
+    fun setCameraZoomRatio(ratio: Float) {
+        activeCamera?.cameraControl?.setZoomRatio(ratio)
+        // No direct callback for zoom ratio change, but zoomState can be observed.
+        // For simplicity, we assume the command will be executed.
+    }
+
+    /**
+     * Gets the camera's current zoom ratio.
+     */
+    fun getCurrentZoomRatio(): Float {
+        return activeCamera?.cameraInfo?.zoomState?.value?.zoomRatio ?: 1.0f
+    }
+
+    /**
+     * Gets the camera's minimum supported zoom ratio.
+     */
+    fun getMinZoomRatio(): Float {
+        return activeCamera?.cameraInfo?.zoomState?.value?.minZoomRatio ?: 1.0f
+    }
+
+    /**
+     * Gets the camera's maximum supported zoom ratio.
+     */
+    fun getMaxZoomRatio(): Float {
+        return activeCamera?.cameraInfo?.zoomState?.value?.maxZoomRatio ?: 1.0f
     }
 
     // Custom ImageAnalysis Analyzer for ball detection using ML Kit

@@ -32,7 +32,8 @@ class ProtractorAnglesDrawer(
             val endY = -(lineLength * cos(rad)).toFloat()
 
             if (angle == 0f) {
-                canvas.drawLine(0f, 0f, endX, endY, appPaints.targetLineGuidePaint) // Main axis line
+                // This draws the main axis line of the protractor, now using targetLineGuidePaint
+                canvas.drawLine(0f, 0f, endX, endY, appPaints.targetLineGuidePaint) // Main axis line (yellow)
                 canvas.drawLine(0f, 0f, -endX, -endY, appPaints.protractorAngleLinePaint) // Opposite side
             } else {
                 canvas.drawLine(0f, 0f, endX, endY, appPaints.protractorAngleLinePaint)

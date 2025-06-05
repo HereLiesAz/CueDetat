@@ -25,7 +25,8 @@ class InvalidShotWarningDrawer(
         config: AppConfig, // Pass AppConfig explicitly
         warningStringToDisplay: String?
     ) {
-        if (warningStringToDisplay == null) return
+        // Only draw if in AIMING mode and a warning string is present
+        if (appState.currentMode != AppState.SelectionMode.AIMING || warningStringToDisplay == null) return
 
         val screenWidth = viewWidthProvider()
         val screenHeight = viewHeightProvider()

@@ -13,7 +13,8 @@ val AppDarkYellow = Color(0xFFE5B205) // A darker variant of the main yellow
 val AppPurple = Color(0xFF6200EE) // A standard purple for the extended shot line
 
 val AppErrorRed = Color(0xFFFF5252)
-val AppHelpTextDefault = Color(0xFFD1C4E9) // Default helper text color // Default helper text color
+// AppHelpTextDefault was moved to AppConfig.kt for consistent text styling.
+// The line `val AppHelpTextDefault = Color(0xFFD1C4E9)` must be REMOVED from here.
 
 // Specific Helper Text Colors (can reuse AppColors or define new ones)
 val AppHelpTextPhoneOverCue = AppDarkYellow

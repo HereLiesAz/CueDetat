@@ -23,7 +23,9 @@ class GhostCueNameDrawer(private val textLayoutHelper: TextLayoutHelper) {
         ghostRadius: Float,
         verticalOffsetAdjustment: Float = 0f // This will be ADDED to the calculated Y. Negative pushes up.
     ) {
-        if (!appState.isInitialized || !appState.areHelperTextsVisible || ghostRadius <= 0.01f) return
+        // Only draw if in AIMING mode and helper texts are visible
+        if (!appState.isInitialized || !appState.areHelperTextsVisible || appState.currentMode != AppState.SelectionMode.AIMING) return
+        if (ghostRadius <= 0.01f) return
 
         val paint = appPaints.ghostCueNamePaint // textAlign is CENTER
         paint.textSize = getScreenSpaceTextSize(
@@ -36,42 +38,18 @@ class GhostCueNameDrawer(private val textLayoutHelper: TextLayoutHelper) {
             .coerceAtLeast(LABEL_MIN_OFFSET_PIXELS)
 
         val fm = paint.fontMetrics
+        val textBlockHeight = fm.descent - fm.ascent
+
         val topOfBallY = ghostCenter.y - ghostRadius
 
-        // Calculate 'preferredY' so it's the baseline of the text,
-        // placing the bottom of the text (fm.descent below baseline)
-        // 'labelOffsetPixels' above the top of the ball.
-        // So, baselineY + fm.descent = topOfBallY - labelOffsetPixels
-        // baselineY = topOfBallY - labelOffsetPixels - fm.descent
-        var preferredY_baseline = topOfBallY - labelOffsetPixels - fm.descent
-
-        // Apply the vertical offset adjustment calculated by ScreenRenderer
-        // A negative adjustment from ScreenRenderer pushes it further up.
-        preferredY_baseline += verticalOffsetAdjustment
+        // The text block's bottom should be 'labelOffsetPixels' above the top of the ball.
+        // Then apply the verticalOffsetAdjustment.
+        // The text block's bottom is at topOfBallY - labelOffsetPixels + verticalOffsetAdjustment
+        val textVisualBottom = topOfBallY - labelOffsetPixels + verticalOffsetAdjustment
+        val textVisualTop = textVisualBottom - textBlockHeight
+        val preferredY_center = textVisualTop + textBlockHeight / 2f // Y for the center of the text block
 
         val preferredX = ghostCenter.x // For Align.CENTER, X is the center
-
-        // TextLayoutHelper.layoutAndDrawText will use this preferredY.
-        // If paint.textAlign is CENTER, TextLayoutHelper's drawTextAtPosition
-        // for non-rotated text with a single line, might use Y as the vertical center.
-        // Let's adjust preferredY to be the center of the text block for TextLayoutHelper.
-        val textBlockHeight = fm.descent - fm.ascent
-        preferredY_baseline - fm.ascent - (textBlockHeight / 2f) + fm.ascent // This simplifies to y_baseline - text_height/2 - ascent
-        // simplified: y_baseline + (fm.ascent - fm.descent)/2
-        // Y for text center = baselineY + ascent + (height/2)
-        // Y for text center = baselineY - (height/2) + descent (if y is baseline)
-        // If preferredY_baseline is the baseline:
-        // The center of the text is roughly baselineY - (textBlockHeight / 2) + (textBlockHeight - descent)
-        // No, if paint.textAlign is CENTER, TextLayoutHelper's drawTextAtPosition (for single line, no rotation)
-        // treats Y as the vertical center.
-        // So we need to calculate the desired vertical center of the text block.
-        // The text block's bottom is at topOfBallY - labelOffsetPixels + verticalOffsetAdjustment (if using actual bottom)
-        // The text block's top is bottom - textBlockHeight
-        // The text block's center is top + textBlockHeight / 2
-        val textVisualBottom = topOfBallY - labelOffsetPixels + verticalOffsetAdjustment // Y where the descent of text ends
-        val textVisualTop = textVisualBottom - textBlockHeight
-        val preferredY_center = textVisualTop + textBlockHeight / 2f
-
 
         textLayoutHelper.layoutAndDrawText(
             canvas, TEXT_STRING, preferredX, preferredY_center, paint, 0f, ghostCenter

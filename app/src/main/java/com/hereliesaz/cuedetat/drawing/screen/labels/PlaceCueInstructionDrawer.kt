@@ -20,7 +20,8 @@ class PlaceCueInstructionDrawer(
         appPaints: AppPaints,
         config: AppConfig
     ) {
-        if (!appState.isInitialized || !appState.areHelperTextsVisible) return
+        // Only draw if in AIMING mode and helper texts are visible
+        if (!appState.isInitialized || !appState.areHelperTextsVisible || appState.currentMode != AppState.SelectionMode.AIMING) return
 
         val paint = appPaints.placeCueInstructionPaint
         // This text is static size, not affected by appState.zoomFactor for its base size

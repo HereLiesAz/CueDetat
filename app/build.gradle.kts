@@ -19,7 +19,6 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        signingConfig = signingConfigs.getByName("debug")
     }
 
     // These blocks should be direct children of the 'android' block
@@ -43,7 +42,7 @@ android {
     // sourceSets block also belongs here, directly under 'android'
     sourceSets {
         getByName("main") {
-            // Your source set configurations go here (e.g., jni, assets, res)
+            // Your custom source set configurations go here if any.
             // It should be empty if there are no custom source set configurations.
         }
     }
@@ -53,10 +52,6 @@ android {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
-    }
-    dependenciesInfo {
-        includeInApk = true
-        includeInBundle = true
     }
 }
 
@@ -69,7 +64,7 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.compose.ui.graphics)
-    // CameraX dependencies
+    // CameraX dependencies (ensure these are up-to-date and compatible)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
@@ -85,10 +80,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.guava)
     implementation(libs.androidx.foundation)
     implementation(libs.androidx.material3)
-    implementation(platform(libs.androidx.compose.bom))
+    implementation(platform(libs.androidx.compose.bom)) // Should only appear once for the BOM
     implementation(libs.androidx.ui)
     implementation(libs.androidx.activity.compose)
-    implementation(libs.ui)
 
-    implementation(libs.object1.detection)
+    implementation(libs.object1.detection) // ML Kit Object Detection Dependency
 }

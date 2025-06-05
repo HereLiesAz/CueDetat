@@ -1,6 +1,6 @@
 // PoolProtractor/build.gradle.kts
 plugins {
-    id("com.android.application") version "8.12.0-alpha03" apply false
+    id("com.android.application") version "8.10.1" apply false
     id("org.jetbrains.kotlin.android") version "2.1.21" apply false
     // Do NOT add an 'android { ... }' block here.
     // This file is for global plugins and configuration, not Android-specific settings.

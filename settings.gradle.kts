@@ -1,4 +1,3 @@
-// PoolProtractor/settings.gradle.kts
 pluginManagement {
   repositories {
     google {
@@ -12,9 +11,9 @@ pluginManagement {
     gradlePluginPortal()
   }
   plugins {
-    id("com.android.application") version "8.12.0-alpha03"
-    id("com.android.library") version "8.12.0-alpha03"
-    id("org.jetbrains.kotlin.android") version "2.1.21"
+    id("com.android.application") version "8.10.0"
+    id("com.android.library") version "8.9.3"
+    id("org.jetbrains.kotlin.android") version "2.1.20"
   }
 }
 dependencyResolutionManagement {

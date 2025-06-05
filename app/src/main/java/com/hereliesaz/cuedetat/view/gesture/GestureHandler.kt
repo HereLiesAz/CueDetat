@@ -5,6 +5,7 @@ import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import com.hereliesaz.cuedetat.config.AppConfig
 import com.hereliesaz.cuedetat.state.AppState
+import com.hereliesaz.cuedetat.state.AppState.SelectionMode // Import SelectionMode
 import com.hereliesaz.cuedetat.view.MainOverlayView.AppStateListener // Assuming AppStateListener is nested or accessible
 import kotlin.math.abs
 
@@ -27,8 +28,9 @@ class GestureHandler(
 
     private inner class ScaleListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
-            // If already panning, don't let scale begin easily, or handle mode transition
-            // For now, pinch takes precedence if it begins.
+            // Allow zoom only in AIMING mode
+            if (appState.currentMode != SelectionMode.AIMING) return false
+
             currentInteractionMode = InteractionMode.PINCH_ZOOMING
             isPinching = true
             listener?.onUserInteraction() // Notify general interaction
@@ -36,14 +38,11 @@ class GestureHandler(
         }
 
         override fun onScale(detector: ScaleGestureDetector): Boolean {
-            if (currentInteractionMode != InteractionMode.PINCH_ZOOMING) return false
+            if (currentInteractionMode != InteractionMode.PINCH_ZOOMING || appState.currentMode != SelectionMode.AIMING) return false
 
             appState.zoomFactor
             // Detector scaleFactor is relative to the start of the current scale gesture
             val newZoomUncoerced = appState.zoomFactor * detector.scaleFactor
-
-            // Clamping is handled by appState.updateZoomFactor, but we can check here too
-            // val newZoom = newZoomUncoerced.coerceIn(config.MIN_ZOOM_FACTOR, config.MAX_ZOOM_FACTOR)
 
             // Check if the change is significant enough or if it's trying to scale
             // The actual updateZoomFactor in AppState will handle coercion and actual change detection.
@@ -83,6 +82,9 @@ class GestureHandler(
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                // Allow pan/rotate only in AIMING mode
+                if (appState.currentMode != SelectionMode.AIMING) return false
+
                 // If not starting a scale gesture, consider it a pan start.
                 if (!isPinching) { // isPinching should be false here if scale isn't in progress
                     currentInteractionMode = InteractionMode.PAN_TO_ROTATE
@@ -94,7 +96,7 @@ class GestureHandler(
                 return true // Consume ACTION_DOWN to receive subsequent MOVE/UP events
             }
             MotionEvent.ACTION_MOVE -> {
-                if (currentInteractionMode == InteractionMode.PAN_TO_ROTATE && !isPinching) {
+                if (currentInteractionMode == InteractionMode.PAN_TO_ROTATE && !isPinching && appState.currentMode == SelectionMode.AIMING) {
                     val dx = touchX - lastTouchX
                     if (abs(dx) > 0.1f) { // Only rotate if there's a meaningful delta
                         val angleDelta = dx * config.PAN_ROTATE_SENSITIVITY

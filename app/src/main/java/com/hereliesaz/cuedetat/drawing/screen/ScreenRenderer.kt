@@ -5,6 +5,7 @@ import android.graphics.PointF
 import com.hereliesaz.cuedetat.config.AppConfig
 import com.hereliesaz.cuedetat.state.AppPaints
 import com.hereliesaz.cuedetat.state.AppState
+import com.hereliesaz.cuedetat.state.AppState.SelectionMode
 import com.hereliesaz.cuedetat.drawing.utility.TextLayoutHelper
 import com.hereliesaz.cuedetat.drawing.screen.elements.*
 import com.hereliesaz.cuedetat.drawing.screen.labels.*
@@ -26,6 +27,8 @@ class ScreenRenderer(
     private val panHintDrawer = PanHintDrawer(textLayoutHelper, viewWidthProvider, viewHeightProvider)
     private val pinchHintDrawer = PinchHintDrawer(textLayoutHelper, viewWidthProvider, viewHeightProvider)
 
+    private val selectionInstructionDrawer = SelectionInstructionDrawer(viewWidthProvider, viewHeightProvider) // New drawer
+
     // Threshold for horizontal proximity to trigger vertical offset adjustment
     private val GHOST_LABEL_HORIZONTAL_PROXIMITY_THRESHOLD_FACTOR = 1.5f // e.g., 1.5 * (sum of radii)
     private val GHOST_LABEL_VERTICAL_ADJUSTMENT_AMOUNT_DP = 10f // DP to adjust by
@@ -44,7 +47,8 @@ class ScreenRenderer(
     ) {
         if (!appState.isInitialized) return
 
-        // 1. Draw Screen Space Visual Elements
+        // 1. Draw Screen Space Visual Elements (Ghost Balls)
+        // These are drawn regardless of mode, as they represent the projection of tracked balls.
         ghostTargetBallDrawer.draw(
             canvas, appPaints,
             projectedTargetGhostCenter.x, projectedTargetGhostCenter.y, targetGhostRadius
@@ -56,54 +60,55 @@ class ScreenRenderer(
         )
 
         // 2. Draw Screen Space Text Labels
+        // Warning text for invalid shots (only in AIMING mode)
         invalidShotWarningDrawer.draw(
             canvas, appState, appPaints, config, invalidShotWarningString
         )
 
+        // Conditional drawing of instructions based on selection mode
         if (appState.areHelperTextsVisible) {
-            var targetLabelVerticalOffset = 0f
-            var cueLabelVerticalOffset = 0f
+            selectionInstructionDrawer.draw(canvas, appState, appPaints, config)
 
-            // Simple overlap avoidance for ghost ball labels
-            if (targetGhostRadius > 0 && cueGhostRadius > 0) {
-                val horizontalDistance = abs(projectedTargetGhostCenter.x - projectedCueGhostCenter.x)
-                val proximityThreshold = (targetGhostRadius + cueGhostRadius) * GHOST_LABEL_HORIZONTAL_PROXIMITY_THRESHOLD_FACTOR
+            when (appState.currentMode) {
+                SelectionMode.AIMING -> {
+                    // Only draw aiming-related labels in AIMING mode
+                    var targetLabelVerticalOffset = 0f
+                    var cueLabelVerticalOffset = 0f
 
-                if (horizontalDistance < proximityThreshold) {
-                    // If horizontally close, adjust one up and one down slightly
-                    // The amount to adjust by, scaled by zoom so it's consistent visually
-                    val adjustmentPixels = (GHOST_LABEL_VERTICAL_ADJUSTMENT_AMOUNT_DP / appState.zoomFactor.coerceAtLeast(0.3f))
+                    // Simple overlap avoidance for ghost ball labels
+                    if (targetGhostRadius > 0 && cueGhostRadius > 0) {
+                        val horizontalDistance = abs(projectedTargetGhostCenter.x - projectedCueGhostCenter.x)
+                        val proximityThreshold = (targetGhostRadius + cueGhostRadius) * GHOST_LABEL_HORIZONTAL_PROXIMITY_THRESHOLD_FACTOR
 
-                    // Example: Push Target Label slightly down, Cue Label slightly up
-                    // Note: Y is from top, so negative makes it go up, positive down.
-                    // We want labels *above* their balls.
-                    // Default position is ALREADY (center.y - radius - padding).
-                    // A positive offset here will push it further UP (more negative final Y).
-                    // A negative offset will push it DOWN (less negative final Y, closer to ball top).
+                        if (horizontalDistance < proximityThreshold) {
+                            val adjustmentPixels = (GHOST_LABEL_VERTICAL_ADJUSTMENT_AMOUNT_DP / appState.zoomFactor.coerceAtLeast(0.3f))
+                            cueLabelVerticalOffset = -adjustmentPixels
+                            targetLabelVerticalOffset = adjustmentPixels / 2f
+                        }
+                    }
 
-                    // Let's push "Ghost Ball" (cue) further up, and "Target Ball" not as far up / slightly down from default.
-                    cueLabelVerticalOffset = -adjustmentPixels // Push further up (more negative)
-                    targetLabelVerticalOffset = adjustmentPixels / 2f // Push less up, or even slightly down from its default 'above'
+                    ghostTargetNameDrawer.draw(
+                        canvas, appState, appPaints, config,
+                        projectedTargetGhostCenter, targetGhostRadius,
+                        targetLabelVerticalOffset
+                    )
+                    ghostCueNameDrawer.draw(
+                        canvas, appState, appPaints, config,
+                        projectedCueGhostCenter, cueGhostRadius,
+                        cueLabelVerticalOffset
+                    )
+                    fitTargetInstructionDrawer.draw(
+                        canvas, appState, appPaints, config,
+                        projectedTargetGhostCenter, targetGhostRadius
+                    )
+                    placeCueInstructionDrawer.draw(canvas, appState, appPaints, config)
+                    panHintDrawer.draw(canvas, appState, appPaints, config)
+                    pinchHintDrawer.draw(canvas, appState, appPaints, config)
+                }
+                SelectionMode.SELECTING_CUE_BALL, SelectionMode.SELECTING_TARGET_BALL -> {
+                    // No other labels are drawn during selection modes, only the instruction text
                 }
             }
-
-            ghostTargetNameDrawer.draw(
-                canvas, appState, appPaints, config,
-                projectedTargetGhostCenter, targetGhostRadius,
-                targetLabelVerticalOffset
-            )
-            ghostCueNameDrawer.draw(
-                canvas, appState, appPaints, config,
-                projectedCueGhostCenter, cueGhostRadius,
-                cueLabelVerticalOffset
-            )
-            fitTargetInstructionDrawer.draw(
-                canvas, appState, appPaints, config,
-                projectedTargetGhostCenter, targetGhostRadius
-            )
-            placeCueInstructionDrawer.draw(canvas, appState, appPaints, config)
-            panHintDrawer.draw(canvas, appState, appPaints, config)
-            pinchHintDrawer.draw(canvas, appState, appPaints, config)
         }
     }
 }

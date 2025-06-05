@@ -22,18 +22,25 @@ object VisualStateLogic {
         logicalTargetCenter: android.graphics.PointF
     ): EvaluatedVisualStates {
 
+        // Check for physical overlap of logical cue and logical target circles on the plane
         val logicalDistanceBetweenCenters = geometryCalculator.distance(logicalCueCenter, logicalTargetCenter)
         val isPhysicalOverlap = logicalDistanceBetweenCenters < (appState.currentLogicalRadius * 2 - 0.1f)
 
+        // Check if logical target ball is on the "far side" relative to the aiming line's origin (actual cue ball)
         val isCueOnFarSide = if (aimingLineCoords != null) {
-            geometryCalculator.isCueOnFarSide(appState, aimingLineCoords)
+            geometryCalculator.isGhostCueOnFarSide(appState, aimingLineCoords)
         } else {
             false
         }
 
+        // Check if protractor angle is in the deflection-dominant range (between 90.5 and 269.5 degrees)
+        // This indicates a cut shot that ML Kit is not designed for, or an extreme angle.
         val isDeflectionDominantAngle = (appState.protractorRotationAngle > 90.5f && appState.protractorRotationAngle < 269.5f)
 
+        // The shot is considered invalid if the logical target is on the far side or the angle is deflection-dominant
         val isInvalidShot = isCueOnFarSide || isDeflectionDominantAngle
+
+        // Warning style for ghost balls and yellow target line is applied if there's physical overlap or if the logical target is on the far side.
         val showGhostWarning = isPhysicalOverlap || isCueOnFarSide
 
         return EvaluatedVisualStates(

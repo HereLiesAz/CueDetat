@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.config.AppConfig
 import com.hereliesaz.cuedetat.state.AppPaints
 import com.hereliesaz.cuedetat.state.AppState
+import com.hereliesaz.cuedetat.state.AppState.SelectionMode
 import com.hereliesaz.cuedetat.geometry.GeometryCalculator
 import com.hereliesaz.cuedetat.geometry.models.AimingLineLogicalCoords
 import com.hereliesaz.cuedetat.geometry.models.ProjectedCoords
@@ -84,31 +85,39 @@ class DrawingCoordinator(
         val deflectionParams = geometryCalculator.calculateDeflectionLineParams(appState)
 
         // --- Evaluate Current Visual States (e.g., valid shot, warnings) ---
-        val visualStates = VisualStateLogic.evaluate(
-            appState, geometryCalculator, aimingLineLogicalCoords,
-            appState.cueCircleCenter, appState.targetCircleCenter
-        )
+        // Only evaluate complex shot states if in AIMING mode
+        val visualStates = if (appState.currentMode == SelectionMode.AIMING) {
+            VisualStateLogic.evaluate(
+                appState, geometryCalculator, aimingLineLogicalCoords,
+                appState.cueCircleCenter, appState.targetCircleCenter
+            )
+        } else {
+            VisualStateLogic.EvaluatedVisualStates(isCurrentlyInvalidShotSetup = false, showWarningStyleForGhostBalls = false)
+        }
 
-        // --- Manage Warning Text Display ---
-        if (visualStates.isCurrentlyInvalidShotSetup) {
-            // If shot just became invalid, pick a new random warning (if available)
-            if (!wasPreviouslyInvalidSetup) {
-                if (config.INSULTING_WARNING_STRINGS.isNotEmpty()) {
-                    var randomIndex = Random.nextInt(config.INSULTING_WARNING_STRINGS.size)
-                    // Ensure the new warning is different from the last one, if possible
-                    if (config.INSULTING_WARNING_STRINGS.size > 1) {
-                        while (randomIndex == lastRandomWarningIndex) {
-                            randomIndex = Random.nextInt(config.INSULTING_WARNING_STRINGS.size)
+
+        // --- Manage Warning Text Display (only in AIMING mode) ---
+        if (appState.currentMode == SelectionMode.AIMING) {
+            if (visualStates.isCurrentlyInvalidShotSetup) {
+                if (!wasPreviouslyInvalidSetup) {
+                    if (config.INSULTING_WARNING_STRINGS.isNotEmpty()) {
+                        var randomIndex = Random.nextInt(config.INSULTING_WARNING_STRINGS.size)
+                        if (config.INSULTING_WARNING_STRINGS.size > 1) {
+                            while (randomIndex == lastRandomWarningIndex) {
+                                randomIndex = Random.nextInt(config.INSULTING_WARNING_STRINGS.size)
+                            }
                         }
+                        currentWarningTextToDisplay = config.INSULTING_WARNING_STRINGS[randomIndex]
+                        lastRandomWarningIndex = randomIndex
+                    } else {
+                        currentWarningTextToDisplay = "Invalid Shot Setup" // Fallback warning
                     }
-                    currentWarningTextToDisplay = config.INSULTING_WARNING_STRINGS[randomIndex]
-                    lastRandomWarningIndex = randomIndex
-                } else {
-                    currentWarningTextToDisplay = "Invalid Shot Setup" // Fallback warning
                 }
+            } else {
+                currentWarningTextToDisplay = null // Clear warning when state is valid
             }
         } else {
-            currentWarningTextToDisplay = null // Clear warning when state is valid
+            currentWarningTextToDisplay = null // No warnings outside AIMING mode
         }
         wasPreviouslyInvalidSetup = visualStates.isCurrentlyInvalidShotSetup // Update state for next frame
 
@@ -128,14 +137,23 @@ class DrawingCoordinator(
         }
 
         // Adjust the aiming assist line colors based on validity
-        val isPhysicalOverlap = geometryCalculator.distance(appState.cueCircleCenter, appState.targetCircleCenter) < (appState.currentLogicalRadius * 2 - 0.1f)
-        if (visualStates.isCurrentlyInvalidShotSetup) {
-            appPaints.shotGuideNearPaint.apply { color = appPaints.M3_COLOR_ERROR; clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_FAR }
-            appPaints.shotGuideFarPaint.apply { color = appPaints.M3_COLOR_ERROR; clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_FAR }
+        // Only modify if in AIMING mode
+        if (appState.currentMode == SelectionMode.AIMING) {
+            val isPhysicalOverlap = geometryCalculator.distance(appState.cueCircleCenter, appState.targetCircleCenter) < (appState.currentLogicalRadius * 2 - 0.1f)
+            if (visualStates.isCurrentlyInvalidShotSetup) {
+                appPaints.shotGuideNearPaint.apply { color = appPaints.M3_COLOR_ERROR; clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_FAR }
+                appPaints.shotGuideFarPaint.apply { color = appPaints.M3_COLOR_ERROR; clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_FAR }
+            } else {
+                appPaints.shotGuideNearPaint.apply { color = AppWhite.toArgb(); strokeWidth = config.STROKE_AIM_LINE_NEAR }
+                appPaints.shotGuideFarPaint.apply { color = AppPurple.toArgb(); strokeWidth = if (!isPhysicalOverlap) config.STROKE_AIM_LINE_NEAR else config.STROKE_AIM_LINE_FAR}
+            }
         } else {
-            appPaints.shotGuideNearPaint.apply { color = AppWhite.toArgb(); strokeWidth = config.STROKE_AIM_LINE_NEAR }
-            appPaints.shotGuideFarPaint.apply { color = AppPurple.toArgb(); strokeWidth = if (!isPhysicalOverlap) config.STROKE_AIM_LINE_NEAR else config.STROKE_AIM_LINE_FAR}
+            // If not in AIMING mode, lines are either not drawn or drawn with a neutral style
+            // Ensure they are not drawn with error color when not in AIMING mode.
+            appPaints.shotGuideNearPaint.apply { color = AppWhite.toArgb(); clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_NEAR }
+            appPaints.shotGuideFarPaint.apply { color = AppPurple.toArgb(); clearShadowLayer(); strokeWidth = config.STROKE_AIM_LINE_FAR }
         }
+
 
         // --- Draw Protractor Plane Elements ---
         canvas.save()
@@ -144,7 +162,8 @@ class DrawingCoordinator(
             canvas, appState, appPaints, config,
             aimingLineCoords = aimingLineLogicalCoords ?: AimingLineLogicalCoords(0f,0f,0f,0f,0f,0f,0f,0f),
             deflectionParams = deflectionParams,
-            useErrorColor = visualStates.isCurrentlyInvalidShotSetup
+            useErrorColor = visualStates.isCurrentlyInvalidShotSetup,
+            actualCueBallScreenCenter = appState.selectedCueBallScreenCenter // Pass actual cue ball screen position
         )
         canvas.restore() // Restore canvas to original (non-pitched) state for screen-space drawing
 

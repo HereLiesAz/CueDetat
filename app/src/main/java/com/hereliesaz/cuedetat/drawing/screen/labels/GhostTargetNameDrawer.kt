@@ -22,7 +22,9 @@ class GhostTargetNameDrawer(private val textLayoutHelper: TextLayoutHelper) {
         ghostRadius: Float,
         verticalOffsetAdjustment: Float = 0f
     ) {
-        if (!appState.isInitialized || !appState.areHelperTextsVisible || ghostRadius <= 0.01f) return
+        // Only draw if in AIMING mode and helper texts are visible
+        if (!appState.isInitialized || !appState.areHelperTextsVisible || appState.currentMode != AppState.SelectionMode.AIMING) return
+        if (ghostRadius <= 0.01f) return
 
         val paint = appPaints.ghostTargetNamePaint // textAlign is CENTER
         paint.textSize = getScreenSpaceTextSize(

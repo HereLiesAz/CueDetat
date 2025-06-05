@@ -21,37 +21,52 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
     var isInitialized: Boolean = false
         private set
 
-    // --- Protractor Plane Elements (now dynamic based on tracking) ---
-    // targetCircleCenter now represents the dynamically tracked position of the target ball
+    // --- Ball Tracking Data (Raw from ML Kit, scaled to MainOverlayView) ---
+    var trackedBalls: List<Ball> = emptyList() // All detected balls from the camera frame
+    var frameWidth: Int = 0 // Raw pixel dimensions of the camera frame used for tracking
+    var frameHeight: Int = 0
+
+    // --- Selected Ball Data (Screen-space, in MainOverlayView pixels) ---
+    var selectedCueBallId: String? = null
+        private set
+    var selectedCueBallScreenCenter: PointF? = null
+        private set
+    var selectedCueBallScreenRadius: Float = 0f
+        private set
+
+    var selectedTargetBallId: String? = null
+        private set
+    var selectedTargetBallScreenCenter: PointF? = null
+        private set
+    var selectedTargetBallScreenRadius: Float = 0f
+        private set
+
+    // --- Protractor Plane Elements (Logical, derived from selected balls) ---
+    // targetCircleCenter and cueCircleCenter are the *logical centers* of the protractor's balls
+    // which represent the ghost balls on the 2D plane.
     var targetCircleCenter: PointF = PointF()
         private set
     var cueCircleCenter: PointF = PointF()
         private set
-    // currentLogicalRadius now represents the effective radius of the target ball in logical units,
-    // which is derived from the tracked ball's pixel radius and the zoom factor.
+    // currentLogicalRadius now represents the effective radius of the target ball in logical units.
+    // Its size directly reflects the detected pixel radius, as CameraX zoom controls the overall scale.
     var currentLogicalRadius: Float = 1f
         private set
 
-    // --- Ball Tracking Data ---
-    var trackedBalls: List<Ball> = emptyList() // All detected balls from the camera frame
-    var selectedTargetBallId: String? = null // ID of the currently selected target ball
-
-    // Raw pixel dimensions of the camera frame used for tracking
-    var frameWidth: Int = 0
-    var frameHeight: Int = 0
-
-    // Storing the raw tracked target ball's properties for consistent radius calculation
-    // These are in the MainOverlayView's pixel space, not camera frame pixel space.
-    private var rawTrackedTargetCenterX: Float = 0f
-    private var rawTrackedTargetCenterY: Float = 0f
-    private var rawTrackedTargetRadiusPx: Float = 0f
-
 
     // --- User Interaction State ---
-    var zoomFactor: Float = config.DEFAULT_ZOOM_FACTOR
+    // This zoomFactor now directly controls CameraX's zoom ratio (1.0f is no optical zoom).
+    var zoomFactor: Float = 1.0f // Default camera zoom is 1.0x (no optical zoom)
         private set
+    // CameraX capabilities
+    var minCameraZoomRatio: Float = 1.0f
+        private set
+    var maxCameraZoomRatio: Float = 1.0f
+        private set
+
     var protractorRotationAngle: Float = config.DEFAULT_ROTATION_ANGLE
         private set
+    var currentMode: SelectionMode = SelectionMode.SELECTING_CUE_BALL // New: Initial selection mode
 
     // --- Device Orientation State ---
     var currentPitchAngle: Float = 0.0f
@@ -67,9 +82,15 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
     // --- UI State ---
     var areHelperTextsVisible: Boolean = true
 
+    enum class SelectionMode {
+        SELECTING_CUE_BALL,
+        SELECTING_TARGET_BALL,
+        AIMING
+    }
+
     /**
      * Initializes or re-initializes the AppState with current view dimensions.
-     * Sets default positions and radius if no ball is tracked.
+     * Sets default positions and radius if no ball is tracked or selected.
      */
     fun initialize(width: Int, height: Int) {
         if (width <= 0 || height <= 0) return
@@ -77,16 +98,16 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
         viewWidth = width
         viewHeight = height
 
-        // If a target ball is currently selected/tracked, use its latest mapped position and radius.
-        // Otherwise, set a default center and logical radius for the protractor.
-        if (selectedTargetBallId != null && rawTrackedTargetRadiusPx > 0f) {
-            targetCircleCenter.set(rawTrackedTargetCenterX, rawTrackedTargetCenterY)
-            currentLogicalRadius = rawTrackedTargetRadiusPx * zoomFactor // Apply zoom to tracked radius
+        // Update protractor's logical base based on selected target ball if available,
+        // otherwise default to screen center.
+        if (selectedTargetBallScreenCenter != null && selectedTargetBallScreenRadius > 0f) {
+            targetCircleCenter.set(selectedTargetBallScreenCenter!!.x, selectedTargetBallScreenCenter!!.y)
+            // currentLogicalRadius is now just the detected screen radius, as camera zoom handles scale.
+            currentLogicalRadius = selectedTargetBallScreenRadius
         } else {
-            // Default position if no ball is tracked (e.g., screen center)
-            targetCircleCenter.set(viewWidth / 2f, viewHeight / 2f)
-            // Default logical radius based on a percentage of the view size, scaled by zoom factor
-            currentLogicalRadius = (min(viewWidth, viewHeight) * 0.15f) * zoomFactor
+            targetCircleCenter.set(viewWidth / 2f, viewHeight / 2f) // Default to screen center
+            // Default logical radius is a percentage of view size (if no ball is selected).
+            currentLogicalRadius = min(viewWidth, viewHeight) * 0.15f
         }
 
         // Ensure a minimum radius to prevent division by zero or infinitesimally small elements
@@ -94,67 +115,76 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
 
         smoothedPitchAngle = currentPitchAngle // Initialize smoothed pitch
         isInitialized = true
-        updateCueBallPlanePosition() // Position cue ball relative to the (potentially tracked) target
+        updateCueBallPlanePosition() // Position logical cue ball relative to the (potentially tracked) target
     }
 
     /**
-     * Updates the raw tracked target ball's data (position and radius) in MainOverlayView pixel space.
-     * This will cause the `targetCircleCenter` to update and `currentLogicalRadius` to be recalculated.
-     *
-     * @param x The tracked ball's center X-coordinate in MainOverlayView pixel space.
-     * @param y The tracked ball's center Y-coordinate in MainOverlayView pixel space.
-     * @param radiusPx The tracked ball's radius in MainOverlayView pixel space.
+     * Updates the camera's zoom capabilities.
      */
-    fun setTrackedTargetBallData(x: Float, y: Float, radiusPx: Float) {
-        rawTrackedTargetCenterX = x
-        rawTrackedTargetCenterY = y
-        rawTrackedTargetRadiusPx = radiusPx
-
-        targetCircleCenter.set(x, y) // Update target center immediately to follow the tracked ball
-
-        // Recalculate effective logical radius based on new raw radius and current zoom
-        currentLogicalRadius = rawTrackedTargetRadiusPx * zoomFactor
-        if (currentLogicalRadius <= 0.01f) currentLogicalRadius = 0.01f // Minimum size
-        updateCueBallPlanePosition() // Re-position cue ball as target/radius changed
+    fun updateCameraZoomCapabilities(minZoom: Float, maxZoom: Float) {
+        minCameraZoomRatio = minZoom
+        maxCameraZoomRatio = maxZoom
+        // Ensure current zoom is within new bounds if capabilities change mid-app
+        zoomFactor = zoomFactor.coerceIn(minCameraZoomRatio, maxCameraZoomRatio)
     }
 
     /**
-     * Clears the currently selected target ball and its tracked data,
-     * resetting the protractor's target to a default position and size.
+     * Updates the selected cue ball's tracked data.
+     * @param ball The selected cue ball.
      */
-    fun clearTrackedTargetBallData() {
-        rawTrackedTargetCenterX = 0f
-        rawTrackedTargetCenterY = 0f
-        rawTrackedTargetRadiusPx = 0f
+    fun updateSelectedCueBall(ball: Ball) {
+        selectedCueBallId = ball.id
+        selectedCueBallScreenCenter = PointF(ball.x, ball.y)
+        selectedCueBallScreenRadius = ball.radius
+    }
+
+    /**
+     * Clears the selected cue ball data.
+     */
+    fun clearSelectedCueBall() {
+        selectedCueBallId = null
+        selectedCueBallScreenCenter = null
+        selectedCueBallScreenRadius = 0f
+    }
+
+    /**
+     * Updates the selected target ball's tracked data and repositions the protractor.
+     * @param ball The selected target ball.
+     */
+    fun updateSelectedTargetBall(ball: Ball) {
+        selectedTargetBallId = ball.id
+        selectedTargetBallScreenCenter = PointF(ball.x, ball.y)
+        selectedTargetBallScreenRadius = ball.radius
+
+        // Re-initialize protractor base (logical target center and radius) to match the new target ball
+        initialize(viewWidth, viewHeight)
+    }
+
+    /**
+     * Clears the selected target ball data and resets protractor position to default.
+     */
+    fun clearSelectedTargetBall() {
         selectedTargetBallId = null
-        // Re-initialize to set defaults if no tracked ball
-        initialize(viewWidth, viewHeight) // Re-initialize with current view dimensions to reset target to center
+        selectedTargetBallScreenCenter = null
+        selectedTargetBallScreenRadius = 0f
+        initialize(viewWidth, viewHeight) // Re-initialize to set defaults if no tracked ball
     }
 
 
     /**
-     * Updates the zoom factor of the protractor and recalculates `currentLogicalRadius`.
-     *
-     * @param newFactor The new desired zoom factor.
+     * Updates the camera zoom factor. This value is clamped by camera capabilities.
+     * @param newFactor The new desired camera zoom factor (e.g., 1.0f for no zoom, 2.0f for 2x zoom).
      * @return True if the zoom factor changed significantly, false otherwise.
      */
     fun updateZoomFactor(newFactor: Float): Boolean {
-        val coercedFactor = newFactor.coerceIn(config.MIN_ZOOM_FACTOR, config.MAX_ZOOM_FACTOR)
-        // Only update if there's a significant change to prevent unnecessary redraws
-        if (abs(zoomFactor - coercedFactor) < 0.001f && currentLogicalRadius > 0.01f) return false
+        val coercedFactor = newFactor.coerceIn(minCameraZoomRatio, maxCameraZoomRatio)
+        // Only update if there's a significant change to prevent unnecessary CameraX calls
+        if (abs(zoomFactor - coercedFactor) < 0.001f) return false
 
         zoomFactor = coercedFactor
-        // Recalculate `currentLogicalRadius` based on the raw tracked radius (if available)
-        // and the new zoom factor.
-        if (rawTrackedTargetRadiusPx > 0f) {
-            currentLogicalRadius = rawTrackedTargetRadiusPx * zoomFactor
-        } else {
-            // Fallback if no ball is tracked, use a default radius based on view size and zoom
-            currentLogicalRadius = (min(viewWidth, viewHeight) * 0.15f) * zoomFactor
-        }
-        if (currentLogicalRadius <= 0.01f) currentLogicalRadius = 0.01f // Ensure minimum size
-
-        updateCueBallPlanePosition() // Recalculate cue ball position as logical radius changed
+        // currentLogicalRadius is NOT updated here, it's updated in initialize() or setTrackedTargetBallData()
+        // when a ball is detected/selected, using its *current detected pixel radius*.
+        // The camera zoom *already* affects the detected pixel radius.
         return true
     }
 
@@ -172,7 +202,7 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
         if (abs(protractorRotationAngle - normalizedAngle) < 0.01f) return false
 
         protractorRotationAngle = normalizedAngle
-        updateCueBallPlanePosition() // Recalculate cue ball position as rotation changed
+        updateCueBallPlanePosition() // Recalculate logical cue ball position as rotation changed
         return true
     }
 
@@ -197,16 +227,16 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
     }
 
     /**
-     * Recalculates the position of the cue ball based on the current target ball
+     * Recalculates the position of the logical cue ball (ghost ball) based on the current logical target ball
      * position, logical radius, and protractor rotation.
      */
     private fun updateCueBallPlanePosition() {
         if (!isInitialized || currentLogicalRadius <= 0.01f) return
 
         val angleRad = Math.toRadians(protractorRotationAngle.toDouble())
-        val distanceFromTarget = 2 * currentLogicalRadius // Cue ball is positioned two radii away from the target
+        val distanceFromTarget = 2 * currentLogicalRadius // Logical cue ball is positioned two radii away from the target
 
-        // Calculate cue ball's position relative to the target ball's center,
+        // Calculate logical cue ball's position relative to the logical target ball's center,
         // rotated by the protractor's current angle.
         cueCircleCenter.x = targetCircleCenter.x - (distanceFromTarget * sin(angleRad)).toFloat()
         cueCircleCenter.y = targetCircleCenter.y + (distanceFromTarget * cos(angleRad)).toFloat()
@@ -217,9 +247,11 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
      * to their default values defined in `AppConfig`.
      */
     fun resetInteractions() {
-        selectedTargetBallId = null // Clear selection on reset
-        rawTrackedTargetRadiusPx = 0f // Clear raw tracked radius
-        updateZoomFactor(config.DEFAULT_ZOOM_FACTOR) // This will also re-calculate currentLogicalRadius
+        clearSelectedCueBall()
+        clearSelectedTargetBall() // This calls initialize internally to reset targetCircleCenter etc.
+        currentMode = SelectionMode.SELECTING_CUE_BALL // Reset to initial mode
+        // Reset camera zoom to default (1.0f)
+        updateZoomFactor(1.0f) // This will trigger CameraX zoom reset
         updateProtractorRotationAngle(config.DEFAULT_ROTATION_ANGLE)
     }
 

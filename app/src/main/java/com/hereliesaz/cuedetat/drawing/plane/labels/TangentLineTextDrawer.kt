@@ -22,7 +22,8 @@ class TangentLineTextDrawer(private val textLayoutHelper: TextLayoutHelper) {
         config: AppConfig,
         deflectionParams: DeflectionLineParams
     ) {
-        if (!appState.isInitialized || !appState.areHelperTextsVisible) return
+        // Only draw if in AIMING mode and helper texts are visible
+        if (!appState.isInitialized || !appState.areHelperTextsVisible || appState.currentMode != AppState.SelectionMode.AIMING) return
         if (deflectionParams.unitPerpendicularX == 0f && deflectionParams.unitPerpendicularY == 0f) return
 
         val paint = appPaints.tangentLineTextPaint // This is the AppPurple paint

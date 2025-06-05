@@ -22,11 +22,12 @@ class ProjectedShotTextDrawer(private val textLayoutHelper: TextLayoutHelper) {
         config: AppConfig,
         aimingLineCoords: AimingLineLogicalCoords
     ) {
-        if (!appState.isInitialized || !appState.areHelperTextsVisible) return
+        // Only draw if in AIMING mode and helper texts are visible
+        if (!appState.isInitialized || !appState.areHelperTextsVisible || appState.currentMode != AppState.SelectionMode.AIMING) return
         if (aimingLineCoords.normDirX == 0f && aimingLineCoords.normDirY == 0f) return // No direction
 
         val paint = appPaints.projectedShotTextPaint
-        paint.textSize = getDynamicTextSizePPD( // Using a local/adapted version for plane labels
+        paint.textSize = getPlaneSpaceTextSize( // Using a local/adapted version for plane labels
             config.PLANE_LABEL_BASE_SIZE,
             appState.zoomFactor,
             config,
@@ -34,13 +35,14 @@ class ProjectedShotTextDrawer(private val textLayoutHelper: TextLayoutHelper) {
             config.PROJECTED_SHOT_TEXT_SIZE_FACTOR
         )
 
+        // The angle of the line segment from logical ghost cue to line end
         val angleRad = atan2(aimingLineCoords.normDirY, aimingLineCoords.normDirX)
         val rotationDegrees = Math.toDegrees(angleRad.toDouble()).toFloat()
 
-        // Position just beyond cue circle along the aiming line (far part)
-        val distanceFromCueCenter = appState.currentLogicalRadius * 1.5f // Adjusted distance
-        val preferredX = aimingLineCoords.cueX + aimingLineCoords.normDirX * distanceFromCueCenter
-        val preferredY = aimingLineCoords.cueY + aimingLineCoords.normDirY * distanceFromCueCenter
+        // Position text along the line, starting from the logical ghost cue ball
+        val distanceFromGhostCueCenter = appState.currentLogicalRadius * 1.5f // Adjusted distance from ghost cue
+        val preferredX = aimingLineCoords.cueX + aimingLineCoords.normDirX * distanceFromGhostCueCenter
+        val preferredY = aimingLineCoords.cueY + aimingLineCoords.normDirY * distanceFromGhostCueCenter
 
         // Add a small perpendicular offset to tuck it alongside the line
         val perpendicularOffsetAmount = 20f / appState.zoomFactor.coerceAtLeast(0.5f)
@@ -50,14 +52,14 @@ class ProjectedShotTextDrawer(private val textLayoutHelper: TextLayoutHelper) {
         val finalX = preferredX + perpOffsetX
         val finalY = preferredY + perpOffsetY
 
-        // Nudge reference: center of the cue ball as this text relates to the line from it
+        // Nudge reference: center of the logical cue ball (ghost ball on plane)
         textLayoutHelper.layoutAndDrawText(
             canvas, TEXT_STRING, finalX, finalY, paint, rotationDegrees, appState.cueCircleCenter
         )
     }
 
     // Helper function for dynamic text sizing, adapted from old ProtractorPlaneTextDrawer
-    private fun getDynamicTextSizePPD(
+    private fun getPlaneSpaceTextSize(
         baseSize: Float, zoomFactor: Float, config: AppConfig,
         isHelperLineLabel: Boolean = false, sizeMultiplier: Float = 1f
     ): Float {

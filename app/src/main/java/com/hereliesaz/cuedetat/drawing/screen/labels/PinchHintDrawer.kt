@@ -21,7 +21,8 @@ class PinchHintDrawer(
         appPaints: AppPaints,
         config: AppConfig
     ) {
-        if (!appState.isInitialized || !appState.areHelperTextsVisible) return
+        // Only draw if in AIMING mode and helper texts are visible
+        if (!appState.isInitialized || !appState.areHelperTextsVisible || appState.currentMode != AppState.SelectionMode.AIMING) return
 
         val paint = appPaints.pinchHintPaint
         paint.textSize = config.HINT_TEXT_BASE_SIZE * config.HINT_TEXT_SIZE_MULTIPLIER

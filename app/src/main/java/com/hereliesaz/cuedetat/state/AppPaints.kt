@@ -67,8 +67,26 @@ class AppPaints(private val context: Context, private val config: AppConfig) {
     val ghostCueNamePaint = createBaseHelperTextPaint().apply { color = AppHelpTextGhostBallLabel.toArgb() }
     val fitTargetInstructionPaint = createBaseHelperTextPaint().apply { color = AppHelpTextYellow.toArgb(); textAlign = Paint.Align.LEFT }
     val placeCueInstructionPaint = createBaseHelperTextPaint().apply { color = AppHelpTextPocketAim.toArgb() }
-    val panHintPaint = createBaseHelperTextPaint().apply { color = AppHelpTextDefault.toArgb(); textAlign = Paint.Align.LEFT }
-    val pinchHintPaint = createBaseHelperTextPaint().apply { color = AppHelpTextDefault.toArgb(); textAlign = Paint.Align.LEFT }
+    // Update these two lines to use the AppConfig constant
+    val panHintPaint = createBaseHelperTextPaint().apply { color = AndroidColor.argb(
+        AndroidColor.alpha(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.red(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.green(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.blue(config.DEFAULT_HELP_TEXT_COLOR_ARGB)
+    ); textAlign = Paint.Align.LEFT }
+    val pinchHintPaint = createBaseHelperTextPaint().apply { color = AndroidColor.argb(
+        AndroidColor.alpha(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.red(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.green(config.DEFAULT_HELP_TEXT_COLOR_ARGB),
+        AndroidColor.blue(config.DEFAULT_HELP_TEXT_COLOR_ARGB)
+    ); textAlign = Paint.Align.LEFT }
+
+    // New instruction paint for selection modes
+    val selectionInstructionPaint = createBaseHelperTextPaint().apply {
+        color = AppHelpTextYellow.toArgb()
+        setShadowLayer(2f, 1f, 1f, AndroidColor.argb(120, 0, 0, 0))
+    }
+
 
     init {
         targetCirclePaint.color = AppYellow.toArgb()
@@ -108,7 +126,7 @@ class AppPaints(private val context: Context, private val config: AppConfig) {
         val allHelperTextPaints = listOf(
             projectedShotTextPaint, tangentLineTextPaint, cueBallPathTextPaint, pocketAimTextPaint,
             ghostTargetNamePaint, ghostCueNamePaint, fitTargetInstructionPaint, placeCueInstructionPaint,
-            panHintPaint, pinchHintPaint
+            panHintPaint, pinchHintPaint, selectionInstructionPaint // Include new paint
         )
         allHelperTextPaints.forEach { paint ->
             paint.setShadowLayer(1.5f,1.5f,1.5f, helperShadowColor); paint.typeface = archivoBlackTypeface ?: paint.typeface

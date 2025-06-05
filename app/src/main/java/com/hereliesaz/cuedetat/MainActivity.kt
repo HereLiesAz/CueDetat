@@ -54,10 +54,12 @@ import com.hereliesaz.cuedetat.system.CameraManager // Use new CameraManager
 import com.hereliesaz.cuedetat.system.PitchSensor
 import com.hereliesaz.cuedetat.ui.theme.PoolProtractorTheme
 import com.hereliesaz.cuedetat.view.MainOverlayView
+import com.hereliesaz.cuedetat.view.MainOverlayView.AppStateListener
+import com.hereliesaz.cuedetat.state.AppState.SelectionMode // Import SelectionMode
 import com.hereliesaz.cuedetat.view.utility.ZoomSliderLogic
 import kotlin.math.abs
 
-class MainActivity : AppCompatActivity(), MainOverlayView.AppStateListener {
+class MainActivity : AppCompatActivity(), AppStateListener {
 
     private companion object {
         private val TAG = AppConfig.TAG + "_MainActivity"
@@ -79,6 +81,7 @@ class MainActivity : AppCompatActivity(), MainOverlayView.AppStateListener {
 
     private var valuesChangedSinceLastReset = false
     private var helpTextCurrentlyVisible = true
+    private var currentSelectionMode: SelectionMode = SelectionMode.SELECTING_CUE_BALL // Track mode in Activity
 
     private enum class ZoomCycleState { MIN_ZOOM, MAX_ZOOM }
     private var nextZoomCycleState: ZoomCycleState = ZoomCycleState.MIN_ZOOM
@@ -129,6 +132,8 @@ class MainActivity : AppCompatActivity(), MainOverlayView.AppStateListener {
 
         mainOverlayView.listener = this // Set MainActivity as the listener for MainOverlayView events
         helpTextCurrentlyVisible = mainOverlayView.getAreHelperTextsVisible() // Get initial visibility state
+        currentSelectionMode = mainOverlayView.getSelectionMode() // Get initial selection mode
+        updateUiVisibilityForSelectionMode() // Update UI based on initial mode
         updateTitleVisibility() // Update title/logo based on initial visibility
 
         // Initialize CameraManager and PitchSensor
@@ -140,6 +145,10 @@ class MainActivity : AppCompatActivity(), MainOverlayView.AppStateListener {
                 mainOverlayView.setDevicePitchAngle(pitchAngle) // Update overlay with pitch angle
             }
         )
+
+        // Initialize MainOverlayView's components here, passing CameraManager
+        mainOverlayView.initializeComponents(cameraManager)
+
 
         // Setup ComposeView for Material 3 theming (colors applied to legacy View system)
         val composeViewForTheme = findViewById<ComposeView>(R.id.composeThemeView)
@@ -161,12 +170,15 @@ class MainActivity : AppCompatActivity(), MainOverlayView.AppStateListener {
      * Configures listeners for UI controls (zoom slider, buttons).
      */
     private fun setupControls() {
-        updateZoomSliderFromFactor(mainOverlayView.getZoomFactor()) // Sync slider with initial zoom
+        // Use CameraManager's current zoom to initialize slider
+        updateZoomSliderFromFactor(mainOverlayView.getZoomFactor())
 
         zoomSlider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
-                    val zoomValue = ZoomSliderLogic.convertSliderProgressToZoomFactor(progress)
+                    val minZoom = mainOverlayView.getMinCameraZoomFactor()
+                    val maxZoom = mainOverlayView.getMaxCameraZoomFactor()
+                    val zoomValue = ZoomSliderLogic.convertSliderProgressToZoomFactor(progress, minZoom, maxZoom)
                     mainOverlayView.setZoomFactor(zoomValue)
                     nextZoomCycleState = ZoomCycleState.MIN_ZOOM // Reset cycle state when slider is used
                 }
@@ -198,17 +210,37 @@ class MainActivity : AppCompatActivity(), MainOverlayView.AppStateListener {
     }
 
     /**
+     * Updates the visibility of UI controls based on the current selection mode.
+     * Only zoom and rotate interactions are enabled in AIMING mode.
+     */
+    private fun updateUiVisibilityForSelectionMode() {
+        val controlsVisibleInAiming = currentSelectionMode == SelectionMode.AIMING
+        zoomSlider.visibility = if (controlsVisibleInAiming) View.VISIBLE else View.INVISIBLE
+        zoomCycleButton.visibility = if (controlsVisibleInAiming) View.VISIBLE else View.INVISIBLE
+
+        // Help and Reset buttons are always visible, but their actions might be restricted by MainOverlayView
+        // Their visibility logic is separate.
+    }
+
+    /**
      * Handles cycling through predefined zoom levels (min/max).
      */
     private fun handleZoomCycleAction() {
+        // Only allow zoom cycling if in AIMING mode
+        if (currentSelectionMode != SelectionMode.AIMING) return
+
+        val currentZoom = mainOverlayView.getZoomFactor()
+        val minZoom = mainOverlayView.getMinCameraZoomFactor()
+        val maxZoom = mainOverlayView.getMaxCameraZoomFactor()
+
         val targetZoom = when (nextZoomCycleState) {
             ZoomCycleState.MIN_ZOOM -> {
                 nextZoomCycleState = ZoomCycleState.MAX_ZOOM
-                AppConfig.MIN_ZOOM_FACTOR
+                minZoom
             }
             ZoomCycleState.MAX_ZOOM -> {
                 nextZoomCycleState = ZoomCycleState.MIN_ZOOM
-                AppConfig.MAX_ZOOM_FACTOR
+                maxZoom
             }
         }
         mainOverlayView.setZoomFactor(targetZoom) // Set zoom via overlay view
@@ -226,11 +258,14 @@ class MainActivity : AppCompatActivity(), MainOverlayView.AppStateListener {
     // --- MainOverlayView.AppStateListener implementations ---
 
     override fun onZoomChanged(newZoomFactor: Float) {
-        updateZoomSliderFromFactor(newZoomFactor) // Sync slider with new zoom
+        // Update the slider to reflect the actual camera zoom ratio, which might be slightly different from requested
+        updateZoomSliderFromFactor(newZoomFactor)
         // Update zoom cycle state based on current zoom factor
-        if (abs(newZoomFactor - AppConfig.MIN_ZOOM_FACTOR) < 0.01f) {
+        val minZoom = mainOverlayView.getMinCameraZoomFactor()
+        val maxZoom = mainOverlayView.getMaxCameraZoomFactor()
+        if (abs(newZoomFactor - minZoom) < 0.01f) {
             nextZoomCycleState = ZoomCycleState.MAX_ZOOM
-        } else if (abs(newZoomFactor - AppConfig.MAX_ZOOM_FACTOR) < 0.01f) {
+        } else if (abs(newZoomFactor - maxZoom) < 0.01f) {
             nextZoomCycleState = ZoomCycleState.MIN_ZOOM
         }
         valuesChangedSinceLastReset = true // Mark that user interaction occurred
@@ -250,13 +285,26 @@ class MainActivity : AppCompatActivity(), MainOverlayView.AppStateListener {
         }
     }
 
-    /**
-     * New listener callback for when a target ball is selected or deselected.
-     * @param ballId The ID of the selected ball, or null if deselected.
-     */
+    override fun onCueBallSelected(ballId: String?) {
+        val message = if (ballId != null) "Cue ball selected: $ballId" else "Cue ball deselected."
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
     override fun onTargetBallSelected(ballId: String?) {
         val message = if (ballId != null) "Target ball selected: $ballId" else "Target ball deselected."
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onSelectionModeChanged(mode: SelectionMode) {
+        currentSelectionMode = mode
+        updateUiVisibilityForSelectionMode() // Update UI based on new mode
+        val message = when (mode) {
+            SelectionMode.SELECTING_CUE_BALL -> "Please tap the cue ball."
+            SelectionMode.SELECTING_TARGET_BALL -> "Now tap the target ball."
+            SelectionMode.AIMING -> "Aiming mode activated."
+        }
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        Log.d(TAG, "Selection Mode changed to: $mode")
     }
 
     /**
@@ -264,7 +312,9 @@ class MainActivity : AppCompatActivity(), MainOverlayView.AppStateListener {
      * @param factor The zoom factor to convert to slider progress.
      */
     private fun updateZoomSliderFromFactor(factor: Float) {
-        val progress = ZoomSliderLogic.convertZoomFactorToSliderProgress(factor)
+        val minZoom = mainOverlayView.getMinCameraZoomFactor()
+        val maxZoom = mainOverlayView.getMaxCameraZoomFactor()
+        val progress = ZoomSliderLogic.convertZoomFactorToSliderProgress(factor, minZoom, maxZoom)
         // Only update if different to avoid infinite loops with onProgressChanged
         if (zoomSlider.progress != progress) {
             zoomSlider.progress = progress
