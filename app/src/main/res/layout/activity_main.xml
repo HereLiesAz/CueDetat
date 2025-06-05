@@ -13,12 +13,10 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- THIS IS THE LINE TO CHANGE -->
     <com.hereliesaz.cuedetat.view.MainOverlayView
         android:id="@+id/protractorOverlayView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
-    <!-- END OF CHANGE -->
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/controls_layout"
@@ -114,19 +112,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:tint="?attr/colorOnPrimaryContainer" />
 
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/helpButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="24dp"
-            android:layout_marginBottom="24dp"
-            android:contentDescription="@string/toggle_help_lines"
-            android:src="@drawable/ic_help_outline_24"
-            app:backgroundTint="?attr/colorSecondaryContainer"
-            app:fabSize="mini"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:tint="?attr/colorOnSecondaryContainer" />
+        <!-- helpButton removed -->
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

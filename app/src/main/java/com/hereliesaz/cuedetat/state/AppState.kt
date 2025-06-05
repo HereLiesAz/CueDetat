@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/state/AppState.kt
 package com.hereliesaz.cuedetat.state
 
 import android.graphics.Camera
@@ -80,7 +79,8 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
     val inversePitchMatrix: Matrix = Matrix()
 
     // --- UI State ---
-    var areHelperTextsVisible: Boolean = true
+    var areHelperTextsVisible: Boolean = true // Default to ON for user guidance
+        private set
 
     enum class SelectionMode {
         SELECTING_CUE_BALL,
@@ -173,7 +173,7 @@ class AppState(val config: AppConfig) { // Changed from 'private val' to 'val'
 
     /**
      * Updates the camera zoom factor. This value is clamped by camera capabilities.
-     * @param newFactor The new desired camera zoom factor (e.g., 1.0f for no zoom, 2.0f for 2x zoom).
+     * @param newFactor The new desired camera zoom factor (e.g., 1.0f for no optical zoom).
      * @return True if the zoom factor changed significantly, false otherwise.
      */
     fun updateZoomFactor(newFactor: Float): Boolean {

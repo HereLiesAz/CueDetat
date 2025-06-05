@@ -1,3 +1,4 @@
+// app/src/main/java/com/hereliesaz/cuedetat/config/AppConfig.kt
 package com.hereliesaz.cuedetat.config
 
 object AppConfig {
@@ -40,9 +41,6 @@ object AppConfig {
     const val TEXT_MIN_SCALE_FACTOR = 0.65f
     const val TEXT_MAX_SCALE_FACTOR = 1.5f
 
-    // Default helper text color ARGB value
-    const val DEFAULT_HELP_TEXT_COLOR_ARGB = 0xFFD1C4E9.toInt()
-
     // Paint Stroke Widths
     const val STROKE_AIM_LINE_NEAR = 4f
     const val STROKE_AIM_LINE_FAR = 2f
@@ -53,7 +51,7 @@ object AppConfig {
     const val STROKE_MAIN_CIRCLES = 5f
     const val STROKE_PROTRACTOR_ANGLE_LINES = 3f
     const val STROKE_AIMING_SIGHT = 2f
-    const val STROKE_FOLLOW_DRAW_PATH = 3f // Correct constant name
+    const val STROKE_FOLLOW_DRAW_PATH = 3f
 
     // Follow/Draw Path Visuals Configuration
     const val FOLLOW_EFFECT_DEVIATION_DEGREES = -25.0f // Negative for one side of tangent
@@ -62,13 +60,10 @@ object AppConfig {
     const val PATH_DRAW_LENGTH_FACTOR = 0.7f    // Length of paths relative to deflection line length
     const val PATH_OPACITY_ALPHA = 180          // Opacity for these paths
 
-    // GitHub Release Updater Configuration
-    const val GITHUB_REPO_OWNER = "HereLiesAz" // Updated to match the provided URL
-    const val GITHUB_REPO_NAME = "CueDetat" // Updated to match the provided URL
-    const val GITHUB_RELEASE_ASSET_NAME_REGEX = ".*\\.apk" // Regex to match your APK asset name
-
-
     // Warning Strings
+    // New: Static text for the repurposed warning
+    const val REPURPOSED_WARNING_TEXT = "Hold phone over the cue ball,\ndirectly below this."
+
     const val WARNING_MRS_CALLED = "Your Mrs. called, she wants her title back."
     const val WARNING_YODA_SAYS = "Yoda says, 'A do not, this is.'"
     val INSULTING_WARNING_STRINGS = listOf( // Ensure this is used if random warnings are active

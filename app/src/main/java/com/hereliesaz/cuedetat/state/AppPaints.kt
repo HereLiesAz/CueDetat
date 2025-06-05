@@ -1,3 +1,4 @@
+// FILE: app\src\main\java\com\hereliesaz\cuedetat\state\AppPaints.kt
 package com.hereliesaz.cuedetat.state
 
 import android.content.Context
@@ -56,7 +57,7 @@ class AppPaints(private val context: Context, private val config: AppConfig) {
         typeface = archivoBlackTypeface; textAlign = Paint.Align.CENTER
     }
     val projectedShotTextPaint = createBaseHelperTextPaint().apply { color = AppHelpTextProjectedShotLineActual.toArgb() }
-    val tangentLineTextPaint = createBaseHelperTextPaint().apply { color = AppPurple.toArgb() }
+    val tangentLineTextPaint = createBaseHelperTextPaint().apply { color = AppHelpTextTangentLine.toArgb() } // Changed from AppPurple
     val cueBallPathTextPaint = createBaseHelperTextPaint().apply { color = AppHelpTextTangentLine.toArgb() }
     val pocketAimTextPaint = createBaseHelperTextPaint().apply { color = AppHelpTextPocketAim.toArgb() }
     val invalidShotWarningPaint = createBaseHelperTextPaint().apply {

@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/tracking/ball_detector/BallDetector.kt
 package com.hereliesaz.cuedetat.tracking.ball_detector
 
 import android.graphics.Rect
@@ -39,6 +38,7 @@ class BallDetector {
     fun detectBalls(imageProxy: ImageProxy, onDetectionSuccess: (List<Ball>) -> Unit, onDetectionFailure: (Exception) -> Unit) {
         val mediaImage = imageProxy.image
         if (mediaImage == null) {
+            Log.d(TAG, "detectBalls: mediaImage is null, closing imageProxy.")
             imageProxy.close()
             return
         }
@@ -54,20 +54,12 @@ class BallDetector {
                     val trackingId = detectedObject.trackingId
                     val confidence = detectedObject.labels.firstOrNull()?.confidence ?: 0f
 
-                    // Filter based on shape (aspect ratio close to 1:1) and confidence if needed
-                    // A simple heuristic for a ball is a bounding box that is roughly square.
+                    // Filter based on shape (aspect ratio close to 1:1) and confidence
                     val aspectRatio = boundingBox.width().toFloat() / boundingBox.height().toFloat()
                     val isRoughlySquare = aspectRatio > 0.7 && aspectRatio < 1.3 // Allow some leeway
 
-                    // You might want to filter by classification label if available and relevant (e.g., "ball")
-                    // For general objects, classification might not be specific enough for pool balls.
-                    val isBall = detectedObject.labels.any { label ->
-                        label.text.equals("ball", ignoreCase = true) || // Common label for round objects
-                                label.text.equals("sphere", ignoreCase = true) ||
-                                label.text.equals("sport", ignoreCase = true) // General sports object
-                        // Add more specific labels if ML Kit provides them for pool balls
-                    }
-
+                    // Removed the explicit 'isBall' classification check for more permissive detection
+                    // This allows any roughly square, confident detection to be a 'ball' for now.
                     if (isRoughlySquare && confidence > 0.5) { // Confidence threshold
                         // Map ML Kit bounding box to our simplified Ball model
                         val centerX = boundingBox.centerX().toFloat()
@@ -75,11 +67,15 @@ class BallDetector {
                         // Use average of half width and half height as radius for a circular representation
                         val radius = (boundingBox.width() + boundingBox.height()) / 4f
 
-                        // Use trackingId for unique identification if available, otherwise fallback to object hash
-                        val id = trackingId?.toString() ?: detectedObject.hashCode().toString()
-                        detectedBalls.add(Ball(id, centerX, centerY, radius))
+                        // Ensure radius is positive to avoid issues with drawing/logic
+                        if (radius > 0) {
+                            // Use trackingId for unique identification if available, otherwise fallback to object hash
+                            val id = trackingId?.toString() ?: detectedObject.hashCode().toString()
+                            detectedBalls.add(Ball(id, centerX, centerY, radius))
+                        }
                     }
                 }
+                Log.d(TAG, "ML Kit Object detection successful, detectedObjects.size=${detectedObjects.size}, filteredBalls.size=${detectedBalls.size}")
                 onDetectionSuccess(detectedBalls)
             }
             .addOnFailureListener { e ->

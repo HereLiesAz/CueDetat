@@ -7,12 +7,25 @@
     <color name="app_dark_gray">#FF333333</color> <!-- A general dark gray for containers -->
     <color name="app_medium_gray">#725F5F</color> <!-- User's gray, can be tertiary -->
     <color name="app_light_gray_for_text_on_dark">#FFCCCCCC</color> <!-- For text on dark containers -->
-    <color name="app_dark_yellow">#E5B205</color> <!-- For surface variants or accents on yellow -->
+    <color name="app_dark_yellow">#E5B205</color> <!-- A darker variant of the main yellow -->
     <color name="app_purple">#FF6200EE</color>
-
 
     <!-- Functional Colors -->
     <color name="app_error_red">#FF5252</color>
+
+    <!-- Popup Menu Specific Colors -->
+    <!-- This color is for the *overall* popup background if a drawable is used directly,
+         but we'll set it to transparent in styles.xml for the outer popup. -->
+    <color name="app_popup_background_dark_transparent">#D0000000</color> <!-- 80% translucent black -->
+    <color name="app_popup_border_color">#40FFFFFF</color> <!-- Subtle white border for depth (removed from drawable but kept in case needed) -->
+    <color name="app_popup_item_selected_light_yellow">#FFFAE0</color> <!-- Slightly lighter yellow for selected state -->
+    <color name="app_popup_menu_text_default">@color/app_yellow</color> <!-- Default text color for menu items - set to yellow -->
+
+    <!-- New color for semi-transparent menu item backgrounds -->
+    <color name="app_menu_item_background_semi_transparent">#40000000</color> <!-- 25% opaque black -->
+
+    <!-- Launcher Background Color -->
+    <color name="ic_launcher_background">#070604</color>
 
     <!-- Original colors (can be removed if not referenced elsewhere) -->
     <color name="purple_200">#FFBB86FC</color>
@@ -20,8 +33,6 @@
     <color name="purple_700">#FF3700B3</color>
     <color name="teal_200">#FF03DAC5</color>
     <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color> <!-- Redundant with app_black -->
+    <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-
-    <color name="ic_launcher_background">#FFFFFF</color> <!-- Redundant with app_white -->
 </resources>

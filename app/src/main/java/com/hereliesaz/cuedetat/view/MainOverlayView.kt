@@ -1,3 +1,4 @@
+// FILE: app\src\main\java\com\hereliesaz\cuedetat\view\MainOverlayView.kt
 // app/src/main/java/com/hereliesaz/cuedetat/view/MainOverlayView.kt
 package com.hereliesaz.cuedetat.view
 
@@ -19,6 +20,7 @@ import com.hereliesaz.cuedetat.view.gesture.GestureHandler
 import com.hereliesaz.cuedetat.tracking.ball_detector.Ball // Import the Ball data class
 import com.hereliesaz.cuedetat.system.CameraManager // Import CameraManager
 import kotlin.math.hypot
+import kotlin.math.min
 
 class MainOverlayView @JvmOverloads constructor(
     context: Context,
@@ -63,6 +65,7 @@ class MainOverlayView @JvmOverloads constructor(
      * @param cameraManager A reference to the CameraManager for camera zoom control.
      */
     fun initializeComponents(cameraManager: CameraManager) {
+        Log.d(TAG, "initializeComponents called. areComponentsInitialized was $areComponentsInitialized, width=$width, height=$height")
         if (areComponentsInitialized || width == 0 || height == 0) return // Already initialized or no dimensions
 
         cameraManagerRef = cameraManager // Store reference
@@ -92,7 +95,7 @@ class MainOverlayView @JvmOverloads constructor(
         })
 
         areComponentsInitialized = true
-        Log.d(TAG, "MainOverlayView components initialized.")
+        Log.d(TAG, "MainOverlayView components initialized. areComponentsInitialized is now $areComponentsInitialized")
     }
 
 
@@ -120,6 +123,7 @@ class MainOverlayView @JvmOverloads constructor(
      */
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        Log.d(TAG, "onSizeChanged: w=$w, h=$h. Calling appState.initialize.")
         if (w > 0 && h > 0) {
             // NOTE: initializeComponents must be called by MainActivity AFTER CameraManager is ready
             // because it now depends on cameraManagerRef.
@@ -134,8 +138,10 @@ class MainOverlayView @JvmOverloads constructor(
      */
     override fun onDraw(canvas: Canvas) { // android.graphics.Canvas
         super.onDraw(canvas)
+        Log.d(TAG, "onDraw called. areComponentsInitialized=$areComponentsInitialized, appState.isInitialized=${appState.isInitialized}, appState.currentLogicalRadius=${appState.currentLogicalRadius}, appState.currentMode=${appState.currentMode}")
         // Guard against drawing before components are ready
         if (!areComponentsInitialized || !appState.isInitialized) {
+            Log.w(TAG, "onDraw returning early: areComponentsInitialized=$areComponentsInitialized, appState.isInitialized=${appState.isInitialized}")
             // Cannot call initializeComponents here as it requires cameraManagerRef now.
             // MainActivity is responsible for calling it.
             return
@@ -177,32 +183,91 @@ class MainOverlayView @JvmOverloads constructor(
      * @param frameHeight The height of the camera frame in pixels.
      */
     fun updateTrackedBalls(balls: List<Ball>, frameWidth: Int, frameHeight: Int) {
-        if (!appState.isInitialized) return
+        Log.d(TAG, "updateTrackedBalls received: balls.size=${balls.size}, frame=${frameWidth}x${frameHeight}")
+        if (!appState.isInitialized || this.width == 0 || this.height == 0 || frameWidth == 0 || frameHeight == 0) {
+            Log.w(TAG, "updateTrackedBalls: view/frame dimensions not ready or zero, skipping. View: ${this.width}x${this.height}, Frame: ${frameWidth}x${frameHeight}")
+            // If frame dimensions are 0, this indicates a problem with the camera or analyzer.
+            // Clear tracked balls to ensure no stale data causes issues.
+            appState.trackedBalls = emptyList()
+            // Invalidate to clear any previous drawings if current frame data is invalid.
+            invalidate()
+            return
+        }
 
-        appState.frameWidth = frameWidth // Store camera frame width
-        appState.frameHeight = frameHeight // Store camera frame height
-        appState.trackedBalls = balls // Store all detected balls
+        // Calculate scaling factors to map camera frame coordinates to MainOverlayView coordinates
+        val scaleX = this.width.toFloat() / frameWidth.toFloat()
+        val scaleY = this.height.toFloat() / frameHeight.toFloat()
+        // Use the smaller scale factor to ensure the entire camera frame fits within the view,
+        // preventing parts of the image from being cropped. This creates a "letterbox" effect
+        // if aspect ratios differ.
+        val scaleFactor = min(scaleX, scaleY)
+
+        // Calculate offsets to center the scaled camera frame content within the MainOverlayView
+        val scaledFrameWidth = frameWidth * scaleFactor
+        val scaledFrameHeight = frameHeight * scaleFactor
+        val offsetX = (this.width - scaledFrameWidth) / 2f
+        val offsetY = (this.height - scaledFrameHeight) / 2f
+
+        val scaledBalls = balls.map { ball ->
+            Ball(
+                id = ball.id,
+                x = ball.x * scaleFactor + offsetX,
+                y = ball.y * scaleFactor + offsetY,
+                radius = ball.radius * scaleFactor
+            )
+        }
+        appState.trackedBalls = scaledBalls // Store the scaled balls
+        Log.d(TAG, "updateTrackedBalls: Scaled ${scaledBalls.size} balls.")
+
+        // Re-evaluate current selected balls based on the scaled, currently tracked balls.
+        // This ensures selected balls are always represented by the latest scaled data
+        // and deselected if they disappear from tracking.
+        val currentSelectedCueBall = scaledBalls.firstOrNull { it.id == appState.selectedCueBallId }
+        if (currentSelectedCueBall != null) {
+            appState.updateSelectedCueBall(currentSelectedCueBall)
+            Log.d(TAG, "updateTrackedBalls: Selected cue ball ${appState.selectedCueBallId} updated.")
+        } else if (appState.selectedCueBallId != null) {
+            // If previously selected cue ball is no longer tracked, deselect it
+            appState.clearSelectedCueBall()
+            listener?.onCueBallSelected(null)
+            Log.d(TAG, "updateTrackedBalls: Previously selected cue ball disappeared, deselected.")
+        }
+
+        val currentSelectedTargetBall = scaledBalls.firstOrNull { it.id == appState.selectedTargetBallId }
+        if (currentSelectedTargetBall != null) {
+            appState.updateSelectedTargetBall(currentSelectedTargetBall)
+            Log.d(TAG, "updateTrackedBalls: Selected target ball ${appState.selectedTargetBallId} updated.")
+        } else if (appState.selectedTargetBallId != null) {
+            // If previously selected target ball is no longer tracked, deselect it
+            appState.clearSelectedTargetBall()
+            listener?.onTargetBallSelected(null)
+            Log.d(TAG, "updateTrackedBalls: Previously selected target ball disappeared, deselected.")
+        }
 
         // Auto-select if currently in a selection mode and no ball is selected
         when (appState.currentMode) {
             SelectionMode.SELECTING_CUE_BALL -> {
                 if (appState.selectedCueBallId == null) {
-                    val firstBall = balls.firstOrNull()
+                    val firstBall = scaledBalls.firstOrNull()
                     if (firstBall != null) {
                         appState.updateSelectedCueBall(firstBall)
                         listener?.onCueBallSelected(firstBall.id)
                         Log.d(TAG, "Auto-selected cue ball: ${firstBall.id}")
+                    } else {
+                        Log.d(TAG, "No balls detected for auto-selection of cue ball.")
                     }
                 }
             }
             SelectionMode.SELECTING_TARGET_BALL -> {
                 if (appState.selectedTargetBallId == null) {
                     // Try to auto-select a target ball that isn't the cue ball
-                    val firstNonCueBall = balls.firstOrNull { it.id != appState.selectedCueBallId }
+                    val firstNonCueBall = scaledBalls.firstOrNull { it.id != appState.selectedCueBallId }
                     if (firstNonCueBall != null) {
                         appState.updateSelectedTargetBall(firstNonCueBall)
                         listener?.onTargetBallSelected(firstNonCueBall.id)
                         Log.d(TAG, "Auto-selected target ball: ${firstNonCueBall.id}")
+                    } else {
+                        Log.d(TAG, "No non-cue balls detected for auto-selection of target ball.")
                     }
                 }
             }
@@ -278,6 +343,7 @@ class MainOverlayView @JvmOverloads constructor(
                         appState.clearSelectedTargetBall()
                         listener?.onTargetBallSelected(null)
                         Log.d(TAG, "User deselected target ball. Still expecting target selection.")
+                        modeChanged = true // Mode changed back to selecting target.
                     } else {
                         Log.d(TAG, "Tap ignored: No ball found, expecting target ball selection.")
                     }
@@ -306,6 +372,7 @@ class MainOverlayView @JvmOverloads constructor(
                         appState.updateSelectedTargetBall(closestBall)
                         listener?.onTargetBallSelected(closestBall.id)
                         Log.d(TAG, "User selected new target ball: ${closestBall.id}.")
+                        // Mode doesn't change from AIMING to AIMING
                     }
                 } else {
                     // Tapped empty space, deselect target and go back to selecting target

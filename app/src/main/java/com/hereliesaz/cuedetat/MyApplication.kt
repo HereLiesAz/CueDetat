@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/MyApplication.kt
 package com.hereliesaz.cuedetat
 
 import android.app.Application
@@ -13,12 +12,14 @@ class MyApplication : Application() {
         Log.i(AppConfig.TAG, "MyApplication onCreate: Forcing Light Theme (MODE_NIGHT_NO).")
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
 
-        // REMOVE THIS BLOCK - No longer needed for OpenCV initialization
-        // if (!OpenCVLoader.initDebug()) { // initDebug is for development, initAsync is better for production
-        //     Log.e(AppConfig.TAG, "Failed to initialize OpenCV!")
-        //     // Consider showing a user-friendly message or disabling features if OpenCV is crucial
-        // } 
-        //     Log.i(AppConfig.TAG, "OpenCV initialized successfully.")
-        // }
+        // REMOVED BLOCK - No longer needed for OpenCV initialization
+        /*
+        if (!OpenCVLoader.initDebug()) { // initDebug is for development, initAsync is better for production
+            Log.e(AppConfig.TAG, "Failed to initialize OpenCV!")
+            // Consider showing a user-friendly message or disabling features if OpenCV is crucial
+        } else {
+            Log.i(AppConfig.TAG, "OpenCV initialized successfully.")
+        }
+        */
     }
 }

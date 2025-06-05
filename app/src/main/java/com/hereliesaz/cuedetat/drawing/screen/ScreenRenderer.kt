@@ -65,49 +65,50 @@ class ScreenRenderer(
             canvas, appState, appPaints, config, invalidShotWarningString
         )
 
-        // Conditional drawing of instructions based on selection mode
+        // Conditional drawing of instructions based on selection modes
         if (appState.areHelperTextsVisible) {
             selectionInstructionDrawer.draw(canvas, appState, appPaints, config)
 
-            when (appState.currentMode) {
-                SelectionMode.AIMING -> {
-                    // Only draw aiming-related labels in AIMING mode
-                    var targetLabelVerticalOffset = 0f
-                    var cueLabelVerticalOffset = 0f
+            // Calculate label offsets if needed for ghost balls
+            var targetLabelVerticalOffset = 0f
+            var cueLabelVerticalOffset = 0f
+            if (targetGhostRadius > 0 && cueGhostRadius > 0) {
+                val horizontalDistance = abs(projectedTargetGhostCenter.x - projectedCueGhostCenter.x)
+                val proximityThreshold = (targetGhostRadius + cueGhostRadius) * GHOST_LABEL_HORIZONTAL_PROXIMITY_THRESHOLD_FACTOR
 
-                    // Simple overlap avoidance for ghost ball labels
-                    if (targetGhostRadius > 0 && cueGhostRadius > 0) {
-                        val horizontalDistance = abs(projectedTargetGhostCenter.x - projectedCueGhostCenter.x)
-                        val proximityThreshold = (targetGhostRadius + cueGhostRadius) * GHOST_LABEL_HORIZONTAL_PROXIMITY_THRESHOLD_FACTOR
-
-                        if (horizontalDistance < proximityThreshold) {
-                            val adjustmentPixels = (GHOST_LABEL_VERTICAL_ADJUSTMENT_AMOUNT_DP / appState.zoomFactor.coerceAtLeast(0.3f))
-                            cueLabelVerticalOffset = -adjustmentPixels
-                            targetLabelVerticalOffset = adjustmentPixels / 2f
-                        }
-                    }
-
-                    ghostTargetNameDrawer.draw(
-                        canvas, appState, appPaints, config,
-                        projectedTargetGhostCenter, targetGhostRadius,
-                        targetLabelVerticalOffset
-                    )
-                    ghostCueNameDrawer.draw(
-                        canvas, appState, appPaints, config,
-                        projectedCueGhostCenter, cueGhostRadius,
-                        cueLabelVerticalOffset
-                    )
-                    fitTargetInstructionDrawer.draw(
-                        canvas, appState, appPaints, config,
-                        projectedTargetGhostCenter, targetGhostRadius
-                    )
-                    placeCueInstructionDrawer.draw(canvas, appState, appPaints, config)
-                    panHintDrawer.draw(canvas, appState, appPaints, config)
-                    pinchHintDrawer.draw(canvas, appState, appPaints, config)
+                if (horizontalDistance < proximityThreshold) {
+                    val adjustmentPixels = (GHOST_LABEL_VERTICAL_ADJUSTMENT_AMOUNT_DP / appState.zoomFactor.coerceAtLeast(0.3f))
+                    cueLabelVerticalOffset = -adjustmentPixels
+                    targetLabelVerticalOffset = adjustmentPixels / 2f
                 }
-                SelectionMode.SELECTING_CUE_BALL, SelectionMode.SELECTING_TARGET_BALL -> {
-                    // No other labels are drawn during selection modes, only the instruction text
-                }
+            }
+
+            // Ghost ball name labels should be visible if helper texts are on and balls are selected, regardless of AIMING mode.
+            // Their individual drawers (`GhostTargetNameDrawer`, `GhostCueNameDrawer`) now only check for `areHelperTextsVisible`.
+            if (appState.selectedTargetBallId != null) { // Only draw label if a target ball is actually selected
+                ghostTargetNameDrawer.draw(
+                    canvas, appState, appPaints, config,
+                    projectedTargetGhostCenter, targetGhostRadius,
+                    targetLabelVerticalOffset
+                )
+            }
+            if (appState.selectedCueBallId != null) { // Only draw label if a cue ball is actually selected
+                ghostCueNameDrawer.draw(
+                    canvas, appState, appPaints, config,
+                    projectedCueGhostCenter, cueGhostRadius,
+                    cueLabelVerticalOffset
+                )
+            }
+
+            // Aiming-specific instructions and hints
+            if (appState.currentMode == SelectionMode.AIMING) {
+                fitTargetInstructionDrawer.draw(
+                    canvas, appState, appPaints, config,
+                    projectedTargetGhostCenter, targetGhostRadius
+                )
+                placeCueInstructionDrawer.draw(canvas, appState, appPaints, config)
+                panHintDrawer.draw(canvas, appState, appPaints, config)
+                pinchHintDrawer.draw(canvas, appState, appPaints, config)
             }
         }
     }

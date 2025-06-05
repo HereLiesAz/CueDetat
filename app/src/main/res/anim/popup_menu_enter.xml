@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="200">
+    <!-- Fade in -->
+    <alpha
+        android:fromAlpha="0.0"
+        android:toAlpha="1.0" />
+    <!-- Slide in from top (or from the direction of Gravity.END which is right in this case) -->
+    <translate
+        android:fromXDelta="100%"
+        android:toXDelta="0%" />
+    <scale
+        android:fromXScale="0.8"
+        android:toXScale="1.0"
+        android:fromYScale="0.8"
+        android:toYScale="1.0"
+        android:pivotX="100%"
+        android:pivotY="0%" />
+</set>
