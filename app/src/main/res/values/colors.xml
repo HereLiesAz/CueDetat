@@ -21,5 +21,7 @@
     <color name="teal_200">#FF03DAC5</color>
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color> <!-- Redundant with app_black -->
-    <color name="white">#FFFFFFFF</color> <!-- Redundant with app_white -->
+    <color name="white">#FFFFFFFF</color>
+
+    <color name="ic_launcher_background">#FFFFFF</color> <!-- Redundant with app_white -->
 </resources>

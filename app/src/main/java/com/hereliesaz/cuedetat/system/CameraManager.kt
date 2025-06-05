@@ -1,10 +1,7 @@
-// app/src/main/java/com/hereliesaz/cuedetat/system/CameraManager.kt
 package com.hereliesaz.cuedetat.system
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.util.Log
 import android.util.Size
 import android.widget.Toast
@@ -22,13 +19,14 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.google.common.util.concurrent.ListenableFuture
 import com.hereliesaz.cuedetat.config.AppConfig
-import com.hereliesaz.cuedetat.tracking.ball_detector.Ball
+import com.hereliesaz.cuedetat.system.*
 import com.hereliesaz.cuedetat.tracking.ball_detector.BallDetector
-import com.hereliesaz.cuedetat.tracking.utils.YuvToRgbConverter
 import com.hereliesaz.cuedetat.view.MainOverlayView
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
+
+
 
 class CameraManager(
     private val activity: AppCompatActivity,
@@ -46,9 +44,7 @@ class CameraManager(
     private var requestCameraPermissionLauncher: ActivityResultLauncher<String>
 
     private val analysisExecutor = Executors.newSingleThreadExecutor() // Single thread for image analysis to avoid frame drops
-    private lateinit var yuvToRgbConverter: YuvToRgbConverter
     private lateinit var ballDetector: BallDetector
-    private var lastFrameBitmap: Bitmap? = null // Reusable bitmap for frame conversion
 
     init {
         requestCameraPermissionLauncher = activity.registerForActivityResult(
@@ -87,8 +83,7 @@ class CameraManager(
     }
 
     private fun initializeCamera() {
-        yuvToRgbConverter = YuvToRgbConverter(activity)
-        ballDetector = BallDetector(activity) // Initialize BallDetector
+        ballDetector = BallDetector() // Initialize ML Kit BallDetector
         cameraProviderFuture = ProcessCameraProvider.getInstance(activity)
         lifecycleOwner.lifecycleScope.launch {
             try {
@@ -109,12 +104,12 @@ class CameraManager(
             .build()
 
         // Connect the Preview use case to the PreviewView
-        preview.setSurfaceProvider(previewView.surfaceProvider)
+        preview.surfaceProvider = previewView.surfaceProvider
 
         // Set up ImageAnalysis for processing camera frames
         val imageAnalysis = ImageAnalysis.Builder()
             .setTargetResolution(Size(IMAGE_ANALYSIS_WIDTH, IMAGE_ANALYSIS_HEIGHT))
-            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_LATEST) // Only analyze the most recent frame
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST) // Only analyze the most recent frame
             .build()
             .also {
                 it.setAnalyzer(analysisExecutor, BallDetectionAnalyzer()) // Set custom analyzer
@@ -129,31 +124,32 @@ class CameraManager(
                 imageAnalysis // Bind ImageAnalysis along with Preview
             )
             Log.i(TAG, "Camera preview and image analysis bound to lifecycle.")
-        } catch (exc: Exception) {
-            Log.e(TAG, "Use case binding failed for camera: ", exc)
-            Toast.makeText(activity, "Camera binding failed: ${exc.message}", Toast.LENGTH_LONG).show()
+        } catch (exception: Exception) {
+            Log.e(TAG, "Use case binding failed for camera: ", exception)
+            Toast.makeText(activity, "Camera binding failed: ${exception.message}", Toast.LENGTH_LONG).show()
         }
     }
 
-    // Custom ImageAnalysis Analyzer for ball detection
+    // Custom ImageAnalysis Analyzer for ball detection using ML Kit
     private inner class BallDetectionAnalyzer : ImageAnalysis.Analyzer {
         override fun analyze(imageProxy: ImageProxy) {
-            // Create or reuse a Bitmap to convert YUV ImageProxy frame to RGB
-            val bitmap = lastFrameBitmap ?: Bitmap.createBitmap(imageProxy.width, imageProxy.height, Bitmap.Config.ARGB_8888)
-            lastFrameBitmap = bitmap // Store for next frame reuse
-
-            // Convert current image frame to RGB Bitmap
-            yuvToRgbConverter.yuvToRgb(imageProxy.image!!, bitmap)
-
-            // Detect balls in the converted Bitmap
-            val balls = ballDetector.detectBalls(bitmap)
-            // Log.d(TAG, "Detected ${balls.size} balls in frame: ${balls.joinToString()}")
-
-            // Pass detected balls and the original camera frame dimensions to MainOverlayView on the UI thread
-            activity.runOnUiThread {
-                mainOverlayView.updateTrackedBalls(balls, imageProxy.width, imageProxy.height)
-            }
-            imageProxy.close() // Important: close the ImageProxy to release the buffer
+            ballDetector.detectBalls(
+                imageProxy,
+                onDetectionSuccess = { balls ->
+                    // Pass detected balls and the original camera frame dimensions to MainOverlayView on the UI thread
+                    activity.runOnUiThread {
+                        mainOverlayView.updateTrackedBalls(balls, imageProxy.width, imageProxy.height)
+                    }
+                },
+                onDetectionFailure = { e ->
+                    Log.e(TAG, "Ball detection failed: $e")
+                    // You might want to clear tracked balls or show a message on UI
+                    activity.runOnUiThread {
+                        mainOverlayView.updateTrackedBalls(emptyList(), imageProxy.width, imageProxy.height)
+                    }
+                }
+            )
+            // ImageProxy is closed within BallDetector.detectBalls on completion listener.
         }
     }
 
@@ -162,6 +158,7 @@ class CameraManager(
      */
     fun shutdown() {
         analysisExecutor.shutdown()
+        ballDetector.shutdown() // Shutdown ML Kit detector
         // It's good practice to unbind all use cases on shutdown
         cameraProviderFuture.get()?.unbindAll()
         Log.i(TAG, "CameraManager shutdown complete.")

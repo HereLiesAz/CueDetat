@@ -10,6 +10,7 @@
     </entry_points>
     <pattern value="com.hereliesaz.poolprotractor.ProtractorOverlayView" method="getPitchAngle" />
   </component>
+  <component name="ExternalStorageConfigurationManager" enabled="true" />
   <component name="ProjectInspectionProfilesVisibleTreeState">
     <entry key="Project Default">
       <profile-state>
@@ -21,7 +22,7 @@
       </profile-state>
     </entry>
   </component>
-  <component name="ProjectRootManager" version="2" languageLevel="JDK_X" default="true" project-jdk-name="24" project-jdk-type="JavaSDK">
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_24" default="true" project-jdk-name="24" project-jdk-type="JavaSDK">
     <output url="file://$PROJECT_DIR$/build/classes" />
   </component>
   <component name="ProjectType">

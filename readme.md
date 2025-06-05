@@ -64,6 +64,7 @@ It uses your phone's camera and orientation sensors to overlay a dynamic protrac
 *   **Android Sensors:** For device orientation.
 *   **Custom View Drawing:** `Canvas` and `Paint` for all visual overlays.
 *   **Jetpack Compose:** For Material 3 theming (colors applied to legacy View system).
+*   **Google ML Kit:** For object detection (pool balls).
 *   **Material Components for Android:** For UI elements like FABs and Seekbar.
 *   **ConstraintLayout:** For UI layout.
 
@@ -81,7 +82,7 @@ It uses your phone's camera and orientation sensors to overlay a dynamic protrac
 *   **Text Collision Avoidance:** Current implementation is basic (first-drawn wins space).
 *   **A Virtual Table for Virtually Useful Bank Shot Projection:** Using more sophisticated dynamic layout involving a line drawing of a billiards table will come someday.
 *   **True 3D Rendering:** This app fakes 3D with 2D canvas tricks. Moving to OpenGL ES or a 3D engine like Filament would allow for actual 3D models and lighting, but would also drastically increase complexity. And probably anxiety. But probably not usefulness.
-*   **Ball, Table and Pocket Detection:** The ultimate fantasy. Using CV to detect the table, balls, and pockets automatically. For now, you are the CV.
+*   **Ball, Table and Pocket Detection:** The ultimate fantasy. Using ML Kit to detect the balls automatically. Table and pocket detection are future delusions.
 *   **Insulting Warnings:** The pool of sarcastic remarks is finite. Contributions welcome if they tickle me the required level of pink.
 *   **Performance:** Drawing many complex paths and text elements on every frame can be demanding. Optimizations are an ongoing battle. And yet, somehow, it feels more like a you-problem.
 

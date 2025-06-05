@@ -56,7 +56,7 @@ class GhostCueNameDrawer(private val textLayoutHelper: TextLayoutHelper) {
         // for non-rotated text with a single line, might use Y as the vertical center.
         // Let's adjust preferredY to be the center of the text block for TextLayoutHelper.
         val textBlockHeight = fm.descent - fm.ascent
-        val preferredY_forHelperCenter = preferredY_baseline - fm.ascent - (textBlockHeight / 2f) + fm.ascent // This simplifies to y_baseline - text_height/2 - ascent
+        preferredY_baseline - fm.ascent - (textBlockHeight / 2f) + fm.ascent // This simplifies to y_baseline - text_height/2 - ascent
         // simplified: y_baseline + (fm.ascent - fm.descent)/2
         // Y for text center = baselineY + ascent + (height/2)
         // Y for text center = baselineY - (height/2) + descent (if y is baseline)

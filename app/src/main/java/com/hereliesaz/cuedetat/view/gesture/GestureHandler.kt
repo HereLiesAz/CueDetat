@@ -38,7 +38,7 @@ class GestureHandler(
         override fun onScale(detector: ScaleGestureDetector): Boolean {
             if (currentInteractionMode != InteractionMode.PINCH_ZOOMING) return false
 
-            val oldZoom = appState.zoomFactor
+            appState.zoomFactor
             // Detector scaleFactor is relative to the start of the current scale gesture
             val newZoomUncoerced = appState.zoomFactor * detector.scaleFactor
 

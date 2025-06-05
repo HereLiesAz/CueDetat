@@ -212,10 +212,12 @@ class MainOverlayView @JvmOverloads constructor(
         val screenScaleY = height.toFloat() / appState.frameHeight
 
         for (ball in appState.trackedBalls) {
-            // Map detected ball coordinates from camera frame to MainOverlayView's screen coordinates
-            val mappedBallX = ball.x * screenScaleX
-            val mappedBallY = ball.y * screenScaleY
-            val mappedBallRadius = ball.radius * ((screenScaleX + screenScaleY) / 2f) // Average scale for radius
+            // ML Kit BallDetector already provides scaled coordinates if it handles it.
+            // But if BallDetector gives coordinates from its original frame, we scale here.
+            // Assuming Ball.x, Ball.y, Ball.radius are already scaled to the MainOverlayView dimensions.
+            val mappedBallX = ball.x // If ball.x is already scaled, use directly
+            val mappedBallY = ball.y // If ball.y is already scaled, use directly
+            val mappedBallRadius = ball.radius // If ball.radius is already scaled, use directly
 
             // Check if the tap is within the ball's projected screen area (with a small tolerance)
             val dist = hypot(tapX - mappedBallX, tapY - mappedBallY)
@@ -251,13 +253,12 @@ class MainOverlayView @JvmOverloads constructor(
         val selectedBall = appState.trackedBalls.find { it.id == appState.selectedTargetBallId }
 
         if (selectedBall != null) {
-            // Map camera frame coordinates to MainOverlayView coordinates
-            val scaleX = width.toFloat() / appState.frameWidth
-            val scaleY = height.toFloat() / appState.frameHeight
-
-            val newTargetX = selectedBall.x * scaleX
-            val newTargetY = selectedBall.y * scaleY
-            val newTargetRadius = selectedBall.radius * ((scaleX + scaleY) / 2f) // Average scale for radius
+            // The BallDetector now provides coordinates and radius already scaled to the
+            // MainOverlayView's expected frame dimensions (based on IMAGE_ANALYSIS_WIDTH/HEIGHT).
+            // So, directly use selectedBall.x, .y, .radius.
+            val newTargetX = selectedBall.x
+            val newTargetY = selectedBall.y
+            val newTargetRadius = selectedBall.radius
 
             // Update AppState with the scaled tracked data.
             // AppState will then re-calculate `currentLogicalRadius` and `cueCircleCenter`.
