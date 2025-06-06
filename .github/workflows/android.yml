@@ -1,0 +1,58 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: set up JDK 11
+      uses: actions/setup-java@v4
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    - name: Build with Gradle
+      run: ./gradlew build
+            - name: Publish Android
+  # You may pin to the exact commit or the version.
+  # uses: joutvhu/publish-android@58c5064befa747851fc826c523a26d158eae50df
+  uses: joutvhu/publish-android@v1.0.1
+  with:
+    # The service account json private key file or the raw json text of the service account private key to authorize the upload request
+    serviceAccountJson: 
+    # The package name, or Application Id, of the app you are uploading
+    packageName: 
+    # The Android release file to upload (.apk or .aab). Multiple files can be supplied on new lines. Supports glob
+    releaseFile: 
+    # The name of this release. If not set it's generated automatically from the APKs versionName. Default is configured by Google Play Console
+    releaseName: # optional
+    # The track in which you want to assign the uploaded app.
+    track: # default is production
+    # In-app update priority of the release. All newly added APKs in the release will be considered at this priority. Can take values in the range [0, 5], with 5 the highest priority.
+    inAppUpdatePriority: # optional, default is 0
+    # Portion of users who should get the staged version of the app. Accepts values between 0.0 and 1.0 (exclusive-exclusive).
+    userFraction: # optional
+    # Release status. This can be set to 'draft' to complete the release at some other time.
+    status: # optional, default is completed
+    # The directory of localized "whats new" files to upload as the release notes. The files contained in the whatsNewDirectory MUST use the pattern whatsnew-<LOCALE> where LOCALE is using the BCP 47 format
+    whatsNewDirectory: # optional
+    # The mapping.txt file used to de-obfuscate your stack traces from crash reports
+    mappingFile: # optional
+    # The native-debug-symbols.zip file or folder that contains your debug symbols
+    debugSymbols: # optional
+    # Indicates that the changes in this edit will not be reviewed until they are explicitly sent for review from the Google Play Console
+    changesNotSentForReview: # optional, default is false
+    # The ID of an existing edit that has not been completed. If this is supplied, the action will append information to that rather than creating an edit
+    existingEditId: # optional
+          
