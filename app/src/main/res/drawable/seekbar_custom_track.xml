@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Background track -->
+    <item android:id="@android:id/background">
+        <shape android:shape="rectangle">
+            <corners android:radius="4dp" /> <!-- Adjust for desired roundness -->
+            <solid android:color="?attr/colorSurfaceVariant" />
+            <size android:height="8dp" /> <!-- This is the THICKNESS of the track drawable -->
+        </shape>
+    </item>
+
+    <!-- Progress track -->
+    <item android:id="@android:id/progress">
+        <scale android:scaleWidth="100%">
+            <shape android:shape="rectangle">
+                <corners android:radius="4dp" />
+                <solid android:color="?attr/colorPrimary" />
+                <size android:height="8dp" /> <!-- Must match background thickness -->
+            </shape>
+        </scale>
+    </item>
+
+    <!-- Secondary progress (optional, remove if not needed) -->
+    <item android:id="@android:id/secondaryProgress">
+        <scale android:scaleWidth="100%">
+            <shape android:shape="rectangle">
+                <corners android:radius="4dp"/>
+                <solid android:color="@android:color/transparent"/> <!-- Or a muted color -->
+                <size android:height="8dp"/>
+            </shape>
+        </scale>
+    </item>
+</layer-list>

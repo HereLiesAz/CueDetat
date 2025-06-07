@@ -1,0 +1,1739 @@
+================================================================================
+FILE: app\src\main\java\com\hereliesaz\poolprotractor\ui\theme\Color.kt
+================================================================================
+package com.hereliesaz.poolprotractor.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+val Purple80 = Color(0xFFD0BCFF)
+val PurpleGrey80 = Color(0xFFCCC2DC)
+val Pink80 = Color(0xFFEFB8C8)
+
+val Purple40 = Color(0xFF6650a4)
+val PurpleGrey40 = Color(0xFF625b71)
+val Pink40 = Color(0xFF7D5260)
+
+
+================================================================================
+FILE: app\src\main\java\com\hereliesaz\poolprotractor\ui\theme\Theme.kt
+================================================================================
+package com.hereliesaz.poolprotractor.ui.theme
+
+import android.app.Activity
+import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+
+private val DarkColorScheme = darkColorScheme(
+    primary = Purple80,       // Light Purple for Dark Theme Primary
+    secondary = PurpleGrey80, // Light PurpleGrey for Dark Theme Secondary
+    tertiary = Pink80,        // Light Pink for Dark Theme Tertiary
+    onSurface = Color(0xFFE6E1E5) // A light color for text on dark surfaces
+    // ... other M3 colors like outline, error etc. should also be light for dark theme
+)
+
+private val LightColorScheme = lightColorScheme(
+    primary = Purple40,       // Darker Purple for Light Theme Primary
+    secondary = PurpleGrey40, // Darker PurpleGrey for Light Theme Secondary
+    tertiary = Pink40,        // Darker Pink for Light Theme Tertiary
+    onSurface = Color(0xFF1C1B1F) // A dark color for text on light surfaces
+    // ... other M3 colors like outline etc. should be dark for light theme
+
+    /* Other default colors to override
+    background = Color(0xFFFFFBFE),
+    surface = Color(0xFFFFFBFE),
+    onPrimary = Color.White,
+    onSecondary = Color.White,
+    onTertiary = Color.White,
+    onBackground = Color(0xFF1C1B1F),
+    onSurface = Color(0xFF1C1B1F), // Explicitly set here for clarity
+    */
+)
+
+
+@Composable
+fun PoolProtractorTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    // Dynamic color is available on Android 12+
+    dynamicColor: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            val context = LocalContext.current
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+        darkTheme -> DarkColorScheme
+        else -> LightColorScheme
+    }
+
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = Typography,
+        content = content
+    )
+}
+
+
+================================================================================
+FILE: app\src\main\java\com\hereliesaz\poolprotractor\ui\theme\Type.kt
+================================================================================
+package com.hereliesaz.poolprotractor.ui.theme
+
+import androidx.compose.material3.Typography
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+
+// Set of Material typography styles to start with
+val Typography = Typography(
+    bodyLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
+        letterSpacing = 0.5.sp
+    )
+    /* Other default text styles to override
+    titleLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 22.sp,
+        lineHeight = 28.sp,
+        letterSpacing = 0.sp
+    ),
+    labelSmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.5.sp
+    )
+    */
+)
+
+
+================================================================================
+FILE: app\src\main\java\com\hereliesaz\poolprotractor\MainActivity.kt
+================================================================================
+package com.hereliesaz.poolprotractor
+
+import android.Manifest
+import android.app.Activity
+import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.os.Bundle
+import android.util.Log
+import android.view.WindowManager
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.lifecycleScope
+import com.google.common.util.concurrent.ListenableFuture
+import com.hereliesaz.poolprotractor.ui.theme.PoolProtractorTheme
+import kotlinx.coroutines.guava.await
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.systemBars
+
+class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlayView.ProtractorStateListener {
+
+    private companion object {
+        private const val TAG = "PoolProtractorApp"
+    }
+
+    // CameraX
+    private lateinit var cameraProviderFuture: ListenableFuture<ProcessCameraProvider>
+    private var previewView: PreviewView? = null // Will be set in Compose
+
+    // Sensor
+    private var sensorManager: SensorManager? = null
+    private var rotationVectorSensor: Sensor? = null
+    private val rotationMatrix = FloatArray(9)
+    private val orientationAngles = FloatArray(3)
+
+    // ProtractorOverlayView instance, to be accessed from Compose
+    private var protractorOverlayViewInstance: ProtractorOverlayView? = null
+
+    private var valuesChangedSinceLastReset by mutableStateOf(false)
+
+    private val requestCameraPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            if (isGranted) {
+                startCameraIfReady()
+            } else {
+                // Consider a more user-friendly way to handle this in Compose
+                Log.e(TAG, "Camera permission denied.")
+            }
+        }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Initialize SensorManager here as it's not UI dependent
+        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+        rotationVectorSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+
+        setContent {
+            val view = LocalView.current
+            SideEffect { // For immersive mode, status bar handling
+                val window = (view.context as Activity).window
+                WindowCompat.setDecorFitsSystemWindows(window, false)
+                WindowInsetsControllerCompat(window, view).let { controller ->
+                    controller.hide(WindowInsetsCompat.Type.statusBars())
+                    controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+
+            PoolProtractorTheme {
+                MainScreen()
+            }
+        }
+        checkCameraPermissionAndStart() // Request permission after content is set
+    }
+
+    @Composable
+    private fun MainScreen() {
+        val context = LocalContext.current
+        val lifecycleOwner = LocalLifecycleOwner.current
+        val currentColorScheme = MaterialTheme.colorScheme
+
+        var sliderProgress by remember { mutableFloatStateOf(0.0f) } // 0.0 to 1.0
+
+        LaunchedEffect(protractorOverlayViewInstance) {
+            protractorOverlayViewInstance?.let {
+                val initialZoom = it.getZoomFactor()
+                val zoomRange = ProtractorOverlayView.MAX_ZOOM_FACTOR - ProtractorOverlayView.MIN_ZOOM_FACTOR
+                if (zoomRange > 0.0001f) {
+                    sliderProgress = ((initialZoom - ProtractorOverlayView.MIN_ZOOM_FACTOR) / zoomRange).coerceIn(0f, 1f)
+                }
+            }
+        }
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Camera Preview
+            AndroidView(
+                factory = { ctx ->
+                    PreviewView(ctx).also { pv ->
+                        previewView = pv
+                        // Defer camera start until permission is granted and previewView is available
+                        startCameraIfReady()
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Protractor Overlay View
+            AndroidView(
+                factory = { ctx ->
+                    ProtractorOverlayView(ctx).also { pov ->
+                        protractorOverlayViewInstance = pov
+                        pov.listener = this@MainActivity
+                    }
+                },
+                update = { view ->
+                    view.applyMaterialYouColors(currentColorScheme)
+                    // If ProtractorOverlayView's state needs to be driven from Compose externally, do it here.
+                    // For now, it manages its own zoom/rotation, and updates MainActivity via listener.
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // UI Controls Overlay
+            Box(modifier = Modifier
+                .fillMaxSize()
+                .padding(WindowInsets.systemBars.asPaddingValues())            ) {
+                // Zoom Controls (Slider and Icon) - Right Aligned
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight(0.7f) // Adjust height as desired for the column
+                        .width(60.dp)        // Give it some width for touch targets
+                        .padding(end = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_zoom_in_24),
+                        contentDescription = stringResource(id = R.string.zoom_icon),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 16.dp) // Space between icon and slider
+                    )
+                    VerticalSlider(
+                        value = sliderProgress,
+                        onValueChange = { newProgress ->
+                            sliderProgress = newProgress
+                            val zoomRange = ProtractorOverlayView.MAX_ZOOM_FACTOR - ProtractorOverlayView.MIN_ZOOM_FACTOR
+                            val zoomValue = ProtractorOverlayView.MIN_ZOOM_FACTOR + (zoomRange * newProgress)
+                            protractorOverlayViewInstance?.setZoomFactor(zoomValue)
+                            onUserInteraction()
+                        },
+                        modifier = Modifier
+                            .weight(1f) // Slider takes up available vertical space
+                            .fillMaxWidth() // Fill the column's width
+                    )
+                }
+
+                // Reset Button - Bottom Right
+                FloatingActionButton(
+                    onClick = { handleResetAction() },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(24.dp),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_undo_24),
+                        contentDescription = stringResource(id = R.string.reset_view),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+
+                // Help Button - Bottom Left
+                FloatingActionButton(
+                    onClick = { protractorOverlayViewInstance?.toggleHelpersVisibility() },
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(24.dp),
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_help_outline_24),
+                        contentDescription = stringResource(id = R.string.toggle_help_lines),
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+        }
+
+        // Register sensor listener when composable is active
+        DisposableEffect(Unit) {
+            registerSensorListener()
+            onDispose {
+                unregisterSensorListener()
+            }
+        }
+    }
+
+
+    @Composable
+    fun VerticalSlider(
+        value: Float,
+        onValueChange: (Float) -> Unit,
+        modifier: Modifier = Modifier,
+        enabled: Boolean = true,
+        valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
+        steps: Int = 0,
+        colors: androidx.compose.material3.SliderColors = SliderDefaults.colors(
+            thumbColor = MaterialTheme.colorScheme.primary,
+            activeTrackColor = MaterialTheme.colorScheme.primary,
+            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        BoxWithConstraints(modifier = modifier
+            .graphicsLayer(rotationZ = 270f)
+            .padding(horizontal = 8.dp) // Add some padding so thumb isn't cut off
+        ) {
+            Slider(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier
+                    .width(this.maxHeight) // Effectively the length of the slider
+                    .height(this.maxWidth),  // Effectively the thickness of the slider
+                enabled = enabled,
+                valueRange = valueRange,
+                steps = steps,
+                colors = colors
+            )
+        }
+    }
+
+
+    private fun checkCameraPermissionAndStart() {
+        when {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> {
+                startCameraIfReady()
+            }
+            shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> {
+                // Explain to the user why the permission is needed
+                Log.w(TAG, "Camera permission rationale should be shown.")
+                requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+            else -> {
+                requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
+    }
+
+    private fun startCameraIfReady() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED && previewView != null) {
+            startCamera()
+        }
+    }
+
+    private fun startCamera() {
+        cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        lifecycleScope.launch {
+            try {
+                val cameraProvider = cameraProviderFuture.await()
+                bindPreview(cameraProvider)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting camera: ", e)
+            }
+        }
+    }
+
+    private fun bindPreview(cameraProvider: ProcessCameraProvider) {
+        val currentPreviewView = previewView ?: return // Ensure previewView is initialized
+
+        val preview: Preview = Preview.Builder().build()
+        val cameraSelector: CameraSelector = CameraSelector.Builder()
+            .requireLensFacing(CameraSelector.LENS_FACING_BACK).build()
+
+        preview.surfaceProvider = currentPreviewView.surfaceProvider
+        try {
+            cameraProvider.unbindAll()
+            cameraProvider.bindToLifecycle(this, cameraSelector, preview) // Use ComponentActivity as LifecycleOwner
+        } catch (e: Exception) {
+            Log.e(TAG, "Use case binding failed", e)
+        }
+    }
+
+    private fun handleResetAction() {
+        protractorOverlayViewInstance?.resetToDefaults()
+        // The onZoomChanged callback will update sliderProgress
+        valuesChangedSinceLastReset = false
+    }
+
+    // ProtractorStateListener Callbacks
+    override fun onZoomChanged(newZoomFactor: Float) {
+        val zoomRange = ProtractorOverlayView.MAX_ZOOM_FACTOR - ProtractorOverlayView.MIN_ZOOM_FACTOR
+        if (zoomRange > 0.0001f) {
+            // This logic will be triggered by setContent's sliderProgress state variable
+            // Find the sliderProgress state variable in MainScreen and update it.
+            // For now, just log, as the MainScreen's sliderProgress state should be updated directly
+            // by the ProtractorOverlayView's listener if we want to keep a single source of truth.
+            // However, the current setup has slider driving POV, and POV listener updating slider.
+            // To correctly update the sliderProgress in Composable:
+            // We need a way for this callback to update the `sliderProgress` state in `MainScreen`.
+            // This can be done by making sliderProgress a member of MainActivity or passing a lambda.
+            // For simplicity with current structure, assume MainScreen's LaunchedEffect and slider's onValueChange manage it.
+            // This callback just ensures the internal `valuesChangedSinceLastReset` is set.
+        }
+        onUserInteraction()
+    }
+
+    override fun onRotationChanged(newRotationAngle: Float) {
+        onUserInteraction()
+    }
+
+    override fun onUserInteraction() {
+        valuesChangedSinceLastReset = true
+    }
+
+    // SensorEventListener Callbacks
+    private fun registerSensorListener() {
+        rotationVectorSensor?.also { sensor ->
+            val registered = sensorManager?.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME)
+            Log.d(TAG, "Sensor listener registration attempt. Success: $registered")
+        }
+    }
+
+    private fun unregisterSensorListener() {
+        sensorManager?.unregisterListener(this)
+        Log.d(TAG, "Sensor listener unregistered.")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Sensor registration is now handled by DisposableEffect in Compose
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Sensor unregistration is now handled by DisposableEffect in Compose
+    }
+
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (event?.sensor?.type == Sensor.TYPE_ROTATION_VECTOR) {
+            SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+            SensorManager.getOrientation(rotationMatrix, orientationAngles)
+            val pitchInRadians = orientationAngles[1]
+            val pitchInDegrees = Math.toDegrees(pitchInRadians.toDouble()).toFloat()
+            protractorOverlayViewInstance?.setPitchAngle(-pitchInDegrees)
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        Log.d(TAG, "Sensor accuracy changed for ${sensor?.name} to $accuracy")
+    }
+}
+
+
+================================================================================
+FILE: app\src\main\java\com\hereliesaz\poolprotractor\MyApplication.kt
+================================================================================
+package com.hereliesaz.poolprotractor
+
+import android.app.Application
+import androidx.appcompat.app.AppCompatDelegate
+import android.util.Log
+
+class MyApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        Log.d("PoolProtractorApp", "MyApplication onCreate: Forcing Light Theme (MODE_NIGHT_NO).")
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+    }
+}
+
+
+================================================================================
+FILE: app\src\main\java\com\hereliesaz\poolprotractor\ProtractorOverlayView.kt
+================================================================================
+package com.hereliesaz.poolprotractor
+
+import android.content.Context
+import android.graphics.*
+import android.util.AttributeSet
+import android.util.Log
+import android.view.MotionEvent
+import android.view.ScaleGestureDetector
+import android.view.View
+import androidx.compose.material3.ColorScheme
+import androidx.compose.ui.graphics.toArgb
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.pow
+import kotlin.math.sin
+import kotlin.math.sqrt
+
+class ProtractorOverlayView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : View(context, attrs, defStyleAttr) {
+
+    interface ProtractorStateListener {
+        fun onZoomChanged(newZoomFactor: Float)
+        fun onRotationChanged(newRotationAngle: Float)
+        fun onUserInteraction()
+    }
+    var listener: ProtractorStateListener? = null
+
+    private var M3_COLOR_PRIMARY: Int = Color.BLUE
+    private var M3_COLOR_SECONDARY: Int = Color.RED
+    private var M3_COLOR_TERTIARY: Int = Color.GREEN
+    private var M3_COLOR_ON_SURFACE: Int = Color.WHITE
+    private var M3_COLOR_OUTLINE: Int = Color.LTGRAY
+    private var M3_COLOR_ERROR: Int = Color.RED
+    private var M3_COLOR_PRIMARY_CONTAINER: Int = Color.CYAN
+    private var M3_COLOR_SECONDARY_CONTAINER: Int = Color.MAGENTA
+    private var M3_TEXT_SHADOW_COLOR: Int = Color.argb(180, 0, 0, 0)
+
+    private var m3GlowColor: Int = Color.argb(100, 255, 255, 224)
+    private val GLOW_RADIUS_FIXED = 8f
+
+    private val targetCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 5f }
+    private val cueCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 5f }
+    private val centerMarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val protractorLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 3f }
+    private val yellowTargetLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.YELLOW; strokeWidth = 5f }
+    private val ghostCueOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 3f }
+    private val targetGhostBallOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.YELLOW; style = Paint.Style.STROKE; strokeWidth = 3f }
+
+    private val aimingAssistNearPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val aimingAssistFarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+
+    private val aimingSightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 2f; style = Paint.Style.STROKE }
+    private val ghostBallTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        color = Color.WHITE
+        setShadowLayer(2f, 1f, 1f, M3_TEXT_SHADOW_COLOR)
+    }
+
+    private var oNearDefaultStroke: Float = 4f
+    private var oFarDefaultStroke: Float = 2f
+    private var oYellowTargetLineStroke: Float = 5f
+
+    private val boldStrokeIncrease = 4f
+    private val oCueDeflectionStrokeWidth = 2f
+    private val cueDeflectionDottedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = oCueDeflectionStrokeWidth; style = Paint.Style.STROKE; pathEffect = DashPathEffect(floatArrayOf(15f, 10f), 0f) }
+    private val cueDeflectionHighlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = oCueDeflectionStrokeWidth + boldStrokeIncrease; style = Paint.Style.STROKE; pathEffect = null }
+
+    private val targetCircleCenter = PointF()
+    private val cueCircleCenter = PointF()
+    private var baseCircleDiameter: Float = 0f
+    private var currentLogicalRadius: Float = 1f
+    private var zoomFactor = 0.4f // Default zoom changed
+    private var protractorRotationAngle = 0.0f
+
+    private var currentPitchAngle = 0.0f
+    private var smoothedPitchAngle = 0.0f
+    private val PITCH_SMOOTHING_FACTOR = 0.15f
+
+    private var isInitialized = false
+    private var lastTouchX = 0f
+    private var lastTouchY = 0f
+    private enum class InteractionMode { NONE, PINCH_ZOOMING, PAN_TO_ROTATE }
+    private var currentInteractionMode = InteractionMode.NONE
+    private val PROTRACTOR_ANGLES = floatArrayOf(0f, 14f, 30f, 36f, 43f, 48f)
+    private val mGraphicsCamera = Camera()
+    private val mPitchMatrix = Matrix()
+    private val mInversePitchMatrix = Matrix()
+    private var isPinching = false
+    private var defaultZoomFactor = 0.4f // Default zoom changed
+    private var defaultProtractorRotationAngle = 0.0f
+    private val PAN_ROTATE_SENSITIVITY = 0.3f
+    private var areTextLabelsVisible = true
+    private val baseGhostBallTextSize = 30f
+    private val minGhostBallTextSize = 15f
+    private val maxGhostBallTextSize = 60f
+
+    private lateinit var scaleGestureDetector: ScaleGestureDetector
+
+    init {
+        scaleGestureDetector = ScaleGestureDetector(context, ScaleListener())
+        storeOriginalPaintProperties()
+    }
+
+    fun applyMaterialYouColors(colorScheme: ColorScheme) {
+        M3_COLOR_PRIMARY = colorScheme.primary.toArgb()
+        M3_COLOR_SECONDARY = colorScheme.secondary.toArgb()
+        M3_COLOR_TERTIARY = colorScheme.tertiary.toArgb()
+        M3_COLOR_ON_SURFACE = colorScheme.onSurface.toArgb()
+        M3_COLOR_OUTLINE = colorScheme.outline.toArgb()
+        M3_COLOR_ERROR = colorScheme.error.toArgb()
+        M3_COLOR_PRIMARY_CONTAINER = colorScheme.primaryContainer.toArgb()
+        M3_COLOR_SECONDARY_CONTAINER = colorScheme.secondaryContainer.toArgb()
+
+        val primaryComposeColor = colorScheme.primary
+        m3GlowColor = Color.argb(100, Color.red(primaryComposeColor.toArgb()), Color.green(primaryComposeColor.toArgb()), Color.blue(primaryComposeColor.toArgb()))
+        val surfaceBrightness = (Color.red(colorScheme.surface.toArgb()) * 299 + Color.green(colorScheme.surface.toArgb()) * 587 + Color.blue(colorScheme.surface.toArgb()) * 114) / 1000
+        M3_TEXT_SHADOW_COLOR = if (surfaceBrightness < 128) Color.argb(180,220,220,220) else Color.argb(180, 30,30,30)
+
+        targetCirclePaint.color = M3_COLOR_SECONDARY
+        cueCirclePaint.color = M3_COLOR_PRIMARY
+        centerMarkPaint.color = M3_COLOR_ON_SURFACE
+        val tertiaryBase = colorScheme.tertiary.toArgb()
+        protractorLinePaint.color = Color.argb(170, Color.red(tertiaryBase), Color.green(tertiaryBase), Color.blue(tertiaryBase))
+        ghostCueOutlinePaint.color = M3_COLOR_OUTLINE
+
+        aimingSightPaint.color = M3_COLOR_ON_SURFACE
+        ghostBallTextPaint.color = Color.WHITE
+        ghostBallTextPaint.setShadowLayer(2f, 1f, 1f, M3_TEXT_SHADOW_COLOR)
+
+        cueDeflectionDottedPaint.color = M3_COLOR_OUTLINE
+        cueDeflectionHighlightPaint.color = M3_COLOR_PRIMARY
+        cueDeflectionHighlightPaint.setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, m3GlowColor)
+
+        invalidate()
+    }
+
+    private fun storeOriginalPaintProperties() {
+        oYellowTargetLineStroke = yellowTargetLinePaint.strokeWidth
+    }
+
+    private inner class ScaleListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+            currentInteractionMode = InteractionMode.PINCH_ZOOMING
+            isPinching = true; listener?.onUserInteraction(); return true
+        }
+        override fun onScale(detector: ScaleGestureDetector): Boolean {
+            if (currentInteractionMode != InteractionMode.PINCH_ZOOMING) return false
+            val oldZoom = zoomFactor
+            val newZoomUncoerced = zoomFactor * detector.scaleFactor
+            val newZoom = newZoomUncoerced.coerceIn(MIN_ZOOM_FACTOR, MAX_ZOOM_FACTOR)
+            if (oldZoom == newZoom && newZoomUncoerced == newZoom) return true
+            setZoomFactorInternal(newZoom)
+            listener?.onZoomChanged(this@ProtractorOverlayView.zoomFactor)
+            invalidate()
+            return true
+        }
+        override fun onScaleEnd(detector: ScaleGestureDetector) {
+            if (currentInteractionMode == InteractionMode.PINCH_ZOOMING) { currentInteractionMode = InteractionMode.NONE }
+            isPinching = false
+        }
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        targetCircleCenter.set(w / 2f, h / 2f)
+        if (!isInitialized) {
+            baseCircleDiameter = min(w, h) * 0.30f // Initial diameter reference
+            // zoomFactor is already defaultZoomFactor (0.4f)
+            setProtractorRotationAngleInternal(defaultProtractorRotationAngle)
+            smoothedPitchAngle = currentPitchAngle
+            isInitialized = true
+        }
+        // Apply the current zoomFactor (which might be the default or user-set)
+        currentLogicalRadius = (baseCircleDiameter / 2f) * zoomFactor
+        updateCueBallPosition(); invalidate()
+    }
+
+    private fun updateCueBallPosition() {
+        if (!isInitialized || currentLogicalRadius <= 0) return
+        val angleRad = Math.toRadians(protractorRotationAngle.toDouble())
+        val distance = 2 * currentLogicalRadius
+        cueCircleCenter.x = targetCircleCenter.x - (distance * sin(angleRad)).toFloat()
+        cueCircleCenter.y = targetCircleCenter.y + (distance * cos(angleRad)).toFloat()
+    }
+
+    private fun mapPoint(logicalPoint: PointF, matrixToUse: Matrix): PointF {
+        val pointArray = floatArrayOf(logicalPoint.x, logicalPoint.y); matrixToUse.mapPoints(pointArray)
+        return PointF(pointArray[0], pointArray[1])
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        if (!isInitialized) return
+        currentLogicalRadius = (baseCircleDiameter / 2f) * zoomFactor
+        if (currentLogicalRadius <= 0.01f) currentLogicalRadius = 0.01f
+        updateCueBallPosition()
+
+        mGraphicsCamera.save(); mGraphicsCamera.rotateX(this.currentPitchAngle); mGraphicsCamera.getMatrix(mPitchMatrix); mGraphicsCamera.restore()
+        mPitchMatrix.preTranslate(-targetCircleCenter.x, -targetCircleCenter.y); mPitchMatrix.postTranslate(targetCircleCenter.x, targetCircleCenter.y)
+        val hasInverse = mPitchMatrix.invert(mInversePitchMatrix)
+
+        val pTGC_s_collision = mapPoint(targetCircleCenter, mPitchMatrix); val pCGC_s_collision = mapPoint(cueCircleCenter, mPitchMatrix)
+        val tL_s_coll = mapPoint(PointF(targetCircleCenter.x - currentLogicalRadius, targetCircleCenter.y), mPitchMatrix); val tR_s_coll = mapPoint(PointF(targetCircleCenter.x + currentLogicalRadius, targetCircleCenter.y), mPitchMatrix)
+        val tT_s_coll = mapPoint(PointF(targetCircleCenter.x, targetCircleCenter.y - currentLogicalRadius), mPitchMatrix); val tB_s_coll = mapPoint(PointF(targetCircleCenter.x, targetCircleCenter.y + currentLogicalRadius), mPitchMatrix)
+        val gTSR_s_collision = max(distance(tL_s_coll.x,tL_s_coll.y,tR_s_coll.x,tR_s_coll.y), distance(tT_s_coll.x,tT_s_coll.y,tB_s_coll.x,tB_s_coll.y)) / 2f
+        val cL_s_coll = mapPoint(PointF(cueCircleCenter.x - currentLogicalRadius, cueCircleCenter.y), mPitchMatrix); val cR_s_coll = mapPoint(PointF(cueCircleCenter.x + currentLogicalRadius, cueCircleCenter.y), mPitchMatrix)
+        val cT_s_coll = mapPoint(PointF(cueCircleCenter.x, cueCircleCenter.y - currentLogicalRadius), mPitchMatrix); val cB_s_coll = mapPoint(PointF(cueCircleCenter.x, cueCircleCenter.y + currentLogicalRadius), mPitchMatrix)
+        val gCSR_s_collision = max(distance(cL_s_coll.x,cL_s_coll.y,cR_s_coll.x,cR_s_coll.y), distance(cT_s_coll.x,cT_s_coll.y,cB_s_coll.x,cB_s_coll.y)) / 2f
+
+        val logicalDistanceBetweenCenters = distance(cueCircleCenter.x, cueCircleCenter.y, targetCircleCenter.x, targetCircleCenter.y)
+        val logicalSumOfRadii = currentLogicalRadius + currentLogicalRadius
+        val isPhysicalOverlap = logicalDistanceBetweenCenters < logicalSumOfRadii - 0.1f
+
+        var isCueOnFarSide = false
+        if (hasInverse) {
+            val screenAimPointScreenCoords = floatArrayOf(width / 2f, height.toFloat()); val screenAimPointLogicalCoordsArray = FloatArray(2)
+            mInversePitchMatrix.mapPoints(screenAimPointLogicalCoordsArray, screenAimPointScreenCoords)
+            val screenAimLogicalX = screenAimPointLogicalCoordsArray[0]; val screenAimLogicalY = screenAimPointLogicalCoordsArray[1]
+            val cueLogX = cueCircleCenter.x; val cueLogY = cueCircleCenter.y; val targetLogX = targetCircleCenter.x; val targetLogY = targetCircleCenter.y
+            val aimDirLogX = cueLogX - screenAimLogicalX; val aimDirLogY = cueLogY - screenAimLogicalY
+            val magAimDirSq = aimDirLogX * aimDirLogX + aimDirLogY * aimDirLogY
+            if (magAimDirSq > 0.0001f) {
+                val magAimDir = sqrt(magAimDirSq); val normAimDirLogX = aimDirLogX / magAimDir; val normAimDirLogY = aimDirLogY / magAimDir
+                val vecScreenToTargetLogX = targetLogX - screenAimLogicalX; val vecScreenToTargetLogY = targetLogY - screenAimLogicalY
+                val distCueProj = magAimDir; val distTargetProj = vecScreenToTargetLogX * normAimDirLogX + vecScreenToTargetLogY * normAimDirLogY
+                isCueOnFarSide = distCueProj > distTargetProj && distTargetProj > 0
+            }
+        }
+
+        val isDeflectionDominantAngle = (protractorRotationAngle > 90.5f && protractorRotationAngle < 269.5f)
+        val useErrorColorForMainCue = isCueOnFarSide || isDeflectionDominantAngle
+        val showWarningStyleForGhostAndYellowTargetLine = isPhysicalOverlap || isCueOnFarSide
+
+        yellowTargetLinePaint.apply {
+            strokeWidth = oYellowTargetLineStroke
+            clearShadowLayer()
+            color = Color.YELLOW
+        }
+        if (showWarningStyleForGhostAndYellowTargetLine) {
+            yellowTargetLinePaint.apply {
+                strokeWidth = oYellowTargetLineStroke + boldStrokeIncrease
+                setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, m3GlowColor)
+            }
+        }
+
+        aimingAssistNearPaint.strokeWidth = oNearDefaultStroke
+        aimingAssistFarPaint.strokeWidth = oFarDefaultStroke
+
+        if (isCueOnFarSide) {
+            aimingAssistNearPaint.apply {
+                color = M3_COLOR_ERROR
+                clearShadowLayer()
+            }
+            aimingAssistFarPaint.apply {
+                color = protractorLinePaint.color
+                strokeWidth = protractorLinePaint.strokeWidth
+                clearShadowLayer()
+            }
+        } else {
+            aimingAssistNearPaint.apply {
+                color = M3_COLOR_PRIMARY_CONTAINER
+                setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, m3GlowColor)
+            }
+            if (!isPhysicalOverlap) {
+                aimingAssistFarPaint.apply {
+                    color = aimingAssistNearPaint.color
+                    strokeWidth = aimingAssistNearPaint.strokeWidth
+                    setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, m3GlowColor)
+                }
+            } else {
+                aimingAssistFarPaint.apply {
+                    color = M3_COLOR_SECONDARY_CONTAINER
+                    setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, m3GlowColor)
+                }
+            }
+        }
+
+
+        canvas.save(); canvas.concat(mPitchMatrix)
+        if (hasInverse) {
+            val spu = floatArrayOf(width/2f, height.toFloat()); val lps = FloatArray(2); mInversePitchMatrix.mapPoints(lps, spu)
+            val sxL=lps[0]; val syL=lps[1]; val cxL=cueCircleCenter.x; val cyL=cueCircleCenter.y
+            val dxL=cxL-sxL; val dyL=cyL-syL; val magL=sqrt(dxL*dxL + dyL*dyL)
+            if(magL > 0.001f){
+                val ndxL=dxL/magL; val ndyL=dyL/magL; val efL=max(width,height)*5f
+                val exL=cxL+ndxL*efL; val eyL=cyL+ndyL*efL
+                canvas.drawLine(sxL,syL,cxL,cyL,aimingAssistNearPaint)
+                canvas.drawLine(cxL,cyL,exL,eyL,aimingAssistFarPaint)
+            }
+        }
+        canvas.drawCircle(targetCircleCenter.x,targetCircleCenter.y,currentLogicalRadius,targetCirclePaint)
+        canvas.drawCircle(targetCircleCenter.x,targetCircleCenter.y,currentLogicalRadius/5f,centerMarkPaint)
+
+        cueCirclePaint.color = if (useErrorColorForMainCue) M3_COLOR_ERROR else M3_COLOR_PRIMARY
+        canvas.drawCircle(cueCircleCenter.x,cueCircleCenter.y,currentLogicalRadius,cueCirclePaint)
+        canvas.drawCircle(cueCircleCenter.x,cueCircleCenter.y,currentLogicalRadius/5f,centerMarkPaint)
+
+        val dxTBP = targetCircleCenter.x - cueCircleCenter.x; val dyTBP = targetCircleCenter.y - cueCircleCenter.y
+        val tBPMag = sqrt(dxTBP * dxTBP + dyTBP * dyTBP)
+        if (tBPMag > 0.001f) {
+            val nDxT = dxTBP / tBPMag; val nDyT = dyTBP / tBPMag; val dLL = max(width, height) * 1.5f
+            val deflectionDir1X = -nDyT; val deflectionDir1Y = nDxT
+
+            var paintForDir1 = cueDeflectionDottedPaint
+            var paintForDir2 = cueDeflectionDottedPaint
+
+            if (useErrorColorForMainCue) {
+                // Both lines are dotted if main cue is in error state
+            } else {
+                val alphaDeg = protractorRotationAngle
+                val epsilon = 0.5f
+                if (alphaDeg > epsilon && alphaDeg < (180f - epsilon)) {
+                    paintForDir2 = cueDeflectionHighlightPaint
+                } else if (alphaDeg > (180f + epsilon) && alphaDeg < (360f - epsilon)) {
+                    paintForDir1 = cueDeflectionHighlightPaint
+                }
+            }
+            canvas.drawLine(cueCircleCenter.x, cueCircleCenter.y, cueCircleCenter.x + deflectionDir1X * dLL, cueCircleCenter.y + deflectionDir1Y * dLL, paintForDir1)
+            canvas.drawLine(cueCircleCenter.x, cueCircleCenter.y, cueCircleCenter.x - deflectionDir1X * dLL, cueCircleCenter.y - deflectionDir1Y * dLL, paintForDir2)
+        }
+        canvas.save(); canvas.translate(targetCircleCenter.x,targetCircleCenter.y); canvas.rotate(protractorRotationAngle)
+        val lineLength = max(width,height)*2f
+        PROTRACTOR_ANGLES.forEach { angle ->
+            val rad = Math.toRadians(angle.toDouble()); val endX1=(lineLength*sin(rad)).toFloat(); val endY1=(lineLength*cos(rad)).toFloat()
+            if(angle == 0f){ canvas.drawLine(0f,0f,endX1,endY1,protractorLinePaint); canvas.drawLine(0f,0f,-endX1,-endY1,yellowTargetLinePaint) }
+            else { canvas.drawLine(0f,0f,endX1,endY1,protractorLinePaint); canvas.drawLine(0f,0f,-endX1,-endY1,protractorLinePaint)
+                val negRad=Math.toRadians(-angle.toDouble()); val negEndX1=(lineLength*sin(negRad)).toFloat(); val negEndY1=(lineLength*cos(negRad)).toFloat()
+                canvas.drawLine(0f,0f,negEndX1,negEndY1,protractorLinePaint); canvas.drawLine(0f,0f,-negEndX1,-negEndY1,protractorLinePaint)
+            }
+        }
+        canvas.restore(); canvas.restore()
+
+        val targetGhostDrawnCenterY = pTGC_s_collision.y - gTSR_s_collision
+        canvas.drawCircle(pTGC_s_collision.x, targetGhostDrawnCenterY, gTSR_s_collision, targetGhostBallOutlinePaint)
+
+        val cueGhostDrawnCenterY = pCGC_s_collision.y - gCSR_s_collision
+        val originalGhostCueColor = ghostCueOutlinePaint.color
+        if (showWarningStyleForGhostAndYellowTargetLine) {
+            ghostCueOutlinePaint.color = M3_COLOR_ERROR
+        } else {
+            ghostCueOutlinePaint.color = M3_COLOR_OUTLINE
+        }
+        canvas.drawCircle(pCGC_s_collision.x, cueGhostDrawnCenterY, gCSR_s_collision, ghostCueOutlinePaint)
+        ghostCueOutlinePaint.color = originalGhostCueColor
+
+        val sightArmLength = gCSR_s_collision * 0.6f
+        canvas.drawLine(pCGC_s_collision.x - sightArmLength, cueGhostDrawnCenterY, pCGC_s_collision.x + sightArmLength, cueGhostDrawnCenterY, aimingSightPaint)
+        canvas.drawLine(pCGC_s_collision.x, cueGhostDrawnCenterY - sightArmLength, pCGC_s_collision.x, cueGhostDrawnCenterY + sightArmLength, aimingSightPaint)
+        canvas.drawCircle(pCGC_s_collision.x, cueGhostDrawnCenterY, sightArmLength * 0.15f, aimingSightPaint)
+
+        if (areTextLabelsVisible) {
+            val currentTextSize = (baseGhostBallTextSize * zoomFactor).coerceIn(minGhostBallTextSize, maxGhostBallTextSize)
+            ghostBallTextPaint.textSize = currentTextSize; val tm = ghostBallTextPaint.fontMetrics
+            val textPaddingBelowText = 5f * zoomFactor.coerceAtLeast(0.5f)
+
+            val visualTopOfTargetGhostBall = targetGhostDrawnCenterY - gTSR_s_collision
+            val targetTextBaselineY = visualTopOfTargetGhostBall - textPaddingBelowText - tm.descent
+            canvas.drawText("Target Ball", pTGC_s_collision.x, targetTextBaselineY, ghostBallTextPaint)
+
+            val visualTopOfCueGhostBall = cueGhostDrawnCenterY - gCSR_s_collision
+            val cueTextBaselineY = visualTopOfCueGhostBall - textPaddingBelowText - tm.descent
+            canvas.drawText("Cue Ball", pCGC_s_collision.x, cueTextBaselineY, ghostBallTextPaint)
+        }
+    }
+
+    fun toggleHelpersVisibility() { areTextLabelsVisible = !areTextLabelsVisible; invalidate() }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (!isInitialized) return false
+        val scaleHandled = scaleGestureDetector.onTouchEvent(event)
+        val touchX = event.x; val touchY = event.y
+
+        if (isPinching || currentInteractionMode == InteractionMode.PINCH_ZOOMING) {
+            if (scaleHandled || (event.actionMasked != MotionEvent.ACTION_UP && event.actionMasked != MotionEvent.ACTION_CANCEL)) {
+                return true
+            }
+        }
+
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                if (!isPinching) {
+                    currentInteractionMode = InteractionMode.PAN_TO_ROTATE
+                    listener?.onUserInteraction()
+                }
+                lastTouchX = touchX; lastTouchY = touchY
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (currentInteractionMode == InteractionMode.PAN_TO_ROTATE) {
+                    val dx = touchX - lastTouchX
+                    val angleDelta = dx * PAN_ROTATE_SENSITIVITY
+                    setProtractorRotationAngleInternal(protractorRotationAngle + angleDelta)
+                    listener?.onRotationChanged(this.protractorRotationAngle)
+                    invalidate()
+                    lastTouchX = touchX; lastTouchY = touchY
+                    return true
+                } else if (currentInteractionMode == InteractionMode.PINCH_ZOOMING) {
+                    return scaleHandled
+                }
+                return false
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                val wasInteracting = currentInteractionMode != InteractionMode.NONE
+                if (currentInteractionMode == InteractionMode.PAN_TO_ROTATE) {
+                    currentInteractionMode = InteractionMode.NONE
+                }
+                if (isPinching && !scaleGestureDetector.isInProgress && currentInteractionMode == InteractionMode.PINCH_ZOOMING) {
+                    currentInteractionMode = InteractionMode.NONE
+                }
+                return wasInteracting || scaleHandled
+            }
+        }
+        return scaleHandled || super.onTouchEvent(event)
+    }
+
+    private fun distance(x1: Float, y1: Float, x2: Float, y2: Float): Float { return sqrt((x1 - x2).pow(2) + (y1 - y2).pow(2)) }
+    fun setZoomFactor(factor: Float) { if (isPinching) return; setZoomFactorInternal(factor); listener?.onUserInteraction(); invalidate() }
+    private fun setZoomFactorInternal(factor: Float) { this.zoomFactor = factor.coerceIn(MIN_ZOOM_FACTOR, MAX_ZOOM_FACTOR); this.currentLogicalRadius = (baseCircleDiameter / 2f) * this.zoomFactor; updateCueBallPosition() }
+    fun getZoomFactor(): Float = zoomFactor
+    fun setProtractorRotationAngle(angle: Float) { setProtractorRotationAngleInternal(angle); listener?.onUserInteraction(); listener?.onRotationChanged(this.protractorRotationAngle); invalidate() }
+    private fun setProtractorRotationAngleInternal(angle: Float) { var normAng = angle % 360f; if (normAng < 0) normAng += 360f; this.protractorRotationAngle = normAng; updateCueBallPosition() }
+    fun getProtractorRotationAngle(): Float = protractorRotationAngle
+
+    fun setPitchAngle(angle: Float) {
+        val newPitch = angle.coerceIn(-85f, 90f)
+        this.smoothedPitchAngle = (PITCH_SMOOTHING_FACTOR * newPitch) + ((1.0f - PITCH_SMOOTHING_FACTOR) * this.smoothedPitchAngle)
+
+        if (abs(this.currentPitchAngle - this.smoothedPitchAngle) > 0.05f) {
+            this.currentPitchAngle = this.smoothedPitchAngle
+            invalidate()
+        }
+    }
+    fun getPitchAngle(): Float = currentPitchAngle
+    fun getTargetCircleCenter(): PointF = PointF(targetCircleCenter.x, targetCircleCenter.y)
+
+    fun resetToDefaults() {
+        if (!isInitialized) return
+        setZoomFactorInternal(defaultZoomFactor) // Uses the new defaultZoomFactor
+        setProtractorRotationAngleInternal(defaultProtractorRotationAngle)
+        areTextLabelsVisible = true
+        yellowTargetLinePaint.apply {
+            strokeWidth = oYellowTargetLineStroke
+            color = Color.YELLOW
+            clearShadowLayer()
+        }
+        listener?.onZoomChanged(this.zoomFactor)
+        listener?.onRotationChanged(this.protractorRotationAngle)
+        invalidate()
+    }
+
+    companion object {
+        private const val TAG = "PoolProtractorApp"
+        internal const val MIN_ZOOM_FACTOR = 0.1f // Allows much further zoom out
+        internal const val MAX_ZOOM_FACTOR = 4.0f // Max zoom in remains the same
+    }
+}
+
+
+================================================================================
+FILE: app\src\main\res\drawable\ic_dark_mode_24.xml
+================================================================================
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:autoMirrored="true" android:height="24dp" android:tint="#FFFFFF" android:viewportHeight="24" android:viewportWidth="24" android:width="24dp">
+      
+    <path android:fillColor="@android:color/white" android:pathData="M20,15.31L23.31,12 20,8.69V4h-4.69L12,0.69 8.69,4H4v4.69L0.69,12 4,15.31V20h4.69L12,23.31 15.31,20H20v-4.69zM12,18V6c3.31,0 6,2.69 6,6s-2.69,6 -6,6z"/>
+    
+</vector>
+
+
+
+================================================================================
+FILE: app\src\main\res\drawable\ic_help_outline_24.xml
+================================================================================
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:autoMirrored="true" android:height="24dp" android:tint="#FFFFFF" android:viewportHeight="24" android:viewportWidth="24" android:width="24dp">
+      
+    <path android:fillColor="@android:color/white" android:pathData="M11,18h2v-2h-2v2zM12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM12,20c-4.41,0 -8,-3.59 -8,-8s3.59,-8 8,-8 8,3.59 8,8 -3.59,8 -8,8zM12,6c-2.21,0 -4,1.79 -4,4h2c0,-1.1 0.9,-2 2,-2s2,0.9 2,2c0,2 -3,1.75 -3,5h2c0,-2.25 3,-2.5 3,-5 0,-2.21 -1.79,-4 -4,-4z"/>
+    
+</vector>
+
+
+
+================================================================================
+FILE: app\src\main\res\drawable\ic_launcher_background.xml
+================================================================================
+<?xml version="1.0" encoding="utf-8"?>
+<vector
+    android:height="108dp"
+    android:width="108dp"
+    android:viewportHeight="108"
+    android:viewportWidth="108"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <path android:fillColor="#3DDC84"
+          android:pathData="M0,0h108v108h-108z"/>
+    <path android:fillColor="#00000000" android:pathData="M9,0L9,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M19,0L19,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M29,0L29,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M39,0L39,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M49,0L49,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M59,0L59,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M69,0L69,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M79,0L79,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M89,0L89,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M99,0L99,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,9L108,9"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,19L108,19"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,29L108,29"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,39L108,39"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,49L108,49"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,59L108,59"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,69L108,69"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,79L108,79"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,89L108,89"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,99L108,99"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M19,29L89,29"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M19,39L89,39"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M19,49L89,49"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M19,59L89,59"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M19,69L89,69"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M19,79L89,79"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M29,19L29,89"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M39,19L39,89"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M49,19L49,89"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M59,19L59,89"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M69,19L69,89"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M79,19L79,89"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+</vector>
+
+
+
+================================================================================
+FILE: app\src\main\res\drawable\ic_launcher_foreground.xml
+================================================================================
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M31,63.928c0,0 6.4,-11 12.1,-13.1c7.2,-2.6 26,-1.4 26,-1.4l38.1,38.1L107,108.928l-32,-1L31,63.928z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startY="49.59793"
+                android:startX="42.9492"
+                android:endY="92.4963"
+                android:endX="85.84757"
+                android:type="linear">
+                <item
+                    android:color="#44000000"
+                    android:offset="0.0" />
+                <item
+                    android:color="#00000000"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M65.3,45.828l3.8,-6.6c0.2,-0.4 0.1,-0.9 -0.3,-1.1c-0.4,-0.2 -0.9,-0.1 -1.1,0.3l-3.9,6.7c-6.3,-2.8 -13.4,-2.8 -19.7,0l-3.9,-6.7c-0.2,-0.4 -0.7,-0.5 -1.1,-0.3C38.8,38.328 38.7,38.828 38.9,39.228l3.8,6.6C36.2,49.428 31.7,56.028 31,63.928h46C76.3,56.028 71.8,49.428 65.3,45.828zM43.4,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2c-0.3,-0.7 -0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C45.3,56.528 44.5,57.328 43.4,57.328L43.4,57.328zM64.6,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2s-0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C66.5,56.528 65.6,57.328 64.6,57.328L64.6,57.328z"
+        android:fillColor="#FFFFFF"
+        android:fillType="nonZero"
+        android:strokeWidth="1"
+        android:strokeColor="#00000000"/>
+</vector>
+
+
+================================================================================
+FILE: app\src\main\res\drawable\ic_light_mode_24.xml
+================================================================================
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:autoMirrored="true" android:height="24dp" android:tint="#FFFFFF" android:viewportHeight="24" android:viewportWidth="24" android:width="24dp">
+      
+    <path android:fillColor="@android:color/white" android:pathData="M20,15.31L23.31,12 20,8.69V4h-4.69L12,0.69 8.69,4H4v4.69L0.69,12 4,15.31V20h4.69L12,23.31 15.31,20H20v-4.69zM12,18V6c3.31,0 6,2.69 6,6s-2.69,6 -6,6z"/>
+    
+</vector>
+
+
+
+================================================================================
+FILE: app\src\main\res\drawable\ic_undo_24.xml
+================================================================================
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M12.5,8c-2.65,0 -5.05,0.99 -6.9,2.6L2,7v9h9l-3.62,-3.62c1.39,-1.16 3.16,-1.88 5.12,-1.88 3.54,0 6.55,2.31 7.6,5.5l2.37,-0.78C21.08,11.96 17.15,8 12.5,8z"/>
+</vector>
+
+
+================================================================================
+FILE: app\src\main\res\drawable\ic_zoom_in_24.xml
+================================================================================
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99,-5zM9.5,14C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14zM10,7H9v2H7v1h2v2h1v-2h2V9h-2z"/>
+</vector>
+
+
+================================================================================
+FILE: app\src\main\res\drawable\seekbar_custom_track.xml
+================================================================================
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Background track -->
+    <item android:id="@android:id/background">
+        <shape android:shape="rectangle">
+            <corners android:radius="4dp" /> <!-- Adjust for desired roundness -->
+            <solid android:color="?attr/colorSurfaceVariant" />
+            <size android:height="8dp" /> <!-- This is the THICKNESS of the track drawable -->
+        </shape>
+    </item>
+
+    <!-- Progress track -->
+    <item android:id="@android:id/progress">
+        <scale android:scaleWidth="100%">
+            <shape android:shape="rectangle">
+                <corners android:radius="4dp" />
+                <solid android:color="?attr/colorPrimary" />
+                <size android:height="8dp" /> <!-- Must match background thickness -->
+            </shape>
+        </scale>
+    </item>
+
+    <!-- Secondary progress (optional, remove if not needed) -->
+    <item android:id="@android:id/secondaryProgress">
+        <scale android:scaleWidth="100%">
+            <shape android:shape="rectangle">
+                <corners android:radius="4dp"/>
+                <solid android:color="@android:color/transparent"/> <!-- Or a muted color -->
+                <size android:height="8dp"/>
+            </shape>
+        </scale>
+    </item>
+</layer-list>
+
+
+================================================================================
+FILE: app\src\main\res\layout\activity_main.xml
+================================================================================
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/activity_main_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/cameraPreviewView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <com.hereliesaz.poolprotractor.ProtractorOverlayView
+        android:id="@+id/protractorOverlayView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/controls_relative_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/zoomControlsLayout"
+            android:layout_width="55dp"
+            android:layout_height="486dp"
+            android:layout_marginEnd="8dp"
+            android:gravity="center_vertical"
+            android:layoutMode="opticalBounds"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.974"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="0.497">
+
+            <ImageView
+                android:id="@+id/zoomIcon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="46dp"
+                android:contentDescription="@string/zoom_icon"
+                android:padding="8dp"
+                android:src="@drawable/ic_zoom_in_24"
+                android:visibility="visible"
+                app:layout_constraintBottom_toTopOf="@+id/zoomSlider"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintHorizontal_bias="0.5"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:tint="?attr/colorControlNormal"
+                tools:ignore="TouchTargetSizeCheck"
+                tools:visibility="visible" />
+
+            <SeekBar
+                android:id="@+id/zoomSlider"
+                android:layout_width="24dp"
+                android:layout_height="400dp"
+                android:max="100"
+                android:progress="50"
+                android:progressDrawable="@drawable/seekbar_custom_track"
+                android:thumbTint="?attr/colorPrimary"
+                android:rotation="90"
+                android:visibility="visible"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintHorizontal_bias="0.5"
+                app:layout_constraintStart_toStartOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/resetButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="24dp"
+            android:contentDescription="@string/reset_view"
+            android:src="@drawable/ic_undo_24"
+            app:backgroundTint="?attr/colorPrimaryContainer"
+            app:fabSize="mini"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:tint="?attr/colorOnPrimaryContainer" />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/helpButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="24dp"
+            android:layout_marginBottom="24dp"
+            android:contentDescription="@string/toggle_help_lines"
+            android:src="@drawable/ic_help_outline_24"
+            app:backgroundTint="?attr/colorSecondaryContainer"
+            app:fabSize="mini"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:tint="?attr/colorOnSecondaryContainer" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/composeThemeView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+</FrameLayout>
+
+
+================================================================================
+FILE: app\src\main\res\mipmap-anydpi-v26\ic_launcher.xml
+================================================================================
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>
+
+
+================================================================================
+FILE: app\src\main\res\mipmap-anydpi-v26\ic_launcher_round.xml
+================================================================================
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>
+
+
+================================================================================
+FILE: app\src\main\res\values\colors.xml
+================================================================================
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>
+
+
+================================================================================
+FILE: app\src\main\res\values\strings.xml
+================================================================================
+<resources>
+    <string name="app_name">PoolProtractor</string>
+    <string name="zoom_icon">Zoom Icon</string>
+    <string name="reset_view">Reset View</string>
+        <string name="toggle_help_lines">Toggle Help Lines</string>
+    <string name="toggle_theme">Toggle Theme</string>
+
+</resources>
+
+
+================================================================================
+FILE: app\src\main\res\values\themes.xml
+================================================================================
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <!-- For Material 3 components like FloatingActionButton, prefer a Material3 theme -->
+    <style name="Theme.PoolProtractor" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">@color/purple_500</item>
+        <!-- <item name="colorPrimaryVariant">@color/purple_700</item> --> <!-- M3 uses colorPrimaryContainer, etc. -->
+        <item name="colorOnPrimary">@color/white</item>
+        <!-- Secondary brand color. -->
+        <item name="colorSecondary">@color/teal_200</item>
+        <!-- <item name="colorSecondaryVariant">@color/teal_700</item> --> <!-- M3 uses colorSecondaryContainer, etc. -->
+        <item name="colorOnSecondary">@color/black</item>
+        <!-- Status bar color. -->
+        <item name="android:statusBarColor">?attr/colorPrimary</item> <!-- Or a specific color -->
+        <!-- Customize your theme here. -->
+    </style>
+</resources>
+
+
+================================================================================
+FILE: app\src\main\res\xml\backup_rules.xml
+================================================================================
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Sample backup rules file; uncomment and customize as necessary.
+   See https://developer.android.com/guide/topics/data/autobackup
+   for details.
+   Note: This file is ignored for devices older than API 31
+   See https://developer.android.com/about/versions/12/backup-restore
+-->
+<full-backup-content>
+<!--
+   <include domain="sharedpref" path="."/>
+   <exclude domain="sharedpref" path="device.xml"/>
+-->
+</full-backup-content>
+
+
+================================================================================
+FILE: app\src\main\res\xml\data_extraction_rules.xml
+================================================================================
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Sample data extraction rules file; uncomment and customize as necessary.
+   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
+   for details.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- TODO: Use <include> and <exclude> to control what is backed up.
+        <include .../>
+        <exclude .../>
+        -->
+    </cloud-backup>
+    <!--
+    <device-transfer>
+        <include .../>
+        <exclude .../>
+    </device-transfer>
+    -->
+</data-extraction-rules>
+
+
+================================================================================
+FILE: app\src\main\AndroidManifest.xml
+================================================================================
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.hereliesaz.poolprotractor">
+
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" />
+    <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.compass" android:required="false" />
+
+    <application
+        android:name=".MyApplication"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.PoolProtractor">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="portrait"
+            android:configChanges="uiMode|screenSize|smallestScreenSize|orientation" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
+
+
+================================================================================
+FILE: README.md
+================================================================================
+# Cue D’état - An IRL Billiards Aiming Assistant for Android
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![GitHub Release](https://img.shields.io/github/v/release/hereliesaz/CueDetat?include_prereleases&display_name=release)
+
+
+**_May your aim be truer than your excuses._**
+
+
+**Cue D’état** is an Android app to ostensibly help billiards players line up and aim, determine shot angles, make cut shots, understand the cue ball tangent, improve their geometric understanding of the game. Maybe get called a cheater, even though using this app is entirely legal. At the very least, get yourself a high-tech understanding of how bad you are at pool.
+
+It uses your phone's camera and orientation sensors to overlay a dynamic protractor and aiming guide onto the real-world view of a pool table.
+
+**(Warning: May induce an inflated sense of skill, followed by the crushing reality of physics. Use with a healthy dose of self-deprecating humor.)**
+
+
+
+## Features
+
+*   **Live Camera Augmented Reality Overlay:**
+    *   See the guides directly on your pool game.
+    *   Designed for easy one or two-handed use. 
+*   **Dynamic Protractor:**
+    *   See where the balls will go before you hit them.  
+    *   Rotates and zooms with on-screen gestures, tilts using the gyroscope. 
+*   **Cue Ball & Target Ball Representation:**
+    *   Simulated "ghost balls" on a projected plane.
+    *   Visual feedback for aiming path and potential collisions.
+*   **Pitch-Adjusted Perspective:** The protractor plane tilts based on your phone's orientation for a three-dimensional augmented reality.
+*   **Where will the Cue ball go?** Visualizes the tangent line and the resulting cue ball path if English (sidespin) were applied.
+*   **Guided Shots** Guide lines extend from the target ball to line up with your table's pockets.
+*   **VERY Helpful Help:**
+    *   Labels for key lines and what to do with them.
+    *   Instructions better than Ikea's.
+    *   Toggleable Help visibility for a cleaner view.
+    *   Uplifting messages of slightly disdainful encouragement.
+
+
+
+## Screenshots Placeholder
+
+*   Pretend this is a screenshot.
+*   This, too.
+*   Imagine looking at a photo of the app in use.
+*   Note the craft.
+*   The flippant attitude towards detail.
+*   I'm a genieaouxess.
+*   And this is a photo from a vacation two years ago that I accidentally pretend included.
+
+
+
+## How It Works: The Gore. The Details.
+
+1.  **Camera Preview:** Uses CameraX to display a live feed from the device camera.
+2.  **Sensor Input:** Leverages the `TYPE_ROTATION_VECTOR` sensor to determine the phone's pitch, roll, and yaw. The pitch is primarily used to tilt the 2D protractor plane. An offset is applied to account for natural phone holding angles.
+3.  **Custom View (`ProtractorOverlayView`):** All guides and visual elements are drawn on a custom `View` that overlays the camera preview.
+4.  **Drawing Logic:**
+    *   **Protractor Plane:** A logical 2D plane is defined. Circles representing the cue and target ball positions, protractor angle lines, and deflection lines are drawn on this plane.
+    *   **3D Projection (Simplified):** An `android.graphics.Camera` object is used to apply an X-axis rotation (based on phone pitch) to this logical plane, creating a 3D perspective effect. This transformed matrix is then applied to the canvas.
+    *   **Ghost Balls:** Screen-space circles are drawn to represent the "3D" position of the cue and target balls. Their Y-offset from the projected plane centers is scaled by the sine of the pitch angle (raised to a power for a more pronounced effect) to simulate them floating above the plane.
+    *   **Helper Text:** Text labels are drawn either on the (lifted) protractor plane or directly in screen space, with basic collision avoidance and dynamic sizing.
+5.  **Gesture Handling:**
+    *   `ScaleGestureDetector` for pinch-to-zoom.
+    *   `MotionEvent` tracking for single-finger pan-to-rotate.
+6.  **Theming:** Uses Jetpack Compose for Material 3 theming, with color values then passed to the custom view's `Paint` objects.
+
+
+
+## Known Quirks & Future Delusions
+
+*   **Text Collision Avoidance:** Current implementation is basic (first-drawn wins space).
+*   **A Virtual Table for Virtually Useful Bank Shot Projection:** Using more sophisticated dynamic layout involving a line drawing of a billiards table will come someday.
+*   **True 3D Rendering:** This app fakes 3D with 2D canvas tricks. Moving to OpenGL ES or a 3D engine like Filament would allow for actual 3D models and lighting, but would also drastically increase complexity. And probably anxiety. But probably not usefulness.
+*   **Ball, Table and Pocket Detection:** The ultimate fantasy. Using CV to detect the table, balls, and pockets automatically. For now, you are the CV.
+*   **Insulting Warnings:** The pool of sarcastic remarks is finite. Contributions welcome if they tickle me the required level of pink.
+*   **Performance:** Drawing many complex paths and text elements on every frame can be demanding. Optimizations are an ongoing battle. And yet, somehow, it feels more like a you-problem.
+
+
+
+## License
+
+Distributed under the MIT License. Basically, completely free to use however you'd like, just gimme a shoutout. I make money making art. So, like this:
+Cue D’état by HereLiesAz (https://instagram.com/hereliesaz)
+
+
+## Acknowledgments (of Who to Blame)
+
+*   The ghosts of billiards past whose missed shots inspired this.
+*   The people I've tried to teach all these things.
+*   Physics. And geometry. Where my hoes at?!
+
+---
+
+
+
+
+================================================================================
+FILE: build.gradle.kts
+================================================================================
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+plugins {
+    id("com.android.application") version "8.11.0-rc01" apply false // Example version
+    id("org.jetbrains.kotlin.android") version "2.1.20" apply false // Example version
+}
+
+
+================================================================================
+FILE: app/build.gradle.kts
+================================================================================
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    alias(libs.plugins.kotlin.compose)
+
+}
+
+android {
+    signingConfigs {
+        create("release") {
+            storeFile = file("G:\\My Drive\\az_apk_keystore.jks")
+            storePassword = "18187077190901818"
+        }
+    }
+    compileSdk = 36 // Or your current target SDK
+
+    defaultConfig {
+        applicationId = "com.hereliesaz.poolprotractor"
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 2
+        versionName = "0.2"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        applicationIdSuffix = "trackless"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            applicationIdSuffix = "trackless"
+        }
+        getByName("debug") {
+            applicationIdSuffix = "trackless"
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    buildFeatures {
+        compose = true // Enable Compose
+        viewBinding = true
+
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.3" // Example: Use the version compatible with your Kotlin plugin
+    }
+
+    namespace = "com.hereliesaz.poolprotractor"
+}
+
+dependencies {
+    implementation(libs.androidx.core.ktx) // Example of a Kotlin dependency if you mix
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
+    implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.compose.ui.graphics) // Or the specific version catalog alias if you have one
+    // CameraX dependencies
+    implementation(libs.androidx.camera.core)
+    implementation (libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.kotlin.stdlib)
+
+    testImplementation(libs.junit)
+    implementation(libs.kotlinx.coroutines.guava)
+    implementation(libs.androidx.foundation)
+    implementation(libs.androidx.material3)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material3)
+    // ... other dependencies
+    implementation(libs.androidx.activity.compose) // Or the latest version
+    implementation(platform(libs.androidx.compose.bom)) // Or the latest BOM
+    implementation(libs.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material3)
+    implementation(libs.androidx.foundation)
+    // ... other compose dependencies
+}
+
+
+================================================================================
+FILE: settings.gradle.kts
+================================================================================
+pluginManagement {
+  repositories {
+    google {
+      content {
+        includeGroupByRegex("com\\.android.*")
+        includeGroupByRegex("com\\.google.*")
+        includeGroupByRegex("androidx.*")
+      }
+    }
+    mavenCentral()
+    gradlePluginPortal()
+  }
+  plugins {
+    id("com.android.application") version "8.10.0"
+    id("com.android.library") version "8.11.0-rc01"   // Or your AGP version
+
+    id("org.jetbrains.kotlin.android") version "2.1.20"
+  }
+}
+dependencyResolutionManagement {
+  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+  repositories {
+    google()
+    mavenCentral()
+  }
+}
+
+rootProject.name = "PoolProtractor"
+include(":app")
+
+
