@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="EntryPointsManager">
+    <entry_points version="2.0">
+      <entry_point TYPE="field" FQNAME="file://$PROJECT_DIR$/app/src/main/java/com/hereliesaz/poolprotractor/ui/theme/Type.kt Typography" />
+      <entry_point TYPE="field" FQNAME="file://$PROJECT_DIR$/app/src/main/java/com/hereliesaz/poolprotractor/ui/theme/Theme.kt DarkColorScheme" />
+      <entry_point TYPE="field" FQNAME="file://$PROJECT_DIR$/app/src/main/java/com/hereliesaz/poolprotractor/ui/theme/Theme.kt LightColorScheme" />
+      <entry_point TYPE="field" FQNAME="com.hereliesaz.poolprotractor.ProtractorOverlayView M3_COLOR_TERTIARY" />
+      <entry_point TYPE="field" FQNAME="com.hereliesaz.poolprotractor.ProtractorOverlayView TAG" />
+      <entry_point TYPE="field" FQNAME="com.hereliesaz.poolprotractor.MainActivity zoomIcon" />
+    </entry_points>
+    <pattern value="com.hereliesaz.poolprotractor.ProtractorOverlayView" method="getPitchAngle" />
+  </component>
+  <component name="ExternalStorageConfigurationManager" enabled="true" />
+  <component name="ProjectInspectionProfilesVisibleTreeState">
+    <entry key="Project Default">
+      <profile-state>
+        <selected-state>
+          <State>
+            <id>User defined</id>
+          </State>
+        </selected-state>
+      </profile-state>
+    </entry>
+  </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_24" default="true" project-jdk-name="24" project-jdk-type="JavaSDK">
+    <output url="file://$PROJECT_DIR$/build/classes" />
+  </component>
+  <component name="ProjectType">
+    <option name="id" value="Android" />
+  </component>
+  <component name="VisualizationToolProject">
+    <option name="state">
+      <ProjectState>
+        <option name="scale" value="0.17140898183064793" />
+      </ProjectState>
+    </option>
+  </component>
+</project>
