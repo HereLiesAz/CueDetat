@@ -1,6 +1,18 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <!-- For Material 3 components like FloatingActionButton, prefer a Material3 theme -->
     <style name="Theme.PoolProtractor" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">@color/purple_500</item>
+        <!-- <item name="colorPrimaryVariant">@color/purple_700</item> --> <!-- M3 uses colorPrimaryContainer, etc. -->
+        <item name="colorOnPrimary">@color/white</item>
         <!-- Secondary brand color. -->
+        <item name="colorSecondary">@color/teal_200</item>
+        <!-- <item name="colorSecondaryVariant">@color/teal_700</item> --> <!-- M3 uses colorSecondaryContainer, etc. -->
+        <item name="colorOnSecondary">@color/black</item>
         <!-- Status bar color. -->
+        <item name="android:statusBarColor">?attr/colorPrimary</item> <!-- Or a specific color -->
+        <!-- Customize your theme here. -->
     </style>
+
 </resources>

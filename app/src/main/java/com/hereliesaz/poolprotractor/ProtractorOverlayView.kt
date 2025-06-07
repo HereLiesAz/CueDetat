@@ -27,9 +27,11 @@ class ProtractorOverlayView @JvmOverloads constructor(
         fun onZoomChanged(newZoomFactor: Float)
         fun onRotationChanged(newRotationAngle: Float)
         fun onUserInteraction()
+        fun onWarningStateChanged(isWarning: Boolean) // New callback for ineptitude
     }
     var listener: ProtractorStateListener? = null
 
+    // ... (rest of the private variables are unchanged) ...
     private var M3_COLOR_PRIMARY: Int = Color.BLUE
     private var M3_COLOR_SECONDARY: Int = Color.RED
     private var M3_COLOR_TERTIARY: Int = Color.GREEN
@@ -39,10 +41,8 @@ class ProtractorOverlayView @JvmOverloads constructor(
     private var M3_COLOR_PRIMARY_CONTAINER: Int = Color.CYAN
     private var M3_COLOR_SECONDARY_CONTAINER: Int = Color.MAGENTA
     private var M3_TEXT_SHADOW_COLOR: Int = Color.argb(180, 0, 0, 0)
-
     private var m3GlowColor: Int = Color.argb(100, 255, 255, 224)
     private val GLOW_RADIUS_FIXED = 8f
-
     private val targetCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 5f }
     private val cueCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 5f }
     private val centerMarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -50,37 +50,30 @@ class ProtractorOverlayView @JvmOverloads constructor(
     private val yellowTargetLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.YELLOW; strokeWidth = 5f }
     private val ghostCueOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 3f }
     private val targetGhostBallOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.YELLOW; style = Paint.Style.STROKE; strokeWidth = 3f }
-
     private val aimingAssistNearPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val aimingAssistFarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-
     private val aimingSightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 2f; style = Paint.Style.STROKE }
     private val ghostBallTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         color = Color.WHITE
         setShadowLayer(2f, 1f, 1f, M3_TEXT_SHADOW_COLOR)
     }
-
     private var oNearDefaultStroke: Float = 4f
     private var oFarDefaultStroke: Float = 2f
     private var oYellowTargetLineStroke: Float = 5f
-
     private val boldStrokeIncrease = 4f
     private val oCueDeflectionStrokeWidth = 2f
     private val cueDeflectionDottedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = oCueDeflectionStrokeWidth; style = Paint.Style.STROKE; pathEffect = DashPathEffect(floatArrayOf(15f, 10f), 0f) }
     private val cueDeflectionHighlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = oCueDeflectionStrokeWidth + boldStrokeIncrease; style = Paint.Style.STROKE; pathEffect = null }
-
     private val targetCircleCenter = PointF()
     private val cueCircleCenter = PointF()
     private var baseCircleDiameter: Float = 0f
     private var currentLogicalRadius: Float = 1f
-    private var zoomFactor = 0.4f // Default zoom changed
+    private var zoomFactor = 0.4f
     private var protractorRotationAngle = 0.0f
-
     private var currentPitchAngle = 0.0f
     private var smoothedPitchAngle = 0.0f
     private val PITCH_SMOOTHING_FACTOR = 0.15f
-
     private var isInitialized = false
     private var lastTouchX = 0f
     private var lastTouchY = 0f
@@ -91,21 +84,23 @@ class ProtractorOverlayView @JvmOverloads constructor(
     private val mPitchMatrix = Matrix()
     private val mInversePitchMatrix = Matrix()
     private var isPinching = false
-    private var defaultZoomFactor = 0.4f // Default zoom changed
+    private var defaultZoomFactor = 0.4f
     private var defaultProtractorRotationAngle = 0.0f
     private val PAN_ROTATE_SENSITIVITY = 0.3f
     private var areTextLabelsVisible = true
     private val baseGhostBallTextSize = 30f
     private val minGhostBallTextSize = 15f
     private val maxGhostBallTextSize = 60f
-
     private lateinit var scaleGestureDetector: ScaleGestureDetector
+
+    private var wasLastWarningState = false // Track the previous warning state
 
     init {
         scaleGestureDetector = ScaleGestureDetector(context, ScaleListener())
         storeOriginalPaintProperties()
     }
-
+    
+    // ... (applyMaterialYouColors and storeOriginalPaintProperties are unchanged) ...
     fun applyMaterialYouColors(colorScheme: ColorScheme) {
         M3_COLOR_PRIMARY = colorScheme.primary.toArgb()
         M3_COLOR_SECONDARY = colorScheme.secondary.toArgb()
@@ -138,10 +133,10 @@ class ProtractorOverlayView @JvmOverloads constructor(
 
         invalidate()
     }
-
     private fun storeOriginalPaintProperties() {
         oYellowTargetLineStroke = yellowTargetLinePaint.strokeWidth
     }
+
 
     private inner class ScaleListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
@@ -170,12 +165,10 @@ class ProtractorOverlayView @JvmOverloads constructor(
         targetCircleCenter.set(w / 2f, h / 2f)
         if (!isInitialized) {
             baseCircleDiameter = min(w, h) * 0.30f // Initial diameter reference
-            // zoomFactor is already defaultZoomFactor (0.4f)
             setProtractorRotationAngleInternal(defaultProtractorRotationAngle)
             smoothedPitchAngle = currentPitchAngle
             isInitialized = true
         }
-        // Apply the current zoomFactor (which might be the default or user-set)
         currentLogicalRadius = (baseCircleDiameter / 2f) * zoomFactor
         updateCueBallPosition(); invalidate()
     }
@@ -193,9 +186,11 @@ class ProtractorOverlayView @JvmOverloads constructor(
         return PointF(pointArray[0], pointArray[1])
     }
 
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (!isInitialized) return
+        // ... (onDraw setup is mostly unchanged) ...
         currentLogicalRadius = (baseCircleDiameter / 2f) * zoomFactor
         if (currentLogicalRadius <= 0.01f) currentLogicalRadius = 0.01f
         updateCueBallPosition()
@@ -217,6 +212,7 @@ class ProtractorOverlayView @JvmOverloads constructor(
         val isPhysicalOverlap = logicalDistanceBetweenCenters < logicalSumOfRadii - 0.1f
 
         var isCueOnFarSide = false
+        // ... (isCueOnFarSide logic is unchanged) ...
         if (hasInverse) {
             val screenAimPointScreenCoords = floatArrayOf(width / 2f, height.toFloat()); val screenAimPointLogicalCoordsArray = FloatArray(2)
             mInversePitchMatrix.mapPoints(screenAimPointLogicalCoordsArray, screenAimPointScreenCoords)
@@ -236,6 +232,15 @@ class ProtractorOverlayView @JvmOverloads constructor(
         val useErrorColorForMainCue = isCueOnFarSide || isDeflectionDominantAngle
         val showWarningStyleForGhostAndYellowTargetLine = isPhysicalOverlap || isCueOnFarSide
 
+        // *** NEW: Notify listener about the current warning state ***
+        val isCurrentlyInWarningState = useErrorColorForMainCue || showWarningStyleForGhostAndYellowTargetLine
+        if (isCurrentlyInWarningState != wasLastWarningState) {
+            listener?.onWarningStateChanged(isCurrentlyInWarningState)
+            wasLastWarningState = isCurrentlyInWarningState
+        }
+        // *** END NEW ***
+
+        // ... (rest of the drawing logic is unchanged) ...
         yellowTargetLinePaint.apply {
             strokeWidth = oYellowTargetLineStroke
             clearShadowLayer()
@@ -367,7 +372,8 @@ class ProtractorOverlayView @JvmOverloads constructor(
             canvas.drawText("Cue Ball", pCGC_s_collision.x, cueTextBaselineY, ghostBallTextPaint)
         }
     }
-
+    
+    // ... (rest of the file is unchanged, including onTouchEvent, setters/getters, resetToDefaults, and companion object) ...
     fun toggleHelpersVisibility() { areTextLabelsVisible = !areTextLabelsVisible; invalidate() }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -440,7 +446,7 @@ class ProtractorOverlayView @JvmOverloads constructor(
 
     fun resetToDefaults() {
         if (!isInitialized) return
-        setZoomFactorInternal(defaultZoomFactor) // Uses the new defaultZoomFactor
+        setZoomFactorInternal(defaultZoomFactor)
         setProtractorRotationAngleInternal(defaultProtractorRotationAngle)
         areTextLabelsVisible = true
         yellowTargetLinePaint.apply {
@@ -450,12 +456,17 @@ class ProtractorOverlayView @JvmOverloads constructor(
         }
         listener?.onZoomChanged(this.zoomFactor)
         listener?.onRotationChanged(this.protractorRotationAngle)
+        // Explicitly notify that the warning state is now false upon reset.
+        if (wasLastWarningState) {
+            listener?.onWarningStateChanged(false)
+            wasLastWarningState = false
+        }
         invalidate()
     }
 
     companion object {
         private const val TAG = "PoolProtractorApp"
-        internal const val MIN_ZOOM_FACTOR = 0.1f // Allows much further zoom out
-        internal const val MAX_ZOOM_FACTOR = 4.0f // Max zoom in remains the same
+        internal const val MIN_ZOOM_FACTOR = 0.1f
+        internal const val MAX_ZOOM_FACTOR = 4.0f
     }
 }

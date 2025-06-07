@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="CompilerConfiguration">
-      <module name="PoolProtractor.app" target="24" />
-    </bytecodeTargetLevel>
+    <bytecodeTargetLevel target="24" />
   </component>
 </project>

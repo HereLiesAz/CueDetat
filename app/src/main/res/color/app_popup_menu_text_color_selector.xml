@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- State when an item is pressed or focused -->
-    <item android:state_pressed="true" android:color="@color/app_dark_gray"/>
-    <item android:state_focused="true" android:color="@color/app_dark_gray"/>
-    <!-- Default color for non-selected/unfocused items -->
-    <item android:color="@color/app_popup_menu_text_default"/>
-</selector>

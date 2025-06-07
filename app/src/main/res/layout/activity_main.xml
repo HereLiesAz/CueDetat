@@ -13,11 +13,13 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <com.hereliesaz.poolprotractor.ProtractorOverlayView
         android:id="@+id/protractorOverlayView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
     <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/controls_relative_layout"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
@@ -35,18 +37,32 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintVertical_bias="0.497">
 
+            <ImageView
+                android:id="@+id/zoomIcon"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="46dp"
+                android:contentDescription="@string/zoom_icon"
+                android:padding="8dp"
                 android:src="@drawable/ic_zoom_in_24"
+                android:visibility="visible"
+                app:layout_constraintBottom_toTopOf="@+id/zoomSlider"
                 app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintHorizontal_bias="0.5"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent"
+                app:tint="?attr/colorControlNormal"
+                tools:ignore="TouchTargetSizeCheck"
+                tools:visibility="visible" />
 
             <SeekBar
                 android:id="@+id/zoomSlider"
+                android:layout_width="24dp"
+                android:layout_height="400dp"
                 android:max="100"
                 android:progress="50"
                 android:progressDrawable="@drawable/seekbar_custom_track"
+                android:thumbTint="?attr/colorPrimary"
                 android:rotation="90"
                 android:visibility="visible"
                 app:layout_constraintBottom_toBottomOf="parent"
@@ -70,6 +86,19 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:tint="?attr/colorOnPrimaryContainer" />
 
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/helpButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="24dp"
+            android:layout_marginBottom="24dp"
+            android:contentDescription="@string/toggle_help_lines"
+            android:src="@drawable/ic_help_outline_24"
+            app:backgroundTint="?attr/colorSecondaryContainer"
+            app:fabSize="mini"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:tint="?attr/colorOnSecondaryContainer" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

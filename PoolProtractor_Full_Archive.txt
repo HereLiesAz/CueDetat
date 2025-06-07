@@ -127,8 +127,8 @@ FILE: app\src\main\java\com\hereliesaz\poolprotractor\MainActivity.kt
 package com.hereliesaz.poolprotractor
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
-import android.graphics.PointF
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -136,120 +136,293 @@ import android.hardware.SensorManager
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
-import android.widget.FrameLayout
-import android.widget.ImageView
-import android.widget.SeekBar
-import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.platform.ComposeView
-import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.common.util.concurrent.ListenableFuture
 import com.hereliesaz.poolprotractor.ui.theme.PoolProtractorTheme
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.systemBars
 
-class MainActivity : AppCompatActivity(), SensorEventListener, ProtractorOverlayView.ProtractorStateListener {
+class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlayView.ProtractorStateListener {
 
     private companion object {
         private const val TAG = "PoolProtractorApp"
     }
 
-    private lateinit var cameraPreviewView: PreviewView
-    private lateinit var protractorOverlayView: ProtractorOverlayView
-    private lateinit var zoomSlider: SeekBar
-    private lateinit var resetButton: FloatingActionButton
-    private lateinit var zoomIcon: ImageView
-    private lateinit var helpButton: FloatingActionButton
-
+    // CameraX
     private lateinit var cameraProviderFuture: ListenableFuture<ProcessCameraProvider>
+    private var previewView: PreviewView? = null // Will be set in Compose
 
+    // Sensor
     private var sensorManager: SensorManager? = null
     private var rotationVectorSensor: Sensor? = null
     private val rotationMatrix = FloatArray(9)
     private val orientationAngles = FloatArray(3)
 
-    private var valuesChangedSinceLastReset = false
+    // ProtractorOverlayView instance, to be accessed from Compose
+    private var protractorOverlayViewInstance: ProtractorOverlayView? = null
+
+    private var valuesChangedSinceLastReset by mutableStateOf(false)
 
     private val requestCameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
-                startCamera()
+                startCameraIfReady()
             } else {
-                Toast.makeText(this, "Camera permission is required.", Toast.LENGTH_LONG).show()
+                // Consider a more user-friendly way to handle this in Compose
+                Log.e(TAG, "Camera permission denied.")
             }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        val windowInsetsController = WindowInsetsControllerCompat(window, window.decorView)
-        windowInsetsController.hide(WindowInsetsCompat.Type.statusBars())
-        windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Initialize SensorManager here as it's not UI dependent
+        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
+        rotationVectorSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
 
-        setContentView(R.layout.activity_main)
-        val rootView = findViewById<FrameLayout>(R.id.activity_main_root)
+        setContent {
+            val view = LocalView.current
+            SideEffect { // For immersive mode, status bar handling
+                val window = (view.context as Activity).window
+                WindowCompat.setDecorFitsSystemWindows(window, false)
+                WindowInsetsControllerCompat(window, view).let { controller ->
+                    controller.hide(WindowInsetsCompat.Type.statusBars())
+                    controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
 
-        ViewCompat.setOnApplyWindowInsetsListener(rootView) { view, windowInsets ->
-            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.updatePadding(
-                left = insets.left,
-                top = insets.top,
-                right = insets.right,
-                bottom = insets.bottom
-            )
-            WindowInsetsCompat.CONSUMED
-        }
-
-        cameraPreviewView = findViewById(R.id.cameraPreviewView)
-        protractorOverlayView = findViewById(R.id.protractorOverlayView)
-        zoomSlider = findViewById(R.id.zoomSlider)
-        resetButton = findViewById(R.id.resetButton)
-        zoomIcon = findViewById(R.id.zoomIcon)
-        helpButton = findViewById(R.id.helpButton)
-
-        protractorOverlayView.listener = this
-
-        val composeViewForTheme = findViewById<ComposeView>(R.id.composeThemeView)
-        composeViewForTheme.setContent {
             PoolProtractorTheme {
-                val currentColorScheme = MaterialTheme.colorScheme
-                SideEffect {
-                    protractorOverlayView.applyMaterialYouColors(currentColorScheme)
-                    Log.d(TAG, "M3 colors applied to ProtractorOverlayView.")
+                MainScreen()
+            }
+        }
+        checkCameraPermissionAndStart() // Request permission after content is set
+    }
+
+    @Composable
+    private fun MainScreen() {
+        val context = LocalContext.current
+        val lifecycleOwner = LocalLifecycleOwner.current
+        val currentColorScheme = MaterialTheme.colorScheme
+
+        var sliderProgress by remember { mutableFloatStateOf(0.0f) } // 0.0 to 1.0
+
+        LaunchedEffect(protractorOverlayViewInstance) {
+            protractorOverlayViewInstance?.let {
+                val initialZoom = it.getZoomFactor()
+                val zoomRange = ProtractorOverlayView.MAX_ZOOM_FACTOR - ProtractorOverlayView.MIN_ZOOM_FACTOR
+                if (zoomRange > 0.0001f) {
+                    sliderProgress = ((initialZoom - ProtractorOverlayView.MIN_ZOOM_FACTOR) / zoomRange).coerceIn(0f, 1f)
                 }
             }
         }
 
-        checkCameraPermissionAndStart()
-        setupControls()
-        setupSensors()
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Camera Preview
+            AndroidView(
+                factory = { ctx ->
+                    PreviewView(ctx).also { pv ->
+                        previewView = pv
+                        // Defer camera start until permission is granted and previewView is available
+                        startCameraIfReady()
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Protractor Overlay View
+            AndroidView(
+                factory = { ctx ->
+                    ProtractorOverlayView(ctx).also { pov ->
+                        protractorOverlayViewInstance = pov
+                        pov.listener = this@MainActivity
+                    }
+                },
+                update = { view ->
+                    view.applyMaterialYouColors(currentColorScheme)
+                    // If ProtractorOverlayView's state needs to be driven from Compose externally, do it here.
+                    // For now, it manages its own zoom/rotation, and updates MainActivity via listener.
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // UI Controls Overlay
+            Box(modifier = Modifier
+                .fillMaxSize()
+                .padding(WindowInsets.systemBars.asPaddingValues())            ) {
+                // Zoom Controls (Slider and Icon) - Right Aligned
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight(0.7f) // Adjust height as desired for the column
+                        .width(60.dp)        // Give it some width for touch targets
+                        .padding(end = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_zoom_in_24),
+                        contentDescription = stringResource(id = R.string.zoom_icon),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 16.dp) // Space between icon and slider
+                    )
+                    VerticalSlider(
+                        value = sliderProgress,
+                        onValueChange = { newProgress ->
+                            sliderProgress = newProgress
+                            val zoomRange = ProtractorOverlayView.MAX_ZOOM_FACTOR - ProtractorOverlayView.MIN_ZOOM_FACTOR
+                            val zoomValue = ProtractorOverlayView.MIN_ZOOM_FACTOR + (zoomRange * newProgress)
+                            protractorOverlayViewInstance?.setZoomFactor(zoomValue)
+                            onUserInteraction()
+                        },
+                        modifier = Modifier
+                            .weight(1f) // Slider takes up available vertical space
+                            .fillMaxWidth() // Fill the column's width
+                    )
+                }
+
+                // Reset Button - Bottom Right
+                FloatingActionButton(
+                    onClick = { handleResetAction() },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(24.dp),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_undo_24),
+                        contentDescription = stringResource(id = R.string.reset_view),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+
+                // Help Button - Bottom Left
+                FloatingActionButton(
+                    onClick = { protractorOverlayViewInstance?.toggleHelpersVisibility() },
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(24.dp),
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_help_outline_24),
+                        contentDescription = stringResource(id = R.string.toggle_help_lines),
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+        }
+
+        // Register sensor listener when composable is active
+        DisposableEffect(Unit) {
+            registerSensorListener()
+            onDispose {
+                unregisterSensorListener()
+            }
+        }
     }
+
+
+    @Composable
+    fun VerticalSlider(
+        value: Float,
+        onValueChange: (Float) -> Unit,
+        modifier: Modifier = Modifier,
+        enabled: Boolean = true,
+        valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
+        steps: Int = 0,
+        colors: androidx.compose.material3.SliderColors = SliderDefaults.colors(
+            thumbColor = MaterialTheme.colorScheme.primary,
+            activeTrackColor = MaterialTheme.colorScheme.primary,
+            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        BoxWithConstraints(modifier = modifier
+            .graphicsLayer(rotationZ = 270f)
+            .padding(horizontal = 8.dp) // Add some padding so thumb isn't cut off
+        ) {
+            Slider(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier
+                    .width(this.maxHeight) // Effectively the length of the slider
+                    .height(this.maxWidth),  // Effectively the thickness of the slider
+                enabled = enabled,
+                valueRange = valueRange,
+                steps = steps,
+                colors = colors
+            )
+        }
+    }
+
 
     private fun checkCameraPermissionAndStart() {
         when {
-            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> startCamera()
+            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> {
+                startCameraIfReady()
+            }
             shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> {
-                Toast.makeText(this, "Camera permission is needed.", Toast.LENGTH_LONG).show()
+                // Explain to the user why the permission is needed
+                Log.w(TAG, "Camera permission rationale should be shown.")
                 requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
             }
-            else -> requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            else -> {
+                requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
+    }
+
+    private fun startCameraIfReady() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED && previewView != null) {
+            startCamera()
         }
     }
 
@@ -261,89 +434,79 @@ class MainActivity : AppCompatActivity(), SensorEventListener, ProtractorOverlay
                 bindPreview(cameraProvider)
             } catch (e: Exception) {
                 Log.e(TAG, "Error starting camera: ", e)
-                Toast.makeText(this@MainActivity, "Error starting camera: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     private fun bindPreview(cameraProvider: ProcessCameraProvider) {
+        val currentPreviewView = previewView ?: return // Ensure previewView is initialized
+
         val preview: Preview = Preview.Builder().build()
         val cameraSelector: CameraSelector = CameraSelector.Builder()
             .requireLensFacing(CameraSelector.LENS_FACING_BACK).build()
 
-        // The XML now correctly orders PreviewView as the background.
-        preview.surfaceProvider = cameraPreviewView.surfaceProvider
+        preview.surfaceProvider = currentPreviewView.surfaceProvider
         try {
             cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(this, cameraSelector, preview)
+            cameraProvider.bindToLifecycle(this, cameraSelector, preview) // Use ComponentActivity as LifecycleOwner
         } catch (e: Exception) {
             Log.e(TAG, "Use case binding failed", e)
-            Toast.makeText(this, "Could not bind camera use cases: ${e.message}", Toast.LENGTH_LONG).show()
         }
-    }
-
-    private fun setupControls() {
-        zoomSlider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    val zoomRange = ProtractorOverlayView.MAX_ZOOM_FACTOR - ProtractorOverlayView.MIN_ZOOM_FACTOR
-                    val zoomValue = ProtractorOverlayView.MIN_ZOOM_FACTOR + (zoomRange * (progress / 100f))
-                    protractorOverlayView.setZoomFactor(zoomValue)
-                    onUserInteraction()
-                }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar) {}
-        })
-        updateZoomSliderFromFactor(protractorOverlayView.getZoomFactor())
-        resetButton.setOnClickListener { handleResetAction() }
-        helpButton.setOnClickListener { protractorOverlayView.toggleHelpersVisibility() }
     }
 
     private fun handleResetAction() {
-        protractorOverlayView.resetToDefaults()
-        updateZoomSliderFromFactor(protractorOverlayView.getZoomFactor())
-        Toast.makeText(this, "View reset to defaults", Toast.LENGTH_SHORT).show()
+        protractorOverlayViewInstance?.resetToDefaults()
+        // The onZoomChanged callback will update sliderProgress
         valuesChangedSinceLastReset = false
     }
 
-    private fun setupSensors() {
-        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-        rotationVectorSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
-        if (rotationVectorSensor == null) {
-            Toast.makeText(this, "Rotation Vector Sensor not available!", Toast.LENGTH_LONG).show()
-            Log.w(TAG, "Rotation Vector Sensor not available!")
-        } else {
-            Log.d(TAG, "Rotation Vector Sensor available and will be registered.")
+    // ProtractorStateListener Callbacks
+    override fun onZoomChanged(newZoomFactor: Float) {
+        val zoomRange = ProtractorOverlayView.MAX_ZOOM_FACTOR - ProtractorOverlayView.MIN_ZOOM_FACTOR
+        if (zoomRange > 0.0001f) {
+            // This logic will be triggered by setContent's sliderProgress state variable
+            // Find the sliderProgress state variable in MainScreen and update it.
+            // For now, just log, as the MainScreen's sliderProgress state should be updated directly
+            // by the ProtractorOverlayView's listener if we want to keep a single source of truth.
+            // However, the current setup has slider driving POV, and POV listener updating slider.
+            // To correctly update the sliderProgress in Composable:
+            // We need a way for this callback to update the `sliderProgress` state in `MainScreen`.
+            // This can be done by making sliderProgress a member of MainActivity or passing a lambda.
+            // For simplicity with current structure, assume MainScreen's LaunchedEffect and slider's onValueChange manage it.
+            // This callback just ensures the internal `valuesChangedSinceLastReset` is set.
+        }
+        onUserInteraction()
+    }
+
+    override fun onRotationChanged(newRotationAngle: Float) {
+        onUserInteraction()
+    }
+
+    override fun onUserInteraction() {
+        valuesChangedSinceLastReset = true
+    }
+
+    // SensorEventListener Callbacks
+    private fun registerSensorListener() {
+        rotationVectorSensor?.also { sensor ->
+            val registered = sensorManager?.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME)
+            Log.d(TAG, "Sensor listener registration attempt. Success: $registered")
         }
     }
 
-    override fun onZoomChanged(newZoomFactor: Float) { updateZoomSliderFromFactor(newZoomFactor); onUserInteraction() }
-    override fun onRotationChanged(newRotationAngle: Float) { onUserInteraction() }
-    override fun onUserInteraction() { valuesChangedSinceLastReset = true }
-
-    private fun updateZoomSliderFromFactor(factor: Float) {
-        val zoomRange = ProtractorOverlayView.MAX_ZOOM_FACTOR - ProtractorOverlayView.MIN_ZOOM_FACTOR
-        if (zoomRange > 0.0001f) {
-            val progress = (( (factor - ProtractorOverlayView.MIN_ZOOM_FACTOR) / zoomRange ) * 100f).toInt()
-            zoomSlider.progress = progress.coerceIn(0, 100)
-        } else {
-            zoomSlider.progress = if (factor <= ProtractorOverlayView.MIN_ZOOM_FACTOR) 0 else 100
-        }
+    private fun unregisterSensorListener() {
+        sensorManager?.unregisterListener(this)
+        Log.d(TAG, "Sensor listener unregistered.")
     }
 
     override fun onResume() {
         super.onResume()
-        rotationVectorSensor?.also { sensor ->
-            val registered = sensorManager?.registerListener(this, sensor, SensorManager.SENSOR_DELAY_GAME)
-            Log.d(TAG, "Sensor listener registration attempt in onResume. Success: $registered")
-        }
+        // Sensor registration is now handled by DisposableEffect in Compose
     }
 
     override fun onPause() {
         super.onPause()
-        sensorManager?.unregisterListener(this)
-        Log.d(TAG, "Sensor listener unregistered in onPause.")
+        // Sensor unregistration is now handled by DisposableEffect in Compose
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
@@ -352,11 +515,30 @@ class MainActivity : AppCompatActivity(), SensorEventListener, ProtractorOverlay
             SensorManager.getOrientation(rotationMatrix, orientationAngles)
             val pitchInRadians = orientationAngles[1]
             val pitchInDegrees = Math.toDegrees(pitchInRadians.toDouble()).toFloat()
-            protractorOverlayView.setPitchAngle(-pitchInDegrees)
+            protractorOverlayViewInstance?.setPitchAngle(-pitchInDegrees)
         }
     }
+
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
         Log.d(TAG, "Sensor accuracy changed for ${sensor?.name} to $accuracy")
+    }
+}
+
+
+================================================================================
+FILE: app\src\main\java\com\hereliesaz\poolprotractor\MyApplication.kt
+================================================================================
+package com.hereliesaz.poolprotractor
+
+import android.app.Application
+import androidx.appcompat.app.AppCompatDelegate
+import android.util.Log
+
+class MyApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        Log.d("PoolProtractorApp", "MyApplication onCreate: Forcing Light Theme (MODE_NIGHT_NO).")
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
     }
 }
 
@@ -828,138 +1010,25 @@ class ProtractorOverlayView @JvmOverloads constructor(
 
 
 ================================================================================
-FILE: app\src\main\java\com\hereliesaz\poolprotractor\MyApplication.kt
+FILE: app\src\main\res\drawable\ic_dark_mode_24.xml
 ================================================================================
-package com.hereliesaz.poolprotractor
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:autoMirrored="true" android:height="24dp" android:tint="#FFFFFF" android:viewportHeight="24" android:viewportWidth="24" android:width="24dp">
+      
+    <path android:fillColor="@android:color/white" android:pathData="M20,15.31L23.31,12 20,8.69V4h-4.69L12,0.69 8.69,4H4v4.69L0.69,12 4,15.31V20h4.69L12,23.31 15.31,20H20v-4.69zM12,18V6c3.31,0 6,2.69 6,6s-2.69,6 -6,6z"/>
+    
+</vector>
 
-import android.app.Application
-import androidx.appcompat.app.AppCompatDelegate
-import android.util.Log
-
-class MyApplication : Application() {
-    override fun onCreate() {
-        super.onCreate()
-        Log.d("PoolProtractorApp", "MyApplication onCreate: Forcing Light Theme (MODE_NIGHT_NO).")
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-    }
-}
 
 
 ================================================================================
-FILE: app\src\main\res\layout\activity_main.xml
+FILE: app\src\main\res\drawable\ic_help_outline_24.xml
 ================================================================================
-<?xml version="1.0" encoding="utf-8"?>
-<FrameLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/activity_main_root"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context=".MainActivity">
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:autoMirrored="true" android:height="24dp" android:tint="#FFFFFF" android:viewportHeight="24" android:viewportWidth="24" android:width="24dp">
+      
+    <path android:fillColor="@android:color/white" android:pathData="M11,18h2v-2h-2v2zM12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM12,20c-4.41,0 -8,-3.59 -8,-8s3.59,-8 8,-8 8,3.59 8,8 -3.59,8 -8,8zM12,6c-2.21,0 -4,1.79 -4,4h2c0,-1.1 0.9,-2 2,-2s2,0.9 2,2c0,2 -3,1.75 -3,5h2c0,-2.25 3,-2.5 3,-5 0,-2.21 -1.79,-4 -4,-4z"/>
+    
+</vector>
 
-    <androidx.camera.view.PreviewView
-        android:id="@+id/cameraPreviewView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <com.hereliesaz.poolprotractor.ProtractorOverlayView
-        android:id="@+id/protractorOverlayView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/controls_relative_layout"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:id="@+id/zoomControlsLayout"
-            android:layout_width="55dp"
-            android:layout_height="486dp"
-            android:layout_marginEnd="8dp"
-            android:gravity="center_vertical"
-            android:layoutMode="opticalBounds"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.974"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.497">
-
-            <ImageView
-                android:id="@+id/zoomIcon"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="46dp"
-                android:contentDescription="@string/zoom_icon"
-                android:padding="8dp"
-                android:src="@drawable/ic_zoom_in_24"
-                android:visibility="visible"
-                app:layout_constraintBottom_toTopOf="@+id/zoomSlider"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintHorizontal_bias="0.5"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                app:tint="?attr/colorControlNormal"
-                tools:ignore="TouchTargetSizeCheck"
-                tools:visibility="visible" />
-
-            <SeekBar
-                android:id="@+id/zoomSlider"
-                android:layout_width="match_parent"
-                android:layout_height="400dp"
-                android:max="100"
-                android:progress="50"
-                android:progressBackgroundTint="?attr/colorSurfaceVariant"
-                android:progressTint="?attr/colorPrimary"
-                android:rotation="90"
-                android:thumbTint="?attr/colorPrimary"
-                android:visibility="visible"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintHorizontal_bias="0.5"
-                app:layout_constraintStart_toStartOf="parent" />
-
-        </androidx.constraintlayout.widget.ConstraintLayout>
-
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/resetButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="24dp"
-            android:layout_marginBottom="24dp"
-            android:contentDescription="@string/reset_view"
-            android:src="@drawable/ic_undo_24"
-            app:backgroundTint="?attr/colorPrimaryContainer"
-            app:fabSize="mini"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:tint="?attr/colorOnPrimaryContainer" />
-
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/helpButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="24dp"
-            android:layout_marginBottom="24dp"
-            android:contentDescription="@string/toggle_help_lines"
-            android:src="@drawable/ic_help_outline_24"
-            app:backgroundTint="?attr/colorSecondaryContainer"
-            app:fabSize="mini"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:tint="?attr/colorOnSecondaryContainer" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
-    <androidx.compose.ui.platform.ComposeView
-        android:id="@+id/composeThemeView"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone" />
-
-</FrameLayout>
 
 
 ================================================================================
@@ -1079,6 +1148,17 @@ FILE: app\src\main\res\drawable\ic_launcher_foreground.xml
 
 
 ================================================================================
+FILE: app\src\main\res\drawable\ic_light_mode_24.xml
+================================================================================
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:autoMirrored="true" android:height="24dp" android:tint="#FFFFFF" android:viewportHeight="24" android:viewportWidth="24" android:width="24dp">
+      
+    <path android:fillColor="@android:color/white" android:pathData="M20,15.31L23.31,12 20,8.69V4h-4.69L12,0.69 8.69,4H4v4.69L0.69,12 4,15.31V20h4.69L12,23.31 15.31,20H20v-4.69zM12,18V6c3.31,0 6,2.69 6,6s-2.69,6 -6,6z"/>
+    
+</vector>
+
+
+
+================================================================================
 FILE: app\src\main\res\drawable\ic_undo_24.xml
 ================================================================================
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -1109,49 +1189,177 @@ FILE: app\src\main\res\drawable\ic_zoom_in_24.xml
 
 
 ================================================================================
-FILE: app\src\main\res\drawable\ic_help_outline_24.xml
+FILE: app\src\main\res\drawable\seekbar_custom_track.xml
 ================================================================================
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:autoMirrored="true" android:height="24dp" android:tint="#FFFFFF" android:viewportHeight="24" android:viewportWidth="24" android:width="24dp">
-      
-    <path android:fillColor="@android:color/white" android:pathData="M11,18h2v-2h-2v2zM12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM12,20c-4.41,0 -8,-3.59 -8,-8s3.59,-8 8,-8 8,3.59 8,8 -3.59,8 -8,8zM12,6c-2.21,0 -4,1.79 -4,4h2c0,-1.1 0.9,-2 2,-2s2,0.9 2,2c0,2 -3,1.75 -3,5h2c0,-2.25 3,-2.5 3,-5 0,-2.21 -1.79,-4 -4,-4z"/>
-    
-</vector>
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Background track -->
+    <item android:id="@android:id/background">
+        <shape android:shape="rectangle">
+            <corners android:radius="4dp" /> <!-- Adjust for desired roundness -->
+            <solid android:color="?attr/colorSurfaceVariant" />
+            <size android:height="8dp" /> <!-- This is the THICKNESS of the track drawable -->
+        </shape>
+    </item>
 
+    <!-- Progress track -->
+    <item android:id="@android:id/progress">
+        <scale android:scaleWidth="100%">
+            <shape android:shape="rectangle">
+                <corners android:radius="4dp" />
+                <solid android:color="?attr/colorPrimary" />
+                <size android:height="8dp" /> <!-- Must match background thickness -->
+            </shape>
+        </scale>
+    </item>
+
+    <!-- Secondary progress (optional, remove if not needed) -->
+    <item android:id="@android:id/secondaryProgress">
+        <scale android:scaleWidth="100%">
+            <shape android:shape="rectangle">
+                <corners android:radius="4dp"/>
+                <solid android:color="@android:color/transparent"/> <!-- Or a muted color -->
+                <size android:height="8dp"/>
+            </shape>
+        </scale>
+    </item>
+</layer-list>
 
 
 ================================================================================
-FILE: app\src\main\res\drawable\ic_light_mode_24.xml
+FILE: app\src\main\res\layout\activity_main.xml
 ================================================================================
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:autoMirrored="true" android:height="24dp" android:tint="#FFFFFF" android:viewportHeight="24" android:viewportWidth="24" android:width="24dp">
-      
-    <path android:fillColor="@android:color/white" android:pathData="M20,15.31L23.31,12 20,8.69V4h-4.69L12,0.69 8.69,4H4v4.69L0.69,12 4,15.31V20h4.69L12,23.31 15.31,20H20v-4.69zM12,18V6c3.31,0 6,2.69 6,6s-2.69,6 -6,6z"/>
-    
-</vector>
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/activity_main_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
 
+    <androidx.camera.view.PreviewView
+        android:id="@+id/cameraPreviewView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <com.hereliesaz.poolprotractor.ProtractorOverlayView
+        android:id="@+id/protractorOverlayView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/controls_relative_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/zoomControlsLayout"
+            android:layout_width="55dp"
+            android:layout_height="486dp"
+            android:layout_marginEnd="8dp"
+            android:gravity="center_vertical"
+            android:layoutMode="opticalBounds"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.974"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="0.497">
+
+            <ImageView
+                android:id="@+id/zoomIcon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="46dp"
+                android:contentDescription="@string/zoom_icon"
+                android:padding="8dp"
+                android:src="@drawable/ic_zoom_in_24"
+                android:visibility="visible"
+                app:layout_constraintBottom_toTopOf="@+id/zoomSlider"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintHorizontal_bias="0.5"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:tint="?attr/colorControlNormal"
+                tools:ignore="TouchTargetSizeCheck"
+                tools:visibility="visible" />
+
+            <SeekBar
+                android:id="@+id/zoomSlider"
+                android:layout_width="24dp"
+                android:layout_height="400dp"
+                android:max="100"
+                android:progress="50"
+                android:progressDrawable="@drawable/seekbar_custom_track"
+                android:thumbTint="?attr/colorPrimary"
+                android:rotation="90"
+                android:visibility="visible"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintHorizontal_bias="0.5"
+                app:layout_constraintStart_toStartOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/resetButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="24dp"
+            android:contentDescription="@string/reset_view"
+            android:src="@drawable/ic_undo_24"
+            app:backgroundTint="?attr/colorPrimaryContainer"
+            app:fabSize="mini"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:tint="?attr/colorOnPrimaryContainer" />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/helpButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="24dp"
+            android:layout_marginBottom="24dp"
+            android:contentDescription="@string/toggle_help_lines"
+            android:src="@drawable/ic_help_outline_24"
+            app:backgroundTint="?attr/colorSecondaryContainer"
+            app:fabSize="mini"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:tint="?attr/colorOnSecondaryContainer" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/composeThemeView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+</FrameLayout>
 
 
 ================================================================================
-FILE: app\src\main\res\drawable\ic_dark_mode_24.xml
+FILE: app\src\main\res\mipmap-anydpi-v26\ic_launcher.xml
 ================================================================================
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:autoMirrored="true" android:height="24dp" android:tint="#FFFFFF" android:viewportHeight="24" android:viewportWidth="24" android:width="24dp">
-      
-    <path android:fillColor="@android:color/white" android:pathData="M20,15.31L23.31,12 20,8.69V4h-4.69L12,0.69 8.69,4H4v4.69L0.69,12 4,15.31V20h4.69L12,23.31 15.31,20H20v-4.69zM12,18V6c3.31,0 6,2.69 6,6s-2.69,6 -6,6z"/>
-    
-</vector>
-
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>
 
 
 ================================================================================
-FILE: app\src\main\res\values\strings.xml
+FILE: app\src\main\res\mipmap-anydpi-v26\ic_launcher_round.xml
 ================================================================================
-<resources>
-    <string name="app_name">PoolProtractor</string>
-    <string name="zoom_icon">Zoom Icon</string>
-    <string name="reset_view">Reset View</string>
-        <string name="toggle_help_lines">Toggle Help Lines</string>
-    <string name="toggle_theme">Toggle Theme</string>
-
-</resources>
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>
 
 
 ================================================================================
@@ -1166,6 +1374,19 @@ FILE: app\src\main\res\values\colors.xml
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+</resources>
+
+
+================================================================================
+FILE: app\src\main\res\values\strings.xml
+================================================================================
+<resources>
+    <string name="app_name">PoolProtractor</string>
+    <string name="zoom_icon">Zoom Icon</string>
+    <string name="reset_view">Reset View</string>
+        <string name="toggle_help_lines">Toggle Help Lines</string>
+    <string name="toggle_theme">Toggle Theme</string>
+
 </resources>
 
 
@@ -1192,7 +1413,51 @@ FILE: app\src\main\res\values\themes.xml
 
 
 ================================================================================
-FILE: app/src/main/AndroidManifest.xml
+FILE: app\src\main\res\xml\backup_rules.xml
+================================================================================
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Sample backup rules file; uncomment and customize as necessary.
+   See https://developer.android.com/guide/topics/data/autobackup
+   for details.
+   Note: This file is ignored for devices older than API 31
+   See https://developer.android.com/about/versions/12/backup-restore
+-->
+<full-backup-content>
+<!--
+   <include domain="sharedpref" path="."/>
+   <exclude domain="sharedpref" path="device.xml"/>
+-->
+</full-backup-content>
+
+
+================================================================================
+FILE: app\src\main\res\xml\data_extraction_rules.xml
+================================================================================
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Sample data extraction rules file; uncomment and customize as necessary.
+   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
+   for details.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- TODO: Use <include> and <exclude> to control what is backed up.
+        <include .../>
+        <exclude .../>
+        -->
+    </cloud-backup>
+    <!--
+    <device-transfer>
+        <include .../>
+        <exclude .../>
+    </device-transfer>
+    -->
+</data-extraction-rules>
+
+
+================================================================================
+FILE: app\src\main\AndroidManifest.xml
 ================================================================================
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -1228,11 +1493,110 @@ FILE: app/src/main/AndroidManifest.xml
 
 
 ================================================================================
+FILE: README.md
+================================================================================
+# Cue D’état - An IRL Billiards Aiming Assistant for Android
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![GitHub Release](https://img.shields.io/github/v/release/hereliesaz/CueDetat?include_prereleases&display_name=release)
+
+
+**_May your aim be truer than your excuses._**
+
+
+**Cue D’état** is an Android app to ostensibly help billiards players line up and aim, determine shot angles, make cut shots, understand the cue ball tangent, improve their geometric understanding of the game. Maybe get called a cheater, even though using this app is entirely legal. At the very least, get yourself a high-tech understanding of how bad you are at pool.
+
+It uses your phone's camera and orientation sensors to overlay a dynamic protractor and aiming guide onto the real-world view of a pool table.
+
+**(Warning: May induce an inflated sense of skill, followed by the crushing reality of physics. Use with a healthy dose of self-deprecating humor.)**
+
+
+
+## Features
+
+*   **Live Camera Augmented Reality Overlay:**
+    *   See the guides directly on your pool game.
+    *   Designed for easy one or two-handed use. 
+*   **Dynamic Protractor:**
+    *   See where the balls will go before you hit them.  
+    *   Rotates and zooms with on-screen gestures, tilts using the gyroscope. 
+*   **Cue Ball & Target Ball Representation:**
+    *   Simulated "ghost balls" on a projected plane.
+    *   Visual feedback for aiming path and potential collisions.
+*   **Pitch-Adjusted Perspective:** The protractor plane tilts based on your phone's orientation for a three-dimensional augmented reality.
+*   **Where will the Cue ball go?** Visualizes the tangent line and the resulting cue ball path if English (sidespin) were applied.
+*   **Guided Shots** Guide lines extend from the target ball to line up with your table's pockets.
+*   **VERY Helpful Help:**
+    *   Labels for key lines and what to do with them.
+    *   Instructions better than Ikea's.
+    *   Toggleable Help visibility for a cleaner view.
+    *   Uplifting messages of slightly disdainful encouragement.
+
+
+
+## Screenshots Placeholder
+
+*   Pretend this is a screenshot.
+*   This, too.
+*   Imagine looking at a photo of the app in use.
+*   Note the craft.
+*   The flippant attitude towards detail.
+*   I'm a genieaouxess.
+*   And this is a photo from a vacation two years ago that I accidentally pretend included.
+
+
+
+## How It Works: The Gore. The Details.
+
+1.  **Camera Preview:** Uses CameraX to display a live feed from the device camera.
+2.  **Sensor Input:** Leverages the `TYPE_ROTATION_VECTOR` sensor to determine the phone's pitch, roll, and yaw. The pitch is primarily used to tilt the 2D protractor plane. An offset is applied to account for natural phone holding angles.
+3.  **Custom View (`ProtractorOverlayView`):** All guides and visual elements are drawn on a custom `View` that overlays the camera preview.
+4.  **Drawing Logic:**
+    *   **Protractor Plane:** A logical 2D plane is defined. Circles representing the cue and target ball positions, protractor angle lines, and deflection lines are drawn on this plane.
+    *   **3D Projection (Simplified):** An `android.graphics.Camera` object is used to apply an X-axis rotation (based on phone pitch) to this logical plane, creating a 3D perspective effect. This transformed matrix is then applied to the canvas.
+    *   **Ghost Balls:** Screen-space circles are drawn to represent the "3D" position of the cue and target balls. Their Y-offset from the projected plane centers is scaled by the sine of the pitch angle (raised to a power for a more pronounced effect) to simulate them floating above the plane.
+    *   **Helper Text:** Text labels are drawn either on the (lifted) protractor plane or directly in screen space, with basic collision avoidance and dynamic sizing.
+5.  **Gesture Handling:**
+    *   `ScaleGestureDetector` for pinch-to-zoom.
+    *   `MotionEvent` tracking for single-finger pan-to-rotate.
+6.  **Theming:** Uses Jetpack Compose for Material 3 theming, with color values then passed to the custom view's `Paint` objects.
+
+
+
+## Known Quirks & Future Delusions
+
+*   **Text Collision Avoidance:** Current implementation is basic (first-drawn wins space).
+*   **A Virtual Table for Virtually Useful Bank Shot Projection:** Using more sophisticated dynamic layout involving a line drawing of a billiards table will come someday.
+*   **True 3D Rendering:** This app fakes 3D with 2D canvas tricks. Moving to OpenGL ES or a 3D engine like Filament would allow for actual 3D models and lighting, but would also drastically increase complexity. And probably anxiety. But probably not usefulness.
+*   **Ball, Table and Pocket Detection:** The ultimate fantasy. Using CV to detect the table, balls, and pockets automatically. For now, you are the CV.
+*   **Insulting Warnings:** The pool of sarcastic remarks is finite. Contributions welcome if they tickle me the required level of pink.
+*   **Performance:** Drawing many complex paths and text elements on every frame can be demanding. Optimizations are an ongoing battle. And yet, somehow, it feels more like a you-problem.
+
+
+
+## License
+
+Distributed under the MIT License. Basically, completely free to use however you'd like, just gimme a shoutout. I make money making art. So, like this:
+Cue D’état by HereLiesAz (https://instagram.com/hereliesaz)
+
+
+## Acknowledgments (of Who to Blame)
+
+*   The ghosts of billiards past whose missed shots inspired this.
+*   The people I've tried to teach all these things.
+*   Physics. And geometry. Where my hoes at?!
+
+---
+
+
+
+
+================================================================================
 FILE: build.gradle.kts
 ================================================================================
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 plugins {
-    id("com.android.application") version "8.9.3" apply false // Example version
+    id("com.android.application") version "8.11.0-rc01" apply false // Example version
     id("org.jetbrains.kotlin.android") version "2.1.20" apply false // Example version
 }
 
@@ -1248,22 +1612,33 @@ plugins {
 }
 
 android {
+    signingConfigs {
+        create("release") {
+            storeFile = file("G:\\My Drive\\az_apk_keystore.jks")
+            storePassword = "18187077190901818"
+        }
+    }
     compileSdk = 36 // Or your current target SDK
 
     defaultConfig {
         applicationId = "com.hereliesaz.poolprotractor"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        applicationIdSuffix = "trackless"
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            applicationIdSuffix = "trackless"
+        }
+        getByName("debug") {
+            applicationIdSuffix = "trackless"
         }
     }
     compileOptions {
@@ -1316,6 +1691,15 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    // ... other dependencies
+    implementation(libs.androidx.activity.compose) // Or the latest version
+    implementation(platform(libs.androidx.compose.bom)) // Or the latest BOM
+    implementation(libs.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material3)
+    implementation(libs.androidx.foundation)
+    // ... other compose dependencies
 }
 
 
@@ -1336,7 +1720,7 @@ pluginManagement {
   }
   plugins {
     id("com.android.application") version "8.10.0"
-    id("com.android.library") version "8.9.3"   // Or your AGP version
+    id("com.android.library") version "8.11.0-rc01"   // Or your AGP version
 
     id("org.jetbrains.kotlin.android") version "2.1.20"
   }

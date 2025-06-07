@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:id="@+id/action_check_for_updates"
-        android:title="@string/check_for_updates" />
-    <item
-        android:id="@+id/action_toggle_help"
-        android:title="@string/wtf_is_all_this" />
-</menu>

@@ -12,6 +12,8 @@ pluginManagement {
   }
   plugins {
     id("com.android.application") version "8.10.0"
+    id("com.android.library") version "8.11.0-rc01"   // Or your AGP version
+
     id("org.jetbrains.kotlin.android") version "2.1.20"
   }
 }
@@ -23,4 +25,5 @@ dependencyResolutionManagement {
   }
 }
 
+rootProject.name = "PoolProtractor"
 include(":app")

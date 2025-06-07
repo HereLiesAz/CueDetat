@@ -3,6 +3,7 @@ package com.hereliesaz.poolprotractor
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.content.res.Resources
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -17,38 +18,27 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -60,9 +50,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.hereliesaz.poolprotractor.ui.theme.PoolProtractorTheme
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.systemBars
+import kotlin.random.Random
 
 class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlayView.ProtractorStateListener {
 
@@ -72,7 +60,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlay
 
     // CameraX
     private lateinit var cameraProviderFuture: ListenableFuture<ProcessCameraProvider>
-    private var previewView: PreviewView? = null // Will be set in Compose
+    private var previewView: PreviewView? = null
 
     // Sensor
     private var sensorManager: SensorManager? = null
@@ -80,54 +68,51 @@ class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlay
     private val rotationMatrix = FloatArray(9)
     private val orientationAngles = FloatArray(3)
 
-    // ProtractorOverlayView instance, to be accessed from Compose
+    // ProtractorOverlayView instance
     private var protractorOverlayViewInstance: ProtractorOverlayView? = null
-
     private var valuesChangedSinceLastReset by mutableStateOf(false)
+
+    // State for the insulting warning message
+    private val warningMessage = mutableStateOf("")
+    private val warningVisible = mutableStateOf(false)
+
 
     private val requestCameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
                 startCameraIfReady()
             } else {
-                // Consider a more user-friendly way to handle this in Compose
                 Log.e(TAG, "Camera permission denied.")
             }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Initialize SensorManager here as it's not UI dependent
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         rotationVectorSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
-
         setContent {
-            val view = LocalView.current
-            SideEffect { // For immersive mode, status bar handling
-                val window = (view.context as Activity).window
-                WindowCompat.setDecorFitsSystemWindows(window, false)
-                WindowInsetsControllerCompat(window, view).let { controller ->
-                    controller.hide(WindowInsetsCompat.Type.statusBars())
-                    controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                }
-                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            }
-
             PoolProtractorTheme {
-                MainScreen()
+                val view = LocalView.current
+                SideEffect {
+                    val window = (view.context as Activity).window
+                    WindowCompat.setDecorFitsSystemWindows(window, false)
+                    WindowInsetsControllerCompat(window, view).let { controller ->
+                        controller.hide(WindowInsetsCompat.Type.statusBars())
+                        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    }
+                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+                MainScreen(warningMessage.value, warningVisible.value)
             }
         }
-        checkCameraPermissionAndStart() // Request permission after content is set
+        checkCameraPermissionAndStart()
     }
 
     @Composable
-    private fun MainScreen() {
-        val context = LocalContext.current
+    private fun MainScreen(currentWarning: String, isWarningVisible: Boolean) {
         val lifecycleOwner = LocalLifecycleOwner.current
         val currentColorScheme = MaterialTheme.colorScheme
-
-        var sliderProgress by remember { mutableFloatStateOf(0.0f) } // 0.0 to 1.0
+        var sliderProgress by remember { mutableFloatStateOf(0.0f) }
 
         LaunchedEffect(protractorOverlayViewInstance) {
             protractorOverlayViewInstance?.let {
@@ -140,45 +125,60 @@ class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlay
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
-            // Camera Preview
-            AndroidView(
-                factory = { ctx ->
-                    PreviewView(ctx).also { pv ->
-                        previewView = pv
-                        // Defer camera start until permission is granted and previewView is available
-                        startCameraIfReady()
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
+            AndroidView(factory = { ctx ->
+                PreviewView(ctx).also { pv ->
+                    previewView = pv
+                    startCameraIfReady()
+                }
+            }, modifier = Modifier.fillMaxSize())
 
-            // Protractor Overlay View
-            AndroidView(
-                factory = { ctx ->
-                    ProtractorOverlayView(ctx).also { pov ->
-                        protractorOverlayViewInstance = pov
-                        pov.listener = this@MainActivity
-                    }
-                },
-                update = { view ->
-                    view.applyMaterialYouColors(currentColorScheme)
-                    // If ProtractorOverlayView's state needs to be driven from Compose externally, do it here.
-                    // For now, it manages its own zoom/rotation, and updates MainActivity via listener.
-                },
-                modifier = Modifier.fillMaxSize()
-            )
+            AndroidView(factory = { ctx ->
+                ProtractorOverlayView(ctx).also { pov ->
+                    protractorOverlayViewInstance = pov
+                    pov.listener = this@MainActivity
+                }
+            }, update = { view ->
+                view.applyMaterialYouColors(currentColorScheme)
+            }, modifier = Modifier.fillMaxSize())
 
-            // UI Controls Overlay
+            // UI Controls and Warnings Overlay
             Box(modifier = Modifier
                 .fillMaxSize()
-                .padding(WindowInsetsCompat.systemBars.asPaddingValues()) // Apply system bar padding
+                .padding(WindowInsets.systemBars.asPaddingValues())
             ) {
-                // Zoom Controls (Slider and Icon) - Right Aligned
+                // Insulting Warning Text - Top Center
+                val warningAreaDesc = stringResource(id = R.string.warning_message_area)
+                AnimatedVisibility(
+                    visible = isWarningVisible,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 24.dp),
+                    enter = fadeIn(animationSpec = tween(300)),
+                    exit = fadeOut(animationSpec = tween(300))
+                ) {
+                    Text(
+                        text = currentWarning,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth(0.8f)
+                            .background(
+                                MaterialTheme.colorScheme.onError.copy(alpha = 0.7f),
+                                shape = MaterialTheme.shapes.medium
+                            )
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .semantics { contentDescription = warningAreaDesc }
+                    )
+                }
+
+
+                // Zoom Controls - Right
                 Column(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .fillMaxHeight(0.7f) // Adjust height as desired for the column
-                        .width(60.dp)        // Give it some width for touch targets
+                        .fillMaxHeight(0.7f)
+                        .width(60.dp)
                         .padding(end = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
@@ -186,8 +186,8 @@ class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlay
                     Icon(
                         painter = painterResource(id = R.drawable.ic_zoom_in_24),
                         contentDescription = stringResource(id = R.string.zoom_icon),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 16.dp) // Space between icon and slider
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 16.dp)
                     )
                     VerticalSlider(
                         value = sliderProgress,
@@ -199,17 +199,18 @@ class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlay
                             onUserInteraction()
                         },
                         modifier = Modifier
-                            .weight(1f) // Slider takes up available vertical space
-                            .fillMaxWidth() // Fill the column's width
+                            .weight(1f)
+                            .fillMaxWidth()
                     )
                 }
 
-                // Reset Button - Bottom Right
+                // FABs - Bottom
                 FloatingActionButton(
                     onClick = { handleResetAction() },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(24.dp),
+                    shape = MaterialTheme.shapes.large,
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 ) {
                     Icon(
@@ -219,12 +220,12 @@ class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlay
                     )
                 }
 
-                // Help Button - Bottom Left
                 FloatingActionButton(
                     onClick = { protractorOverlayViewInstance?.toggleHelpersVisibility() },
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(24.dp),
+                    shape = MaterialTheme.shapes.large,
                     containerColor = MaterialTheme.colorScheme.secondaryContainer
                 ) {
                     Icon(
@@ -236,12 +237,9 @@ class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlay
             }
         }
 
-        // Register sensor listener when composable is active
         DisposableEffect(Unit) {
             registerSensorListener()
-            onDispose {
-                unregisterSensorListener()
-            }
+            onDispose { unregisterSensorListener() }
         }
     }
 
@@ -254,7 +252,7 @@ class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlay
         enabled: Boolean = true,
         valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
         steps: Int = 0,
-        colors: androidx.compose.material3.SliderColors = SliderDefaults.colors(
+        colors: SliderColors = SliderDefaults.colors(
             thumbColor = MaterialTheme.colorScheme.primary,
             activeTrackColor = MaterialTheme.colorScheme.primary,
             inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
@@ -262,14 +260,14 @@ class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlay
     ) {
         BoxWithConstraints(modifier = modifier
             .graphicsLayer(rotationZ = 270f)
-            .padding(horizontal = 8.dp) // Add some padding so thumb isn't cut off
+            .padding(horizontal = 8.dp)
         ) {
             Slider(
                 value = value,
                 onValueChange = onValueChange,
                 modifier = Modifier
-                    .width(this.maxHeight) // Effectively the length of the slider
-                    .height(this.maxWidth),  // Effectively the thickness of the slider
+                    .width(this.maxHeight)
+                    .height(this.maxWidth),
                 enabled = enabled,
                 valueRange = valueRange,
                 steps = steps,
@@ -278,20 +276,14 @@ class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlay
         }
     }
 
-
     private fun checkCameraPermissionAndStart() {
         when {
-            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> {
-                startCameraIfReady()
-            }
+            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> startCameraIfReady()
             shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> {
-                // Explain to the user why the permission is needed
                 Log.w(TAG, "Camera permission rationale should be shown.")
                 requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
             }
-            else -> {
-                requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-            }
+            else -> requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -314,16 +306,14 @@ class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlay
     }
 
     private fun bindPreview(cameraProvider: ProcessCameraProvider) {
-        val currentPreviewView = previewView ?: return // Ensure previewView is initialized
-
+        val currentPreviewView = previewView ?: return
         val preview: Preview = Preview.Builder().build()
         val cameraSelector: CameraSelector = CameraSelector.Builder()
             .requireLensFacing(CameraSelector.LENS_FACING_BACK).build()
-
         preview.surfaceProvider = currentPreviewView.surfaceProvider
         try {
             cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(this, cameraSelector, preview) // Use ComponentActivity as LifecycleOwner
+            cameraProvider.bindToLifecycle(this, cameraSelector, preview)
         } catch (e: Exception) {
             Log.e(TAG, "Use case binding failed", e)
         }
@@ -331,25 +321,11 @@ class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlay
 
     private fun handleResetAction() {
         protractorOverlayViewInstance?.resetToDefaults()
-        // The onZoomChanged callback will update sliderProgress
         valuesChangedSinceLastReset = false
     }
 
     // ProtractorStateListener Callbacks
     override fun onZoomChanged(newZoomFactor: Float) {
-        val zoomRange = ProtractorOverlayView.MAX_ZOOM_FACTOR - ProtractorOverlayView.MIN_ZOOM_FACTOR
-        if (zoomRange > 0.0001f) {
-            // This logic will be triggered by setContent's sliderProgress state variable
-            // Find the sliderProgress state variable in MainScreen and update it.
-            // For now, just log, as the MainScreen's sliderProgress state should be updated directly
-            // by the ProtractorOverlayView's listener if we want to keep a single source of truth.
-            // However, the current setup has slider driving POV, and POV listener updating slider.
-            // To correctly update the sliderProgress in Composable:
-            // We need a way for this callback to update the `sliderProgress` state in `MainScreen`.
-            // This can be done by making sliderProgress a member of MainActivity or passing a lambda.
-            // For simplicity with current structure, assume MainScreen's LaunchedEffect and slider's onValueChange manage it.
-            // This callback just ensures the internal `valuesChangedSinceLastReset` is set.
-        }
         onUserInteraction()
     }
 
@@ -359,6 +335,16 @@ class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlay
 
     override fun onUserInteraction() {
         valuesChangedSinceLastReset = true
+    }
+
+    override fun onWarningStateChanged(isWarning: Boolean) {
+        if (isWarning) {
+            val warnings = resources.getStringArray(R.array.insulting_warnings)
+            warningMessage.value = warnings[Random.nextInt(warnings.size)]
+            warningVisible.value = true
+        } else {
+            warningVisible.value = false
+        }
     }
 
     // SensorEventListener Callbacks
@@ -376,12 +362,10 @@ class MainActivity : ComponentActivity(), SensorEventListener, ProtractorOverlay
 
     override fun onResume() {
         super.onResume()
-        // Sensor registration is now handled by DisposableEffect in Compose
     }
 
     override fun onPause() {
         super.onPause()
-        // Sensor unregistration is now handled by DisposableEffect in Compose
     }
 
     override fun onSensorChanged(event: SensorEvent?) {

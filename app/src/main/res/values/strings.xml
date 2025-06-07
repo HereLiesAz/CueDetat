@@ -1,5 +1,50 @@
+
 <resources>
+    <string name="app_name">Cue D\’état</string>
     <string name="zoom_icon">Zoom Icon</string>
     <string name="reset_view">Reset View</string>
+    <string name="toggle_help_lines">Toggle Help Lines</string>
     <string name="toggle_theme">Toggle Theme</string>
+    <string name="warning_message_area">Sarcastic Warning Message Area</string>
+    <string name="tagline">May your shot be better than your excuses.</string>
+    <string name="my_app_name">Cue D\’état</string>
+
+    <string-array name="insulting_warnings">
+        <item>Physics called. It wants your law degree back.</item>
+        <item>A fine example of geometric optimism.</item>
+        <item>Aiming is not a suggestion.</item>
+        <item>Even the chalk finds your methods dusty.</item>
+        <item>Let\'s list other things you could be doing instead. There\'s knitting, and… </item>
+        <item>Talent not detected.</item>
+        <item>Can\'t even scratch common sense.</item>
+        <item>There are no shots over there. I checked.</item>
+        <item>Do you need a bigger phone or a smaller table?</item>
+        <item>Your Mrs. called, she wants her title back.</item>
+        <item>\'A do not, this is,\' says Yoda.</item>
+        <item>Nope.</item>
+        <item>Not happening.</item>
+        <item>Won\'t work.</item>
+        <item>Try harder.</item>
+        <item>PLEASE try harder.</item>
+        <item>Try gooder?</item>
+        <item>Try better. That\'s the one I was looking for. No, not your shot. The word I was looking for.</item>
+        <item>No.</item>
+        <item>Physics says no.</item>
+        <item>God says no.</item>
+        <item>Your mom says she\'s proud no matter what.</item>
+        <item>Your father says nothing.</item>
+        <item>Hey batter, batter…</item>
+        <item>In the beginning, God created a better shot.</item>
+        <item>Am I crying from laughing, or is this just sad?</item>
+        <item>Am I pretty, yet?</item>
+        <item>Do you even know how to pool, bro?</item>
+        <item>That\'s… an angle. Not a good one.</item>
+        <item>I can\'t more disappointed than your dad.</item>
+        <item>Consult a physicist. Or a therapist.</item>
+        <item>Maybe if you put your phone down once in a while....</item>
+    </string-array>
+
+
 </resources>
+
+
