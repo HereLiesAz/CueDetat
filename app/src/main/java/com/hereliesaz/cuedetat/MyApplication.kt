@@ -3,6 +3,10 @@ package com.hereliesaz.cuedetat
 import android.app.Application
 import android.util.Log
 import androidx.multidex.MultiDex
+import dagger.hilt.android.HiltAndroidApp
+
+
+@HiltAndroidApp
 
 class MyApplication : Application() {
     override fun onCreate() {

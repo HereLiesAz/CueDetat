@@ -1,38 +1,35 @@
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("kotlin-kapt")
+    id("com.google.dagger.hilt.android")
     alias(libs.plugins.kotlin.compose)
-
 }
 
 android {
-    signingConfigs {
-        create("release") {
-            storeFile = file("G:\\My Drive\\az_apk_keystore.jks")
-            storePassword = "18187077190901818"
-        }
-    }
-    compileSdk = 36 // Or your current target SDK
+    namespace = "com.hereliesaz.cuedetat"
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.3.3"
+        versionCode = 1
+        // Versioning Scheme: YYYY.MM.DD-release
+        versionName = "2025.06.07-release"
+        multiDexEnabled = true // <--- ADD THIS LINE
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        applicationIdSuffix = "trackless"
+        vectorDrawables {
+            useSupportLibrary = true
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            applicationIdSuffix = ""
-        }
-        getByName("debug") {
-            applicationIdSuffix = ""
         }
     }
     compileOptions {
@@ -42,57 +39,66 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-
     buildFeatures {
-        compose = true // Enable Compose
-        viewBinding = true
-
+        compose = true
     }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.3" // Example: Use the version compatible with your Kotlin plugin
+    buildFeatures {
+        buildConfig = true
     }
-
-    namespace = "com.hereliesaz.cuedetat"
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+    buildToolsVersion = "36.0.0"
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx) // Example of a Kotlin dependency if you mix
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-    implementation(libs.androidx.constraintlayout)
+    // Core & UI
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.compose.ui.graphics) // Or the specific version catalog alias if you have one
-    // CameraX dependencies
+    implementation(libs.androidx.compose.material3)
+    // CameraX
     implementation(libs.androidx.camera.core)
-    implementation (libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
+    implementation(libs.kotlinx.coroutines.guava)
 
+    // Hilt for Dependency Injection
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.compiler)
+
+    // Retrofit for Networking
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.androidx.ui.test.manifest)
 
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.kotlin.stdlib)
+    // For Glance support
+    implementation(libs.androidx.glance)
+    // For AppWidgets support with Glance
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.bundles.camera)
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.kotlinx.coroutines.guava) // Also part of your bundle
+    implementation(libs.material)
+    implementation(libs.androidx.multidex) // <-- Add this line
+    implementation(libs.androidx.material.icons.extended) // Or the latest version
 
-    testImplementation(libs.junit)
-    implementation(libs.kotlinx.coroutines.guava)
-    implementation(libs.androidx.foundation)
-    implementation(libs.androidx.material3)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-    // ... other dependencies
-    implementation(libs.androidx.activity.compose) // Or the latest version
-    implementation(platform(libs.androidx.compose.bom)) // Or the latest BOM
-    implementation(libs.ui)
-    implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-    implementation(libs.androidx.foundation)
-    // ... other compose dependencies
-    implementation(libs.androidx.multidex)
 }

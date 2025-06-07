@@ -1,10 +1,16 @@
-
 <resources>
     <string name="app_name">CueDetat</string>
     <string name="zoom_icon">Zoom Icon</string>
     <string name="reset_view">Reset View</string>
     <string name="toggle_help_lines">Toggle Help Lines</string>
-    <string name="toggle_theme">Toggle Theme</string>
+
+    <!-- Update Checker -->
+    <string name="update_check_failed">Update check failed. The void is silent.</string>
+    <string name="update_no_new_release">You are aligned with the current reality. No new release found.</string>
+    <string name="update_available">A new version (%s) beckons from the abyss.</string>
+
+
+    <!-- Insulting Warnings -->
     <string name="warning_message_area">Sarcastic Warning Message Area</string>
     <string name="tagline">May your shot be better than your excuses.</string>
 
@@ -43,5 +49,3 @@
         <item>Maybe if you put your phone down once in a while....</item>
     </string-array>
 </resources>
-
-

@@ -1,5 +1,7 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 plugins {
-    id("com.android.application") version "8.11.0-rc01" apply false // Example version
-    id("org.jetbrains.kotlin.android") version "2.1.20" apply false // Example version
+    id("com.android.application") version "8.12.0-alpha04" apply false
+    id("org.jetbrains.kotlin.android") version "2.1.21" apply false
+    id("com.google.dagger.hilt.android") version "2.56.2" apply false
+    id("org.jetbrains.kotlin.plugin.compose") version "2.1.21" apply false
 }
