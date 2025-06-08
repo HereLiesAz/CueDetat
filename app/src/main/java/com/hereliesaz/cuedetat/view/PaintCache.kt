@@ -23,7 +23,7 @@ class PaintCache {
     val centerMarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     val protractorLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 3f }
     val shotPathLinePaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 5f } // Formerly yellowTargetLinePaint
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 5f }
     val ghostCueOutlinePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 3f }
     val targetGhostBallOutlinePaint =
@@ -68,7 +68,7 @@ class PaintCache {
         cueCirclePaint.color = primaryColor
         centerMarkPaint.color = onSurfaceColor
         protractorLinePaint.color = colorScheme.tertiary.copy(alpha = 0.7f).toArgb()
-        shotPathLinePaint.color = colorScheme.tertiary.toArgb() // Replaces yellow
+        shotPathLinePaint.color = colorScheme.tertiary.toArgb()
 
         ghostCueOutlinePaint.color = colorScheme.outline.toArgb()
         targetGhostBallOutlinePaint.color = colorScheme.tertiary.toArgb()
@@ -78,9 +78,9 @@ class PaintCache {
             setShadowLayer(2f, 1f, 1f, textShadowColor)
         }
 
-        tangentLineDottedPaint.color = colorScheme.outline.toArgb() // Muted color
+        tangentLineDottedPaint.color = colorScheme.outline.toArgb()
         tangentLineSolidPaint.apply {
-            color = onSurfaceColor // White / Black
+            color = onSurfaceColor
             setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, glowColor)
         }
     }

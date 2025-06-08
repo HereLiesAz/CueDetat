@@ -5,7 +5,6 @@ import android.graphics.Matrix
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.pow
@@ -106,18 +105,21 @@ class OverlayRenderer {
         }
     }
 
+
     private fun drawBalls(
         canvas: Canvas,
         state: OverlayState,
         paints: PaintCache,
         useErrorColor: Boolean
     ) {
+        // Draw the target ball outline
         canvas.drawCircle(
             state.targetCircleCenter.x,
             state.targetCircleCenter.y,
             state.logicalRadius,
             paints.targetCirclePaint
         )
+        // Draw the target ball center mark
         canvas.drawCircle(
             state.targetCircleCenter.x,
             state.targetCircleCenter.y,
@@ -125,25 +127,28 @@ class OverlayRenderer {
             paints.centerMarkPaint
         )
 
+        // Set error color if needed, otherwise use the theme's primary color
         val originalColor = paints.cueCirclePaint.color
         if (useErrorColor) {
             paints.cueCirclePaint.color = paints.tangentLineDottedPaint.color
         }
+        // Draw the cue ball outline
         canvas.drawCircle(
             state.cueCircleCenter.x,
             state.cueCircleCenter.y,
             state.logicalRadius,
             paints.cueCirclePaint
         )
+        // Draw the cue ball center mark
         canvas.drawCircle(
             state.cueCircleCenter.x,
             state.cueCircleCenter.y,
             state.logicalRadius / 5f,
             paints.centerMarkPaint
         )
+        // Reset the paint color
         paints.cueCirclePaint.color = originalColor
     }
-
     private fun drawTangentLines(
         canvas: Canvas,
         state: OverlayState,
@@ -207,6 +212,8 @@ class OverlayRenderer {
         canvas.restore()
     }
 
+    // In hereliesaz/cued8at/CueD8at-2b11a59283ee0186372bfb070f1e3cb4a10e014c/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/OverlayRenderer.kt
+
     private fun drawGhostBalls(
         canvas: Canvas,
         state: OverlayState,
@@ -230,6 +237,8 @@ class OverlayRenderer {
                 state.targetCircleCenter.y - state.logicalRadius
             ), state.pitchMatrix
         )
+        val gTSR = max(distance(pTGC, tR), distance(pTGC, tT)) // Ghost Target Screen Radius
+
         val cR = mapPoint(
             PointF(state.cueCircleCenter.x + state.logicalRadius, state.cueCircleCenter.y),
             state.pitchMatrix
@@ -238,22 +247,15 @@ class OverlayRenderer {
             PointF(state.cueCircleCenter.x, state.cueCircleCenter.y - state.logicalRadius),
             state.pitchMatrix
         )
+        val gCSR = max(distance(pCGC, cR), distance(pCGC, cT)) // Ghost Cue Screen Radius
 
-        val gTSR = max(distance(pTGC, tR), distance(pTGC, tT))
-        val gCSR = max(distance(pCGC, cR), distance(pCGC, cT))
-
-        // --- 3D Illusion Logic ---
-        // This is the resurrected rite. The Y-position of the ghost ball is further offset
-        // by a factor of the sine of the pitch angle, creating a non-linear "lift" that
-        // tricks the eye into perceiving depth. Reality is a hack.
-        val pitchRad = Math.toRadians(state.pitchAngle.toDouble())
-        val yOffsetFactor = abs(sin(pitchRad)).pow(1.5) // Power enhances the non-linearity
-        val additionalOffset = state.logicalRadius * yOffsetFactor * 0.75 // A tuning factor
-
-        // The ghost ball's bottom edge starts at the projected center, then we lift it further.
-        val targetGhostCenterY = pTGC.y - gTSR - additionalOffset.toFloat()
-        val cueGhostCenterY = pCGC.y - gCSR - additionalOffset.toFloat()
-        // --- End Illusion Logic ---
+        // --- Corrected Positioning Logic ---
+        // The hover-effect logic has been removed.
+        // The Y-position is now calculated so the bottom of the ghost ball
+        // sits exactly on the center of the 2D projected circle.
+        val targetGhostCenterY = pTGC.y - gTSR
+        val cueGhostCenterY = pCGC.y - gCSR
+        // --- End Correction ---
 
         canvas.drawCircle(pTGC.x, targetGhostCenterY, gTSR, paints.targetGhostBallOutlinePaint)
 

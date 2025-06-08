@@ -72,6 +72,7 @@ dependencies {
 
     // Hilt for Dependency Injection
     implementation(libs.hilt.android)
+    implementation(libs.androidx.benchmark.common)
     kapt(libs.hilt.compiler)
 
     // Retrofit for Networking
@@ -101,4 +102,10 @@ dependencies {
     implementation(libs.androidx.multidex) // <-- Add this line
     implementation(libs.androidx.material.icons.extended) // Or the latest version
 
+    implementation(libs.hilt.android)
+    kapt(libs.dagger.hilt.compiler)
+
+}
+kapt {
+    correctErrorTypes = true
 }
