@@ -36,8 +36,13 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
     kotlinOptions {
         jvmTarget = "17"
+        freeCompilerArgs += listOf(
+            "-Xopt-in=kotlin.RequiresOptIn",
+            "-Xopt-in=androidx.compose.material3.ExperimentalMaterial3Api" // Add this line
+        )
     }
     buildFeatures {
         compose = true
@@ -45,6 +50,8 @@ android {
     buildFeatures {
         buildConfig = true
     }
+
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -104,6 +111,8 @@ dependencies {
 
     implementation(libs.hilt.android)
     kapt(libs.dagger.hilt.compiler)
+    implementation(libs.androidx.palette)
+
 
 }
 kapt {

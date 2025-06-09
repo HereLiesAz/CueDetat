@@ -2,44 +2,31 @@ package com.hereliesaz.cuedetat.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// --- Dark Theme: "Mint Night" ---
-val dark_primary = Color(0xFF53DE8C)
-val dark_onPrimary = Color(0xFF003919)
-val dark_primaryContainer = Color(0xFF005227)
-val dark_onPrimaryContainer = Color(0xFF72FBA4)
-val dark_secondary = Color(0xFFB8CCB8)
-val dark_onSecondary = Color(0xFF233427)
-val dark_secondaryContainer = Color(0xFF394B3C)
-val dark_onSecondaryContainer = Color(0xFFD4E8D3)
-val dark_tertiary = Color(0xFFA1CED5)
-val dark_onTertiary = Color(0xFF01363D)
-val dark_tertiaryContainer = Color(0xFF1D4D54)
-val dark_onTertiaryContainer = Color(0xFFBDEAF1)
-val dark_error = Color(0xFFFFB4AB)
-val dark_onError = Color(0xFF690005)
-val dark_background = Color(0xFF1A1C1A)
-val dark_onBackground = Color(0xFFE2E3DE)
-val dark_surface = Color(0xFF1A1C1A)
-val dark_onSurface = Color(0xFFE2E3DE)
-val dark_outline = Color(0xFF8C938A)
+// The color sampled directly from your logo file.
+val AccentGold = Color(0xFFFFC400)
 
-// --- Light Theme: "Mint Day" ---
-val light_primary = Color(0xFF006D35)
-val light_onPrimary = Color(0xFFFFFFFF)
-val light_primaryContainer = Color(0xFF72FBA4)
-val light_onPrimaryContainer = Color(0xFF00210C)
-val light_secondary = Color(0xFF506352)
-val light_onSecondary = Color(0xFFFFFFFF)
-val light_secondaryContainer = Color(0xFFD4E8D3)
-val light_onSecondaryContainer = Color(0xFF0E1F12)
-val light_tertiary = Color(0xFF38656C)
-val light_onTertiary = Color(0xFFFFFFFF)
-val light_tertiaryContainer = Color(0xFFBDEAF1)
-val light_onTertiaryContainer = Color(0xFF001F24)
-val light_error = Color(0xFFBA1A1A)
-val light_onError = Color(0xFFFFFFFF)
-val light_background = Color(0xFFFCFDF7)
-val light_onBackground = Color(0xFF1A1C1A)
-val light_surface = Color(0xFFFCFDF7)
-val light_onSurface = Color(0xFF1A1C1A)
-val light_outline = Color(0xFF727970)
+// The single, unified theme for the app, "Gilded 8-Ball".
+// A high-contrast dark theme with golden-yellow as the primary accent.
+val G8_Primary = Color(0xFFFFB900)
+val G8_OnPrimary = Color(0xFF452B00)
+val G8_PrimaryContainer = Color(0xFF633F00)
+val G8_OnPrimaryContainer = Color(0xFFFFDEA0)
+
+val G8_Secondary = Color(0xFFDDC2A1)
+val G8_OnSecondary = Color(0xFF3F2D16)
+val G8_SecondaryContainer = Color(0xFF58442A)
+val G8_OnSecondaryContainer = Color(0xFFFADEBC)
+
+val G8_Tertiary = Color(0xFFB8CEA1)
+val G8_OnTertiary = Color(0xFF243515)
+val G8_TertiaryContainer = Color(0xFF3A4C2A)
+val G8_OnTertiaryContainer = Color(0xFFD4EABB)
+
+val G8_Error = Color(0xFFFFB4AB)
+val G8_OnError = Color(0xFF690005)
+
+val G8_Background = Color(0xFF1E1B16) // A very dark, slightly warm background
+val G8_OnBackground = Color(0xFFEAE1D9)
+val G8_Surface = Color(0xFF1E1B16)
+val G8_OnSurface = Color(0xFFEAE1D9)
+val G8_Outline = Color(0xFF9C8F78)

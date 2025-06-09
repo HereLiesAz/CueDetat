@@ -28,25 +28,27 @@ class OverlayRenderer {
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         if (state.viewWidth == 0 || state.viewHeight == 0) return
 
+        // --- Consolidated Warning Logic ---
         val (isCueOnFarSide, isPhysicalOverlap) = calculateWarningConditions(state)
         val isDeflectionDominantAngle =
             (state.rotationAngle > 90.5f && state.rotationAngle < 269.5f)
-        val useErrorColorForMainCue = isCueOnFarSide || isDeflectionDominantAngle
-        val showWarningStyleForGhostAndShotLine = isPhysicalOverlap || isCueOnFarSide
+
+        // A shot is "impossible" or a "warning" if any of these conditions are true.
+        val isImpossibleShot = isCueOnFarSide || isPhysicalOverlap || isDeflectionDominantAngle
 
         // --- Draw Protractor Plane (in pitched perspective) ---
         canvas.save()
         canvas.concat(state.pitchMatrix)
 
-        drawAimingLine(canvas, state, paints)
-        drawBalls(canvas, state, paints, useErrorColorForMainCue)
-        drawTangentLines(canvas, state, paints, useErrorColorForMainCue)
+        drawAimingLine(canvas, state, paints, isImpossibleShot)
+        drawBalls(canvas, state, paints, isImpossibleShot)
+        drawTangentLines(canvas, state, paints, isImpossibleShot) // Pass unified flag
         drawProtractorLines(canvas, state, paints)
 
         canvas.restore() // Restore from pitch matrix
 
         // --- Draw Ghost Balls and Text (in screen space) ---
-        drawGhostBalls(canvas, state, paints, showWarningStyleForGhostAndShotLine)
+        drawGhostBalls(canvas, state, paints, isImpossibleShot)
     }
 
     private fun calculateWarningConditions(state: OverlayState): Pair<Boolean, Boolean> {
@@ -79,7 +81,13 @@ class OverlayRenderer {
         return Pair(isCueOnFarSide, isPhysicalOverlap)
     }
 
-    private fun drawAimingLine(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+    // UPDATED: Now accepts the isImpossibleShot flag to change color.
+    private fun drawAimingLine(
+        canvas: Canvas,
+        state: OverlayState,
+        paints: PaintCache,
+        isImpossibleShot: Boolean
+    ) {
         if (!state.hasInverseMatrix) return
 
         val screenAimPoint = floatArrayOf(state.viewWidth / 2f, state.viewHeight.toFloat())
@@ -99,27 +107,34 @@ class OverlayRenderer {
             val ndy = dy / mag
             val extendFactor = max(state.viewWidth, state.viewHeight) * 5f
             val ex = cx + ndx * extendFactor
-            val ey = cy + ndy * extendFactor
-            canvas.drawLine(sx, sy, cx, cy, paints.aimingAssistNearPaint)
-            canvas.drawLine(cx, cy, ex, ey, paints.aimingAssistFarPaint)
+            val ey = cy + ndy * extendFactor // <--- ADD THIS LINE TO CALCULATE EY
+
+            // USER REQUEST: Use a muted red for the cue sight line on impossible shots.
+            val nearPaint =
+                if (isImpossibleShot) paints.warningPaintRed3 else paints.aimingAssistNearPaint
+            val farPaint =
+                if (isImpossibleShot) paints.warningPaintRed3 else paints.aimingAssistFarPaint
+
+            canvas.drawLine(sx, sy, cx, cy, nearPaint)
+            canvas.drawLine(cx, cy, ex, ey, farPaint)
         }
     }
 
 
+    // UPDATED: Now uses the isImpossibleShot flag.
     private fun drawBalls(
         canvas: Canvas,
         state: OverlayState,
         paints: PaintCache,
-        useErrorColor: Boolean
+        isImpossibleShot: Boolean
     ) {
-        // Draw the target ball outline
+        // Target ball does not change color.
         canvas.drawCircle(
             state.targetCircleCenter.x,
             state.targetCircleCenter.y,
             state.logicalRadius,
             paints.targetCirclePaint
         )
-        // Draw the target ball center mark
         canvas.drawCircle(
             state.targetCircleCenter.x,
             state.targetCircleCenter.y,
@@ -127,33 +142,29 @@ class OverlayRenderer {
             paints.centerMarkPaint
         )
 
-        // Set error color if needed, otherwise use the theme's primary color
-        val originalColor = paints.cueCirclePaint.color
-        if (useErrorColor) {
-            paints.cueCirclePaint.color = paints.tangentLineDottedPaint.color
-        }
-        // Draw the cue ball outline
+        // USER REQUEST: Use a muted red for the 2D cue ball on impossible shots.
+        val cuePaint = if (isImpossibleShot) paints.warningPaintRed1 else paints.cueCirclePaint
+
         canvas.drawCircle(
             state.cueCircleCenter.x,
             state.cueCircleCenter.y,
             state.logicalRadius,
-            paints.cueCirclePaint
+            cuePaint
         )
-        // Draw the cue ball center mark
         canvas.drawCircle(
             state.cueCircleCenter.x,
             state.cueCircleCenter.y,
             state.logicalRadius / 5f,
             paints.centerMarkPaint
         )
-        // Reset the paint color
-        paints.cueCirclePaint.color = originalColor
     }
+
+    // UPDATED: Now uses the isImpossibleShot flag.
     private fun drawTangentLines(
         canvas: Canvas,
         state: OverlayState,
         paints: PaintCache,
-        useErrorColor: Boolean
+        isImpossibleShot: Boolean
     ) {
         val dx = state.targetCircleCenter.x - state.cueCircleCenter.x
         val dy = state.targetCircleCenter.y - state.cueCircleCenter.y
@@ -164,10 +175,11 @@ class OverlayRenderer {
         val deflectionDirX = -dy / mag
         val deflectionDirY = dx / mag
 
+        // If shot is impossible, both tangent lines are dotted. Otherwise, one is solid.
         val rightPaint =
-            if (useErrorColor || state.rotationAngle <= 180f) paints.tangentLineDottedPaint else paints.tangentLineSolidPaint
+            if (isImpossibleShot || state.rotationAngle <= 180f) paints.tangentLineDottedPaint else paints.tangentLineSolidPaint
         val leftPaint =
-            if (useErrorColor || state.rotationAngle > 180f) paints.tangentLineDottedPaint else paints.tangentLineSolidPaint
+            if (isImpossibleShot || state.rotationAngle > 180f) paints.tangentLineDottedPaint else paints.tangentLineSolidPaint
 
         canvas.drawLine(
             state.cueCircleCenter.x,
@@ -212,19 +224,16 @@ class OverlayRenderer {
         canvas.restore()
     }
 
-    // In hereliesaz/cued8at/CueD8at-2b11a59283ee0186372bfb070f1e3cb4a10e014c/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/OverlayRenderer.kt
-
+    // UPDATED: Now uses the isImpossibleShot flag.
     private fun drawGhostBalls(
         canvas: Canvas,
         state: OverlayState,
         paints: PaintCache,
-        useWarningStyle: Boolean
+        isImpossibleShot: Boolean
     ) {
-        // Map logical centers to screen space, considering the pitch matrix
         val pTGC = mapPoint(state.targetCircleCenter, state.pitchMatrix)
         val pCGC = mapPoint(state.cueCircleCenter, state.pitchMatrix)
 
-        // Map logical radius points to screen space to get the visual (elliptical) radius
         val tR = mapPoint(
             PointF(
                 state.targetCircleCenter.x + state.logicalRadius,
@@ -237,7 +246,7 @@ class OverlayRenderer {
                 state.targetCircleCenter.y - state.logicalRadius
             ), state.pitchMatrix
         )
-        val gTSR = max(distance(pTGC, tR), distance(pTGC, tT)) // Ghost Target Screen Radius
+        val gTSR = max(distance(pTGC, tR), distance(pTGC, tT))
 
         val cR = mapPoint(
             PointF(state.cueCircleCenter.x + state.logicalRadius, state.cueCircleCenter.y),
@@ -247,26 +256,18 @@ class OverlayRenderer {
             PointF(state.cueCircleCenter.x, state.cueCircleCenter.y - state.logicalRadius),
             state.pitchMatrix
         )
-        val gCSR = max(distance(pCGC, cR), distance(pCGC, cT)) // Ghost Cue Screen Radius
+        val gCSR = max(distance(pCGC, cR), distance(pCGC, cT))
 
-        // --- Corrected Positioning Logic ---
-        // The hover-effect logic has been removed.
-        // The Y-position is now calculated so the bottom of the ghost ball
-        // sits exactly on the center of the 2D projected circle.
         val targetGhostCenterY = pTGC.y - gTSR
         val cueGhostCenterY = pCGC.y - gCSR
-        // --- End Correction ---
 
         canvas.drawCircle(pTGC.x, targetGhostCenterY, gTSR, paints.targetGhostBallOutlinePaint)
 
-        val originalGhostColor = paints.ghostCueOutlinePaint.color
-        if (useWarningStyle) {
-            paints.ghostCueOutlinePaint.color = paints.tangentLineDottedPaint.color
-        }
-        canvas.drawCircle(pCGC.x, cueGhostCenterY, gCSR, paints.ghostCueOutlinePaint)
-        paints.ghostCueOutlinePaint.color = originalGhostColor
+        // USER REQUEST: Use a muted red for the 3D cue ball on impossible shots.
+        val cueGhostPaint =
+            if (isImpossibleShot) paints.warningPaintRed2 else paints.ghostCueOutlinePaint
+        canvas.drawCircle(pCGC.x, cueGhostCenterY, gCSR, cueGhostPaint)
 
-        // Draw aiming sights on cue ghost ball
         val sightArmLength = gCSR * 0.6f
         canvas.drawLine(
             pCGC.x - sightArmLength,

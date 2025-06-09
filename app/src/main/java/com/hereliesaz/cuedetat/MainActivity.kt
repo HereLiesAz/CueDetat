@@ -4,9 +4,6 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Camera
-import android.graphics.Matrix
-import android.graphics.PointF
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -21,6 +18,10 @@ import androidx.activity.viewModels
 import androidx.camera.core.CameraSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,9 +29,12 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -47,11 +51,9 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.guava.await
-import kotlin.math.cos
-import kotlin.math.min
-import kotlin.math.sin
 import androidx.camera.core.Preview as CameraPreview
 
+@ExperimentalMaterial3ExpressiveApi
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
@@ -78,6 +80,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun AppContent() {
         val uiState by viewModel.uiState.collectAsState()
+        val dynamicTheme by viewModel.dynamicColorScheme.collectAsState()
         val context = LocalContext.current
         val currentTheme = MaterialTheme.colorScheme
 
@@ -170,10 +173,9 @@ class MainActivity : ComponentActivity() {
         }
 
 
-        CueDetatTheme {
+        CueDetatTheme(dynamicColorScheme = dynamicTheme) {
             MainScreen(
                 uiState = uiState,
-                previewView = previewView,
                 protractorView = protractorView,
                 onZoomChange = viewModel::onZoomChange,
                 onMenuAction = { action ->
@@ -187,9 +189,19 @@ class MainActivity : ComponentActivity() {
                             )
                             context.startActivity(intent)
                         }
+                        is MenuAction.AdaptTheme -> {
+                            viewModel.adaptThemeFromBitmap(previewView.bitmap)
+                        }
+
+                        is MenuAction.ResetTheme -> {
+                            viewModel.resetTheme()
+                        }
                     }
                 }
-            )
+            ) {
+                // MODIFIED: This is where we pass the REAL camera view to the MainScreen
+                AndroidView({ previewView }, modifier = Modifier.fillMaxSize())
+            }
         }
     }
 
@@ -200,62 +212,20 @@ class MainActivity : ComponentActivity() {
         ) == PackageManager.PERMISSION_GRANTED
 }
 
+@ExperimentalMaterial3ExpressiveApi
 @Preview
 @Composable
 fun AppContentPreview() {
     val context = LocalContext.current
     val currentTheme = MaterialTheme.colorScheme
 
-    // Create a realistic, calculated state for the preview.
-    // Since the recalculate function is private, we'll do the math here.
-    val width = 1080f
-    val height = 1920f
-    val zoomFactor = 1.0f
-    val rotationAngle = 30f
-    val pitchAngle = 15f
-
-    val baseDiameter = min(width, height) * 0.30f
-    val logicalRadius = (baseDiameter / 2f) * zoomFactor
-
-    val angleRad = Math.toRadians(rotationAngle.toDouble())
-    val distance = 2 * logicalRadius
-    val targetCenter = PointF(width / 2f, height / 2f)
-    val cueCenter = PointF(
-        targetCenter.x - (distance * sin(angleRad)).toFloat(),
-        targetCenter.y + (distance * cos(angleRad)).toFloat()
-    )
-
-    // A simplified matrix calculation for the preview
-    val pitchMatrix = Matrix()
-    val camera = Camera()
-    camera.save()
-    camera.rotateX(pitchAngle)
-    camera.getMatrix(pitchMatrix)
-    camera.restore()
-    pitchMatrix.preTranslate(-targetCenter.x, -targetCenter.y)
-    pitchMatrix.postTranslate(targetCenter.x, targetCenter.y)
-
-    val inversePitchMatrix = Matrix()
-    val hasInverse = pitchMatrix.invert(inversePitchMatrix)
-
-
     val uiState = OverlayState(
-        viewWidth = width.toInt(),
-        viewHeight = height.toInt(),
-        targetCircleCenter = targetCenter,
-        cueCircleCenter = cueCenter,
-        logicalRadius = logicalRadius,
-        pitchAngle = pitchAngle,
-        rotationAngle = rotationAngle,
-        zoomFactor = zoomFactor,
-        pitchMatrix = pitchMatrix,
-        inversePitchMatrix = inversePitchMatrix,
-        hasInverseMatrix = hasInverse,
-        areHelpersVisible = true,
-        valuesChangedSinceReset = true
+        viewWidth = 1080,
+        viewHeight = 1920,
+        zoomFactor = 1.0f,
+        areHelpersVisible = true
     )
 
-    // The ProtractorOverlayView needs to be updated with the state.
     val protractorView = ProtractorOverlayView(context)
     protractorView.updateState(uiState)
     protractorView.applyColorScheme(currentTheme)
@@ -263,10 +233,17 @@ fun AppContentPreview() {
     CueDetatTheme {
         MainScreen(
             uiState = uiState,
-            previewView = PreviewView(context),
             protractorView = protractorView,
             onZoomChange = {},
             onMenuAction = {}
-        )
+        ) {
+            // MODIFIED: For the preview, we pass a simple black box instead of the real camera view.
+            // This prevents the crash.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            )
+        }
     }
 }

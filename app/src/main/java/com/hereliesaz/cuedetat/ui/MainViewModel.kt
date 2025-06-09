@@ -1,11 +1,19 @@
 package com.hereliesaz.cuedetat.ui
 
 import android.app.Application
+import android.graphics.Bitmap
 import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.palette.graphics.Palette
 import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.GithubRepository
@@ -40,6 +48,9 @@ class MainViewModel @Inject constructor(
 
     private val _toastMessage = MutableStateFlow<ToastMessage?>(null)
     val toastMessage = _toastMessage.asStateFlow()
+
+    private val _dynamicColorScheme = MutableStateFlow<ColorScheme?>(null)
+    val dynamicColorScheme = _dynamicColorScheme.asStateFlow()
 
     private val insultingWarnings: Array<String> =
         application.resources.getStringArray(R.array.insulting_warnings)
@@ -111,6 +122,78 @@ class MainViewModel @Inject constructor(
 
     fun onToastShown() {
         _toastMessage.value = null
+    }
+
+    fun adaptThemeFromBitmap(bitmap: Bitmap?) {
+        if (bitmap == null) return
+
+        viewModelScope.launch {
+            // Generate the palette asynchronously
+            val palette = Palette.from(bitmap).generate()
+            // Use our custom logic to create a Material 3 ColorScheme
+            _dynamicColorScheme.value = createSchemeFromPalette(palette)
+        }
+    }
+
+    // Resets the theme back to the default
+    fun resetTheme() {
+        _dynamicColorScheme.value = null
+    }
+
+    /**
+     * Creates a Material 3 ColorScheme from a Palette instance.
+     * It prioritizes vibrant colors and ensures readable "on" colors.
+     */
+    private fun createSchemeFromPalette(palette: Palette): ColorScheme {
+        // Pick primary and secondary colors from the palette
+        val primaryColor = Color(palette.getVibrantColor(palette.getMutedColor(0xFF00E5FF.toInt())))
+        val secondaryColor =
+            Color(palette.getLightVibrantColor(palette.getDominantColor(0xFF4DD0E1.toInt())))
+
+        // Determine if the background should be light or dark
+        val isDark = ColorUtils.calculateLuminance(primaryColor.toArgb()) < 0.5
+
+        if (isDark) {
+            // Generate a Dark Color Scheme
+            val onPrimaryColor = getOnColorFor(primaryColor)
+            val onSecondaryColor = getOnColorFor(secondaryColor)
+            return darkColorScheme(
+                primary = primaryColor,
+                onPrimary = onPrimaryColor,
+                primaryContainer = primaryColor.copy(alpha = 0.3f),
+                secondary = secondaryColor,
+                onSecondary = onSecondaryColor,
+                // You can derive other colors or use fallbacks
+                tertiary = Color(palette.getDarkMutedColor(0xFFF50057.toInt())),
+                background = Color(palette.getDarkMutedColor(0xFF1A1C1C.toInt())),
+                surface = Color(palette.getMutedColor(0xFF1A1C1C.toInt())),
+                onBackground = getOnColorFor(Color(palette.getDarkMutedColor(0xFF1A1C1C.toInt()))),
+                onSurface = getOnColorFor(Color(palette.getMutedColor(0xFF1A1C1C.toInt())))
+            )
+        } else {
+            // Generate a Light Color Scheme
+            val onPrimaryColor = getOnColorFor(primaryColor)
+            val onSecondaryColor = getOnColorFor(secondaryColor)
+            return lightColorScheme(
+                primary = primaryColor,
+                onPrimary = onPrimaryColor,
+                primaryContainer = primaryColor.copy(alpha = 0.3f),
+                secondary = secondaryColor,
+                onSecondary = onSecondaryColor,
+                tertiary = Color(palette.getLightMutedColor(0xFFD81B60.toInt())),
+                background = Color(palette.getLightMutedColor(0xFFFAFDFD.toInt())),
+                surface = Color(palette.getDominantColor(0xFFFAFDFD.toInt())),
+                onBackground = getOnColorFor(Color(palette.getLightMutedColor(0xFFFAFDFD.toInt()))),
+                onSurface = getOnColorFor(Color(palette.getDominantColor(0xFFFAFDFD.toInt())))
+            )
+        }
+    }
+
+    /**
+     * Utility to determine if text on a color should be black or white for contrast.
+     */
+    private fun getOnColorFor(color: Color): Color {
+        return if (ColorUtils.calculateLuminance(color.toArgb()) > 0.5) Color.Black else Color.White
     }
 }
 
