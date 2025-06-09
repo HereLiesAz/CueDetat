@@ -1,4 +1,4 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources>
     <!-- Base application theme. -->
     <!-- For Material 3 components like FloatingActionButton, prefer a Material3 theme -->
     <style name="Theme.CueDetat" parent="Theme.Material3.DayNight.NoActionBar">
@@ -13,5 +13,8 @@
         <!-- Status bar color. -->
         <item name="android:statusBarColor">?attr/colorPrimary</item> <!-- Or a specific color -->
         <!-- Customize your theme here. -->
+        <item name="android:windowLightStatusBar">true
+        </item> <!-- true for light themes, false for dark -->
+        <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 </resources>

@@ -14,16 +14,20 @@ data class OverlayState(
     val pitchAngle: Float = 0.0f,
     val areHelpersVisible: Boolean = true,
     val valuesChangedSinceReset: Boolean = false,
+    val isJumpingGhostBallActive: Boolean = false, // New state for the feature
 
-// View-derived properties
+    // View-derived properties
     val viewWidth: Int = 0,
     val viewHeight: Int = 0,
     val targetCircleCenter: PointF = PointF(),
     val cueCircleCenter: PointF = PointF(),
     val logicalRadius: Float = 1f,
 
-// Calculated matrices for rendering
+    // Calculated matrices for rendering
     val pitchMatrix: Matrix = Matrix(),
     val inversePitchMatrix: Matrix = Matrix(),
-    val hasInverseMatrix: Boolean = false
+    val hasInverseMatrix: Boolean = false,
+
+    // Calculated condition flags for rendering
+    val isImpossibleShot: Boolean = false
 )

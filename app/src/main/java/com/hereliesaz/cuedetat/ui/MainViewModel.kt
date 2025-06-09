@@ -30,6 +30,7 @@ import javax.inject.Inject
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 sealed class ToastMessage {
     data class StringResource(val id: Int, val formatArgs: List<Any> = emptyList()) : ToastMessage()
@@ -56,51 +57,87 @@ class MainViewModel @Inject constructor(
         application.resources.getStringArray(R.array.insulting_warnings)
     private val graphicsCamera = Camera()
 
+    private var previousZoom: Float? = null
+    private var previousRotation: Float? = null
+
     init {
         sensorRepository.pitchAngleFlow
             .onEach(::onPitchAngleChanged)
             .launchIn(viewModelScope)
     }
 
+    private fun updateState(updateAndRecalculate: (OverlayState) -> OverlayState) {
+        val oldState = _uiState.value
+        _uiState.update {
+            updateAndRecalculate(it).recalculateDerivedState(camera = graphicsCamera)
+        }
+        val newState = _uiState.value
+
+        if (newState.isImpossibleShot && !oldState.isImpossibleShot) {
+            _toastMessage.value = ToastMessage.PlainText(insultingWarnings.random())
+        }
+    }
+
     fun onSizeChanged(width: Int, height: Int) {
         val baseDiameter = min(width, height) * 0.30f
-        _uiState.update {
-            it.copy(viewWidth = width, viewHeight = height)
-                .recalculateDerivedState(baseDiameter, graphicsCamera)
+        updateState {
+            it.copy(
+                viewWidth = width,
+                viewHeight = height,
+                logicalRadius = baseDiameter / 2f
+            )
         }
     }
 
     fun onZoomChange(newZoom: Float) {
-        _uiState.update {
-            it.copy(zoomFactor = newZoom, valuesChangedSinceReset = true)
-                .recalculateDerivedState(camera = graphicsCamera)
-        }
+        updateState { it.copy(zoomFactor = newZoom, valuesChangedSinceReset = true) }
     }
 
     fun onRotationChange(newRotation: Float) {
         var normAng = newRotation % 360f
         if (normAng < 0) normAng += 360f
-        _uiState.update {
-            it.copy(rotationAngle = normAng, valuesChangedSinceReset = true)
-                .recalculateDerivedState(camera = graphicsCamera)
-        }
+        updateState { it.copy(rotationAngle = normAng, valuesChangedSinceReset = true) }
     }
 
     private fun onPitchAngleChanged(pitch: Float) {
-        _uiState.update {
-            it.copy(pitchAngle = pitch).recalculateDerivedState(camera = graphicsCamera)
-        }
+        updateState { it.copy(pitchAngle = pitch) }
     }
 
     fun onReset() {
-        _uiState.update {
-            OverlayState(viewWidth = it.viewWidth, viewHeight = it.viewHeight)
-                .recalculateDerivedState(camera = graphicsCamera)
+        val currentState = _uiState.value
+
+        if (currentState.valuesChangedSinceReset) {
+            previousZoom = currentState.zoomFactor
+            previousRotation = currentState.rotationAngle
+            updateState {
+                OverlayState(
+                    viewWidth = it.viewWidth,
+                    viewHeight = it.viewHeight,
+                    valuesChangedSinceReset = false
+                )
+            }
+        } else {
+            if (previousZoom != null && previousRotation != null) {
+                updateState {
+                    it.copy(
+                        zoomFactor = previousZoom!!,
+                        rotationAngle = previousRotation!!,
+                        valuesChangedSinceReset = true
+                    )
+                }
+                previousZoom = null
+                previousRotation = null
+            }
         }
     }
 
     fun onToggleHelp() {
         _uiState.update { it.copy(areHelpersVisible = !it.areHelpersVisible) }
+    }
+
+    // NEW: Function to toggle the jumping ghost ball feature
+    fun onToggleJumpingGhostBall() {
+        updateState { it.copy(isJumpingGhostBallActive = !it.isJumpingGhostBallActive) }
     }
 
     fun onCheckForUpdate() {
@@ -128,42 +165,28 @@ class MainViewModel @Inject constructor(
         if (bitmap == null) return
 
         viewModelScope.launch {
-            // Generate the palette asynchronously
             val palette = Palette.from(bitmap).generate()
-            // Use our custom logic to create a Material 3 ColorScheme
             _dynamicColorScheme.value = createSchemeFromPalette(palette)
         }
     }
 
-    // Resets the theme back to the default
     fun resetTheme() {
         _dynamicColorScheme.value = null
     }
 
-    /**
-     * Creates a Material 3 ColorScheme from a Palette instance.
-     * It prioritizes vibrant colors and ensures readable "on" colors.
-     */
     private fun createSchemeFromPalette(palette: Palette): ColorScheme {
-        // Pick primary and secondary colors from the palette
         val primaryColor = Color(palette.getVibrantColor(palette.getMutedColor(0xFF00E5FF.toInt())))
         val secondaryColor =
             Color(palette.getLightVibrantColor(palette.getDominantColor(0xFF4DD0E1.toInt())))
-
-        // Determine if the background should be light or dark
         val isDark = ColorUtils.calculateLuminance(primaryColor.toArgb()) < 0.5
 
-        if (isDark) {
-            // Generate a Dark Color Scheme
-            val onPrimaryColor = getOnColorFor(primaryColor)
-            val onSecondaryColor = getOnColorFor(secondaryColor)
-            return darkColorScheme(
+        return if (isDark) {
+            darkColorScheme(
                 primary = primaryColor,
-                onPrimary = onPrimaryColor,
+                onPrimary = getOnColorFor(primaryColor),
                 primaryContainer = primaryColor.copy(alpha = 0.3f),
                 secondary = secondaryColor,
-                onSecondary = onSecondaryColor,
-                // You can derive other colors or use fallbacks
+                onSecondary = getOnColorFor(secondaryColor),
                 tertiary = Color(palette.getDarkMutedColor(0xFFF50057.toInt())),
                 background = Color(palette.getDarkMutedColor(0xFF1A1C1C.toInt())),
                 surface = Color(palette.getMutedColor(0xFF1A1C1C.toInt())),
@@ -171,15 +194,12 @@ class MainViewModel @Inject constructor(
                 onSurface = getOnColorFor(Color(palette.getMutedColor(0xFF1A1C1C.toInt())))
             )
         } else {
-            // Generate a Light Color Scheme
-            val onPrimaryColor = getOnColorFor(primaryColor)
-            val onSecondaryColor = getOnColorFor(secondaryColor)
-            return lightColorScheme(
+            lightColorScheme(
                 primary = primaryColor,
-                onPrimary = onPrimaryColor,
+                onPrimary = getOnColorFor(primaryColor),
                 primaryContainer = primaryColor.copy(alpha = 0.3f),
                 secondary = secondaryColor,
-                onSecondary = onSecondaryColor,
+                onSecondary = getOnColorFor(secondaryColor),
                 tertiary = Color(palette.getLightMutedColor(0xFFD81B60.toInt())),
                 background = Color(palette.getLightMutedColor(0xFFFAFDFD.toInt())),
                 surface = Color(palette.getDominantColor(0xFFFAFDFD.toInt())),
@@ -189,20 +209,16 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Utility to determine if text on a color should be black or white for contrast.
-     */
     private fun getOnColorFor(color: Color): Color {
         return if (ColorUtils.calculateLuminance(color.toArgb()) > 0.5) Color.Black else Color.White
     }
 }
 
-private fun OverlayState.recalculateDerivedState(
-    baseDiameter: Float? = null,
-    camera: Camera
-): OverlayState {
-    val newBaseDiameter = baseDiameter ?: (min(viewWidth, viewHeight) * 0.30f)
-    val newLogicalRadius = (newBaseDiameter / 2f) * this.zoomFactor
+private fun OverlayState.recalculateDerivedState(camera: Camera): OverlayState {
+    if (this.viewWidth == 0 || this.viewHeight == 0) return this
+
+    val baseDiameter = min(viewWidth, viewHeight) * 0.30f
+    val newLogicalRadius = (baseDiameter / 2f) * this.zoomFactor
 
     val angleRad = Math.toRadians(this.rotationAngle.toDouble())
     val distance = 2 * newLogicalRadius
@@ -223,12 +239,41 @@ private fun OverlayState.recalculateDerivedState(
     val inversePitchMatrix = Matrix()
     val hasInverse = pitchMatrix.invert(inversePitchMatrix)
 
+    val logicalDistance = sqrt(
+        (newCueCenter.x - newTargetCenter.x).pow(2) + (newCueCenter.y - newTargetCenter.y).pow(2)
+    )
+    val isPhysicalOverlap = logicalDistance < (newLogicalRadius * 2) - 0.1f
+
+    var isCueOnFarSide = false
+    if (hasInverse) {
+        val screenAimPoint = floatArrayOf(viewWidth / 2f, viewHeight.toFloat())
+        val logicalAimPoint = FloatArray(2)
+        inversePitchMatrix.mapPoints(logicalAimPoint, screenAimPoint)
+        val aimDirX = newCueCenter.x - logicalAimPoint[0]
+        val aimDirY = newCueCenter.y - logicalAimPoint[1]
+        val magAimDirSq = aimDirX * aimDirX + aimDirY * aimDirY
+        if (magAimDirSq > 0.0001f) {
+            val magAimDir = sqrt(magAimDirSq)
+            val normAimDirX = aimDirX / magAimDir
+            val normAimDirY = aimDirY / magAimDir
+            val vecScreenToTargetX = newTargetCenter.x - logicalAimPoint[0]
+            val vecScreenToTargetY = newTargetCenter.y - logicalAimPoint[1]
+            val distTargetProj =
+                vecScreenToTargetX * normAimDirX + vecScreenToTargetY * normAimDirY
+            isCueOnFarSide = magAimDir > distTargetProj && distTargetProj > 0
+        }
+    }
+
+    val isDeflectionDominantAngle = (this.rotationAngle > 90.5f && this.rotationAngle < 269.5f)
+    val isImpossible = isCueOnFarSide || isPhysicalOverlap || isDeflectionDominantAngle
+
     return this.copy(
         targetCircleCenter = newTargetCenter,
         cueCircleCenter = newCueCenter,
         logicalRadius = newLogicalRadius,
         pitchMatrix = pitchMatrix,
         inversePitchMatrix = inversePitchMatrix,
-        hasInverseMatrix = hasInverse
+        hasInverseMatrix = hasInverse,
+        isImpossibleShot = isImpossible
     )
 }

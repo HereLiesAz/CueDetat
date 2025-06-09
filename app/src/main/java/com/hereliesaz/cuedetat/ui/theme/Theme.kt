@@ -6,7 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
@@ -46,13 +46,19 @@ fun CueDetatTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.background.toArgb()
-            // Since it's always a dark theme, isAppearanceLightStatusBars is always false.
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            val window = (view.context as? Activity)?.window // Ensure Activity is imported
+            window?.let { // Use let for null safety
+                // Decide which color to use, e.g., colorScheme.background or colorScheme.primary
+
+                // For icon color based on status bar brightness:
+                val isLightStatusBar =
+                    colorScheme.background.luminance() > 0.5 // Or whatever color your content draws behind the status bar
+                WindowCompat.getInsetsController(it, view).isAppearanceLightStatusBars =
+                    isLightStatusBar
+
+            }
         }
     }
-
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
