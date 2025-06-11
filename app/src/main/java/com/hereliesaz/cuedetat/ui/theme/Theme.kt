@@ -1,68 +1,80 @@
 package com.hereliesaz.cuedetat.ui.theme
 
 import android.app.Activity
-import androidx.compose.material3.ColorScheme
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-// The one and only theme for the app, built from the "Gilded 8-Ball" palette.
-private val AppColorScheme = darkColorScheme(
-    primary = G8_Primary,
-    onPrimary = G8_OnPrimary,
-    primaryContainer = G8_PrimaryContainer,
-    onPrimaryContainer = G8_OnPrimaryContainer,
-    secondary = G8_Secondary,
-    onSecondary = G8_OnSecondary,
-    secondaryContainer = G8_SecondaryContainer,
-    onSecondaryContainer = G8_OnSecondaryContainer,
-    tertiary = G8_Tertiary,
-    onTertiary = G8_OnTertiary,
-    tertiaryContainer = G8_TertiaryContainer,
-    onTertiaryContainer = G8_OnTertiaryContainer,
-    error = G8_Error,
-    onError = G8_OnError,
-    background = G8_Background,
-    onBackground = G8_OnBackground,
-    surface = G8_Surface,
-    onSurface = G8_OnSurface,
-    outline = G8_Outline
+// MODIFIED: A custom muted palette based on AccentGold has replaced the default purples.
+private val AppDarkColorScheme = darkColorScheme(
+    primary = AccentGold,
+    secondary = MutedTeal,
+    tertiary = MutedGray,
+    background = Color(0xFF121212),
+    surface = Color(0xFF1E1E1E),
+    onPrimary = Color.Black,
+    onSecondary = Color.White,
+    onTertiary = Color.White,
+    onBackground = Color(0xFFE6E1E5),
+    onSurface = Color(0xFFE6E1E5),
+    outline = MutedGray.copy(alpha = 0.5f),
+    surfaceVariant = Color(0xFF49454F),
+    onSurfaceVariant = Color(0xFFCAC4D0),
+    tertiaryContainer = MutedTeal.copy(alpha = 0.3f),
+    onTertiaryContainer = Color.White,
+    secondaryContainer = AccentGold.copy(alpha = 0.3f),
+    onSecondaryContainer = Color.White,
+
+    )
+
+private val AppLightColorScheme = lightColorScheme(
+    primary = DarkerAccentGold,
+    secondary = MutedTeal,
+    tertiary = MutedGray,
+    background = Color(0xFFF7F2F9),
+    surface = Color(0xFFFFFBFE),
+    onPrimary = Color.White,
+    onSecondary = Color.White,
+    onTertiary = Color.White,
+    onBackground = Color(0xFF1C1B1F),
+    onSurface = Color(0xFF1C1B1F),
+    outline = MutedGray.copy(alpha = 0.5f),
+    surfaceVariant = Color(0xFFE7E0EC),
+    onSurfaceVariant = Color(0xFF49454F),
+    tertiaryContainer = MutedTeal.copy(alpha = 0.3f),
+    onTertiaryContainer = Color.Black,
+    secondaryContainer = AccentGold.copy(alpha = 0.3f),
+    onSecondaryContainer = Color.Black,
 )
 
 @Composable
 fun CueDetatTheme(
-    dynamicColorScheme: ColorScheme? = null,
+    darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    // This theme is now independent of the system's light/dark mode.
-    // It will use the dynamic scheme if one is generated, otherwise it defaults
-    // to our custom "Gilded 8-Ball" dark theme.
-    val colorScheme = dynamicColorScheme ?: AppColorScheme
-
+    val colorScheme = when {
+        darkTheme -> AppDarkColorScheme
+        else -> AppLightColorScheme
+    }
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as? Activity)?.window // Ensure Activity is imported
-            window?.let { // Use let for null safety
-                // Decide which color to use, e.g., colorScheme.background or colorScheme.primary
-
-                // For icon color based on status bar brightness:
-                val isLightStatusBar =
-                    colorScheme.background.luminance() > 0.5 // Or whatever color your content draws behind the status bar
-                WindowCompat.getInsetsController(it, view).isAppearanceLightStatusBars =
-                    isLightStatusBar
-
-            }
+            val window = (view.context as Activity).window
+            window.statusBarColor = Color.Transparent.toArgb() // Make status bar transparent
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
+
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        shapes = Shapes,
         content = content
     )
 }

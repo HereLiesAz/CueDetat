@@ -15,9 +15,11 @@ import kotlin.math.sqrt
 class OverlayRenderer {
 
     private val PROTRACTOR_ANGLES = floatArrayOf(0f, 14f, 30f, 36f, 43f, 48f)
-    private val baseGhostBallTextSize = 30f
+
+    // MODIFIED: Increased base text size
+    private val baseGhostBallTextSize = 42f
     private val minGhostBallTextSize = 15f
-    private val maxGhostBallTextSize = 60f
+    private val maxGhostBallTextSize = 80f
 
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         if (state.viewWidth == 0 || state.viewHeight == 0) return
@@ -34,7 +36,6 @@ class OverlayRenderer {
 
         canvas.restore()
 
-        // NEW: Draw the jumping ghost ball if it's active
         if (state.isJumpingGhostBallActive) {
             drawJumpingGhostBall(canvas, state, paints)
         }
@@ -49,7 +50,6 @@ class OverlayRenderer {
     ) {
         if (!state.hasInverseMatrix) return
 
-        // MODIFIED: Anchor the aiming line to the new ghost ball when active
         val screenAimPoint: FloatArray = if (state.isJumpingGhostBallActive) {
             floatArrayOf(state.viewWidth / 2f, state.viewHeight * 0.85f)
         } else {
@@ -183,12 +183,31 @@ class OverlayRenderer {
         canvas.restore()
     }
 
-    // NEW: Function to draw the jumping ghost ball anchor
     private fun drawJumpingGhostBall(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         val centerX = state.viewWidth / 2f
         val centerY = state.viewHeight * 0.85f
-        val radius = state.logicalRadius / 2f // Make it smaller than the main balls
-        canvas.drawCircle(centerX, centerY, radius, paints.jumpingGhostBallPaint)
+
+        // MODIFIED: Inverted the perspective scaling.
+        val pTGC = mapPoint(state.targetCircleCenter, state.pitchMatrix)
+        val tR = mapPoint(
+            PointF(
+                state.targetCircleCenter.x + state.logicalRadius,
+                state.targetCircleCenter.y
+            ), state.pitchMatrix
+        )
+        val tT = mapPoint(
+            PointF(
+                state.targetCircleCenter.x,
+                state.targetCircleCenter.y - state.logicalRadius
+            ), state.pitchMatrix
+        )
+        val baseRadius = max(distance(pTGC, tR), distance(pTGC, tT))
+
+        // This formula makes the ball grow from its base size to double its size as the phone tilts down.
+        val finalRadius =
+            baseRadius * (2 - cos(Math.toRadians(state.pitchAngle.toDouble())).toFloat())
+
+        canvas.drawCircle(centerX, centerY, finalRadius, paints.jumpingGhostBallPaint)
     }
 
     private fun drawGhostBalls(

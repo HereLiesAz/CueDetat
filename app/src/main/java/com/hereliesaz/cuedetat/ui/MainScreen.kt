@@ -1,45 +1,76 @@
 package com.hereliesaz.cuedetat.ui
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.HelpOutline
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.SystemUpdateAlt
-import androidx.compose.material3.BottomAppBar
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.rememberSliderState
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.view.ProtractorOverlayView
+import com.hereliesaz.cuedetat.view.state.OverlayState
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(
-    viewModel: MainViewModel
-) {
+fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val context = LocalContext.current
+
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+    var showBottomSheet by remember { mutableStateOf(false) }
+
+    val protractorView = remember {
+        ProtractorOverlayView(context).apply {
+            onSizeChanged = { w, h -> viewModel.onSizeChanged(w, h) }
+            onRotationChange = viewModel::onRotationChange
+            onZoomChange = viewModel::onZoomChange
+        }
+    }
+
+    val colorScheme = MaterialTheme.colorScheme
+    LaunchedEffect(colorScheme) {
+        viewModel.onThemeChanged(colorScheme)
+    }
 
     LaunchedEffect(toastMessage) {
         toastMessage?.let {
@@ -48,7 +79,6 @@ fun MainScreen(
                     it.id,
                     *it.formatArgs.toTypedArray()
                 )
-
                 is ToastMessage.PlainText -> it.text
             }
             Toast.makeText(context, messageText, Toast.LENGTH_SHORT).show()
@@ -56,90 +86,149 @@ fun MainScreen(
         }
     }
 
-    Scaffold(
-        bottomBar = {
-            BottomAppBar(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    IconButton(onClick = viewModel::onToggleJumpingGhostBall) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_jump_shot),
-                            contentDescription = "Toggle Jumping Ghost Ball",
-                            tint = if (uiState.isJumpingGhostBallActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        CameraPreview(modifier = Modifier.fillMaxSize())
 
-                    Row {
-                        IconButton(onClick = viewModel::onToggleHelp) {
-                            Icon(
-                                imageVector = Icons.Outlined.HelpOutline,
-                                contentDescription = "Toggle Help"
-                            )
-                        }
-                        IconButton(onClick = viewModel::onReset) {
-                            Icon(
-                                imageVector = Icons.Outlined.Refresh,
-                                contentDescription = "Reset"
-                            )
-                        }
-                        IconButton(onClick = viewModel::onCheckForUpdate) {
-                            Icon(
-                                imageVector = Icons.Outlined.SystemUpdateAlt,
-                                contentDescription = "Check for Update"
-                            )
-                        }
-                    }
-                }
-            }
+        AndroidView({ protractorView }, modifier = Modifier.fillMaxSize()) { view ->
+            view.updateState(uiState)
         }
-    ) { innerPadding ->
-        Box(
+
+        TopControls(
+            uiState = uiState,
+            onMenuClick = { showBottomSheet = true }
+        )
+
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight(0.4f)
+                .padding(end = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            ProtractorOverlayView(
-                uiState = uiState,
-                onSizeChanged = viewModel::onSizeChanged,
-                onRotationChange = viewModel::onRotationChange
+            Icon(
+                painter = painterResource(id = R.drawable.ic_zoom_in_24),
+                contentDescription = stringResource(id = R.string.zoom_icon),
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
-
-            Column(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight()
-                    .padding(8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_zoom_in_24),
-                    contentDescription = "Zoom"
+            Spacer(modifier = Modifier.height(8.dp))
+            VerticalSlider(
+                value = uiState.zoomFactor,
+                onValueChange = { newValue -> viewModel.onZoomChange(newValue) },
+                valueRange = 0.1f..4.0f,
+                modifier = Modifier.fillMaxHeight(),
+                colors = SliderDefaults.colors(
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                    thumbColor = MaterialTheme.colorScheme.primary
                 )
-                val sliderState = rememberSliderState(valueRange = 0.1f..4.0f)
-
-                LaunchedEffect(uiState.zoomFactor) {
-                    sliderState.value = uiState.zoomFactor
-                }
-
-                sliderState.onValueChange = { newValue ->
-                    viewModel.onZoomChange(newValue)
-                }
-
-                VerticalSlider(
-                    state = sliderState,
-                    modifier = Modifier.weight(1f),
-                    colors = SliderDefaults.colors(
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
-                        thumbColor = MaterialTheme.colorScheme.primary
-                    )
-                )
-            }
+            )
         }
+
+        FloatingActionButton(
+            onClick = viewModel::onToggleJumpingGhostBall,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(16.dp)
+                .navigationBarsPadding(),
+            containerColor = if (uiState.isJumpingGhostBallActive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_jump_shot),
+                contentDescription = "Toggle Jumping Ghost Ball",
+                tint = if (uiState.isJumpingGhostBallActive) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        FloatingActionButton(
+            onClick = viewModel::onReset,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+                .navigationBarsPadding()
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_undo_24),
+                contentDescription = "Reset View"
+            )
+        }
+    }
+
+    if (showBottomSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showBottomSheet = false },
+            sheetState = sheetState
+            // MODIFIED: The problematic windowInsets parameter has been removed.
+        ) {
+            MenuItem(
+                icon = ImageVector.vectorResource(R.drawable.ic_help_outline_24),
+                text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
+                onClick = viewModel::onToggleHelp
+            )
+            MenuItem(
+                icon = ImageVector.vectorResource(R.drawable.ic_launcher_monochrome),
+                text = "Check for Updates",
+                onClick = {
+                    scope.launch { sheetState.hide() }.invokeOnCompletion {
+                        if (!sheetState.isVisible) {
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://github.com/hereliesaz/CueD8at/releases")
+                            )
+                            context.startActivity(intent)
+                        }
+                    }
+                }
+            )
+            Spacer(modifier = Modifier.navigationBarsPadding())
+        }
+    }
+}
+
+@Composable
+fun TopControls(
+    uiState: OverlayState,
+    onMenuClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(start = 16.dp, end = 16.dp),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (uiState.areHelpersVisible) {
+            Text(
+                text = "Cue D’état",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                modifier = Modifier.clickable(onClick = onMenuClick)
+            )
+        } else {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_launcher_monochrome),
+                contentDescription = "Menu",
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                modifier = Modifier
+                    .size(40.dp)
+                    .clickable(onClick = onMenuClick)
+            )
+        }
+    }
+}
+
+@Composable
+fun MenuItem(icon: ImageVector, text: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(imageVector = icon, contentDescription = text, modifier = Modifier.size(24.dp))
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(text = text, style = MaterialTheme.typography.bodyLarge)
     }
 }

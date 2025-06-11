@@ -9,4 +9,5 @@ sealed class MenuAction {
     object ToggleHelp : MenuAction()
     object ToggleJumpingBall : MenuAction()
     object CheckForUpdate : MenuAction()
+    object ToggleTheme : MenuAction()
 }

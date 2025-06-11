@@ -1,47 +1,56 @@
 package com.hereliesaz.cuedetat
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.core.graphics.ColorUtils
+import androidx.compose.runtime.Composable
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
-import androidx.lifecycle.lifecycleScope
 import com.hereliesaz.cuedetat.ui.MainScreen
 import com.hereliesaz.cuedetat.ui.MainViewModel
-import com.hereliesaz.cuedetat.ui.theme.CueD8atTheme
+import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
+    private val requestCameraPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (isGranted) {
+                recreate()
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        lifecycleScope.launch {
-            viewModel.uiState.collect {
-                // You can react to state changes here if needed outside of Compose
+        if (hasCameraPermission()) {
+            setContent {
+                AppContent()
             }
-        }
-
-        setContent {
-            val dynamicColorScheme by viewModel.dynamicColorScheme.collectAsState()
-            val isSystemInDarkTheme = isSystemInDarkTheme()
-
-            CueD8atTheme(
-                darkTheme = dynamicColorScheme?.let { ColorUtils.calculateLuminance(it.primary.toArgb()) < 0.5 }
-                    ?: isSystemInDarkTheme,
-                dynamicColorScheme = dynamicColorScheme
-            ) {
-                MainScreen(viewModel = viewModel)
-            }
+        } else {
+            requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
+
+    @Composable
+    private fun AppContent() {
+        // MODIFIED: Simplified to remove the broken dynamicColorScheme logic
+        CueDetatTheme {
+            MainScreen(viewModel = viewModel)
+        }
+    }
+
+    private fun hasCameraPermission() =
+        ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
 }

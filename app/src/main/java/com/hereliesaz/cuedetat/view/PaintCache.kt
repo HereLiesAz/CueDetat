@@ -5,8 +5,6 @@ import android.graphics.DashPathEffect
 import android.graphics.Paint
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.toArgb
-import androidx.core.graphics.toColorInt
-import com.hereliesaz.cuedetat.ui.theme.AccentGold
 
 class PaintCache {
     private val GLOW_RADIUS_FIXED = 8f
@@ -28,11 +26,10 @@ class PaintCache {
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 6f }
     val targetGhostBallOutlinePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 6f }
-
-    // NEW: Paint for the jumping ghost ball anchor
     val jumpingGhostBallPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 4f }
 
+    // MODIFIED: Aiming line paints now have a default color set, which will be updated by the theme.
     val aimingAssistNearPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 5f }
     val aimingAssistFarPaint =
@@ -55,87 +52,64 @@ class PaintCache {
     }
 
     val warningPaintRed1 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = "#C05D5D".toColorInt()
+        color = Color.parseColor("#C05D5D")
         style = Paint.Style.STROKE
         strokeWidth = 5f
     }
     val warningPaintRed2 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = "#A04C4C".toColorInt()
+        color = Color.parseColor("#A04C4C")
         style = Paint.Style.STROKE
         strokeWidth = 6f
     }
     val warningPaintRed3 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = "#80E57373".toColorInt()
+        color = Color.parseColor("#80E57373")
         style = Paint.Style.STROKE
         strokeWidth = 5f
-        setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, "#FF5252".toColorInt())
+        setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, Color.parseColor("#FF5252"))
     }
 
     fun updateColors(colorScheme: ColorScheme) {
-        colorScheme.onSurface.toArgb()
-        val mutedGold = "#9A7B4F".toColorInt()
-        val lighterMutedGold = "#BCA683".toColorInt()
-        val finalTeal = "#42C4B5".toColorInt()
-        val cueBallGray = "#A9A9A9".toColorInt()
-
         glowColor = colorScheme.primary.copy(alpha = 0.4f).toArgb()
-        textShadowColor = Color.argb(180, 0, 0, 0)
+        textShadowColor = colorScheme.background.copy(alpha = 0.6f).toArgb()
 
-        targetCirclePaint.color = mutedGold
-        cueCirclePaint.color = cueBallGray
-        targetCenterMarkPaint.color = cueBallGray
-        cueCenterMarkPaint.color = mutedGold
+        targetCirclePaint.color = colorScheme.primary.toArgb()
+        cueCirclePaint.color = colorScheme.tertiary.toArgb()
+        targetCenterMarkPaint.color = cueCirclePaint.color
+        cueCenterMarkPaint.color = targetCirclePaint.color
 
-        // NEW: Set color for the jumping ghost ball
-        jumpingGhostBallPaint.color = finalTeal
+        jumpingGhostBallPaint.color = colorScheme.secondary.toArgb()
 
-        ghostCueOutlinePaint.color = "#CCCCCC".toColorInt()
-        protractorLinePaint.color = colorScheme.tertiary.copy(alpha = 0.7f).toArgb()
-        targetGhostBallOutlinePaint.color = lighterMutedGold
+        ghostCueOutlinePaint.color = colorScheme.tertiary.copy(alpha = 0.7f).toArgb()
+        targetGhostBallOutlinePaint.color = colorScheme.primary.copy(alpha = 0.7f).toArgb()
 
+        protractorLinePaint.color = colorScheme.onSurface.copy(alpha = 0.2f).toArgb()
         shotPathLinePaint.apply {
-            color = mutedGold
-            setShadowLayer(
-                GLOW_RADIUS_FIXED,
-                0f,
-                0f,
-                Color.argb(100, Color.red(mutedGold), Color.green(mutedGold), Color.blue(mutedGold))
-            )
+            color = colorScheme.primary.toArgb()
+            setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, glowColor)
         }
 
+        // MODIFIED: The aiming line is now brighter and uses the primary color.
+        aimingAssistNearPaint.color = colorScheme.primary.toArgb()
+        aimingAssistFarPaint.color = colorScheme.primary.copy(alpha = 0.5f).toArgb()
+
+
         aimingSightPaint.apply {
-            color = AccentGold.toArgb()
-            setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, AccentGold.copy(alpha = 0.7f).toArgb())
+            color = colorScheme.primary.toArgb()
+            setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, glowColor)
         }
 
         tangentLineDottedPaint.color = colorScheme.outline.toArgb()
         tangentLineSolidPaint.apply {
-            color = finalTeal
-            setShadowLayer(
-                GLOW_RADIUS_FIXED,
-                0f,
-                0f,
-                Color.argb(100, Color.red(finalTeal), Color.green(finalTeal), Color.blue(finalTeal))
-            )
-        }
-
-        val cueSightLineColor = "#D3D3D3".toColorInt()
-        val cueSightLineGlow = "#FFFFFF".toColorInt()
-        aimingAssistNearPaint.apply {
-            color = cueSightLineColor
-            setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, cueSightLineGlow)
-        }
-        aimingAssistFarPaint.apply {
-            color = cueSightLineColor
-            setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, cueSightLineGlow)
+            color = colorScheme.secondary.toArgb()
+            setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, glowColor)
         }
 
         cueBallTextPaint.apply {
-            color = cueBallGray
+            color = cueCirclePaint.color
             setShadowLayer(2f, 1f, 1f, textShadowColor)
         }
         targetBallTextPaint.apply {
-            color = lighterMutedGold
+            color = targetCirclePaint.color
             setShadowLayer(2f, 1f, 1f, textShadowColor)
         }
     }

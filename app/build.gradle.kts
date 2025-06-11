@@ -1,4 +1,3 @@
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -16,53 +15,43 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        // Versioning Scheme: YYYY.MM.DD-release
-        versionName = "2025.06.07-release"
-        multiDexEnabled = true // <--- ADD THIS LINE
-
+        versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
+        multiDexEnabled = true
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
     kotlinOptions {
         jvmTarget = "17"
-        freeCompilerArgs += listOf(
-            "-opt-in=kotlin.RequiresOptIn",
-            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            "-opt-in=androidx.compose.material3.expressive.ExperimentalMaterial3ExpressiveApi",
-        )
     }
     buildFeatures {
         compose = true
-    }
-    buildFeatures {
         buildConfig = true
     }
-
-
+    composeOptions {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
-    buildToolsVersion = "36.0.0"
 }
 
 dependencies {
-    // Core & UI
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -70,24 +59,31 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material3)
     implementation(libs.androidx.compose.material3)
-    // CameraX
+
+    // Hilt for Dependency Injection
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.compiler)
+    implementation(libs.androidx.hilt.navigation.compose)
+
+    // CameraX for Camera Preview
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
-    implementation(libs.kotlinx.coroutines.guava)
 
-    // Hilt for Dependency Injection
-    implementation(libs.hilt.android)
-    implementation(libs.androidx.benchmark.common)
-    kapt(libs.hilt.compiler)
-
-    // Retrofit for Networking
+    // Retrofit for network calls
     implementation(libs.retrofit)
     implementation(libs.converter.gson)
 
-    // Testing
+    // Palette API for dynamic colors
+    implementation(libs.androidx.palette)
+
+    // NEW: Added for lifecycle-aware composition
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    // NEW: Added for ExperimentalMaterial3ExpressiveApi used in VerticalSlider
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -95,28 +91,12 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-
-    // For Glance support
-    implementation(libs.androidx.glance)
-    // For AppWidgets support with Glance
-    implementation(libs.androidx.glance.appwidget)
-    implementation(libs.bundles.camera)
-    implementation(libs.androidx.camera.core)
-    implementation(libs.androidx.camera.camera2)
-    implementation(libs.androidx.camera.lifecycle)
-    implementation(libs.androidx.camera.view)
-    implementation(libs.kotlinx.coroutines.guava) // Also part of your bundle
     implementation(libs.material)
-    implementation(libs.androidx.multidex) // <-- Add this line
-    implementation(libs.androidx.material.icons.extended) // Or the latest version
+    implementation(libs.androidx.material.icons.extended)
 
-    implementation(libs.hilt.android)
-    kapt(libs.dagger.hilt.compiler)
-    implementation(libs.androidx.palette)
-    // implementation(libs.androidx.compose.material3.expressive)
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.material3)
 }
+}
+
 kapt {
     correctErrorTypes = true
 }

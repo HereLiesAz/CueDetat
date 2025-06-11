@@ -1,19 +1,12 @@
 package com.hereliesaz.cuedetat.ui
 
 import android.app.Application
-import android.graphics.Bitmap
 import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.palette.graphics.Palette
 import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.GithubRepository
@@ -29,6 +22,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.math.cos
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -49,9 +43,6 @@ class MainViewModel @Inject constructor(
 
     private val _toastMessage = MutableStateFlow<ToastMessage?>(null)
     val toastMessage = _toastMessage.asStateFlow()
-
-    private val _dynamicColorScheme = MutableStateFlow<ColorScheme?>(null)
-    val dynamicColorScheme = _dynamicColorScheme.asStateFlow()
 
     private val insultingWarnings: Array<String> =
         application.resources.getStringArray(R.array.insulting_warnings)
@@ -79,14 +70,7 @@ class MainViewModel @Inject constructor(
     }
 
     fun onSizeChanged(width: Int, height: Int) {
-        val baseDiameter = min(width, height) * 0.30f
-        updateState {
-            it.copy(
-                viewWidth = width,
-                viewHeight = height,
-                logicalRadius = baseDiameter / 2f
-            )
-        }
+        updateState { it.copy(viewWidth = width, viewHeight = height) }
     }
 
     fun onZoomChange(newZoom: Float) {
@@ -103,9 +87,13 @@ class MainViewModel @Inject constructor(
         updateState { it.copy(pitchAngle = pitch) }
     }
 
+    // NEW: Function to receive the current theme from the UI
+    fun onThemeChanged(scheme: ColorScheme) {
+        _uiState.update { it.copy(dynamicColorScheme = scheme) }
+    }
+
     fun onReset() {
         val currentState = _uiState.value
-
         if (currentState.valuesChangedSinceReset) {
             previousZoom = currentState.zoomFactor
             previousRotation = currentState.rotationAngle
@@ -113,7 +101,8 @@ class MainViewModel @Inject constructor(
                 OverlayState(
                     viewWidth = it.viewWidth,
                     viewHeight = it.viewHeight,
-                    valuesChangedSinceReset = false
+                    valuesChangedSinceReset = false,
+                    dynamicColorScheme = it.dynamicColorScheme
                 )
             }
         } else {
@@ -135,7 +124,6 @@ class MainViewModel @Inject constructor(
         _uiState.update { it.copy(areHelpersVisible = !it.areHelpersVisible) }
     }
 
-    // NEW: Function to toggle the jumping ghost ball feature
     fun onToggleJumpingGhostBall() {
         updateState { it.copy(isJumpingGhostBallActive = !it.isJumpingGhostBallActive) }
     }
@@ -159,58 +147,6 @@ class MainViewModel @Inject constructor(
 
     fun onToastShown() {
         _toastMessage.value = null
-    }
-
-    fun adaptThemeFromBitmap(bitmap: Bitmap?) {
-        if (bitmap == null) return
-
-        viewModelScope.launch {
-            val palette = Palette.from(bitmap).generate()
-            _dynamicColorScheme.value = createSchemeFromPalette(palette)
-        }
-    }
-
-    fun resetTheme() {
-        _dynamicColorScheme.value = null
-    }
-
-    private fun createSchemeFromPalette(palette: Palette): ColorScheme {
-        val primaryColor = Color(palette.getVibrantColor(palette.getMutedColor(0xFF00E5FF.toInt())))
-        val secondaryColor =
-            Color(palette.getLightVibrantColor(palette.getDominantColor(0xFF4DD0E1.toInt())))
-        val isDark = ColorUtils.calculateLuminance(primaryColor.toArgb()) < 0.5
-
-        return if (isDark) {
-            darkColorScheme(
-                primary = primaryColor,
-                onPrimary = getOnColorFor(primaryColor),
-                primaryContainer = primaryColor.copy(alpha = 0.3f),
-                secondary = secondaryColor,
-                onSecondary = getOnColorFor(secondaryColor),
-                tertiary = Color(palette.getDarkMutedColor(0xFFF50057.toInt())),
-                background = Color(palette.getDarkMutedColor(0xFF1A1C1C.toInt())),
-                surface = Color(palette.getMutedColor(0xFF1A1C1C.toInt())),
-                onBackground = getOnColorFor(Color(palette.getDarkMutedColor(0xFF1A1C1C.toInt()))),
-                onSurface = getOnColorFor(Color(palette.getMutedColor(0xFF1A1C1C.toInt())))
-            )
-        } else {
-            lightColorScheme(
-                primary = primaryColor,
-                onPrimary = getOnColorFor(primaryColor),
-                primaryContainer = primaryColor.copy(alpha = 0.3f),
-                secondary = secondaryColor,
-                onSecondary = getOnColorFor(secondaryColor),
-                tertiary = Color(palette.getLightMutedColor(0xFFD81B60.toInt())),
-                background = Color(palette.getLightMutedColor(0xFFFAFDFD.toInt())),
-                surface = Color(palette.getDominantColor(0xFFFAFDFD.toInt())),
-                onBackground = getOnColorFor(Color(palette.getLightMutedColor(0xFFFAFDFD.toInt()))),
-                onSurface = getOnColorFor(Color(palette.getDominantColor(0xFFFAFDFD.toInt())))
-            )
-        }
-    }
-
-    private fun getOnColorFor(color: Color): Color {
-        return if (ColorUtils.calculateLuminance(color.toArgb()) > 0.5) Color.Black else Color.White
     }
 }
 
@@ -246,7 +182,12 @@ private fun OverlayState.recalculateDerivedState(camera: Camera): OverlayState {
 
     var isCueOnFarSide = false
     if (hasInverse) {
-        val screenAimPoint = floatArrayOf(viewWidth / 2f, viewHeight.toFloat())
+        val screenAimPoint = if (isJumpingGhostBallActive) {
+            floatArrayOf(viewWidth / 2f, viewHeight * 0.85f)
+        } else {
+            floatArrayOf(viewWidth / 2f, viewHeight.toFloat())
+        }
+
         val logicalAimPoint = FloatArray(2)
         inversePitchMatrix.mapPoints(logicalAimPoint, screenAimPoint)
         val aimDirX = newCueCenter.x - logicalAimPoint[0]

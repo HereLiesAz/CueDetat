@@ -1,13 +1,16 @@
 <resources>
-    <string name="app_name">CueDetat</string>
+    <string name="app_name"> Cue D\’état</string>
     <string name="zoom_icon">Zoom Icon</string>
     <string name="reset_view">Reset View</string>
-    <string name="toggle_help_lines">Toggle Help Lines</string>
+    <string name="show_helpers">WTF is all this?</string>
+    <string name="hide_helpers">Okay, I get it</string>
+    <string name="permission_denied">Camera permission is required to use this app.</string>
+    <string name="toggle_help_lines">Help</string>
 
     <!-- Update Checker -->
-    <string name="update_check_failed">Update check failed. The void is silent.</string>
-    <string name="update_no_new_release">You are aligned with the current reality. No new release found.</string>
-    <string name="update_available">A new version (%s) beckons from the abyss.</string>
+    <string name="update_check_failed">Update check failed.</string>
+    <string name="update_no_new_release">You are on the latest version.</string>
+    <string name="update_available">Version %1$s is available!</string>
 
 
     <!-- Insulting Warnings -->

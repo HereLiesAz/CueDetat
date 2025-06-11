@@ -3,12 +3,12 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.INTERNET" />
-
     <uses-feature android:name="android.hardware.camera.any" />
-    <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false" />
-    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
 
+    <!--
+      The android:name attribute is added back to the <application> tag,
+      pointing to the required MyApplication class for Hilt to work.
+    -->
     <application
         android:name=".MyApplication"
         android:allowBackup="true"
@@ -19,13 +19,11 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.CueDetat"
-        tools:targetApi="31">
+        tools:targetApi="36">
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.CueDetat"
-            tools:ignore="LockedOrientationActivity">
+            android:theme="@style/Theme.CueDetat">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

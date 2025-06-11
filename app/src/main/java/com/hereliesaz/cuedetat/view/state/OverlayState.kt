@@ -2,6 +2,8 @@ package com.hereliesaz.cuedetat.view.state
 
 import android.graphics.Matrix
 import android.graphics.PointF
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.lightColorScheme
 
 /**
  * An immutable data class representing the complete state of the protractor overlay.
@@ -14,7 +16,7 @@ data class OverlayState(
     val pitchAngle: Float = 0.0f,
     val areHelpersVisible: Boolean = true,
     val valuesChangedSinceReset: Boolean = false,
-    val isJumpingGhostBallActive: Boolean = false, // New state for the feature
+    val isJumpingGhostBallActive: Boolean = false,
 
     // View-derived properties
     val viewWidth: Int = 0,
@@ -27,6 +29,9 @@ data class OverlayState(
     val pitchMatrix: Matrix = Matrix(),
     val inversePitchMatrix: Matrix = Matrix(),
     val hasInverseMatrix: Boolean = false,
+
+    // NEW: The color scheme is now part of the state
+    val dynamicColorScheme: ColorScheme = lightColorScheme(),
 
     // Calculated condition flags for rendering
     val isImpossibleShot: Boolean = false
