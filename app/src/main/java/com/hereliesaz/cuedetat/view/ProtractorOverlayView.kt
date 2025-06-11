@@ -1,46 +1,36 @@
+
 package com.hereliesaz.cuedetat.view
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.PointF
 import android.view.MotionEvent
-import android.view.ScaleGestureDetector
 import android.view.View
 import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import kotlin.math.pow
+import kotlin.math.sqrt
 
-/**
- * A custom View that hosts the drawing operations and now handles all touch input
- * for rotation and zooming.
- */
 class ProtractorOverlayView(context: Context) : View(context) {
 
     private val renderer = OverlayRenderer()
-    private val paints = PaintCache()
     private var state = OverlayState()
 
-    // Callbacks to the ViewModel
     var onSizeChanged: ((Int, Int) -> Unit)? = null
     var onRotationChange: ((Float) -> Unit)? = null
-    var onZoomChange: ((Float) -> Unit)? = null
+    var onUnitMove: ((PointF) -> Unit)? = null
+    var onActualCueBallMoved: ((PointF) -> Unit)? = null
 
     private var lastTouchX = 0f
     private var pointerId = -1
 
-    // Gesture detector for pinch-to-zoom
-    private val scaleGestureDetector = ScaleGestureDetector(context, PinchListener())
+    private enum class DragMode { NONE, ROTATE, MOVE_UNIT, MOVE_ACTUAL_CUE_BALL }
 
-    inner class PinchListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-        override fun onScale(detector: ScaleGestureDetector): Boolean {
-            val newZoom = state.zoomFactor * detector.scaleFactor
-            // Clamp the zoom factor to a reasonable range
-            onZoomChange?.invoke(newZoom.coerceIn(0.1f, 4.0f))
-            return true
-        }
-    }
+    private var dragMode = DragMode.NONE
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        renderer.draw(canvas, state, paints)
+        renderer.draw(canvas, state)
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -49,47 +39,86 @@ class ProtractorOverlayView(context: Context) : View(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        scaleGestureDetector.onTouchEvent(event)
-        if (scaleGestureDetector.isInProgress) {
-            return true
-        }
+        if (state.viewWidth == 0) return false
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 pointerId = event.getPointerId(0)
                 lastTouchX = event.x
-            }
+                val touchPoint = PointF(event.x, event.y)
 
+                val projectedTargetCenter =
+                    renderer.mapPoint(state.unitCenterPosition, state.pitchMatrix)
+                val projectedActualCueCenter =
+                    renderer.mapPoint(state.logicalActualCueBallPosition, state.pitchMatrix)
+                val touchRadius = renderer.getPerspectiveRadiusAndLift(
+                    state.unitCenterPosition,
+                    state
+                ).radius * 2.0f
+
+                dragMode = when {
+                    state.isActualCueBallVisible && distance(
+                        touchPoint,
+                        projectedActualCueCenter
+                    ) < touchRadius -> DragMode.MOVE_ACTUAL_CUE_BALL
+
+                    distance(touchPoint, projectedTargetCenter) < touchRadius -> DragMode.MOVE_UNIT
+                    else -> DragMode.ROTATE
+                }
+            }
             MotionEvent.ACTION_MOVE -> {
                 if (pointerId != -1) {
                     val pointerIndex = event.findPointerIndex(pointerId)
                     if (pointerIndex != -1) {
                         val newX = event.getX(pointerIndex)
-                        val dx = newX - lastTouchX
-                        lastTouchX = newX
+                        val newY = event.getY(pointerIndex)
 
-                        // MODIFIED: Inverted the rotation delta to match user expectation.
-                        val rotationDelta = -dx * 0.2f
-                        var newRotation = state.rotationAngle + rotationDelta
+                        when (dragMode) {
+                            DragMode.MOVE_UNIT -> onUnitMove?.invoke(PointF(newX, newY))
+                            DragMode.MOVE_ACTUAL_CUE_BALL -> {
+                                if (state.hasInverseMatrix) {
+                                    val logicalPos = FloatArray(2)
+                                    state.inversePitchMatrix.mapPoints(
+                                        logicalPos,
+                                        floatArrayOf(newX, newY)
+                                    )
+                                    onActualCueBallMoved?.invoke(
+                                        PointF(
+                                            logicalPos[0],
+                                            logicalPos[1]
+                                        )
+                                    )
+                                }
+                            }
 
-                        newRotation %= 360f
-                        if (newRotation < 0) newRotation += 360f
+                            DragMode.ROTATE -> {
+                                val dx = newX - lastTouchX
+                                lastTouchX = newX
+                                val rotationDelta = -dx * 0.2f
+                                onRotationChange?.invoke(state.rotationAngle + rotationDelta)
+                            }
 
-                        onRotationChange?.invoke(newRotation)
+                            else -> {}
+                        }
                     }
                 }
             }
-
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 pointerId = -1
+                dragMode = DragMode.NONE
             }
         }
         return true
     }
 
+    private fun distance(p1: PointF, p2: PointF): Float {
+        val dx = p1.x - p2.x
+        val dy = p1.y - p2.y
+        return sqrt(dx.pow(2) + dy.pow(2))
+    }
+
     fun updateState(newState: OverlayState) {
         this.state = newState
-        paints.updateColors(newState.dynamicColorScheme)
         invalidate()
     }
 }

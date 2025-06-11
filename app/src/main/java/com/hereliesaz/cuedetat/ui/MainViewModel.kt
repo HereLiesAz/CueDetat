@@ -21,10 +21,21 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.math.cos
+import kotlin.math.ln
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
+
+private object ZoomMapping {
+    const val MIN_ZOOM = 0.2f
+    const val MAX_ZOOM = 4.0f
+    const val DEFAULT_ZOOM = 0.4f
+    private const val B = 1.0304433f
+    fun sliderToZoom(sliderValue: Float): Float = MIN_ZOOM * B.pow(sliderValue)
+    fun zoomToSlider(zoomFactor: Float): Float =
+        if (zoomFactor <= MIN_ZOOM) 0f else (ln(zoomFactor / MIN_ZOOM) / ln(B))
+}
 
 sealed class ToastMessage {
     data class StringResource(val id: Int, val formatArgs: List<Any> = emptyList()) : ToastMessage()
@@ -38,7 +49,8 @@ class MainViewModel @Inject constructor(
     application: Application
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(OverlayState())
+    private val _uiState =
+        MutableStateFlow(OverlayState(zoomSliderPosition = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM)))
     val uiState = _uiState.asStateFlow()
 
     private val _toastMessage = MutableStateFlow<ToastMessage?>(null)
@@ -48,33 +60,45 @@ class MainViewModel @Inject constructor(
         application.resources.getStringArray(R.array.insulting_warnings)
     private val graphicsCamera = Camera()
 
-    private var previousZoom: Float? = null
-    private var previousRotation: Float? = null
-
     init {
-        sensorRepository.pitchAngleFlow
-            .onEach(::onPitchAngleChanged)
-            .launchIn(viewModelScope)
+        sensorRepository.pitchAngleFlow.onEach(::onPitchAngleChanged).launchIn(viewModelScope)
     }
 
     private fun updateState(updateAndRecalculate: (OverlayState) -> OverlayState) {
         val oldState = _uiState.value
         _uiState.update {
-            updateAndRecalculate(it).recalculateDerivedState(camera = graphicsCamera)
+            updateAndRecalculate(it).recalculateDerivedState(graphicsCamera)
         }
         val newState = _uiState.value
-
         if (newState.isImpossibleShot && !oldState.isImpossibleShot) {
             _toastMessage.value = ToastMessage.PlainText(insultingWarnings.random())
         }
     }
 
     fun onSizeChanged(width: Int, height: Int) {
-        updateState { it.copy(viewWidth = width, viewHeight = height) }
+        if (_uiState.value.unitCenterPosition.x == 0f) {
+            updateState {
+                it.copy(
+                    viewWidth = width,
+                    viewHeight = height,
+                    unitCenterPosition = PointF(width / 2f, height / 2f),
+                    logicalActualCueBallPosition = PointF(width / 2f, height * 1.2f)
+                )
+            }
+        } else {
+            updateState { it.copy(viewWidth = width, viewHeight = height) }
+        }
     }
 
-    fun onZoomChange(newZoom: Float) {
-        updateState { it.copy(zoomFactor = newZoom, valuesChangedSinceReset = true) }
+    fun onZoomSliderChange(sliderPosition: Float) {
+        val newZoom = ZoomMapping.sliderToZoom(sliderPosition)
+        updateState {
+            it.copy(
+                zoomFactor = newZoom.coerceIn(ZoomMapping.MIN_ZOOM, ZoomMapping.MAX_ZOOM),
+                zoomSliderPosition = sliderPosition,
+                valuesChangedSinceReset = true
+            )
+        }
     }
 
     fun onRotationChange(newRotation: Float) {
@@ -87,45 +111,44 @@ class MainViewModel @Inject constructor(
         updateState { it.copy(pitchAngle = pitch) }
     }
 
-    // NEW: Function to receive the current theme from the UI
     fun onThemeChanged(scheme: ColorScheme) {
         _uiState.update { it.copy(dynamicColorScheme = scheme) }
     }
 
+    fun onUnitMoved(newPosition: PointF) {
+        updateState { it.copy(unitCenterPosition = newPosition, valuesChangedSinceReset = true) }
+    }
+
+    fun onActualCueBallMoved(logicalPosition: PointF) {
+        updateState {
+            it.copy(
+                logicalActualCueBallPosition = logicalPosition,
+                valuesChangedSinceReset = true
+            )
+        }
+    }
+
+    fun onToggleActualCueBall() {
+        _uiState.update { it.copy(isActualCueBallVisible = !it.isActualCueBallVisible) }
+    }
+
     fun onReset() {
-        val currentState = _uiState.value
-        if (currentState.valuesChangedSinceReset) {
-            previousZoom = currentState.zoomFactor
-            previousRotation = currentState.rotationAngle
-            updateState {
-                OverlayState(
-                    viewWidth = it.viewWidth,
-                    viewHeight = it.viewHeight,
-                    valuesChangedSinceReset = false,
-                    dynamicColorScheme = it.dynamicColorScheme
-                )
-            }
-        } else {
-            if (previousZoom != null && previousRotation != null) {
-                updateState {
-                    it.copy(
-                        zoomFactor = previousZoom!!,
-                        rotationAngle = previousRotation!!,
-                        valuesChangedSinceReset = true
-                    )
-                }
-                previousZoom = null
-                previousRotation = null
-            }
+        updateState {
+            OverlayState(
+                viewWidth = it.viewWidth,
+                viewHeight = it.viewHeight,
+                unitCenterPosition = PointF(it.viewWidth / 2f, it.viewHeight / 2f),
+                logicalActualCueBallPosition = PointF(it.viewWidth / 2f, it.viewHeight * 1.2f),
+                valuesChangedSinceReset = false,
+                dynamicColorScheme = it.dynamicColorScheme,
+                zoomFactor = ZoomMapping.DEFAULT_ZOOM,
+                zoomSliderPosition = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM)
+            )
         }
     }
 
     fun onToggleHelp() {
         _uiState.update { it.copy(areHelpersVisible = !it.areHelpersVisible) }
-    }
-
-    fun onToggleJumpingGhostBall() {
-        updateState { it.copy(isJumpingGhostBallActive = !it.isJumpingGhostBallActive) }
     }
 
     fun onCheckForUpdate() {
@@ -150,15 +173,17 @@ class MainViewModel @Inject constructor(
     }
 }
 
+private fun distance(p1: PointF, p2: PointF): Float =
+    sqrt((p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2))
+
 private fun OverlayState.recalculateDerivedState(camera: Camera): OverlayState {
     if (this.viewWidth == 0 || this.viewHeight == 0) return this
 
     val baseDiameter = min(viewWidth, viewHeight) * 0.30f
     val newLogicalRadius = (baseDiameter / 2f) * this.zoomFactor
-
+    val newTargetCenter = this.unitCenterPosition
     val angleRad = Math.toRadians(this.rotationAngle.toDouble())
     val distance = 2 * newLogicalRadius
-    val newTargetCenter = PointF(viewWidth / 2f, viewHeight / 2f)
     val newCueCenter = PointF(
         newTargetCenter.x - (distance * sin(angleRad)).toFloat(),
         newTargetCenter.y + (distance * cos(angleRad)).toFloat()
@@ -166,54 +191,38 @@ private fun OverlayState.recalculateDerivedState(camera: Camera): OverlayState {
 
     val pitchMatrix = Matrix()
     camera.save()
+    camera.setLocation(0f, 0f, -32f)
     camera.rotateX(this.pitchAngle)
     camera.getMatrix(pitchMatrix)
     camera.restore()
-    pitchMatrix.preTranslate(-newTargetCenter.x, -newTargetCenter.y)
-    pitchMatrix.postTranslate(newTargetCenter.x, newTargetCenter.y)
 
-    val inversePitchMatrix = Matrix()
-    val hasInverse = pitchMatrix.invert(inversePitchMatrix)
+    val pivotX = this.viewWidth / 2f
+    val pivotY = this.viewHeight / 2f
+    pitchMatrix.preTranslate(-pivotX, -pivotY)
+    pitchMatrix.postTranslate(pivotX, pivotY)
 
-    val logicalDistance = sqrt(
-        (newCueCenter.x - newTargetCenter.x).pow(2) + (newCueCenter.y - newTargetCenter.y).pow(2)
-    )
+    val inverseMatrix = Matrix()
+    val hasInverse = pitchMatrix.invert(inverseMatrix)
+
+    val logicalDistance = distance(newCueCenter, newTargetCenter)
     val isPhysicalOverlap = logicalDistance < (newLogicalRadius * 2) - 0.1f
+    val isDeflectionDominantAngle = (this.rotationAngle > 90.5f && this.rotationAngle < 269.5f)
 
-    var isCueOnFarSide = false
-    if (hasInverse) {
-        val screenAimPoint = if (isJumpingGhostBallActive) {
-            floatArrayOf(viewWidth / 2f, viewHeight * 0.85f)
-        } else {
-            floatArrayOf(viewWidth / 2f, viewHeight.toFloat())
-        }
-
-        val logicalAimPoint = FloatArray(2)
-        inversePitchMatrix.mapPoints(logicalAimPoint, screenAimPoint)
-        val aimDirX = newCueCenter.x - logicalAimPoint[0]
-        val aimDirY = newCueCenter.y - logicalAimPoint[1]
-        val magAimDirSq = aimDirX * aimDirX + aimDirY * aimDirY
-        if (magAimDirSq > 0.0001f) {
-            val magAimDir = sqrt(magAimDirSq)
-            val normAimDirX = aimDirX / magAimDir
-            val normAimDirY = aimDirY / magAimDir
-            val vecScreenToTargetX = newTargetCenter.x - logicalAimPoint[0]
-            val vecScreenToTargetY = newTargetCenter.y - logicalAimPoint[1]
-            val distTargetProj =
-                vecScreenToTargetX * normAimDirX + vecScreenToTargetY * normAimDirY
-            isCueOnFarSide = magAimDir > distTargetProj && distTargetProj > 0
-        }
+    var isTargetObstructing = false
+    if (this.isActualCueBallVisible) {
+        val distActualToGhost = distance(this.logicalActualCueBallPosition, newCueCenter)
+        val distActualToTarget = distance(this.logicalActualCueBallPosition, newTargetCenter)
+        isTargetObstructing = distActualToGhost > distActualToTarget
     }
 
-    val isDeflectionDominantAngle = (this.rotationAngle > 90.5f && this.rotationAngle < 269.5f)
-    val isImpossible = isCueOnFarSide || isPhysicalOverlap || isDeflectionDominantAngle
+    val isImpossible = isPhysicalOverlap || isDeflectionDominantAngle || isTargetObstructing
 
     return this.copy(
         targetCircleCenter = newTargetCenter,
         cueCircleCenter = newCueCenter,
         logicalRadius = newLogicalRadius,
         pitchMatrix = pitchMatrix,
-        inversePitchMatrix = inversePitchMatrix,
+        inversePitchMatrix = inverseMatrix,
         hasInverseMatrix = hasInverse,
         isImpossibleShot = isImpossible
     )

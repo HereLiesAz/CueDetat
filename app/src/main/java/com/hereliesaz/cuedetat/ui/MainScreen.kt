@@ -1,7 +1,5 @@
 package com.hereliesaz.cuedetat.ui
 
-import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -46,24 +44,24 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.view.ProtractorOverlayView
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
-    val toastMessage by viewModel.toastMessage.collectAsState()
+    val toastMessage: ToastMessage? by viewModel.toastMessage.collectAsState()
     val context = LocalContext.current
 
     val sheetState = rememberModalBottomSheetState()
-    val scope = rememberCoroutineScope()
+    rememberCoroutineScope()
     var showBottomSheet by remember { mutableStateOf(false) }
 
     val protractorView = remember {
         ProtractorOverlayView(context).apply {
-            onSizeChanged = { w, h -> viewModel.onSizeChanged(w, h) }
+            onSizeChanged = viewModel::onSizeChanged
             onRotationChange = viewModel::onRotationChange
-            onZoomChange = viewModel::onZoomChange
+            onUnitMove = viewModel::onUnitMoved
+            onActualCueBallMoved = viewModel::onActualCueBallMoved
         }
     }
 
@@ -88,16 +86,10 @@ fun MainScreen(viewModel: MainViewModel) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         CameraPreview(modifier = Modifier.fillMaxSize())
-
         AndroidView({ protractorView }, modifier = Modifier.fillMaxSize()) { view ->
             view.updateState(uiState)
         }
-
-        TopControls(
-            uiState = uiState,
-            onMenuClick = { showBottomSheet = true }
-        )
-
+        TopControls(uiState = uiState, onMenuClick = { showBottomSheet = true })
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -113,9 +105,9 @@ fun MainScreen(viewModel: MainViewModel) {
             )
             Spacer(modifier = Modifier.height(8.dp))
             VerticalSlider(
-                value = uiState.zoomFactor,
-                onValueChange = { newValue -> viewModel.onZoomChange(newValue) },
-                valueRange = 0.1f..4.0f,
+                value = uiState.zoomSliderPosition,
+                onValueChange = viewModel::onZoomSliderChange,
+                valueRange = 0f..100f,
                 modifier = Modifier.fillMaxHeight(),
                 colors = SliderDefaults.colors(
                     activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -124,22 +116,20 @@ fun MainScreen(viewModel: MainViewModel) {
                 )
             )
         }
-
         FloatingActionButton(
-            onClick = viewModel::onToggleJumpingGhostBall,
+            onClick = viewModel::onToggleActualCueBall,
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(16.dp)
                 .navigationBarsPadding(),
-            containerColor = if (uiState.isJumpingGhostBallActive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (uiState.isActualCueBallVisible) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_jump_shot),
-                contentDescription = "Toggle Jumping Ghost Ball",
-                tint = if (uiState.isJumpingGhostBallActive) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant
+                contentDescription = "Toggle Actual Cue Ball",
+                tint = if (uiState.isActualCueBallVisible) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-
         FloatingActionButton(
             onClick = viewModel::onReset,
             modifier = Modifier
@@ -153,13 +143,8 @@ fun MainScreen(viewModel: MainViewModel) {
             )
         }
     }
-
     if (showBottomSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showBottomSheet = false },
-            sheetState = sheetState
-            // MODIFIED: The problematic windowInsets parameter has been removed.
-        ) {
+        ModalBottomSheet(onDismissRequest = { showBottomSheet = false }, sheetState = sheetState) {
             MenuItem(
                 icon = ImageVector.vectorResource(R.drawable.ic_help_outline_24),
                 text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
@@ -168,28 +153,13 @@ fun MainScreen(viewModel: MainViewModel) {
             MenuItem(
                 icon = ImageVector.vectorResource(R.drawable.ic_launcher_monochrome),
                 text = "Check for Updates",
-                onClick = {
-                    scope.launch { sheetState.hide() }.invokeOnCompletion {
-                        if (!sheetState.isVisible) {
-                            val intent = Intent(
-                                Intent.ACTION_VIEW,
-                                Uri.parse("https://github.com/hereliesaz/CueD8at/releases")
-                            )
-                            context.startActivity(intent)
-                        }
-                    }
-                }
-            )
+                onClick = { viewModel.onCheckForUpdate() })
             Spacer(modifier = Modifier.navigationBarsPadding())
         }
     }
 }
-
 @Composable
-fun TopControls(
-    uiState: OverlayState,
-    onMenuClick: () -> Unit
-) {
+fun TopControls(uiState: OverlayState, onMenuClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -217,7 +187,6 @@ fun TopControls(
         }
     }
 }
-
 @Composable
 fun MenuItem(icon: ImageVector, text: String, onClick: () -> Unit) {
     Row(

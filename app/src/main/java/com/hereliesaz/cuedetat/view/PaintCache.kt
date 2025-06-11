@@ -18,22 +18,30 @@ class PaintCache {
     val targetCenterMarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     val cueCenterMarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     val protractorLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 3f }
-    val shotPathLinePaint =
+
+    /** The paint for the "Aiming Line" (the target ball's path). */
+    val aimingLinePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             strokeWidth = 5f
         }
+
     val ghostCueOutlinePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 6f }
     val targetGhostBallOutlinePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 6f }
-    val jumpingGhostBallPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 4f }
 
-    // MODIFIED: Aiming line paints now have a default color set, which will be updated by the theme.
-    val aimingAssistNearPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 5f }
-    val aimingAssistFarPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 5f }
+    val actualCueBallGhostPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 6f }
+    val actualCueBallBasePaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2f }
+    val actualCueBallCenterMarkPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+
+    /** The paint for the "Shot Line" (the user's line of sight), correctly set to light gray. */
+    val shotLinePaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#CCCCCC"); style = Paint.Style.STROKE; strokeWidth = 5f
+        }
 
     val aimingSightPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 4f; style = Paint.Style.STROKE }
@@ -51,22 +59,24 @@ class PaintCache {
         pathEffect = null
     }
 
+    // Restored warning paints for impossible/foul shots
     val warningPaintRed1 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#C05D5D")
+        color = Color.parseColor("#C05D5D") // For 2D Protractor Cue Ball
         style = Paint.Style.STROKE
         strokeWidth = 5f
     }
     val warningPaintRed2 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#A04C4C")
+        color = Color.parseColor("#A04C4C") // For Ghost Cue Ball
         style = Paint.Style.STROKE
         strokeWidth = 6f
     }
     val warningPaintRed3 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#80E57373")
+        color = Color.parseColor("#80E57373") // For Shot Line
         style = Paint.Style.STROKE
         strokeWidth = 5f
         setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, Color.parseColor("#FF5252"))
     }
+
 
     fun updateColors(colorScheme: ColorScheme) {
         glowColor = colorScheme.primary.copy(alpha = 0.4f).toArgb()
@@ -77,21 +87,18 @@ class PaintCache {
         targetCenterMarkPaint.color = cueCirclePaint.color
         cueCenterMarkPaint.color = targetCirclePaint.color
 
-        jumpingGhostBallPaint.color = colorScheme.secondary.toArgb()
+        actualCueBallGhostPaint.color = colorScheme.secondary.toArgb()
+        actualCueBallBasePaint.color = colorScheme.secondary.copy(alpha = 0.5f).toArgb()
+        actualCueBallCenterMarkPaint.color = colorScheme.secondary.toArgb()
 
         ghostCueOutlinePaint.color = colorScheme.tertiary.copy(alpha = 0.7f).toArgb()
         targetGhostBallOutlinePaint.color = colorScheme.primary.copy(alpha = 0.7f).toArgb()
 
         protractorLinePaint.color = colorScheme.onSurface.copy(alpha = 0.2f).toArgb()
-        shotPathLinePaint.apply {
+        aimingLinePaint.apply {
             color = colorScheme.primary.toArgb()
             setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, glowColor)
         }
-
-        // MODIFIED: The aiming line is now brighter and uses the primary color.
-        aimingAssistNearPaint.color = colorScheme.primary.toArgb()
-        aimingAssistFarPaint.color = colorScheme.primary.copy(alpha = 0.5f).toArgb()
-
 
         aimingSightPaint.apply {
             color = colorScheme.primary.toArgb()

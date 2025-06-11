@@ -1,11 +1,12 @@
+
 package com.hereliesaz.cuedetat.view.renderer
 
 import android.graphics.Canvas
 import android.graphics.Matrix
-import android.graphics.Paint
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.pow
@@ -14,314 +15,184 @@ import kotlin.math.sqrt
 
 class OverlayRenderer {
 
+    private val paints = PaintCache()
     private val PROTRACTOR_ANGLES = floatArrayOf(0f, 14f, 30f, 36f, 43f, 48f)
 
-    // MODIFIED: Increased base text size
-    private val baseGhostBallTextSize = 42f
-    private val minGhostBallTextSize = 15f
-    private val maxGhostBallTextSize = 80f
-
-    fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        if (state.viewWidth == 0 || state.viewHeight == 0) return
-
-        val isImpossibleShot = state.isImpossibleShot
+    fun draw(canvas: Canvas, state: OverlayState) {
+        if (state.viewWidth == 0) return
+        paints.updateColors(state.dynamicColorScheme)
 
         canvas.save()
         canvas.concat(state.pitchMatrix)
 
-        drawAimingLine(canvas, state, paints, isImpossibleShot)
-        drawBalls(canvas, state, paints, isImpossibleShot)
-        drawTangentLines(canvas, state, paints, isImpossibleShot)
-        drawProtractorLines(canvas, state, paints)
+        drawShotLine(canvas, state, paints)
+        if (state.isActualCueBallVisible) {
+            drawActualCueBallBase(canvas, state, paints)
+        }
+        drawProtractorUnit(canvas, state, paints)
 
         canvas.restore()
 
-        if (state.isJumpingGhostBallActive) {
-            drawJumpingGhostBall(canvas, state, paints)
+        if (state.isActualCueBallVisible) {
+            drawActualCueBallGhost(canvas, state, paints)
         }
-        drawGhostBalls(canvas, state, paints, isImpossibleShot)
+        drawGhostBalls(canvas, state, paints)
     }
 
-    private fun drawAimingLine(
-        canvas: Canvas,
-        state: OverlayState,
-        paints: PaintCache,
-        isImpossibleShot: Boolean
-    ) {
-        if (!state.hasInverseMatrix) return
-
-        val screenAimPoint: FloatArray = if (state.isJumpingGhostBallActive) {
-            floatArrayOf(state.viewWidth / 2f, state.viewHeight * 0.85f)
-        } else {
-            floatArrayOf(state.viewWidth / 2f, state.viewHeight.toFloat())
-        }
-
-        val logicalAimPoint = FloatArray(2)
-        state.inversePitchMatrix.mapPoints(logicalAimPoint, screenAimPoint)
-
-        val sx = logicalAimPoint[0]
-        val sy = logicalAimPoint[1]
-        val cx = state.cueCircleCenter.x
-        val cy = state.cueCircleCenter.y
-        val dx = cx - sx
-        val dy = cy - sy
-        val mag = sqrt(dx * dx + dy * dy)
-
-        if (mag > 0.001f) {
-            val ndx = dx / mag
-            val ndy = dy / mag
-            val extendFactor = max(state.viewWidth, state.viewHeight) * 5f
-            val ex = cx + ndx * extendFactor
-            val ey = cy + ndy * extendFactor
-
-            val nearPaint =
-                if (isImpossibleShot) paints.warningPaintRed3 else paints.aimingAssistNearPaint
-            val farPaint =
-                if (isImpossibleShot) paints.warningPaintRed3 else paints.aimingAssistFarPaint
-
-            canvas.drawLine(sx, sy, cx, cy, nearPaint)
-            canvas.drawLine(cx, cy, ex, ey, farPaint)
-        }
-    }
-
-
-    private fun drawBalls(
-        canvas: Canvas,
-        state: OverlayState,
-        paints: PaintCache,
-        isImpossibleShot: Boolean
-    ) {
-        canvas.drawCircle(
-            state.targetCircleCenter.x,
-            state.targetCircleCenter.y,
-            state.logicalRadius,
-            paints.targetCirclePaint
-        )
-        canvas.drawCircle(
-            state.targetCircleCenter.x,
-            state.targetCircleCenter.y,
-            state.logicalRadius / 5f,
-            paints.targetCenterMarkPaint
-        )
-
-        val cuePaint = if (isImpossibleShot) paints.warningPaintRed1 else paints.cueCirclePaint
-
-        canvas.drawCircle(
-            state.cueCircleCenter.x,
-            state.cueCircleCenter.y,
-            state.logicalRadius,
-            cuePaint
-        )
-        canvas.drawCircle(
-            state.cueCircleCenter.x,
-            state.cueCircleCenter.y,
-            state.logicalRadius / 5f,
-            paints.cueCenterMarkPaint
-        )
-    }
-
-    private fun drawTangentLines(
-        canvas: Canvas,
-        state: OverlayState,
-        paints: PaintCache,
-        isImpossibleShot: Boolean
-    ) {
-        val dx = state.targetCircleCenter.x - state.cueCircleCenter.x
-        val dy = state.targetCircleCenter.y - state.cueCircleCenter.y
-        val mag = sqrt(dx * dx + dy * dy)
-        if (mag < 0.001f) return
-
-        val extend = max(state.viewWidth, state.viewHeight) * 1.5f
-        val deflectionDirX = -dy / mag
-        val deflectionDirY = dx / mag
-
-        val rightPaint =
-            if (isImpossibleShot || state.rotationAngle <= 180f) paints.tangentLineDottedPaint else paints.tangentLineSolidPaint
-        val leftPaint =
-            if (isImpossibleShot || state.rotationAngle > 180f) paints.tangentLineDottedPaint else paints.tangentLineSolidPaint
-
-        canvas.drawLine(
-            state.cueCircleCenter.x,
-            state.cueCircleCenter.y,
-            state.cueCircleCenter.x + deflectionDirX * extend,
-            state.cueCircleCenter.y + deflectionDirY * extend,
-            rightPaint
-        )
-        canvas.drawLine(
-            state.cueCircleCenter.x,
-            state.cueCircleCenter.y,
-            state.cueCircleCenter.x - deflectionDirX * extend,
-            state.cueCircleCenter.y - deflectionDirY * extend,
-            leftPaint
-        )
-    }
-
-    private fun drawProtractorLines(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+    private fun drawProtractorUnit(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         canvas.save()
         canvas.translate(state.targetCircleCenter.x, state.targetCircleCenter.y)
         canvas.rotate(state.rotationAngle)
+
+        // Target Ball (at the local origin 0,0)
+        canvas.drawCircle(0f, 0f, state.logicalRadius, paints.targetCirclePaint)
+        canvas.drawCircle(0f, 0f, state.logicalRadius / 5f, paints.targetCenterMarkPaint)
+
+        // Protractor Cue Ball (relative to the Target Ball)
+        val cuePaint =
+            if (state.isImpossibleShot) paints.warningPaintRed1 else paints.cueCirclePaint
+        val distance = 2 * state.logicalRadius
+        val cueX = 0f
+        val cueY = distance
+        canvas.drawCircle(cueX, cueY, state.logicalRadius, cuePaint)
+        canvas.drawCircle(cueX, cueY, state.logicalRadius / 5f, paints.cueCenterMarkPaint)
+
+        // Tangent Lines
+        val dx = 0 - cueX
+        val dy = 0 - cueY
+        val mag = sqrt(dx * dx + dy * dy)
+        if (mag > 0.001f) {
+            val extend = max(state.viewWidth, state.viewHeight) * 1.5f
+            val dX = -dy / mag
+            val dY = dx / mag
+            val rightPaint =
+                if (state.isImpossibleShot || state.rotationAngle <= 180f) paints.tangentLineDottedPaint else paints.tangentLineSolidPaint
+            val leftPaint =
+                if (state.isImpossibleShot || state.rotationAngle > 180f) paints.tangentLineDottedPaint else paints.tangentLineSolidPaint
+            canvas.drawLine(cueX, cueY, cueX + dX * extend, cueY + dY * extend, rightPaint)
+            canvas.drawLine(cueX, cueY, cueX - dX * extend, cueY - dY * extend, leftPaint)
+        }
+
+        // Protractor & Aiming Line
         val lineLength = max(state.viewWidth, state.viewHeight) * 2f
-
         PROTRACTOR_ANGLES.forEach { angle ->
-            val rad = Math.toRadians(angle.toDouble())
-            val endX = (lineLength * sin(rad)).toFloat()
-            val endY = (lineLength * cos(rad)).toFloat()
-
+            val r = Math.toRadians(angle.toDouble())
+            val eX = (lineLength * sin(r)).toFloat()
+            val eY = (lineLength * cos(r)).toFloat()
             if (angle == 0f) {
-                canvas.drawLine(0f, 0f, endX, endY, paints.protractorLinePaint)
-                canvas.drawLine(0f, 0f, -endX, -endY, paints.shotPathLinePaint)
+                canvas.drawLine(0f, 0f, eX, eY, paints.protractorLinePaint)
+                canvas.drawLine(0f, 0f, -eX, -eY, paints.aimingLinePaint)
             } else {
-                canvas.drawLine(0f, 0f, endX, endY, paints.protractorLinePaint)
-                canvas.drawLine(0f, 0f, -endX, -endY, paints.protractorLinePaint)
-                val negRad = Math.toRadians(-angle.toDouble())
-                val negEndX = (lineLength * sin(negRad)).toFloat()
-                val negEndY = (lineLength * cos(negRad)).toFloat()
-                canvas.drawLine(0f, 0f, negEndX, negEndY, paints.protractorLinePaint)
-                canvas.drawLine(0f, 0f, -negEndX, -negEndY, paints.protractorLinePaint)
+                canvas.drawLine(0f, 0f, eX, eY, paints.protractorLinePaint)
+                canvas.drawLine(0f, 0f, -eX, -eY, paints.protractorLinePaint)
+                val nR = Math.toRadians(-angle.toDouble())
+                val nEX = (lineLength * sin(nR)).toFloat()
+                val nEY = (lineLength * cos(nR)).toFloat()
+                canvas.drawLine(0f, 0f, nEX, nEY, paints.protractorLinePaint)
+                canvas.drawLine(0f, 0f, -nEX, -nEY, paints.protractorLinePaint)
             }
         }
         canvas.restore()
     }
 
-    private fun drawJumpingGhostBall(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        val centerX = state.viewWidth / 2f
-        val centerY = state.viewHeight * 0.85f
+    private fun drawShotLine(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+        val startPoint: PointF = if (state.isActualCueBallVisible) {
+            state.logicalActualCueBallPosition
+        } else {
+            if (!state.hasInverseMatrix) return
+            val screenAnchor = floatArrayOf(state.viewWidth / 2f, state.viewHeight.toFloat())
+            val logicalAnchorArray = FloatArray(2)
+            state.inversePitchMatrix.mapPoints(logicalAnchorArray, screenAnchor)
+            PointF(logicalAnchorArray[0], logicalAnchorArray[1])
+        }
 
-        // MODIFIED: Inverted the perspective scaling.
-        val pTGC = mapPoint(state.targetCircleCenter, state.pitchMatrix)
-        val tR = mapPoint(
-            PointF(
-                state.targetCircleCenter.x + state.logicalRadius,
-                state.targetCircleCenter.y
-            ), state.pitchMatrix
-        )
-        val tT = mapPoint(
-            PointF(
-                state.targetCircleCenter.x,
-                state.targetCircleCenter.y - state.logicalRadius
-            ), state.pitchMatrix
-        )
-        val baseRadius = max(distance(pTGC, tR), distance(pTGC, tT))
-
-        // This formula makes the ball grow from its base size to double its size as the phone tilts down.
-        val finalRadius =
-            baseRadius * (2 - cos(Math.toRadians(state.pitchAngle.toDouble())).toFloat())
-
-        canvas.drawCircle(centerX, centerY, finalRadius, paints.jumpingGhostBallPaint)
-    }
-
-    private fun drawGhostBalls(
-        canvas: Canvas,
-        state: OverlayState,
-        paints: PaintCache,
-        isImpossibleShot: Boolean
-    ) {
-        val pTGC = mapPoint(state.targetCircleCenter, state.pitchMatrix)
-        val pCGC = mapPoint(state.cueCircleCenter, state.pitchMatrix)
-
-        val tR = mapPoint(
-            PointF(
-                state.targetCircleCenter.x + state.logicalRadius,
-                state.targetCircleCenter.y
-            ), state.pitchMatrix
-        )
-        val tT = mapPoint(
-            PointF(
-                state.targetCircleCenter.x,
-                state.targetCircleCenter.y - state.logicalRadius
-            ), state.pitchMatrix
-        )
-        val gTSR = max(distance(pTGC, tR), distance(pTGC, tT))
-
-        val cR = mapPoint(
-            PointF(state.cueCircleCenter.x + state.logicalRadius, state.cueCircleCenter.y),
-            state.pitchMatrix
-        )
-        val cT = mapPoint(
-            PointF(state.cueCircleCenter.x, state.cueCircleCenter.y - state.logicalRadius),
-            state.pitchMatrix
-        )
-        val gCSR = max(distance(pCGC, cR), distance(pCGC, cT))
-
-        val pitchRadians = Math.toRadians(state.pitchAngle.toDouble())
-        val liftFactor = sin(pitchRadians).toFloat()
-
-        val targetLift = gTSR * liftFactor
-        val cueLift = gCSR * liftFactor
-
-        val targetGhostCenterY = pTGC.y - targetLift
-        val cueGhostCenterY = pCGC.y - cueLift
-
-        canvas.drawCircle(pTGC.x, targetGhostCenterY, gTSR, paints.targetGhostBallOutlinePaint)
-
-        val cueGhostPaint =
-            if (isImpossibleShot) paints.warningPaintRed2 else paints.ghostCueOutlinePaint
-        canvas.drawCircle(pCGC.x, cueGhostCenterY, gCSR, cueGhostPaint)
-
-        val sightArmLength = gCSR * 0.6f
-        canvas.drawLine(
-            pCGC.x - sightArmLength,
-            cueGhostCenterY,
-            pCGC.x + sightArmLength,
-            cueGhostCenterY,
-            paints.aimingSightPaint
-        )
-        canvas.drawLine(
-            pCGC.x,
-            cueGhostCenterY - sightArmLength,
-            pCGC.x,
-            cueGhostCenterY + sightArmLength,
-            paints.aimingSightPaint
-        )
-        canvas.drawCircle(pCGC.x, cueGhostCenterY, sightArmLength * 0.15f, paints.aimingSightPaint)
-
-        if (state.areHelpersVisible) {
-            drawGhostBallText(
-                canvas,
-                state,
-                pTGC.x,
-                targetGhostCenterY,
-                gTSR,
-                "Target Ball",
-                paints.targetBallTextPaint
-            )
-            drawGhostBallText(
-                canvas,
-                state,
-                pCGC.x,
-                cueGhostCenterY,
-                gCSR,
-                "Cue Ball",
-                paints.cueBallTextPaint
+        val throughPoint = state.cueCircleCenter
+        val dirX = throughPoint.x - startPoint.x
+        val dirY = throughPoint.y - startPoint.y
+        val mag = sqrt(dirX * dirX + dirY * dirY)
+        if (mag > 0.001f) {
+            val extendFactor = max(state.viewWidth, state.viewHeight) * 5f
+            val ndx = dirX / mag
+            val ndy = dirY / mag
+            val paint =
+                if (state.isImpossibleShot) paints.warningPaintRed3 else paints.shotLinePaint
+            canvas.drawLine(
+                startPoint.x,
+                startPoint.y,
+                startPoint.x + ndx * extendFactor,
+                startPoint.y + ndy * extendFactor,
+                paint
             )
         }
     }
 
-    private fun drawGhostBallText(
-        canvas: Canvas,
-        state: OverlayState,
-        x: Float,
-        y: Float,
-        radius: Float,
-        text: String,
-        textPaint: Paint
-    ) {
-        val currentTextSize = (baseGhostBallTextSize * state.zoomFactor).coerceIn(
-            minGhostBallTextSize,
-            maxGhostBallTextSize
+    private fun drawActualCueBallBase(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+        canvas.drawCircle(
+            state.logicalActualCueBallPosition.x,
+            state.logicalActualCueBallPosition.y,
+            state.logicalRadius,
+            paints.actualCueBallBasePaint
         )
-        textPaint.textSize = currentTextSize
-        val textMetrics = textPaint.fontMetrics
-        val textPadding = 5f * state.zoomFactor.coerceAtLeast(0.5f)
-        val visualTop = y - radius
-        val baseline = visualTop - textPadding - textMetrics.descent
-        canvas.drawText(text, x, baseline, textPaint)
+        canvas.drawCircle(
+            state.logicalActualCueBallPosition.x,
+            state.logicalActualCueBallPosition.y,
+            state.logicalRadius / 5f,
+            paints.actualCueBallCenterMarkPaint
+        )
+    }
+
+    private fun drawActualCueBallGhost(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+        val radiusInfo = getPerspectiveRadiusAndLift(state.logicalActualCueBallPosition, state)
+        val screenBasePos = mapPoint(state.logicalActualCueBallPosition, state.pitchMatrix)
+        val ghostCenterY = screenBasePos.y - radiusInfo.lift
+        canvas.drawCircle(
+            screenBasePos.x,
+            ghostCenterY,
+            radiusInfo.radius,
+            paints.actualCueBallGhostPaint
+        )
+    }
+
+    private fun drawGhostBalls(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+        val targetRadiusInfo = getPerspectiveRadiusAndLift(state.targetCircleCenter, state)
+        val cueRadiusInfo = getPerspectiveRadiusAndLift(state.cueCircleCenter, state)
+
+        val pTGC = mapPoint(state.targetCircleCenter, state.pitchMatrix)
+        val pCGC = mapPoint(state.cueCircleCenter, state.pitchMatrix)
+
+        val targetGhostCenterY = pTGC.y - targetRadiusInfo.lift
+        val cueGhostCenterY = pCGC.y - cueRadiusInfo.lift
+
+        canvas.drawCircle(
+            pTGC.x,
+            targetGhostCenterY,
+            targetRadiusInfo.radius,
+            paints.targetGhostBallOutlinePaint
+        )
+        val cueGhostPaint =
+            if (state.isImpossibleShot) paints.warningPaintRed2 else paints.ghostCueOutlinePaint
+        canvas.drawCircle(pCGC.x, cueGhostCenterY, cueRadiusInfo.radius, cueGhostPaint)
+    }
+
+    data class PerspectiveRadiusInfo(val radius: Float, val lift: Float)
+
+    fun getPerspectiveRadiusAndLift(
+        logicalCenter: PointF,
+        state: OverlayState
+    ): PerspectiveRadiusInfo {
+        if (!state.hasInverseMatrix) return PerspectiveRadiusInfo(state.logicalRadius, 0f)
+        val screenCenter = mapPoint(logicalCenter, state.pitchMatrix)
+        val logicalEdge = PointF(logicalCenter.x + state.logicalRadius, logicalCenter.y)
+        val screenEdge = mapPoint(logicalEdge, state.pitchMatrix)
+        val radius = distance(screenCenter, screenEdge)
+        val lift = radius * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
+        return PerspectiveRadiusInfo(radius, lift)
     }
 
     private fun distance(p1: PointF, p2: PointF): Float =
         sqrt((p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2))
 
-    private fun mapPoint(p: PointF, m: Matrix): PointF {
+    fun mapPoint(p: PointF, m: Matrix): PointF {
         val arr = floatArrayOf(p.x, p.y)
         m.mapPoints(arr)
         return PointF(arr[0], arr[1])
