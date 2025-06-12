@@ -11,12 +11,6 @@ object Perspective {
 
     /**
      * Creates the 3D transformation matrix that pivots around the center of the view.
-     *
-     * @param pitchAngle The device's pitch in degrees.
-     * @param viewWidth The width of the view.
-     * @param viewHeight The height of the view.
-     * @param camera A reusable android.graphics.Camera instance.
-     * @return A Matrix representing the 3D tilt.
      */
     fun createPitchMatrix(
         pitchAngle: Float,
@@ -31,7 +25,6 @@ object Perspective {
         camera.getMatrix(matrix)
         camera.restore()
 
-        // Pivot the rotation around the center of the screen
         val pivotX = viewWidth / 2f
         val pivotY = viewHeight / 2f
         matrix.preTranslate(-pivotX, -pivotY)
@@ -42,10 +35,6 @@ object Perspective {
 
     /**
      * Projects a point from the screen space (user touch) to the logical 2D plane.
-     *
-     * @param screenPoint The point on the screen.
-     * @param inverseMatrix The inverse of the current pitch matrix.
-     * @return The corresponding PointF on the logical plane.
      */
     fun screenToLogical(screenPoint: PointF, inverseMatrix: Matrix): PointF {
         val logicalCoords = floatArrayOf(screenPoint.x, screenPoint.y)
