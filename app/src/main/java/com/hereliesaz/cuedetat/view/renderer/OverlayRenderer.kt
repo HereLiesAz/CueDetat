@@ -2,66 +2,78 @@ package com.hereliesaz.cuedetat.view.renderer
 
 import android.graphics.Canvas
 import android.graphics.Matrix
+import android.graphics.Paint
 import android.graphics.PointF
+import androidx.core.graphics.withMatrix
+import androidx.core.graphics.withTranslation
+import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.model.ILogicalBall
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import kotlin.math.*
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.pow
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 class OverlayRenderer {
 
-    private val paints = PaintCache()
     private val PROTRACTOR_ANGLES = floatArrayOf(0f, 14f, 30f, 36f, 43f, 48f)
-    private val baseGhostBallTextSize = 42f
+    private val baseGhostBallTextSize = 30f
     private val minGhostBallTextSize = 15f
-    private val maxGhostBallTextSize = 80f
+    private val maxGhostBallTextSize = 60f
 
-    fun draw(canvas: Canvas, state: OverlayState) {
+    fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         if (state.protractorUnit.center.x == 0f) return
-        paints.updateColors(state.dynamicColorScheme)
 
-        canvas.save()
-        canvas.concat(state.pitchMatrix)
+        canvas.withMatrix(state.pitchMatrix) {
+            drawShotLine(this, state, paints)
+            state.actualCueBall?.let { drawActualCueBallBase(this, it, paints) }
+            drawProtractorUnit(this, state, paints)
 
-        drawShotLine(canvas, state, paints)
-        state.actualCueBall?.let { drawActualCueBallBase(canvas, it, paints) }
-        drawProtractorUnit(canvas, state, paints)
-
-        canvas.restore()
+        }
 
         state.actualCueBall?.let { drawActualCueBallGhost(canvas, it, state, paints) }
         drawGhostBalls(canvas, state, paints)
     }
 
     private fun drawProtractorUnit(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        canvas.save()
-        canvas.translate(state.protractorUnit.center.x, state.protractorUnit.center.y)
-        canvas.rotate(state.protractorUnit.rotationDegrees)
+        canvas.withTranslation(state.protractorUnit.center.x, state.protractorUnit.center.y) {
+            rotate(state.protractorUnit.rotationDegrees)
 
-        canvas.drawCircle(0f, 0f, state.protractorUnit.radius, paints.targetCirclePaint)
-        canvas.drawCircle(0f, 0f, state.protractorUnit.radius / 5f, paints.targetCenterMarkPaint)
+            // Draw Target Ball (at the new origin)
+            drawCircle(0f, 0f, state.protractorUnit.radius, paints.targetCirclePaint)
+            drawCircle(0f, 0f, state.protractorUnit.radius / 5f, paints.targetCenterMarkPaint)
 
-        val cuePaint =
-            if (state.isImpossibleShot) paints.warningPaintRed1 else paints.cueCirclePaint
-        val cueLocalPos = state.protractorUnit.protractorCueBallCenter.apply {
-            offset(
-                -state.protractorUnit.center.x,
-                -state.protractorUnit.center.y
+            // Determine position of Ghost Cue Ball relative to the now-rotated canvas
+            val cueBallLocalCenter = state.protractorUnit.protractorCueBallCenter.let {
+                val p = PointF(it.x, it.y)
+                p.offset(-state.protractorUnit.center.x, -state.protractorUnit.center.y)
+                p
+            }
+            val rotationInvertedMatrix =
+                Matrix().apply { setRotate(-state.protractorUnit.rotationDegrees) }
+            val cueBallRelativePosition = floatArrayOf(cueBallLocalCenter.x, cueBallLocalCenter.y)
+            rotationInvertedMatrix.mapPoints(cueBallRelativePosition)
+            val cuePos = PointF(cueBallRelativePosition[0], cueBallRelativePosition[1])
+
+            // Draw Ghost Cue Ball
+            val cuePaint =
+                if (state.isImpossibleShot) paints.warningPaintRed1 else paints.cueCirclePaint
+            drawCircle(cuePos.x, cuePos.y, state.protractorUnit.radius, cuePaint)
+            drawCircle(
+                cuePos.x,
+                cuePos.y,
+                state.protractorUnit.radius / 5f,
+                paints.cueCenterMarkPaint
             )
+
+            // Draw Tangent lines and Protractor lines from the perspective of the rotated canvas
+            drawTangentLines(this, cuePos, paints, state)
+            drawProtractorLines(this, cuePos, paints)
+
         }
-        canvas.drawCircle(cueLocalPos.x, cueLocalPos.y, state.protractorUnit.radius, cuePaint)
-        canvas.drawCircle(
-            cueLocalPos.x,
-            cueLocalPos.y,
-            state.protractorUnit.radius / 5f,
-            paints.cueCenterMarkPaint
-        )
-
-        // Tangent Lines & Protractor Lines
-        drawTangentLines(canvas, cueLocalPos, paints, state)
-        drawProtractorLines(canvas, paints)
-
-        canvas.restore()
     }
 
     private fun drawTangentLines(
@@ -74,8 +86,7 @@ class OverlayRenderer {
         val dy = 0 - cueLocalPos.y
         val mag = sqrt(dx * dx + dy * dy)
         if (mag > 0.001f) {
-            val extend =
-                max(state.protractorUnit.center.x * 2, state.protractorUnit.center.y * 2) * 1.5f
+            val extend = max(state.viewWidth, state.viewHeight) * 1.5f
             val dX = -dy / mag
             val dY = dx / mag
             val rightPaint =
@@ -99,34 +110,39 @@ class OverlayRenderer {
         }
     }
 
-    private fun drawProtractorLines(canvas: Canvas, paints: PaintCache) {
-        val lineLength = 2000f // A large number
+
+    private fun drawProtractorLines(canvas: Canvas, cueLocalPos: PointF, paints: PaintCache) {
+        val lineLength = 2000f
+
+        // Draw the Aiming Line (Line of Centers)
+        val aimDirX = 0 - cueLocalPos.x // Vector from cue to target (origin)
+        val aimDirY = 0 - cueLocalPos.y
+        val mag = sqrt(aimDirX * aimDirX + aimDirY * aimDirY)
+        if (mag > 0.001f) {
+            val nX = aimDirX / mag
+            val nY = aimDirY / mag
+            // Draw from the Ghost Cue, through the Target, and beyond
+            canvas.drawLine(
+                cueLocalPos.x,
+                cueLocalPos.y,
+                cueLocalPos.x + nX * lineLength,
+                cueLocalPos.y + nY * lineLength,
+                paints.aimingLinePaint
+            )
+        }
+
+
+        // Draw the other protractor angles relative to the target ball (origin)
         PROTRACTOR_ANGLES.forEach { angle ->
+            if (angle == 0f) return@forEach // Skip the 0-degree line as it's the aiming line now
             val r = Math.toRadians(angle.toDouble())
             val eX = (lineLength * sin(r)).toFloat()
             val eY = (lineLength * cos(r)).toFloat()
-            if (angle == 0f) {
-                canvas.drawLine(0f, 0f, eX, eY, paints.protractorLinePaint)
-                canvas.drawLine(0f, 0f, -eX, -eY, paints.aimingLinePaint)
-            } else {
-                canvas.drawLine(0f, 0f, eX, eY, paints.protractorLinePaint); canvas.drawLine(
-                    0f,
-                    0f,
-                    -eX,
-                    -eY,
-                    paints.protractorLinePaint
-                )
-                val nR = Math.toRadians(-angle.toDouble())
-                val nEX = (lineLength * sin(nR)).toFloat()
-                val nEY = (lineLength * cos(nR)).toFloat()
-                canvas.drawLine(0f, 0f, nEX, nEY, paints.protractorLinePaint); canvas.drawLine(
-                    0f,
-                    0f,
-                    -nEX,
-                    -nEY,
-                    paints.protractorLinePaint
-                )
-            }
+
+            canvas.drawLine(0f, 0f, eX, eY, paints.protractorLinePaint)
+            canvas.drawLine(0f, 0f, -eX, -eY, paints.protractorLinePaint)
+            canvas.drawLine(0f, 0f, -eX, eY, paints.protractorLinePaint)
+            canvas.drawLine(0f, 0f, eX, -eY, paints.protractorLinePaint)
         }
     }
 
@@ -134,8 +150,8 @@ class OverlayRenderer {
         val startPoint: PointF = state.actualCueBall?.center ?: run {
             if (!state.hasInverseMatrix) return
             val screenAnchor = floatArrayOf(
-                state.protractorUnit.center.x * 2 / 2f,
-                state.protractorUnit.center.y * 2
+                state.viewWidth / 2f,
+                state.viewHeight.toFloat()
             )
             val logicalAnchorArray = FloatArray(2)
             state.inversePitchMatrix.mapPoints(logicalAnchorArray, screenAnchor)
@@ -187,16 +203,29 @@ class OverlayRenderer {
             radiusInfo.radius,
             paints.actualCueBallGhostPaint
         )
+        if (state.areHelpersVisible) {
+            drawGhostBallText(
+                canvas,
+                paints.cueBallTextPaint, // Different paint for clarity
+                state.zoomSliderPosition,
+                screenBasePos.x,
+                ghostCenterY,
+                radiusInfo.radius,
+                "Actual Cue Ball"
+            )
+        }
     }
 
     private fun drawGhostBalls(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         val targetRadiusInfo = getPerspectiveRadiusAndLift(state.protractorUnit, state)
         val cueRadiusInfo =
-            getPerspectiveRadiusAndLift(state.protractorUnit.protractorCueBallCenter.let {
-                ILogicalBall {
-                    center = it; radius = state.protractorUnit.radius
+            getPerspectiveRadiusAndLift(state.protractorUnit.let {
+                object : ILogicalBall {
+                    override val center = it.protractorCueBallCenter
+                    override val radius = it.radius
                 }
             }, state)
+
 
         val pTGC = mapPoint(state.protractorUnit.center, state.pitchMatrix)
         val pCGC = mapPoint(state.protractorUnit.protractorCueBallCenter, state.pitchMatrix)
@@ -213,11 +242,55 @@ class OverlayRenderer {
         val cueGhostPaint =
             if (state.isImpossibleShot) paints.warningPaintRed2 else paints.ghostCueOutlinePaint
         canvas.drawCircle(pCGC.x, cueGhostCenterY, cueRadiusInfo.radius, cueGhostPaint)
+
+        if (state.areHelpersVisible) {
+            drawGhostBallText(
+                canvas,
+                paints.targetBallTextPaint,
+                state.zoomSliderPosition,
+                pTGC.x,
+                targetGhostCenterY,
+                targetRadiusInfo.radius,
+                "Target Ball"
+            )
+            drawGhostBallText(
+                canvas,
+                paints.cueBallTextPaint,
+                state.zoomSliderPosition,
+                pCGC.x,
+                cueGhostCenterY,
+                cueRadiusInfo.radius,
+                "Ghost Cue Ball"
+            )
+        }
     }
+
+    private fun drawGhostBallText(
+        canvas: Canvas,
+        paint: Paint,
+        zoomSliderPosition: Float,
+        x: Float,
+        y: Float,
+        radius: Float,
+        text: String
+    ) {
+        val zoomFactor = ZoomMapping.sliderToZoom(zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM
+        val currentTextSize = (baseGhostBallTextSize * zoomFactor).coerceIn(
+            minGhostBallTextSize,
+            maxGhostBallTextSize
+        )
+        paint.textSize = currentTextSize
+        val textMetrics = paint.fontMetrics
+        val textPadding = 5f * zoomFactor.coerceAtLeast(0.5f)
+        val visualTop = y - radius
+        val baseline = visualTop - textPadding - textMetrics.descent
+        canvas.drawText(text, x, baseline, paint)
+    }
+
 
     data class PerspectiveRadiusInfo(val radius: Float, val lift: Float)
 
-    fun getPerspectiveRadiusAndLift(
+    internal fun getPerspectiveRadiusAndLift(
         ball: ILogicalBall,
         state: OverlayState
     ): PerspectiveRadiusInfo {
@@ -233,7 +306,8 @@ class OverlayRenderer {
 
     private fun distance(p1: PointF, p2: PointF): Float =
         sqrt((p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2))
-    fun mapPoint(p: PointF, m: Matrix): PointF {
+
+    internal fun mapPoint(p: PointF, m: Matrix): PointF {
         val arr = floatArrayOf(p.x, p.y)
         m.mapPoints(arr)
         return PointF(arr[0], arr[1])

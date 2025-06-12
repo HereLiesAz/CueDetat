@@ -18,12 +18,8 @@ class PaintCache {
     val targetCenterMarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     val cueCenterMarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     val protractorLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 3f }
+    val aimingLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 5f }
 
-    /** The paint for the "Aiming Line" (the target ball's path). */
-    val aimingLinePaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            strokeWidth = 5f
-        }
 
     val ghostCueOutlinePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 6f }
@@ -36,8 +32,6 @@ class PaintCache {
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2f }
     val actualCueBallCenterMarkPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-
-    /** The paint for the "Shot Line" (the user's line of sight), correctly set to light gray. */
     val shotLinePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#CCCCCC"); style = Paint.Style.STROKE; strokeWidth = 5f
@@ -58,6 +52,7 @@ class PaintCache {
         strokeWidth = 5f
         pathEffect = null
     }
+    val ghostBallTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
 
     // Restored warning paints for impossible/foul shots
     val warningPaintRed1 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -117,6 +112,11 @@ class PaintCache {
         }
         targetBallTextPaint.apply {
             color = targetCirclePaint.color
+            setShadowLayer(2f, 1f, 1f, textShadowColor)
+        }
+
+        ghostBallTextPaint.apply {
+            color = colorScheme.onSurface.toArgb()
             setShadowLayer(2f, 1f, 1f, textShadowColor)
         }
     }

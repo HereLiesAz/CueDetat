@@ -1,55 +1,35 @@
-package com.hereliesaz.cuedetat.view.model
+package com.hereliesaz.cuedetat.view.state
 
-import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.darkColorScheme
+import com.hereliesaz.cuedetat.view.model.ActualCueBall
+import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 
-/**
- * A helper object for handling the 3D perspective transformations.
- */
-object Perspective {
+data class OverlayState(
+    // View dimensions
+    val viewWidth: Int = 0,
+    val viewHeight: Int = 0,
 
-    /**
-     * Creates the 3D transformation matrix that pivots around the center of the view.
-     *
-     * @param pitchAngle The device's pitch in degrees.
-     * @param viewWidth The width of the view.
-     * @param viewHeight The height of the view.
-     * @param camera A reusable android.graphics.Camera instance.
-     * @return A Matrix representing the 3D tilt.
-     */
-    fun createPitchMatrix(
-        pitchAngle: Float,
-        viewWidth: Int,
-        viewHeight: Int,
-        camera: Camera
-    ): Matrix {
-        val matrix = Matrix()
-        camera.save()
-        camera.setLocation(0f, 0f, -32f) // Move camera back to reduce distortion
-        camera.rotateX(pitchAngle)
-        camera.getMatrix(matrix)
-        camera.restore()
+    // Core logical model
+    val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), 1f, 0f),
+    val actualCueBall: ActualCueBall? = null,
 
-        // Pivot the rotation around the center of the screen
-        val pivotX = viewWidth / 2f
-        val pivotY = viewHeight / 2f
-        matrix.preTranslate(-pivotX, -pivotY)
-        matrix.postTranslate(pivotX, pivotY)
+    // UI control state
+    val zoomSliderPosition: Float = 100f,
+    val areHelpersVisible: Boolean = true,
+    val valuesChangedSinceReset: Boolean = false,
 
-        return matrix
-    }
+    // Sensor and perspective data
+    val pitchAngle: Float = 0.0f,
+    val pitchMatrix: Matrix = Matrix(),
+    val inversePitchMatrix: Matrix = Matrix(),
+    val hasInverseMatrix: Boolean = false,
 
-    /**
-     * Projects a point from the screen space (user touch) to the logical 2D plane.
-     *
-     * @param screenPoint The point on the screen.
-     * @param inverseMatrix The inverse of the current pitch matrix.
-     * @return The corresponding PointF on the logical plane.
-     */
-    fun screenToLogical(screenPoint: PointF, inverseMatrix: Matrix): PointF {
-        val logicalCoords = floatArrayOf(screenPoint.x, screenPoint.y)
-        inverseMatrix.mapPoints(logicalCoords)
-        return PointF(logicalCoords[0], logicalCoords[1])
-    }
-}
+    // Derived state
+    val isImpossibleShot: Boolean = false,
+
+    // Theming
+    val dynamicColorScheme: ColorScheme = darkColorScheme() // Provide a default
+)

@@ -5,6 +5,7 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.darkColorScheme
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.R
@@ -20,17 +21,10 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
-import kotlin.math.*
-
-private object ZoomMapping {
-    const val MIN_ZOOM = 0.2f
-    const val MAX_ZOOM = 0.4f
-    const val DEFAULT_ZOOM = 0.4f
-    private const val B = 1.0069555f
-    fun sliderToZoom(sliderValue: Float): Float = MIN_ZOOM * B.pow(sliderValue)
-    fun zoomToSlider(zoomFactor: Float): Float =
-        if (zoomFactor <= MIN_ZOOM) 0f else (ln(zoomFactor / MIN_ZOOM) / ln(B))
-}
+import kotlin.math.abs
+import kotlin.math.min
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 sealed class ToastMessage {
     data class StringResource(val id: Int, val formatArgs: List<Any> = emptyList()) : ToastMessage()
@@ -51,6 +45,8 @@ class MainViewModel @Inject constructor(
     val uiState = _uiState.asStateFlow()
 
     private val _toastMessage = MutableStateFlow<ToastMessage?>(null)
+    val toastMessage = _toastMessage.asStateFlow()
+
 
     init {
         sensorRepository.pitchAngleFlow.onEach(::onPitchAngleChanged).launchIn(viewModelScope)
@@ -63,52 +59,47 @@ class MainViewModel @Inject constructor(
     ): OverlayState {
         val radius = (min(viewWidth, viewHeight) * 0.30f / 2f) * ZoomMapping.DEFAULT_ZOOM
         val state = OverlayState(
+            viewWidth = viewWidth,
+            viewHeight = viewHeight,
             protractorUnit = ProtractorUnit(
                 center = PointF(viewWidth / 2f, viewHeight / 2f),
                 radius = radius,
                 rotationDegrees = 0f
             ),
             actualCueBall = null,
-            dynamicColorScheme = scheme ?: _uiState.value.dynamicColorScheme,
-            zoomSliderPosition = 100f
+            dynamicColorScheme = scheme ?: darkColorScheme(),
+            zoomSliderPosition = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM)
         )
-        return state.recalculateDerivedState(graphicsCamera, 0f, viewWidth, viewHeight)
+        return state.recalculateDerivedState(graphicsCamera)
     }
 
     private fun updateState(updateLogic: (currentState: OverlayState) -> OverlayState) {
         val oldState = _uiState.value
-        _uiState.update(updateLogic)
+        val updatedState = updateLogic(oldState)
+        val finalState = updatedState.recalculateDerivedState(graphicsCamera)
 
-        val currentState = _uiState.value
-        _uiState.update {
-            it.recalculateDerivedState(
-                graphicsCamera,
-                currentState.protractorUnit.rotationDegrees,
-                currentState.protractorUnit.center.x.toInt() * 2,
-                currentState.protractorUnit.center.y.toInt() * 2
-            )
-        }
+        _uiState.value = finalState
 
-        val newState = _uiState.value
-        if (newState.isImpossibleShot && !oldState.isImpossibleShot) {
+        if (finalState.isImpossibleShot && !oldState.isImpossibleShot) {
             _toastMessage.value = ToastMessage.PlainText(insultingWarnings.random())
         }
     }
 
     fun onSizeChanged(width: Int, height: Int) {
-        if (_uiState.value.protractorUnit.center.x == 0f) {
-            updateState { createInitialState(width, height) }
+        if (_uiState.value.viewWidth == 0) {
+            updateState { createInitialState(width, height, it.dynamicColorScheme) }
         }
     }
 
     fun onZoomSliderChange(sliderPosition: Float) {
         val newZoom = ZoomMapping.sliderToZoom(sliderPosition)
         updateState { currentState ->
-            val viewWidth = currentState.protractorUnit.center.x.toInt() * 2
-            val viewHeight = currentState.protractorUnit.center.y.toInt() * 2
+            val viewWidth = currentState.viewWidth
+            val viewHeight = currentState.viewHeight
             val newRadius = (min(viewWidth, viewHeight) * 0.30f / 2f) * newZoom
             currentState.copy(
                 protractorUnit = currentState.protractorUnit.copy(radius = newRadius),
+                actualCueBall = currentState.actualCueBall?.copy(radius = newRadius),
                 zoomSliderPosition = sliderPosition,
                 valuesChangedSinceReset = true
             )
@@ -128,31 +119,29 @@ class MainViewModel @Inject constructor(
 
     private fun onPitchAngleChanged(pitch: Float) {
         updateState {
-            it.recalculateDerivedState(
-                graphicsCamera,
-                pitch,
-                it.protractorUnit.center.x.toInt() * 2,
-                it.protractorUnit.center.y.toInt() * 2
-            )
+            it.copy(pitchAngle = pitch)
         }
     }
 
-    fun onUnitMoved(newPosition: PointF) {
+    fun onUnitMoved(screenPosition: PointF) {
         updateState {
-            it.copy(
-                protractorUnit = it.protractorUnit.copy(center = newPosition),
-                valuesChangedSinceReset = true
-            )
+            if (it.hasInverseMatrix) {
+                val logicalPos = Perspective.screenToLogical(screenPosition, it.inversePitchMatrix)
+                it.copy(
+                    protractorUnit = it.protractorUnit.copy(center = logicalPos),
+                    valuesChangedSinceReset = true
+                )
+            } else {
+                it
+            }
         }
     }
 
-    fun onActualCueBallMoved(screenPosition: PointF) {
-        val logicalPos =
-            Perspective.screenToLogical(screenPosition, _uiState.value.inversePitchMatrix)
+    fun onActualCueBallMoved(logicalPosition: PointF) {
         updateState {
             it.copy(
-                actualCueBall = it.actualCueBall?.copy(center = logicalPos)
-                    ?: ActualCueBall(center = logicalPos, radius = it.protractorUnit.radius),
+                actualCueBall = it.actualCueBall?.copy(center = logicalPosition)
+                    ?: ActualCueBall(center = logicalPosition, radius = it.protractorUnit.radius),
                 valuesChangedSinceReset = true
             )
         }
@@ -178,8 +167,8 @@ class MainViewModel @Inject constructor(
     fun onReset() {
         updateState {
             createInitialState(
-                it.protractorUnit.center.x.toInt() * 2,
-                it.protractorUnit.center.y.toInt() * 2,
+                it.viewWidth,
+                it.viewHeight,
                 it.dynamicColorScheme
             )
         }
@@ -199,28 +188,49 @@ class MainViewModel @Inject constructor(
 }
 
 private fun OverlayState.recalculateDerivedState(
-    camera: Camera,
-    pitch: Float,
-    viewWidth: Int,
-    viewHeight: Int
+    camera: Camera
 ): OverlayState {
     if (viewWidth == 0 || viewHeight == 0) return this
 
-    val pitchMatrix = Perspective.createPitchMatrix(pitch, viewWidth, viewHeight, camera)
+    val pitchMatrix =
+        Perspective.createPitchMatrix(this.pitchAngle, this.viewWidth, this.viewHeight, camera)
     val inverseMatrix = Matrix()
     val hasInverse = pitchMatrix.invert(inverseMatrix)
 
-    val logicalDistance = distance(protractorUnit.protractorCueBallCenter, protractorUnit.center)
-    val isPhysicalOverlap = logicalDistance < (protractorUnit.radius * 2) - 0.1f
+    val logicalDistance =
+        distance(this.protractorUnit.protractorCueBallCenter, this.protractorUnit.center)
+    val isPhysicalOverlap = logicalDistance < (this.protractorUnit.radius * 2) - 0.1f
     val isDeflectionDominantAngle =
-        (protractorUnit.rotationDegrees > 90.5f && protractorUnit.rotationDegrees < 269.5f)
-    var isTargetObstructing = false
-    this.actualCueBall?.let {
-        val distActualToGhost = distance(it.center, protractorUnit.protractorCueBallCenter)
-        val distActualToTarget = distance(it.center, protractorUnit.center)
-        isTargetObstructing = distActualToGhost > distActualToTarget
+        (this.protractorUnit.rotationDegrees > 90.5f && this.protractorUnit.rotationDegrees < 269.5f)
+
+    // BUGFIX: This was the source of the incorrect warning. The old logic was removed, but a new,
+    // more correct version is needed. This only triggers if the Actual Cue Ball is active.
+    var isShotThroughTarget = false
+    if (this.actualCueBall != null) {
+        val actual = this.actualCueBall.center
+        val protractorCue = this.protractorUnit.protractorCueBallCenter
+        val target = this.protractorUnit.center
+
+        // Check if the target is roughly between the actual ball and the ghost cue ball.
+        val dotProduct =
+            (target.x - actual.x) * (protractorCue.x - actual.x) + (target.y - actual.y) * (protractorCue.y - actual.y)
+        val squaredLength =
+            (protractorCue.x - actual.x).pow(2) + (protractorCue.y - actual.y).pow(2)
+
+        // If the dot product is between 0 and the squared length, the projection of the target lies on the segment.
+        if (dotProduct > 0 && dotProduct < squaredLength) {
+            // Check how far the target center is from the line segment.
+            val dist =
+                abs((protractorCue.x - actual.x) * (actual.y - target.y) - (actual.x - target.x) * (protractorCue.y - actual.y)) /
+                        distance(actual, protractorCue)
+            if (dist < this.protractorUnit.radius) {
+                isShotThroughTarget = true
+            }
+        }
     }
-    val isImpossible = isPhysicalOverlap || isDeflectionDominantAngle || isTargetObstructing
+
+
+    val isImpossible = isPhysicalOverlap || isDeflectionDominantAngle || isShotThroughTarget
 
     return this.copy(
         pitchMatrix = pitchMatrix,

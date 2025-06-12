@@ -1,6 +1,6 @@
-
 package com.hereliesaz.cuedetat.view
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.PointF
@@ -11,9 +11,11 @@ import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.pow
 import kotlin.math.sqrt
 
+@SuppressLint("ClickableViewAccessibility")
 class ProtractorOverlayView(context: Context) : View(context) {
 
     private val renderer = OverlayRenderer()
+    private val paints = PaintCache() // The view now owns the paints
     private var state = OverlayState()
 
     var onSizeChanged: ((Int, Int) -> Unit)? = null
@@ -30,7 +32,8 @@ class ProtractorOverlayView(context: Context) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        renderer.draw(canvas, state)
+        // Delegate all drawing to the renderer, passing the current state and paints.
+        renderer.draw(canvas, state, paints)
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -39,7 +42,7 @@ class ProtractorOverlayView(context: Context) : View(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (state.viewWidth == 0) return false
+        if (state.viewWidth == 0 || !state.hasInverseMatrix) return false
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -48,16 +51,16 @@ class ProtractorOverlayView(context: Context) : View(context) {
                 val touchPoint = PointF(event.x, event.y)
 
                 val projectedTargetCenter =
-                    renderer.mapPoint(state.unitCenterPosition, state.pitchMatrix)
-                val projectedActualCueCenter =
-                    renderer.mapPoint(state.logicalActualCueBallPosition, state.pitchMatrix)
-                val touchRadius = renderer.getPerspectiveRadiusAndLift(
-                    state.unitCenterPosition,
-                    state
-                ).radius * 2.0f
+                    renderer.mapPoint(state.protractorUnit.center, state.pitchMatrix)
+                val projectedActualCueCenter = state.actualCueBall?.let {
+                    renderer.mapPoint(it.center, state.pitchMatrix)
+                }
+
+                val touchRadius =
+                    renderer.getPerspectiveRadiusAndLift(state.protractorUnit, state).radius * 2.0f
 
                 dragMode = when {
-                    state.isActualCueBallVisible && distance(
+                    state.actualCueBall != null && projectedActualCueCenter != null && distance(
                         touchPoint,
                         projectedActualCueCenter
                     ) < touchRadius -> DragMode.MOVE_ACTUAL_CUE_BALL
@@ -76,26 +79,23 @@ class ProtractorOverlayView(context: Context) : View(context) {
                         when (dragMode) {
                             DragMode.MOVE_UNIT -> onUnitMove?.invoke(PointF(newX, newY))
                             DragMode.MOVE_ACTUAL_CUE_BALL -> {
-                                if (state.hasInverseMatrix) {
-                                    val logicalPos = FloatArray(2)
-                                    state.inversePitchMatrix.mapPoints(
-                                        logicalPos,
-                                        floatArrayOf(newX, newY)
+                                val logicalPos = FloatArray(2)
+                                state.inversePitchMatrix.mapPoints(
+                                    logicalPos,
+                                    floatArrayOf(newX, newY)
+                                )
+                                onActualCueBallMoved?.invoke(
+                                    PointF(
+                                        logicalPos[0],
+                                        logicalPos[1]
                                     )
-                                    onActualCueBallMoved?.invoke(
-                                        PointF(
-                                            logicalPos[0],
-                                            logicalPos[1]
-                                        )
-                                    )
-                                }
+                                )
                             }
-
                             DragMode.ROTATE -> {
                                 val dx = newX - lastTouchX
                                 lastTouchX = newX
                                 val rotationDelta = -dx * 0.2f
-                                onRotationChange?.invoke(state.rotationAngle + rotationDelta)
+                                onRotationChange?.invoke(state.protractorUnit.rotationDegrees + rotationDelta)
                             }
 
                             else -> {}
@@ -119,6 +119,7 @@ class ProtractorOverlayView(context: Context) : View(context) {
 
     fun updateState(newState: OverlayState) {
         this.state = newState
+        paints.updateColors(newState.dynamicColorScheme)
         invalidate()
     }
 }

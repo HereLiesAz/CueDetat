@@ -44,16 +44,17 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.view.ProtractorOverlayView
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
-    val toastMessage: ToastMessage? by viewModel.toastMessage.collectAsState()
+    val toastMessage by viewModel.toastMessage.collectAsState()
     val context = LocalContext.current
 
     val sheetState = rememberModalBottomSheetState()
-    rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
     var showBottomSheet by remember { mutableStateOf(false) }
 
     val protractorView = remember {
@@ -122,12 +123,12 @@ fun MainScreen(viewModel: MainViewModel) {
                 .align(Alignment.BottomStart)
                 .padding(16.dp)
                 .navigationBarsPadding(),
-            containerColor = if (uiState.isActualCueBallVisible) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (uiState.actualCueBall != null) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_jump_shot),
                 contentDescription = "Toggle Actual Cue Ball",
-                tint = if (uiState.isActualCueBallVisible) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant
+                tint = if (uiState.actualCueBall != null) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         FloatingActionButton(
@@ -148,12 +149,12 @@ fun MainScreen(viewModel: MainViewModel) {
             MenuItem(
                 icon = ImageVector.vectorResource(R.drawable.ic_help_outline_24),
                 text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
-                onClick = viewModel::onToggleHelp
+                onClick = {
+                    viewModel.onToggleHelp()
+                    scope.launch { sheetState.hide() }
+                        .invokeOnCompletion { showBottomSheet = false }
+                }
             )
-            MenuItem(
-                icon = ImageVector.vectorResource(R.drawable.ic_launcher_monochrome),
-                text = "Check for Updates",
-                onClick = { viewModel.onCheckForUpdate() })
             Spacer(modifier = Modifier.navigationBarsPadding())
         }
     }
@@ -164,27 +165,18 @@ fun TopControls(uiState: OverlayState, onMenuClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(start = 16.dp, end = 16.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp),
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (uiState.areHelpersVisible) {
-            Text(
-                text = "Cue D’état",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                modifier = Modifier.clickable(onClick = onMenuClick)
-            )
-        } else {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_launcher_monochrome),
-                contentDescription = "Menu",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                modifier = Modifier
-                    .size(40.dp)
-                    .clickable(onClick = onMenuClick)
-            )
-        }
+        Icon(
+            painter = painterResource(id = R.drawable.ic_launcher_monochrome),
+            contentDescription = "Menu",
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+            modifier = Modifier
+                .size(40.dp)
+                .clickable(onClick = onMenuClick)
+        )
     }
 }
 @Composable
