@@ -9,7 +9,6 @@ import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.model.ILogicalBall
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.pow
@@ -206,7 +205,7 @@ class OverlayRenderer {
         state: OverlayState,
         paints: PaintCache
     ) {
-        val radiusInfo = getPerspectiveRadiusAndLift(ball, state, false) // Decouple from rotation
+        val radiusInfo = getPerspectiveRadiusAndLift(ball, state)
         val screenBasePos = mapPoint(ball.center, state.pitchMatrix)
         val ghostCenterY = screenBasePos.y - radiusInfo.lift
         canvas.drawCircle(
@@ -229,15 +228,13 @@ class OverlayRenderer {
     }
 
     private fun drawGhostBalls(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        val targetRadiusInfo =
-            getPerspectiveRadiusAndLift(state.protractorUnit, state, true) // Coupled to rotation
-        val cueRadiusInfo =
-            getPerspectiveRadiusAndLift(state.protractorUnit.let {
-                object : ILogicalBall {
-                    override val center = it.protractorCueBallCenter
-                    override val radius = it.radius
-                }
-            }, state, true) // Coupled to rotation
+        val targetRadiusInfo = getPerspectiveRadiusAndLift(state.protractorUnit, state)
+        val cueRadiusInfo = getPerspectiveRadiusAndLift(state.protractorUnit.let {
+            object : ILogicalBall {
+                override val center = it.protractorCueBallCenter
+                override val radius = it.radius
+            }
+        }, state)
 
 
         val pTGC = mapPoint(state.protractorUnit.center, state.pitchMatrix)
@@ -320,25 +317,27 @@ class OverlayRenderer {
 
     internal fun getPerspectiveRadiusAndLift(
         ball: ILogicalBall,
-        state: OverlayState,
-        useProtractorRotation: Boolean
+        state: OverlayState
     ): PerspectiveRadiusInfo {
         if (!state.hasInverseMatrix) return PerspectiveRadiusInfo(ball.radius, 0f)
+
+        // Project key points from the logical plane to the screen space
         val screenCenter = mapPoint(ball.center, state.pitchMatrix)
-        val logicalEdge = PointF(ball.center.x + ball.radius, ball.center.y)
-        val screenEdge = mapPoint(logicalEdge, state.pitchMatrix)
-        val radius = distance(screenCenter, screenEdge)
+        val logicalHorizontalEdge = PointF(ball.center.x + ball.radius, ball.center.y)
 
-        val angleForLift = if (useProtractorRotation) state.protractorUnit.rotationDegrees else 0f
+        val screenHorizontalEdge = mapPoint(logicalHorizontalEdge, state.pitchMatrix)
 
-        val lift = if (abs(state.pitchAngle) > 0.5) { // Only apply lift if phone is tilted
-            radius * abs(sin(Math.toRadians(angleForLift.toDouble()))).toFloat()
-        } else {
-            0f
-        }
+        // The on-screen radius should be the horizontal radius of the resulting ellipse.
+        // This represents the widest part of the circle when tilted.
+        val radiusOnScreen = distance(screenCenter, screenHorizontalEdge)
 
-        return PerspectiveRadiusInfo(radius, lift)
+        // The lift should be equal to the radius of the circle we are drawing,
+        // so that its bottom edge sits exactly on the projected center of the 2D ball.
+        val lift = radiusOnScreen
+
+        return PerspectiveRadiusInfo(radiusOnScreen, lift)
     }
+
 
     private fun distance(p1: PointF, p2: PointF): Float =
         sqrt((p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2))

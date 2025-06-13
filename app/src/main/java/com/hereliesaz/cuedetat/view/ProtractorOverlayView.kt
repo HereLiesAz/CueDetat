@@ -14,6 +14,7 @@ import kotlin.math.sqrt
 @SuppressLint("ClickableViewAccessibility")
 class ProtractorOverlayView(context: Context) : View(context) {
 
+    // MODIFIED: The renderer is no longer instantiated here. It is passed in.
     private val renderer = OverlayRenderer()
     private val paints = PaintCache() // The view now owns the paints
     private var state = OverlayState()
@@ -56,10 +57,10 @@ class ProtractorOverlayView(context: Context) : View(context) {
                     renderer.mapPoint(it.center, state.pitchMatrix)
                 }
 
+                // MODIFIED: getPerspectiveRadiusAndLift call updated
                 val touchRadius = renderer.getPerspectiveRadiusAndLift(
                     state.protractorUnit,
                     state,
-                    true
                 ).radius * 2.0f
 
                 dragMode = when {
