@@ -206,7 +206,7 @@ class OverlayRenderer {
         state: OverlayState,
         paints: PaintCache
     ) {
-        val radiusInfo = getPerspectiveRadiusAndLift(ball, state, false) // Decouple from rotation
+        val radiusInfo = getPerspectiveRadiusAndLift(ball, state)
         val screenBasePos = mapPoint(ball.center, state.pitchMatrix)
         val ghostCenterY = screenBasePos.y - radiusInfo.lift
         canvas.drawCircle(
@@ -229,15 +229,13 @@ class OverlayRenderer {
     }
 
     private fun drawGhostBalls(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        val targetRadiusInfo =
-            getPerspectiveRadiusAndLift(state.protractorUnit, state, true) // Coupled to rotation
-        val cueRadiusInfo =
-            getPerspectiveRadiusAndLift(state.protractorUnit.let {
-                object : ILogicalBall {
-                    override val center = it.protractorCueBallCenter
-                    override val radius = it.radius
-                }
-            }, state, true) // Coupled to rotation
+        val targetRadiusInfo = getPerspectiveRadiusAndLift(state.protractorUnit, state)
+        val cueRadiusInfo = getPerspectiveRadiusAndLift(state.protractorUnit.let {
+            object : ILogicalBall {
+                override val center = it.protractorCueBallCenter
+                override val radius = it.radius
+            }
+        }, state)
 
 
         val pTGC = mapPoint(state.protractorUnit.center, state.pitchMatrix)
@@ -320,25 +318,22 @@ class OverlayRenderer {
 
     internal fun getPerspectiveRadiusAndLift(
         ball: ILogicalBall,
-        state: OverlayState,
-        useProtractorRotation: Boolean
+        state: OverlayState
     ): PerspectiveRadiusInfo {
         if (!state.hasInverseMatrix) return PerspectiveRadiusInfo(ball.radius, 0f)
+
         val screenCenter = mapPoint(ball.center, state.pitchMatrix)
-        val logicalEdge = PointF(ball.center.x + ball.radius, ball.center.y)
-        val screenEdge = mapPoint(logicalEdge, state.pitchMatrix)
-        val radius = distance(screenCenter, screenEdge)
+        val logicalHorizontalEdge = PointF(ball.center.x + ball.radius, ball.center.y)
 
-        val angleForLift = if (useProtractorRotation) state.protractorUnit.rotationDegrees else 0f
+        val screenHorizontalEdge = mapPoint(logicalHorizontalEdge, state.pitchMatrix)
 
-        val lift = if (abs(state.pitchAngle) > 0.5) { // Only apply lift if phone is tilted
-            radius * abs(sin(Math.toRadians(angleForLift.toDouble()))).toFloat()
-        } else {
-            0f
-        }
+        val radiusOnScreen = distance(screenCenter, screenHorizontalEdge)
 
-        return PerspectiveRadiusInfo(radius, lift)
+        val lift = radiusOnScreen * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
+
+        return PerspectiveRadiusInfo(radiusOnScreen, lift)
     }
+
 
     private fun distance(p1: PointF, p2: PointF): Float =
         sqrt((p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2))

@@ -8,7 +8,9 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.R
+import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.view.model.ActualCueBall
 import com.hereliesaz.cuedetat.view.model.Perspective
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.math.min
 import kotlin.math.pow
@@ -30,10 +33,15 @@ sealed class ToastMessage {
     data class PlainText(val text: String) : ToastMessage()
 }
 
+sealed class SingleEvent {
+    data class OpenUrl(val url: String) : SingleEvent()
+}
+
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val sensorRepository: SensorRepository,
-    application: Application
+    private val githubRepository: GithubRepository,
+    private val application: Application
 ) : ViewModel() {
 
     private val graphicsCamera = Camera()
@@ -45,6 +53,9 @@ class MainViewModel @Inject constructor(
 
     private val _toastMessage = MutableStateFlow<ToastMessage?>(null)
     val toastMessage = _toastMessage.asStateFlow()
+
+    private val _singleEvent = MutableStateFlow<SingleEvent?>(null)
+    val singleEvent = _singleEvent.asStateFlow()
 
 
     init {
@@ -66,6 +77,7 @@ class MainViewModel @Inject constructor(
                 rotationDegrees = 0f
             ),
             actualCueBall = null,
+            areHelpersVisible = false,
             dynamicColorScheme = scheme ?: darkColorScheme(),
             zoomSliderPosition = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM)
         )
@@ -181,6 +193,31 @@ class MainViewModel @Inject constructor(
         _uiState.update { it.copy(areHelpersVisible = !it.areHelpersVisible) }
     }
 
+    fun onCheckForUpdate() {
+        viewModelScope.launch {
+            val latestVersion = githubRepository.getLatestVersion()
+            val currentVersion = BuildConfig.VERSION_NAME
+
+            val message = when {
+                latestVersion == null -> ToastMessage.StringResource(R.string.update_check_failed)
+                latestVersion == currentVersion -> ToastMessage.StringResource(R.string.update_no_new_release)
+                else -> ToastMessage.StringResource(
+                    R.string.update_available,
+                    listOf(latestVersion)
+                )
+            }
+            _toastMessage.value = message
+        }
+    }
+
+    fun onViewArt() {
+        _singleEvent.value = SingleEvent.OpenUrl("https://instagram.com/hereliesaz")
+    }
+
+    fun onSingleEventConsumed() {
+        _singleEvent.value = null
+    }
+
     fun onToastShown() {
         _toastMessage.value = null
     }
@@ -196,13 +233,24 @@ private fun OverlayState.recalculateDerivedState(
     val inverseMatrix = Matrix()
     val hasInverse = pitchMatrix.invert(inverseMatrix)
 
-    val logicalDistance =
-        distance(this.protractorUnit.protractorCueBallCenter, this.protractorUnit.center)
-    val isPhysicalOverlap = logicalDistance < (this.protractorUnit.radius * 2) - 0.1f
-    val isDeflectionDominantAngle =
-        (this.protractorUnit.rotationDegrees > 90.5f && this.protractorUnit.rotationDegrees < 269.5f)
+    val anchorPointA: PointF? = if (this.actualCueBall != null) {
+        this.actualCueBall.center
+    } else {
+        if (hasInverse) {
+            val screenAnchor = floatArrayOf(viewWidth / 2f, viewHeight.toFloat())
+            val logicalAnchorArray = FloatArray(2)
+            inverseMatrix.mapPoints(logicalAnchorArray, screenAnchor)
+            PointF(logicalAnchorArray[0], logicalAnchorArray[1])
+        } else {
+            null
+        }
+    }
 
-    val isImpossible = isPhysicalOverlap || isDeflectionDominantAngle
+    val isImpossible = anchorPointA?.let { anchor ->
+        val distAtoG = distance(anchor, this.protractorUnit.protractorCueBallCenter)
+        val distAtoT = distance(anchor, this.protractorUnit.center)
+        distAtoG > distAtoT
+    } ?: false
 
     return this.copy(
         pitchMatrix = pitchMatrix,
