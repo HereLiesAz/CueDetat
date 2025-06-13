@@ -3,9 +3,8 @@ package com.hereliesaz.cuedetat.view.renderer
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PointF
-import androidx.core.graphics.withMatrix
-import androidx.core.graphics.withTranslation
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.model.ILogicalBall
@@ -23,57 +22,61 @@ class OverlayRenderer {
     private val baseGhostBallTextSize = 30f
     private val minGhostBallTextSize = 15f
     private val maxGhostBallTextSize = 60f
+    private val lineTextSize = 28f
 
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         if (state.protractorUnit.center.x == 0f) return
 
-        canvas.withMatrix(state.pitchMatrix) {
-            drawShotLine(this, state, paints)
-            state.actualCueBall?.let { drawActualCueBallBase(this, it, paints) }
-            drawProtractorUnit(this, state, paints)
+        canvas.save()
+        canvas.concat(state.pitchMatrix)
 
-        }
+        drawShotLine(canvas, state, paints)
+        state.actualCueBall?.let { drawActualCueBallBase(canvas, it, paints) }
+        drawProtractorUnit(canvas, state, paints)
+
+        canvas.restore()
 
         state.actualCueBall?.let { drawActualCueBallGhost(canvas, it, state, paints) }
         drawGhostBalls(canvas, state, paints)
     }
 
     private fun drawProtractorUnit(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        canvas.withTranslation(state.protractorUnit.center.x, state.protractorUnit.center.y) {
-            rotate(state.protractorUnit.rotationDegrees)
+        canvas.save()
+        canvas.translate(state.protractorUnit.center.x, state.protractorUnit.center.y)
+        canvas.rotate(state.protractorUnit.rotationDegrees)
 
-            // Draw Target Ball (at the new origin)
-            drawCircle(0f, 0f, state.protractorUnit.radius, paints.targetCirclePaint)
-            drawCircle(0f, 0f, state.protractorUnit.radius / 5f, paints.targetCenterMarkPaint)
+        // Draw Target Ball (at the new origin)
+        canvas.drawCircle(0f, 0f, state.protractorUnit.radius, paints.targetCirclePaint)
+        canvas.drawCircle(0f, 0f, state.protractorUnit.radius / 5f, paints.targetCenterMarkPaint)
 
-            // Determine position of Ghost Cue Ball relative to the now-rotated canvas
-            val cueBallLocalCenter = state.protractorUnit.protractorCueBallCenter.let {
-                val p = PointF(it.x, it.y)
-                p.offset(-state.protractorUnit.center.x, -state.protractorUnit.center.y)
-                p
-            }
-            val rotationInvertedMatrix =
-                Matrix().apply { setRotate(-state.protractorUnit.rotationDegrees) }
-            val cueBallRelativePosition = floatArrayOf(cueBallLocalCenter.x, cueBallLocalCenter.y)
-            rotationInvertedMatrix.mapPoints(cueBallRelativePosition)
-            val cuePos = PointF(cueBallRelativePosition[0], cueBallRelativePosition[1])
-
-            // Draw Ghost Cue Ball
-            val cuePaint =
-                if (state.isImpossibleShot) paints.warningPaintRed1 else paints.cueCirclePaint
-            drawCircle(cuePos.x, cuePos.y, state.protractorUnit.radius, cuePaint)
-            drawCircle(
-                cuePos.x,
-                cuePos.y,
-                state.protractorUnit.radius / 5f,
-                paints.cueCenterMarkPaint
-            )
-
-            // Draw Tangent lines and Protractor lines from the perspective of the rotated canvas
-            drawTangentLines(this, cuePos, paints, state)
-            drawProtractorLines(this, cuePos, paints)
-
+        // Determine position of Ghost Cue Ball relative to the now-rotated canvas
+        val cueBallLocalCenter = state.protractorUnit.protractorCueBallCenter.let {
+            val p = PointF(it.x, it.y)
+            p.offset(-state.protractorUnit.center.x, -state.protractorUnit.center.y)
+            p
         }
+        val rotationInvertedMatrix =
+            Matrix().apply { setRotate(-state.protractorUnit.rotationDegrees) }
+        val cueBallRelativePosition = floatArrayOf(cueBallLocalCenter.x, cueBallLocalCenter.y)
+        rotationInvertedMatrix.mapPoints(cueBallRelativePosition)
+        val cuePos = PointF(cueBallRelativePosition[0], cueBallRelativePosition[1])
+
+        // Draw Ghost Cue Ball
+        val cuePaint =
+            if (state.isImpossibleShot) paints.warningPaintRed1 else paints.cueCirclePaint
+        canvas.drawCircle(cuePos.x, cuePos.y, state.protractorUnit.radius, cuePaint)
+        canvas.drawCircle(
+            cuePos.x,
+            cuePos.y,
+            state.protractorUnit.radius / 5f,
+            paints.cueCenterMarkPaint
+        )
+
+        // Draw Tangent lines and Protractor lines from the perspective of the rotated canvas
+        drawTangentLines(canvas, cuePos, paints, state)
+        drawProtractorLines(canvas, cuePos, paints, state)
+
+        canvas.restore()
     }
 
     private fun drawTangentLines(
@@ -93,25 +96,36 @@ class OverlayRenderer {
                 if (state.isImpossibleShot || state.protractorUnit.rotationDegrees <= 180f) paints.tangentLineDottedPaint else paints.tangentLineSolidPaint
             val leftPaint =
                 if (state.isImpossibleShot || state.protractorUnit.rotationDegrees > 180f) paints.tangentLineDottedPaint else paints.tangentLineSolidPaint
-            canvas.drawLine(
-                cueLocalPos.x,
-                cueLocalPos.y,
-                cueLocalPos.x + dX * extend,
-                cueLocalPos.y + dY * extend,
-                rightPaint
-            )
-            canvas.drawLine(
-                cueLocalPos.x,
-                cueLocalPos.y,
-                cueLocalPos.x - dX * extend,
-                cueLocalPos.y - dY * extend,
-                leftPaint
-            )
+
+            val rightStart = PointF(cueLocalPos.x, cueLocalPos.y)
+            val rightEnd = PointF(cueLocalPos.x + dX * extend, cueLocalPos.y + dY * extend)
+            canvas.drawLine(rightStart.x, rightStart.y, rightEnd.x, rightEnd.y, rightPaint)
+
+            val leftStart = PointF(cueLocalPos.x, cueLocalPos.y)
+            val leftEnd = PointF(cueLocalPos.x - dX * extend, cueLocalPos.y - dY * extend)
+            canvas.drawLine(leftStart.x, leftStart.y, leftEnd.x, leftEnd.y, leftPaint)
+
+            if (state.areHelpersVisible) {
+                drawLineText(
+                    canvas,
+                    "Tangent Line",
+                    rightStart,
+                    rightEnd,
+                    paints.lineTextPaint,
+                    150f
+                )
+                drawLineText(canvas, "Tangent Line", leftStart, leftEnd, paints.lineTextPaint, 150f)
+            }
         }
     }
 
 
-    private fun drawProtractorLines(canvas: Canvas, cueLocalPos: PointF, paints: PaintCache) {
+    private fun drawProtractorLines(
+        canvas: Canvas,
+        cueLocalPos: PointF,
+        paints: PaintCache,
+        state: OverlayState
+    ) {
         val lineLength = 2000f
 
         // Draw the Aiming Line (Line of Centers)
@@ -121,14 +135,12 @@ class OverlayRenderer {
         if (mag > 0.001f) {
             val nX = aimDirX / mag
             val nY = aimDirY / mag
-            // Draw from the Ghost Cue, through the Target, and beyond
-            canvas.drawLine(
-                cueLocalPos.x,
-                cueLocalPos.y,
-                cueLocalPos.x + nX * lineLength,
-                cueLocalPos.y + nY * lineLength,
-                paints.aimingLinePaint
-            )
+            val start = cueLocalPos
+            val end = PointF(cueLocalPos.x + nX * lineLength, cueLocalPos.y + nY * lineLength)
+            canvas.drawLine(start.x, start.y, end.x, end.y, paints.aimingLinePaint)
+            if (state.areHelpersVisible) {
+                drawLineText(canvas, "Aiming Line", start, end, paints.lineTextPaint, 250f)
+            }
         }
 
 
@@ -168,13 +180,13 @@ class OverlayRenderer {
             val ndy = dirY / mag
             val paint =
                 if (state.isImpossibleShot) paints.warningPaintRed3 else paints.shotLinePaint
-            canvas.drawLine(
-                startPoint.x,
-                startPoint.y,
-                startPoint.x + ndx * extendFactor,
-                startPoint.y + ndy * extendFactor,
-                paint
-            )
+            val lineStart = PointF(startPoint.x, startPoint.y)
+            val lineEnd =
+                PointF(startPoint.x + ndx * extendFactor, startPoint.y + ndy * extendFactor)
+            canvas.drawLine(lineStart.x, lineStart.y, lineEnd.x, lineEnd.y, paint)
+            if (state.areHelpersVisible && state.actualCueBall != null) {
+                drawLineText(canvas, "Shot Line", lineStart, lineEnd, paints.lineTextPaint, 350f)
+            }
         }
     }
 
@@ -194,7 +206,7 @@ class OverlayRenderer {
         state: OverlayState,
         paints: PaintCache
     ) {
-        val radiusInfo = getPerspectiveRadiusAndLift(ball, state)
+        val radiusInfo = getPerspectiveRadiusAndLift(ball, state, false) // Decouple from rotation
         val screenBasePos = mapPoint(ball.center, state.pitchMatrix)
         val ghostCenterY = screenBasePos.y - radiusInfo.lift
         canvas.drawCircle(
@@ -206,7 +218,7 @@ class OverlayRenderer {
         if (state.areHelpersVisible) {
             drawGhostBallText(
                 canvas,
-                paints.cueBallTextPaint, // Different paint for clarity
+                paints.cueBallTextPaint,
                 state.zoomSliderPosition,
                 screenBasePos.x,
                 ghostCenterY,
@@ -217,14 +229,15 @@ class OverlayRenderer {
     }
 
     private fun drawGhostBalls(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        val targetRadiusInfo = getPerspectiveRadiusAndLift(state.protractorUnit, state)
+        val targetRadiusInfo =
+            getPerspectiveRadiusAndLift(state.protractorUnit, state, true) // Coupled to rotation
         val cueRadiusInfo =
             getPerspectiveRadiusAndLift(state.protractorUnit.let {
                 object : ILogicalBall {
                     override val center = it.protractorCueBallCenter
                     override val radius = it.radius
                 }
-            }, state)
+            }, state, true) // Coupled to rotation
 
 
         val pTGC = mapPoint(state.protractorUnit.center, state.pitchMatrix)
@@ -265,6 +278,21 @@ class OverlayRenderer {
         }
     }
 
+    private fun drawLineText(
+        canvas: Canvas,
+        text: String,
+        start: PointF,
+        end: PointF,
+        paint: Paint,
+        offset: Float
+    ) {
+        paint.textSize = lineTextSize
+        val path = Path()
+        path.moveTo(start.x, start.y)
+        path.lineTo(end.x, end.y)
+        canvas.drawTextOnPath(text, path, offset, -20f, paint)
+    }
+
     private fun drawGhostBallText(
         canvas: Canvas,
         paint: Paint,
@@ -292,15 +320,23 @@ class OverlayRenderer {
 
     internal fun getPerspectiveRadiusAndLift(
         ball: ILogicalBall,
-        state: OverlayState
+        state: OverlayState,
+        useProtractorRotation: Boolean
     ): PerspectiveRadiusInfo {
         if (!state.hasInverseMatrix) return PerspectiveRadiusInfo(ball.radius, 0f)
         val screenCenter = mapPoint(ball.center, state.pitchMatrix)
         val logicalEdge = PointF(ball.center.x + ball.radius, ball.center.y)
         val screenEdge = mapPoint(logicalEdge, state.pitchMatrix)
         val radius = distance(screenCenter, screenEdge)
-        val lift =
-            radius * abs(sin(Math.toRadians(state.protractorUnit.rotationDegrees.toDouble()))).toFloat()
+
+        val angleForLift = if (useProtractorRotation) state.protractorUnit.rotationDegrees else 0f
+
+        val lift = if (abs(state.pitchAngle) > 0.5) { // Only apply lift if phone is tilted
+            radius * abs(sin(Math.toRadians(angleForLift.toDouble()))).toFloat()
+        } else {
+            0f
+        }
+
         return PerspectiveRadiusInfo(radius, lift)
     }
 

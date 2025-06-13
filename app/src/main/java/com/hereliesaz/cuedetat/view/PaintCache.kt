@@ -53,6 +53,8 @@ class PaintCache {
         pathEffect = null
     }
     val ghostBallTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+    val lineTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+
 
     // Restored warning paints for impossible/foul shots
     val warningPaintRed1 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -118,6 +120,10 @@ class PaintCache {
         ghostBallTextPaint.apply {
             color = colorScheme.onSurface.toArgb()
             setShadowLayer(2f, 1f, 1f, textShadowColor)
+        }
+        lineTextPaint.apply {
+            color = colorScheme.onSurface.copy(alpha = 0.7f).toArgb()
+            setShadowLayer(1f, 1f, 1f, textShadowColor)
         }
     }
 }

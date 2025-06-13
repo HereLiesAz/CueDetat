@@ -56,8 +56,11 @@ class ProtractorOverlayView(context: Context) : View(context) {
                     renderer.mapPoint(it.center, state.pitchMatrix)
                 }
 
-                val touchRadius =
-                    renderer.getPerspectiveRadiusAndLift(state.protractorUnit, state).radius * 2.0f
+                val touchRadius = renderer.getPerspectiveRadiusAndLift(
+                    state.protractorUnit,
+                    state,
+                    true
+                ).radius * 2.0f
 
                 dragMode = when {
                     state.actualCueBall != null && projectedActualCueCenter != null && distance(

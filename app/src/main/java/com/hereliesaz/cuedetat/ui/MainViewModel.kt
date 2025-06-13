@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
-import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -203,34 +202,7 @@ private fun OverlayState.recalculateDerivedState(
     val isDeflectionDominantAngle =
         (this.protractorUnit.rotationDegrees > 90.5f && this.protractorUnit.rotationDegrees < 269.5f)
 
-    // BUGFIX: This was the source of the incorrect warning. The old logic was removed, but a new,
-    // more correct version is needed. This only triggers if the Actual Cue Ball is active.
-    var isShotThroughTarget = false
-    if (this.actualCueBall != null) {
-        val actual = this.actualCueBall.center
-        val protractorCue = this.protractorUnit.protractorCueBallCenter
-        val target = this.protractorUnit.center
-
-        // Check if the target is roughly between the actual ball and the ghost cue ball.
-        val dotProduct =
-            (target.x - actual.x) * (protractorCue.x - actual.x) + (target.y - actual.y) * (protractorCue.y - actual.y)
-        val squaredLength =
-            (protractorCue.x - actual.x).pow(2) + (protractorCue.y - actual.y).pow(2)
-
-        // If the dot product is between 0 and the squared length, the projection of the target lies on the segment.
-        if (dotProduct > 0 && dotProduct < squaredLength) {
-            // Check how far the target center is from the line segment.
-            val dist =
-                abs((protractorCue.x - actual.x) * (actual.y - target.y) - (actual.x - target.x) * (protractorCue.y - actual.y)) /
-                        distance(actual, protractorCue)
-            if (dist < this.protractorUnit.radius) {
-                isShotThroughTarget = true
-            }
-        }
-    }
-
-
-    val isImpossible = isPhysicalOverlap || isDeflectionDominantAngle || isShotThroughTarget
+    val isImpossible = isPhysicalOverlap || isDeflectionDominantAngle
 
     return this.copy(
         pitchMatrix = pitchMatrix,
