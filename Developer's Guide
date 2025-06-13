@@ -1,5 +1,7 @@
 # Project Development Guide: Cue D'état
-This document outlines the core architecture, concepts, and future direction of the Cue D'état application. It serves as a single source of truth to prevent regressions and ensure consistent development. Consider it a note-to-self for the AI working on this project, and keep it updated accordingly with ANYTHING that will be useful to the next AI in the next chat. NEVER change what is written here, only add to it. Always include anything that you note to yourself as a matter of clarification.
+This document outlines the core architecture, concepts, and future direction of the Cue D'état application. It serves as a single source of truth to prevent regressions and ensure consistent development.
+Consider it a note-to-self for the AI working on this project, and keep it updated accordingly with ANYTHING that will be useful to the next AI in the next chat.
+NEVER change what is written here, only add to it. Always include anything that you note to yourself as a matter of clarification.
 
 ## 1. Core Concepts & Official Terminology
 A precise vocabulary is critical. The following terms are to be used exclusively.
