@@ -1,3 +1,7 @@
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -14,7 +18,7 @@ android {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 26
         targetSdk = 36
-        versionCode = 342
+        versionCode = 7
         versionName = "3.4.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -30,6 +34,19 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // The applicationVariants property is deprecated.
+            // For more information, see https://developer.android.com/studio/build/gradle-plugin-api-updates#variant-output-api
+            applicationVariants.all {
+                outputs.all {
+                    (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
+                        "CueDetat-${versionName}-${
+                            SimpleDateFormat(
+                                "yyyyMMddHHmmss",
+                                Locale.getDefault()
+                            ).format(Date())
+                        }.apk"
+                }
+            }
         }
     }
     compileOptions {
