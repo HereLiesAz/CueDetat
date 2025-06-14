@@ -19,10 +19,10 @@ import kotlin.math.sqrt
 class OverlayRenderer {
 
     private val PROTRACTOR_ANGLES = floatArrayOf(0f, 14f, 30f, 36f, 43f, 48f)
-    private val baseGhostBallTextSize = 30f
-    private val minGhostBallTextSize = 15f
-    private val maxGhostBallTextSize = 60f
-    private val lineTextSize = 28f
+    private val baseGhostBallTextSize = 42f
+    private val minGhostBallTextSize = 20f
+    private val maxGhostBallTextSize = 80f
+    private val lineTextSize = 38f
 
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         if (state.protractorUnit.center.x == 0f) return
@@ -45,11 +45,9 @@ class OverlayRenderer {
         canvas.translate(state.protractorUnit.center.x, state.protractorUnit.center.y)
         canvas.rotate(state.protractorUnit.rotationDegrees)
 
-        // Draw Target Ball (at the new origin)
         canvas.drawCircle(0f, 0f, state.protractorUnit.radius, paints.targetCirclePaint)
         canvas.drawCircle(0f, 0f, state.protractorUnit.radius / 5f, paints.targetCenterMarkPaint)
 
-        // Determine position of Ghost Cue Ball relative to the now-rotated canvas
         val cueBallLocalCenter = state.protractorUnit.protractorCueBallCenter.let {
             val p = PointF(it.x, it.y)
             p.offset(-state.protractorUnit.center.x, -state.protractorUnit.center.y)
@@ -61,7 +59,6 @@ class OverlayRenderer {
         rotationInvertedMatrix.mapPoints(cueBallRelativePosition)
         val cuePos = PointF(cueBallRelativePosition[0], cueBallRelativePosition[1])
 
-        // Draw Ghost Cue Ball
         val cuePaint =
             if (state.isImpossibleShot) paints.warningPaintRed1 else paints.cueCirclePaint
         canvas.drawCircle(cuePos.x, cuePos.y, state.protractorUnit.radius, cuePaint)
@@ -72,7 +69,6 @@ class OverlayRenderer {
             paints.cueCenterMarkPaint
         )
 
-        // Draw Tangent lines and Protractor lines from the perspective of the rotated canvas
         drawTangentLines(canvas, cuePos, paints, state)
         drawProtractorLines(canvas, cuePos, paints, state)
 
@@ -106,15 +102,16 @@ class OverlayRenderer {
             canvas.drawLine(leftStart.x, leftStart.y, leftEnd.x, leftEnd.y, leftPaint)
 
             if (state.areHelpersVisible) {
+                val labelOffset = state.protractorUnit.radius + 10f
+                val textPaintRight = Paint(paints.lineTextPaint).apply { color = rightPaint.color }
+                val textPaintLeft = Paint(paints.lineTextPaint).apply { color = leftPaint.color }
+
                 drawLineText(
-                    canvas,
-                    "Tangent Line",
-                    rightStart,
-                    rightEnd,
-                    paints.lineTextPaint,
-                    150f
+                    canvas, "Tangent Line", rightStart, rightEnd, textPaintRight, labelOffset, -20f
                 )
-                drawLineText(canvas, "Tangent Line", leftStart, leftEnd, paints.lineTextPaint, 150f)
+                drawLineText(
+                    canvas, "Tangent Line", leftStart, leftEnd, textPaintLeft, labelOffset, -20f
+                )
             }
         }
     }
@@ -128,8 +125,7 @@ class OverlayRenderer {
     ) {
         val lineLength = 2000f
 
-        // Draw the Aiming Line (Line of Centers)
-        val aimDirX = 0 - cueLocalPos.x // Vector from cue to target (origin)
+        val aimDirX = 0 - cueLocalPos.x
         val aimDirY = 0 - cueLocalPos.y
         val mag = sqrt(aimDirX * aimDirX + aimDirY * aimDirY)
         if (mag > 0.001f) {
@@ -139,14 +135,16 @@ class OverlayRenderer {
             val end = PointF(cueLocalPos.x + nX * lineLength, cueLocalPos.y + nY * lineLength)
             canvas.drawLine(start.x, start.y, end.x, end.y, paints.aimingLinePaint)
             if (state.areHelpersVisible) {
-                drawLineText(canvas, "Aiming Line", start, end, paints.lineTextPaint, 250f)
+                val labelOffset = state.protractorUnit.radius + 10f
+                val textPaint =
+                    Paint(paints.lineTextPaint).apply { color = paints.aimingLinePaint.color }
+                drawLineText(canvas, "Aiming Line", start, end, textPaint, labelOffset, -20f)
             }
         }
 
 
-        // Draw the other protractor angles relative to the target ball (origin)
         PROTRACTOR_ANGLES.forEach { angle ->
-            if (angle == 0f) return@forEach // Skip the 0-degree line as it's the aiming line now
+            if (angle == 0f) return@forEach
             val r = Math.toRadians(angle.toDouble())
             val eX = (lineLength * sin(r)).toFloat()
             val eY = (lineLength * cos(r)).toFloat()
@@ -155,6 +153,35 @@ class OverlayRenderer {
             canvas.drawLine(0f, 0f, -eX, -eY, paints.protractorLinePaint)
             canvas.drawLine(0f, 0f, -eX, eY, paints.protractorLinePaint)
             canvas.drawLine(0f, 0f, eX, -eY, paints.protractorLinePaint)
+
+            if (state.areHelpersVisible) {
+                val labelOffset = state.protractorUnit.radius + 10f
+                val text = "${angle.toInt()}°"
+                val start = PointF(0f, 0f)
+                val angleTextSize = lineTextSize * 0.8f
+                val textPaint =
+                    Paint(paints.lineTextPaint).apply { color = paints.protractorLinePaint.color }
+                drawLineText(
+                    canvas,
+                    text,
+                    start,
+                    PointF(eX, -eY),
+                    textPaint,
+                    labelOffset,
+                    -20f,
+                    angleTextSize
+                )
+                drawLineText(
+                    canvas,
+                    text,
+                    start,
+                    PointF(-eX, -eY),
+                    textPaint,
+                    labelOffset,
+                    -20f,
+                    angleTextSize
+                )
+            }
         }
     }
 
@@ -184,8 +211,21 @@ class OverlayRenderer {
             val lineEnd =
                 PointF(startPoint.x + ndx * extendFactor, startPoint.y + ndy * extendFactor)
             canvas.drawLine(lineStart.x, lineStart.y, lineEnd.x, lineEnd.y, paint)
-            if (state.areHelpersVisible && state.actualCueBall != null) {
-                drawLineText(canvas, "Shot Line", lineStart, lineEnd, paints.lineTextPaint, 350f)
+
+            if (state.areHelpersVisible) {
+                val textPaint = Paint(paints.lineTextPaint).apply { color = paint.color }
+                val startOfTextPath = throughPoint
+                val endOfTextPath = lineEnd
+                val labelOffset = state.protractorUnit.radius + 10f
+                drawLineText(
+                    canvas,
+                    "Shot Line",
+                    startOfTextPath,
+                    endOfTextPath,
+                    textPaint,
+                    labelOffset,
+                    -20f
+                )
             }
         }
     }
@@ -218,7 +258,7 @@ class OverlayRenderer {
         if (state.areHelpersVisible) {
             drawGhostBallText(
                 canvas,
-                paints.cueBallTextPaint,
+                paints.actualCueBallTextPaint,
                 state.zoomSliderPosition,
                 screenBasePos.x,
                 ghostCenterY,
@@ -282,13 +322,15 @@ class OverlayRenderer {
         start: PointF,
         end: PointF,
         paint: Paint,
-        offset: Float
+        hOffset: Float,
+        vOffset: Float,
+        size: Float = lineTextSize
     ) {
-        paint.textSize = lineTextSize
+        paint.textSize = size
         val path = Path()
         path.moveTo(start.x, start.y)
         path.lineTo(end.x, end.y)
-        canvas.drawTextOnPath(text, path, offset, -20f, paint)
+        canvas.drawTextOnPath(text, path, hOffset, vOffset, paint)
     }
 
     private fun drawGhostBallText(

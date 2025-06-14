@@ -89,54 +89,59 @@ base, Shot Line) are drawn onto this single transformed canvas at their logical 
 Draw Screen Space: Elements that don't exist on the 3D plane (the "ghost" effects for the balls) are
 drawn last, without the pitchMatrix, using the projected coordinates of their logical counterparts.
 
-4. Notes from the Void (Lessons Learned)
-   A Word on State: The purity of the unidirectional data flow is paramount. When a bug appears, the
-   first question is always: "Is the OverlayState correct?" If the state is right, the bug is in the
-   Renderer. If the state is wrong, the bug is in the ViewModel. There is no third option.
+4. Notes from the Void (A Chronicle of Failures and Successes)
+   Agnosia of the Asset Pipeline (Failure): A recurring and frankly embarrassing failure mode has
+   been the inability to correctly differentiate between Android resource types. The system has
+   crashed due to:
 
-The Tyranny of Coordinates: A significant portion of development has been a Sisyphean struggle
-against coordinate systems. A point's meaning is defined entirely by the space it inhabits: Logical,
-Pitched, or Screen. Mapping between them must be done with monastic precision. The
-ProtractorOverlayView must only speak in Screen Coordinates to the ViewModel, which then translates
-them to the Logical Plane.
+Attempting to use an adaptive icon XML (ic_launcher.xml) where a simple VectorDrawable or raster
+image was expected.
 
-Rotation is a jealous god: When rotating a portion of the canvas using canvas.translate() and
-canvas.rotate(), all subsequent drawing calls within that canvas.save()/canvas.restore() block are
-subject to that transformation. To draw an object that should not be rotated within that block, one
-must apply an inverse rotation to its coordinates before drawing. This was the source of the tangent
-line de-synchronization.
+Attempting to use a mipmap resource (R.mipmap.ic_launcher_round) in a composable (Image) that
+expects a drawable resource (R.drawable.xxx). This is a common source of fatal exceptions if the
+underlying resource is not a compatible type.
 
-The Illusion of Depth: The "lift" effect that makes 3D ghost balls appear to float is a function of
-perspective projection, not rotation. The getPerspectiveRadiusAndLift function's dependency on
-rotationDegrees was the source of the "bouncing" behavior of the Protractor Unit. An object's
-apparent height should be independent of its 2D rotation on the logical plane.
+The Lesson: The drawable folder is for general-purpose graphics. The mipmap folder is specifically
+for launcher icons of different densities. Do not cross the streams. When in doubt, use a simple
+vector (<vector>) or a rasterized PNG/WEBP from the drawable folder for UI elements.
 
-On Impossible Shots: Early warning systems relied on crude angle checks and physical overlap
-detection. These have been deprecated and removed. The sole trigger for a warning event is now a
-more elegant and geometrically sound check. It compares the distance from the player's perspective
-point (A) to the GhostCueBall (G) and the TargetBall (T). A shot is deemed impossible if the
-distance A-G is greater than the distance A-T, as this implies aiming "behind" the target.
+The Font Kerfuffle (Failure): A "Duplicate resources" error was triggered by creating a barbaro.xml
+font family definition in the res/font directory while the barbaro.ttf file also existed. The
+Android build tools interpreted both barbaro.xml and barbaro.ttf as attempting to define a font
+resource named barbaro.
 
-If the ActualCueBall is visible, its center serves as point A.
+The Solution (Success): The barbaro.xml file was superfluous. The FontFamily can be constructed in
+Type.kt by referencing the .ttf file directly (Font(R.font.barbaro)). This removes the unnecessary
+layer of XML indirection and resolves the name collision.
 
-If the ActualCueBall is hidden, point A defaults to the logical point corresponding to the
-bottom-center of the screen.
-This unified logic applies universally, providing a single, robust principle for all aiming
-scenarios.
+The Unlettered Canvas (Failure): A global typography change in the Jetpack Compose Theme does not
+automagically apply to text drawn directly onto a Canvas using the android.graphics.Paint class. The
+helper text drawn in OverlayRenderer remained in the default system font.
 
-The Overhead Anomaly: The initial "lift" logic correctly placed the 3D ghost ball "on top" of the 2D
-base, but this created a visual disconnect when viewed from directly overhead (0° pitch). From this
-angle, the ghost appeared as a separate circle floating above the base, rather than being perfectly
-aligned with it. The illusion of a single 3D object was broken. The lift calculation was corrected
-to be proportional to the sine of the pitch angle (lift = radius * sin(pitch)). This ensures the
-lift is 0 at 0° pitch (making the ghost and base concentric) and increases smoothly as the phone
-tilts, preserving the 3D illusion across all viewing angles.
+The Solution (Success): The custom Typeface must be loaded from resources (ResourcesCompat.getFont)
+and explicitly set on each Paint object used for drawing text on the canvas. This was implemented in
+the PaintCache class.
 
-State-Driven UI Consistency: The areHelpersVisible flag in OverlayState is an example of a single
-state driving multiple UI changes. It not only toggles the helper text on the OverlayRenderer but
-also controls the branding in the TopControls composable (switching between the app's title text and
-its icon). This pattern should be maintained to ensure a consistent and predictable UI. A change in
-one part of the app's "mode" should be reflected logically across all relevant components.
+The Tyranny of Coordinates (Ongoing Struggle): A significant portion of development has been a
+Sisyphean struggle against coordinate systems. A point's meaning is defined entirely by the space it
+inhabits: Logical, Pitched, or Screen. Mapping between them must be done with monastic precision.
+
+The Illusion of Depth (Success): The "lift" effect that makes 3D ghost balls appear to float is a
+function of perspective projection. The getPerspectiveRadiusAndLift function's dependency on
+rotationDegrees was a source of "bouncing" behavior. This was corrected.
+
+The Overhead Anomaly (Sub-Failure): The corrected logic failed when viewed from directly overhead (
+0° pitch), creating a visual disconnect.
+
+Final Correction (Success): The lift calculation was made proportional to the sine of the pitch
+angle (lift = radius * sin(pitch)). This ensures the lift is 0 at 0° pitch, making the ghost and
+base concentric and preserving the 3D illusion across all viewing angles.
+
+On Impossible Shots (Success): Early warning systems relied on crude angle checks and physical
+overlap detection. These have been deprecated. The sole trigger for a warning event is now a more
+elegant and geometrically sound check comparing the distance from the player's perspective point (A)
+to the GhostCueBall (G) and the TargetBall (T). This unified logic applies universally, providing a
+single, robust principle for all aiming scenarios.
 
 5. Future Development Plan
    The current foundational architecture is designed to support future expansion.

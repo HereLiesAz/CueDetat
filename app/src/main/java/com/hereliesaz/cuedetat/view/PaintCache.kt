@@ -3,6 +3,7 @@ package com.hereliesaz.cuedetat.view
 import android.graphics.Color
 import android.graphics.DashPathEffect
 import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.toArgb
 
@@ -41,6 +42,8 @@ class PaintCache {
         Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 4f; style = Paint.Style.STROKE }
     val cueBallTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     val targetBallTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+    val actualCueBallTextPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
 
     val tangentLineDottedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -56,24 +59,31 @@ class PaintCache {
     val lineTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
 
 
-    // Restored warning paints for impossible/foul shots
     val warningPaintRed1 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#C05D5D") // For 2D Protractor Cue Ball
+        color = Color.parseColor("#C05D5D")
         style = Paint.Style.STROKE
         strokeWidth = 5f
     }
     val warningPaintRed2 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#A04C4C") // For Ghost Cue Ball
+        color = Color.parseColor("#A04C4C")
         style = Paint.Style.STROKE
         strokeWidth = 6f
     }
     val warningPaintRed3 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#80E57373") // For Shot Line
+        color = Color.parseColor("#80E57373")
         style = Paint.Style.STROKE
         strokeWidth = 5f
         setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, Color.parseColor("#FF5252"))
     }
 
+
+    fun setTypeface(typeface: Typeface?) {
+        cueBallTextPaint.typeface = typeface
+        targetBallTextPaint.typeface = typeface
+        ghostBallTextPaint.typeface = typeface
+        lineTextPaint.typeface = typeface
+        actualCueBallTextPaint.typeface = typeface
+    }
 
     fun updateColors(colorScheme: ColorScheme) {
         glowColor = colorScheme.primary.copy(alpha = 0.4f).toArgb()
@@ -114,6 +124,10 @@ class PaintCache {
         }
         targetBallTextPaint.apply {
             color = targetCirclePaint.color
+            setShadowLayer(2f, 1f, 1f, textShadowColor)
+        }
+        actualCueBallTextPaint.apply {
+            color = actualCueBallGhostPaint.color
             setShadowLayer(2f, 1f, 1f, textShadowColor)
         }
 

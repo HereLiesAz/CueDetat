@@ -14,7 +14,7 @@ pluginManagement {
   }
   plugins {
     id("com.android.application") version "8.12.0"
-    id("com.android.library") version "8.12.0-alpha04"
+      id("com.android.library") version "8.12.0-alpha05"
 
     id("org.jetbrains.kotlin.android") version "2.1.21"
   }

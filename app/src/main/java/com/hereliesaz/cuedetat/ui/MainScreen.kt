@@ -108,12 +108,22 @@ fun MainScreen(viewModel: MainViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_zoom_in_24),
-                contentDescription = stringResource(id = R.string.zoom_icon),
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            if (uiState.areHelpersVisible) {
+                Text(
+                    text = "Zoom",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            } else {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_zoom_in_24),
+                    contentDescription = stringResource(id = R.string.zoom_icon),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
             VerticalSlider(
                 value = uiState.zoomSliderPosition,
                 onValueChange = viewModel::onZoomSliderChange,
@@ -134,23 +144,43 @@ fun MainScreen(viewModel: MainViewModel) {
                 .navigationBarsPadding(),
             containerColor = if (uiState.actualCueBall != null) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
         ) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_jump_shot),
-                contentDescription = "Toggle Actual Cue Ball",
-                tint = if (uiState.actualCueBall != null) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (uiState.areHelpersVisible) {
+                Text(
+                    text = "Cue Ball\nToggle",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (uiState.actualCueBall != null) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_jump_shot),
+                    contentDescription = "Toggle Actual Cue Ball",
+                    tint = if (uiState.actualCueBall != null) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
         FloatingActionButton(
             onClick = viewModel::onReset,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
-                .navigationBarsPadding()
+                .navigationBarsPadding(),
+            containerColor = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
         ) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_undo_24),
-                contentDescription = "Reset View"
-            )
+            if (uiState.areHelpersVisible) {
+                Text(
+                    text = "Reset\nView",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_undo_24),
+                    contentDescription = "Reset View",
+                    tint = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
     if (showBottomSheet) {

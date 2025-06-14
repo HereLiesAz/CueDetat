@@ -4,8 +4,11 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.PointF
+import android.graphics.Typeface
 import android.view.MotionEvent
 import android.view.View
+import androidx.core.content.res.ResourcesCompat
+import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.pow
@@ -14,9 +17,8 @@ import kotlin.math.sqrt
 @SuppressLint("ClickableViewAccessibility")
 class ProtractorOverlayView(context: Context) : View(context) {
 
-    // MODIFIED: The renderer is no longer instantiated here. It is passed in.
     private val renderer = OverlayRenderer()
-    private val paints = PaintCache() // The view now owns the paints
+    private val paints = PaintCache()
     private var state = OverlayState()
 
     var onSizeChanged: ((Int, Int) -> Unit)? = null
@@ -31,9 +33,15 @@ class ProtractorOverlayView(context: Context) : View(context) {
 
     private var dragMode = DragMode.NONE
 
+    init {
+        if (!isInEditMode) {
+            val barbaroTypeface: Typeface? = ResourcesCompat.getFont(context, R.font.barbaro)
+            paints.setTypeface(barbaroTypeface)
+        }
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        // Delegate all drawing to the renderer, passing the current state and paints.
         renderer.draw(canvas, state, paints)
     }
 
@@ -57,7 +65,6 @@ class ProtractorOverlayView(context: Context) : View(context) {
                     renderer.mapPoint(it.center, state.pitchMatrix)
                 }
 
-                // MODIFIED: getPerspectiveRadiusAndLift call updated
                 val touchRadius = renderer.getPerspectiveRadiusAndLift(
                     state.protractorUnit,
                     state,

@@ -161,11 +161,23 @@ class MainViewModel @Inject constructor(
     fun onToggleActualCueBall() {
         updateState {
             if (it.actualCueBall == null) {
-                val defaultLogicalPos =
-                    PointF(it.protractorUnit.center.x, it.protractorUnit.center.y + 200f)
+                if (!it.hasInverseMatrix) return@updateState it // Guard clause
+
+                val ghostCueBallPos = it.protractorUnit.protractorCueBallCenter
+
+                val screenBottomCenter = floatArrayOf(it.viewWidth / 2f, it.viewHeight.toFloat())
+                val logicalBottomCenterArray = FloatArray(2)
+                it.inversePitchMatrix.mapPoints(logicalBottomCenterArray, screenBottomCenter)
+                val logicalBottomPos =
+                    PointF(logicalBottomCenterArray[0], logicalBottomCenterArray[1])
+
+                val newDefaultX = (ghostCueBallPos.x + logicalBottomPos.x) / 2f
+                val newDefaultY = (ghostCueBallPos.y + logicalBottomPos.y) / 2f
+                val newDefaultPos = PointF(newDefaultX, newDefaultY)
+
                 it.copy(
                     actualCueBall = ActualCueBall(
-                        center = defaultLogicalPos,
+                        center = newDefaultPos,
                         radius = it.protractorUnit.radius
                     )
                 )
@@ -176,11 +188,24 @@ class MainViewModel @Inject constructor(
     }
 
     fun onReset() {
-        updateState {
-            createInitialState(
-                it.viewWidth,
-                it.viewHeight,
-                it.dynamicColorScheme
+        updateState { currentState ->
+            val newRadius = (min(
+                currentState.viewWidth,
+                currentState.viewHeight
+            ) * 0.30f / 2f) * ZoomMapping.DEFAULT_ZOOM
+
+            val updatedActualCueBall = currentState.actualCueBall?.copy(radius = newRadius)
+
+            currentState.copy(
+                protractorUnit = ProtractorUnit(
+                    center = PointF(currentState.viewWidth / 2f, currentState.viewHeight / 2f),
+                    radius = newRadius,
+                    rotationDegrees = 0f
+                ),
+                actualCueBall = updatedActualCueBall,
+                zoomSliderPosition = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM),
+                valuesChangedSinceReset = false,
+                pitchAngle = 0.0f
             )
         }
     }
