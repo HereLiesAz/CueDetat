@@ -10,9 +10,8 @@ import android.view.View
 import androidx.core.content.res.ResourcesCompat
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
+import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import kotlin.math.pow
-import kotlin.math.sqrt
 
 @SuppressLint("ClickableViewAccessibility")
 class ProtractorOverlayView(context: Context) : View(context) {
@@ -20,6 +19,7 @@ class ProtractorOverlayView(context: Context) : View(context) {
     private val renderer = OverlayRenderer()
     private val paints = PaintCache()
     private var state = OverlayState()
+    private var barbaroTypeface: Typeface? = null
 
     var onSizeChanged: ((Int, Int) -> Unit)? = null
     var onRotationChange: ((Float) -> Unit)? = null
@@ -35,14 +35,14 @@ class ProtractorOverlayView(context: Context) : View(context) {
 
     init {
         if (!isInEditMode) {
-            val barbaroTypeface: Typeface? = ResourcesCompat.getFont(context, R.font.barbaro)
+            barbaroTypeface = ResourcesCompat.getFont(context, R.font.barbaro)
             paints.setTypeface(barbaroTypeface)
         }
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        renderer.draw(canvas, state, paints)
+        renderer.draw(canvas, state, paints, barbaroTypeface)
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -60,12 +60,12 @@ class ProtractorOverlayView(context: Context) : View(context) {
                 val touchPoint = PointF(event.x, event.y)
 
                 val projectedTargetCenter =
-                    renderer.mapPoint(state.protractorUnit.center, state.pitchMatrix)
+                    DrawingUtils.mapPoint(state.protractorUnit.center, state.pitchMatrix)
                 val projectedActualCueCenter = state.actualCueBall?.let {
-                    renderer.mapPoint(it.center, state.pitchMatrix)
+                    DrawingUtils.mapPoint(it.center, state.pitchMatrix)
                 }
 
-                val touchRadius = renderer.getPerspectiveRadiusAndLift(
+                val touchRadius = DrawingUtils.getPerspectiveRadiusAndLift(
                     state.protractorUnit,
                     state,
                 ).radius * 2.0f
@@ -123,9 +123,7 @@ class ProtractorOverlayView(context: Context) : View(context) {
     }
 
     private fun distance(p1: PointF, p2: PointF): Float {
-        val dx = p1.x - p2.x
-        val dy = p1.y - p2.y
-        return sqrt(dx.pow(2) + dy.pow(2))
+        return DrawingUtils.distance(p1, p2)
     }
 
     fun updateState(newState: OverlayState) {
