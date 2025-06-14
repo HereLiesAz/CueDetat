@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.theme.AccentGold
 import com.hereliesaz.cuedetat.view.ProtractorOverlayView
@@ -95,16 +96,31 @@ fun MainScreen(viewModel: MainViewModel) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        CameraPreview(modifier = Modifier.fillMaxSize())
-        AndroidView({ protractorView }, modifier = Modifier.fillMaxSize()) { view ->
+        CameraPreview(modifier = Modifier
+            .fillMaxSize()
+            .zIndex(0f))
+
+        AndroidView(
+            factory = { protractorView },
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(1f)
+        ) { view ->
             view.updateState(uiState)
         }
-        TopControls(uiState = uiState, onMenuClick = { showBottomSheet = true })
+
+        TopControls(
+            uiState = uiState,
+            onMenuClick = { showBottomSheet = true },
+            modifier = Modifier.zIndex(2f)
+        )
+
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight(0.4f)
-                .padding(end = 8.dp),
+                .padding(end = 8.dp)
+                .zIndex(2f),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -141,7 +157,8 @@ fun MainScreen(viewModel: MainViewModel) {
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(16.dp)
-                .navigationBarsPadding(),
+                .navigationBarsPadding()
+                .zIndex(2f),
             containerColor = if (uiState.actualCueBall != null) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
         ) {
             if (uiState.areHelpersVisible) {
@@ -164,7 +181,8 @@ fun MainScreen(viewModel: MainViewModel) {
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
-                .navigationBarsPadding(),
+                .navigationBarsPadding()
+                .zIndex(2f),
             containerColor = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
         ) {
             if (uiState.areHelpersVisible) {
@@ -218,9 +236,9 @@ fun MainScreen(viewModel: MainViewModel) {
     }
 }
 @Composable
-fun TopControls(uiState: OverlayState, onMenuClick: () -> Unit) {
+fun TopControls(uiState: OverlayState, onMenuClick: () -> Unit, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
             .padding(start = 16.dp, end = 16.dp, top = 16.dp),

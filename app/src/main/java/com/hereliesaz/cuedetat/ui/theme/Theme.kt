@@ -12,7 +12,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-// MODIFIED: A custom muted palette based on AccentGold has replaced the default purples.
 private val AppDarkColorScheme = darkColorScheme(
     primary = AccentGold,
     secondary = MutedTeal,

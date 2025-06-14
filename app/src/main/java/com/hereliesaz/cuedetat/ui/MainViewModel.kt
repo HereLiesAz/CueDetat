@@ -8,10 +8,10 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.R
-import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.SensorRepository
+import com.hereliesaz.cuedetat.data.UpdateChecker
+import com.hereliesaz.cuedetat.data.UpdateResult
 import com.hereliesaz.cuedetat.view.model.ActualCueBall
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
@@ -40,7 +40,7 @@ sealed class SingleEvent {
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val sensorRepository: SensorRepository,
-    private val githubRepository: GithubRepository,
+    private val updateChecker: UpdateChecker,
     private val application: Application
 ) : ViewModel() {
 
@@ -220,16 +220,15 @@ class MainViewModel @Inject constructor(
 
     fun onCheckForUpdate() {
         viewModelScope.launch {
-            val latestVersion = githubRepository.getLatestVersion()
-            val currentVersion = BuildConfig.VERSION_NAME
-
-            val message = when {
-                latestVersion == null -> ToastMessage.StringResource(R.string.update_check_failed)
-                latestVersion == currentVersion -> ToastMessage.StringResource(R.string.update_no_new_release)
-                else -> ToastMessage.StringResource(
+            val result = updateChecker.checkForUpdate()
+            val message: ToastMessage = when (result) {
+                is UpdateResult.UpdateAvailable -> ToastMessage.StringResource(
                     R.string.update_available,
-                    listOf(latestVersion)
+                    listOf(result.latestVersion)
                 )
+
+                is UpdateResult.UpToDate -> ToastMessage.StringResource(R.string.update_no_new_release)
+                is UpdateResult.CheckFailed -> ToastMessage.PlainText(result.reason)
             }
             _toastMessage.value = message
         }
