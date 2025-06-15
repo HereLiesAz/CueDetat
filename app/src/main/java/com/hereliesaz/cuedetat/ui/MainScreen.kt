@@ -1,3 +1,4 @@
+// hereliesaz/cued8at/CueD8at-66142b655f7e247d83b8004a442ad41e04dd6348/app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt
 package com.hereliesaz.cuedetat.ui
 
 import android.widget.Toast
@@ -46,6 +47,8 @@ fun MainScreen(viewModel: MainViewModel) {
             onUnitMove = { pos -> viewModel.onEvent(MainScreenEvent.UnitMoved(pos)) }
             onActualCueBallMoved =
                 { pos -> viewModel.onEvent(MainScreenEvent.ActualCueBallMoved(pos)) }
+            // Wire up the new zoom callback
+            onZoomChange = { pos -> viewModel.onEvent(MainScreenEvent.ZoomSliderChanged(pos)) }
         }
     }
 

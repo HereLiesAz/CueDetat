@@ -1,3 +1,4 @@
+// hereliesaz/cued8at/CueD8at-66142b655f7e247d83b8004a442ad41e04dd6348/app/src/main/java/com/hereliesaz/cuedetat/view/ProtractorOverlayView.kt
 package com.hereliesaz.cuedetat.view
 
 import android.annotation.SuppressLint
@@ -6,9 +7,11 @@ import android.graphics.Canvas
 import android.graphics.PointF
 import android.graphics.Typeface
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import androidx.core.content.res.ResourcesCompat
 import com.hereliesaz.cuedetat.R
+import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -21,11 +24,15 @@ class ProtractorOverlayView(context: Context) : View(context) {
     private var state = OverlayState()
     private var barbaroTypeface: Typeface? = null
 
+    // Callbacks to the ViewModel
     var onSizeChanged: ((Int, Int) -> Unit)? = null
     var onRotationChange: ((Float) -> Unit)? = null
     var onUnitMove: ((PointF) -> Unit)? = null
     var onActualCueBallMoved: ((PointF) -> Unit)? = null
+    var onZoomChange: ((Float) -> Unit)? = null // Add this callback
 
+    // Gesture detection
+    private val scaleGestureDetector: ScaleGestureDetector
     private var lastTouchX = 0f
     private var pointerId = -1
 
@@ -37,6 +44,19 @@ class ProtractorOverlayView(context: Context) : View(context) {
         if (!isInEditMode) {
             barbaroTypeface = ResourcesCompat.getFont(context, R.font.barbaro)
             paints.setTypeface(barbaroTypeface)
+        }
+        // Initialize the gesture detector
+        scaleGestureDetector = ScaleGestureDetector(context, ScaleListener())
+    }
+
+    private inner class ScaleListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScale(detector: ScaleGestureDetector): Boolean {
+            val currentZoom = ZoomMapping.sliderToZoom(state.zoomSliderPosition)
+            val newZoom = currentZoom * detector.scaleFactor
+            val newSliderPos = ZoomMapping.zoomToSlider(newZoom)
+            // Invoke the callback with the new slider position
+            onZoomChange?.invoke(newSliderPos.coerceIn(0f, 100f))
+            return true
         }
     }
 
@@ -53,6 +73,16 @@ class ProtractorOverlayView(context: Context) : View(context) {
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (state.viewWidth == 0 || !state.hasInverseMatrix) return false
 
+        // Pass all touch events to the ScaleGestureDetector.
+        scaleGestureDetector.onTouchEvent(event)
+
+        // If a scale gesture is in progress, consume the event and don't process other gestures.
+        if (scaleGestureDetector.isInProgress) {
+            dragMode = DragMode.NONE
+            return true
+        }
+
+        // Let other gestures proceed only if scale is not being handled
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 pointerId = event.getPointerId(0)
