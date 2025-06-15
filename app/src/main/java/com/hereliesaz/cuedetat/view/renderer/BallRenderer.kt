@@ -2,20 +2,17 @@ package com.hereliesaz.cuedetat.view.renderer
 
 import android.graphics.Canvas
 import android.graphics.Matrix
-import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.Typeface
-import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.model.ILogicalBall
+import com.hereliesaz.cuedetat.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class BallRenderer {
 
-    private val baseGhostBallTextSize = 42f
-    private val minGhostBallTextSize = 20f
-    private val maxGhostBallTextSize = 80f
+    private val textRenderer = BallTextRenderer()
 
     fun drawLogicalBalls(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         state.actualCueBall?.let {
@@ -81,7 +78,7 @@ class BallRenderer {
                 paints.actualCueBallGhostPaint
             )
             if (state.areHelpersVisible) {
-                drawGhostBallText(
+                textRenderer.draw(
                     canvas,
                     paints.actualCueBallTextPaint,
                     state.zoomSliderPosition,
@@ -117,7 +114,7 @@ class BallRenderer {
         canvas.drawCircle(pCGC.x, cueGhostCenterY, cueRadiusInfo.radius, cueGhostPaint)
 
         if (state.areHelpersVisible) {
-            drawGhostBallText(
+            textRenderer.draw(
                 canvas,
                 paints.targetBallTextPaint,
                 state.zoomSliderPosition,
@@ -126,7 +123,7 @@ class BallRenderer {
                 targetRadiusInfo.radius,
                 "Target Ball"
             )
-            drawGhostBallText(
+            textRenderer.draw(
                 canvas,
                 paints.cueBallTextPaint,
                 state.zoomSliderPosition,
@@ -136,27 +133,5 @@ class BallRenderer {
                 "Ghost Cue Ball"
             )
         }
-    }
-
-    private fun drawGhostBallText(
-        canvas: Canvas,
-        paint: Paint,
-        zoomSliderPosition: Float,
-        x: Float,
-        y: Float,
-        radius: Float,
-        text: String
-    ) {
-        val zoomFactor = ZoomMapping.sliderToZoom(zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM
-        val currentTextSize = (baseGhostBallTextSize * zoomFactor).coerceIn(
-            minGhostBallTextSize,
-            maxGhostBallTextSize
-        )
-        paint.textSize = currentTextSize
-        val textMetrics = paint.fontMetrics
-        val textPadding = 5f * zoomFactor.coerceAtLeast(0.5f)
-        val visualTop = y - radius
-        val baseline = visualTop - textPadding - textMetrics.descent
-        canvas.drawText(text, x, baseline, paint)
     }
 }

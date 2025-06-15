@@ -111,6 +111,9 @@ android {
 
     }
 }
+dependencies {
+    implementation(libs.ui)
+}
 
 kapt {
     correctErrorTypes = true

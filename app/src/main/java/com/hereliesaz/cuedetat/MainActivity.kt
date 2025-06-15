@@ -14,9 +14,10 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.hereliesaz.cuedetat.ui.MainScreen
+import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.MainViewModel
-import com.hereliesaz.cuedetat.ui.SingleEvent
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
+import com.hereliesaz.cuedetat.view.state.SingleEvent
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -54,9 +55,8 @@ class MainActivity : ComponentActivity() {
                 is SingleEvent.OpenUrl -> {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
                     startActivity(intent)
-                    viewModel.onSingleEventConsumed()
+                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
-
                 null -> {
                     // Do nothing
                 }

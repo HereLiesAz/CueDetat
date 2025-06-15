@@ -14,7 +14,7 @@ import androidx.core.view.WindowCompat
 
 private val AppDarkColorScheme = darkColorScheme(
     primary = AccentGold,
-    secondary = MutedTeal,
+    secondary = AcidPatina,
     tertiary = MutedGray,
     background = Color(0xFF121212),
     surface = Color(0xFF1E1E1E),
@@ -26,7 +26,7 @@ private val AppDarkColorScheme = darkColorScheme(
     outline = MutedGray.copy(alpha = 0.5f),
     surfaceVariant = Color(0xFF49454F),
     onSurfaceVariant = Color(0xFFCAC4D0),
-    tertiaryContainer = MutedTeal.copy(alpha = 0.3f),
+    tertiaryContainer = AcidPatina.copy(alpha = 0.3f),
     onTertiaryContainer = Color.White,
     secondaryContainer = AccentGold.copy(alpha = 0.3f),
     onSecondaryContainer = Color.White,
@@ -35,7 +35,7 @@ private val AppDarkColorScheme = darkColorScheme(
 
 private val AppLightColorScheme = lightColorScheme(
     primary = DarkerAccentGold,
-    secondary = MutedTeal,
+    secondary = AcidPatina,
     tertiary = MutedGray,
     background = Color(0xFFF7F2F9),
     surface = Color(0xFFFFFBFE),
@@ -47,7 +47,7 @@ private val AppLightColorScheme = lightColorScheme(
     outline = MutedGray.copy(alpha = 0.5f),
     surfaceVariant = Color(0xFFE7E0EC),
     onSurfaceVariant = Color(0xFF49454F),
-    tertiaryContainer = MutedTeal.copy(alpha = 0.3f),
+    tertiaryContainer = AcidPatina.copy(alpha = 0.3f),
     onTertiaryContainer = Color.Black,
     secondaryContainer = AccentGold.copy(alpha = 0.3f),
     onSecondaryContainer = Color.Black,
