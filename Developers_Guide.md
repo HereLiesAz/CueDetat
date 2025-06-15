@@ -19,30 +19,33 @@ A precise vocabulary is critical. The following terms are to be used exclusively
   Logical Plane onto the Screen Plane to create the 3D illusion. Crucially, this transformation must
   always pivot around the absolute center of the view.
 * **On-Screen Elements**:
-   * **Protractor Unit**: The primary aiming apparatus. It consists of two components that are
-     always linked.
-      * **Target Ball**: The logical and visual center of the Protractor Unit. The user drags this
-        on-screen to move the entire unit.
-      * **Ghost Cue Ball**: The second ball in the unit. Its position on the Logical Plane is always
-        derived from the Target Ball's position plus the user-controlled rotation angle.
-   * **Actual Cue Ball**: A separate, independent entity representing the real-world cue ball.
-      * Its visibility is toggled by the user via a FAB.
-      * It has a **2D Base**, which exists on the Logical Plane. The user drags the ball on the
-        screen, and the app calculates the corresponding position for this base on the Logical
-        Plane.
-      * It has a **3D Ghost**, which is a visual representation that appears to "float" above the 2D
-        base.
-   * **Shot Line**: The line representing the player's line of sight to the cue ball.
-      * It must be drawn on the Logical Plane to adhere to perspective.
-      * Its path is defined as a ray originating from an anchor point and passing through the center
-        of the Ghost Cue Ball.
-   * **Anchor Points**:
-      * If the **Actual Cue Ball** is visible, the anchor is the center of its 2D Base.
-      * If the **Actual Cue Ball** is hidden, the anchor is the logical point corresponding to the
-        bottom-center of the screen.
-   * **Aiming Line**: The line representing the path the Target Ball will take upon impact.
-      * It is always the line of centers between the Ghost Cue Ball and the Target Ball, extending
-        through the Target Ball.
+    * **Protractor Unit**: The primary aiming apparatus. It consists of two components that are
+      always linked.
+        * **Target Ball**: The logical and visual center of the Protractor Unit. The user drags this
+          on-screen to move the entire unit.
+        * **Ghost Cue Ball**: The second ball in the unit. Its position on the Logical Plane is
+          always
+          derived from the Target Ball's position plus the user-controlled rotation angle.
+    * **Actual Cue Ball**: A separate, independent entity representing the real-world cue ball.
+        * Its visibility is toggled by the user via a FAB.
+        * It has a **2D Base**, which exists on the Logical Plane. The user drags the ball on the
+          screen, and the app calculates the corresponding position for this base on the Logical
+          Plane.
+        * It has a **3D Ghost**, which is a visual representation that appears to "float" above the
+          2D
+          base.
+    * **Shot Line**: The line representing the player's line of sight to the cue ball.
+        * It must be drawn on the Logical Plane to adhere to perspective.
+        * Its path is defined as a ray originating from an anchor point and passing through the
+          center
+          of the Ghost Cue Ball.
+    * **Anchor Points**:
+        * If the **Actual Cue Ball** is visible, the anchor is the center of its 2D Base.
+        * If the **Actual Cue Ball** is hidden, the anchor is the logical point corresponding to the
+          bottom-center of the screen.
+    * **Aiming Line**: The line representing the path the Target Ball will take upon impact.
+        * It is always the line of centers between the Ghost Cue Ball and the Target Ball, extending
+          through the Target Ball.
 
 ## 2. Architectural Model & File Structure
 
@@ -60,11 +63,17 @@ com/hereliesaz/cuedetat/
 │ │ ├── BallRenderer.kt // Draws all ball and ghost ball elements.
 │ │ ├── LineRenderer.kt // Draws all line and label elements.
 │ │ └── OverlayRenderer.kt // The coordinator. Initializes and calls other renderers.
-│   ├── state/
-│   │   └── OverlayState.kt      // An immutable snapshot of the entire scene's state.
-│   └── ProtractorOverlayView.kt   // The Android View, handles touch input.
+│ └── state/
+│ ├── OverlayState.kt // An immutable snapshot of the entire scene's state.
+│ └── ScreenState.kt // Defines UI-level states like Toast messages.
+├── domain/
+│ ├── StateReducer.kt // Pure function to handle state changes from events.
+│ └── UpdateStateUseCase.kt // Pure function for complex, derived state calculations.
 └── ui/
-└── MainViewModel.kt         // The single source of truth. Manages state and business logic.
+├── composables/ // Small, reusable UI components.
+├── MainViewModel.kt // The lean coordinator of state and events.
+├── MainScreen.kt // The main Composable screen, assembles components.
+└── MainScreenEvent.kt // Defines all possible user interactions.
 
 **The Golden Rule**: The `ViewModel` is the only component that can create or modify the
 `OverlayState`. The `View` and `Renderer` components are "dumb" components that only receive state
@@ -125,28 +134,51 @@ To avoid rendering artifacts, the following order of operations is mandatory:
 
 * **The Labyrinth of Label Placement**: The seemingly simple act of placing a text label next to a
   line became a tragicomedy of errors.
-   * **Initial Diagnosis**: It was assumed that a small, fixed horizontal offset (`hOffset`) would
-     suffice. This failed spectacularly, producing no visible change. This failure was, in itself, a
-     success: it proved the logical coordinate space was vastly larger than assumed, and that our
-     understanding of scale was flawed.
-   * **The Red Herring of `drawTextOnPath`**: The primary tool, `drawTextOnPath`, was treated as a
-     black box. Its `vOffset` parameter was discovered to be the silent culprit, pushing labels an
-     enormous perpendicular distance away from their intended paths, even when the horizontal offset
-     was small. The realization was that we were trying to finesse a sledgehammer.
-   * **The Refactor That Wasn't**: An attempt to solve the problem by refactoring the
-     `OverlayRenderer` into smaller, more specialized classes was architecturally sound but executed
-     poorly. It severed dependencies and broke the build, proving that a good idea implemented badly
-     is often worse than a bad idea implemented well. The subsequent decision to revert the
-     refactor, fix the build, and *then* re-implement the refactor correctly was a critical lesson
-     in not being afraid to retreat and regroup.
-   * **The Rotational Farce**: A subsequent attempt to use a more "direct" coordinate calculation
-     with `canvas.rotate()` resulted in all labels comically stacking on top of each other, anchored
-     to the wrong point and rotated into nonsense. This was a valuable lesson in humility.
-   * **The Final, Simple Truth**: The solution, as is often the case, was to stop fighting the tool
-     and understand the environment. By returning to `drawTextOnPath` and setting its perpendicular
-     offset (`vOffset`) to zero, we regained control. The horizontal offset (`hOffset`) was then
-     made dynamic—a multiple of the ball's on-screen radius—ensuring the labels now sit a
-     predictable, scalable distance from their origin points.
+    * **Initial Diagnosis**: It was assumed that a small, fixed horizontal offset (`hOffset`) would
+      suffice. This failed spectacularly, producing no visible change. This failure was, in itself,
+      a
+      success: it proved the logical coordinate space was vastly larger than assumed, and that our
+      understanding of scale was flawed.
+    * **The Red Herring of `drawTextOnPath`**: The primary tool, `drawTextOnPath`, was treated as a
+      black box. Its `vOffset` parameter was discovered to be the silent culprit, pushing labels an
+      enormous perpendicular distance away from their intended paths, even when the horizontal
+      offset
+      was small. The realization was that we were trying to finesse a sledgehammer.
+    * **The Refactor That Wasn't**: An attempt to solve the problem by refactoring the
+      `OverlayRenderer` into smaller, more specialized classes was architecturally sound but
+      executed
+      poorly. It severed dependencies and broke the build, proving that a good idea implemented
+      badly
+      is often worse than a bad idea implemented well. The subsequent decision to revert the
+      refactor, fix the build, and *then* re-implement the refactor correctly was a critical lesson
+      in not being afraid to retreat and regroup.
+    * **The Rotational Farce**: A subsequent attempt to use a more "direct" coordinate calculation
+      with `canvas.rotate()` resulted in all labels comically stacking on top of each other,
+      anchored
+      to the wrong point and rotated into nonsense. This was a valuable lesson in humility.
+    * **The Final, Simple Truth**: The solution, as is often the case, was to stop fighting the tool
+      and understand the environment. By returning to `drawTextOnPath` and setting its perpendicular
+      offset (`vOffset`) to zero, we regained control. The horizontal offset (`hOffset`) was then
+      made dynamic—a multiple of the ball's on-screen radius—ensuring the labels now sit a
+      predictable, scalable distance from their origin points.
+
+* **The Great Unraveling (A Refactoring Failure)**: A recent, ambitious effort to decompose the
+  monolithic `MainViewModel` and `MainScreen` serves as a stark warning. The principle was sound:
+  break large components into smaller, single-responsibility units. The execution was a catastrophe.
+  In the process of creating a `StateReducer` and various new composables, the connections between
+  them were not re-established correctly in a single, atomic step. This left the application in a
+  perpetually broken state across several iterations, a testament to the fact that demolition
+  without a clear and immediate reconstruction plan leads only to ruin. **Lesson**: A refactoring is
+  not complete until the system compiles and runs as it did before. It is not a multi-stage process;
+  it is a single, decisive, and fully-tested action.
+
+* **The Heresy of the Domain (A Refactoring Success)**: Out of the ashes of the Great Unraveling
+  came a moment of clarity. An early version of the `StateReducer` contained a dependency on a
+  UI-layer component (`ColorScheme`). This was a violation of clean architecture. The error was
+  identified and corrected by removing the theme-related logic from the domain layer and handling it
+  exclusively in the ViewModel. This solidified the boundary between pure business logic and UI
+  concerns. **Lesson**: The Domain layer must remain pure. It must not know about colors, views, or
+  any other UI-specific constructs.
 
 ## 5. Future Development Plan
 
@@ -155,10 +187,11 @@ The current foundational architecture is designed to support future expansion.
 * **Bank/Kick Shot Calculator**: A virtual table boundary can be added to the Logical Plane. The
   AimingLine can then be reflected off these boundaries to project multi-rail shots.
 * **Object/Table Detection (Computer Vision)**: The ultimate goal.
-   * Use OpenCV or ML Kit to detect the boundaries of the pool table. These screen coordinates can
-     be projected back to the Logical Plane to define the virtual table.
-   * Detect the screen coordinates of the cue ball and object balls. These can be used to
-     automatically place the `ActualCueBall` and `ProtractorUnit` on the Logical Plane, removing the
-     need for manual positioning.
+    * Use OpenCV or ML Kit to detect the boundaries of the pool table. These screen coordinates can
+      be projected back to the Logical Plane to define the virtual table.
+    * Detect the screen coordinates of the cue ball and object balls. These can be used to
+      automatically place the `ActualCueBall` and `ProtractorUnit` on the Logical Plane, removing
+      the
+      need for manual positioning.
 * **"English" / Spin Visualization**: Add UI controls to simulate sidespin, which would alter the
   path of the tangent lines.

@@ -18,7 +18,7 @@ data class OverlayState(
 
     // UI control state
     val zoomSliderPosition: Float = 100f,
-    val areHelpersVisible: Boolean = true,
+    val areHelpersVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
 
     // Sensor and perspective data
@@ -29,7 +29,8 @@ data class OverlayState(
 
     // Derived state
     val isImpossibleShot: Boolean = false,
+    val warningText: String? = null, // Added this property
 
     // Theming
-    val dynamicColorScheme: ColorScheme = darkColorScheme() // Provide a default
+    val dynamicColorScheme: ColorScheme = darkColorScheme()
 )

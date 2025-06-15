@@ -14,8 +14,8 @@ android {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "3.4.3"
+        versionCode = 9
+        versionName = "0.3.44"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -110,6 +110,9 @@ android {
         implementation(libs.androidx.material.icons.extended)
 
     }
+}
+dependencies {
+    implementation(libs.ui)
 }
 
 kapt {
