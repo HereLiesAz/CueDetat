@@ -1,3 +1,4 @@
+// app/src/main/java/com/hereliesaz/cuedetat/ui/composables/MenuBottomSheet.kt
 package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.clickable
@@ -50,6 +51,15 @@ fun MenuBottomSheet(
             text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
             onClick = {
                 onEvent(MainScreenEvent.ToggleHelp)
+                scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+            }
+        )
+        // ADDED: Table Toggle
+        MenuItem(
+            icon = ImageVector.vectorResource(id = R.drawable.ic_table_view_24),
+            text = if (uiState.poolTable == null) "Enable Table" else "Disable Table",
+            onClick = {
+                onEvent(MainScreenEvent.ToggleTable)
                 scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
             }
         )

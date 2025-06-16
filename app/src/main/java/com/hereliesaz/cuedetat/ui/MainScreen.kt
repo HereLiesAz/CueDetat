@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -18,12 +19,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
 import com.hereliesaz.cuedetat.ui.composables.KineticWarningOverlay
 import com.hereliesaz.cuedetat.ui.composables.MenuBottomSheet
 import com.hereliesaz.cuedetat.ui.composables.ResetFab
+import com.hereliesaz.cuedetat.ui.composables.TableControls
 import com.hereliesaz.cuedetat.ui.composables.ToggleCueBallFab
 import com.hereliesaz.cuedetat.ui.composables.TopControls
 import com.hereliesaz.cuedetat.ui.composables.ZoomControls
@@ -48,10 +51,9 @@ fun MainScreen(viewModel: MainViewModel) {
             onActualCueBallMoved =
                 { pos -> viewModel.onEvent(MainScreenEvent.ActualCueBallMoved(pos)) }
             onScale =
-                { scaleFactor -> viewModel.onEvent(MainScreenEvent.ZoomScaleChanged(scaleFactor)) } // CHANGE to this
+                { scaleFactor -> viewModel.onEvent(MainScreenEvent.ZoomScaleChanged(scaleFactor)) }
         }
     }
-
 
     val colorScheme = MaterialTheme.colorScheme
     LaunchedEffect(colorScheme) {
@@ -101,21 +103,41 @@ fun MainScreen(viewModel: MainViewModel) {
                 .zIndex(2f)
         )
 
-        ToggleCueBallFab(
-            uiState = uiState,
-            onEvent = viewModel::onEvent,
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 16.dp)
+                .zIndex(2f)
+        ) {
+            TableControls(
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
+
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .zIndex(2f)
-        )
+        ) {
+            ToggleCueBallFab(
+                uiState = uiState,
+                onEvent = viewModel::onEvent
+            )
+        }
 
-        ResetFab(
-            uiState = uiState,
-            onEvent = viewModel::onEvent,
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .zIndex(2f)
-        )
+        ) {
+            ResetFab(
+                uiState = uiState,
+                onEvent = viewModel::onEvent
+            )
+        }
+
 
         KineticWarningOverlay(
             text = uiState.warningText,

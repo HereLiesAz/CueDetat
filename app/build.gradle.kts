@@ -14,8 +14,8 @@ android {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "0.3.45"
+        versionCode = 11
+        versionName = "0.3.46"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -108,11 +108,10 @@ android {
         debugImplementation(libs.androidx.ui.test.manifest)
         implementation(libs.material)
         implementation(libs.androidx.material.icons.extended)
+        implementation(libs.ui)
 
+        implementation(libs.androidx.datastore.preferences) // Or the latest version
     }
-}
-dependencies {
-    implementation(libs.ui)
 }
 
 kapt {

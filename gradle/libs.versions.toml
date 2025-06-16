@@ -11,6 +11,7 @@ composeBom = "2025.06.00"
 composeVerticalSlider = "0.4.0"
 constraintlayout = "2.2.1"
 coreKtx = "1.16.0"
+datastorePreferences = "1.1.7"
 espresso = "3.6.1"
 glanceAppwidget = "1.2.0-alpha01"
 hiltCompiler = "2.56.2"
@@ -54,6 +55,7 @@ androidx-activity-compose = { group = "androidx.activity", name = "activity-comp
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.16.0" }
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
 androidx-glance = { module = "androidx.glance:glance", version = "1.2.0-alpha01" }
 androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version = "1.2.0-alpha01" }
 androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigationCompose" }

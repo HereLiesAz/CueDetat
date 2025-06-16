@@ -1,3 +1,4 @@
+// app/src/main/java/com/hereliesaz/cuedetat/view/PaintCache.kt
 package com.hereliesaz.cuedetat.view
 
 import android.graphics.Color
@@ -76,6 +77,11 @@ class PaintCache {
         setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, Color.parseColor("#FF5252"))
     }
 
+    // ADDED: Paints for the table
+    val tableRailPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 4f }
+    val tablePocketPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+
 
     fun setTypeface(typeface: Typeface?) {
         cueBallTextPaint.typeface = typeface
@@ -139,5 +145,9 @@ class PaintCache {
             color = colorScheme.onSurface.copy(alpha = 0.7f).toArgb()
             setShadowLayer(1f, 1f, 1f, textShadowColor)
         }
+
+        // ADDED: Table paint colors
+        tableRailPaint.color = colorScheme.outline.copy(alpha = 0.8f).toArgb()
+        tablePocketPaint.color = colorScheme.background.copy(alpha = 0.7f).toArgb()
     }
 }

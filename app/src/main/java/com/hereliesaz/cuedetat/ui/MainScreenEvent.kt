@@ -7,7 +7,7 @@ import androidx.compose.material3.ColorScheme
 sealed class MainScreenEvent {
     data class SizeChanged(val width: Int, val height: Int) : MainScreenEvent()
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
-    data class ZoomScaleChanged(val scaleFactor: Float) : MainScreenEvent() // ADD THIS LINE
+    data class ZoomScaleChanged(val scaleFactor: Float) : MainScreenEvent()
     data class RotationChanged(val newRotation: Float) : MainScreenEvent()
     data class PitchAngleChanged(val pitch: Float) : MainScreenEvent()
     data class UnitMoved(val position: PointF) : MainScreenEvent()
@@ -20,4 +20,10 @@ sealed class MainScreenEvent {
     object ViewArt : MainScreenEvent()
     object SingleEventConsumed : MainScreenEvent()
     object ToastShown : MainScreenEvent()
+
+    // ADDED EVENTS
+    object ToggleTable : MainScreenEvent()
+    object ChangeTableSize : MainScreenEvent()
+    data class RotateTable(val rotation: Float) : MainScreenEvent()
+    data class InitialTableSizeLoaded(val sizeName: String) : MainScreenEvent()
 }

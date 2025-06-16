@@ -1,3 +1,4 @@
+// app/src/main/java/com/hereliesaz/cuedetat/view/renderer/LineRenderer.kt
 package com.hereliesaz.cuedetat.view.renderer
 
 import android.graphics.Canvas
@@ -15,32 +16,31 @@ import kotlin.math.sqrt
 
 class LineRenderer {
     // --- POSITION CONTROL CONSTANTS ---
-    private val SHOT_LINE_LABEL_DISTANCE_FACTOR = 15f
-    private val RIGHT_TANGENT_LABEL_DISTANCE_FACTOR = 7f
-    private val LEFT_TANGENT_LABEL_DISTANCE_FACTOR = 7f
-    private val AIMING_LINE_LABEL_DISTANCE_FACTOR = 10f
-    private val PROTRACTOR_LABEL_DISTANCE_FACTOR = 20f
+    // These are multipliers of the ball's radius
+    private val SHOT_LINE_LABEL_DISTANCE_FACTOR = 1.5f
+    private val TANGENT_LABEL_DISTANCE_FACTOR = 1.5f
+    private val AIMING_LINE_LABEL_DISTANCE_FACTOR = 1.5f
+    private val PROTRACTOR_LABEL_DISTANCE_FACTOR = 1.2f
 
-    // --- ANGLE CONTROL CONSTANTS ---
+    // --- ANGLE CONTROL CONSTANTS (in degrees) ---
     private val SHOT_LINE_LABEL_ANGLE_OFFSET = -2f
     private val RIGHT_TANGENT_LABEL_ANGLE_OFFSET = -5f
     private val LEFT_TANGENT_LABEL_ANGLE_OFFSET = 5f
     private val AIMING_LINE_LABEL_ANGLE_OFFSET = -2f
     private val PROTRACTOR_LABEL_ANGLE_OFFSET = 0f
 
-    // --- ROTATION CONTROL CONSTANTS ---
+    // --- ROTATION CONTROL CONSTANTS (in degrees)---
     private val SHOT_LINE_LABEL_ROTATION = 0f
     private val RIGHT_TANGENT_LABEL_ROTATION = 0f
     private val LEFT_TANGENT_LABEL_ROTATION = 180f
     private val AIMING_LINE_LABEL_ROTATION = 0f
-    private val PROTRACTOR_LABEL_ROTATION = 90f
+    private val PROTRACTOR_LABEL_ROTATION = -90f // Corrected to align with line
 
-    // --- NEW FONT SIZE CONTROL CONSTANTS ---
-    private val SHOT_LINE_LABEL_FONT_SIZE = 38f
-    private val RIGHT_TANGENT_LABEL_FONT_SIZE = 38f
-    private val LEFT_TANGENT_LABEL_FONT_SIZE = 38f
-    private val AIMING_LINE_LABEL_FONT_SIZE = 38f
-    private val PROTRACTOR_LABEL_FONT_SIZE = 42f
+    // --- FONT SIZE CONTROL CONSTANTS (in logical inches) ---
+    private val SHOT_LINE_LABEL_FONT_SIZE = 0.7f
+    private val TANGENT_LABEL_FONT_SIZE = 0.7f
+    private val AIMING_LINE_LABEL_FONT_SIZE = 0.7f
+    private val PROTRACTOR_LABEL_FONT_SIZE = 0.8f
 
 
     private val PROTRACTOR_ANGLES = floatArrayOf(0f, 14f, 30f, 36f, 43f, 48f)
@@ -54,9 +54,13 @@ class LineRenderer {
     ) {
         paints.lineTextPaint.typeface = typeface
         drawShotLine(canvas, state, paints)
+
+        // The rest of the lines are relative to the protractor unit's position and rotation
         canvas.save()
         canvas.translate(state.protractorUnit.center.x, state.protractorUnit.center.y)
         canvas.rotate(state.protractorUnit.rotationDegrees)
+
+        // Get the cue ball's position relative to the target ball (which is now at 0,0)
         val cueBallLocalCenter = state.protractorUnit.protractorCueBallCenter.let {
             val p = PointF(it.x, it.y)
             p.offset(-state.protractorUnit.center.x, -state.protractorUnit.center.y)
@@ -67,6 +71,7 @@ class LineRenderer {
         val cueBallRelativePosition = floatArrayOf(cueBallLocalCenter.x, cueBallLocalCenter.y)
         rotationInvertedMatrix.mapPoints(cueBallRelativePosition)
         val cuePos = PointF(cueBallRelativePosition[0], cueBallRelativePosition[1])
+
         drawTangentLines(canvas, cuePos, paints, state)
         drawProtractorLines(canvas, cuePos, paints, state)
         canvas.restore()
@@ -81,7 +86,7 @@ class LineRenderer {
             if (!state.hasInverseMatrix) return
             val screenAnchor = floatArrayOf(state.viewWidth / 2f, state.viewHeight.toFloat())
             val logicalAnchorArray = FloatArray(2)
-            state.inversePitchMatrix.mapPoints(logicalAnchorArray, screenAnchor)
+            state.screenToWorldMatrix.mapPoints(logicalAnchorArray, screenAnchor)
             PointF(logicalAnchorArray[0], logicalAnchorArray[1])
         }
 
@@ -90,7 +95,7 @@ class LineRenderer {
         val dirY = throughPoint.y - startPoint.y
         val mag = sqrt(dirX * dirX + dirY * dirY)
         if (mag > 0.001f) {
-            val extendFactor = 5000f
+            val extendFactor = 5000f // A very large number to ensure it goes off-screen
             val ndx = dirX / mag
             val ndy = dirY / mag
             val paint =
@@ -108,16 +113,9 @@ class LineRenderer {
                 val labelDistance = state.protractorUnit.radius * SHOT_LINE_LABEL_DISTANCE_FACTOR
                 val lineAngle = getAngle(startPoint, throughPoint)
                 textRenderer.draw(
-                    canvas,
-                    "Shot Line",
-                    throughPoint,
-                    lineAngle,
-                    labelDistance,
-                    SHOT_LINE_LABEL_ANGLE_OFFSET,
-                    SHOT_LINE_LABEL_ROTATION,
-                    textPaint,
-                    SHOT_LINE_LABEL_FONT_SIZE,
-                    state.zoomSliderPosition
+                    canvas, "Shot Line", throughPoint, lineAngle, labelDistance,
+                    SHOT_LINE_LABEL_ANGLE_OFFSET, SHOT_LINE_LABEL_ROTATION, textPaint,
+                    SHOT_LINE_LABEL_FONT_SIZE, state.scale
                 )
             }
         }
@@ -133,7 +131,7 @@ class LineRenderer {
         val dy = 0f - cueLocalPos.y
         val mag = sqrt(dx * dx + dy * dy)
         if (mag > 0.001f) {
-            val extend = state.viewWidth.coerceAtLeast(state.viewHeight) * 1.5f
+            val extend = 5000f
             val dX = -dy / mag
             val dY = dx / mag
 
@@ -158,37 +156,19 @@ class LineRenderer {
                 val textPaintRight = Paint(paints.lineTextPaint).apply { color = rightPaint.color }
                 val textPaintLeft = Paint(paints.lineTextPaint).apply { color = leftPaint.color }
 
-                val rightLabelDistance =
-                    state.protractorUnit.radius * RIGHT_TANGENT_LABEL_DISTANCE_FACTOR
-                val leftLabelDistance =
-                    state.protractorUnit.radius * LEFT_TANGENT_LABEL_DISTANCE_FACTOR
-
+                val labelDistance = state.protractorUnit.radius * TANGENT_LABEL_DISTANCE_FACTOR
                 val rightLineAngle = getAngle(cueLocalPos, rightEndPoint)
                 val leftLineAngle = getAngle(cueLocalPos, leftEndPoint)
 
                 textRenderer.draw(
-                    canvas,
-                    "Tangent Line",
-                    cueLocalPos,
-                    rightLineAngle,
-                    rightLabelDistance,
-                    RIGHT_TANGENT_LABEL_ANGLE_OFFSET,
-                    RIGHT_TANGENT_LABEL_ROTATION,
-                    textPaintRight,
-                    RIGHT_TANGENT_LABEL_FONT_SIZE,
-                    state.zoomSliderPosition
+                    canvas, "Tangent Line", cueLocalPos, rightLineAngle, labelDistance,
+                    RIGHT_TANGENT_LABEL_ANGLE_OFFSET, RIGHT_TANGENT_LABEL_ROTATION, textPaintRight,
+                    TANGENT_LABEL_FONT_SIZE, state.scale
                 )
                 textRenderer.draw(
-                    canvas,
-                    "Tangent Line",
-                    cueLocalPos,
-                    leftLineAngle,
-                    leftLabelDistance,
-                    LEFT_TANGENT_LABEL_ANGLE_OFFSET,
-                    LEFT_TANGENT_LABEL_ROTATION,
-                    textPaintLeft,
-                    LEFT_TANGENT_LABEL_FONT_SIZE,
-                    state.zoomSliderPosition
+                    canvas, "Tangent Line", cueLocalPos, leftLineAngle, labelDistance,
+                    LEFT_TANGENT_LABEL_ANGLE_OFFSET, LEFT_TANGENT_LABEL_ROTATION, textPaintLeft,
+                    TANGENT_LABEL_FONT_SIZE, state.scale
                 )
             }
         }
@@ -200,10 +180,10 @@ class LineRenderer {
         paints: PaintCache,
         state: OverlayState
     ) {
-        val lineLength = 2000f
+        val lineLength = 5000f
         val origin = PointF(0f, 0f)
 
-        // Aiming Line
+        // Aiming Line (from cue ball towards target ball center)
         val aimDirX = 0 - cueLocalPos.x
         val aimDirY = 0 - cueLocalPos.y
         val mag = sqrt(aimDirX * aimDirX + aimDirY * aimDirY)
@@ -225,21 +205,14 @@ class LineRenderer {
                 val labelDistance = state.protractorUnit.radius * AIMING_LINE_LABEL_DISTANCE_FACTOR
                 val lineAngle = getAngle(cueLocalPos, endPoint)
                 textRenderer.draw(
-                    canvas,
-                    "Aiming Line",
-                    cueLocalPos,
-                    lineAngle,
-                    labelDistance,
-                    AIMING_LINE_LABEL_ANGLE_OFFSET,
-                    AIMING_LINE_LABEL_ROTATION,
-                    textPaint,
-                    AIMING_LINE_LABEL_FONT_SIZE,
-                    state.zoomSliderPosition
+                    canvas, "Aiming Line", cueLocalPos, lineAngle, labelDistance,
+                    AIMING_LINE_LABEL_ANGLE_OFFSET, AIMING_LINE_LABEL_ROTATION, textPaint,
+                    AIMING_LINE_LABEL_FONT_SIZE, state.scale
                 )
             }
         }
 
-        // Angle lines
+        // Angle lines from target ball center
         PROTRACTOR_ANGLES.forEach { angle ->
             if (angle == 0f) return@forEach
             val r = Math.toRadians(angle.toDouble())
@@ -265,16 +238,9 @@ class LineRenderer {
                     val lineAngle = getAngle(origin, endPoint)
                     val label = "${angle.toInt()}°"
                     textRenderer.draw(
-                        canvas,
-                        label,
-                        origin,
-                        lineAngle,
-                        labelDistance,
-                        PROTRACTOR_LABEL_ANGLE_OFFSET,
-                        PROTRACTOR_LABEL_ROTATION,
-                        textPaint,
-                        PROTRACTOR_LABEL_FONT_SIZE,
-                        state.zoomSliderPosition
+                        canvas, label, origin, lineAngle, labelDistance,
+                        PROTRACTOR_LABEL_ANGLE_OFFSET, PROTRACTOR_LABEL_ROTATION, textPaint,
+                        PROTRACTOR_LABEL_FONT_SIZE, state.scale
                     )
                 }
             }
