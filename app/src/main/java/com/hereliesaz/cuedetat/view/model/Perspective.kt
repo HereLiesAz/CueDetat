@@ -11,16 +11,25 @@ object Perspective {
 
     /**
      * Creates the 3D transformation matrix that pivots around the center of the view.
+     * An optional lift parameter can be provided to translate the object vertically
+     * in the 3D space before projection.
      */
     fun createPitchMatrix(
         pitchAngle: Float,
         viewWidth: Int,
         viewHeight: Int,
-        camera: Camera
+        camera: Camera,
+        lift: Float = 0f // A positive value lifts the object "up" from the plane
     ): Matrix {
         val matrix = Matrix()
         camera.save()
         camera.setLocation(0f, 0f, -32f) // Move camera back to reduce distortion
+
+        // Apply lift in 3D space. Android's Camera Y-axis is inverted.
+        if (lift != 0f) {
+            camera.translate(0f, lift, 0f)
+        }
+
         camera.rotateX(pitchAngle)
         camera.getMatrix(matrix)
         camera.restore()

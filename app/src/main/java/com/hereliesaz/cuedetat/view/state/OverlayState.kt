@@ -23,9 +23,13 @@ data class OverlayState(
     val isMoreHelpVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
 
+    // New banking mode state
+    val isBankingMode: Boolean = false,
+
     // Sensor and perspective data
     val pitchAngle: Float = 0.0f,
     val pitchMatrix: Matrix = Matrix(),
+    val railPitchMatrix: Matrix = Matrix(), // New matrix for lifted rails
     val inversePitchMatrix: Matrix = Matrix(),
     val hasInverseMatrix: Boolean = false,
 

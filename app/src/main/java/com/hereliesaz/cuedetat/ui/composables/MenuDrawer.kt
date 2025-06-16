@@ -116,7 +116,7 @@ fun MenuDrawerContent(
             icon = Icons.Outlined.ViewInAr,
             text = "Calculate Bank",
             onClick = {
-                onEvent(MainScreenEvent.FeatureComingSoon)
+                onEvent(MainScreenEvent.ToggleBankingMode)
                 onCloseDrawer()
             }
         )

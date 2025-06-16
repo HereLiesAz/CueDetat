@@ -13,6 +13,8 @@ import kotlin.math.min
 
 class StateReducer @Inject constructor() {
 
+    private val tableToBallRatioLong = 88f
+
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         return when (event) {
             is MainScreenEvent.SizeChanged -> {
@@ -86,6 +88,8 @@ class StateReducer @Inject constructor() {
 
             is MainScreenEvent.ToggleActualCueBall -> handleToggleActualCueBall(currentState)
 
+            is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(currentState)
+
             is MainScreenEvent.Reset -> {
                 val newRadius = (min(
                     currentState.viewWidth,
@@ -103,7 +107,8 @@ class StateReducer @Inject constructor() {
                     valuesChangedSinceReset = false,
                     pitchAngle = 0.0f,
                     isMoreHelpVisible = false,
-                    areHelpersVisible = false
+                    areHelpersVisible = false,
+                    isBankingMode = false
                 )
             }
 
@@ -112,6 +117,44 @@ class StateReducer @Inject constructor() {
             else -> currentState
         }
     }
+
+    private fun handleToggleBankingMode(currentState: OverlayState): OverlayState {
+        val bankingEnabled = !currentState.isBankingMode
+
+        if (bankingEnabled) {
+            // --- Auto-zoom logic ---
+            val baseRadiusAtUnitZoom =
+                (min(currentState.viewWidth, currentState.viewHeight) * 0.30f / 2f)
+            val tableLogicalWidth = tableToBallRatioLong * baseRadiusAtUnitZoom
+            // Target the rotated table's logical width to fit into 95% of the screen's height
+            val desiredScreenHeight = currentState.viewHeight * 0.95f
+            val newZoom = (desiredScreenHeight / tableLogicalWidth).coerceIn(
+                ZoomMapping.MIN_ZOOM,
+                ZoomMapping.MAX_ZOOM
+            )
+            val newSliderPos = ZoomMapping.zoomToSlider(newZoom)
+            val newRadius = baseRadiusAtUnitZoom * newZoom
+
+            // --- Centered cue ball logic ---
+            val tableCenter = PointF(currentState.viewWidth / 2f, currentState.viewHeight / 2f)
+            val newActualCueBall = ActualCueBall(
+                center = tableCenter,
+                radius = newRadius
+            )
+
+            return currentState.copy(
+                isBankingMode = true,
+                actualCueBall = newActualCueBall,
+                protractorUnit = currentState.protractorUnit.copy(radius = newRadius),
+                zoomSliderPosition = newSliderPos,
+                warningText = null
+            )
+        } else {
+            // When turning banking mode OFF, just toggle the flag.
+            return currentState.copy(isBankingMode = false)
+        }
+    }
+
 
     private fun handleToggleActualCueBall(currentState: OverlayState): OverlayState {
         return if (currentState.actualCueBall == null) {
