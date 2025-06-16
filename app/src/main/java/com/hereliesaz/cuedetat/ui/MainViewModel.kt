@@ -1,7 +1,9 @@
+// app/src/main/java/com/hereliesaz/cuedetat/ui/MainViewModel.kt
 package com.hereliesaz.cuedetat.ui
 
 import android.app.Application
 import android.graphics.Camera
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.R
@@ -51,6 +53,13 @@ class MainViewModel @Inject constructor(
     }
 
     fun onEvent(event: MainScreenEvent) {
+        // Add logging to see all incoming events
+        if (event is MainScreenEvent.PitchAngleChanged) {
+            // Don't log spammy sensor events
+        } else {
+            Log.d("ZOOM_DEBUG", "ViewModel onEvent: $event")
+        }
+
         when (event) {
             is MainScreenEvent.CheckForUpdate -> checkForUpdate()
             is MainScreenEvent.ViewArt -> _singleEvent.value =

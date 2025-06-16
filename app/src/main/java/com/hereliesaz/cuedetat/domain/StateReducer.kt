@@ -1,6 +1,8 @@
+// app/src/main/java/com/hereliesaz/cuedetat/domain/StateReducer.kt
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
+import android.util.Log
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.ActualCueBall
@@ -19,18 +21,53 @@ class StateReducer @Inject constructor() {
                 else currentState
             }
 
-            is MainScreenEvent.ZoomSliderChanged -> {
-                val newZoom = ZoomMapping.sliderToZoom(event.position)
+            is MainScreenEvent.ZoomScaleChanged -> {
+                val currentZoom = ZoomMapping.sliderToZoom(currentState.zoomSliderPosition)
+                val newZoom = (currentZoom * event.scaleFactor)
+                    .coerceIn(ZoomMapping.MIN_ZOOM, ZoomMapping.MAX_ZOOM)
+                val newSliderPos = ZoomMapping.zoomToSlider(newZoom)
                 val newRadius =
                     (min(currentState.viewWidth, currentState.viewHeight) * 0.30f / 2f) * newZoom
+
+                // Log the inputs and outputs of the calculation
+                Log.d(
+                    "ZOOM_DEBUG",
+                    "Reducer(Scale): currentZoom=${"%.3f".format(currentZoom)}, newZoom=${
+                        "%.3f".format(newZoom)
+                    }, newSliderPos=${"%.2f".format(newSliderPos)}"
+                )
+
                 currentState.copy(
                     protractorUnit = currentState.protractorUnit.copy(radius = newRadius),
                     actualCueBall = currentState.actualCueBall?.copy(radius = newRadius),
-                    zoomSliderPosition = event.position,
+                    zoomSliderPosition = newSliderPos,
                     valuesChangedSinceReset = true
                 )
             }
 
+            is MainScreenEvent.ZoomSliderChanged -> {
+                val newSliderPos = event.position.coerceIn(0f, 100f)
+                val newZoom = ZoomMapping.sliderToZoom(newSliderPos)
+                    .coerceIn(ZoomMapping.MIN_ZOOM, ZoomMapping.MAX_ZOOM)
+                val newRadius =
+                    (min(currentState.viewWidth, currentState.viewHeight) * 0.30f / 2f) * newZoom
+
+                // Log the inputs and outputs of the calculation
+                Log.d(
+                    "ZOOM_DEBUG",
+                    "Reducer(Slider): newZoom=${"%.3f".format(newZoom)}, newSliderPos=${
+                        "%.2f".format(newSliderPos)
+                    }"
+                )
+
+                currentState.copy(
+                    protractorUnit = currentState.protractorUnit.copy(radius = newRadius),
+                    actualCueBall = currentState.actualCueBall?.copy(radius = newRadius),
+                    zoomSliderPosition = newSliderPos,
+                    valuesChangedSinceReset = true
+                )
+            }
+            // ... other cases are unchanged
             is MainScreenEvent.RotationChanged -> {
                 var normAng = event.newRotation % 360f
                 if (normAng < 0) normAng += 360f
@@ -123,7 +160,8 @@ class StateReducer @Inject constructor() {
                 center = PointF(viewWidth / 2f, viewHeight / 2f),
                 radius = radius,
                 rotationDegrees = 0f
-            )
+            ),
+            zoomSliderPosition = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM)
         )
     }
 }

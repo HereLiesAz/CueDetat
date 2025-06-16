@@ -1,3 +1,4 @@
+// app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreenEvent.kt
 package com.hereliesaz.cuedetat.ui
 
 import android.graphics.PointF
@@ -6,6 +7,7 @@ import androidx.compose.material3.ColorScheme
 sealed class MainScreenEvent {
     data class SizeChanged(val width: Int, val height: Int) : MainScreenEvent()
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
+    data class ZoomScaleChanged(val scaleFactor: Float) : MainScreenEvent() // ADD THIS LINE
     data class RotationChanged(val newRotation: Float) : MainScreenEvent()
     data class PitchAngleChanged(val pitch: Float) : MainScreenEvent()
     data class UnitMoved(val position: PointF) : MainScreenEvent()
