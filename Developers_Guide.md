@@ -19,6 +19,7 @@ Perspective Transformation: The process, handled by a single pitchMatrix, of pro
 Logical Plane onto the Screen Plane to create the 3D illusion. Crucially, this transformation must
 always pivot around the absolute center of the view.
 
+<<<<<<< HEAD
 On-Screen Elements:
 
 Protractor Unit: The primary aiming apparatus. It consists of two components that are
@@ -99,3 +100,6 @@ current state is an isImpossibleShot. If it is, a new sarcastic warning is selec
 OverlayState, causing it to appear after the user has committed to their shot. This separates the
 immediate geometric feedback (red lines) from the delayed textual feedback (sarcasm).
 
+=======
+The architecture strictly separates data, logic, and presentation.
+> > > > > > > CueDetat/main
