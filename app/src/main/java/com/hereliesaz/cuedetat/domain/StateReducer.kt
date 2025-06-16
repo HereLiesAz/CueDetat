@@ -2,7 +2,6 @@
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
-import android.util.Log
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.ActualCueBall
@@ -13,6 +12,9 @@ import javax.inject.Inject
 import kotlin.math.min
 
 class StateReducer @Inject constructor() {
+
+    // Re-introducing smoothing to prevent a "snap" at the end of a drag gesture.
+    private val moveSmoothingFactor = 0.5f
 
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         return when (event) {
@@ -29,14 +31,6 @@ class StateReducer @Inject constructor() {
                 val newRadius =
                     (min(currentState.viewWidth, currentState.viewHeight) * 0.30f / 2f) * newZoom
 
-                // Log the inputs and outputs of the calculation
-                Log.d(
-                    "ZOOM_DEBUG",
-                    "Reducer(Scale): currentZoom=${"%.3f".format(currentZoom)}, newZoom=${
-                        "%.3f".format(newZoom)
-                    }, newSliderPos=${"%.2f".format(newSliderPos)}"
-                )
-
                 currentState.copy(
                     protractorUnit = currentState.protractorUnit.copy(radius = newRadius),
                     actualCueBall = currentState.actualCueBall?.copy(radius = newRadius),
@@ -52,14 +46,6 @@ class StateReducer @Inject constructor() {
                 val newRadius =
                     (min(currentState.viewWidth, currentState.viewHeight) * 0.30f / 2f) * newZoom
 
-                // Log the inputs and outputs of the calculation
-                Log.d(
-                    "ZOOM_DEBUG",
-                    "Reducer(Slider): newZoom=${"%.3f".format(newZoom)}, newSliderPos=${
-                        "%.2f".format(newSliderPos)
-                    }"
-                )
-
                 currentState.copy(
                     protractorUnit = currentState.protractorUnit.copy(radius = newRadius),
                     actualCueBall = currentState.actualCueBall?.copy(radius = newRadius),
@@ -67,7 +53,7 @@ class StateReducer @Inject constructor() {
                     valuesChangedSinceReset = true
                 )
             }
-            // ... other cases are unchanged
+
             is MainScreenEvent.RotationChanged -> {
                 var normAng = event.newRotation % 360f
                 if (normAng < 0) normAng += 360f
@@ -78,29 +64,39 @@ class StateReducer @Inject constructor() {
             }
 
             is MainScreenEvent.PitchAngleChanged -> currentState.copy(pitchAngle = event.pitch)
+
             is MainScreenEvent.UnitMoved -> {
                 if (currentState.hasInverseMatrix) {
-                    val logicalPos =
+                    val newTarget =
                         Perspective.screenToLogical(event.position, currentState.inversePitchMatrix)
+                    val oldCenter = currentState.protractorUnit.center
+                    val smoothedX = oldCenter.x + moveSmoothingFactor * (newTarget.x - oldCenter.x)
+                    val smoothedY = oldCenter.y + moveSmoothingFactor * (newTarget.y - oldCenter.y)
+                    val smoothedCenter = PointF(smoothedX, smoothedY)
                     currentState.copy(
-                        protractorUnit = currentState.protractorUnit.copy(center = logicalPos),
+                        protractorUnit = currentState.protractorUnit.copy(center = smoothedCenter),
                         valuesChangedSinceReset = true
                     )
                 } else currentState
             }
 
             is MainScreenEvent.ActualCueBallMoved -> {
-                currentState.copy(
-                    actualCueBall = currentState.actualCueBall?.copy(center = event.position)
-                        ?: ActualCueBall(
-                            center = event.position,
-                            radius = currentState.protractorUnit.radius
-                        ),
-                    valuesChangedSinceReset = true
-                )
+                if (currentState.hasInverseMatrix && currentState.actualCueBall != null) {
+                    val newTarget =
+                        Perspective.screenToLogical(event.position, currentState.inversePitchMatrix)
+                    val oldCenter = currentState.actualCueBall.center
+                    val smoothedX = oldCenter.x + moveSmoothingFactor * (newTarget.x - oldCenter.x)
+                    val smoothedY = oldCenter.y + moveSmoothingFactor * (newTarget.y - oldCenter.y)
+                    val smoothedCenter = PointF(smoothedX, smoothedY)
+                    currentState.copy(
+                        actualCueBall = currentState.actualCueBall.copy(center = smoothedCenter),
+                        valuesChangedSinceReset = true
+                    )
+                } else currentState
             }
 
             is MainScreenEvent.ToggleActualCueBall -> handleToggleActualCueBall(currentState)
+
             is MainScreenEvent.Reset -> {
                 val newRadius = (min(
                     currentState.viewWidth,
