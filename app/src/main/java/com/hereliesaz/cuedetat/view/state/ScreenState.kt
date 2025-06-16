@@ -7,4 +7,5 @@ sealed class ToastMessage {
 
 sealed class SingleEvent {
     data class OpenUrl(val url: String) : SingleEvent()
+    object ShowDonationDialog : SingleEvent()
 }

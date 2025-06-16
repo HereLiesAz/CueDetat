@@ -3,7 +3,6 @@ package com.hereliesaz.cuedetat.ui
 
 import android.app.Application
 import android.graphics.Camera
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.R
@@ -53,45 +52,47 @@ class MainViewModel @Inject constructor(
     }
 
     fun onEvent(event: MainScreenEvent) {
-        // Add logging to see all incoming events
-        if (event is MainScreenEvent.PitchAngleChanged) {
-            // Don't log spammy sensor events
-        } else {
-            Log.d("ZOOM_DEBUG", "ViewModel onEvent: $event")
-        }
-
         when (event) {
             is MainScreenEvent.CheckForUpdate -> checkForUpdate()
             is MainScreenEvent.ViewArt -> _singleEvent.value =
                 SingleEvent.OpenUrl("https://instagram.com/hereliesaz")
+            is MainScreenEvent.ShowDonationOptions -> _singleEvent.value =
+                SingleEvent.ShowDonationDialog
+
+            is MainScreenEvent.FeatureComingSoon -> _toastMessage.value =
+                ToastMessage.PlainText("Feature coming soon!")
 
             is MainScreenEvent.SingleEventConsumed -> _singleEvent.value = null
             is MainScreenEvent.ToastShown -> _toastMessage.value = null
-            is MainScreenEvent.ThemeChanged -> _uiState.value =
-                _uiState.value.copy(dynamicColorScheme = event.scheme)
 
-            else -> updateState(event)
+            is MainScreenEvent.ThemeChanged -> {
+                _uiState.value = _uiState.value.copy(dynamicColorScheme = event.scheme)
+            }
+
+            is MainScreenEvent.GestureStarted -> {
+                _uiState.value = _uiState.value.copy(warningText = null)
+            }
+
+            is MainScreenEvent.GestureEnded -> {
+                if (_uiState.value.isImpossibleShot) {
+                    val nextWarning = insultingWarnings[warningIndex]
+                    warningIndex = (warningIndex + 1) % insultingWarnings.size
+                    _uiState.value = _uiState.value.copy(warningText = nextWarning)
+                }
+            }
+
+            else -> updateContinuousState(event)
         }
     }
 
-    private fun updateState(event: MainScreenEvent) {
+    private fun updateContinuousState(event: MainScreenEvent) {
         val oldState = _uiState.value
         val updatedState = stateReducer.reduce(oldState, event)
-        var finalState = updateStateUseCase(updatedState, graphicsCamera)
-
-        if (finalState.isImpossibleShot) {
-            val text = if (!oldState.isImpossibleShot) {
-                val nextWarning = insultingWarnings[warningIndex]
-                warningIndex = (warningIndex + 1) % insultingWarnings.size
-                nextWarning
-            } else {
-                oldState.warningText ?: insultingWarnings[warningIndex]
-            }
-            finalState = finalState.copy(warningText = text)
-        } else {
-            finalState = finalState.copy(warningText = null)
-        }
-        _uiState.value = finalState
+        val finalState = updateStateUseCase(updatedState, graphicsCamera)
+        // Preserve the warning text during continuous updates
+        val warningText =
+            if (oldState.warningText != null && finalState.isImpossibleShot) oldState.warningText else null
+        _uiState.value = finalState.copy(warningText = warningText)
     }
 
     private fun checkForUpdate() {

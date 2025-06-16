@@ -11,9 +11,9 @@
       "type": "SINGLE",
       "filters": [],
       "attributes": [],
-      "versionCode": 10,
-      "versionName": "0.3.45",
-      "outputFile": "CueDetat-0.3.45-release.apk"
+      "versionCode": 11,
+      "versionName": "0.3.46",
+      "outputFile": "CueDetat-0.3.46-release.apk"
     }
   ],
   "elementType": "File",
@@ -22,14 +22,14 @@
       "minApi": 28,
       "maxApi": 30,
       "baselineProfiles": [
-        "baselineProfiles/1/CueDetat-0.3.45-release.dm"
+        "baselineProfiles/1/CueDetat-0.3.46-release.dm"
       ]
     },
     {
       "minApi": 31,
       "maxApi": 2147483647,
       "baselineProfiles": [
-        "baselineProfiles/0/CueDetat-0.3.45-release.dm"
+        "baselineProfiles/0/CueDetat-0.3.46-release.dm"
       ]
     }
   ],

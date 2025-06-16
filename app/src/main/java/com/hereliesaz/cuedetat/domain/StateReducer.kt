@@ -2,7 +2,6 @@
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
-import android.util.Log
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.ActualCueBall
@@ -29,14 +28,6 @@ class StateReducer @Inject constructor() {
                 val newRadius =
                     (min(currentState.viewWidth, currentState.viewHeight) * 0.30f / 2f) * newZoom
 
-                // Log the inputs and outputs of the calculation
-                Log.d(
-                    "ZOOM_DEBUG",
-                    "Reducer(Scale): currentZoom=${"%.3f".format(currentZoom)}, newZoom=${
-                        "%.3f".format(newZoom)
-                    }, newSliderPos=${"%.2f".format(newSliderPos)}"
-                )
-
                 currentState.copy(
                     protractorUnit = currentState.protractorUnit.copy(radius = newRadius),
                     actualCueBall = currentState.actualCueBall?.copy(radius = newRadius),
@@ -52,14 +43,6 @@ class StateReducer @Inject constructor() {
                 val newRadius =
                     (min(currentState.viewWidth, currentState.viewHeight) * 0.30f / 2f) * newZoom
 
-                // Log the inputs and outputs of the calculation
-                Log.d(
-                    "ZOOM_DEBUG",
-                    "Reducer(Slider): newZoom=${"%.3f".format(newZoom)}, newSliderPos=${
-                        "%.2f".format(newSliderPos)
-                    }"
-                )
-
                 currentState.copy(
                     protractorUnit = currentState.protractorUnit.copy(radius = newRadius),
                     actualCueBall = currentState.actualCueBall?.copy(radius = newRadius),
@@ -67,7 +50,7 @@ class StateReducer @Inject constructor() {
                     valuesChangedSinceReset = true
                 )
             }
-            // ... other cases are unchanged
+
             is MainScreenEvent.RotationChanged -> {
                 var normAng = event.newRotation % 360f
                 if (normAng < 0) normAng += 360f
@@ -78,29 +61,31 @@ class StateReducer @Inject constructor() {
             }
 
             is MainScreenEvent.PitchAngleChanged -> currentState.copy(pitchAngle = event.pitch)
+
             is MainScreenEvent.UnitMoved -> {
                 if (currentState.hasInverseMatrix) {
-                    val logicalPos =
+                    val newTarget =
                         Perspective.screenToLogical(event.position, currentState.inversePitchMatrix)
                     currentState.copy(
-                        protractorUnit = currentState.protractorUnit.copy(center = logicalPos),
+                        protractorUnit = currentState.protractorUnit.copy(center = newTarget),
                         valuesChangedSinceReset = true
                     )
                 } else currentState
             }
 
             is MainScreenEvent.ActualCueBallMoved -> {
-                currentState.copy(
-                    actualCueBall = currentState.actualCueBall?.copy(center = event.position)
-                        ?: ActualCueBall(
-                            center = event.position,
-                            radius = currentState.protractorUnit.radius
-                        ),
-                    valuesChangedSinceReset = true
-                )
+                if (currentState.hasInverseMatrix && currentState.actualCueBall != null) {
+                    val newTarget =
+                        Perspective.screenToLogical(event.position, currentState.inversePitchMatrix)
+                    currentState.copy(
+                        actualCueBall = currentState.actualCueBall.copy(center = newTarget),
+                        valuesChangedSinceReset = true
+                    )
+                } else currentState
             }
 
             is MainScreenEvent.ToggleActualCueBall -> handleToggleActualCueBall(currentState)
+
             is MainScreenEvent.Reset -> {
                 val newRadius = (min(
                     currentState.viewWidth,
@@ -116,11 +101,14 @@ class StateReducer @Inject constructor() {
                     actualCueBall = updatedActualCueBall,
                     zoomSliderPosition = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM),
                     valuesChangedSinceReset = false,
-                    pitchAngle = 0.0f
+                    pitchAngle = 0.0f,
+                    isMoreHelpVisible = false,
+                    areHelpersVisible = false
                 )
             }
 
             is MainScreenEvent.ToggleHelp -> currentState.copy(areHelpersVisible = !currentState.areHelpersVisible)
+            is MainScreenEvent.ToggleMoreHelp -> currentState.copy(isMoreHelpVisible = !currentState.isMoreHelpVisible)
             else -> currentState
         }
     }

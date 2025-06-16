@@ -20,6 +20,7 @@ data class OverlayState(
     // UI control state
     val zoomSliderPosition: Float = 100f, // REVERTED to original value
     val areHelpersVisible: Boolean = false,
+    val isMoreHelpVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
 
     // Sensor and perspective data
