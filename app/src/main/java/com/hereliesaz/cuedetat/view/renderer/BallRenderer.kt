@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/view/renderer/BallRenderer.kt
 package com.hereliesaz.cuedetat.view.renderer
 
 import android.graphics.Canvas
@@ -70,8 +69,7 @@ class BallRenderer {
 
         state.actualCueBall?.let {
             val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(it, state)
-            val screenBasePos =
-                DrawingUtils.mapPoint(it.center, state.worldToScreenMatrix) // Use correct matrix
+            val screenBasePos = DrawingUtils.mapPoint(it.center, state.pitchMatrix)
             val ghostCenterY = screenBasePos.y - radiusInfo.lift
             canvas.drawCircle(
                 screenBasePos.x,
@@ -83,7 +81,7 @@ class BallRenderer {
                 textRenderer.draw(
                     canvas,
                     paints.actualCueBallTextPaint,
-                    state.scale, // Use scale
+                    state.zoomSliderPosition,
                     screenBasePos.x,
                     ghostCenterY,
                     radiusInfo.radius,
@@ -98,15 +96,9 @@ class BallRenderer {
             override val radius = state.protractorUnit.radius
         }, state)
 
-        val pTGC = DrawingUtils.mapPoint(
-            state.protractorUnit.center,
-            state.worldToScreenMatrix
-        ) // Use correct matrix
+        val pTGC = DrawingUtils.mapPoint(state.protractorUnit.center, state.pitchMatrix)
         val pCGC =
-            DrawingUtils.mapPoint(
-                state.protractorUnit.protractorCueBallCenter,
-                state.worldToScreenMatrix
-            ) // Use correct matrix
+            DrawingUtils.mapPoint(state.protractorUnit.protractorCueBallCenter, state.pitchMatrix)
 
         val targetGhostCenterY = pTGC.y - targetRadiusInfo.lift
         val cueGhostCenterY = pCGC.y - cueRadiusInfo.lift
@@ -125,7 +117,7 @@ class BallRenderer {
             textRenderer.draw(
                 canvas,
                 paints.targetBallTextPaint,
-                state.scale, // Use scale
+                state.zoomSliderPosition,
                 pTGC.x,
                 targetGhostCenterY,
                 targetRadiusInfo.radius,
@@ -134,7 +126,7 @@ class BallRenderer {
             textRenderer.draw(
                 canvas,
                 paints.cueBallTextPaint,
-                state.scale, // Use scale
+                state.zoomSliderPosition,
                 pCGC.x,
                 cueGhostCenterY,
                 cueRadiusInfo.radius,

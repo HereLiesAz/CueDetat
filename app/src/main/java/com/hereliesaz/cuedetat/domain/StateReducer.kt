@@ -7,9 +7,7 @@ import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.ActualCueBall
 import com.hereliesaz.cuedetat.view.model.Perspective
-import com.hereliesaz.cuedetat.view.model.PoolTable
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
-import com.hereliesaz.cuedetat.view.model.TableSize
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import kotlin.math.min
@@ -31,6 +29,7 @@ class StateReducer @Inject constructor() {
                 val newRadius =
                     (min(currentState.viewWidth, currentState.viewHeight) * 0.30f / 2f) * newZoom
 
+                // Log the inputs and outputs of the calculation
                 Log.d(
                     "ZOOM_DEBUG",
                     "Reducer(Scale): currentZoom=${"%.3f".format(currentZoom)}, newZoom=${
@@ -53,6 +52,7 @@ class StateReducer @Inject constructor() {
                 val newRadius =
                     (min(currentState.viewWidth, currentState.viewHeight) * 0.30f / 2f) * newZoom
 
+                // Log the inputs and outputs of the calculation
                 Log.d(
                     "ZOOM_DEBUG",
                     "Reducer(Slider): newZoom=${"%.3f".format(newZoom)}, newSliderPos=${
@@ -67,6 +67,7 @@ class StateReducer @Inject constructor() {
                     valuesChangedSinceReset = true
                 )
             }
+            // ... other cases are unchanged
             is MainScreenEvent.RotationChanged -> {
                 var normAng = event.newRotation % 360f
                 if (normAng < 0) normAng += 360f
@@ -77,7 +78,6 @@ class StateReducer @Inject constructor() {
             }
 
             is MainScreenEvent.PitchAngleChanged -> currentState.copy(pitchAngle = event.pitch)
-
             is MainScreenEvent.UnitMoved -> {
                 if (currentState.hasInverseMatrix) {
                     val logicalPos =
@@ -116,58 +116,11 @@ class StateReducer @Inject constructor() {
                     actualCueBall = updatedActualCueBall,
                     zoomSliderPosition = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM),
                     valuesChangedSinceReset = false,
-                    pitchAngle = 0.0f,
-                    tableRotation = 0f // Reset table rotation as well
+                    pitchAngle = 0.0f
                 )
             }
 
             is MainScreenEvent.ToggleHelp -> currentState.copy(areHelpersVisible = !currentState.areHelpersVisible)
-
-            // ADDED: Table logic
-            is MainScreenEvent.InitialTableSizeLoaded -> {
-                val size = try {
-                    TableSize.valueOf(event.sizeName)
-                } catch (e: Exception) {
-                    TableSize.SEVEN_FOOT
-                }
-                currentState.copy(
-                    poolTable = currentState.poolTable?.copy(size = size)
-                )
-            }
-
-            is MainScreenEvent.ToggleTable -> {
-                if (currentState.poolTable == null) {
-                    val center = if (currentState.hasInverseMatrix) {
-                        Perspective.screenToLogical(
-                            PointF(
-                                currentState.viewWidth / 2f,
-                                currentState.viewHeight / 2f
-                            ), currentState.inversePitchMatrix
-                        )
-                    } else {
-                        PointF(currentState.viewWidth / 2f, currentState.viewHeight / 2f)
-                    }
-                    currentState.copy(poolTable = PoolTable(center = center))
-                } else {
-                    currentState.copy(poolTable = null)
-                }
-            }
-
-            is MainScreenEvent.ChangeTableSize -> {
-                currentState.copy(
-                    poolTable = currentState.poolTable?.copy(
-                        size = currentState.poolTable.size.getNext()
-                    )
-                )
-            }
-
-            is MainScreenEvent.RotateTable -> {
-                currentState.copy(
-                    tableRotation = event.rotation,
-                    poolTable = currentState.poolTable?.copy(rotationDegrees = event.rotation)
-                )
-            }
-
             else -> currentState
         }
     }

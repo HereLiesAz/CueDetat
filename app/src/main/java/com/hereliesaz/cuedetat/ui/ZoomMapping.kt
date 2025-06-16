@@ -4,31 +4,30 @@ package com.hereliesaz.cuedetat.ui
 import kotlin.math.ln
 import kotlin.math.pow
 
-/**
- * Maps the linear 0-100 slider position to a nonlinear scale factor for zooming.
- * This provides finer control at higher zoom levels.
- */
 internal object ZoomMapping {
-    // Defines the effective zoom range. A scale of 1.0 means 1 logical inch = 1 pixel.
-    const val MIN_SCALE = 5f   // Most zoomed out
-    const val DEFAULT_SCALE = 20f
-    const val MAX_SCALE = 100f  // Most zoomed in
+    // --- Master Zoom Controls ---
+    const val MIN_ZOOM = 0.084f // Changed from 0.05f to limit max zoom-out
+    const val DEFAULT_ZOOM = 0.4f
+    const val MAX_ZOOM = 0.6f
+    // ----------------------------
 
     // This constant determines the curve of the exponential zoom.
-    // It is calculated to map the slider's 0-100 range precisely to the MIN_SCALE-MAX_SCALE range.
-    private val B = (MAX_SCALE / MIN_SCALE).pow(0.01f)
+    // It is calculated to map the slider's 0-100 range precisely to the MIN_ZOOM-MAX_ZOOM range.
+    // Formula: B = (MAX_ZOOM / MIN_ZOOM) ^ (1 / 100)
+    private val B = (MAX_ZOOM / MIN_ZOOM).pow(0.01f)
 
     /**
-     * Converts a slider position (0f-100f) to an exponential scale factor.
+     * Converts a slider position (0f-100f) to an exponential zoom factor.
      */
-    fun sliderToScale(sliderValue: Float): Float = MIN_SCALE * B.pow(sliderValue)
+    fun sliderToZoom(sliderValue: Float): Float = MIN_ZOOM * B.pow(sliderValue)
 
     /**
-     * Converts a scale factor back to its corresponding slider position (0f-100f).
+     * Converts a zoom factor back to its corresponding slider position (0f-100f).
      */
-    fun scaleToSlider(scaleFactor: Float): Float {
-        val clampedScale = scaleFactor.coerceIn(MIN_SCALE, MAX_SCALE)
-        // Formula: sliderValue = log(scaleFactor / MIN_SCALE) / log(B)
-        return (ln(clampedScale / MIN_SCALE) / ln(B))
+    fun zoomToSlider(zoomFactor: Float): Float {
+        if (zoomFactor <= MIN_ZOOM) return 0f
+        if (zoomFactor >= MAX_ZOOM) return 100f
+        // Formula: sliderValue = log(zoomFactor / MIN_ZOOM) / log(B)
+        return (ln(zoomFactor / MIN_ZOOM) / ln(B))
     }
 }

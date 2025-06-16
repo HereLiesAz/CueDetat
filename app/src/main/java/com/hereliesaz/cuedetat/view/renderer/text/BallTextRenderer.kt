@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/view/renderer/text/BallTextRenderer.kt
 package com.hereliesaz.cuedetat.view.renderer.text
 
 import android.graphics.Canvas
@@ -7,30 +6,27 @@ import com.hereliesaz.cuedetat.ui.ZoomMapping
 
 class BallTextRenderer {
 
-    private val baseGhostBallTextSize = 2f // Base size in logical units (inches)
-    private val minGhostBallTextSize = 1f  // Min size in logical units
-    private val maxGhostBallTextSize = 4f  // Max size in logical units
+    private val baseGhostBallTextSize = 42f
+    private val minGhostBallTextSize = 20f
+    private val maxGhostBallTextSize = 80f
 
     fun draw(
         canvas: Canvas,
         paint: Paint,
-        currentScale: Float,
+        zoomSliderPosition: Float,
         x: Float,
         y: Float,
         radius: Float,
         text: String
     ) {
-        // Text size is now relative to the world scale
-        val scaleFactor = currentScale / ZoomMapping.DEFAULT_SCALE
-        val logicalTextSize = (baseGhostBallTextSize * scaleFactor).coerceIn(
+        val zoomFactor = ZoomMapping.sliderToZoom(zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM
+        val currentTextSize = (baseGhostBallTextSize * zoomFactor).coerceIn(
             minGhostBallTextSize,
             maxGhostBallTextSize
         )
-        // Convert logical text size to screen text size
-        paint.textSize = logicalTextSize * currentScale
-
+        paint.textSize = currentTextSize
         val textMetrics = paint.fontMetrics
-        val textPadding = 5f * scaleFactor.coerceAtLeast(0.5f)
+        val textPadding = 5f * zoomFactor.coerceAtLeast(0.5f)
         val visualTop = y - radius
         val baseline = visualTop - textPadding - textMetrics.descent
         canvas.drawText(text, x, baseline, paint)

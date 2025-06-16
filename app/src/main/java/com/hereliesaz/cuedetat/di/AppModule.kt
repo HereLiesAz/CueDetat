@@ -1,13 +1,9 @@
-// app/src/main/java/com/hereliesaz/cuedetat/di/AppModule.kt
 package com.hereliesaz.cuedetat.di
 
-import android.content.Context
-import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.network.GithubApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -25,11 +21,5 @@ object AppModule {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(GithubApi::class.java)
-    }
-
-    @Provides
-    @Singleton
-    fun provideUserPreferencesRepository(@ApplicationContext context: Context): UserPreferencesRepository {
-        return UserPreferencesRepository(context)
     }
 }

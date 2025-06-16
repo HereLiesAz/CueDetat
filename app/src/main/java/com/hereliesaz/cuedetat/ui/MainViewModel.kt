@@ -10,17 +10,14 @@ import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.UpdateChecker
 import com.hereliesaz.cuedetat.data.UpdateResult
-import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.domain.StateReducer
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
-import com.hereliesaz.cuedetat.view.model.TableSize
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SingleEvent
 import com.hereliesaz.cuedetat.view.state.ToastMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -32,8 +29,7 @@ class MainViewModel @Inject constructor(
     private val updateChecker: UpdateChecker,
     private val application: Application,
     private val updateStateUseCase: UpdateStateUseCase,
-    private val stateReducer: StateReducer,
-    private val userPreferencesRepository: UserPreferencesRepository
+    private val stateReducer: StateReducer
 ) : ViewModel() {
 
     private val graphicsCamera = Camera()
@@ -51,24 +47,19 @@ class MainViewModel @Inject constructor(
     val singleEvent = _singleEvent.asStateFlow()
 
     init {
-        // Start listening to sensors
         sensorRepository.pitchAngleFlow
             .onEach { onEvent(MainScreenEvent.PitchAngleChanged(it)) }
             .launchIn(viewModelScope)
-
-        // Load user preferences
-        viewModelScope.launch {
-            val initialSize = userPreferencesRepository.tableSize.first()
-            onEvent(MainScreenEvent.InitialTableSizeLoaded(initialSize.name))
-        }
     }
 
     fun onEvent(event: MainScreenEvent) {
-        if (event !is MainScreenEvent.PitchAngleChanged) {
-            Log.d("EVENT_DEBUG", "ViewModel onEvent: $event")
+        // Add logging to see all incoming events
+        if (event is MainScreenEvent.PitchAngleChanged) {
+            // Don't log spammy sensor events
+        } else {
+            Log.d("ZOOM_DEBUG", "ViewModel onEvent: $event")
         }
 
-        // Handle side-effects and one-off events first
         when (event) {
             is MainScreenEvent.CheckForUpdate -> checkForUpdate()
             is MainScreenEvent.ViewArt -> _singleEvent.value =
@@ -78,13 +69,7 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.ToastShown -> _toastMessage.value = null
             is MainScreenEvent.ThemeChanged -> _uiState.value =
                 _uiState.value.copy(dynamicColorScheme = event.scheme)
-            is MainScreenEvent.ChangeTableSize -> {
-                viewModelScope.launch {
-                    val nextSize = _uiState.value.poolTable?.size?.getNext() ?: TableSize.SEVEN_FOOT
-                    userPreferencesRepository.saveTableSize(nextSize)
-                }
-                updateState(event) // Also update the state
-            }
+
             else -> updateState(event)
         }
     }

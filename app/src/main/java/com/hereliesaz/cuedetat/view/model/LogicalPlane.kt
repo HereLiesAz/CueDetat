@@ -1,11 +1,6 @@
-// app/src/main/java/com/hereliesaz/cuedetat/view/model/LogicalPlane.kt
 package com.hereliesaz.cuedetat.view.model
 
 import android.graphics.PointF
-
-// A standard billiard ball is 2.25 inches in diameter.
-const val STANDARD_BALL_DIAMETER = 2.25f
-const val STANDARD_BALL_RADIUS = STANDARD_BALL_DIAMETER / 2f
 
 /**
  * Represents an object with a position and radius on the logical 2D plane.
@@ -21,9 +16,8 @@ interface ILogicalBall {
  */
 data class ProtractorUnit(
     override val center: PointF,
-    val rotationDegrees: Float,
-    // Radius is now constant based on real-world dimensions
-    override val radius: Float = STANDARD_BALL_RADIUS
+    override val radius: Float,
+    val rotationDegrees: Float
 ) : ILogicalBall {
 
     /**
@@ -45,6 +39,5 @@ data class ProtractorUnit(
  */
 data class ActualCueBall(
     override val center: PointF,
-    // Radius is now constant based on real-world dimensions
-    override val radius: Float = STANDARD_BALL_RADIUS
+    override val radius: Float
 ) : ILogicalBall

@@ -1,4 +1,4 @@
-// app/src/main/java/com/hereliesaz/cuedetat/view/state/OverlayState.kt
+// hereliesaz/cued8at/CueD8at-66142b655f7e247d83b8004a442ad41e04dd6348/app/src/main/java/com/hereliesaz/cuedetat/view/state/OverlayState.kt
 package com.hereliesaz.cuedetat.view.state
 
 import android.graphics.Matrix
@@ -6,7 +6,6 @@ import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import com.hereliesaz.cuedetat.view.model.ActualCueBall
-import com.hereliesaz.cuedetat.view.model.PoolTable
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 
 data class OverlayState(
@@ -17,11 +16,9 @@ data class OverlayState(
     // Core logical model
     val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), 1f, 0f),
     val actualCueBall: ActualCueBall? = null,
-    val poolTable: PoolTable? = null,
-    val tableRotation: Float = 0f,
 
     // UI control state
-    val zoomSliderPosition: Float = 100f,
+    val zoomSliderPosition: Float = 100f, // REVERTED to original value
     val areHelpersVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
 

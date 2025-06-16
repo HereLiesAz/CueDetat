@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/view/renderer/util/DrawingUtils.kt
 package com.hereliesaz.cuedetat.view.renderer.util
 
 import android.graphics.Matrix
@@ -18,12 +17,11 @@ object DrawingUtils {
         ball: ILogicalBall,
         state: OverlayState
     ): PerspectiveRadiusInfo {
-        if (!state.hasInverseMatrix) return PerspectiveRadiusInfo(ball.radius * state.scale, 0f)
+        if (!state.hasInverseMatrix) return PerspectiveRadiusInfo(ball.radius, 0f)
 
-        // Use the new worldToScreenMatrix
-        val screenCenter = mapPoint(ball.center, state.worldToScreenMatrix)
+        val screenCenter = mapPoint(ball.center, state.pitchMatrix)
         val logicalHorizontalEdge = PointF(ball.center.x + ball.radius, ball.center.y)
-        val screenHorizontalEdge = mapPoint(logicalHorizontalEdge, state.worldToScreenMatrix)
+        val screenHorizontalEdge = mapPoint(logicalHorizontalEdge, state.pitchMatrix)
         val radiusOnScreen = distance(screenCenter, screenHorizontalEdge)
         val lift = radiusOnScreen * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
         return PerspectiveRadiusInfo(radiusOnScreen, lift)
