@@ -74,7 +74,7 @@ class MainViewModel @Inject constructor(
             }
 
             is MainScreenEvent.GestureEnded -> {
-                if (_uiState.value.isImpossibleShot) {
+                if (!_uiState.value.isBankingMode && _uiState.value.isImpossibleShot) {
                     val nextWarning = insultingWarnings[warningIndex]
                     warningIndex = (warningIndex + 1) % insultingWarnings.size
                     _uiState.value = _uiState.value.copy(warningText = nextWarning)

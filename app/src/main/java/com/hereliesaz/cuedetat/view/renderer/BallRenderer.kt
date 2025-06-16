@@ -25,6 +25,8 @@ class BallRenderer {
             )
         }
 
+        if (state.isBankingMode) return // Don't draw the protractor unit in banking mode
+
         canvas.save()
         canvas.translate(state.protractorUnit.center.x, state.protractorUnit.center.y)
         canvas.rotate(state.protractorUnit.rotationDegrees)
@@ -89,6 +91,8 @@ class BallRenderer {
                 )
             }
         }
+
+        if (state.isBankingMode) return // Don't draw ghost balls for the protractor unit
 
         val targetRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(state.protractorUnit, state)
         val cueRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(object : ILogicalBall {

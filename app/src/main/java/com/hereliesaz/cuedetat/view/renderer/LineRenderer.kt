@@ -54,6 +54,9 @@ class LineRenderer {
     ) {
         paints.lineTextPaint.typeface = typeface
         drawShotLine(canvas, state, paints)
+
+        if (state.isBankingMode) return // Don't draw protractor lines in banking mode
+
         canvas.save()
         canvas.translate(state.protractorUnit.center.x, state.protractorUnit.center.y)
         canvas.rotate(state.protractorUnit.rotationDegrees)

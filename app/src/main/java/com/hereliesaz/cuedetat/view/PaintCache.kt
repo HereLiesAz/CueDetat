@@ -6,11 +6,17 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.toArgb
+import com.hereliesaz.cuedetat.ui.theme.TargetAcid
 
 class PaintCache {
     private val GLOW_RADIUS_FIXED = 8f
     private var glowColor: Int = Color.argb(100, 255, 196, 0)
     private var textShadowColor: Int = Color.argb(180, 0, 0, 0)
+
+    val tableOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 4f
+    }
 
     val targetCirclePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 5f }
@@ -88,6 +94,12 @@ class PaintCache {
     fun updateColors(colorScheme: ColorScheme) {
         glowColor = colorScheme.primary.copy(alpha = 0.4f).toArgb()
         textShadowColor = colorScheme.background.copy(alpha = 0.6f).toArgb()
+
+        tableOutlinePaint.apply {
+            color = TargetAcid.toArgb()
+            val glow = TargetAcid.copy(alpha = 0.6f).toArgb()
+            setShadowLayer(GLOW_RADIUS_FIXED, 0f, 0f, glow)
+        }
 
         targetCirclePaint.color = colorScheme.primary.toArgb()
         cueCirclePaint.color = colorScheme.tertiary.toArgb()
