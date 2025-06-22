@@ -7,20 +7,7 @@ plugins {
 }
 
 android {
-    signingConfigs {
-        getByName("debug") {
-            storeFile = file("G:\\My Drive\\az_apk_keystore.jks")
-            storePassword = "18187077190901818"
-            keyAlias = "key0"
-            keyPassword = "18187077190901818"
-        }
-        create("release") {
-            storeFile = file("G:\\My Drive\\az_apk_keystore.jks")
-            storePassword = "18187077190901818"
-            keyPassword = "18187077190901818"
-            keyAlias = "key0"
-        }
-    }
+
     namespace = "com.hereliesaz.cuedetat"
     compileSdk = 36
 
@@ -52,6 +39,28 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = false
             multiDexEnabled = true
+        }
+    }
+    signingConfigs {
+        create("release") { // It's good practice to use create for release if it's not already defined elsewhere
+            val userHome = System.getProperty("user.home")
+            val tmpFilePath = "$userHome/work/_temp/keystore/"
+            val tmpDir = File(tmpFilePath)
+            val allFilesFromDir = tmpDir.listFiles()
+
+            if (allFilesFromDir != null && allFilesFromDir.isNotEmpty()) {
+                val keystoreFile = allFilesFromDir.first()
+                val destinationDir = File(project.projectDir, "keystore")
+                if (!destinationDir.exists()) {
+                    destinationDir.mkdirs()
+                }
+                keystoreFile.renameTo(File(destinationDir, "your_keystore.jks"))
+            }
+
+            storeFile = file("keystore/your_keystore.jks")
+            storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+            keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+            keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
         }
     }
 
