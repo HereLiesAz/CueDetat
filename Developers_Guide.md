@@ -7,7 +7,6 @@ accordingly with ANYTHING that will be useful to the next AI in the next chat.
 NEVER change what is written here, only add to it. Always include anything that you note to yourself as a matter of clarification.
 
 ## 1. Core Concepts & Official Terminology
-
 A precise vocabulary is critical. The following terms are to be used exclusively.
 
 * **Logical Plane:** An abstract, infinite 2D coordinate system (like graph paper) where all aiming
@@ -28,16 +27,21 @@ A precise vocabulary is critical. The following terms are to be used exclusively
 
     * **Protractor Unit (Protractor Mode Only):** The primary aiming apparatus for cut shots.
         * **Target Ball (Protractor):** The logical and visual center of the `ProtractorUnit`. Its
-          logical position is fixed at the view's center. Its logical radius is set by Global Zoom.
-        * **Ghost Cue Ball (Protractor):** The second ball in the `ProtractorUnit`. Its logical
-          position is derived from the Target Ball's position plus the user-controlled rotation
-          angle. Its logical radius is the same as the Target Ball's.
-          Both are rendered with a "lifted" 3D ghost effect.
+          logical position is fixed at the view's center (`state.protractorUnit.center`). Its
+          logical radius is set by Global Zoom (`state.protractorUnit.radius`).
+        * **Ghost Cue Ball (Protractor):** The second ball in the `ProtractorUnit`. Its *absolute
+          logical position* (`state.protractorUnit.protractorCueBallCenter`) is calculated by the
+          `ProtractorUnit` class based on the Target Ball's center, the unit's radius, and
+          `state.protractorUnit.rotationDegrees`. Its logical radius is the same as the Target
+          Ball's.
+          Both Target and Ghost Cue Ball have a 2D logical representation (drawn by
+          `BallRenderer.drawLogicalBalls`) and a 3D screen-space "ghost" effect (drawn by
+          `BallRenderer.drawScreenSpaceBalls` with lift).
     * **ActualCueBall:** A user-draggable logical ball.
         * **In Protractor Mode (Optional):** Can be toggled by the user. Used for visualizing shots
           originating from a specific point (e.g., jump shots). Rendered with a "lifted" 3D ghost
           effect.
-          Its logical radius is set by Global Zoom.
+          Its logical radius (`state.actualCueBall.radius`) is set by Global Zoom.
         * **In Banking Mode (Mandatory, becomes the "Banking Ball"):** Always visible and represents
           the
           cue ball on the table. Its logical radius is set by Global Zoom. Rendered *on* the table
@@ -47,26 +51,29 @@ A precise vocabulary is critical. The following terms are to be used exclusively
       pockets, and diamonds.
         * Logically anchored at the view's center (`viewWidth/2, viewHeight/2`).
         * Its logical scale is determined by `tableToBallRatio * ActualCueBall.radius` (where
-          `ActualCueBall.radius` is the current Global Zoom-scaled radius).
+          `ActualCueBall.radius` is the current Global Zoom-scaled radius when in banking mode).
         * The table surface is rendered on the `pitchMatrix`. Rails are rendered on the
-          `railPitchMatrix`
-          (which includes calculated lift).
+          `railPitchMatrix`.
         * Can be rotated by the user via `tableRotationDegrees`.
     * **Lines:**
-        * **Protractor Shot Line (Protractor Mode):** From `ActualCueBall` (if visible, else a
-          default
-          screen anchor) through the `ProtractorUnit.GhostCueBall`.
-        * **Aiming Line (Protractor Mode):** From `ProtractorUnit.GhostCueBall` through
-          `ProtractorUnit.TargetBall`.
-        * **Tangent Lines & Angle Lines (Protractor Mode):** Relative to the `ProtractorUnit`.
+        * **Protractor Shot Line (Protractor Mode):** From `ActualCueBall.center` (if visible, else
+          a default
+          screen anchor's logical projection) through the `ProtractorUnit.GhostCueBall`'s absolute
+          logical center. Drawn in absolute logical coordinates.
+        * **Aiming Line (Protractor Mode):** From `ProtractorUnit.GhostCueBall`'s local position
+          through `ProtractorUnit.TargetBall`'s local position (which is 0,0 in the transformed
+          canvas). Drawn relative to the transformed ProtractorUnit canvas.
+        * **Tangent Lines & Angle Lines (Protractor Mode):** Relative to the transformed
+          ProtractorUnit canvas, originating from the Ghost Cue Ball's local position or Target
+          Ball's local position respectively.
         * **Banking Shot Line (Banking Mode):** From `ActualCueBall.center` (the "Banking Ball")
           towards
-          `bankingAimTarget`, with reflections off logical table boundaries.
+          `bankingAimTarget`, with reflections off logical table boundaries. Drawn in absolute
+          logical coordinates.
 
 ## 2. Architectural Model & File Structure
 
 The architecture strictly separates data, logic, and presentation.
-
 com/hereliesaz/cuedetat/
 ├── view/
 │ ├── model/
@@ -93,171 +100,222 @@ matrices).
 ├── MainScreen.kt // The main Composable screen, assembles components.
 └── MainScreenEvent.kt // Defines all possible user interactions.
 
-**The Golden Rule**: The `ViewModel` handles event dispatch and conversion (e.g., screen to logical
-coordinates). The `StateReducer` is the only component that can create or modify the `OverlayState`
-based on processed events. The `View` and `Renderer` components are "dumb" components that only
-receive state and display it. `UpdateStateUseCase` calculates derived state like matrices.
+**The Golden Rule**: ViewModel orchestrates. StateReducer computes state. UpdateStateUseCase
+computes derived state. Renderers display.
 
 ## 3. Rendering Pipeline (Conceptual)
 
-To avoid rendering artifacts, the following order of operations is conceptually followed:
+To avoid rendering artifacts and ensure correct transformations, the following conceptual order is
+maintained:
 
-1. **ViewModel**: Orchestrates event handling. For position-based events, converts screen
-   coordinates to logical coordinates and dispatches new internal events to the `StateReducer`.
-2. **StateReducer**: Receives events (including internal logical position events) and computes a new
-   `OverlayState`. This includes updating logical positions and radii based on Global Zoom.
-3. **UpdateStateUseCase**: Takes the new `OverlayState` and calculates derived properties like
-   `pitchMatrix`, `railPitchMatrix`, `inversePitchMatrix`, and `isImpossibleShot`. Returns the
-   updated `OverlayState`.
-4. **ViewModel**: Emits the final `OverlayState` to the UI.
+1. **ViewModel**: Orchestrates event handling. For position-based events from
+   `ProtractorOverlayView` (which are in screen coordinates), it uses `Perspective.screenToLogical`
+   with the `inversePitchMatrix` to convert them to logical coordinates and then dispatches new
+   internal `UpdateLogical...` events to the `StateReducer`.
+2. **StateReducer**: Receives all `MainScreenEvent` types (including internal logical position
+   events) and computes a new `OverlayState`. This state contains all fundamental logical
+   properties: positions, radii (derived from Global Zoom), rotations, mode flags, and
+   theme/luminance choices for drawn elements.
+3. **UpdateStateUseCase**: Takes the new `OverlayState` from the reducer. It calculates derived
+   geometric properties essential for rendering, primarily:
+    * `pitchMatrix`: The main perspective transformation matrix based on `pitchAngle`, view
+      dimensions, and potentially table rotation (if in banking mode).
+    * `railPitchMatrix`: A separate perspective matrix for banking mode rails, incorporating a
+      calculated "lift" based on table dimensions.
+    * `inversePitchMatrix`: The inverse of `pitchMatrix`, used by the ViewModel for
+      screen-to-logical conversions.
+    * `hasInverseMatrix`: A flag indicating if `pitchMatrix` was invertible.
+    * `isImpossibleShot`: A boolean flag for protractor mode aiming.
+      It returns the `OverlayState` augmented with these calculated matrices and flags.
+4. **ViewModel**: Receives the fully processed `OverlayState` (with matrices) from
+   `UpdateStateUseCase` and emits it to the UI (`MainScreen`). It also handles discrete events like
+   showing dialogs or navigating. The `appControlColorScheme` in `OverlayState` is updated here
+   based on the `MaterialTheme.colorScheme` from `MainScreen`.
 5. **Renderer (`ProtractorOverlayView` via `OverlayRenderer`):**
     * Receives the final `OverlayState`.
-    * **Banking Mode Specifics:**
-        * `canvas.concat(state.pitchMatrix)`: Applies perspective for table surface and Banking
-          Ball.
-        * `TableRenderer.draw()`: Draws table surface and pockets.
-        * `LineRenderer.drawLogicalLines()`: Draws Banking Shot Line (with reflections).
-        * `BallRenderer.drawLogicalBalls()`: Draws logical representation of Banking Ball.
-        * `canvas.restore()`
+    * `PaintCache.updateColors()` is called (from `MainScreen`'s `AndroidView.update` lambda),
+      passing the `OverlayState` (for `isForceLightMode`, `luminanceAdjustment`) and `systemIsDark`
+      status. This configures all `Paint` objects for the custom drawing.
+    * **`OverlayRenderer.draw()`:**
         * `canvas.save()`
-        * `canvas.concat(state.railPitchMatrix)`: Applies perspective for lifted rails.
-        * `RailRenderer.draw()`: Draws rails and diamonds.
-        * `canvas.restore()`
-    * **Protractor Mode Specifics:**
-        * `canvas.concat(state.pitchMatrix)`: Applies perspective for all logical elements.
-        * `LineRenderer.drawLogicalLines()`: Draws Protractor Shot Line, Tangent Lines, Protractor
-          Aiming and Angle Lines.
-        * `BallRenderer.drawLogicalBalls()`: Draws logical representations of `ProtractorUnit` and
-          optional `ActualCueBall`.
-        * `canvas.restore()`
-    * **Screen Space Elements (for both modes, if applicable):**
-        * `BallRenderer.drawScreenSpaceBalls()`: Draws the 3D "ghost" effect for `ActualCueBall` (in
-          banking mode, this is the primary visual of the ball on the table; in protractor mode, for
-          the optional `ActualCueBall` and `ProtractorUnit` components). This method internally uses
-          `state.pitchMatrix` to project logical centers and determine visual radii appropriately
-          for each mode.
+        * `canvas.concat(state.pitchMatrix)`: Applies the primary perspective transformation to the
+          canvas. All subsequent "logical" drawing happens on this transformed canvas.
+        * **Logical Elements Drawing (on `pitchMatrix`-transformed canvas):**
+            * `BallRenderer.drawLogicalBalls()`:
+                * Draws `ActualCueBall` (if any) at its absolute logical coordinates (
+                  `state.actualCueBall.center`).
+                * **Protractor Mode:** Draws `ProtractorUnit.TargetBall` at its absolute logical
+                  center (`state.protractorUnit.center`). Draws `ProtractorUnit.GhostCueBall` at its
+                  absolute logical center (`state.protractorUnit.protractorCueBallCenter`). No local
+                  canvas transforms (translate/rotate) are used *within this method* for these
+                  protractor components; they rely on their pre-calculated absolute logical
+                  positions.
+                * **Banking Mode:** Only `ActualCueBall` (as Banking Ball) is drawn by this method,
+                  using its absolute logical coordinates.
+            * `LineRenderer.drawLogicalLines()`:
+                * **Protractor Mode:**
+                    * `ProtractorShotLine`: Drawn using absolute logical coordinates (from
+                      `ActualCueBall` or anchor, to `ProtractorUnit.GhostCueBall.center`).
+                    * For Tangent Lines, Protractor Aiming Line, and Angle Lines: `LineRenderer`
+                      performs a *local* `canvas.save()`, then `canvas.translate()` to the
+                      `ProtractorUnit.TargetBall`'s logical center, then `canvas.rotate()` by
+                      `ProtractorUnit.rotationDegrees`. Lines are then drawn using coordinates
+                      *relative to this local, rotated system* (e.g., Ghost Cue Ball is at
+                      `(0, 2*radius)` in this local unrotated frame before the canvas rotation takes
+                      effect). `canvas.restore()` is called afterwards.
+                * **Banking Mode:** `BankingShotLine` (with reflections) is drawn using absolute
+                  logical coordinates for the `ActualCueBall` (Banking Ball) and `bankingAimTarget`.
+                  Table boundaries for reflection are also calculated in logical space.
+            * `TableRenderer.draw()` (Banking Mode Only): Draws table surface and pockets at their
+              logical positions (centered in the view).
+        * `canvas.restore()` (from the initial `concat(state.pitchMatrix)`)
+        * **Lifted Rails (Banking Mode Only):**
+            * `canvas.save()`
+            * `canvas.concat(state.railPitchMatrix)`: Applies the rail-specific perspective (with
+              lift).
+            * `RailRenderer.draw()`: Draws rails and diamonds at their logical positions (centered
+              with the table).
+            * `canvas.restore()`
+        * **Screen Space Elements (3D "Ghosts" - drawn last, directly on screen canvas, no further
+          matrix concat by `OverlayRenderer`):**
+            * `BallRenderer.drawScreenSpaceBalls()`: This method internally uses `state.pitchMatrix`
+              to project the *logical centers* of balls to get their *screen anchor positions*. It
+              then applies "lift" (for protractor ghosts) or calculates perspective-correct visual
+              radii.
+                * **Protractor Mode:** Renders 3D ghosts for `ProtractorUnit.TargetBall`,
+                  `ProtractorUnit.GhostCueBall`, and the optional `ActualCueBall`.
+                * **Banking Mode:** Renders the 3D ghost for `ActualCueBall` (the Banking Ball),
+                  ensuring it appears *on* the table surface (no Y-lift for its center) and its
+                  visual size is stable during tilt/rotation (see point L below).
 
-## 4. Key Implementation Learnings & Mandates
+## 4. Core Operational Modes & Entity Behavior
 
-This section captures critical design decisions and implementation details that have been clarified
-through development iterations. Adherence to these points is mandatory to prevent regressions.
+The application operates in two distinct modes: Protractor Mode and Banking Mode. The
+`ActualCueBall` entity behaves differently depending on the active mode. The table itself (in
+banking mode) is always logically anchored at the center of the view.
 
-* **A. Operational Modes: Protractor vs. Banking**
-  The application has two mutually exclusive primary modes:
-    * Protractor Mode: The default mode. `ProtractorUnit` (Target Ball, Ghost Cue Ball), its
-      associated lines (Aiming, Tangent, Angle), and an optional user-draggable `ActualCueBall` are
-      active.
-    * Banking Mode: Activated by the menu. The `ProtractorUnit` is hidden. A wireframe pool table (
-      surface, rails, pockets, diamonds) is displayed, logically anchored at the view center. The
-      `ActualCueBall` becomes the "Banking Ball," which is always visible and user-draggable on the
-      table plane. The table can be rotated by the user.
-* **B. State Transition for Banking Mode**
-  Entering/Exiting Banking Mode is handled by `StateReducer.ToggleBankingMode`:
-    * **Entering:** `isBankingMode = true`. `ActualCueBall` ("Banking Ball") is created/reset to the
-      logical view center. A "fit table to screen" zoom is calculated, setting the global
-      `zoomSliderPosition`, which then determines the logical radius for `ActualCueBall` and
-      `ProtractorUnit` (even if hidden). `bankingAimTarget` is initialized. `tableRotationDegrees`
-      is reset to 0.
-    * **Exiting:** `isBankingMode = false`. `bankingAimTarget` is cleared. `ActualCueBall` is
-      typically cleared (user can re-toggle if needed for protractor mode). Zoom resets to default.
-* **C. Rendering of Lifted 3D Objects (Rails)**
-  To create the illusion of an object being "lifted" above the logical plane (e.g., the pool table
-  rails in banking mode), a dedicated perspective matrix (`railPitchMatrix`) MUST be used.
-    * The `OverlayState` contains both a base `pitchMatrix` and a separate `railPitchMatrix`.
-    * The `railPitchMatrix` is generated in `UpdateStateUseCase` by calling
-      `Perspective.createPitchMatrix` and passing a positive floating-point value to the `lift`
-      parameter. The `lift` amount is calculated proportionally to the table's logical dimensions (
-      derived from `ActualCueBall.radius` in banking mode).
-    * The Android Camera's Y-axis is inverted; therefore, to lift an object "up" (closer to the
-      viewer), a POSITIVE Y translation must be applied within the `Perspective` helper:
-      `camera.translate(0f, lift, 0f)`.
-    * `RailRenderer` draws rail primitives on the canvas transformed by `railPitchMatrix`. The
-      rails' logical size and position are determined relative to the table's playing surface
-      *before* this lift matrix is applied.
-* **D. Rendering of Rotated Objects (The Table)**
-  The user-controlled table rotation (`tableRotationDegrees`) in Banking Mode is applied to both
-  `pitchMatrix` and `railPitchMatrix` via `matrix.preRotate(...)` in `UpdateStateUseCase`. This
-  rotation occurs around the view's logical center *after* the initial 90-degree banking mode
-  rotation but *before* the final perspective projection. Renderers themselves should not apply 2D
-  rotations for the table itself.
-* **E. Table and Rail Rendering (Primitives)**
-  Previously, SVG assets were considered for complex shapes. However, for the banking mode table and
-  rails, rendering is now done using primitive shapes (stroked rectangles for the table surface,
-  stroked lines for rails, stroked circles for pockets and diamonds). This is handled by
-  `TableRenderer` and `RailRenderer`.
-* **F. Table Rotation in Banking Mode**
-  When in Banking Mode, the user can rotate the displayed table using a horizontal slider.
-    * State: `OverlayState.tableRotationDegrees`.
-    * Event: `MainScreenEvent.TableRotationChanged` updates this state.
-    * Logic: The `StateReducer` handles the event and resets `tableRotationDegrees` to 0 when
-      Banking Mode is entered or when a full view reset occurs.
-    * Rendering: `UpdateStateUseCase` applies this rotation via `preRotate(...)` to `pitchMatrix`
-      and `railPitchMatrix`.
-* **G. ActualCueBall Sizing in Banking Mode (Key for Tilt/Rotation Stability)**
-  When `isBankingMode` is true, the visual screen-space radius of the `ActualCueBall` (the "Banking
-  Ball") must accurately reflect its logical size (determined by global zoom) as viewed on the
-  tilted/rotated table plane.
-    * Its logical position (`actualCueBall.center`) is user-draggable and is not affected by phone
-      tilt.
-    * Its logical radius (`actualCueBall.radius`) is solely determined by the global zoom level set
-      in `StateReducer`.
-    * In `BallRenderer.drawScreenSpaceBalls`:
-        * The on-screen Y-coordinate (`effectiveCenterY`) is the direct projection of the
-          `ActualCueBall`'s logical center using the `pitchMatrix`. No additional "lift" is applied
-          to its Y-position.
-        * The on-screen visual radius (`visualRadiusOnScreen`) is determined by:
-            1. Taking two logical points representing a horizontal diameter of the ball *at its
-               current logical center* (e.g., `logicalCenter.x ± logicalRadius, logicalCenter.y`).
-            2. Projecting these two logical points to screen space using the current
-               `state.pitchMatrix`.
-            3. The screen distance between these projected points, halved, gives the
-               `visualRadiusOnScreen`.
-        * This method ensures the ball's visual size accurately reflects perspective foreshortening
-          based on the full transformation of the plane it resides on (including tilt and table
-          rotation), using its zoom-defined logical radius as the basis.
-* **H. Conditional UI in Banking Mode**
-    * The "Toggle Actual Cue Ball" FAB is hidden (the Banking Ball is always active).
-    * The "Calculate Bank" menu item text changes to "Back to the Balls."
-* **I. Cue Ball Zoom Behavior in Banking Mode**
-  When zooming while in Banking Mode, the `ActualCueBall` ("Banking Ball") must appear to stay fixed
-  relative to the table's surface.
-    * `StateReducer` handles zoom events. If `isBankingMode`, `actualCueBall.center` (logical) is
-      adjusted by scaling its vector from the view's logical center (zoom pivot) by the inverse of
-      the zoom factor change.
-* **J. Touch Handling and Pinch-to-Zoom (`ProtractorOverlayView`)**
-    * `ScaleGestureDetector.onTouchEvent(event)` is always called.
-    * The `ScaleGestureDetector.SimpleOnScaleGestureListener`'s `onScaleBegin` method sets
-      `interactionMode = SCALING` and manages a `gestureInProgress` flag to coordinate with
-      single-touch gesture detection.
-    * Single-touch gesture determination (in `determineSingleTouchMode` called on `ACTION_DOWN`)
-      only proceeds if `interactionMode` is not already `SCALING`.
-    * Touch slop for moving the `ActualCueBall` (especially in banking mode) is increased for better
-      usability.
-* **K. (Formerly L) Visual Sizing of Objects on a Projected Plane (Banking Ball Case Study -
-  Summarized by G)**
-  The successful approach for the Banking Ball's visual size stability during tilt/rotation relies
-  on projecting the ball's *logical diameter* (which is only affected by global zoom) onto the
-  screen using the complete `pitchMatrix`. The length of this projected diameter determines the
-  visual screen diameter. This directly ties its apparent size to how its constant logical size is
-  transformed by the current perspective of the plane it's on.
+### 4.1. Protractor Mode
 
-* **On Impossible Shots (Protractor Mode):** The sole trigger for a warning event is comparing the
-  distance from the player's perspective point (A: `ActualCueBall` if visible, else screen
-  bottom-center anchor) to the `ProtractorUnit.GhostCueBall` (G) and the
-  `ProtractorUnit.TargetBall` (T). Impossible if A-G > A-T.
-* **The Overhead Anomaly (Protractor Ghosts):** Lift for protractor ghost balls is
-  `radius * sin(pitch)` to ensure concentricity at 0° pitch.
-* **State-Driven UI Consistency:** Flags like `areHelpersVisible` drive multiple UI parts.
+* **`ProtractorUnit`**:
+    * Comprises a `TargetBall` (logical center) and a `GhostCueBall`.
+    * The `ProtractorUnit.center` is fixed at the logical view center. Its logical radius is
+      determined by Global Zoom.
+    * `ProtractorUnit.rotationDegrees` is user-controlled.
+    * The `ProtractorUnit.GhostCueBall.center` (absolute logical) is calculated by `ProtractorUnit`
+      based on its center, radius, and rotation.
+    * Visuals: Both components have a 2D logical representation and a 3D screen-space "ghost" effect
+      with lift.
+* **`ActualCueBall` (Optional in Protractor Mode)**:
+    * Toggled by the user. Logical center is user-draggable. Logical radius by Global Zoom.
+    * Visuals: Rendered with a "lifted" 3D ghost effect.
+* **Lines**:
+    * `ProtractorShotLine`: From `ActualCueBall.center` (if visible, else default anchor) to
+      `ProtractorUnit.GhostCueBall.center`.
+    * `AimingLine`, `TangentLines`, `AngleLines`: Drawn relative to the `ProtractorUnit`'s local
+      coordinate system (see Rendering Pipeline and Point M).
 
-## 5. Future Development Plan (Renumbered from old Section 5)
+### 4.2. Banking Mode (`isBankingMode = true`)
+
+* **Table Visuals**:
+    * Logically anchored at the view center. Scale relative to `ActualCueBall.radius` (Global Zoom).
+    * Rotated by `tableRotationDegrees`. Surface on `pitchMatrix`, rails on `railPitchMatrix`.
+* **`ActualCueBall` (Serves as the "Banking Ball")**:
+    * Always present. Logical center is user-draggable. Logical radius by Global Zoom.
+    * Visuals: Position projected by `pitchMatrix`. Visual size stable during tilt/rotation (see
+      Point L). Rendered *on* the plane.
+* **`bankingAimTarget`**: Logical point set by user drag.
+* **"Banking Shot Line"**: From `ActualCueBall.center` to `bankingAimTarget`, with reflections.
+* **Protractor Unit and its lines are NOT drawn.**
+
+### 4.3. Global Zoom and Radii
+
+* `zoomSliderPosition` controls Global Zoom via `ZoomMapping`.
+* `StateReducer.getCurrentLogicalRadius()` calculates the *logical radius* for `ProtractorUnit` and
+  `ActualCueBall` based on Global Zoom and view dimensions, ensuring consistent logical sizing.
+
+## 5. Key Implementation Learnings & Mandates (Chronological where possible)
+
+* **A. Unidirectional Data Flow**: `ViewModel` orchestrates, `StateReducer` computes `OverlayState`,
+  `UpdateStateUseCase` computes derived matrices/flags, `Renderers` display. State is the single
+  source of truth.
+* **B. Coordinate Systems**: Precision is vital. `ProtractorOverlayView` sends screen coords;
+  `ViewModel` converts to logical using `inversePitchMatrix`; `StateReducer` works with logical;
+  `Renderers` use `pitchMatrix` to project logical to screen.
+* **C. Impossible Shots (Protractor Mode)**: Distance check: A (anchor) to G (GhostCue) vs. A to T (
+  TargetBall). Impossible if A-G > A-T.
+* **D. Overhead Anomaly (Protractor Ghosts Lift)**: Lift for protractor ghosts is
+  `radius * sin(pitch)` for concentricity at 0° pitch.
+* **E. State-Driven UI Consistency**: Flags like `areHelpersVisible` drive multiple UI parts (
+  overlay text, FAB appearance, etc.).
+* **F. Label Placement**: `LineTextRenderer` uses dynamic offsets (multiples of ball radius) for
+  consistent label distance from lines across zoom levels.
+* **G. Domain Layer Purity**: `StateReducer` and `UpdateStateUseCase` must not depend on UI-layer
+  components (e.g., `ColorScheme` objects). Theme/luminance choices for *drawn elements* are flags
+  in `OverlayState`, interpreted by `PaintCache`.
+* **H. Zoom Functionality (Pinch & Slider)**:
+    * `ProtractorOverlayView` uses `ScaleGestureDetector`. Raw `scaleFactor` sent via
+      `ZoomScaleChanged` event.
+    * `StateReducer` applies this factor to the current zoom (derived from `zoomSliderPosition`),
+      clamps to `MIN/MAX_ZOOM`, and updates `zoomSliderPosition`. It also updates logical radii of
+      all elements.
+    * **Banking Mode Zoom Anchor**: To keep the `ActualCueBall` (Banking Ball) fixed relative to the
+      *table center* during zoom, `StateReducer` scales the vector from the view center to the
+      ball's center by the inverse of the zoom change.
+* **I. Rendering of Lifted 3D Objects (Rails)**: `railPitchMatrix` uses a `lift` proportional to
+  table's logical dimensions (derived via `ActualCueBall.radius` in banking mode). `RailRenderer`
+  draws rails in their correct logical size/position on this lifted matrix.
+* **J. Rendering of Rotated Objects (Table)**: `tableRotationDegrees` is applied via `preRotate` to
+  `pitchMatrix` and `railPitchMatrix` in `UpdateStateUseCase`, pivoting around view center.
+* **K. Table and Rail Rendering (Primitives)**: Banking mode table/rails are drawn using primitive
+  stroked shapes by `TableRenderer` and `RailRenderer`.
+* **L. Visual Sizing of Banking Ball (Tilt/Rotation Stability):**
+  To ensure the `ActualCueBall` (as "Banking Ball") in Banking Mode has a visual size primarily
+  driven by global zoom and natural perspective, without erratic resizing during pure phone tilt or
+  table rotation:
+    * Its logical radius (`actualCueBall.radius`) is solely determined by global zoom (via
+      `StateReducer`).
+    * Its logical center (`actualCueBall.center`) is user-draggable and fixed during tilt/rotation.
+    * In `BallRenderer.drawScreenSpaceBalls` (banking mode):
+        1. The ball's screen-projected center (`screenProjectedCenter`) is found using
+           `pitchMatrix`.
+        2. Its visual screen radius (`visualRadiusOnScreen`) is determined by:
+            * Defining two logical points representing a horizontal diameter of the ball *at its
+              current logical center* (e.g., `logicalCenter.x ± logicalRadius, logicalCenter.y`).
+            * Projecting these two logical points to screen space using the current
+              `state.pitchMatrix`.
+            * The screen distance between these projected points, halved, gives the
+              `visualRadiusOnScreen`.
+        3. This method directly measures how the ball's logical diameter appears on screen under the
+           full current perspective (tilt, table rotation, zoom via logical radius).
+* **M. Protractor Unit 2D Logical Drawing (Rotation Fix):**
+  To prevent "double rotation" of the 2D logical `ProtractorUnit.GhostCueBall`:
+    * **`BallRenderer.drawLogicalBalls` (Protractor Mode):** Draws `ProtractorUnit.TargetBall` and
+      `ProtractorUnit.GhostCueBall` using their *absolute logical coordinates* (
+      `state.protractorUnit.center` and `state.protractorUnit.protractorCueBallCenter` respectively)
+      directly onto the main canvas (already transformed by `state.pitchMatrix`). No local canvas
+      rotation is applied *by BallRenderer* for these.
+    * **`LineRenderer.drawLogicalLines` (Protractor Mode for Tangent/Aiming/Angle lines):** Uses a
+      *local* `canvas.save/translate(to_TargetBall_center)/rotate(by_ProtractorUnit_rotation)`.
+      Lines are then drawn using coordinates *relative to this local, rotated system*, with the
+      Ghost Cue Ball's position calculated as its *unrotated* offset from the Target Ball (e.g.,
+      `PointF(0, 2 * radius)`). The canvas rotation orients these correctly.
+* **N. Theme Control for Drawn Elements vs. App UI:**
+    * The app's Material Theme (menus, sliders, etc.) follows system dark/light (via
+      `CueDetatTheme`). This is stored in `OverlayState.appControlColorScheme`.
+    * Colors of custom-drawn elements (`ProtractorOverlayView`) are controlled by `PaintCache`.
+      `PaintCache.updateColors()` uses `uiState.isForceLightMode`, `uiState.luminanceAdjustment`,
+      and `systemIsDark` status to modify colors from its internal light/dark palettes for `Paint`
+      objects.
+
+## 6. Future Development Plan
 
 * **Bank/Kick Shot Calculator (Refinement):**
-    * Improve reflection logic in `LineRenderer` for multi-rail shots (currently supports up to 2
-      banks).
+    * Improve reflection logic in `LineRenderer` for more than 2 banks.
     * Consider pocket geometry for line termination/success.
-* **Object/Table Detection (Computer Vision):** The ultimate goal.
+* **Object/Table Detection (Computer Vision):**
     * Use OpenCV or ML Kit to detect table boundaries and ball positions.
-    * Project screen coordinates to Logical Plane to auto-place `ActualCueBall` and potentially
-      align `ProtractorUnit`.
+    * Project screen coordinates to Logical Plane to auto-place `ActualCueBall`.
 * **"English" / Spin Visualization:** Add UI controls to simulate sidespin, altering tangent lines
   or shot paths.
+* **Tutorial Enhancements:** Make the tutorial more interactive, highlighting UI elements
+  corresponding to the current step.
