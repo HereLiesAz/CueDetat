@@ -10,6 +10,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect // For initial theme dispatch
+import androidx.compose.material3.MaterialTheme // For getting current theme
+// import androidx.compose.runtime.collectAsState // No longer needed here for theme
+// import androidx.compose.runtime.getValue // No longer needed here for theme
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
@@ -31,7 +35,11 @@ class MainActivity : ComponentActivity() {
     private val requestCameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             if (isGranted) {
-                recreate()
+                if (findViewById<android.view.ViewGroup>(android.R.id.content).childCount == 0) {
+                    setContent { AppContent(viewModel) }
+                }
+            } else {
+                // TODO: Handle permission denial gracefully (e.g., show a message)
             }
         }
 
@@ -41,12 +49,11 @@ class MainActivity : ComponentActivity() {
 
         if (hasCameraPermission()) {
             setContent {
-                AppContent()
+                AppContent(viewModel)
             }
         } else {
             requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
-
         observeSingleEvents()
     }
 
@@ -58,13 +65,11 @@ class MainActivity : ComponentActivity() {
                     startActivity(intent)
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
-
                 is SingleEvent.ShowDonationDialog -> {
                     showDonationDialog()
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
-                null -> {
-                    // Do nothing
+                null -> { /* Do nothing */
                 }
             }
         }.launchIn(lifecycleScope)
@@ -77,13 +82,11 @@ class MainActivity : ComponentActivity() {
             "https://venmo.com/u/hereliesaz",
             "https://cash.app/\$azcamehere"
         )
-
         MaterialAlertDialogBuilder(this)
             .setTitle("Chalk Your Tip")
             .setItems(items) { _, which ->
                 if (which < urls.size) {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(urls[which]))
-                    startActivity(intent)
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(urls[which])))
                 }
             }
             .setNegativeButton("Maybe Later", null)
@@ -91,8 +94,13 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun AppContent() {
-        CueDetatTheme {
+    private fun AppContent(viewModel: MainViewModel) {
+        CueDetatTheme { // CueDetatTheme now manages its dark/light mode internally based on system
+            // Dispatch the initial app control theme to the ViewModel
+            val currentAppControlColorScheme = MaterialTheme.colorScheme
+            LaunchedEffect(currentAppControlColorScheme) {
+                viewModel.onEvent(MainScreenEvent.ThemeChanged(currentAppControlColorScheme))
+            }
             MainScreen(viewModel = viewModel)
         }
     }

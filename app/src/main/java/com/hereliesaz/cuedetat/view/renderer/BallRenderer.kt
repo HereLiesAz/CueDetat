@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/view/renderer/BallRenderer.kt
 package com.hereliesaz.cuedetat.view.renderer
 
 import android.graphics.Canvas
@@ -6,22 +5,21 @@ import android.graphics.Matrix
 import android.graphics.PointF
 import android.graphics.Typeface
 import android.util.Log
-import com.hereliesaz.cuedetat.ui.ZoomMapping // Import if needed for direct zoom factor
+import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.model.ILogicalBall
 import com.hereliesaz.cuedetat.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import kotlin.math.min // For base radius calculation if used
+import kotlin.math.min
 
 class BallRenderer {
 
     private val textRenderer = BallTextRenderer()
     private var lastLoggedPitchBanking = -9999f
 
-    // ... drawLogicalBalls method (no changes from previous correct version) ...
     fun drawLogicalBalls(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        state.actualCueBall?.let { // This is the single ActualCueBall, used as banking ball in banking mode
+        state.actualCueBall?.let {
             canvas.drawCircle(it.center.x, it.center.y, it.radius, paints.actualCueBallBasePaint)
             canvas.drawCircle(
                 it.center.x,
@@ -31,37 +29,35 @@ class BallRenderer {
             )
         }
 
-        if (state.isBankingMode) return // Protractor unit not drawn in banking mode
+        if (state.isBankingMode) return
 
-        // Protractor unit drawing (only if not in banking mode)
         canvas.save()
         canvas.translate(state.protractorUnit.center.x, state.protractorUnit.center.y)
         canvas.rotate(state.protractorUnit.rotationDegrees)
-        // Target Ball of Protractor
+
         canvas.drawCircle(0f, 0f, state.protractorUnit.radius, paints.targetCirclePaint)
         canvas.drawCircle(0f, 0f, state.protractorUnit.radius / 5f, paints.targetCenterMarkPaint)
-        // Ghost Cue Ball of Protractor
-        val protractorCueBallLocalCenter = state.protractorUnit.protractorCueBallCenter.let {
-            val p = PointF(it.x, it.y); p.offset(
-            -state.protractorUnit.center.x,
-            -state.protractorUnit.center.y
-        ); p
+
+        val protractorGhostCueLocalPos = state.protractorUnit.protractorCueBallCenter.let {
+            val p = PointF(it.x, it.y)
+            p.offset(-state.protractorUnit.center.x, -state.protractorUnit.center.y)
+            p
         }
-        val rotationInvertedMatrix =
-            Matrix().apply { setRotate(-state.protractorUnit.rotationDegrees) }
-        val cueBallRelativePosition =
-            floatArrayOf(protractorCueBallLocalCenter.x, protractorCueBallLocalCenter.y)
-        rotationInvertedMatrix.mapPoints(cueBallRelativePosition)
-        val relativeCuePos = PointF(cueBallRelativePosition[0], cueBallRelativePosition[1])
         val cuePaint =
-            if (state.isImpossibleShot) paints.warningPaintRed1 else paints.cueCirclePaint
-        canvas.drawCircle(relativeCuePos.x, relativeCuePos.y, state.protractorUnit.radius, cuePaint)
+            if (state.isImpossibleShot && !state.isBankingMode) paints.warningPaintRed1 else paints.cueCirclePaint
         canvas.drawCircle(
-            relativeCuePos.x,
-            relativeCuePos.y,
+            protractorGhostCueLocalPos.x,
+            protractorGhostCueLocalPos.y,
+            state.protractorUnit.radius,
+            cuePaint
+        )
+        canvas.drawCircle(
+            protractorGhostCueLocalPos.x,
+            protractorGhostCueLocalPos.y,
             state.protractorUnit.radius / 5f,
             paints.cueCenterMarkPaint
         )
+
         canvas.restore()
     }
 
@@ -71,8 +67,10 @@ class BallRenderer {
         paints: PaintCache,
         typeface: Typeface?
     ) {
-        paints.actualCueBallTextPaint.typeface = typeface
+        paints.actualCueBallTextPaint.typeface =
+            typeface // Set typeface for this specific text paint
 
+        // Draw ActualCueBall (which is the BankingBall in banking mode, or optional cue ball in protractor)
         state.actualCueBall?.let { currentActualCueBall ->
             val screenProjectedCenter =
                 DrawingUtils.mapPoint(currentActualCueBall.center, state.pitchMatrix)
@@ -81,73 +79,30 @@ class BallRenderer {
 
             if (state.isBankingMode) {
                 effectiveCenterY = screenProjectedCenter.y
-
-                // For banking mode, the visual radius should primarily reflect the zoom level,
-                // and then be uniformly scaled by the perspective at the ball's depth.
-                // The ball's logicalRadius is already scaled by zoom.
-                // We need a factor representing how 1 logical unit *at the ball's depth* scales to screen pixels.
-
-                // 1. Get the current zoom multiplier based on the slider position.
-                //    The logical radius already incorporates this.
+                val logicalCenter = currentActualCueBall.center
                 val logicalRadius = currentActualCueBall.radius
+                val p1Logical = PointF(logicalCenter.x - logicalRadius, logicalCenter.y)
+                val p2Logical = PointF(logicalCenter.x + logicalRadius, logicalCenter.y)
+                val screenP1 = DrawingUtils.mapPoint(p1Logical, state.pitchMatrix)
+                val screenP2 = DrawingUtils.mapPoint(p2Logical, state.pitchMatrix)
+                visualRadiusOnScreen = DrawingUtils.distance(screenP1, screenP2) / 2.0f
 
-                // 2. Determine the perspective scale factor at the ball's center depth.
-                //    Project two points very close together vertically in logical space at the ball's center,
-                //    and see how their screen distance scales. This gives a local Z-depth scale.
-                //    This method attempts to get a scale factor that is less sensitive to XY rotation of the measurement axis.
-                val pCenterLogical = currentActualCueBall.center
-                val pSlightlyAboveLogical =
-                    PointF(pCenterLogical.x, pCenterLogical.y - 1f) // 1 logical unit offset
-
-                val pCenterScreen = screenProjectedCenter // Already have this
-                val pSlightlyAboveScreen =
-                    DrawingUtils.mapPoint(pSlightlyAboveLogical, state.pitchMatrix)
-
-                val logicalUnitDistance = 1f
-                var screenDistanceForLogicalUnit =
-                    DrawingUtils.distance(pCenterScreen, pSlightlyAboveScreen)
-
-                if (screenDistanceForLogicalUnit < 0.001f) { // Avoid division by zero or extreme scaling
-                    // Fallback: project a horizontal radius if vertical is too small (e.g. extreme side view)
-                    val pSlightlyRightLogical = PointF(pCenterLogical.x + 1f, pCenterLogical.y)
-                    val pSlightlyRightScreen =
-                        DrawingUtils.mapPoint(pSlightlyRightLogical, state.pitchMatrix)
-                    screenDistanceForLogicalUnit =
-                        DrawingUtils.distance(pCenterScreen, pSlightlyRightScreen)
-                    if (screenDistanceForLogicalUnit < 0.001f) {
-                        // If still too small, use a default based on initial zoom setup (very rough)
-                        val baseScreenRadiusAtDefaultZoom =
-                            (min(state.viewWidth, state.viewHeight) * 0.30f / 2f)
-                        val defaultLogicalRadiusAtDefaultZoom =
-                            baseScreenRadiusAtDefaultZoom * ZoomMapping.DEFAULT_ZOOM
-                        if (defaultLogicalRadiusAtDefaultZoom > 0) {
-                            screenDistanceForLogicalUnit =
-                                (baseScreenRadiusAtDefaultZoom / defaultLogicalRadiusAtDefaultZoom)
-                        } else {
-                            screenDistanceForLogicalUnit = 1f
-                        }
-                    }
-                }
-
-                val perspectiveScaleAtBallDepth = screenDistanceForLogicalUnit / logicalUnitDistance
-                visualRadiusOnScreen = logicalRadius * perspectiveScaleAtBallDepth
-
-
+                // Logging for banking ball size debugging
                 if (kotlin.math.abs(state.pitchAngle - lastLoggedPitchBanking) > 0.5f || kotlin.math.abs(
-                        state.tableRotationDegrees % 360 - /* some lastTableRotation */ 0f
+                        state.tableRotationDegrees % 360 - /* some lastTableRotation reference if needed */ 0f
                     ) > 1f
                 ) {
                     Log.i(
-                        "BallRenderer_Banking", "Pitch: ${"%.1f".format(state.pitchAngle)}, " +
+                        "BallRenderer_Banking", "PITCH: ${"%.1f".format(state.pitchAngle)}, " +
                                 "TableRot: ${"%.1f".format(state.tableRotationDegrees)}, " +
-                                "LogRadius: ${"%.2f".format(logicalRadius)}, " +
-                                "PerspScale: ${"%.3f".format(perspectiveScaleAtBallDepth)}, " +
-                                "VISUAL ScreenRadius: ${"%.2f".format(visualRadiusOnScreen)}"
+                                "LogRadius (from state): ${"%.2f".format(currentActualCueBall.radius)}, " +
+                                "VISUAL ScreenRadius: ${"%.2f".format(visualRadiusOnScreen)}, " +
+                                "CurrentZoomLevel: ${"%.3f".format(ZoomMapping.sliderToZoom(state.zoomSliderPosition))}"
                     )
                     lastLoggedPitchBanking = state.pitchAngle
                 }
 
-            } else { // Protractor mode
+            } else { // Protractor mode - for the optional ActualCueBall
                 val radiusInfo =
                     DrawingUtils.getPerspectiveRadiusAndLift(currentActualCueBall, state)
                 visualRadiusOnScreen = radiusInfo.radius
@@ -180,46 +135,70 @@ class BallRenderer {
             }
         }
 
-        // Draw ProtractorUnit ghosts only if NOT in banking mode
+        // Draw ProtractorUnit ghosts (Target Ball & Ghost Cue Ball) only if NOT in banking mode
         if (!state.isBankingMode) {
-            // ... (rest of protractor ghost ball drawing, no changes needed here from previous version)
-            paints.targetBallTextPaint.typeface = typeface
+            paints.targetBallTextPaint.typeface = typeface // Set typeface for these text paints
             paints.cueBallTextPaint.typeface = typeface
 
+            // 1. Protractor's Target Ball (Screen Ghost)
+            // Its logical center IS state.protractorUnit.center
+            val targetBallLogical =
+                state.protractorUnit // ProtractorUnit itself is an ILogicalBall for its target part
             val targetRadiusInfo =
-                DrawingUtils.getPerspectiveRadiusAndLift(state.protractorUnit, state)
-            val pTGC = DrawingUtils.mapPoint(state.protractorUnit.center, state.pitchMatrix)
-            val targetGhostCenterY = pTGC.y - targetRadiusInfo.lift
+                DrawingUtils.getPerspectiveRadiusAndLift(targetBallLogical, state)
+            val screenProjectedTargetCenter =
+                DrawingUtils.mapPoint(targetBallLogical.center, state.pitchMatrix)
+            val targetGhostVisualY = screenProjectedTargetCenter.y - targetRadiusInfo.lift
+
             canvas.drawCircle(
-                pTGC.x,
-                targetGhostCenterY,
+                screenProjectedTargetCenter.x,
+                targetGhostVisualY,
                 targetRadiusInfo.radius,
                 paints.targetGhostBallOutlinePaint
             )
             if (state.areHelpersVisible) {
                 textRenderer.draw(
-                    canvas, paints.targetBallTextPaint, state.zoomSliderPosition,
-                    pTGC.x, targetGhostCenterY, targetRadiusInfo.radius, "Target Ball"
+                    canvas,
+                    paints.targetBallTextPaint,
+                    state.zoomSliderPosition,
+                    screenProjectedTargetCenter.x,
+                    targetGhostVisualY,
+                    targetRadiusInfo.radius,
+                    "Target Ball"
                 )
             }
 
-            val protractorCueBall = object : ILogicalBall {
-                override val center = state.protractorUnit.protractorCueBallCenter
+            // 2. Protractor's Ghost Cue Ball (Screen Ghost)
+            // Its logical center IS state.protractorUnit.protractorCueBallCenter
+            // Its logical radius IS state.protractorUnit.radius
+            val protractorGhostCueLogical = object : ILogicalBall {
+                override val center =
+                    state.protractorUnit.protractorCueBallCenter // Use the absolute logical center
                 override val radius = state.protractorUnit.radius
             }
-            val cueRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(protractorCueBall, state)
-            val pCGC = DrawingUtils.mapPoint(
-                state.protractorUnit.protractorCueBallCenter,
-                state.pitchMatrix
-            )
-            val cueGhostCenterY = pCGC.y - cueRadiusInfo.lift
+            val cueRadiusInfo =
+                DrawingUtils.getPerspectiveRadiusAndLift(protractorGhostCueLogical, state)
+            val screenProjectedGhostCueCenter =
+                DrawingUtils.mapPoint(protractorGhostCueLogical.center, state.pitchMatrix)
+            val cueGhostVisualY = screenProjectedGhostCueCenter.y - cueRadiusInfo.lift
+
             val cueGhostPaint =
                 if (state.isImpossibleShot) paints.warningPaintRed2 else paints.ghostCueOutlinePaint
-            canvas.drawCircle(pCGC.x, cueGhostCenterY, cueRadiusInfo.radius, cueGhostPaint)
+            canvas.drawCircle(
+                screenProjectedGhostCueCenter.x,
+                cueGhostVisualY,
+                cueRadiusInfo.radius,
+                cueGhostPaint
+            )
             if (state.areHelpersVisible) {
                 textRenderer.draw(
-                    canvas, paints.cueBallTextPaint, state.zoomSliderPosition,
-                    pCGC.x, cueGhostCenterY, cueRadiusInfo.radius, "Ghost Cue Ball"
+                    canvas,
+                    paints.cueBallTextPaint,
+                    state.zoomSliderPosition,
+                    screenProjectedGhostCueCenter.x,
+                    cueGhostVisualY,
+                    cueRadiusInfo.radius,
+                    "Ghost Cue Ball"
                 )
             }
         }

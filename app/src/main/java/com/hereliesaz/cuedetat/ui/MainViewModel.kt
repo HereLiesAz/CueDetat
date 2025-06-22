@@ -1,13 +1,15 @@
-// app/src/main/java/com/hereliesaz/cuedetat/ui/MainViewModel.kt
 package com.hereliesaz.cuedetat.ui
 
 import android.app.Application
 import android.graphics.Camera
+import android.graphics.PointF
+import androidx.compose.material3.darkColorScheme // For default state initialization
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.UpdateChecker
+import com.hereliesaz.cuedetat.data.UpdateResult
 import com.hereliesaz.cuedetat.domain.StateReducer
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.view.model.Perspective
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
@@ -30,13 +33,13 @@ class MainViewModel @Inject constructor(
     private val stateReducer: StateReducer
 ) : ViewModel() {
 
-    private val graphicsCamera =
-        Camera() // Consider making this local in UpdateStateUseCase if no other use
+    private val graphicsCamera = Camera()
     private val insultingWarnings: Array<String> =
         application.resources.getStringArray(R.array.insulting_warnings)
     private var warningIndex = 0
 
-    private val _uiState = MutableStateFlow(OverlayState())
+    // Initialize OverlayState with a default appControlColorScheme
+    private val _uiState = MutableStateFlow(OverlayState(appControlColorScheme = darkColorScheme()))
     val uiState = _uiState.asStateFlow()
 
     private val _toastMessage = MutableStateFlow<ToastMessage?>(null)
@@ -52,8 +55,13 @@ class MainViewModel @Inject constructor(
     }
 
     fun onEvent(event: MainScreenEvent) {
-        // Handle screen-to-logical conversions before passing to reducer for some events
         when (event) {
+            is MainScreenEvent.ThemeChanged -> {
+                // This event is now for the APP's UI controls' theme.
+                _uiState.value =
+                    _uiState.value.copy(appControlColorScheme = event.scheme) // Corrected field name
+                return
+            }
             is MainScreenEvent.ActualCueBallMoved -> {
                 if (_uiState.value.hasInverseMatrix) {
                     val logicalPos = Perspective.screenToLogical(
@@ -66,10 +74,10 @@ class MainViewModel @Inject constructor(
                         )
                     )
                 }
-                return // Consume, internal event dispatched
+                return
             }
 
-            is MainScreenEvent.UnitMoved -> { // For ProtractorUnit
+            is MainScreenEvent.UnitMoved -> {
                 if (_uiState.value.hasInverseMatrix) {
                     val logicalPos = Perspective.screenToLogical(
                         event.position,
@@ -77,9 +85,8 @@ class MainViewModel @Inject constructor(
                     )
                     updateContinuousState(MainScreenEvent.UpdateLogicalUnitPosition(logicalPos))
                 }
-                return // Consume
+                return
             }
-
             is MainScreenEvent.BankingAimTargetDragged -> {
                 if (_uiState.value.hasInverseMatrix) {
                     val logicalTarget = Perspective.screenToLogical(
@@ -92,9 +99,8 @@ class MainViewModel @Inject constructor(
                         )
                     )
                 }
-                return // Consume
+                return
             }
-            // --- Events that directly update state or trigger actions ---
             is MainScreenEvent.CheckForUpdate -> checkForUpdate()
             is MainScreenEvent.ViewArt -> _singleEvent.value =
                 SingleEvent.OpenUrl("https://instagram.com/hereliesaz")
@@ -106,42 +112,66 @@ class MainViewModel @Inject constructor(
                 ToastMessage.PlainText("Feature coming soon!")
             is MainScreenEvent.SingleEventConsumed -> _singleEvent.value = null
             is MainScreenEvent.ToastShown -> _toastMessage.value = null
-            is MainScreenEvent.ThemeChanged -> { // Direct state copy
-                _uiState.value = _uiState.value.copy(dynamicColorScheme = event.scheme)
-            }
             is MainScreenEvent.GestureStarted -> {
                 _uiState.value = _uiState.value.copy(warningText = null)
-                // Do not return, let updateContinuousState run if needed for other reasons
+                // Fall through to updateContinuousState for other potential logic
             }
-            // For other events, pass them to updateContinuousState
-            else -> updateContinuousState(event)
+
+            else -> Unit // Let updateContinuousState handle the rest
         }
+        // For events not handled by a return, proceed to updateContinuousState
+        // This ensures events like GestureStarted and GestureEnded also flow through the main update path.
+        updateContinuousState(event)
     }
 
     private fun updateContinuousState(event: MainScreenEvent) {
         val oldState = _uiState.value
-        val stateAfterReducer = stateReducer.reduce(oldState, event)
-        val finalGeometricState = updateStateUseCase(stateAfterReducer, graphicsCamera)
+        // Pass the current appControlColorScheme from oldState to the reducer
+        // The reducer itself does not modify appControlColorScheme; it's set by ThemeChanged event directly.
+        val stateFromReducer = stateReducer.reduce(oldState, event)
+        val finalGeometricState = updateStateUseCase(stateFromReducer, graphicsCamera)
 
-        var newWarningText = finalGeometricState.warningText
+        var newWarningText =
+            finalGeometricState.warningText // Start with what reducer/usecase might have set
 
         if (event is MainScreenEvent.GestureEnded) {
             if (!finalGeometricState.isBankingMode && finalGeometricState.isImpossibleShot) {
                 newWarningText = insultingWarnings[warningIndex]
                 warningIndex = (warningIndex + 1) % insultingWarnings.size
             } else {
-                newWarningText = null
+                newWarningText = null // Clear warning if not impossible or in banking mode
             }
         } else if (event !is MainScreenEvent.GestureStarted) {
+            // For continuous events, preserve existing warning if shot is still impossible & not banking
             if (oldState.warningText != null && finalGeometricState.isImpossibleShot && !finalGeometricState.isBankingMode) {
                 newWarningText = oldState.warningText
             } else if (!finalGeometricState.isImpossibleShot || finalGeometricState.isBankingMode) {
+                // Clear warning if shot becomes possible or if we enter banking mode
                 newWarningText = null
             }
         }
-        _uiState.value = finalGeometricState.copy(warningText = newWarningText)
+        // If event is GestureStarted, warningText was already nulled in the onEvent handler for immediate UI feedback.
+
+        // Ensure appControlColorScheme from the oldState is preserved, as reducer doesn't touch it.
+        // The ThemeChanged event is the sole source for updating appControlColorScheme.
+        _uiState.value = finalGeometricState.copy(
+            warningText = newWarningText,
+            appControlColorScheme = oldState.appControlColorScheme
+        )
     }
 
-    private fun checkForUpdate() { /* ... no change ... */
+    private fun checkForUpdate() {
+        viewModelScope.launch {
+            val result = updateChecker.checkForUpdate()
+            _toastMessage.value = when (result) {
+                is UpdateResult.UpdateAvailable -> ToastMessage.StringResource(
+                    R.string.update_available,
+                    listOf(result.latestVersion)
+                )
+
+                is UpdateResult.UpToDate -> ToastMessage.StringResource(R.string.update_no_new_release)
+                is UpdateResult.CheckFailed -> ToastMessage.PlainText(result.reason)
+            }
+        }
     }
 }

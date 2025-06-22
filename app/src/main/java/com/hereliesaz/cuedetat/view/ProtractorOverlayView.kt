@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/view/ProtractorOverlayView.kt
 package com.hereliesaz.cuedetat.view
 
 import android.annotation.SuppressLint
@@ -21,34 +20,29 @@ import kotlin.math.abs
 class ProtractorOverlayView(context: Context) : View(context) {
 
     private enum class InteractionMode {
-        NONE,
-        SCALING,
-        ROTATING_PROTRACTOR, // For ProtractorUnit
-        MOVING_PROTRACTOR_UNIT, // For ProtractorUnit center
-        MOVING_ACTUAL_CUE_BALL, // For ActualCueBall (in either mode if applicable)
-        AIMING_BANK_SHOT      // For bankingAimTarget
+        NONE, SCALING, ROTATING_PROTRACTOR, MOVING_PROTRACTOR_UNIT, MOVING_ACTUAL_CUE_BALL, AIMING_BANK_SHOT
     }
 
+    private val paints = PaintCache() // Keep paints instance here
     private val renderer = OverlayRenderer()
-    private val paints = PaintCache()
     private var canonicalState = OverlayState()
     private var barbaroTypeface: Typeface? = null
 
     // Callbacks to ViewModel (using SCREEN coordinates for positions)
     var onSizeChanged: ((Int, Int) -> Unit)? = null
-    var onProtractorRotationChange: ((Float) -> Unit)? = null // Specific to ProtractorUnit
-    var onProtractorUnitMoved: ((PointF) -> Unit)? = null    // Specific to ProtractorUnit
-    var onActualCueBallScreenMoved: ((PointF) -> Unit)? = null // For ActualCueBall/BankingBall
+    var onProtractorRotationChange: ((Float) -> Unit)? = null
+    var onProtractorUnitMoved: ((PointF) -> Unit)? = null
+    var onActualCueBallScreenMoved: ((PointF) -> Unit)? = null
     var onScale: ((Float) -> Unit)? = null
     var onGestureStarted: (() -> Unit)? = null
     var onGestureEnded: (() -> Unit)? = null
-    var onBankingAimTargetScreenDrag: ((PointF) -> Unit)? = null // For bankingAimTarget
+    var onBankingAimTargetScreenDrag: ((PointF) -> Unit)? = null
 
     private val scaleGestureDetector: ScaleGestureDetector
     private var lastTouchX_single = 0f
     private var lastTouchY_single = 0f
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
-    private val draggableElementSlop = touchSlop * 6.0f // Unified larger slop
+    private val draggableElementSlop = touchSlop * 7.0f
 
     private var activePointerId = MotionEvent.INVALID_POINTER_ID
     private var interactionMode = InteractionMode.NONE
@@ -57,60 +51,50 @@ class ProtractorOverlayView(context: Context) : View(context) {
     init {
         if (!isInEditMode) {
             barbaroTypeface = ResourcesCompat.getFont(context, R.font.barbaro)
-            paints.setTypeface(barbaroTypeface)
+            paints.setTypeface(barbaroTypeface) // Set typeface on internal paints instance
         }
         val scaleListener = object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
                 if (interactionMode == InteractionMode.NONE || interactionMode == InteractionMode.SCALING) {
                     interactionMode = InteractionMode.SCALING
                     if (!gestureInProgress) {
-                        onGestureStarted?.invoke()
-                        gestureInProgress = true
+                        onGestureStarted?.invoke(); gestureInProgress = true
                     }
                     return true
                 }
                 return false
             }
-
             override fun onScale(detector: ScaleGestureDetector): Boolean {
                 if (interactionMode == InteractionMode.SCALING) {
-                    onScale?.invoke(detector.scaleFactor)
-                    return true
+                    onScale?.invoke(detector.scaleFactor); return true
                 }
                 return false
             }
+            // onScaleEnd not strictly needed as ACTION_UP/CANCEL handles gesture end
         }
         scaleGestureDetector = ScaleGestureDetector(context, scaleListener)
     }
 
-    override fun onDraw(canvas: Canvas) { /* ... no change ... */ renderer.draw(
-        canvas,
-        canonicalState,
-        paints,
-        barbaroTypeface
-    )
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        renderer.draw(canvas, canonicalState, paints, barbaroTypeface)
     }
 
-    override fun onSizeChanged(
-        w: Int,
-        h: Int,
-        oldw: Int,
-        oldh: Int
-    ) { /* ... no change ... */ super.onSizeChanged(w, h, oldw, oldh); onSizeChanged?.invoke(w, h)
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        onSizeChanged?.invoke(w, h)
     }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
         scaleGestureDetector.onTouchEvent(event)
-
         val action = event.actionMasked
         val pointerIndex = event.actionIndex
 
         when (action) {
             MotionEvent.ACTION_DOWN -> {
                 if (!gestureInProgress) {
-                    onGestureStarted?.invoke()
-                    gestureInProgress = true
+                    onGestureStarted?.invoke(); gestureInProgress = true
                 }
                 lastTouchX_single = event.getX(0)
                 lastTouchY_single = event.getY(0)
@@ -122,10 +106,11 @@ class ProtractorOverlayView(context: Context) : View(context) {
             MotionEvent.ACTION_MOVE -> {
                 if (interactionMode == InteractionMode.SCALING) return true
                 if (event.pointerCount == 1 && activePointerId != MotionEvent.INVALID_POINTER_ID) {
-                    val currentX = event.findPointerIndex(activePointerId)
-                        .let { idx -> if (idx == -1) return true else event.getX(idx) }
-                    val currentY = event.findPointerIndex(activePointerId)
-                        .let { idx -> if (idx == -1) return true else event.getY(idx) }
+                    val currentEventPointerIndex = event.findPointerIndex(activePointerId)
+                    if (currentEventPointerIndex == -1) return true
+
+                    val currentX = event.getX(currentEventPointerIndex)
+                    val currentY = event.getY(currentEventPointerIndex)
                     val dx = currentX - lastTouchX_single
 
                     when (interactionMode) {
@@ -135,41 +120,34 @@ class ProtractorOverlayView(context: Context) : View(context) {
                                 lastTouchX_single = currentX
                             }
                         }
-
                         InteractionMode.MOVING_PROTRACTOR_UNIT -> {
                             onProtractorUnitMoved?.invoke(PointF(currentX, currentY))
                             lastTouchX_single = currentX; lastTouchY_single = currentY
                         }
-
                         InteractionMode.MOVING_ACTUAL_CUE_BALL -> {
                             onActualCueBallScreenMoved?.invoke(PointF(currentX, currentY))
                             lastTouchX_single = currentX; lastTouchY_single = currentY
                         }
-
                         InteractionMode.AIMING_BANK_SHOT -> {
                             onBankingAimTargetScreenDrag?.invoke(PointF(currentX, currentY))
                             lastTouchX_single = currentX; lastTouchY_single = currentY
                         }
-
                         InteractionMode.NONE -> {
                             if (abs(currentX - lastTouchX_single) > touchSlop || abs(currentY - lastTouchY_single) > touchSlop) {
                                 determineSingleTouchMode(lastTouchX_single, lastTouchY_single)
                             }
                         }
-
-                        else -> {}
+                        else -> {} // SCALING
                     }
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 if (gestureInProgress) {
-                    onGestureEnded?.invoke()
-                    gestureInProgress = false
+                    onGestureEnded?.invoke(); gestureInProgress = false
                 }
                 interactionMode = InteractionMode.NONE
                 activePointerId = MotionEvent.INVALID_POINTER_ID
             }
-
             MotionEvent.ACTION_POINTER_UP -> {
                 val upPointerId = event.getPointerId(pointerIndex)
                 if (upPointerId == activePointerId) {
@@ -180,7 +158,7 @@ class ProtractorOverlayView(context: Context) : View(context) {
                         activePointerId = event.getPointerId(newPointerIdx)
                     }
                 }
-                if (event.pointerCount == 1 && interactionMode == InteractionMode.SCALING) {
+                if (event.pointerCount <= 1 && interactionMode == InteractionMode.SCALING) {
                     interactionMode = InteractionMode.NONE
                 }
             }
@@ -191,39 +169,29 @@ class ProtractorOverlayView(context: Context) : View(context) {
     private fun determineSingleTouchMode(touchX: Float, touchY: Float) {
         if (interactionMode == InteractionMode.SCALING) return
         val touchPoint = PointF(touchX, touchY)
-        interactionMode = InteractionMode.NONE // Default
+        interactionMode = InteractionMode.NONE
 
         if (canonicalState.isBankingMode) {
-            // In banking mode, primary draggable is the ActualCueBall (BankingBall)
             canonicalState.actualCueBall?.let {
                 val ballScreenPos = DrawingUtils.mapPoint(it.center, canonicalState.pitchMatrix)
                 if (DrawingUtils.distance(touchPoint, ballScreenPos) < draggableElementSlop) {
-                    interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
-                    return
+                    interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL; return
                 }
             }
-            // If not moving the ball, then it's aiming the bank shot
             interactionMode = InteractionMode.AIMING_BANK_SHOT
-            onBankingAimTargetScreenDrag?.invoke(touchPoint) // Start aiming
+            onBankingAimTargetScreenDrag?.invoke(touchPoint)
         } else {
-            // Protractor Mode
-            // Check optional ActualCueBall first, as it might be overlaid
             canonicalState.actualCueBall?.let {
                 val ballScreenPos = DrawingUtils.mapPoint(it.center, canonicalState.pitchMatrix)
-                val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
-                    it,
-                    canonicalState
-                ) // Use its own radius
+                val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(it, canonicalState)
                 if (DrawingUtils.distance(
                         touchPoint,
                         ballScreenPos
                     ) < radiusInfo.radius + draggableElementSlop
                 ) {
-                    interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
-                    return
+                    interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL; return
                 }
             }
-            // Check ProtractorUnit center (Target Ball)
             val unitScreenPos = DrawingUtils.mapPoint(
                 canonicalState.protractorUnit.center,
                 canonicalState.pitchMatrix
@@ -237,15 +205,19 @@ class ProtractorOverlayView(context: Context) : View(context) {
                     unitScreenPos
                 ) < unitRadiusInfo.radius + draggableElementSlop
             ) {
-                interactionMode = InteractionMode.MOVING_PROTRACTOR_UNIT
-                return
+                interactionMode = InteractionMode.MOVING_PROTRACTOR_UNIT; return
             }
-            // If nothing else, it's rotating the protractor
             interactionMode = InteractionMode.ROTATING_PROTRACTOR
         }
     }
 
-    fun updateState(newState: OverlayState) { /* ... no change ... */ this.canonicalState =
-        newState; paints.updateColors(newState.dynamicColorScheme); invalidate()
+    // Modified updateState to accept systemIsDark for PaintCache
+    fun updateState(newState: OverlayState, systemIsDark: Boolean) {
+        this.canonicalState = newState
+        this.paints.updateColors(
+            newState,
+            systemIsDark
+        ) // Update paints with full state and system theme
+        invalidate()
     }
 }
