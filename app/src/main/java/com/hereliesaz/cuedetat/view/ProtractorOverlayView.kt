@@ -23,156 +23,229 @@ class ProtractorOverlayView(context: Context) : View(context) {
     private enum class InteractionMode {
         NONE,
         SCALING,
-        ROTATING,
-        MOVING_UNIT,
-        MOVING_CUE_BALL
+        ROTATING_PROTRACTOR, // For ProtractorUnit
+        MOVING_PROTRACTOR_UNIT, // For ProtractorUnit center
+        MOVING_ACTUAL_CUE_BALL, // For ActualCueBall (in either mode if applicable)
+        AIMING_BANK_SHOT      // For bankingAimTarget
     }
 
     private val renderer = OverlayRenderer()
     private val paints = PaintCache()
-
     private var canonicalState = OverlayState()
     private var barbaroTypeface: Typeface? = null
 
-    // Callbacks to the ViewModel
+    // Callbacks to ViewModel (using SCREEN coordinates for positions)
     var onSizeChanged: ((Int, Int) -> Unit)? = null
-    var onRotationChange: ((Float) -> Unit)? = null
-    var onUnitMove: ((PointF) -> Unit)? = null
-    var onActualCueBallMoved: ((PointF) -> Unit)? = null
+    var onProtractorRotationChange: ((Float) -> Unit)? = null // Specific to ProtractorUnit
+    var onProtractorUnitMoved: ((PointF) -> Unit)? = null    // Specific to ProtractorUnit
+    var onActualCueBallScreenMoved: ((PointF) -> Unit)? = null // For ActualCueBall/BankingBall
     var onScale: ((Float) -> Unit)? = null
     var onGestureStarted: (() -> Unit)? = null
     var onGestureEnded: (() -> Unit)? = null
+    var onBankingAimTargetScreenDrag: ((PointF) -> Unit)? = null // For bankingAimTarget
 
-    // Gesture Handling
     private val scaleGestureDetector: ScaleGestureDetector
-    private var lastTouchX = 0f
-    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private var lastTouchX_single = 0f
+    private var lastTouchY_single = 0f
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
+    private val draggableElementSlop = touchSlop * 6.0f // Unified larger slop
+
+    private var activePointerId = MotionEvent.INVALID_POINTER_ID
     private var interactionMode = InteractionMode.NONE
+    private var gestureInProgress = false
 
     init {
         if (!isInEditMode) {
             barbaroTypeface = ResourcesCompat.getFont(context, R.font.barbaro)
             paints.setTypeface(barbaroTypeface)
         }
-        val listener = object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        val scaleListener = object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
-                onGestureStarted?.invoke()
-                interactionMode = InteractionMode.SCALING
-                return true
+                if (interactionMode == InteractionMode.NONE || interactionMode == InteractionMode.SCALING) {
+                    interactionMode = InteractionMode.SCALING
+                    if (!gestureInProgress) {
+                        onGestureStarted?.invoke()
+                        gestureInProgress = true
+                    }
+                    return true
+                }
+                return false
             }
 
             override fun onScale(detector: ScaleGestureDetector): Boolean {
-                onScale?.invoke(detector.scaleFactor)
-                return true
-            }
-
-            override fun onScaleEnd(detector: ScaleGestureDetector) {
-                onGestureEnded?.invoke()
-                interactionMode = InteractionMode.NONE
-            }
-        }
-        scaleGestureDetector = ScaleGestureDetector(context, listener)
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        renderer.draw(canvas, canonicalState, paints, barbaroTypeface)
-    }
-
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        onSizeChanged?.invoke(w, h)
-    }
-
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        scaleGestureDetector.onTouchEvent(event)
-        if (interactionMode == InteractionMode.SCALING) {
-            return true
-        }
-
-        val touchX = event.x
-        val touchY = event.y
-
-        when (event.action) {
-            MotionEvent.ACTION_DOWN -> {
-                onGestureStarted?.invoke()
-                lastTouchX = touchX
-
-                val touchPoint = PointF(touchX, touchY)
-                val unitScreenPos = DrawingUtils.mapPoint(
-                    canonicalState.protractorUnit.center,
-                    canonicalState.pitchMatrix
-                )
-                val unitRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
-                    canonicalState.protractorUnit,
-                    canonicalState
-                )
-
-                if (DrawingUtils.distance(
-                        touchPoint,
-                        unitScreenPos
-                    ) < unitRadiusInfo.radius + touchSlop
-                ) {
-                    interactionMode = InteractionMode.MOVING_UNIT
+                if (interactionMode == InteractionMode.SCALING) {
+                    onScale?.invoke(detector.scaleFactor)
                     return true
                 }
-
-                canonicalState.actualCueBall?.let {
-                    val cueBallScreenPos =
-                        DrawingUtils.mapPoint(it.center, canonicalState.pitchMatrix)
-                    val cueBallRadiusInfo =
-                        DrawingUtils.getPerspectiveRadiusAndLift(it, canonicalState)
-                    if (DrawingUtils.distance(
-                            touchPoint,
-                            cueBallScreenPos
-                        ) < cueBallRadiusInfo.radius + touchSlop
-                    ) {
-                        interactionMode = InteractionMode.MOVING_CUE_BALL
-                        return true
-                    }
-                }
-
-                interactionMode = InteractionMode.ROTATING
-                return true
-            }
-
-            MotionEvent.ACTION_MOVE -> {
-                val dx = touchX - lastTouchX
-
-                when (interactionMode) {
-                    InteractionMode.ROTATING -> {
-                        if (abs(dx) > touchSlop) {
-                            val newRotation =
-                                canonicalState.protractorUnit.rotationDegrees - (dx * 0.3f)
-                            onRotationChange?.invoke(newRotation)
-                            lastTouchX = touchX
-                        }
-                    }
-                    InteractionMode.MOVING_UNIT -> {
-                        onUnitMove?.invoke(PointF(touchX, touchY))
-                    }
-                    InteractionMode.MOVING_CUE_BALL -> {
-                        if (canonicalState.actualCueBall != null) {
-                            onActualCueBallMoved?.invoke(PointF(touchX, touchY))
-                        }
-                    }
-                    else -> return true
-                }
-                return true
-            }
-
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                onGestureEnded?.invoke()
-                interactionMode = InteractionMode.NONE
-                return true
+                return false
             }
         }
-        return super.onTouchEvent(event)
+        scaleGestureDetector = ScaleGestureDetector(context, scaleListener)
     }
 
-    fun updateState(newState: OverlayState) {
-        this.canonicalState = newState
-        paints.updateColors(newState.dynamicColorScheme)
-        invalidate()
+    override fun onDraw(canvas: Canvas) { /* ... no change ... */ renderer.draw(
+        canvas,
+        canonicalState,
+        paints,
+        barbaroTypeface
+    )
+    }
+
+    override fun onSizeChanged(
+        w: Int,
+        h: Int,
+        oldw: Int,
+        oldh: Int
+    ) { /* ... no change ... */ super.onSizeChanged(w, h, oldw, oldh); onSizeChanged?.invoke(w, h)
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        scaleGestureDetector.onTouchEvent(event)
+
+        val action = event.actionMasked
+        val pointerIndex = event.actionIndex
+
+        when (action) {
+            MotionEvent.ACTION_DOWN -> {
+                if (!gestureInProgress) {
+                    onGestureStarted?.invoke()
+                    gestureInProgress = true
+                }
+                lastTouchX_single = event.getX(0)
+                lastTouchY_single = event.getY(0)
+                activePointerId = event.getPointerId(0)
+                if (interactionMode != InteractionMode.SCALING) {
+                    determineSingleTouchMode(lastTouchX_single, lastTouchY_single)
+                }
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (interactionMode == InteractionMode.SCALING) return true
+                if (event.pointerCount == 1 && activePointerId != MotionEvent.INVALID_POINTER_ID) {
+                    val currentX = event.findPointerIndex(activePointerId)
+                        .let { idx -> if (idx == -1) return true else event.getX(idx) }
+                    val currentY = event.findPointerIndex(activePointerId)
+                        .let { idx -> if (idx == -1) return true else event.getY(idx) }
+                    val dx = currentX - lastTouchX_single
+
+                    when (interactionMode) {
+                        InteractionMode.ROTATING_PROTRACTOR -> {
+                            if (abs(dx) > touchSlop) {
+                                onProtractorRotationChange?.invoke(canonicalState.protractorUnit.rotationDegrees - (dx * 0.3f))
+                                lastTouchX_single = currentX
+                            }
+                        }
+
+                        InteractionMode.MOVING_PROTRACTOR_UNIT -> {
+                            onProtractorUnitMoved?.invoke(PointF(currentX, currentY))
+                            lastTouchX_single = currentX; lastTouchY_single = currentY
+                        }
+
+                        InteractionMode.MOVING_ACTUAL_CUE_BALL -> {
+                            onActualCueBallScreenMoved?.invoke(PointF(currentX, currentY))
+                            lastTouchX_single = currentX; lastTouchY_single = currentY
+                        }
+
+                        InteractionMode.AIMING_BANK_SHOT -> {
+                            onBankingAimTargetScreenDrag?.invoke(PointF(currentX, currentY))
+                            lastTouchX_single = currentX; lastTouchY_single = currentY
+                        }
+
+                        InteractionMode.NONE -> {
+                            if (abs(currentX - lastTouchX_single) > touchSlop || abs(currentY - lastTouchY_single) > touchSlop) {
+                                determineSingleTouchMode(lastTouchX_single, lastTouchY_single)
+                            }
+                        }
+
+                        else -> {}
+                    }
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (gestureInProgress) {
+                    onGestureEnded?.invoke()
+                    gestureInProgress = false
+                }
+                interactionMode = InteractionMode.NONE
+                activePointerId = MotionEvent.INVALID_POINTER_ID
+            }
+
+            MotionEvent.ACTION_POINTER_UP -> {
+                val upPointerId = event.getPointerId(pointerIndex)
+                if (upPointerId == activePointerId) {
+                    val newPointerIdx = if (pointerIndex == 0) 1 else 0
+                    if (newPointerIdx < event.pointerCount) {
+                        lastTouchX_single = event.getX(newPointerIdx)
+                        lastTouchY_single = event.getY(newPointerIdx)
+                        activePointerId = event.getPointerId(newPointerIdx)
+                    }
+                }
+                if (event.pointerCount == 1 && interactionMode == InteractionMode.SCALING) {
+                    interactionMode = InteractionMode.NONE
+                }
+            }
+        }
+        return true
+    }
+
+    private fun determineSingleTouchMode(touchX: Float, touchY: Float) {
+        if (interactionMode == InteractionMode.SCALING) return
+        val touchPoint = PointF(touchX, touchY)
+        interactionMode = InteractionMode.NONE // Default
+
+        if (canonicalState.isBankingMode) {
+            // In banking mode, primary draggable is the ActualCueBall (BankingBall)
+            canonicalState.actualCueBall?.let {
+                val ballScreenPos = DrawingUtils.mapPoint(it.center, canonicalState.pitchMatrix)
+                if (DrawingUtils.distance(touchPoint, ballScreenPos) < draggableElementSlop) {
+                    interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
+                    return
+                }
+            }
+            // If not moving the ball, then it's aiming the bank shot
+            interactionMode = InteractionMode.AIMING_BANK_SHOT
+            onBankingAimTargetScreenDrag?.invoke(touchPoint) // Start aiming
+        } else {
+            // Protractor Mode
+            // Check optional ActualCueBall first, as it might be overlaid
+            canonicalState.actualCueBall?.let {
+                val ballScreenPos = DrawingUtils.mapPoint(it.center, canonicalState.pitchMatrix)
+                val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
+                    it,
+                    canonicalState
+                ) // Use its own radius
+                if (DrawingUtils.distance(
+                        touchPoint,
+                        ballScreenPos
+                    ) < radiusInfo.radius + draggableElementSlop
+                ) {
+                    interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
+                    return
+                }
+            }
+            // Check ProtractorUnit center (Target Ball)
+            val unitScreenPos = DrawingUtils.mapPoint(
+                canonicalState.protractorUnit.center,
+                canonicalState.pitchMatrix
+            )
+            val unitRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
+                canonicalState.protractorUnit,
+                canonicalState
+            )
+            if (DrawingUtils.distance(
+                    touchPoint,
+                    unitScreenPos
+                ) < unitRadiusInfo.radius + draggableElementSlop
+            ) {
+                interactionMode = InteractionMode.MOVING_PROTRACTOR_UNIT
+                return
+            }
+            // If nothing else, it's rotating the protractor
+            interactionMode = InteractionMode.ROTATING_PROTRACTOR
+        }
+    }
+
+    fun updateState(newState: OverlayState) { /* ... no change ... */ this.canonicalState =
+        newState; paints.updateColors(newState.dynamicColorScheme); invalidate()
     }
 }

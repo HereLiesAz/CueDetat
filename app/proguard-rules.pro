@@ -19,3 +19,29 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+
+# Keep Retrofit, OkHttp, Okio, and Gson classes
+-keep class retrofit2.** { *; }
+-keep interface retrofit2.** { *; }
+-keep class com.google.gson.** { *; }
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
+-keep class okio.** { *; }
+-keep interface okio.** { *; }
+
+# Keep your GithubApi interface and its methods
+-keep interface com.hereliesaz.cuedetat.network.GithubApi { *; }
+# Keep your GithubRelease data class and its members if used directly by Gson
+-keep class com.hereliesaz.cuedetat.network.GithubRelease { *; }
+-keepclassmembers class com.hereliesaz.cuedetat.network.GithubRelease {
+    <fields>;
+    <init>(...);
+}
+
+# Keep Hilt generated classes
+-keep class * extends androidx.lifecycle.ViewModel
+-keep class **_HiltModules* { *; }
+-keep class dagger.hilt.internal.aggregatedroot.AggregatedRoot { *; }
+-keep class **_Factory { *; }
+-keep class **_MembersInjector { *; }

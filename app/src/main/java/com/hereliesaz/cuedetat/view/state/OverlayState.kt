@@ -14,27 +14,33 @@ data class OverlayState(
     val viewHeight: Int = 0,
 
     // Core logical model
+    // ProtractorUnit is primarily for non-banking mode.
     val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), 1f, 0f),
+    // ActualCueBall is the user-draggable cue ball.
+    // In protractor mode, it's optional (for jump shot / advanced aiming).
+    // In banking mode, it's the primary "banking ball" and is always present.
     val actualCueBall: ActualCueBall? = null,
 
     // UI control state
-    val zoomSliderPosition: Float = 100f, // REVERTED to original value
+    val zoomSliderPosition: Float = 100f,
     val areHelpersVisible: Boolean = false,
     val isMoreHelpVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
 
-    // New banking mode state
+    // Banking mode specific state
     val isBankingMode: Boolean = false,
+    val tableRotationDegrees: Float = 0f,
+    val bankingAimTarget: PointF? = null, // Logical target for banking mode aiming
 
     // Sensor and perspective data
     val pitchAngle: Float = 0.0f,
-    val pitchMatrix: Matrix = Matrix(),
-    val railPitchMatrix: Matrix = Matrix(), // New matrix for lifted rails
+    val pitchMatrix: Matrix = Matrix(),       // Primary matrix for protractor or table plane
+    val railPitchMatrix: Matrix = Matrix(),   // For lifted rails in banking mode
     val inversePitchMatrix: Matrix = Matrix(),
     val hasInverseMatrix: Boolean = false,
 
     // Derived state
-    val isImpossibleShot: Boolean = false,
+    val isImpossibleShot: Boolean = false, // Relevant for protractor mode
     val warningText: String? = null,
 
     // Theming

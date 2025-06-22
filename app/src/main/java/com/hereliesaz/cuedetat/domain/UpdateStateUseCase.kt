@@ -12,6 +12,10 @@ import kotlin.math.sqrt
 
 class UpdateStateUseCase @Inject constructor() {
 
+    private val tableToBallRatioShort = 44f // For table height calculation
+    private val railHeightToTableHeightRatio =
+        0.05f // Rails are e.g., 5% of table's logical short side
+
     operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
@@ -23,22 +27,31 @@ class UpdateStateUseCase @Inject constructor() {
             camera
         )
 
-        // Create the lifted matrix for the rails
-        val railHeight = state.protractorUnit.radius * 1.5f
+        // Calculate rail height based on the table's logical short dimension
+        // state.protractorUnit.radius here is the CURRENT ball radius, which is tied to zoom.
+        val logicalTableShortSide = tableToBallRatioShort * state.protractorUnit.radius
+        val railLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
+
         val railPitchMatrix = Perspective.createPitchMatrix(
             state.pitchAngle,
             state.viewWidth,
             state.viewHeight,
             camera,
-            lift = railHeight
+            lift = railLiftAmount // Use table-proportional lift
         )
 
-        // If in banking mode, apply a 90-degree rotation to both matrices
+        val centerX = state.viewWidth / 2f
+        val centerY = state.viewHeight / 2f
+
         if (state.isBankingMode) {
-            val centerX = state.viewWidth / 2f
-            val centerY = state.viewHeight / 2f
             pitchMatrix.preRotate(90f, centerX, centerY)
             railPitchMatrix.preRotate(90f, centerX, centerY)
+
+            val effectiveTableRotation = state.tableRotationDegrees % 360f
+            if (effectiveTableRotation != 0f) {
+                pitchMatrix.preRotate(effectiveTableRotation, centerX, centerY)
+                railPitchMatrix.preRotate(effectiveTableRotation, centerX, centerY)
+            }
         }
 
 
@@ -58,7 +71,8 @@ class UpdateStateUseCase @Inject constructor() {
             }
         }
 
-        val isImpossible = anchorPointA?.let { anchor ->
+        // Calculate isImpossibleShot based on the current (potentially updated) state
+        val calculatedIsImpossibleShot = anchorPointA?.let { anchor ->
             val distAtoG = distance(anchor, state.protractorUnit.protractorCueBallCenter)
             val distAtoT = distance(anchor, state.protractorUnit.center)
             distAtoG > distAtoT
@@ -66,10 +80,10 @@ class UpdateStateUseCase @Inject constructor() {
 
         return state.copy(
             pitchMatrix = pitchMatrix,
-            railPitchMatrix = railPitchMatrix, // Store the new rail matrix
+            railPitchMatrix = railPitchMatrix,
             inversePitchMatrix = inverseMatrix,
             hasInverseMatrix = hasInverse,
-            isImpossibleShot = isImpossible
+            isImpossibleShot = calculatedIsImpossibleShot // Corrected reference
         )
     }
 

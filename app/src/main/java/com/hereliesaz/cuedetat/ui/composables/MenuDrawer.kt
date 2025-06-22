@@ -89,32 +89,38 @@ fun MenuDrawerContent(
                 onCloseDrawer()
             }
         )
-        MenuItem(
-            icon = ImageVector.vectorResource(R.drawable.ic_jump_shot),
-            text = "Toggle Cue Ball",
-            onClick = {
-                onEvent(MainScreenEvent.ToggleActualCueBall)
-                onCloseDrawer()
-            }
-        )
+        // Conditionally show "Toggle Cue Ball" if not in banking mode
+        if (!uiState.isBankingMode) {
+            MenuItem(
+                icon = ImageVector.vectorResource(R.drawable.ic_jump_shot),
+                text = "Toggle Cue Ball",
+                onClick = {
+                    onEvent(MainScreenEvent.ToggleActualCueBall)
+                    onCloseDrawer()
+                }
+            )
+        }
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             thickness = DividerDefaults.Thickness,
             color = DividerDefaults.color
         )
 
-        // --- Future Features ---
+        // --- Future Features / Banking Mode Toggle ---
         MenuItem(
-            icon = Icons.Outlined.ViewInAr,
+            icon = Icons.Outlined.ViewInAr, // Keeping icon generic for now
             text = "Toggle Table",
             onClick = {
-                onEvent(MainScreenEvent.FeatureComingSoon)
+                onEvent(MainScreenEvent.FeatureComingSoon) // This menu item is now just a placeholder
                 onCloseDrawer()
             }
         )
+
+        val bankingModeToggleText =
+            if (uiState.isBankingMode) "Back to the Balls" else "Calculate Bank"
         MenuItem(
-            icon = Icons.Outlined.ViewInAr,
-            text = "Calculate Bank",
+            icon = Icons.Outlined.ViewInAr, // Keeping icon generic
+            text = bankingModeToggleText,
             onClick = {
                 onEvent(MainScreenEvent.ToggleBankingMode)
                 onCloseDrawer()

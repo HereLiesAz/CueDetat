@@ -7,6 +7,20 @@ plugins {
 }
 
 android {
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("G:\\My Drive\\az_apk_keystore.jks")
+            storePassword = "18187077190901818"
+            keyAlias = "key0"
+            keyPassword = "18187077190901818"
+        }
+        create("release") {
+            storeFile = file("G:\\My Drive\\az_apk_keystore.jks")
+            storePassword = "18187077190901818"
+            keyPassword = "18187077190901818"
+            keyAlias = "key0"
+        }
+    }
     namespace = "com.hereliesaz.cuedetat"
     compileSdk = 36
 
@@ -14,22 +28,30 @@ android {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.3.46"
+        versionCode = 12
+        versionName = "0.3.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
         multiDexEnabled = true
+        signingConfig = signingConfigs.getByName("debug")
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
+            multiDexEnabled = true
+        }
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = false
+            multiDexEnabled = true
         }
     }
 
@@ -65,6 +87,8 @@ android {
             }
         }
     }
+    buildToolsVersion = "36.0.0"
+    ndkVersion = "29.0.13599879 rc2"
 
     dependencies {
         implementation(libs.androidx.core.ktx)
