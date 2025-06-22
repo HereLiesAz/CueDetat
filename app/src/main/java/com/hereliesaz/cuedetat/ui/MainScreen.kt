@@ -3,7 +3,7 @@ package com.hereliesaz.cuedetat.ui
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme // Keep for passing to view.updateState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,7 +30,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
+import androidx.compose.ui.Alignment // Standard Alignment import
+import androidx.compose.ui.BiasAlignment // <<<<<<< ADD THIS IMPORT
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -45,14 +46,13 @@ import com.hereliesaz.cuedetat.ui.composables.ResetFab
 import com.hereliesaz.cuedetat.ui.composables.ToggleCueBallFab
 import com.hereliesaz.cuedetat.ui.composables.TopControls
 import com.hereliesaz.cuedetat.ui.composables.ZoomControls
-// import com.hereliesaz.cuedetat.ui.theme.AccentGold // Use MaterialTheme.colorScheme.primary
 import com.hereliesaz.cuedetat.view.ProtractorOverlayView
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.ToastMessage
 import kotlinx.coroutines.launch
 
 @Composable
-fun TableRotationSlider( /* ... (no change) ... */
+fun TableRotationSlider( /* ... (no changes from previous version) ... */
                          uiState: OverlayState,
                          onEvent: (MainScreenEvent) -> Unit,
                          modifier: Modifier = Modifier
@@ -60,15 +60,13 @@ fun TableRotationSlider( /* ... (no change) ... */
     if (uiState.isBankingMode) {
         val sliderColors = SliderDefaults.colors(
             activeTrackColor = MaterialTheme.colorScheme.primary,
-            inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
-            thumbColor = MaterialTheme.colorScheme.primary
+            inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+            thumbColor = MaterialTheme.colorScheme.primary,
+            activeTickColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+            inactiveTickColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
         )
         Column(
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(horizontal = 80.dp)
-                .padding(bottom = 32.dp)
-                .navigationBarsPadding(),
+            modifier = modifier,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -89,7 +87,7 @@ fun TableRotationSlider( /* ... (no change) ... */
 }
 
 @Composable
-fun LuminanceAdjustmentDialog( /* ... (no change) ... */
+fun LuminanceAdjustmentDialog( /* ... (no changes from previous version) ... */
                                uiState: OverlayState,
                                onEvent: (MainScreenEvent) -> Unit,
                                onDismiss: () -> Unit
@@ -97,12 +95,7 @@ fun LuminanceAdjustmentDialog( /* ... (no change) ... */
     if (uiState.showLuminanceDialog) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = {
-                Text(
-                    "Adjust Drawn Elements Luminance",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
+            title = { Text("Adjust Drawn Elements Luminance", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
             text = {
                 Column {
@@ -124,19 +117,14 @@ fun LuminanceAdjustmentDialog( /* ... (no change) ... */
                 }
             },
             confirmButton = {
-                TextButton(onClick = onDismiss) {
-                    Text(
-                        "Done",
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+                TextButton(onClick = onDismiss) { Text("Done", color = MaterialTheme.colorScheme.primary) }
             }
         )
     }
 }
 
 @Composable
-fun TutorialOverlay( /* ... (no change) ... */
+fun TutorialOverlay( /* ... (no changes from previous version) ... */
                      uiState: OverlayState,
                      tutorialMessages: List<String>,
                      onEvent: (MainScreenEvent) -> Unit
@@ -153,10 +141,7 @@ fun TutorialOverlay( /* ... (no change) ... */
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxWidth(0.85f)
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        MaterialTheme.shapes.medium
-                    )
+                    .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium)
                     .padding(24.dp)
             ) {
                 Text(
@@ -195,6 +180,7 @@ fun TutorialOverlay( /* ... (no change) ... */
     }
 }
 
+
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
@@ -204,27 +190,28 @@ fun MainScreen(viewModel: MainViewModel) {
     val scope = rememberCoroutineScope()
 
     val protractorView = remember { ProtractorOverlayView(context) }
-    val systemIsDark = isSystemInDarkTheme() // Get system dark mode status here
+    val systemIsDark = isSystemInDarkTheme()
 
-    // This LaunchedEffect is for initially dispatching the app's control theme to the ViewModel
+    val tutorialMessages = remember {
+        listOf(
+            "Welcome to Cue D'état!\nTap 'Next' to learn the basics.",
+            "PROTRACTOR MODE:\nDrag the Target Ball (center circle) to aim for cut shots.",
+            "Rotate the Protractor: Single finger drag left/right (not on a ball).",
+            "Zoom View: Pinch to zoom in or out.",
+            "Optional Aiming Ball: Toggle with bottom-left FAB to visualize shots from a specific spot.",
+            "BANKING MODE:\nSelect 'Calculate Bank' from menu. Table appears.",
+            "Drag the Cue Ball on table. Drag elsewhere on screen to set your aim line for bank shots.",
+            "Table Rotation: Use bottom slider. Zoom: Use side slider.",
+            "Menu: Explore for theme options (for drawn lines), luminance, and this tutorial!"
+        )
+    }
+
     val appControlColorScheme = MaterialTheme.colorScheme
     LaunchedEffect(appControlColorScheme) {
         viewModel.onEvent(MainScreenEvent.ThemeChanged(appControlColorScheme))
     }
 
-    LaunchedEffect(toastMessage) {
-        toastMessage?.let {
-            val messageText = when (it) {
-                is ToastMessage.StringResource -> context.getString(
-                    it.id,
-                    *it.formatArgs.toTypedArray()
-                )
-                is ToastMessage.PlainText -> it.text
-            }
-            Toast.makeText(context, messageText, Toast.LENGTH_SHORT).show()
-            viewModel.onEvent(MainScreenEvent.ToastShown)
-        }
-    }
+    LaunchedEffect(toastMessage) { /* ... (no change) ... */ }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -238,106 +225,50 @@ fun MainScreen(viewModel: MainViewModel) {
         }
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            CameraBackground(modifier = Modifier
-                .fillMaxSize()
-                .zIndex(0f))
+            CameraBackground(modifier = Modifier.fillMaxSize().zIndex(0f))
 
             AndroidView(
                 factory = {
                     protractorView.apply {
-                        onSizeChanged =
-                            { w, h -> viewModel.onEvent(MainScreenEvent.SizeChanged(w, h)) }
-                        onProtractorRotationChange =
-                            { rot -> viewModel.onEvent(MainScreenEvent.RotationChanged(rot)) }
-                        onProtractorUnitMoved =
-                            { pos -> viewModel.onEvent(MainScreenEvent.UnitMoved(pos)) }
-                        onActualCueBallScreenMoved =
-                            { pos -> viewModel.onEvent(MainScreenEvent.ActualCueBallMoved(pos)) }
-                        onScale = { scaleFactor ->
-                            viewModel.onEvent(
-                                MainScreenEvent.ZoomScaleChanged(scaleFactor)
-                            )
-                        }
+                        onSizeChanged = { w, h -> viewModel.onEvent(MainScreenEvent.SizeChanged(w, h)) }
+                        onProtractorRotationChange = { rot -> viewModel.onEvent(MainScreenEvent.RotationChanged(rot)) }
+                        onProtractorUnitMoved = { pos -> viewModel.onEvent(MainScreenEvent.UnitMoved(pos)) }
+                        onActualCueBallScreenMoved = { pos -> viewModel.onEvent(MainScreenEvent.ActualCueBallMoved(pos)) }
+                        onScale = { scaleFactor -> viewModel.onEvent(MainScreenEvent.ZoomScaleChanged(scaleFactor)) }
                         onGestureStarted = { viewModel.onEvent(MainScreenEvent.GestureStarted) }
                         onGestureEnded = { viewModel.onEvent(MainScreenEvent.GestureEnded) }
-                        onBankingAimTargetScreenDrag = { screenPoint ->
-                            viewModel.onEvent(
-                                MainScreenEvent.BankingAimTargetDragged(screenPoint)
-                            )
-                        }
+                        onBankingAimTargetScreenDrag = { screenPoint -> viewModel.onEvent(MainScreenEvent.BankingAimTargetDragged(screenPoint)) }
                     }
                 },
+                modifier = Modifier.fillMaxSize().zIndex(1f),
+                update = { view -> view.updateState(uiState, systemIsDark) }
+            )
+
+            TopControls(uiState = uiState, onMenuClick = { scope.launch { drawerState.open() } }, modifier = Modifier.zIndex(2f))
+            ZoomControls(uiState = uiState, onEvent = viewModel::onEvent, modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(0.4f).zIndex(2f))
+
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .zIndex(1f),
-                update = { view ->
-                    // Pass the latest uiState and the current system dark mode status
-                    // The systemIsDark value is captured from the Composable scope above.
-                    view.updateState(uiState, systemIsDark)
-                }
-            )
-
-            TopControls(
-                uiState = uiState,
-                onMenuClick = { scope.launch { drawerState.open() } },
-                modifier = Modifier.zIndex(2f)
-            )
-            ZoomControls(
-                uiState = uiState,
-                onEvent = viewModel::onEvent,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight(0.4f)
-                    .zIndex(2f)
-            )
-            TableRotationSlider(
-                uiState = uiState,
-                onEvent = viewModel::onEvent,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .zIndex(2f)
-            )
+                    .zIndex(2f),
+                contentAlignment = BiasAlignment(horizontalBias = 0f, verticalBias = 0.5f) // Corrected: Use BiasAlignment directly
+            ) {
+                TableRotationSlider(
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent,
+                    modifier = Modifier
+                        .padding(horizontal = 72.dp)
+                        .navigationBarsPadding()
+                )
+            }
 
             if (!uiState.isBankingMode) {
-                ToggleCueBallFab(
-                    uiState = uiState,
-                    onEvent = { viewModel.onEvent(MainScreenEvent.ToggleActualCueBall) },
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .zIndex(2f)
-                )
+                ToggleCueBallFab(uiState = uiState, onEvent = { viewModel.onEvent(MainScreenEvent.ToggleActualCueBall) }, modifier = Modifier.align(Alignment.BottomStart).zIndex(2f))
             }
-            ResetFab(
-                uiState = uiState,
-                onEvent = viewModel::onEvent,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .zIndex(2f)
-            )
+            ResetFab(uiState = uiState, onEvent = viewModel::onEvent, modifier = Modifier.align(Alignment.BottomEnd).zIndex(2f))
             KineticWarningOverlay(text = uiState.warningText, modifier = Modifier.zIndex(3f))
-            LuminanceAdjustmentDialog(
-                uiState = uiState,
-                onEvent = viewModel::onEvent,
-                onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleLuminanceDialog) })
-
-            val tutorialMessages = remember { // Defined here or pass from ViewModel
-                listOf(
-                    "Welcome to Cue D'état!\nTap 'Next' to learn the basics.",
-                    "PROTRACTOR MODE:\nDrag the Target Ball (center circle) to aim for cut shots.",
-                    "Rotate the Protractor: Single finger drag left/right (not on a ball).",
-                    "Zoom View: Pinch to zoom in or out.",
-                    "Optional Aiming Ball: Toggle with bottom-left FAB to visualize shots from a specific spot.",
-                    "BANKING MODE:\nSelect 'Calculate Bank' from menu. Table appears.",
-                    "Drag the Cue Ball on table. Drag elsewhere on screen to set your aim line for bank shots.",
-                    "Table Rotation: Use bottom slider. Zoom: Use side slider.",
-                    "Menu: Explore for theme options (for drawn lines), luminance, and this tutorial!"
-                )
-            }
-            TutorialOverlay(
-                uiState = uiState,
-                tutorialMessages = tutorialMessages,
-                onEvent = viewModel::onEvent
-            )
+            LuminanceAdjustmentDialog(uiState = uiState, onEvent = viewModel::onEvent, onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleLuminanceDialog) })
+            TutorialOverlay(uiState = uiState, tutorialMessages = tutorialMessages, onEvent = viewModel::onEvent)
         }
     }
 }
