@@ -29,6 +29,12 @@ class SensorRepository @Inject constructor(
     private val rotationVectorSensor: Sensor? =
         sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
 
+    // EMA filter parameters
+    private val alpha = 0.2f // Smoothing factor; lower means more smoothing (less responsive)
+    private var smoothedYaw: Float? = null
+    private var smoothedPitch: Float? = null
+    private var smoothedRoll: Float? = null
+
     // Keep the old pitchAngleFlow for now if anything still relies on it directly,
     // but prefer using fullOrientationFlow.
     val pitchAngleFlow: Flow<Float> = callbackFlow {
@@ -63,16 +69,17 @@ class SensorRepository @Inject constructor(
                     SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
                     SensorManager.getOrientation(rotationMatrix, orientationAngles)
 
-                    // orientationAngles[0] is yaw (azimuth)
-                    // orientationAngles[1] is pitch
-                    // orientationAngles[2] is roll
-                    // Convert radians to degrees
-                    val yaw = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
-                    val pitch = Math.toDegrees(orientationAngles[1].toDouble()).toFloat()
-                    val roll = Math.toDegrees(orientationAngles[2].toDouble()).toFloat()
+                    val rawYaw = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
+                    val rawPitch = Math.toDegrees(orientationAngles[1].toDouble()).toFloat()
+                    val rawRoll = Math.toDegrees(orientationAngles[2].toDouble()).toFloat()
+
+                    // Apply EMA filter
+                    smoothedYaw = smoothedYaw?.let { (rawYaw * alpha) + (it * (1 - alpha)) } ?: rawYaw
+                    smoothedPitch = smoothedPitch?.let { (rawPitch * alpha) + (it * (1 - alpha)) } ?: rawPitch
+                    smoothedRoll = smoothedRoll?.let { (rawRoll * alpha) + (it * (1 - alpha)) } ?: rawRoll
 
                     // Send pitch as negative to match existing convention for `pitchAngle` in state.
-                    trySend(FullOrientation(yaw = yaw, pitch = -pitch, roll = roll))
+                    trySend(FullOrientation(yaw = smoothedYaw!!, pitch = -smoothedPitch!!, roll = smoothedRoll!!))
                 }
             }
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) { /* Not used */ }
@@ -82,9 +89,15 @@ class SensorRepository @Inject constructor(
             sensorManager.registerListener(
                 listener,
                 rotationVectorSensor,
-                SensorManager.SENSOR_DELAY_GAME
+                SensorManager.SENSOR_DELAY_GAME // SENSOR_DELAY_UI or SENSOR_DELAY_NORMAL might be better for smoother UI if GAME is too fast
             )
         }
-        awaitClose { sensorManager.unregisterListener(listener) }
+        awaitClose {
+            sensorManager.unregisterListener(listener)
+            // Reset smoothed values when listener is unregistered
+            smoothedYaw = null
+            smoothedPitch = null
+            smoothedRoll = null
+        }
     }
 }
