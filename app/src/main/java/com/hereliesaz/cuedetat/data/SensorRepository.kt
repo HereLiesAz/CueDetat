@@ -30,7 +30,7 @@ class SensorRepository @Inject constructor(
         sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
 
     // EMA filter parameters
-    private val alpha = 0.2f // Smoothing factor; lower means more smoothing (less responsive)
+    private val alpha = 0.1f // Smoothing factor; lower means more smoothing (less responsive)
     private var smoothedYaw: Float? = null
     private var smoothedPitch: Float? = null
     private var smoothedRoll: Float? = null

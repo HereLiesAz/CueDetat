@@ -277,21 +277,25 @@ class LineRenderer {
 
     private fun drawProtractorAimingAndAngleLines(canvas: Canvas, ghostCuePosInUnitLocalSpace: PointF, paints: PaintCache, state: OverlayState): Boolean {
         val lineLength = 2000f
-        val originTargetBall = PointF(0f, 0f)
+        // The origin for all these lines should be the ghost cue ball's center
+        val originOfAllLines = ghostCuePosInUnitLocalSpace
+        val targetBallLogicalOrigin = PointF(0f, 0f) // This is still the target ball's center in local space
         var lineDrawn = false
-        val aimDirX = originTargetBall.x - ghostCuePosInUnitLocalSpace.x
-        val aimDirY = originTargetBall.y - ghostCuePosInUnitLocalSpace.y
+
+        // Aiming line from ghost cue to target ball
+        val aimDirX = targetBallLogicalOrigin.x - originOfAllLines.x
+        val aimDirY = targetBallLogicalOrigin.y - originOfAllLines.y
         val mag = sqrt(aimDirX * aimDirX + aimDirY * aimDirY)
 
         if (mag > state.protractorUnit.radius * 0.1f) {
             val nX = aimDirX / mag; val nY = aimDirY / mag
-            val endPointThroughTarget = PointF(originTargetBall.x + nX * lineLength, originTargetBall.y + nY * lineLength)
-            canvas.drawLine(ghostCuePosInUnitLocalSpace.x, ghostCuePosInUnitLocalSpace.y, endPointThroughTarget.x, endPointThroughTarget.y, paints.aimingLinePaint)
+            val endPointThroughTarget = PointF(originOfAllLines.x + nX * lineLength, originOfAllLines.y + nY * lineLength)
+            canvas.drawLine(originOfAllLines.x, originOfAllLines.y, endPointThroughTarget.x, endPointThroughTarget.y, paints.aimingLinePaint)
             lineDrawn = true
             if (state.areHelpersVisible) {
                 val textPaint = Paint(paints.lineTextPaint).apply { color = paints.aimingLinePaint.color }
                 val labelDistance = state.protractorUnit.radius * AIMING_LINE_LABEL_DISTANCE_FACTOR
-                textRenderer.draw(canvas, "Aiming Line", originTargetBall, getAngle(ghostCuePosInUnitLocalSpace, originTargetBall),
+                textRenderer.draw(canvas, "Aiming Line", originOfAllLines, getAngle(originOfAllLines, targetBallLogicalOrigin),
                     labelDistance, AIMING_LINE_LABEL_ANGLE_OFFSET, AIMING_LINE_LABEL_ROTATION,
                     textPaint, AIMING_LINE_LABEL_FONT_SIZE, state.zoomSliderPosition)
             }
@@ -301,18 +305,36 @@ class LineRenderer {
             if (angle == 0f) return@forEach
             val r = Math.toRadians(angle.toDouble())
             val eX = (lineLength * sin(r)).toFloat(); val eY = (lineLength * cos(r)).toFloat()
-            val endPoints = listOf(PointF(eX, eY), PointF(-eX, -eY), PointF(-eX, eY), PointF(eX, -eY))
-            endPoints.forEach { endPoint ->
-                canvas.drawLine(originTargetBall.x, originTargetBall.y, endPoint.x, endPoint.y, paints.protractorLinePaint)
-                lineDrawn = true
-                if (state.areHelpersVisible) {
-                    val textPaint = Paint(paints.lineTextPaint).apply { color = paints.protractorLinePaint.color }
-                    val labelDistance = state.protractorUnit.radius * PROTRACTOR_LABEL_DISTANCE_FACTOR
-                    val labelText = "${angle.toInt()}°"
-                    textRenderer.draw(canvas, labelText, originTargetBall, getAngle(originTargetBall, endPoint),
-                        labelDistance, PROTRACTOR_LABEL_ANGLE_OFFSET, PROTRACTOR_LABEL_ROTATION,
-                        textPaint, PROTRACTOR_LABEL_FONT_SIZE, state.zoomSliderPosition)
-                }
+            // End points are relative to the *originOfAllLines* now.
+            // These points describe the direction of the angle lines from the origin.
+            val angleEndPoint = PointF(originOfAllLines.x + eX, originOfAllLines.y + eY)
+
+            // Draw lines for positive and negative angles
+            canvas.drawLine(originOfAllLines.x, originOfAllLines.y, originOfAllLines.x + eX, originOfAllLines.y + eY, paints.protractorLinePaint)
+            canvas.drawLine(originOfAllLines.x, originOfAllLines.y, originOfAllLines.x - eX, originOfAllLines.y - eY, paints.protractorLinePaint)
+            canvas.drawLine(originOfAllLines.x, originOfAllLines.y, originOfAllLines.x - eX, originOfAllLines.y + eY, paints.protractorLinePaint)
+            canvas.drawLine(originOfAllLines.x, originOfAllLines.y, originOfAllLines.x + eX, originOfAllLines.y - eY, paints.protractorLinePaint)
+
+
+            lineDrawn = true
+            if (state.areHelpersVisible) {
+                val textPaint = Paint(paints.lineTextPaint).apply { color = paints.protractorLinePaint.color }
+                val labelDistance = state.protractorUnit.radius * PROTRACTOR_LABEL_DISTANCE_FACTOR
+                val labelText = "${angle.toInt()}°"
+
+                // Labels for the four angle lines
+                textRenderer.draw(canvas, labelText, originOfAllLines, getAngle(originOfAllLines, PointF(originOfAllLines.x + eX, originOfAllLines.y + eY)),
+                    labelDistance, PROTRACTOR_LABEL_ANGLE_OFFSET, PROTRACTOR_LABEL_ROTATION,
+                    textPaint, PROTRACTOR_LABEL_FONT_SIZE, state.zoomSliderPosition)
+                textRenderer.draw(canvas, labelText, originOfAllLines, getAngle(originOfAllLines, PointF(originOfAllLines.x - eX, originOfAllLines.y - eY)),
+                    labelDistance, PROTRACTOR_LABEL_ANGLE_OFFSET, PROTRACTOR_LABEL_ROTATION,
+                    textPaint, PROTRACTOR_LABEL_FONT_SIZE, state.zoomSliderPosition)
+                textRenderer.draw(canvas, labelText, originOfAllLines, getAngle(originOfAllLines, PointF(originOfAllLines.x - eX, originOfAllLines.y + eY)),
+                    labelDistance, PROTRACTOR_LABEL_ANGLE_OFFSET, PROTRACTOR_LABEL_ROTATION,
+                    textPaint, PROTRACTOR_LABEL_FONT_SIZE, state.zoomSliderPosition)
+                textRenderer.draw(canvas, labelText, originOfAllLines, getAngle(originOfAllLines, PointF(originOfAllLines.x + eX, originOfAllLines.y - eY)),
+                    labelDistance, PROTRACTOR_LABEL_ANGLE_OFFSET, PROTRACTOR_LABEL_ROTATION,
+                    textPaint, PROTRACTOR_LABEL_FONT_SIZE, state.zoomSliderPosition)
             }
         }
         return lineDrawn

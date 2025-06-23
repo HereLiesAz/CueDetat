@@ -107,7 +107,7 @@ fun LuminanceAdjustmentDialog(
         AlertDialog(
             onDismissRequest = onDismiss,
             title = { Text("Adjust Drawn Elements Luminance", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             text = {
                 Column {
                     Text("Current: ${"%.2f".format(uiState.luminanceAdjustment)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -139,7 +139,7 @@ fun TutorialOverlay(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.85f))
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f))
                 .clickable(onClick = { /* Consume clicks */ })
                 .zIndex(5f),
             contentAlignment = Alignment.Center
@@ -148,7 +148,7 @@ fun TutorialOverlay(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxWidth(0.85f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), MaterialTheme.shapes.medium)
                     .padding(24.dp)
             ) {
                 Text(
