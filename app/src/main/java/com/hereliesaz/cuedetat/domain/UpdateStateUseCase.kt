@@ -12,32 +12,34 @@ import kotlin.math.sqrt
 
 class UpdateStateUseCase @Inject constructor() {
 
-    private val tableToBallRatioShort = 44f // For table height calculation
-    private val railHeightToTableHeightRatio =
-        0.05f // Rails are e.g., 5% of table's logical short side
+    private val tableToBallRatioShort = 44f
+    private val railHeightToTableHeightRatio = 0.05f
 
     operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
-        // Create the base matrix for the table surface and aiming tools
         val pitchMatrix = Perspective.createPitchMatrix(
-            state.pitchAngle,
-            state.viewWidth,
-            state.viewHeight,
-            camera
+            currentOrientation = state.currentOrientation,
+            anchorOrientation = state.anchorOrientation, // Passed correctly
+            isSpatiallyLocked = state.isSpatiallyLocked, // Pass the lock state explicitly
+            viewWidth = state.viewWidth,
+            viewHeight = state.viewHeight,
+            camera = camera
         )
 
-        // Calculate rail height based on the table's logical short dimension
-        // state.protractorUnit.radius here is the CURRENT ball radius, which is tied to zoom.
-        val logicalTableShortSide = tableToBallRatioShort * state.protractorUnit.radius
+        // For banking mode, referenceRadius should be actualCueBall.radius
+        val referenceRadiusForTable = state.actualCueBall?.radius ?: state.protractorUnit.radius
+        val logicalTableShortSide = tableToBallRatioShort * referenceRadiusForTable
         val railLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
 
         val railPitchMatrix = Perspective.createPitchMatrix(
-            state.pitchAngle,
-            state.viewWidth,
-            state.viewHeight,
-            camera,
-            lift = railLiftAmount // Use table-proportional lift
+            currentOrientation = state.currentOrientation,
+            anchorOrientation = state.anchorOrientation,
+            isSpatiallyLocked = state.isSpatiallyLocked,
+            viewWidth = state.viewWidth,
+            viewHeight = state.viewHeight,
+            camera = camera,
+            lift = railLiftAmount
         )
 
         val centerX = state.viewWidth / 2f
@@ -54,13 +56,10 @@ class UpdateStateUseCase @Inject constructor() {
             }
         }
 
-
         val inverseMatrix = Matrix()
         val hasInverse = pitchMatrix.invert(inverseMatrix)
 
-        val anchorPointA: PointF? = if (state.actualCueBall != null) {
-            state.actualCueBall.center
-        } else {
+        val anchorPointA: PointF? = state.actualCueBall?.center ?: run {
             if (hasInverse) {
                 val screenAnchor = floatArrayOf(state.viewWidth / 2f, state.viewHeight.toFloat())
                 val logicalAnchorArray = FloatArray(2)
@@ -71,7 +70,6 @@ class UpdateStateUseCase @Inject constructor() {
             }
         }
 
-        // Calculate isImpossibleShot based on the current (potentially updated) state
         val calculatedIsImpossibleShot = anchorPointA?.let { anchor ->
             val distAtoG = distance(anchor, state.protractorUnit.protractorCueBallCenter)
             val distAtoT = distance(anchor, state.protractorUnit.center)
@@ -83,7 +81,7 @@ class UpdateStateUseCase @Inject constructor() {
             railPitchMatrix = railPitchMatrix,
             inversePitchMatrix = inverseMatrix,
             hasInverseMatrix = hasInverse,
-            isImpossibleShot = calculatedIsImpossibleShot // Corrected reference
+            isImpossibleShot = calculatedIsImpossibleShot
         )
     }
 

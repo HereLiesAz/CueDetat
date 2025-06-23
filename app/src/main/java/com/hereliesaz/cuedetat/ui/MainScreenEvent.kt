@@ -3,6 +3,7 @@ package com.hereliesaz.cuedetat.ui
 
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
+import com.hereliesaz.cuedetat.data.FullOrientation // Import
 
 sealed class MainScreenEvent {
     data class SizeChanged(val width: Int, val height: Int) : MainScreenEvent()
@@ -24,9 +25,9 @@ sealed class MainScreenEvent {
     internal data class UpdateLogicalUnitPosition(val logicalPoint: PointF) : MainScreenEvent()
     internal data class UpdateLogicalBankingAimTarget(val logicalPoint: PointF) : MainScreenEvent()
 
-    data class PitchAngleChanged(val pitch: Float) : MainScreenEvent()
-    // Add events for other sensor data (roll, yaw) if needed for locking
-    // data class FullOrientationChanged(val pitch: Float, val roll: Float, val yaw: Float): MainScreenEvent()
+    // data class PitchAngleChanged(val pitch: Float) : MainScreenEvent() // Replaced by FullOrientationChanged
+    data class FullOrientationChanged(val orientation: FullOrientation) : MainScreenEvent()
+
 
     data class ThemeChanged(val scheme: ColorScheme) : MainScreenEvent()
 
@@ -44,7 +45,6 @@ sealed class MainScreenEvent {
     object ToggleActualCueBall : MainScreenEvent()
     object ToggleBankingMode : MainScreenEvent()
 
-    // New Spatial Lock Event
     object ToggleSpatialLock : MainScreenEvent()
 
     object CheckForUpdate : MainScreenEvent()
