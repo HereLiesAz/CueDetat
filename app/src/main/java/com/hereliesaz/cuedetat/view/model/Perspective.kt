@@ -31,46 +31,49 @@ object Perspective {
             camera.translate(0f, lift, 0f)
         }
 
+        val finalPitchForCamera: Float
+        val finalRollForCamera: Float
+        // For finalYawForCamera, we need to be careful. Android's yaw is often 0 at North.
+        // If anchorYaw is -170 and currentYaw is +170 (crossed North), delta is 340, 2*anchor - current is very wrong.
+        // We need to handle yaw wraparound.
+        var finalYawForCamera: Float
+
         if (isSpatiallyLocked && anchorOrientation != null) {
-            // LOCKED MODE:
-            // Goal: Start view based on anchorPitch (no jump from unlocked).
-            // Then, counteract phone's Pitch, Roll, Yaw movements relative to the anchor point.
+            // LOCKED MODE: Stabilize the view based on anchor.
+            // FinalCameraAngle = AnchorAngle - (CurrentAngle - AnchorAngle)
+            // FinalCameraAngle = 2 * AnchorAngle - CurrentAngle
 
-            // 1. Base camera rotation: Set to the pitch observed at the moment of locking.
-            //    This ensures the initial locked view matches the unlocked view's primary tilt.
-            camera.rotateX(anchorOrientation.pitch)
+            finalPitchForCamera = 2 * anchorOrientation.pitch - currentOrientation.pitch
+            finalRollForCamera = 2 * anchorOrientation.roll - currentOrientation.roll
 
-            // 2. Calculate how much the phone has deviated from its anchored orientation
-            //    for EACH axis (Roll, Yaw, and any *additional* Pitch beyond the anchor pitch).
-            val deltaRoll = currentOrientation.roll - anchorOrientation.roll
-            val deltaYaw = currentOrientation.yaw - anchorOrientation.yaw
-            // This deltaPitch is the phone's pitch movement *relative to the pitch it had when locked*.
-            val deltaPitch = currentOrientation.pitch - anchorOrientation.pitch
+            // Handle Yaw wraparound (e.g., from -179 to +179 is a small change, not 358 degrees)
+            var deltaYaw = currentOrientation.yaw - anchorOrientation.yaw
+            if (deltaYaw > 180) {
+                deltaYaw -= 360
+            } else if (deltaYaw < -180) {
+                deltaYaw += 360
+            }
+            finalYawForCamera = anchorOrientation.yaw - deltaYaw // Equivalent to 2*anchor - current after wraparound adjustment
 
-            // 3. Apply counter-rotations to the camera for these deltas.
-            //    These rotations are applied to the camera *which is already pitched by anchorOrientation.pitch*.
-            //    The order of these counter-rotations can matter. Z, Y, X is a common order for applying
-            //    delta rotations to a camera's local axes to achieve world stabilization.
-            //    - To counteract phone roll, camera rolls opposite: camera.rotateZ(-deltaRoll)
-            //    - To counteract phone pitch delta, camera pitches opposite: camera.rotateX(-deltaPitch)
-            //    - To counteract phone yaw, camera yaws opposite: camera.rotateY(deltaYaw)
-            //      (Sign of deltaYaw for rotateY is tricky: if phone yaws right (sensor yaw increases, deltaYaw positive),
-            //       scene should appear to move left. camera.rotateY(positive) makes scene move left. So +deltaYaw might be right)
-
-            camera.rotateZ(-deltaRoll)    // Counteract phone's roll since anchor
-            camera.rotateX(-deltaPitch)   // Counteract phone's additional pitch since anchor
-            camera.rotateY(deltaYaw)      // Counteract phone's yaw since anchor (TEST THIS SIGN)
-
-
-            Log.d(classTag, "LOCKED: BaseAnchorPitch:${anchorOrientation.pitch.f1()} | " +
-                    "Delta(P:${deltaPitch.f1()},R:${deltaRoll.f1()},Y:${deltaYaw.f1()}) | " +
-                    "AppliedCamCounter(P:${(-deltaPitch).f1()},R:${(-deltaRoll).f1()},Y:${(deltaYaw).f1()})")
+            Log.d(classTag, "LOCKED: Anchor(P:${anchorOrientation.pitch.f1()},R:${anchorOrientation.roll.f1()},Y:${anchorOrientation.yaw.f1()})")
+            Log.d(classTag, "LOCKED: Current(P:${currentOrientation.pitch.f1()},R:${currentOrientation.roll.f1()},Y:${currentOrientation.yaw.f1()})")
+            Log.d(classTag, "LOCKED: DeltaYaw(raw):${(currentOrientation.yaw - anchorOrientation.yaw).f1()}, DeltaYaw(wrapped):${deltaYaw.f1()}")
+            Log.d(classTag, "LOCKED: FinalCamAngles(P:${finalPitchForCamera.f1()},R:${finalRollForCamera.f1()},Y:${finalYawForCamera.f1()})")
 
         } else {
-            // UNLOCKED MODE: Only apply the current pitch. Roll and Yaw are ignored.
-            camera.rotateX(currentOrientation.pitch)
-            // Log.d(classTag, "UNLOCKED: Applied CurrentPitch:${currentOrientation.pitch.f1()}")
+            // UNLOCKED MODE: View is primarily affected by pitch. Roll and Yaw are ignored for the main plane.
+            finalPitchForCamera = currentOrientation.pitch
+            finalRollForCamera = 0f
+            finalYawForCamera = 0f // No yaw effect from phone in unlocked mode on the plane
         }
+
+        // Apply rotations to the camera.
+        // Order Z, X, Y (Roll, Pitch, Yaw applied to camera's local axes)
+        camera.rotateZ(finalRollForCamera)
+        camera.rotateX(finalPitchForCamera)
+        camera.rotateY(-finalYawForCamera) // Sign of Yaw application is critical.
+        // If finalYawForCamera is world-space yaw scene should have,
+        // -finalYawForCamera for camera.rotateY might be correct.
 
         camera.getMatrix(matrix)
         camera.restore()
@@ -92,3 +95,4 @@ object Perspective {
 
 // Helper for logging
 private fun Float?.f1(): String = this?.let { "%.1f".format(it) } ?: "n"
+private fun Float.f1(): String = "%.1f".format(this)
