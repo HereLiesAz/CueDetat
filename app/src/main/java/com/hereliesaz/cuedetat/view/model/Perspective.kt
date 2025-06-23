@@ -11,13 +11,17 @@ object Perspective {
 
     fun createPitchMatrix(
         currentOrientation: FullOrientation,
-        anchorOrientation: FullOrientation?, // If null, we are in UNLOCKED mode
+        anchorOrientation: FullOrientation?,
         isSpatiallyLocked: Boolean,
         viewWidth: Int,
         viewHeight: Int,
         camera: Camera,
         lift: Float = 0f
     ): Matrix {
+        Log.d("PerspectiveCHK", "CALLED - Locked=$isSpatiallyLocked, " +
+                "Current(P:${currentOrientation.pitch.f1()},R:${currentOrientation.roll.f1()},Y:${currentOrientation.yaw.f1()}), " +
+                "Anchor(P:${anchorOrientation?.pitch?.f1()},R:${anchorOrientation?.roll?.f1()},Y:${anchorOrientation?.yaw?.f1()})")
+
         val matrix = Matrix()
         camera.save()
         camera.setLocation(0f, 0f, -32f)
@@ -28,55 +32,43 @@ object Perspective {
 
         if (isSpatiallyLocked && anchorOrientation != null) {
             // LOCKED MODE:
-            // The camera's final orientation should be the orientation it had AT THE MOMENT OF LOCK,
-            // further adjusted by how much the phone has moved SINCE THE MOMENT OF LOCK.
+            // 1. Start with the orientation the camera had when things were locked (based on anchor's PITCH only, initially).
+            // This establishes the baseline "forward/backward tilted" view.
+            camera.rotateX(anchorOrientation.pitch)
 
-            // 1. What was the phone's orientation when "Lock" was pressed? This is anchorOrientation.
-            //    The scene should *initially* appear as it did at anchorOrientation.pitch, .roll, .yaw.
+            // 2. Calculate how much the phone has rolled and yawed *since locking*.
+            val deltaRoll = currentOrientation.roll - anchorOrientation.roll
+            val deltaYaw = currentOrientation.yaw - anchorOrientation.yaw
+            // And how much it has pitched *additionally* since locking.
+            val additionalPitch = currentOrientation.pitch - anchorOrientation.pitch
 
-            // 2. How much has the phone moved since locking? This is (currentOrientation - anchorOrientation).
-            //    Let this be deltaOrientation.
+            // 3. Apply these deltas. These rotations are applied to the camera that is already
+            //    pitched according to anchorOrientation.pitch.
+            //    The order here is critical for how roll and yaw feel relative to the pitched view.
+            //    Typically, you might apply yaw around the world's Y, then additional pitch, then roll.
+            //    Or, for camera's local axes:
 
-            // 3. The final effective orientation for the camera to apply is:
-            //    EffectivePitch = anchorOrientation.pitch + (currentOrientation.pitch - anchorOrientation.pitch) = currentOrientation.pitch
-            //    EffectiveRoll = anchorOrientation.roll + (currentOrientation.roll - anchorOrientation.roll) = currentOrientation.roll
-            //    EffectiveYaw = anchorOrientation.yaw + (currentOrientation.yaw - anchorOrientation.yaw) = currentOrientation.yaw
+            // Option A: Apply deltas to camera's local axes after initial anchor pitch
+            // camera.rotateY(-deltaYaw)   // Yaw around camera's Y (up)
+            // camera.rotateX(additionalPitch) // Additional pitch around camera's X (right)
+            // camera.rotateZ(deltaRoll)   // Roll around camera's Z (forward)
 
-            // This mathematical simplification means that if we just apply currentOrientation directly,
-            // the scene *will* reflect the phone's current absolute orientation.
-            // This *is* what we want for the scene to follow the phone once locked.
+            // Option B: A more intuitive approach might be to think of world transformations
+            // For now, let's try applying the deltas directly to the camera's current state.
+            // The effect of camera.rotateX(anchorOrientation.pitch) has already set a tilted coordinate system for the camera.
+            // Subsequent rotateZ and rotateY will be around the new Z and Y axes of this tilted camera.
 
-            // The "reset to some default view" problem implies that either:
-            //    a) `anchorOrientation` is not being captured correctly when lock is pressed (StateReducer issue).
-            //    b) Or, `currentOrientation` is somehow incorrect/defaulted when lock is active.
-            //    c) Or, the application of these rotations to the `android.graphics.Camera` is not achieving the desired visual.
+            camera.rotateZ(deltaRoll)       // Roll the already pitched view
+            camera.rotateY(-deltaYaw)       // Yaw the already pitched and rolled view
+            camera.rotateX(additionalPitch) // Apply additional pitch last to avoid altering the roll/yaw plane too much
 
-            // Let's ensure the camera rotations directly use the currentOrientation values when locked.
-            // The "lock" then is purely about disabling user input for element manipulation.
-            // The view itself should *always* track the current phone orientation.
-            // If it "resets", it means currentOrientation itself is perceived as "reset" by this function when locked.
-
-            // Apply rotations based on the phone's CURRENT full orientation.
-            // Order: Z (Roll), X (Pitch), Y (Yaw) for the camera object.
-            // Remember currentOrientation.pitch is already -sensorPitch.
-            // A positive camera.rotateX makes the scene pitch "down" (camera looking more up).
-            camera.rotateZ(currentOrientation.roll)
-            camera.rotateX(currentOrientation.pitch)
-            // For Yaw: Android's getOrientation often gives yaw where 0 is North.
-            // camera.rotateY rotates around the camera's Y (vertical) axis.
-            // If phone turns right (yaw increases), scene should appear to pan left.
-            // A positive rotateY makes the scene shift left. So, if yaw increases (turn right), we want positive rotateY.
-            // This means the sign of yaw might need adjustment based on its definition.
-            // If currentOrientation.yaw directly reflects sensor yaw (e.g. increases clockwise):
-            camera.rotateY(-currentOrientation.yaw) // Try with negative first.
-
-            // Log.d("Perspective", "LOCKED: Using Current(P:${currentOrientation.pitch}, R:${currentOrientation.roll}, Y:${currentOrientation.yaw})")
+            Log.d("PerspectiveLOCK", "AnchorPitch:${anchorOrientation.pitch.f1()}, " +
+                    "Delta(P:${additionalPitch.f1()}, R:${deltaRoll.f1()}, Y:${deltaYaw.f1()})")
 
         } else {
-            // UNLOCKED MODE: Only apply the current pitch (forward/backward tilt).
-            // Roll and Yaw do not affect the perspective matrix in unlocked mode.
+            // UNLOCKED MODE: Only apply the current pitch.
             camera.rotateX(currentOrientation.pitch)
-            // Log.d("Perspective", "UNLOCKED: Pitch:${currentOrientation.pitch}")
+            Log.d("PerspectiveUNLOCK", "Applied CurrentPitch:${currentOrientation.pitch.f1()}")
         }
 
         camera.getMatrix(matrix)
@@ -96,3 +88,6 @@ object Perspective {
         return PointF(logicalCoords[0], logicalCoords[1])
     }
 }
+
+// Helper for logging
+private fun Float?.f1(): String = this?.let { "%.1f".format(it) } ?: "n"

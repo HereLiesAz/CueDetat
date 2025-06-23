@@ -2,6 +2,7 @@
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
+import android.util.Log
 import androidx.compose.material3.ColorScheme
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
@@ -154,6 +155,7 @@ class StateReducer @Inject constructor() {
                 )
             }
             is MainScreenEvent.FullOrientationChanged -> {
+                Log.d("StateReducer", "FullOrientationChanged: ${event.orientation}, Locked: ${currentState.isSpatiallyLocked}")
                 currentState.copy(currentOrientation = event.orientation)
             }
             is MainScreenEvent.ToggleSpatialLock -> {
@@ -310,3 +312,4 @@ class StateReducer @Inject constructor() {
         )
     }
 }
+
