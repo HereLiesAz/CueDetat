@@ -6,7 +6,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.PointF
 import android.graphics.Typeface
-import android.util.Log // Added for debugging
+import android.util.Log
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
@@ -43,7 +43,7 @@ class ProtractorOverlayView(context: Context) : View(context) {
     private var lastTouchX_single = 0f
     private var lastTouchY_single = 0f
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
-    private val draggableElementSlop = touchSlop * 7.0f // Consider if this is too large
+    private val draggableElementSlop = touchSlop * 7.0f
 
     private var activePointerId = MotionEvent.INVALID_POINTER_ID
     private var interactionMode = InteractionMode.NONE
@@ -56,7 +56,7 @@ class ProtractorOverlayView(context: Context) : View(context) {
         }
         val scaleListener = object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
-                // Regardless of current single-touch mode, if a scale gesture starts, prioritize it.
+                // Spatial lock does NOT prevent scaling.
                 interactionMode = InteractionMode.SCALING
                 if (!gestureInProgress) {
                     onGestureStarted?.invoke()
@@ -69,17 +69,12 @@ class ProtractorOverlayView(context: Context) : View(context) {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
                 if (interactionMode == InteractionMode.SCALING) {
                     onScale?.invoke(detector.scaleFactor)
-                    // Log.d("ProtractorOverlayView", "onScale: factor=${detector.scaleFactor}")
                     return true
                 }
                 return false
             }
 
             override fun onScaleEnd(detector: ScaleGestureDetector) {
-                // This is called when the scale gesture itself ends (e.g., fingers lift sufficiently apart).
-                // We will also handle finger lifting in ACTION_POINTER_UP and ACTION_UP.
-                // Log.d("ProtractorOverlayView", "onScaleEnd")
-                // No specific interactionMode change here, let ACTION_POINTER_UP / ACTION_UP handle final mode.
                 super.onScaleEnd(detector)
             }
         }
@@ -99,47 +94,60 @@ class ProtractorOverlayView(context: Context) : View(context) {
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
         // Pass to ScaleGestureDetector first. It will update its state.
-        // If it consumes the event (e.g., during a scale), it might return true.
-        val scaleEventHandled = scaleGestureDetector.onTouchEvent(event)
+        val scaleEventHandledByDetector = scaleGestureDetector.onTouchEvent(event)
+
+        // If spatially locked and not a scaling gesture, consume most other touches.
+        // Scaling IS allowed when locked.
+        if (canonicalState.isSpatiallyLocked && !scaleGestureDetector.isInProgress) {
+            val currentAction = event.actionMasked
+            if (currentAction == MotionEvent.ACTION_DOWN) {
+                if (!gestureInProgress) { onGestureStarted?.invoke(); gestureInProgress = true }
+                // Set activePointerId for potential gesture end, even if locked
+                activePointerId = event.getPointerId(0)
+                lastTouchX_single = event.getX(0)
+                lastTouchY_single = event.getY(0)
+                interactionMode = InteractionMode.NONE // No specific interaction if locked
+            } else if (currentAction == MotionEvent.ACTION_UP || currentAction == MotionEvent.ACTION_CANCEL) {
+                if (gestureInProgress) { onGestureEnded?.invoke(); gestureInProgress = false }
+                interactionMode = InteractionMode.NONE
+                activePointerId = MotionEvent.INVALID_POINTER_ID
+            }
+            return true // Consume to prevent further processing for non-scaling touches when locked
+        }
 
         val action = event.actionMasked
         val pointerIndex = event.actionIndex
 
-        // If ScaleGestureDetector is in progress, it usually means interactionMode is SCALING.
-        // Let it handle the event primarily.
-        if (scaleGestureDetector.isInProgress || interactionMode == InteractionMode.SCALING && action == MotionEvent.ACTION_MOVE) {
+        // If ScaleGestureDetector is in progress (scaling), it primarily handles the event.
+        // However, we still need to manage ACTION_UP/CANCEL or POINTER_UP to reset our state.
+        if (scaleGestureDetector.isInProgress || (interactionMode == InteractionMode.SCALING && action == MotionEvent.ACTION_MOVE)) {
             if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL ||
-                (action == MotionEvent.ACTION_POINTER_UP && event.pointerCount <= 2) ) { // If last two fingers lift or one of two lifts
-                // Fall through to handle gesture end or transition from scaling.
+                (action == MotionEvent.ACTION_POINTER_UP && event.pointerCount <= 2)) {
+                // Fall through to handle these specific end/transition events for scaling
             } else {
-                return true // ScaleGestureDetector is handling it, or we are in active scaling move.
+                return true // ScaleGestureDetector is actively scaling or was the primary handler
             }
         }
-
 
         when (action) {
             MotionEvent.ACTION_DOWN -> {
                 if (!gestureInProgress) {
                     onGestureStarted?.invoke(); gestureInProgress = true
                 }
-                // activePointerId is for single touch drag, scale detector handles multiple.
-                event.findPointerIndex(activePointerId).takeIf { it != -1 }?.let {
-                    // This pointer is already active, unusual for ACTION_DOWN unless it's a quick tap release-down
-                } ?: run {
-                    activePointerId = event.getPointerId(0)
-                    lastTouchX_single = event.getX(0)
-                    lastTouchY_single = event.getY(0)
-                }
+                // Set primary pointer for potential single touch drag
+                activePointerId = event.getPointerId(0)
+                lastTouchX_single = event.getX(0)
+                lastTouchY_single = event.getY(0)
 
-                // Only determine single touch mode if not already in scaling (e.g. if scale ended but one finger remained down then lifted and tapped again)
+                // Only determine single touch mode if not already in scaling
+                // (which shouldn't happen here due to the gate above, but good for safety)
                 if (interactionMode != InteractionMode.SCALING) {
                     determineSingleTouchMode(lastTouchX_single, lastTouchY_single)
                 }
-                Log.d("ProtractorOverlayView", "ACTION_DOWN: Mode=$interactionMode, activePointerId=$activePointerId")
+                Log.d("ProtractorOverlayView", "ACTION_DOWN: Mode=$interactionMode, activePointerId=$activePointerId, spatiallyLocked=${canonicalState.isSpatiallyLocked}")
             }
             MotionEvent.ACTION_MOVE -> {
-                // If scaling was handled above, this won't be reached for scaling moves.
-                // This handles single pointer moves.
+                // This handles single pointer moves if not locked and not scaling.
                 if (event.pointerCount == 1 && activePointerId != MotionEvent.INVALID_POINTER_ID) {
                     val currentEventPointerIndex = event.findPointerIndex(activePointerId)
                     if (currentEventPointerIndex == -1) return true // Stale active pointer ID
@@ -147,20 +155,18 @@ class ProtractorOverlayView(context: Context) : View(context) {
                     val currentX = event.getX(currentEventPointerIndex)
                     val currentY = event.getY(currentEventPointerIndex)
                     val dx = currentX - lastTouchX_single
-                    // val dy = currentY - lastTouchY_single // Not used for rotation
 
                     // If mode is NONE, attempt to determine mode based on movement surpassing slop
                     if (interactionMode == InteractionMode.NONE && (abs(dx) > touchSlop || abs(currentY - lastTouchY_single) > touchSlop)) {
-                        determineSingleTouchMode(lastTouchX_single, lastTouchY_single) // Use original touch down point for determination
+                        determineSingleTouchMode(lastTouchX_single, lastTouchY_single)
                         Log.d("ProtractorOverlayView", "ACTION_MOVE: Re-determined Mode=$interactionMode due to slop")
                     }
 
                     when (interactionMode) {
                         InteractionMode.ROTATING_PROTRACTOR -> {
-                            if (abs(dx) > touchSlop/2) { // smaller slop for continuous rotation
+                            if (abs(dx) > touchSlop/2) {
                                 onProtractorRotationChange?.invoke(canonicalState.protractorUnit.rotationDegrees - (dx * 0.3f))
-                                lastTouchX_single = currentX // Update lastTouch for next delta
-                                // lastTouchY_single = currentY; // Keep Y updated too
+                                lastTouchX_single = currentX
                             }
                         }
                         InteractionMode.MOVING_PROTRACTOR_UNIT -> {
@@ -175,7 +181,6 @@ class ProtractorOverlayView(context: Context) : View(context) {
                             onBankingAimTargetScreenDrag?.invoke(PointF(currentX, currentY))
                             lastTouchX_single = currentX; lastTouchY_single = currentY
                         }
-                        // SCALING is handled by ScaleGestureDetector, NONE means no dominant single gesture yet
                         InteractionMode.SCALING, InteractionMode.NONE -> { /* No specific single touch action */ }
                     }
                 }
@@ -189,15 +194,13 @@ class ProtractorOverlayView(context: Context) : View(context) {
                 activePointerId = MotionEvent.INVALID_POINTER_ID
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
-                // A new pointer has come down. If not already scaling, ScaleGestureDetector's onScaleBegin
-                // should handle setting interactionMode = SCALING.
-                // We don't need to change activePointerId here for single touch,
-                // as this is now a multi-touch gesture.
-                // Log.d("ProtractorOverlayView", "ACTION_POINTER_DOWN: event.pointerCount=${event.pointerCount}")
+                // A new pointer has come down. ScaleGestureDetector's onScaleBegin
+                // (called by scaleGestureDetector.onTouchEvent(event) at the top)
+                // should handle setting interactionMode = SCALING if it's a scale.
             }
             MotionEvent.ACTION_POINTER_UP -> {
                 val upPointerId = event.getPointerId(pointerIndex)
-                // Log.d("ProtractorOverlayView", "ACTION_POINTER_UP: upPointerId=$upPointerId, activePointerId=$activePointerId, event.pointerCount=${event.pointerCount}, oldMode=$interactionMode")
+                Log.d("ProtractorOverlayView", "ACTION_POINTER_UP: upPointerId=$upPointerId, activePointerId=$activePointerId, event.pointerCount=${event.pointerCount}, oldMode=$interactionMode")
 
                 if (interactionMode == InteractionMode.SCALING) {
                     // If scaling was active and this UP event means only one pointer remains,
@@ -212,6 +215,10 @@ class ProtractorOverlayView(context: Context) : View(context) {
                                 lastTouchX_single = event.getX(i)
                                 lastTouchY_single = event.getY(i)
                                 Log.d("ProtractorOverlayView", "Transition from SCALING to single: new activePointerId=$activePointerId, x=$lastTouchX_single, y=$lastTouchY_single")
+                                // If not spatially locked, redetermine mode for the remaining finger.
+                                if (!canonicalState.isSpatiallyLocked) {
+                                    determineSingleTouchMode(lastTouchX_single, lastTouchY_single)
+                                }
                                 break
                             }
                         }
@@ -220,42 +227,40 @@ class ProtractorOverlayView(context: Context) : View(context) {
                         activePointerId = MotionEvent.INVALID_POINTER_ID
                         if (gestureInProgress) { onGestureEnded?.invoke(); gestureInProgress = false }
                     }
-                    // If event.pointerCount > 2, scaling might continue with remaining pointers.
-                    // ScaleGestureDetector handles this.
                 } else if (upPointerId == activePointerId) {
                     // The primary single-touch pointer was lifted, but it's not ACTION_UP (more pointers remain)
-                    // This is a complex case, often means transitioning from an unintended multi-touch that wasn't a scale.
+                    // This can happen if user briefly adds a second finger without initiating a scale, then lifts the first.
                     // Switch to the next available pointer for single touch.
-                    val newPointerActionIndex = if (pointerIndex == 0) 1 else 0 // Simplistic way to get other pointer
-                    if (newPointerActionIndex < event.pointerCount) {
+                    val newPointerActionIndex = if (pointerIndex == 0) 1 else 0
+                    if (newPointerActionIndex < event.pointerCount) { // Check if another pointer exists
                         activePointerId = event.getPointerId(newPointerActionIndex)
                         lastTouchX_single = event.getX(newPointerActionIndex)
                         lastTouchY_single = event.getY(newPointerActionIndex)
-                        // Mode might need redetermination or reset
-                        interactionMode = InteractionMode.NONE // Safest to reset and let next MOVE determine
-                        Log.d("ProtractorOverlayView", "Primary single touch lifted, switched to other pointer: new activePointerId=$activePointerId")
-                    } else {
-                        // Should be caught by ACTION_UP
+                        interactionMode = InteractionMode.NONE // Safest to reset
+                        // If not spatially locked, redetermine mode for the new active finger.
+                        if (!canonicalState.isSpatiallyLocked) {
+                            determineSingleTouchMode(lastTouchX_single, lastTouchY_single)
+                        }
+                        Log.d("ProtractorOverlayView", "Primary single touch lifted, switched to other pointer: new activePointerId=$activePointerId. New Mode: $interactionMode")
+                    } else { // Should ideally be caught by ACTION_UP
                         interactionMode = InteractionMode.NONE
                         activePointerId = MotionEvent.INVALID_POINTER_ID
                     }
                 }
-                // If a non-active, non-scaling pointer went up, activePointerId and mode for single touch remain.
             }
         }
-        return true // This view always handles touch events to manage its complex gestures.
+        return true
     }
 
     private fun determineSingleTouchMode(touchX: Float, touchY: Float) {
-        // if (interactionMode == InteractionMode.SCALING) return // Already checked before calling normally
-
+        // This function is only called if not spatially locked (due to the gate in onTouchEvent)
+        // or if transitioning from a scale gesture with one finger remaining (and not locked).
         val touchPoint = PointF(touchX, touchY)
-        var determinedMode = InteractionMode.NONE // Default to NONE
+        var determinedMode = InteractionMode.NONE
 
         if (canonicalState.isBankingMode) {
             canonicalState.actualCueBall?.let {
                 val ballScreenPos = DrawingUtils.mapPoint(it.center, canonicalState.pitchMatrix)
-                // Use a smaller slop for banking ball selection as it's the primary interactive element.
                 val bankingBallSlop = draggableElementSlop * 0.75f
                 if (DrawingUtils.distance(touchPoint, ballScreenPos) < bankingBallSlop) {
                     determinedMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
@@ -263,7 +268,6 @@ class ProtractorOverlayView(context: Context) : View(context) {
             }
             if (determinedMode == InteractionMode.NONE) {
                 determinedMode = InteractionMode.AIMING_BANK_SHOT
-                // Don't invoke callback here, let ACTION_MOVE handle it based on confirmed mode
             }
         } else { // Protractor Mode
             canonicalState.actualCueBall?.let {
@@ -284,8 +288,8 @@ class ProtractorOverlayView(context: Context) : View(context) {
                 determinedMode = InteractionMode.ROTATING_PROTRACTOR
             }
         }
-        interactionMode = determinedMode // Set the determined mode
-        // Log.d("ProtractorOverlayView", "determineSingleTouchMode: x=$touchX, y=$touchY -> Mode=$interactionMode")
+        interactionMode = determinedMode
+        Log.d("ProtractorOverlayView", "determineSingleTouchMode: x=$touchX, y=$touchY -> Mode=$interactionMode")
     }
 
     fun updateState(newState: OverlayState, systemIsDark: Boolean) {

@@ -1,9 +1,10 @@
+// app/src/main/java/com/hereliesaz/cuedetat/view/state/OverlayState.kt
 package com.hereliesaz.cuedetat.view.state
 
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.darkColorScheme // For default initialization
+import androidx.compose.material3.darkColorScheme
 import com.hereliesaz.cuedetat.view.model.ActualCueBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 
@@ -14,7 +15,7 @@ data class OverlayState(
 
     // Core logical model
     val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), 1f, 0f),
-    val actualCueBall: ActualCueBall? = null, // Used for optional ball in protractor, and as banking ball in banking mode
+    val actualCueBall: ActualCueBall? = null,
 
     // UI control state
     val zoomSliderPosition: Float = 100f,
@@ -28,26 +29,32 @@ data class OverlayState(
     val bankingAimTarget: PointF? = null,
 
     // Theme and Appearance FOR DRAWN ELEMENTS on ProtractorOverlayView
-    val isForceLightMode: Boolean? = null, // null = system, true = light, false = dark (for PaintCache)
-    val luminanceAdjustment: Float = 0f,   // Range -0.5f to 0.5f typically (for PaintCache)
+    val isForceLightMode: Boolean? = null,
+    val luminanceAdjustment: Float = 0f,
     val showLuminanceDialog: Boolean = false,
 
     // Tutorial State
     val showTutorialOverlay: Boolean = false,
     val currentTutorialStep: Int = 0,
-    // tutorialMessages will be a constant or resource, not in state directly
 
     // Sensor and perspective data
     val pitchAngle: Float = 0.0f,
+    // Add new sensor data fields for full orientation when locked
+    // val lockedPitch: Float? = null, // Example for future
+    // val lockedRoll: Float? = null,  // Example for future
+    // val lockedYaw: Float? = null,   // Example for future
     val pitchMatrix: Matrix = Matrix(),
     val railPitchMatrix: Matrix = Matrix(),
     val inversePitchMatrix: Matrix = Matrix(),
     val hasInverseMatrix: Boolean = false,
 
     // Derived state
-    val isImpossibleShot: Boolean = false, // Relevant for protractor mode
+    val isImpossibleShot: Boolean = false,
     val warningText: String? = null,
 
-    // Theming - This represents the UNMODIFIED Material Theme of the app's UI controls (sliders, menu, etc.)
-    val appControlColorScheme: ColorScheme = darkColorScheme() // Base theme for UI controls, initialized to a default
+    // Theming
+    val appControlColorScheme: ColorScheme = darkColorScheme(),
+
+    // New Spatial Lock State
+    val isSpatiallyLocked: Boolean = false
 )

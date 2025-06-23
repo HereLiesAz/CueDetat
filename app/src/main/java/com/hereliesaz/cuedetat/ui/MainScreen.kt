@@ -343,3 +343,185 @@ fun MainScreen(viewModel: MainViewModel) {
         }
     }
 }
+
+@Composable
+fun LockFab(
+    uiState: OverlayState,
+    onEvent: (MainScreenEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FloatingActionButton(
+        onClick = { onEvent(MainScreenEvent.ToggleSpatialLock) },
+        modifier = modifier
+            .padding(bottom = 16.dp) // Standard FAB padding
+            .navigationBarsPadding(), // Respect navigation bar
+        containerColor = if (uiState.isSpatiallyLocked) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = if (uiState.isSpatiallyLocked) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
+    ) {
+        Row(modifier = Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = if (uiState.isSpatiallyLocked) Icons.Filled.Lock else Icons.Filled.LockOpen,
+                contentDescription = if (uiState.isSpatiallyLocked) "Unlock Spatial Position" else "Lock Spatial Position"
+            )
+            // Text can be added here if desired, e.g., " Lock" / " Unlk"
+            // if (uiState.areHelpersVisible || true) { // Always show text for this one for clarity
+            //     Spacer(modifier = Modifier.width(8.dp))
+            //     Text(if (uiState.isSpatiallyLocked) "Locked" else "Lock")
+            // }
+        }
+    }
+}
+
+
+@Composable
+fun MainScreen(viewModel: MainViewModel) {
+    val uiState by viewModel.uiState.collectAsState()
+    val toastMessage by viewModel.toastMessage.collectAsState()
+    val context = LocalContext.current
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    val protractorView = remember { ProtractorOverlayView(context) }
+    val systemIsDark = isSystemInDarkTheme()
+
+    val appControlColorScheme = MaterialTheme.colorScheme
+    LaunchedEffect(appControlColorScheme) {
+        viewModel.onEvent(MainScreenEvent.ThemeChanged(appControlColorScheme))
+    }
+
+    LaunchedEffect(toastMessage) {
+        toastMessage?.let {
+            val messageText = when (it) {
+                is ToastMessage.StringResource -> context.getString(it.id, *it.formatArgs.toTypedArray())
+                is ToastMessage.PlainText -> it.text
+            }
+            Toast.makeText(context, messageText, Toast.LENGTH_SHORT).show()
+            viewModel.onEvent(MainScreenEvent.ToastShown)
+        }
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        gesturesEnabled = drawerState.isOpen,
+        drawerContent = {
+            MenuDrawerContent(
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                onCloseDrawer = { scope.launch { drawerState.close() } }
+            )
+        }
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            CameraBackground(modifier = Modifier.fillMaxSize().zIndex(0f))
+
+            AndroidView(
+                factory = {
+                    protractorView.apply {
+                        onSizeChanged = { w, h -> viewModel.onEvent(MainScreenEvent.SizeChanged(w, h)) }
+                        onProtractorRotationChange = { rot -> viewModel.onEvent(MainScreenEvent.RotationChanged(rot)) }
+                        onProtractorUnitMoved = { pos -> viewModel.onEvent(MainScreenEvent.UnitMoved(pos)) }
+                        onActualCueBallScreenMoved = { pos -> viewModel.onEvent(MainScreenEvent.ActualCueBallMoved(pos)) }
+                        onScale = { scaleFactor -> viewModel.onEvent(MainScreenEvent.ZoomScaleChanged(scaleFactor)) }
+                        onGestureStarted = { viewModel.onEvent(MainScreenEvent.GestureStarted) }
+                        onGestureEnded = { viewModel.onEvent(MainScreenEvent.GestureEnded) }
+                        onBankingAimTargetScreenDrag = { screenPoint -> viewModel.onEvent(MainScreenEvent.BankingAimTargetDragged(screenPoint)) }
+                    }
+                },
+                modifier = Modifier.fillMaxSize().zIndex(1f),
+                update = { view -> view.updateState(uiState, systemIsDark) }
+            )
+
+            TopControls(
+                uiState = uiState,
+                onMenuClick = { scope.launch { drawerState.open() } },
+                modifier = Modifier.zIndex(2f)
+            )
+            ZoomControls(
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight(0.4f)
+                    .padding(end = 8.dp)
+                    .zIndex(5f)
+            )
+
+            // FABs Column for bottom alignment
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter) // Align the whole column to bottom center
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp) // Padding for the column from screen bottom edge
+                    .zIndex(2f),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // TableRotationSlider will only appear if isBankingMode is true
+                TableRotationSlider(
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent,
+                    // Modifier for TableRotationSlider itself if needed,
+                    // e.g., to control its width within the Column
+                    modifier = Modifier.fillMaxWidth(0.8f) // Example: take 80% of column width
+                        .padding(bottom = 8.dp) // Space between slider and LockFab
+                )
+
+                LockFab( // Add the Lock FAB
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent
+                    // modifier for LockFab is handled internally for padding
+                )
+            }
+
+
+            // This Row is for the bottom-start and bottom-end FABs
+            Row(
+                modifier = Modifier
+                    .fillMaxSize() // Fill the whole screen to allow alignment to corners
+                    .padding(16.dp) // Outer padding for the FABs from screen edges
+                    .navigationBarsPadding()
+                    .zIndex(2f),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                if (!uiState.isBankingMode) {
+                    ToggleCueBallFab(
+                        uiState = uiState,
+                        onEvent = { viewModel.onEvent(MainScreenEvent.ToggleActualCueBall) }
+                        // Modifier here would be for the FAB itself within the Row
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f)) // Pushes ResetFab to the end
+                ResetFab(
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent
+                    // Modifier here would be for the FAB itself within the Row
+                )
+            }
+
+            KineticWarningOverlay(text = uiState.warningText, modifier = Modifier.zIndex(3f))
+            LuminanceAdjustmentDialog(
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleLuminanceDialog) })
+
+            val tutorialMessages = remember {
+                listOf(
+                    "Welcome to Cue D'état!\nTap 'Next' to learn the basics.",
+                    "PROTRACTOR MODE:\nDrag the Target Ball (center circle) to aim for cut shots.",
+                    "Rotate the Protractor: Single finger drag left/right (not on a ball).",
+                    "Zoom View: Pinch to zoom in or out.",
+                    "Optional Aiming Ball: Toggle with bottom-left FAB to visualize shots from a specific spot.",
+                    "BANKING MODE:\nSelect 'Calculate Bank' from menu. Table appears.",
+                    "Drag the Cue Ball on table. Drag elsewhere on screen to set your aim line for bank shots.",
+                    "Table Rotation: Use bottom slider. Zoom: Use side slider.",
+                    "LOCK BUTTON (Bottom Center):\nTap 'Lock' to fix elements in real space. Move your phone; they should stay put relative to the table. Tap 'Unlock' to adjust again.",
+                    "Menu: Explore for theme options (for drawn lines), luminance, and this tutorial!"
+                )
+            }
+            TutorialOverlay(
+                uiState = uiState,
+                tutorialMessages = tutorialMessages,
+                onEvent = viewModel::onEvent
+            )
+        }
+    }
+}
