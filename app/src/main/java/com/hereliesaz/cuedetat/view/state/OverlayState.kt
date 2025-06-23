@@ -5,6 +5,7 @@ import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
+import com.hereliesaz.cuedetat.data.FullOrientation // Import FullOrientation
 import com.hereliesaz.cuedetat.view.model.ActualCueBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 
@@ -38,11 +39,9 @@ data class OverlayState(
     val currentTutorialStep: Int = 0,
 
     // Sensor and perspective data
-    val pitchAngle: Float = 0.0f,
-    // Add new sensor data fields for full orientation when locked
-    // val lockedPitch: Float? = null, // Example for future
-    // val lockedRoll: Float? = null,  // Example for future
-    // val lockedYaw: Float? = null,   // Example for future
+    val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f), // Current real-time orientation
+    val anchorOrientation: FullOrientation? = null, // Stored orientation when locked
+
     val pitchMatrix: Matrix = Matrix(),
     val railPitchMatrix: Matrix = Matrix(),
     val inversePitchMatrix: Matrix = Matrix(),
@@ -55,6 +54,11 @@ data class OverlayState(
     // Theming
     val appControlColorScheme: ColorScheme = darkColorScheme(),
 
-    // New Spatial Lock State
+    // Spatial Lock State
     val isSpatiallyLocked: Boolean = false
-)
+) {
+    // Convenience getter for the old pitchAngle, derived from currentOrientation
+    // This maintains compatibility with parts of the code still using pitchAngle directly.
+    val pitchAngle: Float
+        get() = currentOrientation.pitch
+}
