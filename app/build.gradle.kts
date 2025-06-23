@@ -15,8 +15,8 @@ android {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 26
         targetSdk = 36
-        versionCode = 14
-        versionName = "0.3.6"
+        versionCode = 15
+        versionName = "0.3.65"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
