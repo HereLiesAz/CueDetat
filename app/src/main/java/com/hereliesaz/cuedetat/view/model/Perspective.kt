@@ -18,13 +18,14 @@ object Perspective {
         camera: Camera,
         lift: Float = 0f
     ): Matrix {
-        Log.d("PerspectiveCHK", "CALLED - Locked=$isSpatiallyLocked, " +
-                "Current(P:${currentOrientation.pitch.f1()},R:${currentOrientation.roll.f1()},Y:${currentOrientation.yaw.f1()}), " +
-                "Anchor(P:${anchorOrientation?.pitch?.f1()},R:${anchorOrientation?.roll?.f1()},Y:${anchorOrientation?.yaw?.f1()})")
+        val classTag = "Perspective"
+        Log.d(classTag, "CALLED - Locked=$isSpatiallyLocked, " +
+                "Cur(P:${currentOrientation.pitch.f1()},R:${currentOrientation.roll.f1()},Y:${currentOrientation.yaw.f1()}), " +
+                "Anc(P:${anchorOrientation?.pitch?.f1()},R:${anchorOrientation?.roll?.f1()},Y:${anchorOrientation?.yaw?.f1()})")
 
         val matrix = Matrix()
         camera.save()
-        camera.setLocation(0f, 0f, -32f)
+        camera.setLocation(0f, 0f, -32f) // Reset position each time
 
         if (lift != 0f) {
             camera.translate(0f, lift, 0f)
@@ -32,43 +33,43 @@ object Perspective {
 
         if (isSpatiallyLocked && anchorOrientation != null) {
             // LOCKED MODE:
-            // 1. Start with the orientation the camera had when things were locked (based on anchor's PITCH only, initially).
-            // This establishes the baseline "forward/backward tilted" view.
+            // Goal: Start view based on anchorPitch (no jump from unlocked).
+            // Then, counteract phone's Pitch, Roll, Yaw movements relative to the anchor point.
+
+            // 1. Base camera rotation: Set to the pitch observed at the moment of locking.
+            //    This ensures the initial locked view matches the unlocked view's primary tilt.
             camera.rotateX(anchorOrientation.pitch)
 
-            // 2. Calculate how much the phone has rolled and yawed *since locking*.
+            // 2. Calculate how much the phone has deviated from its anchored orientation
+            //    for EACH axis (Roll, Yaw, and any *additional* Pitch beyond the anchor pitch).
             val deltaRoll = currentOrientation.roll - anchorOrientation.roll
             val deltaYaw = currentOrientation.yaw - anchorOrientation.yaw
-            // And how much it has pitched *additionally* since locking.
-            val additionalPitch = currentOrientation.pitch - anchorOrientation.pitch
+            // This deltaPitch is the phone's pitch movement *relative to the pitch it had when locked*.
+            val deltaPitch = currentOrientation.pitch - anchorOrientation.pitch
 
-            // 3. Apply these deltas. These rotations are applied to the camera that is already
-            //    pitched according to anchorOrientation.pitch.
-            //    The order here is critical for how roll and yaw feel relative to the pitched view.
-            //    Typically, you might apply yaw around the world's Y, then additional pitch, then roll.
-            //    Or, for camera's local axes:
+            // 3. Apply counter-rotations to the camera for these deltas.
+            //    These rotations are applied to the camera *which is already pitched by anchorOrientation.pitch*.
+            //    The order of these counter-rotations can matter. Z, Y, X is a common order for applying
+            //    delta rotations to a camera's local axes to achieve world stabilization.
+            //    - To counteract phone roll, camera rolls opposite: camera.rotateZ(-deltaRoll)
+            //    - To counteract phone pitch delta, camera pitches opposite: camera.rotateX(-deltaPitch)
+            //    - To counteract phone yaw, camera yaws opposite: camera.rotateY(deltaYaw)
+            //      (Sign of deltaYaw for rotateY is tricky: if phone yaws right (sensor yaw increases, deltaYaw positive),
+            //       scene should appear to move left. camera.rotateY(positive) makes scene move left. So +deltaYaw might be right)
 
-            // Option A: Apply deltas to camera's local axes after initial anchor pitch
-            // camera.rotateY(-deltaYaw)   // Yaw around camera's Y (up)
-            // camera.rotateX(additionalPitch) // Additional pitch around camera's X (right)
-            // camera.rotateZ(deltaRoll)   // Roll around camera's Z (forward)
+            camera.rotateZ(-deltaRoll)    // Counteract phone's roll since anchor
+            camera.rotateX(-deltaPitch)   // Counteract phone's additional pitch since anchor
+            camera.rotateY(deltaYaw)      // Counteract phone's yaw since anchor (TEST THIS SIGN)
 
-            // Option B: A more intuitive approach might be to think of world transformations
-            // For now, let's try applying the deltas directly to the camera's current state.
-            // The effect of camera.rotateX(anchorOrientation.pitch) has already set a tilted coordinate system for the camera.
-            // Subsequent rotateZ and rotateY will be around the new Z and Y axes of this tilted camera.
 
-            camera.rotateZ(deltaRoll)       // Roll the already pitched view
-            camera.rotateY(-deltaYaw)       // Yaw the already pitched and rolled view
-            camera.rotateX(additionalPitch) // Apply additional pitch last to avoid altering the roll/yaw plane too much
-
-            Log.d("PerspectiveLOCK", "AnchorPitch:${anchorOrientation.pitch.f1()}, " +
-                    "Delta(P:${additionalPitch.f1()}, R:${deltaRoll.f1()}, Y:${deltaYaw.f1()})")
+            Log.d(classTag, "LOCKED: BaseAnchorPitch:${anchorOrientation.pitch.f1()} | " +
+                    "Delta(P:${deltaPitch.f1()},R:${deltaRoll.f1()},Y:${deltaYaw.f1()}) | " +
+                    "AppliedCamCounter(P:${(-deltaPitch).f1()},R:${(-deltaRoll).f1()},Y:${(deltaYaw).f1()})")
 
         } else {
-            // UNLOCKED MODE: Only apply the current pitch.
+            // UNLOCKED MODE: Only apply the current pitch. Roll and Yaw are ignored.
             camera.rotateX(currentOrientation.pitch)
-            Log.d("PerspectiveUNLOCK", "Applied CurrentPitch:${currentOrientation.pitch.f1()}")
+            // Log.d(classTag, "UNLOCKED: Applied CurrentPitch:${currentOrientation.pitch.f1()}")
         }
 
         camera.getMatrix(matrix)
