@@ -21,6 +21,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import org.opencv.android.OpenCVLoader
+
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -36,7 +38,10 @@ class MainActivity : ComponentActivity() {
 
         // Attempt to enable ARCore if not already done, or check for its availability
         maybeEnableArCore()
-
+        if (!OpenCVLoader.initDebug())
+            Log.e("OpenCV", "Unable to load OpenCV!");
+        else
+            Log.d("OpenCV", "OpenCV loaded Successfully!");
         setContent {
             CueDetatTheme {
                 MainScreen(viewModel = viewModel)

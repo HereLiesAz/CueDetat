@@ -152,12 +152,16 @@ android {
         implementation(libs.material)
         implementation(libs.androidx.material.icons.extended)
         implementation(libs.ar.core)
+        implementation(project(":opencv"))
+
     }
 }
 dependencies {
     implementation(libs.ui)
+    implementation(libs.sceneform.base)
 }
 
 kapt {
     correctErrorTypes = true
 }
+
