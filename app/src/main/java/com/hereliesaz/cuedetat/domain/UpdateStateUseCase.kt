@@ -4,6 +4,7 @@ package com.hereliesaz.cuedetat.domain
 import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
+import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
@@ -20,14 +21,13 @@ class UpdateStateUseCase @Inject constructor() {
 
         val pitchMatrix = Perspective.createPitchMatrix(
             currentOrientation = state.currentOrientation,
-            anchorOrientation = state.anchorOrientation, // Passed correctly
-            isSpatiallyLocked = state.isSpatiallyLocked, // Pass the lock state explicitly
+            anchorOrientation = state.anchorOrientation,
+            isSpatiallyLocked = state.isSpatiallyLocked,
             viewWidth = state.viewWidth,
             viewHeight = state.viewHeight,
             camera = camera
         )
 
-        // For banking mode, referenceRadius should be actualCueBall.radius
         val referenceRadiusForTable = state.actualCueBall?.radius ?: state.protractorUnit.radius
         val logicalTableShortSide = tableToBallRatioShort * referenceRadiusForTable
         val railLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
@@ -59,7 +59,7 @@ class UpdateStateUseCase @Inject constructor() {
         val inverseMatrix = Matrix()
         val hasInverse = pitchMatrix.invert(inverseMatrix)
 
-        val anchorPointA: PointF? = state.actualCueBall?.center ?: run {
+        val anchorPointA: PointF? = state.actualCueBall?.logicalPosition ?: run {
             if (hasInverse) {
                 val screenAnchor = floatArrayOf(state.viewWidth / 2f, state.viewHeight.toFloat())
                 val logicalAnchorArray = FloatArray(2)
@@ -71,8 +71,8 @@ class UpdateStateUseCase @Inject constructor() {
         }
 
         val calculatedIsImpossibleShot = anchorPointA?.let { anchor ->
-            val distAtoG = distance(anchor, state.protractorUnit.protractorCueBallCenter)
-            val distAtoT = distance(anchor, state.protractorUnit.center)
+            val distAtoG = distance(anchor, state.protractorUnit.protractorCueBallLogicalCenter)
+            val distAtoT = distance(anchor, state.protractorUnit.logicalPosition)
             distAtoG > distAtoT
         } ?: false
 

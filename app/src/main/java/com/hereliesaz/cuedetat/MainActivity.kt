@@ -1,113 +1,168 @@
+// app/src/main/java/com/hereliesaz/cuedetat/MainActivity.kt
 package com.hereliesaz.cuedetat
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.viewModels
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect // For initial theme dispatch
-import androidx.compose.material3.MaterialTheme // For getting current theme
-// import androidx.compose.runtime.collectAsState // No longer needed here for theme
-// import androidx.compose.runtime.getValue // No longer needed here for theme
-import androidx.core.content.ContextCompat
-import androidx.core.view.WindowCompat
+import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.ar.core.ArCoreApk
+import com.google.ar.core.Session
+import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException
+import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
+import com.google.ar.core.exceptions.UnavailableException
+import com.google.ar.core.exceptions.UnavailableSdkTooOldException
+import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
 import com.hereliesaz.cuedetat.ui.MainScreen
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.MainViewModel
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
-import com.hereliesaz.cuedetat.view.state.SingleEvent
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: MainViewModel by viewModels()
+    @Inject
+    lateinit var viewModel: MainViewModel
 
-    private val requestCameraPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-            if (isGranted) {
-                if (findViewById<android.view.ViewGroup>(android.R.id.content).childCount == 0) {
-                    setContent { AppContent(viewModel) }
-                }
-            } else {
-                // TODO: Handle permission denial gracefully (e.g., show a message)
-            }
-        }
+    private var arSession: Session? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        enableEdgeToEdge()
 
-        if (hasCameraPermission()) {
-            setContent {
-                AppContent(viewModel)
+        // Attempt to enable ARCore if not already done, or check for its availability
+        maybeEnableArCore()
+
+        setContent {
+            CueDetatTheme {
+                MainScreen(viewModel = viewModel)
             }
+        }
+
+        // Observe the spatial lock state from the ViewModel
+        // and manage the AR session accordingly.
+        lifecycleScope.launch {
+            viewModel.uiState.collectLatest { uiState ->
+                if (uiState.isSpatiallyLocked) {
+                    // If switching to locked (AR) mode, ensure AR session is created and resumed
+                    if (arSession == null) {
+                        tryCreateArSession()
+                    } else {
+                        try {
+                            arSession?.resume()
+                        } catch (e: Exception) {
+                            Log.e("ARCore", "Failed to resume AR session on lock enable", e)
+                        }
+                    }
+                } else {
+                    // If switching off locked (AR) mode, pause AR session
+                    arSession?.pause()
+                }
+            }
+        }
+    }
+
+    /**
+     * Checks ARCore availability and attempts to install it if needed.
+     * This function should be called early in the Activity lifecycle.
+     */
+    private fun maybeEnableArCore() {
+        val availability = ArCoreApk.getInstance().checkAvailability(this)
+
+        if (availability.isTransient) {
+            // ARCore is not yet available, but might be soon. Retry later.
+            Log.d("ARCore", "ARCore availability is transient. Retrying soon.")
+            // Consider adding a delay or retry mechanism here if critical for initial load
+            return
+        }
+
+        if (availability.isSupported) {
+            Log.d("ARCore", "ARCore is supported on this device.")
+            // If supported, attempt to create the AR session immediately
+            tryCreateArSession()
         } else {
-            requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-        }
-        observeSingleEvents()
-    }
-
-    private fun observeSingleEvents() {
-        viewModel.singleEvent.onEach { event ->
-            when (event) {
-                is SingleEvent.OpenUrl -> {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
-                    startActivity(intent)
-                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
-                }
-                is SingleEvent.ShowDonationDialog -> {
-                    showDonationDialog()
-                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
-                }
-                null -> { /* Do nothing */
-                }
-            }
-        }.launchIn(lifecycleScope)
-    }
-
-    private fun showDonationDialog() {
-        val items = arrayOf("PayPal", "Venmo", "CashApp")
-        val urls = arrayOf(
-            "https://paypal.me/azcamehere",
-            "https://venmo.com/u/hereliesaz",
-            "https://cash.app/\$azcamehere"
-        )
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Chalk Your Tip")
-            .setItems(items) { _, which ->
-                if (which < urls.size) {
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(urls[which])))
-                }
-            }
-            .setNegativeButton("Maybe Later", null)
-            .show()
-    }
-
-    @Composable
-    private fun AppContent(viewModel: MainViewModel) {
-        CueDetatTheme { // CueDetatTheme now manages its dark/light mode internally based on system
-            // Dispatch the initial app control theme to the ViewModel
-            val currentAppControlColorScheme = MaterialTheme.colorScheme
-            LaunchedEffect(currentAppControlColorScheme) {
-                viewModel.onEvent(MainScreenEvent.ThemeChanged(currentAppControlColorScheme))
-            }
-            MainScreen(viewModel = viewModel)
+            Log.w("ARCore", "ARCore is NOT supported on this device.")
+            // Handle cases where ARCore is permanently not supported on the device.
+            // You might want to disable AR-related UI elements or show a message.
         }
     }
 
-    private fun hasCameraPermission() =
-        ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.CAMERA
-        ) == PackageManager.PERMISSION_GRANTED
+    /**
+     * Attempts to create an ARCore session. Handles installation requests if necessary.
+     */
+    private fun tryCreateArSession() {
+        if (arSession != null) {
+            Log.d("ARCore", "AR Session already exists. Skipping creation.")
+            return // Session already exists
+        }
+
+        try {
+            when (ArCoreApk.getInstance().requestInstall(this, true)) { // `true` requests user installation if needed
+                ArCoreApk.InstallStatus.INSTALLED -> {
+                    // ARCore is installed. Create the AR session.
+                    arSession = Session(this)
+                    Log.d("ARCore", "AR Session created successfully.")
+                    // Inform ViewModel about the created AR session
+                    viewModel.onArSessionCreated(arSession!!)
+                }
+                // If 'INSTALL_REQUEST_NEEDED' remains unresolved, please verify your ARCore SDK setup in build.gradle.kts
+                // and ensure Gradle caches are cleared. This is a build environment issue.
+                ArCoreApk.InstallStatus.INSTALL_REQUEST_NEEDED -> {
+                    Log.d("ARCore", "ARCore installation requested. Waiting for user interaction.")
+                    // User will be prompted to install Google Play Services for AR.
+                    // The activity will resume (via onResume) when installation is complete or cancelled.
+                }
+                else -> { // Added else branch to make 'when' exhaustive
+                    Log.e("ARCore", "Unhandled ARCore installation status.")
+                }
+            }
+        } catch (e: UnavailableUserDeclinedInstallationException) {
+            Log.e("ARCore", "User declined ARCore installation.", e)
+            // Inform ViewModel or show user-friendly message
+        } catch (e: UnavailableDeviceNotCompatibleException) {
+            Log.e("ARCore", "Device not compatible with ARCore.", e)
+            // Inform ViewModel or show user-friendly message
+        } catch (e: UnavailableArcoreNotInstalledException) {
+            Log.e("ARCore", "ARCore not installed unexpectedly.", e)
+            // This case should ideally be caught by requestInstall mostly, but here as a fallback
+        } catch (e: UnavailableSdkTooOldException) {
+            Log.e("ARCore", "ARCore SDK version too old.", e)
+        } catch (e: UnavailableException) {
+            Log.e("ARCore", "ARCore is unavailable for an unknown reason.", e)
+        } catch (e: Exception) { // Catch any other unexpected exceptions during session creation
+            Log.e("ARCore", "Unexpected error during AR session creation.", e)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Resume AR session only if it exists and the app is in spatially locked (AR) mode
+        if (viewModel.uiState.value.isSpatiallyLocked) {
+            try {
+                arSession?.resume()
+                Log.d("ARCore", "AR Session resumed from onResume.")
+            } catch (e: Exception) {
+                Log.e("ARCore", "Failed to resume AR session in onResume", e)
+            }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Pause AR session regardless of spatial lock state when activity pauses
+        arSession?.pause()
+        Log.d("ARCore", "AR Session paused from onPause.")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Close AR session when activity is destroyed
+        arSession?.close()
+        arSession = null
+        Log.d("ARCore", "AR Session closed from onDestroy.")
+    }
 }

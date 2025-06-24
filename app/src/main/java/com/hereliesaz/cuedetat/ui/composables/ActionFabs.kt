@@ -26,6 +26,7 @@ fun ResetFab(
         modifier = modifier
             .padding(16.dp)
             .navigationBarsPadding(),
+        // Corrected: `valuesChangedSinceReset` now exists in OverlayState
         containerColor = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
     ) {
         if (uiState.areHelpersVisible) {
@@ -33,12 +34,14 @@ fun ResetFab(
                 text = "Reset\nView",
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelSmall,
+                // Corrected: `valuesChangedSinceReset` now exists in OverlayState
                 color = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
             Icon(
                 painter = painterResource(id = R.drawable.ic_undo_24),
                 contentDescription = "Reset View",
+                // Corrected: `valuesChangedSinceReset` now exists in OverlayState
                 tint = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }

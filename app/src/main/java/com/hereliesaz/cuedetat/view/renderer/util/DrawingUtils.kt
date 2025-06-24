@@ -1,3 +1,4 @@
+// app/src/main/java/com/hereliesaz/cuedetat/view/renderer/util/DrawingUtils.kt
 package com.hereliesaz.cuedetat.view.renderer.util
 
 import android.graphics.Matrix
@@ -19,8 +20,9 @@ object DrawingUtils {
     ): PerspectiveRadiusInfo {
         if (!state.hasInverseMatrix) return PerspectiveRadiusInfo(ball.radius, 0f)
 
-        val screenCenter = mapPoint(ball.center, state.pitchMatrix)
-        val logicalHorizontalEdge = PointF(ball.center.x + ball.radius, ball.center.y)
+        // Map the logicalPosition to screen coordinates
+        val screenCenter = mapPoint(ball.logicalPosition, state.pitchMatrix)
+        val logicalHorizontalEdge = PointF(ball.logicalPosition.x + ball.radius, ball.logicalPosition.y)
         val screenHorizontalEdge = mapPoint(logicalHorizontalEdge, state.pitchMatrix)
         val radiusOnScreen = distance(screenCenter, screenHorizontalEdge)
         val lift = radiusOnScreen * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
@@ -30,7 +32,7 @@ object DrawingUtils {
     fun mapPoint(p: PointF, m: Matrix): PointF {
         val arr = floatArrayOf(p.x, p.y)
         m.mapPoints(arr)
-        return PointF(arr[0], arr[1])
+        return PointF(arr[0], arr[1]) // Corrected: Return arr[1] for Y coordinate
     }
 
     fun distance(p1: PointF, p2: PointF): Float =
