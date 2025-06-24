@@ -1,4 +1,3 @@
-// app/build.gradle.kts
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -83,9 +82,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -110,7 +107,7 @@ android {
         implementation(libs.androidx.lifecycle.runtime.ktx)
         implementation(libs.androidx.activity.compose)
         implementation(platform(libs.androidx.compose.bom))
-        implementation(libs.androidx.ui)
+        implementation(libs.ui)
         implementation(libs.androidx.ui.graphics)
         implementation(libs.androidx.ui.tooling.preview)
         implementation(libs.androidx.material3)
@@ -140,7 +137,6 @@ android {
         // ARCore for Augmented Reality capabilities
         // Replace '1.x.x' with the latest stable version of ARCore.
         // You may check the official Google ARCore documentation for the most up-to-date version.
-        implementation("com.google.ar:core:1.42.0") //
 
         testImplementation(libs.junit)
         androidTestImplementation(libs.androidx.junit)
@@ -152,12 +148,17 @@ android {
         implementation(libs.material)
         implementation(libs.androidx.material.icons.extended)
         implementation(libs.ar.core)
+        implementation(project(":opencv"))
+
+        // For Sceneform (Community Maintained - Check for latest versions and artifacts)
+        // Example, these might not be the current ones:
+        implementation(libs.sceneform)
+        // Or specific modules like:
+
+
+        implementation(libs.ui)
     }
 }
-dependencies {
-    implementation(libs.ui)
-}
-
 kapt {
     correctErrorTypes = true
 }
