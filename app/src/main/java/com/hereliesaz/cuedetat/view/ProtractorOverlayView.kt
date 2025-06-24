@@ -253,14 +253,13 @@ class ProtractorOverlayView(context: Context) : View(context) {
     }
 
     private fun determineSingleTouchMode(touchX: Float, touchY: Float) {
-        // This function is only called if not spatially locked (due to the gate in onTouchEvent)
-        // or if transitioning from a scale gesture with one finger remaining (and not locked).
         val touchPoint = PointF(touchX, touchY)
         var determinedMode = InteractionMode.NONE
 
         if (canonicalState.isBankingMode) {
             canonicalState.actualCueBall?.let {
-                val ballScreenPos = DrawingUtils.mapPoint(it.center, canonicalState.pitchMatrix)
+                // Use screenCenter for screen-based interaction check
+                val ballScreenPos = DrawingUtils.mapPoint(it.screenCenter, canonicalState.pitchMatrix)
                 val bankingBallSlop = draggableElementSlop * 0.75f
                 if (DrawingUtils.distance(touchPoint, ballScreenPos) < bankingBallSlop) {
                     determinedMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
@@ -271,14 +270,16 @@ class ProtractorOverlayView(context: Context) : View(context) {
             }
         } else { // Protractor Mode
             canonicalState.actualCueBall?.let {
-                val ballScreenPos = DrawingUtils.mapPoint(it.center, canonicalState.pitchMatrix)
+                // Use screenCenter for screen-based interaction check
+                val ballScreenPos = DrawingUtils.mapPoint(it.screenCenter, canonicalState.pitchMatrix)
                 val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(it, canonicalState)
                 if (DrawingUtils.distance(touchPoint, ballScreenPos) < radiusInfo.radius + draggableElementSlop) {
                     determinedMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
                 }
             }
             if (determinedMode == InteractionMode.NONE) {
-                val unitScreenPos = DrawingUtils.mapPoint(canonicalState.protractorUnit.center, canonicalState.pitchMatrix)
+                // Use screenCenter for screen-based interaction check
+                val unitScreenPos = DrawingUtils.mapPoint(canonicalState.protractorUnit.screenCenter, canonicalState.pitchMatrix)
                 val unitRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(canonicalState.protractorUnit, canonicalState)
                 if (DrawingUtils.distance(touchPoint, unitScreenPos) < unitRadiusInfo.radius + draggableElementSlop) {
                     determinedMode = InteractionMode.MOVING_PROTRACTOR_UNIT

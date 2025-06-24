@@ -10,6 +10,7 @@ camera = "1.4.2"
 composeBom = "2025.06.00"
 constraintlayout = "2.2.1"
 coreKtx = "1.16.0"
+coreVersion = "1.49.0"
 espresso = "3.6.1"
 glanceAppwidget = "1.2.0-alpha01"
 hiltCompiler = "2.56.2"
@@ -61,6 +62,7 @@ androidx-material-icons-extended = { module = "androidx.compose.material:materia
 androidx-material3 = { module = "androidx.compose.material3:material3", name = "material3" }
 androidx-material3-expressive = { module = "androidx.compose.material3:material3-expressive", name = "material3-expressive" }
 androidx-multidex = { group = "androidx.multidex", name = "multidex", version = "2.0.1" }
+ar-core = { module = "com.google.ar:core", version.ref = "coreVersion" }
 dagger-hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hiltCompiler" }
 material = { group = "com.google.android.material", name = "material", version = "1.14.0-alpha02" }
 

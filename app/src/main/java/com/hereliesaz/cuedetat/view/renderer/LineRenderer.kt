@@ -1,7 +1,7 @@
+// app/src/main/java/com/hereliesaz/cuedetat/view/renderer/LineRenderer.kt
 package com.hereliesaz.cuedetat.view.renderer
 
 import android.graphics.Canvas
-// import android.graphics.Matrix // Not strictly needed if local pos is correct
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.RectF
@@ -17,7 +17,6 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 class LineRenderer {
-    // --- Constants ... (as before) ...
     private val SHOT_LINE_LABEL_DISTANCE_FACTOR = 15f
     private val RIGHT_TANGENT_LABEL_DISTANCE_FACTOR = 7f
     private val LEFT_TANGENT_LABEL_DISTANCE_FACTOR = 7f
@@ -76,39 +75,34 @@ class LineRenderer {
             return
         }
 
-        // --- Protractor Mode Lines ---
         val protractorShotLineDrawn = drawProtractorShotLine(canvas, state, paints)
 
-        // Variable to store the local position for logging, calculated inside the save/restore block
-        var unrotatedGhostCueLocalPosForLog: PointF? = null
+        var unrotatedGhostCueLogicalPosForLog: PointF? = null
 
         canvas.save()
-        canvas.translate(state.protractorUnit.center.x, state.protractorUnit.center.y)
+        canvas.translate(state.protractorUnit.logicalPosition.x, state.protractorUnit.logicalPosition.y) // Use logicalPosition
         canvas.rotate(state.protractorUnit.rotationDegrees)
 
         val distanceBetweenProtractorCenters = 2 * state.protractorUnit.radius
-        val unrotatedProtractorGhostCueLocalPos = PointF(0f, distanceBetweenProtractorCenters)
-        unrotatedGhostCueLocalPosForLog = unrotatedProtractorGhostCueLocalPos // Assign for logging
+        val unrotatedProtractorGhostCueLogicalPos = PointF(0f, distanceBetweenProtractorCenters)
+        unrotatedGhostCueLogicalPosForLog = unrotatedProtractorGhostCueLogicalPos
 
-        drawTangentLines(canvas, unrotatedProtractorGhostCueLocalPos, paints, state)
-        val protractorAimingLineDrawn = drawProtractorAimingAndAngleLines(canvas, unrotatedProtractorGhostCueLocalPos, paints, state)
+        drawTangentLines(canvas, unrotatedProtractorGhostCueLogicalPos, paints, state)
+        val protractorAimingLineDrawn = drawProtractorAimingAndAngleLines(canvas, unrotatedProtractorGhostCueLogicalPos, paints, state)
 
         canvas.restore()
 
-        // Logging using the variable assigned inside the block
         val pShotLog = "ProtShotLine: drawn=$protractorShotLineDrawn, actualCue=${state.actualCueBall != null}, hasInverse=${state.hasInverseMatrix}, radius=${state.protractorUnit.radius}"
         if (pShotLog != lastProtractorShotLineLog) {
             Log.d("LineRenderer", pShotLog); lastProtractorShotLineLog = pShotLog
         }
-        // Safely log the local position
-        val localPosString = unrotatedGhostCueLocalPosForLog?.let { "(${it.x},${it.y})" } ?: "(not set)"
-        val pAimLog = "ProtAimLine: drawn=$protractorAimingLineDrawn, radius=${state.protractorUnit.radius}, ghostLocalPos=$localPosString"
+        val logicalPosString = unrotatedGhostCueLogicalPosForLog?.let { "(${it.x},${it.y})" } ?: "(not set)"
+        val pAimLog = "ProtAimLine: drawn=$protractorAimingLineDrawn, radius=${state.protractorUnit.radius}, ghostLogicalPos=$logicalPosString"
         if (pAimLog != lastProtractorAimingLineLog) {
             Log.d("LineRenderer", pAimLog); lastProtractorAimingLineLog = pAimLog
         }
     }
 
-    // ... (getAngle, drawBankingShotLinesWithReflection, findClosestRailIntersection, getLineSegmentRayIntersection, distanceSq, reflectVector - no changes) ...
     private fun getAngle(from: PointF, to: PointF): Float {
         return Math.toDegrees(atan2(to.y - from.y, to.x - from.x).toDouble()).toFloat()
     }
@@ -118,7 +112,7 @@ class LineRenderer {
         state: OverlayState, paints: PaintCache
     ) {
         if (bankingBall.radius <= 0) return
-        var startPoint = bankingBall.center
+        var startPoint = bankingBall.logicalPosition // Use logicalPosition
         var currentAimVector = PointF(initialAimTarget.x - startPoint.x, initialAimTarget.y - startPoint.y)
         val ballRadiusForTableScale = bankingBall.radius
         val tableHeight = tableToBallRatioShort * ballRadiusForTableScale
@@ -201,14 +195,14 @@ class LineRenderer {
     }
 
     private fun drawProtractorShotLine(canvas: Canvas, state: OverlayState, paints: PaintCache): Boolean {
-        val startPoint: PointF = state.actualCueBall?.center ?: run {
+        val startPoint: PointF = state.actualCueBall?.logicalPosition ?: run { // Use logicalPosition
             if (!state.hasInverseMatrix) return false
             val screenAnchor = floatArrayOf(state.viewWidth / 2f, state.viewHeight.toFloat())
             val logicalAnchorArray = FloatArray(2)
             state.inversePitchMatrix.mapPoints(logicalAnchorArray, screenAnchor)
             PointF(logicalAnchorArray[0], logicalAnchorArray[1])
         }
-        val throughPoint = state.protractorUnit.protractorCueBallCenter
+        val throughPoint = state.protractorUnit.protractorCueBallLogicalCenter // Use logical center
         val paintToUse = if (state.isImpossibleShot && !state.isBankingMode) paints.warningPaintRed3 else paints.shotLinePaint
         val label = if (state.areHelpersVisible) "Shot Line" else null
         val textPaint = Paint(paints.lineTextPaint).apply { color = paintToUse.color }
@@ -241,9 +235,9 @@ class LineRenderer {
         }
     }
 
-    private fun drawTangentLines(canvas: Canvas, ghostCuePosInUnitLocalSpace: PointF, paints: PaintCache, state: OverlayState) {
-        val dxToTarget = 0f - ghostCuePosInUnitLocalSpace.x
-        val dyToTarget = 0f - ghostCuePosInUnitLocalSpace.y
+    private fun drawTangentLines(canvas: Canvas, ghostCuePosInUnitLogicalSpace: PointF, paints: PaintCache, state: OverlayState) {
+        val dxToTarget = 0f - ghostCuePosInUnitLogicalSpace.x
+        val dyToTarget = 0f - ghostCuePosInUnitLogicalSpace.y
         val magToTarget = sqrt(dxToTarget * dxToTarget + dyToTarget * dyToTarget)
 
         if (magToTarget > 0.001f) {
@@ -254,35 +248,33 @@ class LineRenderer {
             val rightPaint = if (state.isImpossibleShot || state.protractorUnit.rotationDegrees <= 180f) paints.tangentLineDottedPaint else paints.tangentLineSolidPaint
             val leftPaint = if (state.isImpossibleShot || state.protractorUnit.rotationDegrees > 180f) paints.tangentLineDottedPaint else paints.tangentLineSolidPaint
 
-            val rightEndPoint = PointF(ghostCuePosInUnitLocalSpace.x + tangentDx * extend, ghostCuePosInUnitLocalSpace.y + tangentDy * extend)
-            val leftEndPoint = PointF(ghostCuePosInUnitLocalSpace.x - tangentDx * extend, ghostCuePosInUnitLocalSpace.y - tangentDy * extend)
+            val rightEndPoint = PointF(ghostCuePosInUnitLogicalSpace.x + tangentDx * extend, ghostCuePosInUnitLogicalSpace.y + tangentDy * extend)
+            val leftEndPoint = PointF(ghostCuePosInUnitLogicalSpace.x - tangentDx * extend, ghostCuePosInUnitLogicalSpace.y - tangentDy * extend)
 
-            canvas.drawLine(ghostCuePosInUnitLocalSpace.x, ghostCuePosInUnitLocalSpace.y, rightEndPoint.x, rightEndPoint.y, rightPaint)
-            canvas.drawLine(ghostCuePosInUnitLocalSpace.x, ghostCuePosInUnitLocalSpace.y, leftEndPoint.x, leftEndPoint.y, leftPaint)
+            canvas.drawLine(ghostCuePosInUnitLogicalSpace.x, ghostCuePosInUnitLogicalSpace.y, rightEndPoint.x, rightEndPoint.y, rightPaint)
+            canvas.drawLine(ghostCuePosInUnitLogicalSpace.x, ghostCuePosInUnitLogicalSpace.y, leftEndPoint.x, leftEndPoint.y, leftPaint)
 
             if (state.areHelpersVisible) {
                 val textPaintRight = Paint(paints.lineTextPaint).apply { color = rightPaint.color }
                 val textPaintLeft = Paint(paints.lineTextPaint).apply { color = leftPaint.color }
                 val labelDistance = state.protractorUnit.radius * RIGHT_TANGENT_LABEL_DISTANCE_FACTOR
 
-                textRenderer.draw(canvas, "Tangent Line", ghostCuePosInUnitLocalSpace, getAngle(ghostCuePosInUnitLocalSpace, rightEndPoint),
+                textRenderer.draw(canvas, "Tangent Line", ghostCuePosInUnitLogicalSpace, getAngle(ghostCuePosInUnitLogicalSpace, rightEndPoint),
                     labelDistance, RIGHT_TANGENT_LABEL_ANGLE_OFFSET, RIGHT_TANGENT_LABEL_ROTATION,
                     textPaintRight, RIGHT_TANGENT_LABEL_FONT_SIZE, state.zoomSliderPosition)
-                textRenderer.draw(canvas, "Tangent Line", ghostCuePosInUnitLocalSpace, getAngle(ghostCuePosInUnitLocalSpace, leftEndPoint),
+                textRenderer.draw(canvas, "Tangent Line", ghostCuePosInUnitLogicalSpace, getAngle(ghostCuePosInUnitLogicalSpace, leftEndPoint),
                     labelDistance, LEFT_TANGENT_LABEL_ANGLE_OFFSET, LEFT_TANGENT_LABEL_ROTATION,
                     textPaintLeft, LEFT_TANGENT_LABEL_FONT_SIZE, state.zoomSliderPosition)
             }
         }
     }
 
-    private fun drawProtractorAimingAndAngleLines(canvas: Canvas, ghostCuePosInUnitLocalSpace: PointF, paints: PaintCache, state: OverlayState): Boolean {
+    private fun drawProtractorAimingAndAngleLines(canvas: Canvas, ghostCuePosInUnitLogicalSpace: PointF, paints: PaintCache, state: OverlayState): Boolean {
         val lineLength = 2000f
-        // The origin for all these lines should be the ghost cue ball's center
-        val originOfAllLines = ghostCuePosInUnitLocalSpace
-        val targetBallLogicalOrigin = PointF(0f, 0f) // This is still the target ball's center in local space
+        val originOfAllLines = ghostCuePosInUnitLogicalSpace
+        val targetBallLogicalOrigin = PointF(0f, 0f)
         var lineDrawn = false
 
-        // Aiming line from ghost cue to target ball
         val aimDirX = targetBallLogicalOrigin.x - originOfAllLines.x
         val aimDirY = targetBallLogicalOrigin.y - originOfAllLines.y
         val mag = sqrt(aimDirX * aimDirX + aimDirY * aimDirY)
@@ -305,34 +297,27 @@ class LineRenderer {
             if (angle == 0f) return@forEach
             val r = Math.toRadians(angle.toDouble())
             val eX = (lineLength * sin(r)).toFloat(); val eY = (lineLength * cos(r)).toFloat()
-            // End points are relative to the *originOfAllLines* now.
-            // These points describe the direction of the angle lines from the origin.
-            val angleEndPoint = PointF(originOfAllLines.x + eX, originOfAllLines.y + eY)
 
-            // Draw lines for positive and negative angles
             canvas.drawLine(originOfAllLines.x, originOfAllLines.y, originOfAllLines.x + eX, originOfAllLines.y + eY, paints.protractorLinePaint)
             canvas.drawLine(originOfAllLines.x, originOfAllLines.y, originOfAllLines.x - eX, originOfAllLines.y - eY, paints.protractorLinePaint)
             canvas.drawLine(originOfAllLines.x, originOfAllLines.y, originOfAllLines.x - eX, originOfAllLines.y + eY, paints.protractorLinePaint)
             canvas.drawLine(originOfAllLines.x, originOfAllLines.y, originOfAllLines.x + eX, originOfAllLines.y - eY, paints.protractorLinePaint)
 
-
             lineDrawn = true
             if (state.areHelpersVisible) {
                 val textPaint = Paint(paints.lineTextPaint).apply { color = paints.protractorLinePaint.color }
                 val labelDistance = state.protractorUnit.radius * PROTRACTOR_LABEL_DISTANCE_FACTOR
-                val labelText = "${angle.toInt()}°"
 
-                // Labels for the four angle lines
-                textRenderer.draw(canvas, labelText, originOfAllLines, getAngle(originOfAllLines, PointF(originOfAllLines.x + eX, originOfAllLines.y + eY)),
+                textRenderer.draw(canvas, "${angle.toInt()}°", originOfAllLines, getAngle(originOfAllLines, PointF(originOfAllLines.x + eX, originOfAllLines.y + eY)),
                     labelDistance, PROTRACTOR_LABEL_ANGLE_OFFSET, PROTRACTOR_LABEL_ROTATION,
                     textPaint, PROTRACTOR_LABEL_FONT_SIZE, state.zoomSliderPosition)
-                textRenderer.draw(canvas, labelText, originOfAllLines, getAngle(originOfAllLines, PointF(originOfAllLines.x - eX, originOfAllLines.y - eY)),
+                textRenderer.draw(canvas, "${angle.toInt()}°", originOfAllLines, getAngle(originOfAllLines, PointF(originOfAllLines.x - eX, originOfAllLines.y - eY)),
                     labelDistance, PROTRACTOR_LABEL_ANGLE_OFFSET, PROTRACTOR_LABEL_ROTATION,
                     textPaint, PROTRACTOR_LABEL_FONT_SIZE, state.zoomSliderPosition)
-                textRenderer.draw(canvas, labelText, originOfAllLines, getAngle(originOfAllLines, PointF(originOfAllLines.x - eX, originOfAllLines.y + eY)),
+                textRenderer.draw(canvas, "${angle.toInt()}°", originOfAllLines, getAngle(originOfAllLines, PointF(originOfAllLines.x - eX, originOfAllLines.y + eY)),
                     labelDistance, PROTRACTOR_LABEL_ANGLE_OFFSET, PROTRACTOR_LABEL_ROTATION,
                     textPaint, PROTRACTOR_LABEL_FONT_SIZE, state.zoomSliderPosition)
-                textRenderer.draw(canvas, labelText, originOfAllLines, getAngle(originOfAllLines, PointF(originOfAllLines.x + eX, originOfAllLines.y - eY)),
+                textRenderer.draw(canvas, "${angle.toInt()}°", originOfAllLines, getAngle(originOfAllLines, PointF(originOfAllLines.x + eX, originOfAllLines.y - eY)),
                     labelDistance, PROTRACTOR_LABEL_ANGLE_OFFSET, PROTRACTOR_LABEL_ROTATION,
                     textPaint, PROTRACTOR_LABEL_FONT_SIZE, state.zoomSliderPosition)
             }

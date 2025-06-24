@@ -1,3 +1,4 @@
+// app/build.gradle.kts
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -15,8 +16,8 @@ android {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 26
         targetSdk = 36
-        versionCode = 15
-        versionName = "0.3.65"
+        versionCode = 16
+        versionName = "0.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -96,6 +97,11 @@ android {
             }
         }
     }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
     buildToolsVersion = "36.0.0"
     ndkVersion = "29.0.13599879 rc2"
 
@@ -130,7 +136,11 @@ android {
 
         // NEW: Added for lifecycle-aware composition
         implementation(libs.androidx.lifecycle.runtime.compose)
-        // NEW: Added for ExperimentalMaterial3ExpressiveApi used in VerticalSlider
+
+        // ARCore for Augmented Reality capabilities
+        // Replace '1.x.x' with the latest stable version of ARCore.
+        // You may check the official Google ARCore documentation for the most up-to-date version.
+        implementation("com.google.ar:core:1.42.0") //
 
         testImplementation(libs.junit)
         androidTestImplementation(libs.androidx.junit)
@@ -141,7 +151,7 @@ android {
         debugImplementation(libs.androidx.ui.test.manifest)
         implementation(libs.material)
         implementation(libs.androidx.material.icons.extended)
-
+        implementation(libs.ar.core)
     }
 }
 dependencies {

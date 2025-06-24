@@ -15,14 +15,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width // Added for Spacer in LockFab
-import androidx.compose.material.icons.Icons // Import for Icons.Filled
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.FloatingActionButton // Import for FloatingActionButton
-import androidx.compose.material3.Icon // Import for Icon
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Slider
@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
+import com.hereliesaz.cuedetat.ui.composables.ArCoreScene
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
 import com.hereliesaz.cuedetat.ui.composables.KineticWarningOverlay
 import com.hereliesaz.cuedetat.ui.composables.MenuDrawerContent
@@ -55,10 +56,6 @@ import com.hereliesaz.cuedetat.view.ProtractorOverlayView
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.ToastMessage
 import kotlinx.coroutines.launch
-
-// TableRotationSlider, LuminanceAdjustmentDialog, TutorialOverlay Composable functions
-// should be defined here (or imported if in separate files)
-// Assuming they are defined as before and are correct.
 
 @Composable
 fun TableRotationSlider(
@@ -75,8 +72,6 @@ fun TableRotationSlider(
         Column(
             modifier = modifier
                 .fillMaxWidth()
-                // .padding(horizontal = 80.dp) // This was in previous version, adjust as needed
-                // .padding(bottom = 120.dp) // This was in previous version, adjust as needed
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -115,7 +110,7 @@ fun LuminanceAdjustmentDialog(
                         value = uiState.luminanceAdjustment,
                         onValueChange = { onEvent(MainScreenEvent.AdjustLuminance(it)) },
                         valueRange = -0.4f..0.4f,
-                        steps = 79, // For 80 possible values in the range
+                        steps = 79,
                         colors = SliderDefaults.colors(
                             activeTrackColor = MaterialTheme.colorScheme.primary,
                             inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
@@ -160,12 +155,9 @@ fun TutorialOverlay(
                 Spacer(modifier = Modifier.height(32.dp))
                 Row {
                     if (uiState.currentTutorialStep > 0) {
-                        // TextButton(onClick = { /* TODO: Implement PreviousTutorialStep if desired */ }) {
-                        //     Text("Previous", color = MaterialTheme.colorScheme.primary)
-                        // }
-                        // Spacer(modifier = Modifier.weight(1f))
+                        // TODO: Implement PreviousTutorialStep if desired
                     }
-                    Spacer(modifier = Modifier.weight(1f)) // Ensure Next/Got it is on the right
+                    Spacer(modifier = Modifier.weight(1f))
 
                     TextButton(onClick = {
                         if (uiState.currentTutorialStep < tutorialMessages.size - 1) {
@@ -188,16 +180,14 @@ fun TutorialOverlay(
 
 
 @Composable
-fun LockFab( // Defined as a top-level Composable function
+fun LockFab(
     uiState: OverlayState,
     onEvent: (MainScreenEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
     FloatingActionButton(
-        onClick = { onEvent(MainScreenEvent.ToggleSpatialLock) },
-        modifier = modifier
-            // .padding(bottom = 16.dp) // Padding will be handled by parent Column
-            .navigationBarsPadding(),
+        onClick = { onEvent(MainScreenEvent.ToggleSpatialLock(isLocked = !uiState.isSpatiallyLocked)) },
+        modifier = modifier.navigationBarsPadding(),
         containerColor = if (uiState.isSpatiallyLocked) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer,
         contentColor = if (uiState.isSpatiallyLocked) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
     ) {
@@ -216,7 +206,7 @@ fun LockFab( // Defined as a top-level Composable function
 
 
 @Composable
-fun MainScreen(viewModel: MainViewModel) { // Ensure this is the only MainScreen function
+fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val context = LocalContext.current
@@ -254,24 +244,47 @@ fun MainScreen(viewModel: MainViewModel) { // Ensure this is the only MainScreen
         }
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            CameraBackground(modifier = Modifier.fillMaxSize().zIndex(0f))
-
-            AndroidView(
-                factory = {
-                    protractorView.apply {
-                        onSizeChanged = { w, h -> viewModel.onEvent(MainScreenEvent.SizeChanged(w, h)) }
-                        onProtractorRotationChange = { rot -> viewModel.onEvent(MainScreenEvent.RotationChanged(rot)) }
-                        onProtractorUnitMoved = { pos -> viewModel.onEvent(MainScreenEvent.UnitMoved(pos)) }
-                        onActualCueBallScreenMoved = { pos -> viewModel.onEvent(MainScreenEvent.ActualCueBallMoved(pos)) }
-                        onScale = { scaleFactor -> viewModel.onEvent(MainScreenEvent.ZoomScaleChanged(scaleFactor)) }
-                        onGestureStarted = { viewModel.onEvent(MainScreenEvent.GestureStarted) }
-                        onGestureEnded = { viewModel.onEvent(MainScreenEvent.GestureEnded) }
-                        onBankingAimTargetScreenDrag = { screenPoint -> viewModel.onEvent(MainScreenEvent.BankingAimTargetDragged(screenPoint)) }
+            if (uiState.isSpatiallyLocked) {
+                uiState.arSession?.let { session ->
+                    ArCoreScene(
+                        modifier = Modifier.fillMaxSize().zIndex(0f),
+                        arSession = session,
+                        uiState = uiState
+                    )
+                } ?: run {
+                    Box(
+                        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Initializing ARCore...",
+                            color = Color.White,
+                            style = MaterialTheme.typography.headlineMedium,
+                            textAlign = TextAlign.Center
+                        )
                     }
-                },
-                modifier = Modifier.fillMaxSize().zIndex(1f),
-                update = { view -> view.updateState(uiState, systemIsDark) }
-            )
+                }
+            } else {
+                CameraBackground(modifier = Modifier.fillMaxSize().zIndex(0f))
+
+                AndroidView(
+                    factory = {
+                        protractorView.apply {
+                            onSizeChanged = { w, h -> viewModel.onEvent(MainScreenEvent.SizeChanged(w, h)) }
+                            onProtractorRotationChange = { rot -> viewModel.onEvent(MainScreenEvent.RotationChanged(rot)) }
+                            onProtractorUnitMoved = { pos -> viewModel.onEvent(MainScreenEvent.UnitMoved(pos)) }
+                            onActualCueBallScreenMoved = { pos -> viewModel.onEvent(MainScreenEvent.ActualCueBallMoved(pos)) }
+                            onScale = { scaleFactor -> viewModel.onEvent(MainScreenEvent.ZoomScaleChanged(scaleFactor)) }
+                            onGestureStarted = { viewModel.onEvent(MainScreenEvent.GestureStarted) }
+                            onGestureEnded = { viewModel.onEvent(MainScreenEvent.GestureEnded) }
+                            onBankingAimTargetScreenDrag = { screenPoint -> viewModel.onEvent(MainScreenEvent.BankingAimTargetDragged(screenPoint)) }
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize().zIndex(1f),
+                    update = { view -> view.updateState(uiState, systemIsDark) }
+                )
+            }
+
 
             TopControls(
                 uiState = uiState,
@@ -293,30 +306,28 @@ fun MainScreen(viewModel: MainViewModel) { // Ensure this is the only MainScreen
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
-                    .navigationBarsPadding() // Apply navigationBarsPadding to the column too
+                    .navigationBarsPadding()
                     .zIndex(2f),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                TableRotationSlider( // This will only compose if uiState.isBankingMode is true
+                TableRotationSlider(
                     uiState = uiState,
                     onEvent = viewModel::onEvent,
                     modifier = Modifier
                         .fillMaxWidth(0.8f)
-                        .padding(bottom = if (uiState.isBankingMode) 8.dp else 0.dp) // Only pad if slider is visible
+                        .padding(bottom = if (uiState.isBankingMode) 8.dp else 0.dp)
                 )
 
                 LockFab(
                     uiState = uiState,
                     onEvent = viewModel::onEvent
-                    // Modifier for LockFab will be applied by its Column parent for alignment.
-                    // Internal padding for FAB content.
                 )
             }
 
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 16.dp) // Adjusted padding
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
                     .navigationBarsPadding()
                     .zIndex(2f),
                 verticalAlignment = Alignment.Bottom
