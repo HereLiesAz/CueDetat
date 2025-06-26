@@ -8,7 +8,6 @@ import android.graphics.PointF
  * It holds both screen-space and logical (table-space) coordinates.
  */
 data class ActualCueBall(
-    val screenCenter: PointF, // Screen coordinates of the ball's center
     override val radius: Float, // Radius of the ball in logical units (pixels based on zoom)
     override val logicalPosition: PointF // Logical (table-space) coordinates of the ball's center
 ) : ILogicalBall

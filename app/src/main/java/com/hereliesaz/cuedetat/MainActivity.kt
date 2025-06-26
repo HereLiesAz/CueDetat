@@ -1,12 +1,17 @@
 // app/src/main/java/com/hereliesaz/cuedetat/MainActivity.kt
 package com.hereliesaz.cuedetat
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Session
@@ -28,12 +33,29 @@ import org.opencv.android.OpenCVLoader
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
-
     private var arSession: Session? = null
+
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            if (isGranted) {
+                Log.d("Permission", "Camera permission granted.")
+                // Re-launch the content setting if permission is granted, to ensure camera starts
+                setContent {
+                    CueDetatTheme {
+                        MainScreen(viewModel = viewModel)
+                    }
+                }
+            } else {
+                Log.e("Permission", "Camera permission denied.")
+                Toast.makeText(this, "Camera permission is required to use this app.", Toast.LENGTH_LONG).show()
+                // Optionally, you could finish the activity or show a placeholder screen
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        requestCameraPermission()
 
         // Attempt to enable ARCore if not already done, or check for its availability
         maybeEnableArCore()
@@ -69,6 +91,26 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    private fun requestCameraPermission() {
+        when {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                Log.d("Permission", "Camera permission already granted.")
+            }
+            shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> {
+                // In a real app, you would explain to the user why the permission is needed.
+                // For now, we just request it.
+                requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+            else -> {
+                requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        }
+    }
+
 
     /**
      * Checks ARCore availability and attempts to install it if needed.

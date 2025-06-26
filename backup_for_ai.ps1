@@ -10,7 +10,7 @@ IDE settings to minimize token count. Non-text assets are listed.
 The output file is timestamped and the script shows progress.
 .NOTES
 Author: Your Name/AI Assistant
-Version: 1.1
+Version: 1.2
 Place this script in the root of your Android project and run it from there.
 #>
 
@@ -144,10 +144,22 @@ function Is-NonTextAssetToList
 Write-Host "Starting Android project backup for AI analysis..." -ForegroundColor Green
 Write-Host "Project root: $ProjectRoot"
 
+# --- MODIFIED: Cleanup Step ---
+$oldBackupPattern = "project_context_for_ai_*.txt"
+$oldBackups = Get-ChildItem -Path $ProjectRoot -Filter $oldBackupPattern -File -ErrorAction SilentlyContinue
+if ($null -ne $oldBackups) {
+    Write-Host "`nFound $(@($oldBackups).Count) previously generated backup file(s). Cleaning up..." -ForegroundColor Yellow
+    foreach ($backup in $oldBackups) {
+        Write-Host " - Removing $($backup.Name)"
+        Remove-Item -Path $backup.FullName -Force
+    }
+}
+# --- End Modification ---
+
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $outputFileName = "project_context_for_ai_$timestamp.txt"
 $outputFilePath = Join-Path -Path $ProjectRoot -ChildPath $outputFileName
-Write-Host "Output file will be: $outputFilePath"
+Write-Host "`nOutput file will be: $outputFilePath"
 
 # Ensure this script and its potential output are in the exclusion list by full path temporarily for robust exclusion
 $scriptFullPath = $MyInvocation.MyCommand.Path

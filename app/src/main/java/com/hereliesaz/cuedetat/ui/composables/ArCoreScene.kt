@@ -10,7 +10,6 @@ import com.google.ar.sceneform.AnchorNode
 import com.google.ar.sceneform.SceneView
 import com.google.ar.sceneform.math.Quaternion
 import com.google.ar.sceneform.math.Vector3
-import com.hereliesaz.cuedetat.BallNode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable

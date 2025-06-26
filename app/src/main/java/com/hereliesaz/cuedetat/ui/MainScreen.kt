@@ -265,7 +265,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
                 }
             } else {
-                CameraBackground(modifier = Modifier.fillMaxSize().zIndex(0f))
+                CameraPreview(modifier = Modifier.fillMaxSize().zIndex(0f))
 
                 AndroidView(
                     factory = {
