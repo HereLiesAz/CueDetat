@@ -4,14 +4,15 @@
 .SYNOPSIS
 Backs up an Android project by letting the user interactively toggle which modules/folders to include.
 .DESCRIPTION
-This script scans the project's root directory to find main folders/modules. It then iterates
-through each found module, prompting the user to either include or skip it. A complete project
-tree is generated for the entire project, visually indicating the user's choices. The script
-then processes only the included modules, concatenating relevant text files and listing non-text
-assets, while ignoring build artifacts and IDE files.
+This script scans the project's root directory to find main folders/modules. It automatically ignores
+configuration folders (like .idea, .git) and build output. It then iterates through the remaining
+valid modules, prompting the user to either include or skip each one. A complete project tree is
+generated for the entire project, visually indicating the user's choices. The script then processes
+only the included modules, concatenating relevant text files and listing non-text assets.
+This version does NOT delete previous backups.
 .NOTES
 Author: Your Name/AI Assistant
-Version: 3.1
+Version: 3.3
 Place this script in the root of your Android project and run it from there.
 #>
 
@@ -22,7 +23,7 @@ param (
 # --- Configuration ---
 # Top-level directories to ALWAYS ignore when presenting module choices
 $IgnoreModuleDirs = @(
-    ".gradle", ".idea", "build", "gradle", "captures"
+    "build", "gradle", "captures"
 )
 
 # Directories to exclude from processing inside selected modules (uses -like)
@@ -105,13 +106,14 @@ Write-Host "Starting Android project backup for AI analysis..." -ForegroundColor
 Write-Host "Project root: $ProjectRoot"
 
 # --- Step 1: Discover available modules/folders ---
+# Automatically filter out ignored names and any folder starting with a dot.
 $moduleCandidates = Get-ChildItem -Path $ProjectRoot -Directory -Depth 0 | Where-Object {
-    $_.Name -notin $IgnoreModuleDirs
+    ($_.Name -notin $IgnoreModuleDirs) -and ($_.Name -notlike ".*")
 } | Select-Object Name, FullName
 
 if ($moduleCandidates.Count -eq 0) {
-    Write-Error "No potential modules/folders found in '$ProjectRoot'. Cannot proceed."
-    exit 1
+    Write-Error "No potential modules/folders found to include in '$ProjectRoot'. Cannot proceed."
+    exit
 }
 
 # --- Step 2: Interactive Toggling of Modules ---
@@ -132,21 +134,8 @@ if (-not $selectedModules) {
 }
 $selectedModulePaths = $selectedModules.FullName
 
-# --- Step 3: Cleanup and Setup ---
-# ... (same as before) ...
-
-# --- Step 4: Full scan and categorization based on module selection ---
-Write-Host "`nCategorizing all project files..." -ForegroundColor Cyan
-$allItems = Get-ChildItem -Path $ProjectRoot -Recurse -Force -ErrorAction SilentlyContinue
-# ... (rest of the script is the same as the previous version) ...
-
-# --- Step 3: Cleanup and Setup ---
-$oldBackupPattern = "project_context_for_ai_*.txt"
-Get-ChildItem -Path $ProjectRoot -Filter $oldBackupPattern -File -ErrorAction SilentlyContinue | ForEach-Object {
-    Write-Host " - Removing old backup: $($_.Name)" -ForegroundColor DarkYellow
-    Remove-Item -Path $_.FullName -Force
-}
-
+# --- Step 3: Setup output file ---
+# Automatic cleanup of old backups is DISABLED.
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $outputFileName = "project_context_for_ai_$timestamp.txt"
 $outputFilePath = Join-Path -Path $ProjectRoot -ChildPath $outputFileName
@@ -163,10 +152,12 @@ $fileStatusMap = @{}
 foreach ($item in $allItems) {
     # Determine if the item is inside a selected module
     $isInsideSelectedModule = $false
-    foreach ($modulePath in $selectedModulePaths) {
-        if ($item.FullName.StartsWith($modulePath)) {
-            $isInsideSelectedModule = $true
-            break
+    if ($selectedModulePaths) {
+        foreach ($modulePath in $selectedModulePaths) {
+            if ($item.FullName.StartsWith($modulePath)) {
+                $isInsideSelectedModule = $true
+                break
+            }
         }
     }
 
@@ -174,7 +165,7 @@ foreach ($item in $allItems) {
     if ($item.PSIsContainer -and $item.PSParentPath -eq $ProjectRoot) {
         if ($item.FullName -in $selectedModulePaths) {
             $fileStatusMap[$item.FullName] = "MODULE INCLUDED"
-        } elseif ($item.Name -in $IgnoreModuleDirs) {
+        } elseif (($item.Name -in $IgnoreModuleDirs) -or ($item.Name -like ".*")) {
             $fileStatusMap[$item.FullName] = "MODULE IGNORED"
         } else {
             $fileStatusMap[$item.FullName] = "MODULE SKIPPED"
@@ -214,7 +205,8 @@ Write-Host "Found $($nonTextAssetsFound.Count) non-text assets to list from sele
 # --- Step 5: Write output file ---
 Set-Content -Path $outputFilePath -Value "Android Project Backup for AI Analysis`n" -Encoding UTF8
 Add-Content -Path $outputFilePath -Value "Generated on: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`n" -Encoding UTF8
-Add-Content -Path $outputFilePath -Value "Included Modules: $($selectedModules.Name -join ', ')" -Encoding UTF8
+$includedModuleNames = if ($selectedModules) { $selectedModules.Name -join ', ' } else { "None" }
+Add-Content -Path $outputFilePath -Value "Included Modules: $includedModuleNames" -Encoding UTF8
 Add-Content -Path $outputFilePath -Value "`n`n" -Encoding UTF8
 
 Write-Host "Generating comprehensive project tree..." -ForegroundColor Cyan
