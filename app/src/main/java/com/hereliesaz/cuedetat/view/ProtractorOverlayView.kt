@@ -259,7 +259,7 @@ class ProtractorOverlayView(context: Context) : View(context) {
         if (canonicalState.isBankingMode) {
             canonicalState.actualCueBall?.let {
                 // Use screenCenter for screen-based interaction check
-                val ballScreenPos = DrawingUtils.mapPoint(it.screenCenter, canonicalState.pitchMatrix)
+                val ballScreenPos = it.screenCenter
                 val bankingBallSlop = draggableElementSlop * 0.75f
                 if (DrawingUtils.distance(touchPoint, ballScreenPos) < bankingBallSlop) {
                     determinedMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
@@ -271,7 +271,7 @@ class ProtractorOverlayView(context: Context) : View(context) {
         } else { // Protractor Mode
             canonicalState.actualCueBall?.let {
                 // Use screenCenter for screen-based interaction check
-                val ballScreenPos = DrawingUtils.mapPoint(it.screenCenter, canonicalState.pitchMatrix)
+                val ballScreenPos = it.screenCenter
                 val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(it, canonicalState)
                 if (DrawingUtils.distance(touchPoint, ballScreenPos) < radiusInfo.radius + draggableElementSlop) {
                     determinedMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
@@ -279,7 +279,7 @@ class ProtractorOverlayView(context: Context) : View(context) {
             }
             if (determinedMode == InteractionMode.NONE) {
                 // Use screenCenter for screen-based interaction check
-                val unitScreenPos = DrawingUtils.mapPoint(canonicalState.protractorUnit.screenCenter, canonicalState.pitchMatrix)
+                val unitScreenPos = canonicalState.protractorUnit.screenCenter
                 val unitRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(canonicalState.protractorUnit, canonicalState)
                 if (DrawingUtils.distance(touchPoint, unitScreenPos) < unitRadiusInfo.radius + draggableElementSlop) {
                     determinedMode = InteractionMode.MOVING_PROTRACTOR_UNIT

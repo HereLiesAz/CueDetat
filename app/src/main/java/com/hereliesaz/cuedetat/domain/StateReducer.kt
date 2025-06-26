@@ -98,12 +98,12 @@ class StateReducer @Inject constructor() {
                     var updatedActualCueBall = currentState.actualCueBall?.copy(radius = newLogicalRadius)
                     var protractorNewScreenCenter = currentState.protractorUnit.screenCenter
                     if (!currentState.isSpatiallyLocked) {
-                        if (protractorNewScreenCenter.x. लगभगEquals(currentState.viewWidth / 2f) &&
-                            protractorNewScreenCenter.y. लगभगEquals(currentState.viewHeight / 2f)) {
+                        if (protractorNewScreenCenter.x.ほぼEquals(currentState.viewWidth / 2f) &&
+                            protractorNewScreenCenter.y.ほぼEquals(currentState.viewHeight / 2f)) {
                             protractorNewScreenCenter = PointF(event.width / 2f, event.height / 2f)
                         }
                         if (currentState.isBankingMode && updatedActualCueBall != null) {
-                            if (updatedActualCueBall.screenCenter.x. लगभगEquals(currentState.viewWidth/2f) && updatedActualCueBall.screenCenter.y. लगभगEquals(currentState.viewHeight/2f)) {
+                            if (updatedActualCueBall.screenCenter.x.ほぼEquals(currentState.viewWidth/2f) && updatedActualCueBall.screenCenter.y.ほぼEquals(currentState.viewHeight/2f)) {
                                 updatedActualCueBall = updatedActualCueBall.copy(screenCenter = PointF(event.width / 2f, event.height / 2f))
                             }
                         }

@@ -1,6 +1,8 @@
 package com.hereliesaz.cuedetat
 
 import com.google.ar.sceneform.math.Vector3
+import com.google.ar.sceneform.math.Vector3.dot
+import com.google.ar.sceneform.math.Vector3.subtract
 import kotlin.math.acos
 import com.hereliesaz.cuedetat.SpinType
 
@@ -30,11 +32,11 @@ class SpinTracker {
 
     private fun currentVelocity(): Vector3? {
         if (previousPos == null || currentPos == null) return null
-        return currentPos!!.subtract(previousPos!!).normalized()
+        return subtract(currentPos!!, previousPos!!).normalized()
     }
 
     private fun angleBetweenVectors(v1: Vector3, v2: Vector3): Float {
-        val dot = v1.dot(v2)
+        val dot = dot(v1, v2)
         val mag = v1.length() * v2.length()
         return if (mag == 0f) 0f else Math.toDegrees(acos((dot / mag).coerceIn(-1.0f, 1.0f).toDouble())).toFloat()
     }

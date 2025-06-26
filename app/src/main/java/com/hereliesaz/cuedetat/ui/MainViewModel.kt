@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.min
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -62,12 +63,41 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    private fun getCurrentLogicalRadius(
+        stateWidth: Int,
+        stateHeight: Int,
+        zoomSliderPos: Float
+    ): Float {
+        if (stateWidth == 0 || stateHeight == 0) return 1f
+        val zoomFactor = ZoomMapping.sliderToZoom(zoomSliderPos)
+        return (min(stateWidth, stateHeight) * 0.30f / 2f) * zoomFactor
+    }
+
+
     fun onEvent(event: MainScreenEvent) {
         _uiState.update { currentState ->
             val newState = when (event) {
                 is MainScreenEvent.SizeChanged -> currentState.copy(viewWidth = event.width, viewHeight = event.height)
-                is MainScreenEvent.ZoomSliderChanged -> currentState.copy(zoomSliderPosition = event.position)
-                is MainScreenEvent.ZoomScaleChanged -> currentState
+                is MainScreenEvent.ZoomSliderChanged -> {
+                    val newSliderPos = event.position.coerceIn(0f, 100f)
+                    val newLogicalRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
+                    currentState.copy(
+                        protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
+                        actualCueBall = currentState.actualCueBall?.copy(radius = newLogicalRadius),
+                        zoomSliderPosition = newSliderPos
+                    )
+                }
+                is MainScreenEvent.ZoomScaleChanged -> {
+                    val currentZoomValue = ZoomMapping.sliderToZoom(currentState.zoomSliderPosition)
+                    val newZoomValue = (currentZoomValue * event.scaleFactor).coerceIn(ZoomMapping.MIN_ZOOM, ZoomMapping.MAX_ZOOM)
+                    val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue)
+                    val newLogicalRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
+                    currentState.copy(
+                        protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
+                        actualCueBall = currentState.actualCueBall?.copy(radius = newLogicalRadius),
+                        zoomSliderPosition = newSliderPos
+                    )
+                }
                 is MainScreenEvent.RotationChanged -> currentState.copy(protractorUnit = currentState.protractorUnit.copy(rotationDegrees = event.newRotation))
                 is MainScreenEvent.UnitMoved -> currentState.copy(protractorUnit = currentState.protractorUnit.copy(screenCenter = event.position))
                 is MainScreenEvent.ActualCueBallMoved -> currentState.copy(actualCueBall = currentState.actualCueBall?.copy(screenCenter = event.position) ?: ActualCueBall(screenCenter = event.position, radius = currentState.protractorUnit.radius / 2f, logicalPosition = PointF(0f,0f)))

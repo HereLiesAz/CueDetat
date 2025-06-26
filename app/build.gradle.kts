@@ -87,6 +87,9 @@ android {
         compose = true
         buildConfig = true
     }
+    kotlinOptions {
+        jvmTarget = "17" // Or your desired Java version, matching compileOptions
+    }
     composeOptions {
         packaging {
             resources {
@@ -99,6 +102,11 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    kotlin {
+        jvmToolchain(17)
+    }
+
     buildToolsVersion = "36.0.0"
     ndkVersion = "29.0.13599879 rc2"
 

@@ -1,3 +1,4 @@
+// app/src/main/java/com/hereliesaz/cuedetat/view/PaintCache.kt
 package com.hereliesaz.cuedetat.view
 
 import android.graphics.Color as AndroidColor
@@ -99,6 +100,9 @@ class PaintCache {
     }
     val tangentLineSolidPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeWidth = lineStrokeWidth
+    }
+    val ghostLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE; strokeWidth = thinLineStrokeWidth
     }
 
     val bankShotLinePaint1 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -230,6 +234,12 @@ class PaintCache {
         protractorLinePaint.applyGlow(
             baseDrawingScheme.onSurface.adjustLuminance(LUMINANCE_ADJUST),
             alpha = 0.2f
+        )
+
+        ghostLinePaint.color =
+            baseDrawingScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.6f).toArgb()
+        ghostLinePaint.applyGlow(
+            baseDrawingScheme.secondary.adjustLuminance(LUMINANCE_ADJUST), alpha = 0.3f
         )
 
         aimingLinePaint.apply {

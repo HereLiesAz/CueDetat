@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.lifecycle.lifecycleScope
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Session
@@ -20,15 +21,13 @@ import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 import org.opencv.android.OpenCVLoader
 
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    @Inject
-    lateinit var viewModel: MainViewModel
+    private val viewModel: MainViewModel by viewModels()
 
     private var arSession: Session? = null
 
@@ -116,7 +115,7 @@ class MainActivity : ComponentActivity() {
                 }
                 // If 'INSTALL_REQUEST_NEEDED' remains unresolved, please verify your ARCore SDK setup in build.gradle.kts
                 // and ensure Gradle caches are cleared. This is a build environment issue.
-                ArCoreApk.InstallStatus.INSTALL_REQUEST_NEEDED -> {
+                ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
                     Log.d("ARCore", "ARCore installation requested. Waiting for user interaction.")
                     // User will be prompted to install Google Play Services for AR.
                     // The activity will resume (via onResume) when installation is complete or cancelled.
