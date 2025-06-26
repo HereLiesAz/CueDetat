@@ -4,10 +4,10 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import com.google.ar.sceneform.math.Vector3
+import com.hereliesaz.cuedetat.view.model.OverlayState
+import com.hereliesaz.cuedetat.model.SpinType
+import com.hereliesaz.cuedetat.view.model.SpinType
 
-/**
- * Drives OverlayState and emits updates for rendering.
- */
 class OverlayViewModel : ViewModel() {
 
     private val _overlayState = MutableLiveData(OverlayState())
@@ -33,7 +33,15 @@ class OverlayViewModel : ViewModel() {
         _overlayState.value = _overlayState.value?.withConfidence(conf)
     }
 
+    fun updatePocket(pocket: Vector3) {
+        _overlayState.value = _overlayState.value?.copy(targetPocket = pocket)
+    }
+
+    fun updateTableCorners(corners: List<Vector3>) {
+        _overlayState.value = _overlayState.value?.copy(tableCorners = corners)
+    }
+
     fun resetState() {
-        _overlayState.value = _overlayState.value?.reset()
+        _overlayState.value = OverlayState()
     }
 }
