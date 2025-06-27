@@ -1,31 +1,36 @@
+// app/src/main/java/com/hereliesaz/cuedetat/ar/rendering/BallNode.kt
 package com.hereliesaz.cuedetat.ar.rendering
 
 import android.content.Context
-import com.google.ar.sceneform.Node
-import com.google.ar.sceneform.math.Vector3
-import com.google.ar.sceneform.rendering.Color
+import android.util.Log
 import com.google.ar.sceneform.rendering.MaterialFactory
-import com.google.ar.sceneform.rendering.ModelRenderable
 import com.google.ar.sceneform.rendering.ShapeFactory
+
+import io.github.sceneview.collision.Vector3
+import io.github.sceneview.node.Node
+import io.github.sceneview.rememberEngine
+import io.github.sceneview.math.Color
+
 
 /**
  * BallNode represents a ghost ball rendered in 3D AR space.
- * Appears as a semi-transparent green sphere.
+ * Its color and size can now be customized.
  */
-class BallNode(context: Context) : Node() {
-
-    private var sphereRenderable: ModelRenderable? = null
+class BallNode(
+    context: Context,
+    color: Color,
+    radius: Float = 0.028575f // Standard pool ball radius in meters
+) : Node() {
 
     init {
-        MaterialFactory.makeTransparentWithColor(context, Color(0.1f, 1f, 0.2f, 0.5f))
+        MaterialFactory.makeTransparentWithColor(context, color)
             .thenAccept { material ->
-                sphereRenderable = ShapeFactory.makeSphere(
-                    0.03f, Vector3(0.0f, 0.03f, 0.0f), material
+                this.renderable = ShapeFactory.makeSphere(
+                    radius, Vector3.zero(), material
                 )
-                this.renderable = sphereRenderable
             }
             .exceptionally { throwable ->
-                // Log error
+                Log.e("BallNode", "Failed to create material", throwable)
                 null
             }
     }

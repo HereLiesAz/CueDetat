@@ -132,26 +132,26 @@ computes derived state. Renderers display.
 2.  **ViewModel (`MainViewModel`)**: Receives `FullOrientationChanged` events and passes them to the
     `StateReducer` via `updateContinuousState`.
 3.  **StateReducer (`StateReducer`)**:
-    *   Updates `OverlayState.currentOrientation` with the latest sensor data.
-    *   Handles `ToggleSpatialLock`:
-        *   If locking: sets `isSpatiallyLocked = true` and
-            `anchorOrientation = currentState.currentOrientation`.
-        *   If unlocking: sets `isSpatiallyLocked = false` and `anchorOrientation = null`.
-    *   If `isSpatiallyLocked == true`, it ignores most `MainScreenEvent` types that attempt to
-        change the logical position or rotation of elements (e.g., `RotationChanged`,
-        `UpdateLogicalUnitPosition`, etc.). Events like zoom, mode changes, and sensor updates are
-        still processed.
+    * Updates `OverlayState.currentOrientation` with the latest sensor data.
+    * Handles `ToggleSpatialLock`:
+        * If locking: sets `isSpatiallyLocked = true` and
+          `anchorOrientation = currentState.currentOrientation`.
+        * If unlocking: sets `isSpatiallyLocked = false` and `anchorOrientation = null`.
+    * If `isSpatiallyLocked == true`, it ignores most `MainScreenEvent` types that attempt to
+      change the logical position or rotation of elements (e.g., `RotationChanged`,
+      `UpdateLogicalUnitPosition`, etc.). Events like zoom, mode changes, and sensor updates are
+      still processed.
 4.  **UpdateStateUseCase (`UpdateStateUseCase`)**:
-    *   Receives the `OverlayState` (containing `currentOrientation`, `anchorOrientation`,
-        `isSpatiallyLocked`).
-    *   Calls `Perspective.createPitchMatrix`, passing all three: `currentOrientation`,
-        `anchorOrientation`, and `isSpatiallyLocked`.
+    * Receives the `OverlayState` (containing `currentOrientation`, `anchorOrientation`,
+      `isSpatiallyLocked`).
+    * Calls `Perspective.createPitchMatrix`, passing all three: `currentOrientation`,
+      `anchorOrientation`, and `isSpatiallyLocked`.
 5.  **Perspective Transformation (`Perspective.createPitchMatrix`)**:
-    *   **If Unlocked (`isSpatiallyLocked == false` or `anchorOrientation == null`):**
-        *   The camera is rotated *only* based on `currentOrientation.pitch` (forward/backward
-            tilt). Roll and yaw from the phone do not directly influence the main plane's rendering
-            matrix.
-    *   **If Locked (`isSpatiallyLocked == true` and `anchorOrientation != null`):**
+    * **If Unlocked (`isSpatiallyLocked == false` or `anchorOrientation == null`):**
+        * The camera is rotated *only* based on `currentOrientation.pitch` (forward/backward
+          tilt). Roll and yaw from the phone do not directly influence the main plane's rendering
+          matrix.
+    * **If Locked (`isSpatiallyLocked == true` and `anchorOrientation != null`):**
         1.  The camera's base orientation is set using `camera.rotateX(anchorOrientation.pitch)`.
             This ensures the initial locked view matches the primary tilt of the unlocked view,
             preventing a visual jump in pitch when the lock is engaged.
@@ -166,11 +166,11 @@ computes derived state. Renderers display.
             and may require empirical tuning for intuitive feel, especially yaw.
 6.  **ViewModel (Continued)**: Emits the fully processed `OverlayState` (with matrices) to the UI.
 7.  **Renderer (`ProtractorOverlayView` via `OverlayRenderer`):**
-    *   Uses the `pitchMatrix` (and `railPitchMatrix`) from `OverlayState` to draw all logical
-        elements. Since their logical coordinates are fixed (when locked) and the matrix now reflects
-        the counter-rotated camera view, the elements should appear spatially anchored.
-    *   Touch input for moving/rotating elements is disabled by `ProtractorOverlayView` if
-        `canonicalState.isSpatiallyLocked` is true (except for scaling).
+    * Uses the `pitchMatrix` (and `railPitchMatrix`) from `OverlayState` to draw all logical
+      elements. Since their logical coordinates are fixed (when locked) and the matrix now reflects
+      the counter-rotated camera view, the elements should appear spatially anchored.
+    * Touch input for moving/rotating elements is disabled by `ProtractorOverlayView` if
+      `canonicalState.isSpatiallyLocked` is true (except for scaling).
 
 ## 4. Core Operational Modes & Entity Behavior
 
@@ -181,25 +181,29 @@ computes derived state. Renderers display.
 (Existing points A-N remain relevant.)
 
 * **O. Spatial Lock Implementation Details:**
-    *   `SensorRepository` now provides `FullOrientation` (yaw, pitch, roll).
-    *   `OverlayState` stores `currentOrientation` and `anchorOrientation` (when locked).
-    *   `StateReducer`:
-        *   On `ToggleSpatialLock` to true: `isSpatiallyLocked = true`,
-            `anchorOrientation = currentOrientation`.
-        *   On `ToggleSpatialLock` to false: `isSpatiallyLocked = false`, `anchorOrientation = null`.
-        *   When locked, ignores events that would change logical positions/rotations of elements.
-    *   `ProtractorOverlayView`: Disables touch manipulations (except zoom) when locked.
-    *   `Perspective.createPitchMatrix`:
-        *   Unlocked: Uses `currentOrientation.pitch` only.
-        *   Locked: Establishes view with `anchorOrientation.pitch`. Then applies counter-rotations
-            based on `currentOrientation - anchorOrientation` for pitch, roll, and yaw to achieve
-            world-space stability. Fine-tuning of rotation order and signs (especially for yaw) is
-            critical for intuitive feel.
+    * `SensorRepository` now provides `FullOrientation` (yaw, pitch, roll).
+    * `OverlayState` stores `currentOrientation` and `anchorOrientation` (when locked).
+    * `StateReducer`:
+        * On `ToggleSpatialLock` to true: `isSpatiallyLocked = true`,
+          `anchorOrientation = currentOrientation`.
+        * On `ToggleSpatialLock` to false: `isSpatiallyLocked = false`, `anchorOrientation = null`.
+        * When locked, ignores events that would change logical positions/rotations of elements.
+    * `ProtractorOverlayView`: Disables touch manipulations (except zoom) when locked.
+    * `Perspective.createPitchMatrix`:
+        * Unlocked: Uses `currentOrientation.pitch` only.
+        * Locked: Establishes view with `anchorOrientation.pitch`. Then applies counter-rotations
+          based on `currentOrientation - anchorOrientation` for pitch, roll, and yaw to achieve
+          world-space stability. Fine-tuning of rotation order and signs (especially for yaw) is
+          critical for intuitive feel.
 * **P. Avoiding Visual "Jump" on Lock:** The strategy for "Lock" mode in `Perspective.kt` aims to
   prevent a jarring visual change when the lock is engaged by ensuring the initial locked camera
   perspective (based on `anchorOrientation.pitch`) aligns with the unlocked view's primary
   rotational axis. Full 3D stabilization (roll, yaw) then activates relative to this initial
   locked view.
+* **Q. Conditional AR (Spatial Lock):** The application now checks for ARCore support on startup.
+  The result is stored in `OverlayState.isArSupported`. The `MainViewModel` prevents the `ToggleSpatialLock`
+  event from enabling lock mode if `isArSupported` is false, ensuring the app gracefully falls
+  back to the 2D overlay mode on devices without AR capabilities.
 
 ## 6. Future Development Plan
 
@@ -214,13 +218,10 @@ computes derived state. Renderers display.
 * **Tutorial Enhancements:** Make the tutorial more interactive, highlighting UI elements
   corresponding to the current step.
 * **Spatial Lock Refinement:**
-    *   Empirically tune the signs and order of applying delta rotations (pitch, roll, yaw) in
-        `Perspective.kt` for the most intuitive "world lock" feel.
-    *   Consider using Quaternions instead of Euler angles in `Perspective.kt` for more robust
-        3D rotations, avoiding gimbal lock and simplifying combined rotations. This is a significant
-        refactor.
-    *   Investigate if ARCore or similar AR SDKs could provide more stable world tracking if sensor-only
-        data proves too drifty for reliable spatial anchoring over time.
-
-
-
+    * Empirically tune the signs and order of applying delta rotations (pitch, roll, yaw) in
+      `Perspective.kt` for the most intuitive "world lock" feel.
+    * Consider using Quaternions instead of Euler angles in `Perspective.kt` for more robust
+      3D rotations, avoiding gimbal lock and simplifying combined rotations. This is a significant
+      refactor.
+    * Investigate if ARCore or similar AR SDKs could provide more stable world tracking if sensor-only
+      data proves too drifty for reliable spatial anchoring over time.

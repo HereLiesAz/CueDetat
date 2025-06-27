@@ -3,8 +3,8 @@ package com.hereliesaz.cuedetat.view.renderer
 import android.graphics.Canvas
 import android.graphics.Typeface
 import com.hereliesaz.cuedetat.view.PaintCache
-import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.renderer.LineRenderer // Explicitly import your LineRenderer
+import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class OverlayRenderer {
 

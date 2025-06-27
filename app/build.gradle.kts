@@ -160,12 +160,18 @@ android {
 
         // For Sceneform (Community Maintained - Check for latest versions and artifacts)
         // Example, these might not be the current ones:
-        implementation(libs.sceneform)
-        // Or specific modules like:
+        //
+        implementation(libs.arsceneview)
+
+        implementation("com.google.ar:core:1.33.0")
 
 
         implementation(libs.ui)
     }
+}
+dependencies {
+    implementation(project(":opencv"))
+    implementation(libs.rendering)
 }
 kapt {
     correctErrorTypes = true

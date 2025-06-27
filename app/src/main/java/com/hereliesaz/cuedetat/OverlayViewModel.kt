@@ -1,10 +1,10 @@
 package com.hereliesaz.cuedetat
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import com.google.ar.sceneform.math.Vector3
-import com.hereliesaz.cuedetat.view.model.OverlayState
-import com.hereliesaz.cuedetat.model.SpinType
-import com.hereliesaz.cuedetat.view.model.SpinType
+import com.hereliesaz.cuedetat.view.model.LegacyOverlayState
 
+// This is a legacy ViewModel, kept to ensure older parts of the app can be referenced or restored.
+// It uses LegacyOverlayState to avoid name collision with the main app's modern OverlayState.
+class OverlayViewModel : ViewModel() {
+    val state = LegacyOverlayState()
+}

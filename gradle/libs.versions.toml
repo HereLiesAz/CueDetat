@@ -6,6 +6,7 @@
 activityCompose = "1.10.1"
 androidMaterialSlider = "{version}"
 appcompat = "1.7.1"
+arsceneview = "2.3.0"
 camera = "1.4.2"
 composeBom = "2025.06.00"
 constraintlayout = "2.2.1"
@@ -30,8 +31,8 @@ palette = "1.0.0"
 kotlinxCoroutinesGuava = "1.10.2"
 sceneform = "1.23.0"
 sceneformAnimation = "1.21.0"
-sceneformAr = "1.21.0"
-sceneformUx = "1.21.0"
+sceneformAr = "1.23.0"
+sceneformUx = "1.23.0"
 stdlib = "2.2.0"
 
 
@@ -50,6 +51,7 @@ benchmarkCommon = "1.3.4"
 composeMaterial3 = "1.5.0-beta04"
 ui = "1.8.3"
 sceneformBase = "1.17.1"
+rendering = "1.17.1"
 
 [libraries]
 # AndroidX Core & UI
@@ -68,6 +70,7 @@ androidx-material3 = { module = "androidx.compose.material3:material3", name = "
 androidx-material3-expressive = { module = "androidx.compose.material3:material3-expressive", name = "material3-expressive" }
 androidx-multidex = { group = "androidx.multidex", name = "multidex", version = "2.0.1" }
 ar-core = { module = "com.google.ar:core", version.ref = "coreVersion" }
+arsceneview = { module = "io.github.sceneview:arsceneview", version.ref = "arsceneview" }
 dagger-hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hiltCompiler" }
 material = { group = "com.google.android.material", name = "material", version = "1.14.0-alpha02" }
 
@@ -111,9 +114,9 @@ androidx-benchmark-common = { group = "androidx.benchmark", name = "benchmark-co
 
 androidx-palette = { group = "androidx.palette", name = "palette-ktx", version = "1.0.0" }
 compose-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "composeMaterial3" }
-sceneform = { module = "com.gorisse.thomas.sceneform:sceneform", version.ref = "sceneform" }
 ui = { group = "androidx.compose.ui", name = "ui", version = "1.9.0-beta01" }
 sceneform-base = { group = "com.google.ar.sceneform", name = "sceneform-base", version.ref = "sceneformBase" }
+rendering = { group = "com.google.ar.sceneform", name = "rendering", version.ref = "rendering" }
 #androidx-compose-material3-expressive = { group = "androidx.compose.material3", name = "material3-expressive" }
 
 

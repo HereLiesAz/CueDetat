@@ -3,6 +3,7 @@ package com.hereliesaz.cuedetat.ui
 
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
+import com.google.ar.core.Anchor
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.view.state.ToastMessage
 
@@ -46,6 +47,8 @@ sealed class MainScreenEvent {
     object ToggleBankingMode : MainScreenEvent()
 
     data class ToggleSpatialLock(val isLocked: Boolean) : MainScreenEvent()
+    data class ArAnchorPlaced(val anchor: Anchor?) : MainScreenEvent()
+
 
     object CheckForUpdate : MainScreenEvent()
     object ViewArt : MainScreenEvent()
@@ -55,4 +58,5 @@ sealed class MainScreenEvent {
     object ToastShown : MainScreenEvent()
     object GestureStarted : MainScreenEvent()
     object GestureEnded : MainScreenEvent()
+    data class ArAvailabilityChecked(val isSupported: Boolean) : MainScreenEvent()
 }

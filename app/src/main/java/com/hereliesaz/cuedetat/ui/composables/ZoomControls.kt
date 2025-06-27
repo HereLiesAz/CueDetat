@@ -24,6 +24,7 @@ import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.VerticalSlider // <-- IMPORT THE CUSTOM ONE
 import com.hereliesaz.cuedetat.view.state.OverlayState
+
 // We need Color for the SliderDefaults if we were using it for ticks, but M3 SliderDefaults handles it.
 // import androidx.compose.ui.graphics.Color // Not needed if SliderDefaults handles everything
 

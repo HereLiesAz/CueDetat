@@ -1,58 +1,26 @@
-// app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt
 package com.hereliesaz.cuedetat.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDrawerState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
-import com.hereliesaz.cuedetat.ui.composables.ArCoreScene
-import com.hereliesaz.cuedetat.ui.composables.CameraBackground
-import com.hereliesaz.cuedetat.ui.composables.KineticWarningOverlay
-import com.hereliesaz.cuedetat.ui.composables.MenuDrawerContent
-import com.hereliesaz.cuedetat.ui.composables.ResetFab
-import com.hereliesaz.cuedetat.ui.composables.ToggleCueBallFab
-import com.hereliesaz.cuedetat.ui.composables.TopControls
-import com.hereliesaz.cuedetat.ui.composables.ZoomControls
-import com.hereliesaz.cuedetat.view.ProtractorOverlayView
+import com.hereliesaz.cuedetat.ui.composables.*
+import com.hereliesaz.cuedetat.ui.overlay.ProtractorOverlayView
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.ToastMessage
 import kotlinx.coroutines.launch
@@ -178,7 +146,6 @@ fun TutorialOverlay(
     }
 }
 
-
 @Composable
 fun LockFab(
     uiState: OverlayState,
@@ -204,7 +171,6 @@ fun LockFab(
     }
 }
 
-
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
@@ -212,9 +178,14 @@ fun MainScreen(viewModel: MainViewModel) {
     val context = LocalContext.current
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-
-    val protractorView = remember { ProtractorOverlayView(context) }
     val systemIsDark = isSystemInDarkTheme()
+
+    val density = LocalDensity.current.density
+    LaunchedEffect(density) {
+        val width = (context.resources.displayMetrics.widthPixels)
+        val height = (context.resources.displayMetrics.heightPixels)
+        viewModel.onEvent(MainScreenEvent.SizeChanged(width, height))
+    }
 
     val appControlColorScheme = MaterialTheme.colorScheme
     LaunchedEffect(appControlColorScheme) {
@@ -245,46 +216,34 @@ fun MainScreen(viewModel: MainViewModel) {
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (uiState.isSpatiallyLocked) {
-                uiState.arSession?.let { session ->
-                    ArCoreScene(
-                        modifier = Modifier.fillMaxSize().zIndex(0f),
-                        arSession = session,
-                        uiState = uiState
-                    )
-                } ?: run {
-                    Box(
-                        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Initializing ARCore...",
-                            color = Color.White,
-                            style = MaterialTheme.typography.headlineMedium,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
+                ArCoreScene(
+                    modifier = Modifier.fillMaxSize().zIndex(0f),
+                    arSession = uiState.arSession,
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent
+                )
             } else {
                 CameraPreview(modifier = Modifier.fillMaxSize().zIndex(0f))
 
                 AndroidView(
                     factory = {
-                        protractorView.apply {
+                        ProtractorOverlayView(it).apply {
                             onSizeChanged = { w, h -> viewModel.onEvent(MainScreenEvent.SizeChanged(w, h)) }
                             onProtractorRotationChange = { rot -> viewModel.onEvent(MainScreenEvent.RotationChanged(rot)) }
+                            onScale = { scale -> viewModel.onEvent(MainScreenEvent.ZoomScaleChanged(scale)) }
                             onProtractorUnitMoved = { pos -> viewModel.onEvent(MainScreenEvent.UnitMoved(pos)) }
                             onActualCueBallScreenMoved = { pos -> viewModel.onEvent(MainScreenEvent.ActualCueBallMoved(pos)) }
-                            onScale = { scaleFactor -> viewModel.onEvent(MainScreenEvent.ZoomScaleChanged(scaleFactor)) }
+                            onBankingAimTargetScreenDrag = { pos -> viewModel.onEvent(MainScreenEvent.BankingAimTargetDragged(pos)) }
                             onGestureStarted = { viewModel.onEvent(MainScreenEvent.GestureStarted) }
                             onGestureEnded = { viewModel.onEvent(MainScreenEvent.GestureEnded) }
-                            onBankingAimTargetScreenDrag = { screenPoint -> viewModel.onEvent(MainScreenEvent.BankingAimTargetDragged(screenPoint)) }
                         }
                     },
-                    modifier = Modifier.fillMaxSize().zIndex(1f),
-                    update = { view -> view.updateState(uiState, systemIsDark) }
+                    update = { view ->
+                        view.updateState(uiState, systemIsDark)
+                    },
+                    modifier = Modifier.fillMaxSize().zIndex(1f)
                 )
             }
-
 
             TopControls(
                 uiState = uiState,

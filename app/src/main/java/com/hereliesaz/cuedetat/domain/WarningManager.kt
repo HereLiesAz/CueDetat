@@ -1,6 +1,6 @@
 package com.hereliesaz.cuedetat.domain
 
-import com.hereliesaz.cuedetat.view.state.OverlayState // Import OverlayState
+import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
