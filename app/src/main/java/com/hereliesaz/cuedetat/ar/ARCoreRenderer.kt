@@ -8,12 +8,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.xr.compose.ARScene
 import androidx.xr.compose.AnchorNode
 import androidx.xr.compose.rememberARState
-import androidx.xr.compose.core.Anchor
-import com.google.xr.arcore.Config
-import com.google.xr.arcore.Plane
+import androidx.xr.core.Config
+import com.google.ar.core.Plane
 import com.hereliesaz.cuedetat.ar.renderables.TableNode
-import com.hereliesaz.cuedetat.ar.rendering.TableNode
 import com.hereliesaz.cuedetat.ui.MainViewModel
+import com.hereliesaz.cuedetat.ui.state.UiEvent
 
 /**
  * This is the main composable for the AR experience, built with the official
@@ -32,8 +31,7 @@ fun ARCoreRenderer(
 
     // Observe the state from the ViewModel.
     // This allows the UI to reactively update when the state changes.
-    val anchors by viewModel.anchors.collectAsState()
-    val tablePlaced by viewModel.tablePlaced.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
 
     // ARScene is the root container for your AR content.
     ARScene(
@@ -47,11 +45,11 @@ fun ARCoreRenderer(
         onTap = { hitResult ->
             // Handle user taps in the 3D scene.
             // We only allow placing the table once.
-            if (!tablePlaced) {
+            if (!uiState.tablePlaced) {
                 // Ensure the tap is on a valid, tracking plane.
                 val trackable = hitResult.trackable
                 if (trackable is Plane && trackable.trackingState == Plane.TrackingState.TRACKING) {
-                    viewModel.onPlaneTap(hitResult.createAnchor())
+                    viewModel.onEvent(UiEvent.OnPlaneTap(hitResult.createAnchor()))
                 }
             }
         }
@@ -61,7 +59,7 @@ fun ARCoreRenderer(
         // This replaces the imperative onDrawFrame() loop.
 
         // Iterate through the anchors managed by the ViewModel and render them.
-        for (appAnchor in anchors) {
+        for (appAnchor in uiState.anchors) {
             AnchorNode(anchor = appAnchor.arAnchor) {
                 // This is where you place your 3D objects relative to the anchor.
                 // You would have custom composables like TableNode, BallNode, etc.

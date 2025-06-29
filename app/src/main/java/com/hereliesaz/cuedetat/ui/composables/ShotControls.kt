@@ -1,46 +1,48 @@
 package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.ui.state.ShotType
+import com.hereliesaz.cuedetat.ui.state.UiEvent
+import com.hereliesaz.cuedetat.ui.state.UiState
 
 @Composable
 fun ShotControls(
-    selectedShotType: ShotType,
-    onShotTypeSelect: (ShotType) -> Unit
+    modifier: Modifier = Modifier,
+    uiState: UiState,
+    onMenuClick: () -> Unit,
+    onEvent: (UiEvent) -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly
+    Column(
+        modifier = modifier.padding(16.dp),
+        verticalArrangement = Arrangement.Bottom,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        ShotTypeButton("Cut", selectedShotType == ShotType.CUT) { onShotTypeSelect(ShotType.CUT) }
-        ShotTypeButton("Bank", selectedShotType == ShotType.BANK) { onShotTypeSelect(ShotType.BANK) }
-        ShotTypeButton("Kick", selectedShotType == ShotType.KICK) { onShotTypeSelect(ShotType.KICK) }
-        ShotTypeButton("Jump", selectedShotType == ShotType.JUMP) { onShotTypeSelect(ShotType.JUMP) }
-        ShotTypeButton("Massé", selectedShotType == ShotType.MASSE) { onShotTypeSelect(ShotType.MASSE) }
-    }
-}
+        Text(text = uiState.statusText)
 
-@Composable
-private fun ShotTypeButton(
-    text: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Button(
-        onClick = onClick,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-        )
-    ) {
-        Text(text)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            // Example Button for Shot Type
+            IconButton(onClick = { onEvent(UiEvent.OnShotTypeSelect(ShotType.JUMP)) }) {
+                Text(text = "Jump")
+            }
+            // Add other controls for spin, elevation etc. here
+        }
+
+        IconButton(onClick = onMenuClick) {
+            // Icon for menu
+            Text(text = "Menu")
+        }
     }
 }
