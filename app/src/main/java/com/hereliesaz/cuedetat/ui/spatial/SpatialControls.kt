@@ -14,6 +14,8 @@ import com.hereliesaz.cuedetat.ui.state.ShotType
 import com.hereliesaz.cuedetat.ui.state.UiEvent
 import com.hereliesaz.cuedetat.ui.state.UiState
 
+private val shotType: ShotType
+
 @Composable
 fun SpatialControls(
     uiState: UiState,
