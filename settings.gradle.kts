@@ -1,22 +1,8 @@
 pluginManagement {
   repositories {
-    google {
-      content {
-        includeGroupByRegex("com\\.android.*")
-        includeGroupByRegex("com\\.google.*")
-        includeGroupByRegex("androidx.*")
-      }
-    }
+    google()
     mavenCentral()
     gradlePluginPortal()
-    maven(url = "https://jitpack.io")
-
-  }
-  plugins {
-    id("com.android.application") version "8.12.0"
-    id("com.android.library") version "8.12.0-alpha06"
-
-    id("org.jetbrains.kotlin.android") version "2.1.21"
   }
 }
 dependencyResolutionManagement {
@@ -27,6 +13,5 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "CueDetat"
+rootProject.name = "CueDetatAR"
 include(":app")
-include(":opencv")

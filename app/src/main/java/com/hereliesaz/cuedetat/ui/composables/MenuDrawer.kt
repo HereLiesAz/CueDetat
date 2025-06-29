@@ -1,168 +1,59 @@
 package com.hereliesaz.cuedetat.ui.composables
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Brush
-import androidx.compose.material.icons.outlined.BrightnessMedium
-import androidx.compose.material.icons.outlined.LightMode
-import androidx.compose.material.icons.outlined.MonetizationOn
-import androidx.compose.material.icons.outlined.Nightlight
-import androidx.compose.material.icons.outlined.School
-import androidx.compose.material.icons.outlined.SystemUpdate
-import androidx.compose.material.icons.outlined.ViewInAr
-import androidx.compose.material3.DividerDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.MonetizationOn
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.R
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
-import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.ui.MainViewModel
+import com.hereliesaz.cuedetat.ui.UiEvent
+import com.hereliesaz.cuedetat.ui.state.MainUiState
 
 @Composable
-fun MenuDrawerContent(
-    uiState: OverlayState,
-    onEvent: (MainScreenEvent) -> Unit,
-    onCloseDrawer: () -> Unit
-) {
-    ModalDrawerSheet(
-        drawerContainerColor = MaterialTheme.colorScheme.surfaceVariant
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = stringResource(id = R.string.app_name),
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.displaySmall,
-                textAlign = TextAlign.Center
+fun MenuDrawerContent(uiState: MainUiState, viewModel: MainViewModel, onCloseDrawer: () -> Unit) {
+    val uriHandler = LocalUriHandler.current
+
+    ModalDrawerSheet {
+        Text(stringResource(id = R.string.app_name), modifier = Modifier.padding(24.dp), style = MaterialTheme.typography.titleLarge)
+        HorizontalDivider()
+        if (uiState.tablePose != null) {
+            DrawerMenuItem(
+                icon = Icons.Default.Refresh,
+                text = "Reset Scene",
+                onClick = { viewModel.onEvent(UiEvent.OnReset); onCloseDrawer() }
             )
         }
-        HorizontalDivider(
-            thickness = DividerDefaults.Thickness,
-            color = MaterialTheme.colorScheme.outline
+        DrawerMenuItem(
+            icon = Icons.Default.HelpOutline,
+            text = "How to Use",
+            onClick = { viewModel.onEvent(UiEvent.ToggleHelpDialog); onCloseDrawer() }
         )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // --- Help & Tutorial ---
-        MenuItem(
-            icon = ImageVector.vectorResource(R.drawable.ic_help_outline_24),
-            text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
-            onClick = { onEvent(MainScreenEvent.ToggleHelp); onCloseDrawer() }
+        DrawerMenuItem(
+            icon = Icons.Default.MonetizationOn,
+            text = "Chalk Your Tip (Support)",
+            onClick = {
+                uriHandler.openUri("https://www.buymeacoffee.com/placeholder") // Replace with your actual link
+                onCloseDrawer()
+            }
         )
-        MenuItem(
-            icon = Icons.Outlined.School,
-            text = "Show Tutorial",
-            onClick = { onEvent(MainScreenEvent.StartTutorial); onCloseDrawer() }
-        )
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            color = MaterialTheme.colorScheme.outline
-        )
-
-        // --- View Controls ---
-        MenuItem(
-            icon = ImageVector.vectorResource(R.drawable.ic_undo_24),
-            text = "Reset View",
-            onClick = { onEvent(MainScreenEvent.Reset); onCloseDrawer() }
-        )
-        if (!uiState.isBankingMode) {
-            MenuItem(
-                icon = ImageVector.vectorResource(R.drawable.ic_jump_shot),
-                text = "Toggle Aiming Ball",
-                onClick = { onEvent(MainScreenEvent.ToggleActualCueBall); onCloseDrawer() }
-            )
-        }
-        val bankingModeToggleText =
-            if (uiState.isBankingMode) "Visualize Ghost Ball" else "Calculate Bank"
-        MenuItem(
-            icon = Icons.Outlined.ViewInAr,
-            text = bankingModeToggleText,
-            onClick = { onEvent(MainScreenEvent.ToggleBankingMode); onCloseDrawer() }
-        )
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            color = MaterialTheme.colorScheme.outline
-        )
-
-        // --- Theme and Appearance (for Drawn Elements) ---
-        val systemIsCurrentlyDark = isSystemInDarkTheme()
-        val (themeToggleText, themeToggleIcon) = when (uiState.isForceLightMode) { // Corrected: isForceLightMode now accessible
-            true -> "Embrace the Dark" to Icons.Outlined.Nightlight
-            false -> "Use System Theme" to Icons.Outlined.BrightnessMedium
-            else -> if (systemIsCurrentlyDark) "Let there be Light" to Icons.Outlined.LightMode else "Embrace the Dark" to Icons.Outlined.Nightlight
-        }
-        MenuItem(
-            icon = themeToggleIcon,
-            text = themeToggleText,
-            onClick = { onEvent(MainScreenEvent.ToggleForceTheme); onCloseDrawer() }
-        )
-        MenuItem(
-            icon = Icons.Outlined.BrightnessMedium,
-            text = "Luminance",
-            onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog); onCloseDrawer() }
-        )
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            color = MaterialTheme.colorScheme.outline
-        )
-
-        // --- Meta Section ---
-        MenuItem(
-            icon = Icons.Outlined.Brush,
-            text = "About Me",
-            onClick = { onEvent(MainScreenEvent.ViewArt); onCloseDrawer() })
-        MenuItem(
-            icon = Icons.Outlined.MonetizationOn,
-            text = "Chalk Your Tip",
-            onClick = { onEvent(MainScreenEvent.ShowDonationOptions); onCloseDrawer() })
-        MenuItem(
-            icon = Icons.Outlined.SystemUpdate,
-            text = "Check for Updates",
-            onClick = { onEvent(MainScreenEvent.CheckForUpdate); onCloseDrawer() })
-        Spacer(modifier = Modifier.height(12.dp))
     }
 }
 
 @Composable
-private fun MenuItem(icon: ImageVector, text: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon, contentDescription = text, modifier = Modifier.size(24.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+private fun DrawerMenuItem(icon: ImageVector, text: String, onClick: () -> Unit) {
+    NavigationDrawerItem(
+        icon = { Icon(icon, contentDescription = text) },
+        label = { Text(text) },
+        selected = false,
+        onClick = onClick,
+        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+    )
 }
