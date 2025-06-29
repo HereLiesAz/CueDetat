@@ -1,155 +1,85 @@
 package com.hereliesaz.cuedetat.ar
 
-import android.content.Context
-import android.opengl.GLES30
-import android.opengl.GLSurfaceView
-import android.opengl.Matrix
-import android.view.MotionEvent
-import com.google.ar.core.*
-import com.hereliesaz.cuedetat.ar.renderables.*
-import com.hereliesaz.cuedetat.ui.state.BallState
-import com.hereliesaz.cuedetat.ui.state.ShotType
-import dev.romainguy.kotlin.math.Float3
-import javax.microedition.khronos.egl.EGLConfig
-import javax.microedition.khronos.opengles.GL10
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.xr.compose.ARScene
+import androidx.xr.compose.AnchorNode
+import androidx.xr.compose.rememberARState
+import androidx.xr.compose.core.Anchor
+import com.google.xr.arcore.Config
+import com.google.xr.arcore.Plane
+import com.hereliesaz.cuedetat.ar.renderables.Table
+import com.hereliesaz.cuedetat.ar.rendering.TableNode
+import com.hereliesaz.cuedetat.ui.MainViewModel
 
-class ARCoreRenderer(
-    private val context: Context,
-    private val onTap: (HitResult) -> Unit
-) : GLSurfaceView.Renderer {
+/**
+ * This is the main composable for the AR experience, built with the official
+ * Google Jetpack XR library. It replaces the old GLSurfaceView.Renderer paradigm.
+ *
+ * @param modifier The modifier to be applied to the scene.
+ * @param viewModel The ViewModel that holds the application's state.
+ */
+@Composable
+fun ARCoreRenderer(
+    modifier: Modifier = Modifier,
+    viewModel: MainViewModel = viewModel()
+) {
+    // ARState manages the underlying ARCore session and frame lifecycle.
+    val arState = rememberARState()
 
-    var arSession: Session? = null
-    var onPlaneDetected: (() -> Unit)? = null
+    // Observe the state from the ViewModel.
+    // This allows the UI to reactively update when the state changes.
+    val anchors by viewModel.anchors.collectAsState()
+    val tablePlaced by viewModel.tablePlaced.collectAsState()
 
-    // Rendering-specific state
-    private val viewMatrix = FloatArray(16)
-    private val projectionMatrix = FloatArray(16)
-    private val viewProjectionMatrix = FloatArray(16)
-    private var viewportWidth = 0
-    private var viewportHeight = 0
-    private var tapToProcess: MotionEvent? = null
-
-    // Renderables
-    private lateinit var backgroundRenderer: BackgroundRenderer
-    private lateinit var table: Table
-    private lateinit var cueBall: Ball
-    private lateinit var objectBall: Ball
-    private lateinit var ghostBall: Ball
-    private lateinit var pocketingLine: Line
-    private lateinit var tangentLine: Line
-    private lateinit var cueBallPathLine: Line
-    private lateinit var selectionDisc: HighlightDisc
-
-    // Public properties updated from the UI State
-    var tablePose: Pose? = null
-    var cueBallState: BallState? = null
-    var objectBallState: BallState? = null
-    var selectedBallId: Int? = null
-    var shotType: ShotType = ShotType.CUT
-    var spinOffset: Float3 = Float3()
-    var cueElevation: Float = 0f
-
-    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        backgroundRenderer = BackgroundRenderer()
-        backgroundRenderer.createOnGlThread()
-        table = Table(context)
-        cueBall = Ball(context, ArConstants.CUE_BALL_COLOR)
-        objectBall = Ball(context, ArConstants.OBJECT_BALL_COLOR)
-        ghostBall = Ball(context, ArConstants.GHOST_BALL_COLOR)
-        pocketingLine = Line(context, ArConstants.POCKET_LINE_COLOR)
-        tangentLine = Line(context, ArConstants.TANGENT_LINE_COLOR)
-        cueBallPathLine = Line(context, ArConstants.CUE_PATH_COLOR)
-        selectionDisc = HighlightDisc(context, ArConstants.SELECTION_COLOR)
-    }
-
-    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        GLES30.glViewport(0, 0, width, height)
-        viewportWidth = width
-        viewportHeight = height
-        arSession?.setDisplayGeometry(0, width, height)
-    }
-
-    override fun onDrawFrame(gl: GL10?) {
-        val session = arSession ?: return
-        session.setCameraTextureName(backgroundRenderer.textureId)
-
-        val frame = session.update()
-        if (frame.timestamp == 0L) return
-
-        handleTap(frame)
-
-        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
-        backgroundRenderer.draw(frame)
-
-        val camera = frame.camera
-        if (camera.trackingState != TrackingState.TRACKING) return
-
-        camera.getViewMatrix(viewMatrix, 0)
-        camera.getProjectionMatrix(projectionMatrix, 0, 0.1f, 100.0f)
-        Matrix.multiplyMM(viewProjectionMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
-
-        // Plane detection notification
-        if (tablePose == null && frame.getUpdatedTrackables(Plane::class.java).any { it.trackingState == TrackingState.TRACKING }) {
-            onPlaneDetected?.invoke()
-        }
-
-        tablePose?.let {
-            val tableModelMatrix = it.toM4()
-            drawTable(tableModelMatrix)
-
-            val currentCueState = cueBallState
-            val currentObjectState = objectBallState
-
-            currentCueState?.let { cue -> drawBall(cueBall, cue.pose.translation.toF3(), tableModelMatrix, selectedBallId == 0) }
-            currentObjectState?.let { obj -> drawBall(objectBall, obj.pose.translation.toF3(), tableModelMatrix, selectedBallId == 1) }
-
-            if (currentCueState != null && currentObjectState != null) {
-                val shotData = ShotVisualization.calculateCutShot(currentCueState.pose, currentObjectState.pose)
-                drawShotVisualization(shotData, tableModelMatrix)
-            }
-        }
-    }
-
-    fun queueTap(e: MotionEvent) {
-        tapToProcess = e
-    }
-
-    private fun handleTap(frame: Frame) {
-        val tap = tapToProcess ?: return
-        tapToProcess = null
-        if (frame.camera.trackingState == TrackingState.TRACKING) {
-            frame.hitTest(tap).firstOrNull()?.let { hitResult ->
-                if(hitResult.trackable is Plane) {
-                    onTap(hitResult)
+    // ARScene is the root container for your AR content.
+    ARScene(
+        modifier = modifier,
+        arState = arState,
+        onSessionConfig = { session, config ->
+            // Configure the ARCore session. This is called once.
+            config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+            config.lightEstimationMode = Config.LightEstimationMode.ENVIRONMENTAL_HDR
+        },
+        onTap = { hitResult ->
+            // Handle user taps in the 3D scene.
+            // We only allow placing the table once.
+            if (!tablePlaced) {
+                // Ensure the tap is on a valid, tracking plane.
+                val trackable = hitResult.trackable
+                if (trackable is Plane && trackable.trackingState == Plane.TrackingState.TRACKING) {
+                    viewModel.onPlaneTap(hitResult.createAnchor())
                 }
             }
         }
-    }
+    ) {
+        // The content of this lambda is a declarative description of your 3D scene.
+        // It will be re-composed whenever the state it depends on changes.
+        // This replaces the imperative onDrawFrame() loop.
 
-    private fun drawShotVisualization(shotData: ShotData, tableModelMatrix: FloatArray) {
-        shotData.ghostBallPose?.let { drawBall(ghostBall, it.translation.toF3(), tableModelMatrix) }
-        if (shotData.pocketingLinePoints.size == 2) drawLine(pocketingLine, shotData.pocketingLinePoints[0], shotData.pocketingLinePoints[1], tableModelMatrix)
-        if (shotData.tangentLinePoints.size == 2) drawLine(tangentLine, shotData.tangentLinePoints[0], shotData.tangentLinePoints[1], tableModelMatrix)
-        if (shotData.cueBallPathPoints.size == 2) drawLine(cueBallPathLine, shotData.cueBallPathPoints[0], shotData.cueBallPathPoints[1], tableModelMatrix)
-    }
+        // Iterate through the anchors managed by the ViewModel and render them.
+        for (appAnchor in anchors) {
+            AnchorNode(anchor = appAnchor.arAnchor) {
+                // This is where you place your 3D objects relative to the anchor.
+                // You would have custom composables like TableNode, BallNode, etc.
 
-    private fun drawTable(modelMatrix: FloatArray) = table.draw(viewProjectionMatrix, modelMatrix)
+                // Example: If the anchor represents the table, render the table.
+                if (appAnchor.isTable) {
+                    // Assuming TableNode is a @Composable function you've created
+                    // that knows how to render your table model.
+                    TableNode()
+                }
 
-    private fun drawBall(ball: Ball, localPosition: Float3, tableMatrix: FloatArray, isSelected: Boolean = false) {
-        val ballModelMatrix = tableMatrix.clone()
-        Matrix.translateM(ballModelMatrix, 0, localPosition.x, ArConstants.BALL_RADIUS, localPosition.z)
-        ball.draw(viewProjectionMatrix, ballModelMatrix)
-        if (isSelected) {
-            val discModelMatrix = tableMatrix.clone()
-            Matrix.translateM(discModelMatrix, 0, localPosition.x, 0.001f, localPosition.z)
-            selectionDisc.draw(viewProjectionMatrix, discModelMatrix)
+                // Other objects like balls, cue sticks, and lines would be rendered
+                // here as well, driven by the state in your ViewModel.
+            }
         }
     }
-
-    private fun drawLine(line: Line, start: Float3, end: Float3, tableMatrix: FloatArray) {
-        line.update(start, end)
-        line.draw(viewProjectionMatrix, tableMatrix)
-    }
-
-    private fun Pose.toM4(): FloatArray = FloatArray(16).apply { this@toM4.toMatrix(this, 0) }
 }
+
+// Note: You will need to create a simple data class to help manage your anchors in the ViewModel,
+// for example:
+// data class AppAnchor(val arAnchor: Anchor, val isTable: Boolean = false)
