@@ -84,6 +84,7 @@ dependencies {
     // Hilt
     implementation(libs.hilt.android)
     implementation(libs.androidx.room.compiler.processing.testing)
+    implementation(libs.androidx.benchmark.common)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 

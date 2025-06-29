@@ -7,9 +7,12 @@ This document provides a guide to the architecture and development process for t
 The core principle of this architecture is a clean separation of concerns:
 -   **State Management:** Handled exclusively by the `MainViewModel`.
 -   **UI (View Layer):** Handled exclusively by Jetpack Compose composables (`MainScreen.kt`).
--   **Rendering:** Handled exclusively by the `ARCoreRenderer` and its associated OpenGL object classes.
+-   **Rendering:** Handled exclusively by the `sceneview` declarative AR library.
 
-There is no direct communication between the UI and the Renderer. All interactions flow through the ViewModel.
+There is no direct communication between the UI and any manual rendering pipeline. All interactions flow through the ViewModel, and the UI is a direct representation of the state.
+
+### Development Mandates
+**It is mandatory to use the modern Android XR and Jetpack XR (`sceneview`) libraries wherever available.** Manual OpenGL implementations are to be avoided in favor of the declarative, component-based architecture provided by `sceneview`. This ensures maintainability, leverages the latest platform features, and keeps the project aligned with modern Android development practices.
 
 ## Core Components
 
@@ -22,18 +25,12 @@ There is no direct communication between the UI and the Renderer. All interactio
 ### 2. MainScreen.kt
 
 -   **Purely Declarative UI:** This file contains only Jetpack Compose code. It observes the `uiState` StateFlow from the ViewModel.
--   **Gesture Handling:** It uses a transparent `ARScene` composable layered over the `GLSurfaceView` to capture gestures. `rememberTapGestureRecognizer` and `rememberDragGestureRecognizer` translate user input into `UiEvent`s for the ViewModel.
--   **State Propagation to Renderer:** The `AndroidView` that hosts our `GLSurfaceView` has an `update` block. This block is called on every recomposition, passing the latest `uiState` values as public properties to the `ARCoreRenderer`. This is the one-way data flow from UI State -> Renderer.
+-   **AR Scene Definition:** The `ARScene` composable is the root of the AR experience. It declaratively defines the scene's nodes (`TableNode`, `BallNode`, etc.) based on the current `uiState`.
+-   **Gesture Handling:** It uses `sceneview`'s built-in gesture recognizers on the scene and its nodes to translate user input into `UiEvent`s for the ViewModel.
 
-### 3. ARCoreRenderer.kt
+### 3. AR Node Classes (`ar/rendering/`)
 
--   **Stateless Rendering Engine:** The renderer is designed to be "dumb." It holds no state of its own. On every `onDrawFrame` call, it reads its public properties (like `tableAnchor`, `cueBallLocalPosition`, etc.) and draws the scene based on those values.
--   **OpenGL Object Management:** It owns instances of our 3D object classes (`Table`, `Ball`, `Line`, etc.).
--   **Rendering Logic:** It contains all the complex rendering logic, including matrix math for positioning objects, and the shot calculation functions (`drawCutShotVisualization`, `drawBankShotVisualization`).
-
-### 4. AR Object Classes (`ar/objects/`)
-
--   **Self-Contained:** Each class (`Table.kt`, `Ball.kt`, etc.) is responsible for its own OpenGL setup (loading shaders, creating vertex buffers) and its own `draw()` call. They are simple, reusable components.
+-   **Self-Contained Composable Nodes:** Each class (`TableNode.kt`, `BallNode.kt`, etc.) is a self-contained `@Composable` function that represents a physical object in the scene. They are simple, reusable components within the `ARScene`.
 
 ## How to Extend the App
 
@@ -43,20 +40,20 @@ This architecture is designed for easy extension.
 
 1.  **Update State:** In `MainViewModel.kt`, add a new property to `MainUiState`:
     ```kotlin
-    val thirdBallLocalPosition: Position? = null,
+    val thirdBallPose: BallState? = null,
     ```
-2.  **Update Logic:** In `MainViewModel.kt`, update the `handleTap` logic to place the third ball after the object ball is placed.
-3.  **Update Renderer:**
-    *   In `ARCoreRenderer.kt`, create a new `Ball` instance: `private lateinit var thirdBall: Ball`.
-    *   Instantiate it in `onSurfaceCreated`: `thirdBall = Ball(context, color = floatArrayOf(1.0f, 0.0f, 0.0f, 1.0f)) // Red`.
-    *   Add a public property: `var thirdBallLocalPosition: Position? = null`.
-    *   In `onDrawFrame`, add the draw call: `if (thirdBallLocalPosition != null) drawBall(thirdBall, thirdBallLocalPosition, tableModelMatrix)`.
-4.  **Update UI:** In `MainScreen.kt`'s `AndroidView` `update` block, pass the new state to the renderer:
+2.  **Update Logic:** In `MainViewModel.kt`, update the `handlePlaneTap` logic to place the third ball after the object ball is placed.
+3.  **Update UI:** In `MainScreen.kt`, within the `ARScene` composable, add a new `BallNode` that is rendered when `uiState.thirdBallPose` is not null:
     ```kotlin
-    update = {
-        //...
-        renderer.thirdBallLocalPosition = uiState.thirdBallLocalPosition
+    uiState.thirdBallPose?.let {
+        BallNode(
+            id = 2,
+            pose = it.pose,
+            isSelected = uiState.selectedBall == 2,
+            onBallTapped = { id -> onEvent(UiEvent.OnBallTapped(id)) },
+            color = Color.Blue // Or some other color
+        )
     }
     ```
 
-This clean separation ensures that adding new visual elements requires minimal changes across the codebase and follows a predictable pattern.
+This clean separation ensures that adding new visual elements requires minimal changes across the codebase and follows a predictable, declarative pattern.

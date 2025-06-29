@@ -1,16 +1,31 @@
 package com.hereliesaz.cuedetat.ar
 
-object ARConstants {
-    // Standard 8-foot table dimensions in meters (playing surface)
-    const val TABLE_WIDTH = 1.12f  // 44 inches
-    const val TABLE_DEPTH = 2.24f // 88 inches
-    const val BALL_DIAMETER = 0.05715f
+import dev.romainguy.kotlin.math.Float3
 
-    // Dimensions for rendering the table rails
-    const val RAIL_HEIGHT = 0.04f
-    const val RAIL_WIDTH = 0.07f
+object ArConstants {
+    // Colors
+    val CUE_BALL_COLOR = floatArrayOf(0.9f, 0.9f, 0.9f, 1.0f) // White
+    val OBJECT_BALL_COLOR = floatArrayOf(0.8f, 0.2f, 0.2f, 1.0f) // Red
+    val GHOST_BALL_COLOR = floatArrayOf(0.8f, 0.2f, 0.2f, 0.3f) // Transparent Red
+    val POCKET_LINE_COLOR = floatArrayOf(0.2f, 0.8f, 0.2f, 1.0f) // Green
+    val TANGENT_LINE_COLOR = floatArrayOf(0.2f, 0.2f, 0.8f, 1.0f) // Blue
+    val CUE_PATH_COLOR = floatArrayOf(0.9f, 0.9f, 0.2f, 1.0f) // Yellow
+    val SELECTION_COLOR = floatArrayOf(0.9f, 0.9f, 0.2f, 0.5f) // Transparent Yellow
 
-    // Diamonds are spaced at 1/4 the length of the table
-    val DIAMOND_SPACING_DEPTH = TABLE_DEPTH / 4.0f
-    val DIAMOND_SPACING_WIDTH = TABLE_WIDTH / 4.0f
+    // Dimensions (in meters)
+    const val TABLE_WIDTH = 1.27f
+    const val TABLE_DEPTH = 2.54f
+    const val TABLE_HEIGHT = 0.05f
+    const val BALL_RADIUS = 0.028575f
+    const val BALL_DIAMETER = BALL_RADIUS * 2
+
+    // Pocket locations (local coordinates relative to table center)
+    val POCKETS = arrayOf(
+        Float3(TABLE_WIDTH / 2, 0f, TABLE_DEPTH / 2), // Top-right
+        Float3(-TABLE_WIDTH / 2, 0f, TABLE_DEPTH / 2), // Top-left
+        Float3(TABLE_WIDTH / 2, 0f, -TABLE_DEPTH / 2), // Bottom-right
+        Float3(-TABLE_WIDTH / 2, 0f, -TABLE_DEPTH / 2), // Bottom-left
+        Float3(0f, 0f, TABLE_DEPTH / 2), // Top-center
+        Float3(0f, 0f, -TABLE_DEPTH / 2) // Bottom-center
+    )
 }

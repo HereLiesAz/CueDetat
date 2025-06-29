@@ -3,15 +3,15 @@ package com.hereliesaz.cuedetat.ui
 import android.content.Context
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
-import androidx.xr.core.Pose
+import com.google.ar.core.Pose
+import com.google.ar.core.Session
 import com.hereliesaz.cuedetat.R
-import com.hereliesaz.cuedetat.ar.ARConstants
-import com.hereliesaz.cuedetat.ar.MathUtils.toF3
+import com.hereliesaz.cuedetat.ar.ArConstants
 import com.hereliesaz.cuedetat.ui.state.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.romainguy.kotlin.math.Float3
 import dev.romainguy.kotlin.math.inverse
-import io.github.sceneview.math.Position
 import io.github.sceneview.math.toTransform
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,27 +39,33 @@ class MainViewModel @Inject constructor(
             is UiEvent.ToggleHelpDialog -> _uiState.update { it.copy(showHelpDialog = !it.showHelpDialog) }
             is UiEvent.SetShotType -> setShotType(event.type)
             is UiEvent.SetCueElevation -> _uiState.update { it.copy(cueElevation = event.elevation) }
-            is UiEvent.SetSpin -> _uiState.update { it.copy(spinOffset = event.offset) }
+            is UiEvent.SetSpin -> _uiState.update { it.copy(spinOffset = event.offset.toF3()) }
+            is UiEvent.SetARSession -> _uiState.update { it.copy(arSession = event.session) }
+            is UiEvent.OnPlanesDetected -> {
+                if (_uiState.value.appState == AppState.DetectingPlanes) {
+                    _uiState.update { it.copy(appState = AppState.ReadyToPlace, statusText = getStatusText(AppState.ReadyToPlace)) }
+                }
+            }
         }
     }
 
     private fun placeTable() {
         val cameraPose = uiState.value.arSession?.camera?.pose ?: return
         val tablePose = cameraPose.copy(
-            translation = cameraPose.translation + cameraPose.forward * 1.5f
+            translation = (cameraPose.translation.toF3() + cameraPose.forward.toF3() * 1.5f).toFloatArray()
         )
         _uiState.update { it.copy(appState = AppState.ScenePlaced, tablePose = tablePose, statusText = getStatusText(AppState.ScenePlaced)) }
     }
 
     private fun handlePlaneTap(pose: Pose) {
         val currentState = _uiState.value
-        val localPos = getLocalPosition(pose, currentState.tablePose)
+        val localPos = getLocalPosition(pose, currentState.tablePose) ?: return
         if (!isWithinTableBounds(localPos)) return
 
         if (currentState.cueBallPose == null) {
-            _uiState.update { it.copy(cueBallPose = BallState(Pose(localPos))) }
+            _uiState.update { it.copy(cueBallPose = BallState(Pose(localPos.toFloatArray(), pose.rotation))) }
         } else if (currentState.objectBallPose == null) {
-            _uiState.update { it.copy(objectBallPose = BallState(Pose(localPos))) }
+            _uiState.update { it.copy(objectBallPose = BallState(Pose(localPos.toFloatArray(), pose.rotation))) }
         } else {
             _uiState.update { it.copy(selectedBall = null) }
         }
@@ -75,23 +81,21 @@ class MainViewModel @Inject constructor(
     }
 
     private fun reset() {
-        _uiState.update { MainUiState(appState = AppState.ReadyToPlace, statusText = getStatusText(AppState.ReadyToPlace)) }
+        _uiState.update { MainUiState(arSession = it.arSession, appState = AppState.ReadyToPlace, statusText = getStatusText(AppState.ReadyToPlace)) }
     }
 
-    private fun getLocalPosition(hitPose: Pose, tablePose: Pose?): FloatArray {
-        if (tablePose == null) return hitPose.translation
-        val tableMatrix = tablePose.matrix
-        val inverseTableMatrix = tableMatrix.clone().apply { android.opengl.Matrix.invertM(this, 0) }
-        val hitVector = floatArrayOf(hitPose.translation[0], hitPose.translation[1], hitPose.translation[2], 1f)
-        val localVector = FloatArray(4)
-        android.opengl.Matrix.multiplyMV(localVector, 0, inverseTableMatrix, 0, hitVector, 0)
-        return floatArrayOf(localVector[0], 0f, localVector[2])
+    private fun getLocalPosition(hitPose: Pose, tablePose: Pose?): Float3? {
+        if (tablePose == null) return null
+        val inverseTableMatrix = inverse(tablePose.toTransform())
+        val hitPosition = hitPose.translation.toF3()
+        val localPosition = inverseTableMatrix * hitPosition
+        return localPosition.copy(y = 0f)
     }
 
-    private fun isWithinTableBounds(localPosition: FloatArray): Boolean {
-        val halfWidth = ARConstants.TABLE_WIDTH / 2f
-        val halfDepth = ARConstants.TABLE_DEPTH / 2f
-        return localPosition[0] in -halfWidth..halfWidth && localPosition[2] in -halfDepth..halfDepth
+    private fun isWithinTableBounds(localPosition: Float3): Boolean {
+        val halfWidth = ArConstants.TABLE_WIDTH / 2f
+        val halfDepth = ArConstants.TABLE_DEPTH / 2f
+        return localPosition.x in -halfWidth..halfWidth && localPosition.z in -halfDepth..halfDepth
     }
 
     private fun getStatusText(appState: AppState, shotType: ShotType = ShotType.CUT): String {
@@ -99,13 +103,17 @@ class MainViewModel @Inject constructor(
             AppState.DetectingPlanes -> "Move phone to detect a surface"
             AppState.ReadyToPlace -> "Surface Detected. Tap button to place table."
             AppState.ScenePlaced -> when(shotType) {
-                ShotType.CUT, ShotType.BANK, ShotType.KICK -> "Tap on table to place balls."
+                ShotType.CUT, ShotType.BANK, ShotType.KICK -> if(uiState.value.cueBallPose == null) "Tap on table to place cue ball" else if(uiState.value.objectBallPose == null) "Tap to place object ball" else "All set."
                 ShotType.JUMP, ShotType.MASSE -> "Use spatial controls to adjust shot."
             }
         }
     }
 
-    fun updateStatusText() {
+    private fun updateStatusText() {
         _uiState.update { it.copy(statusText = getStatusText(it.appState, it.shotType)) }
     }
+
+    private fun Pose.forward() = floatArrayOf(0f,0f,-1f).let {vec -> this.rotateVector(vec); vec}
+    private fun FloatArray.toF3() = Float3(this[0], this[1], this[2])
+    private fun Offset.toF3() = Float3(this.x, this.y, 0f)
 }
