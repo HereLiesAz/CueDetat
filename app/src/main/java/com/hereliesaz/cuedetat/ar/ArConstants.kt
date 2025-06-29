@@ -19,6 +19,10 @@ object ArConstants {
     const val BALL_RADIUS = 0.028575f
     const val BALL_DIAMETER = BALL_RADIUS * 2
 
+    // Physics Constants
+    const val MAX_SQUIRT_DEGREES = 5.0f
+    const val MAX_THROW_DEGREES = 3.0f
+
     // Pocket locations (local coordinates relative to table center)
     val POCKETS = arrayOf(
         Float3(TABLE_WIDTH / 2, 0f, TABLE_DEPTH / 2), // Top-right

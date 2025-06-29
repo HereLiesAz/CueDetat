@@ -7,6 +7,7 @@ import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ar.ArConstants
+import com.hereliesaz.cuedetat.ar.toF3
 import com.hereliesaz.cuedetat.ui.state.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -51,9 +52,10 @@ class MainViewModel @Inject constructor(
 
     private fun placeTable() {
         val cameraPose = uiState.value.arSession?.camera?.pose ?: return
-        val tablePose = cameraPose.copy(
-            translation = (cameraPose.translation.toF3() + cameraPose.forward.toF3() * 1.5f).toFloatArray()
-        )
+        val forwardVector = cameraPose.forward.toF3() * 1.5f
+        val tablePosition = cameraPose.translation.toF3() + forwardVector
+        val tablePose = Pose(tablePosition.toFloatArray(), cameraPose.rotation)
+
         _uiState.update { it.copy(appState = AppState.ScenePlaced, tablePose = tablePose, statusText = getStatusText(AppState.ScenePlaced)) }
     }
 
@@ -62,18 +64,32 @@ class MainViewModel @Inject constructor(
         val localPos = getLocalPosition(pose, currentState.tablePose) ?: return
         if (!isWithinTableBounds(localPos)) return
 
+        val newBallPose = Pose(localPos.toFloatArray(), pose.rotation)
+
         if (currentState.cueBallPose == null) {
-            _uiState.update { it.copy(cueBallPose = BallState(Pose(localPos.toFloatArray(), pose.rotation))) }
+            _uiState.update { it.copy(cueBallPose = BallState(newBallPose)) }
         } else if (currentState.objectBallPose == null) {
-            _uiState.update { it.copy(objectBallPose = BallState(Pose(localPos.toFloatArray(), pose.rotation))) }
+            _uiState.update { it.copy(objectBallPose = BallState(newBallPose)) }
         } else {
-            _uiState.update { it.copy(selectedBall = null) }
+            // Logic to move a selected ball can be added here
+            val selectedId = currentState.selectedBall
+            if (selectedId == 0) {
+                _uiState.update { it.copy(cueBallPose = BallState(newBallPose), selectedBall = null) }
+            } else if (selectedId == 1) {
+                _uiState.update { it.copy(objectBallPose = BallState(newBallPose), selectedBall = null) }
+            }
         }
         updateStatusText()
     }
 
     private fun handleBallTap(ballId: Int) {
-        _uiState.update { it.copy(selectedBall = ballId, statusText = "${if(ballId == 0) "Cue" else "Object"} Ball Selected. Tap table to move.") }
+        val currentSelected = _uiState.value.selectedBall
+        // Toggle selection off if tapping the same ball
+        if (currentSelected == ballId) {
+            _uiState.update { it.copy(selectedBall = null) }
+        } else {
+            _uiState.update { it.copy(selectedBall = ballId, statusText = "${if (ballId == 0) "Cue" else "Object"} Ball Selected. Tap table to move.") }
+        }
     }
 
     private fun setShotType(type: ShotType) {
@@ -102,18 +118,19 @@ class MainViewModel @Inject constructor(
         return when (appState) {
             AppState.DetectingPlanes -> "Move phone to detect a surface"
             AppState.ReadyToPlace -> "Surface Detected. Tap button to place table."
-            AppState.ScenePlaced -> when(shotType) {
-                ShotType.CUT, ShotType.BANK, ShotType.KICK -> if(uiState.value.cueBallPose == null) "Tap on table to place cue ball" else if(uiState.value.objectBallPose == null) "Tap to place object ball" else "All set."
-                ShotType.JUMP, ShotType.MASSE -> "Use spatial controls to adjust shot."
+            AppState.ScenePlaced -> when {
+                uiState.value.cueBallPose == null -> "Tap on table to place cue ball"
+                uiState.value.objectBallPose == null -> "Tap to place object ball"
+                else -> "All set. Ready to visualize shot."
             }
         }
     }
 
-    private fun updateStatusText() {
+    fun updateStatusText() {
         _uiState.update { it.copy(statusText = getStatusText(it.appState, it.shotType)) }
     }
 
-    private fun Pose.forward() = floatArrayOf(0f,0f,-1f).let {vec -> this.rotateVector(vec); vec}
-    private fun FloatArray.toF3() = Float3(this[0], this[1], this[2])
+    // Helper extensions
+    private val Pose.forward: FloatArray get() = floatArrayOf(0f, 0f, -1f).apply { this@forward.rotateVector(this, 0) }
     private fun Offset.toF3() = Float3(this.x, this.y, 0f)
 }

@@ -1,31 +1,39 @@
 package com.hereliesaz.cuedetat.ar
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import com.google.ar.sceneform.rendering.MaterialFactory
-import com.google.ar.sceneform.rendering.ShapeFactory
+import com.google.ar.core.Pose
 import dev.romainguy.kotlin.math.Float3
-import io.github.sceneview.math.toOldColor
-import io.github.sceneview.node.Node
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
+import io.github.sceneview.ar.node.ArNode
+import io.github.sceneview.material.rememberMaterial
+import io.github.sceneview.material.baseColor
+import io.github.sceneview.node.CylinderNode
+import kotlin.math.sqrt
 
-class SpinIndicatorNode(
-    coroutineScope: CoroutineScope,
-    color: Color,
-    radius: Float = 0.005f // Small dot
-) : Node() {
-    init {
-        coroutineScope.launch {
-            val material = MaterialFactory.makeOpaqueWithColor(engine, color.toOldColor()).await()
-            val renderable = ShapeFactory.makeCylinder(engine,
-                radius = radius,
-                height = 0.001f, // Almost flat
-                center = Float3(),
-                material = material
-            )
-            setRenderable(renderable)
-            // Rotate it to be flat
-            rotation = Float3(x = 90.0f, y = 0.0f, z = 0.0f)
-        }
+@Composable
+fun SpinIndicatorNode(
+    pose: Pose, // Should be the pose of the cue ball
+    spinOffset: Float3
+) {
+    // A simple red material for the indicator
+    val material = rememberMaterial {
+        baseColor(Color.Red)
+    }
+
+    // Place an AR node at the cue ball's position
+    ArNode(pose = pose) {
+        // Calculate the position on the surface of the ball
+        val x = spinOffset.x * ArConstants.BALL_RADIUS
+        val y = spinOffset.y * ArConstants.BALL_RADIUS
+        val zSquared = (ArConstants.BALL_RADIUS * ArConstants.BALL_RADIUS) - (x * x) - (y * y)
+        val z = if (zSquared > 0) sqrt(zSquared) else 0f
+
+        // Add a small cylinder as a child to indicate the spin contact point
+        CylinderNode(
+            material = material,
+            radius = 0.005f,
+            height = 0.002f,
+            center = Float3(x, y, z) // Position it on the ball's surface, facing the camera
+        )
     }
 }

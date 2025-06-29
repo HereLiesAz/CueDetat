@@ -1,57 +1,46 @@
 package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
-import com.hereliesaz.cuedetat.R
-import com.hereliesaz.cuedetat.ui.Rail
-import com.hereliesaz.cuedetat.ui.ShotType
+import com.hereliesaz.cuedetat.ui.state.ShotType
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ShotTypeSelector(selectedType: ShotType, onTypeSelected: (ShotType) -> Unit) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))) {
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
-            ShotType.entries.forEach { type ->
-                SegmentedButton(
-                    shape = SegmentedButtonDefaults.shape,
-                    onClick = { onTypeSelected(type) },
-                    selected = type == selectedType
-                ) {
-                    Text(type.name)
-                }
-            }
-        }
+fun ShotControls(
+    selectedShotType: ShotType,
+    onShotTypeSelect: (ShotType) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        ShotTypeButton("Cut", selectedShotType == ShotType.CUT) { onShotTypeSelect(ShotType.CUT) }
+        ShotTypeButton("Bank", selectedShotType == ShotType.BANK) { onShotTypeSelect(ShotType.BANK) }
+        ShotTypeButton("Kick", selectedShotType == ShotType.KICK) { onShotTypeSelect(ShotType.KICK) }
+        ShotTypeButton("Jump", selectedShotType == ShotType.JUMP) { onShotTypeSelect(ShotType.JUMP) }
+        ShotTypeButton("Massé", selectedShotType == ShotType.MASSE) { onShotTypeSelect(ShotType.MASSE) }
     }
 }
 
 @Composable
-fun RailSelectionControls(selectedRail: Rail, onRailSelected: (Rail) -> Unit) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))) {
-        Row(
-            modifier = Modifier.padding(vertical = 4.dp, horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(painter = painterResource(id = R.drawable.ic_rail_select), contentDescription = "Select Rail")
-            Rail.entries.forEach { rail ->
-                val isSelected = selectedRail == rail
-                OutlinedButton(
-                    onClick = { onRailSelected(rail) },
-                    colors = ButtonDefaults.outlinedButtonColors(containerColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                ) {
-                    Text(rail.name.first().toString(), color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
-                }
-            }
-        }
+private fun ShotTypeButton(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+        )
+    ) {
+        Text(text)
     }
 }
