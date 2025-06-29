@@ -12,7 +12,7 @@ The core principle of this architecture is a clean separation of concerns:
 There is no direct communication between the UI and the Renderer outside of passing state. All interactions flow through the ViewModel.
 
 ### Development Mandates
-**It is mandatory to use the official Android XR SDK, ARCore for Jetpack XR SDK, and OpenXR to develop this app.** This ensures full control over the rendering pipeline and avoids third-party scene graph libraries like `sceneview` or deprecated libraries like Sceneform.
+**It is mandatory to use the official Android XR SDK, ARCore for Jetpack XR SDK, and OpenXR to develop this app. Do NOT confuse Google's ARcore with Android XR or Arcore for Jetpack XR** This ensures full control over the rendering pipeline and avoids third-party scene graph libraries like `sceneview` or deprecated libraries like Sceneform.
 
 ## Core Components
 

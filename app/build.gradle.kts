@@ -99,4 +99,36 @@ dependencies {
     implementation(libs.androidx.xr.scenecore)
     implementation(libs.androidx.xr.arcore)
 
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.activity:activity-compose:1.9.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.1")
+
+    // Jetpack XR Libraries
+    implementation("androidx.xr.compose:compose:1.0.0-alpha04")
+    implementation("androidx.xr:xr-scenecore:1.0.0-alpha01")
+    implementation("androidx.xr:xr-arcore:1.0.0-alpha01")
+    implementation("androidx.vectordrawable:vectordrawable-seekable:1.0.0")
+    implementation("androidx.vectordrawable:vectordrawable:1.2.0")
+    implementation("androidx.vectordrawable:vectordrawable-animated:1.2.0")
+    implementation("androidx.xr.scenecore:scenecore:1.0.0-alpha04")
+    // Required for Java
+    implementation("com.google.guava:listenablefuture:1.0")
+    // Required for Kotlin
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.9.0")
+
+    // Use to write unit tests
+    testImplementation("androidx.xr.scenecore:scenecore-testing:1.0.0-alpha04")
+    implementation("androidx.xr.runtime:runtime:1.0.0-alpha04")
+
+    // Use in environments that do not support OpenXR
+    testImplementation("androidx.xr.runtime:runtime-testing:1.0.0-alpha04")
+    implementation("androidx.xr.compose.material3:material3:1.0.0-alpha08")
+    implementation("androidx.xr.compose:compose:1.0.0-alpha04")
+
+    // Use to write unit tests
+    testImplementation("androidx.xr.compose:compose-testing:1.0.0-alpha04")
+    implementation("androidx.xr.arcore:arcore:1.0.0-alpha04")
+
+
 }

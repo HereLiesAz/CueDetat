@@ -10,8 +10,9 @@ dependencyResolutionManagement {
   repositories {
     google()
     mavenCentral()
+    // Add the AndroidX snapshot repository for pre-release libraries
+    maven { url = uri("https://androidx.dev/snapshots/builds/LATEST/repository") }
   }
 }
-
-rootProject.name = "CueDetatAR"
+rootProject.name = "Cue D'etat"
 include(":app")

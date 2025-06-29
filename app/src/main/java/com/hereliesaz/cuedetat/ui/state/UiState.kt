@@ -1,34 +1,20 @@
 package com.hereliesaz.cuedetat.ui.state
 
-import androidx.compose.ui.geometry.Offset
-import androidx.xr.arcore.Anchor
-import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
+import androidx.compose.ui.geometry.Offset
 
-/**
- * Represents the complete, immutable state of the UI at a single point in time.
- */
 data class UiState(
-    val statusText: String = "Searching for planes...",
-    val anchors: List<AppAnchor> = emptyList(),
-    val tablePlaced: Boolean = false,
-    val shotType: ShotType = ShotType.FOLLOW,
-    val spinOffset: Offset = Offset.Zero,
-    val cueElevation: Float = 0f,
-    val selectedBallId: String? = null
+    // AR State
+    val table: TableState? = null,
+    val cueBall: BallState? = null,
+    val objectBall: BallState? = null,
+
+    // UI and Shot State
+    val isDrawerOpen: Boolean = false,
+    val shotPower: Float = 50f,
+    val cueballSpin: Offset = Offset.Zero,
+    val isAiming: Boolean = true // To differentiate between placing objects and taking a shot
 )
 
-/**
- * A wrapper for ARCore Anchors to associate them with application-specific data.
- */
-data class AppAnchor(val arAnchor: Anchor, val isTable: Boolean = false)
-
-/**
- * Defines the types of shots the user can select.
- */
-enum class ShotType {
-    FOLLOW,
-    DRAW,
-    JUMP,
-    BANK
-}
+data class TableState(val pose: Pose)
+data class BallState(val pose: Pose, val isMoving: Boolean = false)
