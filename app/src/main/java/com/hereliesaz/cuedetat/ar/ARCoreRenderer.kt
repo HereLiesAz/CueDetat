@@ -11,7 +11,7 @@ import androidx.xr.compose.rememberARState
 import androidx.xr.compose.core.Anchor
 import com.google.xr.arcore.Config
 import com.google.xr.arcore.Plane
-import com.hereliesaz.cuedetat.ar.renderables.Table
+import com.hereliesaz.cuedetat.ar.renderables.TableNode
 import com.hereliesaz.cuedetat.ar.rendering.TableNode
 import com.hereliesaz.cuedetat.ui.MainViewModel
 
@@ -79,7 +79,3 @@ fun ARCoreRenderer(
         }
     }
 }
-
-// Note: You will need to create a simple data class to help manage your anchors in the ViewModel,
-// for example:
-// data class AppAnchor(val arAnchor: Anchor, val isTable: Boolean = false)
