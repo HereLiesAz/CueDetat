@@ -5,19 +5,38 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.HitResult
 import com.google.ar.core.Pose
+import com.hereliesaz.cuedetat.data.UserPreferenceRepository
 import com.hereliesaz.cuedetat.ui.state.BallState
 import com.hereliesaz.cuedetat.ui.state.TableState
 import com.hereliesaz.cuedetat.ui.state.UiEvent
 import com.hereliesaz.cuedetat.ui.state.UiState
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class MainViewModel : ViewModel() {
+@HiltViewModel
+class MainViewModel @Inject constructor(
+    private val userPreferenceRepository: UserPreferenceRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            userPreferenceRepository.userPreferences.collect { preferences ->
+                _uiState.update {
+                    it.copy(
+                        isDarkMode = preferences.isDarkMode,
+                        showHelp = preferences.showHelp
+                    )
+                }
+            }
+        }
+    }
 
     fun onEvent(event: UiEvent) {
         viewModelScope.launch {
@@ -69,10 +88,5 @@ class MainViewModel : ViewModel() {
         _uiState.update { it.copy(isAiming = false) }
 
         // TODO: Implement Physics Simulation
-        // 1. Get current state: ball positions, power, spin.
-        // 2. Start a physics loop (e.g., using another coroutine).
-        // 3. In the loop, use PhysicsUtil to calculate collisions and new positions.
-        // 4. Update the cueBall and objectBall states in the UiState flow.
-        // 5. When the simulation ends, set isAiming = true.
     }
 }

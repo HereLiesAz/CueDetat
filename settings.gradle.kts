@@ -10,7 +10,7 @@ dependencyResolutionManagement {
   repositories {
     google()
     mavenCentral()
-    // Add the AndroidX snapshot repository for pre-release libraries
+    // Required for AndroidX pre-release libraries
     maven { url = uri("https://androidx.dev/snapshots/builds/LATEST/repository") }
   }
 }

@@ -1,48 +1,47 @@
 package com.hereliesaz.cuedetat.ui.composables
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.cuedetat.ui.state.ShotType
-import com.hereliesaz.cuedetat.ui.state.UiEvent
-import com.hereliesaz.cuedetat.ui.state.UiState
 
 @Composable
 fun ShotControls(
-    modifier: Modifier = Modifier,
-    uiState: UiState,
-    onMenuClick: () -> Unit,
-    onEvent: (UiEvent) -> Unit
+    power: Float,
+    spin: Offset,
+    onPowerChange: (Float) -> Unit,
+    onSpinChange: (Offset) -> Unit,
+    onExecuteShot: () -> Unit
 ) {
-    Column(
-        modifier = modifier.padding(16.dp),
-        verticalArrangement = Arrangement.Bottom,
-        horizontalAlignment = Alignment.CenterHorizontally
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
-        Text(text = uiState.statusText)
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Example Button for Shot Type
-            IconButton(onClick = { onEvent(UiEvent.OnShotTypeSelect(ShotType.JUMP)) }) {
-                Text(text = "Jump")
+            Text("Power: ${power.toInt()}", style = MaterialTheme.typography.bodyLarge)
+            Slider(
+                value = power,
+                onValueChange = onPowerChange,
+                valueRange = 0f..100f
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Spin", style = MaterialTheme.typography.bodyLarge)
+            SpinControl(
+                spinOffset = spin,
+                onSpinChanged = onSpinChange
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onExecuteShot) {
+                Text("Shoot")
             }
-            // Add other controls for spin, elevation etc. here
-        }
-
-        IconButton(onClick = onMenuClick) {
-            // Icon for menu
-            Text(text = "Menu")
         }
     }
 }
