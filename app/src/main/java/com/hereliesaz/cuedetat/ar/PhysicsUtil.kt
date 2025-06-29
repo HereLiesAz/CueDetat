@@ -6,6 +6,7 @@ import dev.romainguy.kotlin.math.distance
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
+import com.hereliesaz.cuedetat.ar.ARConstants
 
 object PhysicsUtil {
 
@@ -43,10 +44,10 @@ object PhysicsUtil {
         selectedRail: Rail
     ): Pair<Float3, Float3>? {
         val timeToRail = when (selectedRail) {
-            Rail.TOP -> (ArConstants.TABLE_DEPTH / 2 - startPos.z) / direction.z
-            Rail.BOTTOM -> (-ArConstants.TABLE_DEPTH / 2 - startPos.z) / direction.z
-            Rail.LEFT_TOP, Rail.LEFT_BOTTOM -> (-ArConstants.TABLE_WIDTH / 2 - startPos.x) / direction.x
-            Rail.RIGHT_TOP, Rail.RIGHT_BOTTOM -> (ArConstants.TABLE_WIDTH / 2 - startPos.x) / direction.x
+            Rail.TOP -> (ARConstants.TABLE_DEPTH / 2 - startPos.z) / direction.z
+            Rail.BOTTOM -> (-ARConstants.TABLE_DEPTH / 2 - startPos.z) / direction.z
+            Rail.LEFT_TOP, Rail.LEFT_BOTTOM -> (-ARConstants.TABLE_WIDTH / 2 - startPos.x) / direction.x
+            Rail.RIGHT_TOP, Rail.RIGHT_BOTTOM -> (ARConstants.TABLE_WIDTH / 2 - startPos.x) / direction.x
         }
         if (timeToRail < 0) return null
 

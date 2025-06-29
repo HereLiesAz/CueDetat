@@ -1,74 +1,92 @@
 package com.hereliesaz.cuedetat.ui.overlay
 
-import android.annotation.SuppressLint
-import android.content.Context
-import android.graphics.Canvas
-import android.graphics.PointF
-import android.util.AttributeSet
-import android.view.GestureDetector
-import android.view.MotionEvent
-import android.view.ScaleGestureDetector
-import android.view.View
-import com.hereliesaz.cuedetat.view.PaintCache
-import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
-import com.hereliesaz.cuedetat.view.state.OverlayState
+import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PointMode
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.unit.dp
+import kotlin.math.cos
+import kotlin.math.sin
 
-@SuppressLint("ViewConstructor")
-class ProtractorOverlayView(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
+/**
+ * A Jetpack Compose implementation of a protractor overlay.
+ * This replaces the legacy ProtractorOverlayView with a modern, declarative component.
+ * It is responsible for drawing protractor-like guides on the screen.
+ *
+ * @param modifier Modifier for layout.
+ * @param angleDegrees The angle to display on the protractor.
+ * @param center The screen coordinate for the center of the protractor.
+ * @param color The color of the protractor lines and text.
+ */
+@Composable
+fun ProtractorOverlay(
+    modifier: Modifier = Modifier,
+    angleDegrees: Float,
+    center: Offset,
+    color: Color = Color.Yellow
+) {
+    // The Canvas composable is the modern, correct way to perform custom 2D drawing.
+    Canvas(modifier = modifier) {
+        val radius = 120.dp.toPx()
+        val angleRadians = Math.toRadians(angleDegrees.toDouble() - 90) // Adjust for canvas coordinates
 
-    private val renderer = OverlayRenderer()
-    private val paints = PaintCache()
-    private var internalState: OverlayState = OverlayState()
+        // Calculate the endpoint for the line indicating the angle
+        val lineEnd = Offset(
+            x = center.x + radius * cos(angleRadians).toFloat(),
+            y = center.y + radius * sin(angleRadians).toFloat()
+        )
 
-    var onSizeChanged: (Int, Int) -> Unit = { _, _ -> }
-    var onProtractorRotationChange: (Float) -> Unit = {}
-    var onProtractorUnitMoved: (PointF) -> Unit = {}
-    var onActualCueBallScreenMoved: (PointF) -> Unit = {}
-    var onBankingAimTargetScreenDrag: (PointF) -> Unit = {}
-    var onScale: (Float) -> Unit = {}
-    var onGestureStarted: () -> Unit = {}
-    var onGestureEnded: () -> Unit = {}
+        // Draw the main line
+        drawLine(
+            color = color,
+            start = center,
+            end = lineEnd,
+            strokeWidth = 2.dp.toPx()
+        )
 
-    private val scaleGestureDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-        override fun onScale(detector: ScaleGestureDetector): Boolean {
-            onScale(detector.scaleFactor)
-            return true
+        // Draw tick marks for a more protractor-like feel
+        val ticks = mutableListOf<Offset>()
+        for (i in 0..180 step 10) {
+            val tickAngleRad = Math.toRadians(i.toDouble() - 180) // Draw a semicircle
+            val tickStartRadius = radius * 0.95f
+            val tickEndRadius = radius * 1.05f
+            ticks.add(
+                Offset(
+                    x = center.x + tickStartRadius * cos(tickAngleRad).toFloat(),
+                    y = center.y + tickStartRadius * sin(tickAngleRad).toFloat()
+                )
+            )
+            ticks.add(
+                Offset(
+                    x = center.x + tickEndRadius * cos(tickAngleRad).toFloat(),
+                    y = center.y + tickEndRadius * sin(tickAngleRad).toFloat()
+                )
+            )
         }
-    })
+        drawPoints(
+            points = ticks,
+            pointMode = PointMode.Lines,
+            color = color.copy(alpha = 0.7f),
+            strokeWidth = 1.5.dp.toPx()
+        )
 
-    private val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
-        override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
-            onProtractorRotationChange(internalState.protractorUnit.rotationDegrees - (distanceX / 5f))
-            return true
+        // Draw the angle text using the underlying native canvas for more text control
+        drawContext.canvas.nativeCanvas.apply {
+            val textPaint = android.graphics.Paint().apply {
+                this.color = color.hashCode()
+                textSize = 18.dp.toPx()
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+            drawText(
+                "${angleDegrees.toInt()}°",
+                lineEnd.x,
+                lineEnd.y + 24.dp.toPx(), // Position text below the line end
+                textPaint
+            )
         }
-    })
-
-    fun updateState(newState: OverlayState, isDark: Boolean) {
-        this.internalState = newState
-        paints.updateColors(newState, isDark)
-        invalidate()
-    }
-
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        onSizeChanged(w, h)
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        renderer.draw(canvas, internalState, paints, null)
-    }
-
-    @SuppressLint("ClickableViewAccessibility")
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        var handled = scaleGestureDetector.onTouchEvent(event)
-        if (!scaleGestureDetector.isInProgress) {
-            handled = gestureDetector.onTouchEvent(event)
-        }
-        when (event.action) {
-            MotionEvent.ACTION_DOWN -> onGestureStarted()
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> onGestureEnded()
-        }
-        return handled || super.onTouchEvent(event)
     }
 }

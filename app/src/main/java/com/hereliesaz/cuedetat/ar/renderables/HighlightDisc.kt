@@ -2,8 +2,10 @@ package com.hereliesaz.cuedetat.ar.renderables
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.xr.compose.material3.Shape
-import androidx.xr.compose.material3.rememberMaterial
-import androidx.xr.core.Pose
+import androidx.xr.compose.material3.RememberMaterial
+import androidx.xr.*
+import androidx.xr.compose.spatial.OrbiterDefaults.Shape
+import androidx.xr.scenecore.impl.perception.Pose
 import com.hereliesaz.cuedetat.ui.theme.AccentGold
 
 @Composable

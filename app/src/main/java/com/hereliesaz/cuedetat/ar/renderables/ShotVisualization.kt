@@ -1,7 +1,8 @@
 package com.hereliesaz.cuedetat.ar.renderables
 
-import com.google.ar.core.Pose
-import com.hereliesaz.cuedetat.ar.ArConstants
+import androidx.xr.arcore.*
+import androidx.xr.runtime.math.Pose
+import com.hereliesaz.cuedetat.ar.ARConstants
 import com.hereliesaz.cuedetat.ar.MathUtils
 import com.hereliesaz.cuedetat.ar.normalize
 import com.hereliesaz.cuedetat.ar.toF3
@@ -21,11 +22,11 @@ object ShotVisualization {
         val objPos = objectBallPose.translation.toF3()
 
         val shotVector = normalize(objPos - cuePos)
-        val ghostBallPos = objPos - shotVector * ArConstants.BALL_DIAMETER
+        val ghostBallPos = objPos - shotVector * ARConstants.BALL_DIAMETER
         val ghostBallPose = Pose(ghostBallPos.toFloatArray(), cueBallPose.rotation)
 
         // Pocketing Line (defaulting to a straight line through nearest pocket)
-        val pocket = ArConstants.POCKETS.minByOrNull { MathUtils.dot(it - objPos, it - objPos) } ?: objPos
+        val pocket = ARConstants.POCKETS.minByOrNull { MathUtils.dot(it - objPos, it - objPos) } ?: objPos
         val pocketingLinePoints = listOf(objPos, pocket)
 
         // Tangent Line
@@ -35,7 +36,7 @@ object ShotVisualization {
         val tangentLinePoints = listOf(tangentStart, tangentEnd)
 
         // Cue Ball Path
-        val cuePathStart = ghostBallPos + shotVector * ArConstants.BALL_DIAMETER
+        val cuePathStart = ghostBallPos + shotVector * ARConstants.BALL_DIAMETER
         val cuePathEnd = cuePathStart + tangentVector * 1.0f
         val cueBallPathPoints = listOf(cuePathStart, cuePathEnd)
 

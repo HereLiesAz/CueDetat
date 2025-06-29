@@ -2,7 +2,7 @@ package com.hereliesaz.cuedetat.ar
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import com.google.ar.core.Pose
+import androidx.xr.scenecore.impl.math.Vector3.Pose
 import dev.romainguy.kotlin.math.Float3
 import io.github.sceneview.ar.node.ArNode
 import io.github.sceneview.material.rememberMaterial

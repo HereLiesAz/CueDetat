@@ -2,7 +2,7 @@ package com.hereliesaz.cuedetat.ar
 
 import dev.romainguy.kotlin.math.Float3
 
-object ArConstants {
+object ARConstants {
     // Colors
     val CUE_BALL_COLOR = floatArrayOf(0.9f, 0.9f, 0.9f, 1.0f) // White
     val OBJECT_BALL_COLOR = floatArrayOf(0.8f, 0.2f, 0.2f, 1.0f) // Red
