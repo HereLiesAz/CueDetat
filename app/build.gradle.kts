@@ -94,6 +94,7 @@ dependencies {
     testImplementation(libs.androidx.room.compiler.processing.testing)
     testImplementation(libs.androidx.benchmark.common)
 
-    implementation(libs.sceneview)
+    implementation(libs.androidx.xr.scenecore)
+    implementation(libs.androidx.xr.arcore)
 
 }

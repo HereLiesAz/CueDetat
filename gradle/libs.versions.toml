@@ -16,6 +16,7 @@ datastorePreferences = "1.1.7"
 
 # Jetpack XR
 material = "1.12.0"
+scenecoreTesting = "1.0.0-alpha04"
 sceneview = "2.3.0"
 xrCompose = "1.0.0-alpha08"
 xrComposeCore = "1.0.0-alpha04"
@@ -43,6 +44,7 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 # Jetpack Compose
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-scenecore-testing = { module = "androidx.xr.scenecore:scenecore-testing", version.ref = "scenecoreTesting" }
 androidx-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
@@ -70,9 +72,7 @@ arcore = { group = "com.google.ar", name = "core", version.ref = "arcore" }
 material = { module = "com.google.android.material:material", version.ref = "material" }
 androidx-room-compiler-processing-testing = { group = "androidx.room", name = "room-compiler-processing-testing", version.ref = "roomCompilerProcessingTesting" }
 androidx-benchmark-common = { group = "androidx.benchmark", name = "benchmark-common", version.ref = "benchmarkCommon" }
-sceneview = { module = "io.github.sceneview:sceneview", version.ref = "sceneview" }
 
-xr-arcore ={ group = "androidx.xr.arcore", name = "arcore", version.ref = "arcore"}
 
 
 [plugins]
