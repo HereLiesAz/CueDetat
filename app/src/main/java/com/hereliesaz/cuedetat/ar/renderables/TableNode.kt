@@ -3,13 +3,10 @@ package com.hereliesaz.cuedetat.ar.renderables
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.Group
 import androidx.xr.compose.Cube
 import androidx.xr.compose.Group
 import androidx.xr.compose.material.ColorMaterial
 import com.hereliesaz.cuedetat.ar.ARConstants
-
-private val ARConstants.Companion.TABLE_LENGTH: Any
 
 /**
  * A composable that renders a 3D model of a pool table.
@@ -39,9 +36,9 @@ fun TableNode() {
         // They are positioned relative to the center of the Group.
         val legWidth = 0.1f
         val legHeight = 0.7f // Arbitrary height for the legs
-        val legX = ARConstants.TABLE_WIDTH / 2 - legWidth / 2
-        val legZ = ARConstants.TABLE_LENGTH / 2 - legWidth / 2
-        val legY = -(legHeight / 2) - (ARConstants.TABLE_HEIGHT / 2)
+        val legX = ARConstants.TABLE_WIDTH / 2f - legWidth / 2f
+        val legZ = ARConstants.TABLE_LENGTH / 2f - legWidth / 2f
+        val legY = -(legHeight / 2f) - (ARConstants.TABLE_HEIGHT / 2f)
 
         // Front-left leg
         Cube(
