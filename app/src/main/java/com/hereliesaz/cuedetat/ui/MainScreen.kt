@@ -1,125 +1,106 @@
 package com.hereliesaz.cuedetat.ui
 
+import android.annotation.SuppressLint
+import android.opengl.GLSurfaceView
+import android.view.MotionEvent
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.google.ar.core.Session
-import com.hereliesaz.cuedetat.ar.jetpack.ArView
-import com.hereliesaz.cuedetat.ui.composables.HelpDialog
-import com.hereliesaz.cuedetat.ui.composables.InstructionText
-import com.hereliesaz.cuedetat.ui.composables.MenuDrawer
-import com.hereliesaz.cuedetat.ui.composables.ShotControls
-import com.hereliesaz.cuedetat.ui.state.ShotType
+import androidx.compose.ui.viewinterop.AndroidView
+import com.hereliesaz.cuedetat.MainActivity
+import com.hereliesaz.cuedetat.ar.jetpack.helpers.DisplayRotationHelper
+import com.hereliesaz.cuedetat.ar.rendering.OpenXrRenderer
+import com.hereliesaz.cuedetat.ui.composables.*
 import com.hereliesaz.cuedetat.ui.state.UiEvent
 import com.hereliesaz.cuedetat.ui.state.UiState
-import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import kotlinx.coroutines.launch
 
+@SuppressLint("ClickableViewAccessibility")
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     uiState: UiState,
     onEvent: (UiEvent) -> Unit,
-    arSession: Session?
+    activity: MainActivity?
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    var renderer by remember { mutableStateOf<OpenXrRenderer?>(null) }
+
+    renderer?.updateState(uiState)
 
     Surface(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // AR View is the background, filling the entire screen.
-            if (arSession != null) {
-                ArView(
-                    modifier = Modifier.fillMaxSize(),
-                    session = arSession,
-                    uiState = uiState,
-                    onTap = { motionEvent ->
-                        onEvent(UiEvent.OnScreenTap(Offset(motionEvent.x, motionEvent.y)))
-                    }
-                )
-            }
-
-            // This is the container for ALL UI elements.
-            // We apply padding that respects the system bars (status bar, navigation bar).
-            // This creates the "global margin" you requested.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.systemBars)
-            ) {
-                // All UI elements go inside this Box and will be constrained by the padding.
-                InstructionText(
-                    text = uiState.instructionText,
-                    modifier = Modifier.align(Alignment.TopCenter)
-                )
-
-                ShotControls(
-                    shotPower = uiState.shotPower,
-                    spin = uiState.cueballSpin,
-                    onEvent = onEvent,
-                    onMenuClick = {
-                        scope.launch { drawerState.open() }
+            // AR View is the background
+            if (activity?.arSession != null) {
+                AndroidView(
+                    factory = { context ->
+                        GLSurfaceView(context).apply {
+                            preserveEGLContextOnPause = true
+                            setEGLContextClientVersion(2)
+                            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+                            val newRenderer = OpenXrRenderer(
+                                session = activity.arSession!!,
+                                displayRotationHelper = DisplayRotationHelper(activity),
+                                uiState = uiState
+                            )
+                            renderer = newRenderer
+                            setRenderer(newRenderer)
+                            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                            setOnTouchListener { _, event ->
+                                if (event.action == MotionEvent.ACTION_DOWN) {
+                                    onEvent(UiEvent.OnScreenTap(Offset(event.x, event.y)))
+                                }
+                                true
+                            }
+                        }
                     },
-                    modifier = Modifier.align(Alignment.BottomCenter) // Align to bottom of safe area
+                    modifier = Modifier.fillMaxSize()
                 )
             }
 
-            // The Modal Drawer will handle its own positioning correctly.
-            ModalNavigationDrawer(
-                drawerState = drawerState,
-                drawerContent = {
-                    MenuDrawer(
-                        onClose = {
-                            scope.launch { drawerState.close() }
+            // UI on top
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                containerColor = Color.Transparent,
+                topBar = {
+                    TopAppBar(
+                        title = { Text(uiState.instructionText, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) },
+                        navigationIcon = { IconButton(onClick = { scope.launch { drawerState.open() } }) { Icon(Icons.Default.Menu, "Menu") } },
+                        actions = {
+                            IconButton(onClick = { activity?.toggleFlashlight() }) { Icon(Icons.Default.FlashOn, "Toggle Flashlight") }
+                            IconButton(onClick = { onEvent(UiEvent.ToggleHelpDialog) }) { Icon(Icons.Default.HelpOutline, "Help") }
                         },
-                        onEvent = onEvent
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black.copy(alpha = 0.3f), titleContentColor = Color.White, navigationIconContentColor = Color.White, actionIconContentColor = Color.White)
                     )
+                },
+                contentWindowInsets = WindowInsets.systemBars
+            ) { innerPadding ->
+                Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                    if (uiState.table != null) {
+                        Column(
+                            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            SpinControl(onSpinChanged = { onEvent(UiEvent.SetSpin(it)) })
+                            Spacer(Modifier.height(8.dp))
+                            Slider(value = uiState.shotPower, onValueChange = { onEvent(UiEvent.SetShotPower(it)) }, modifier = Modifier.fillMaxWidth(0.8f))
+                        }
+                    }
                 }
-            ) {
-                // The content of the drawer is the main screen content, which we've already defined in the outer Box.
-                // So, this lambda can be empty.
             }
 
-
-            // Help dialog is a popup, it can stay outside the main layout container.
             if (uiState.showHelp) {
-                HelpDialog(onDismiss = { onEvent(UiEvent.ToggleHelpDialog) })
+                HelpDialog { onEvent(UiEvent.ToggleHelpDialog) }
             }
         }
-    }
-}
-
-// Update ShotControls to accept a modifier
-@Composable
-fun ShotControls(
-    modifier: Modifier = Modifier, // Add modifier parameter
-    shotPower: Float,
-    spin: Offset,
-    onEvent: (UiEvent) -> Unit,
-    onMenuClick: () -> Unit
-) {
-    Column(
-        modifier = modifier, // Apply the modifier here
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // TODO: Re-implement the full shot controls UI using onEvent, including a menu button that calls onMenuClick
-        Slider(value = shotPower, onValueChange = { onEvent(UiEvent.SetShotPower(it)) })
-        Button(onClick = { onEvent(UiEvent.ExecuteShot) }) {
-            Text("Shoot")
-        }
-    }
-}
-
-
-@Preview
-@Composable
-private fun MainScreenPreview() {
-    CueDetatTheme {
-        MainScreen(uiState = UiState(shotType = ShotType.CUT), onEvent = {}, arSession = null)
     }
 }
