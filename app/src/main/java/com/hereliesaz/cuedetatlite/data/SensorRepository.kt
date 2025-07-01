@@ -1,4 +1,4 @@
-// app/src/main/java/com.hereliesaz.cuedetatlite/data/SensorRepository.kt
+// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/data/SensorRepository.kt
 package com.hereliesaz.cuedetatlite.data
 
 import android.content.Context
@@ -6,98 +6,56 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import javax.inject.Inject
-import javax.inject.Singleton
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.OnLifecycleEvent
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * Holds the full orientation data: yaw, pitch, roll in degrees.
- * Yaw (Azimuth): Rotation around Z-axis.
- * Pitch: Rotation around X-axis.
- * Roll: Rotation around Y-axis.
- */
-data class FullOrientation(val yaw: Float, val pitch: Float, val roll: Float)
+data class FullOrientation(val azimuth: Float, val pitch: Float, val roll: Float)
 
-@Singleton
-class SensorRepository @Inject constructor(
-    @ApplicationContext context: Context
-) {
+class SensorRepository(context: Context) : SensorEventListener, LifecycleObserver {
+
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    private val rotationVectorSensor: Sensor? =
-        sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+    private val rotationSensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
 
-    // EMA filter parameters
-    private val alpha = 0.1f // Smoothing factor; lower means more smoothing (less responsive)
-    private var smoothedYaw: Float? = null
-    private var smoothedPitch: Float? = null
-    private var smoothedRoll: Float? = null
+    private val _orientation = MutableStateFlow(FullOrientation(0f, 0f, 0f))
+    val orientation: StateFlow<FullOrientation> = _orientation.asStateFlow()
 
-    // Keep the old pitchAngleFlow for now if anything still relies on it directly,
-    // but prefer using fullOrientationFlow.
-    val pitchAngleFlow: Flow<Float> = callbackFlow {
-        val listener = object : SensorEventListener {
-            private val rotationMatrix = FloatArray(9)
-            private val orientationAngles = FloatArray(3) // For yaw, pitch, roll
-
-            override fun onSensorChanged(event: SensorEvent?) {
-                if (event?.sensor?.type == Sensor.TYPE_ROTATION_VECTOR) {
-                    SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-                    SensorManager.getOrientation(rotationMatrix, orientationAngles)
-                    // orientationAngles[1] is pitch. Convert radians to degrees.
-                    val pitchInDegrees = Math.toDegrees(orientationAngles[1].toDouble()).toFloat()
-                    trySend(-pitchInDegrees) // Send negative pitch as per existing convention
-                }
-            }
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) { /* Not used */ }
+    @OnLifecycleEvent(Lifecycle.Event.ON_RESUME)
+    fun start() {
+        rotationSensor?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
         }
-        if (rotationVectorSensor != null) {
-            sensorManager.registerListener(listener, rotationVectorSensor, SensorManager.SENSOR_DELAY_GAME)
-        }
-        awaitClose { sensorManager.unregisterListener(listener) }
     }
 
-    val fullOrientationFlow: Flow<FullOrientation> = callbackFlow {
-        val listener = object : SensorEventListener {
-            private val rotationMatrix = FloatArray(9)
-            private val orientationAngles = FloatArray(3) // For yaw, pitch, roll
+    @OnLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+    fun stop() {
+        sensorManager.unregisterListener(this)
+    }
 
-            override fun onSensorChanged(event: SensorEvent?) {
-                if (event?.sensor?.type == Sensor.TYPE_ROTATION_VECTOR) {
-                    SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-                    SensorManager.getOrientation(rotationMatrix, orientationAngles)
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (event?.sensor?.type == Sensor.TYPE_ROTATION_VECTOR) {
+            val rotationMatrix = FloatArray(9)
+            SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
 
-                    val rawYaw = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
-                    val rawPitch = Math.toDegrees(orientationAngles[1].toDouble()).toFloat()
-                    val rawRoll = Math.toDegrees(orientationAngles[2].toDouble()).toFloat()
+            val orientationAngles = FloatArray(3)
+            SensorManager.getOrientation(rotationMatrix, orientationAngles)
 
-                    // Apply EMA filter
-                    smoothedYaw = smoothedYaw?.let { (rawYaw * alpha) + (it * (1 - alpha)) } ?: rawYaw
-                    smoothedPitch = smoothedPitch?.let { (rawPitch * alpha) + (it * (1 - alpha)) } ?: rawPitch
-                    smoothedRoll = smoothedRoll?.let { (rawRoll * alpha) + (it * (1 - alpha)) } ?: rawRoll
-
-                    // Send pitch as negative to match existing convention for `pitchAngle` in state.
-                    trySend(FullOrientation(yaw = smoothedYaw!!, pitch = -smoothedPitch!!, roll = smoothedRoll!!))
-                }
-            }
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) { /* Not used */ }
-        }
-
-        if (rotationVectorSensor != null) {
-            sensorManager.registerListener(
-                listener,
-                rotationVectorSensor,
-                SensorManager.SENSOR_DELAY_GAME // SENSOR_DELAY_UI or SENSOR_DELAY_NORMAL might be better for smoother UI if GAME is too fast
+            _orientation.value = FullOrientation(
+                azimuth = Math.toDegrees(orientationAngles[0].toDouble()).toFloat(),
+                pitch = Math.toDegrees(orientationAngles[1].toDouble()).toFloat(),
+                roll = Math.toDegrees(orientationAngles[2].toDouble()).toFloat()
             )
         }
-        awaitClose {
-            sensorManager.unregisterListener(listener)
-            // Reset smoothed values when listener is unregistered
-            smoothedYaw = null
-            smoothedPitch = null
-            smoothedRoll = null
-        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // Not used
+    }
+
+    fun getOrientationFlow(): StateFlow<FullOrientation> {
+        return orientation
     }
 }

@@ -86,7 +86,7 @@ val AppControlLightColorScheme = lightColorScheme(
 )
 
 @Composable
-fun CueDetatTheme(
+fun CueDetatLiteTheme(
     // App's UI controls will use system settings by default for dark/light mode
     useSystemSettings: Boolean = true,
     darkThemeUserOverride: Boolean? = null, // Allows direct override for testing or future app setting

@@ -1,4 +1,3 @@
-// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/utils/ToastMessage.kt
 package com.hereliesaz.cuedetatlite.utils
 
 sealed class ToastMessage {
