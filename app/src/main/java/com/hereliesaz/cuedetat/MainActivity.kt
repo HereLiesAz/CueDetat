@@ -1,93 +1,131 @@
 package com.hereliesaz.cuedetat
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
-import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.core.app.ActivityCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.xr.runtime.Session
-import androidx.xr.runtime.SessionCreatePermissionsNotGranted
-import androidx.xr.runtime.SessionCreateResult
-import androidx.xr.runtime.SessionCreateSuccess
+import androidx.core.content.ContextCompat
+import com.google.ar.core.ArCoreApk
+import com.google.ar.core.Session
+import com.google.ar.core.exceptions.CameraNotAvailableException
+import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
 import com.hereliesaz.cuedetat.ui.AppRoot
+import com.hereliesaz.cuedetat.ui.MainScreen
 import com.hereliesaz.cuedetat.ui.MainViewModel
-import com.hereliesaz.cuedetat.ui.state.UiEvent
-import dagger.hilt.android.AndroidEntryPoint
 
-@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
     private val viewModel: MainViewModel by viewModels()
+    var arSession: Session? = null
+    private var userRequestedInstall = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 0)
 
         setContent {
             val uiState by viewModel.uiState.collectAsState()
-            var session by remember { mutableStateOf<Session?>(null) }
-            var error by remember { mutableStateOf<String?>(null) }
+            AppRoot(uiState = uiState) {
+                MainScreen(
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent,
+                    arSession = arSession
+                )
+            }
+        }
+    }
 
-            // DisposableEffect correctly ties the session's lifecycle to the composable's lifecycle.
-            DisposableEffect(lifecycle) {
-                val observer = object : LifecycleEventObserver {
-                    override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
-                        when (event) {
-                            Lifecycle.Event.ON_RESUME -> session?.resume()
-                            Lifecycle.Event.ON_PAUSE -> session?.pause()
-                            else -> {}
-                        }
+    override fun onResume() {
+        super.onResume()
+        if (arSession == null) {
+            if (!requestCameraPermission()) {
+                return
+            }
+            try {
+                when (ArCoreApk.getInstance().requestInstall(this, userRequestedInstall)) {
+                    ArCoreApk.InstallStatus.INSTALLED -> {
+                        arSession = Session(this)
+                    }
+                    ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
+                        userRequestedInstall = false
+                        return
+                    }
+                    else -> {
+                        // Another state, just return for now
+                        return
                     }
                 }
-                lifecycle.addObserver(observer)
-
-                // The onDispose block is crucial for cleanup, ensuring the session is destroyed.
-                onDispose {
-                    lifecycle.removeObserver(observer)
-                    session?.destroy()
-                }
+            } catch (e: UnavailableUserDeclinedInstallationException) {
+                Toast.makeText(this, "Please install ARCore", Toast.LENGTH_LONG).show()
+                finish()
+                return
+            } catch (e: Exception) {
+                Toast.makeText(this, "Failed to create AR session: $e", Toast.LENGTH_LONG).show()
+                finish()
+                return
             }
+        }
 
-            // LaunchedEffect handles the one-time, asynchronous creation of the session.
-            LaunchedEffect(Unit) {
-                if (session == null) {
-                    // The 'when' statement must be exhaustive. Adding an 'else' branch
-                    // satisfies the compiler.
-                    when (val result = Session.create(this@MainActivity)) {
-                        is SessionCreateSuccess -> {
-                            session = result.session
-                            viewModel.onEvent(UiEvent.SetSession(result.session))
-                        }
-                        is Error -> {
-                            error = result.message
-                            Log.e("MainActivity", "Session creation failed: ${result.message}")
-                        }
-                        is SessionCreatePermissionsNotGranted -> {
-                            error = "Permissions not granted for session."
-                            Log.e("MainActivity", "Permissions not granted")
-                        }
-                        else -> {
-                            error = "An unknown error occurred during session creation."
-                            Log.e("MainActivity", "Unknown session creation result: $result")
-                        }
-                    }
-                }
+        try {
+            arSession?.resume()
+        } catch (e: CameraNotAvailableException) {
+            Toast.makeText(this, "Camera not available. Try restarting the app.", Toast.LENGTH_LONG).show()
+            arSession = null
+            return
+        }
+        // Redraw the composable to pass the session
+        setContent {
+            val uiState by viewModel.uiState.collectAsState()
+            AppRoot(uiState = uiState) {
+                MainScreen(
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent,
+                    arSession = arSession
+                )
             }
+        }
+    }
 
-            // The root of the UI is now AppRoot. Spatial rendering will be handled
-            // by components within AppRoot.
-            AppRoot(viewModel = viewModel, uiState = uiState)
+    override fun onPause() {
+        super.onPause()
+        arSession?.pause()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        arSession?.close()
+        arSession = null
+    }
+
+    private fun requestCameraPermission(): Boolean {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 0)
+            return false
+        }
+        return true
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 0) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Permission granted, onResume will handle the rest.
+            } else {
+                Toast.makeText(this, "Camera permission is needed to run this application", Toast.LENGTH_LONG).show()
+                if (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA)) {
+                    // User selected "Don't ask again". Direct them to settings.
+                }
+                finish()
+            }
         }
     }
 }
