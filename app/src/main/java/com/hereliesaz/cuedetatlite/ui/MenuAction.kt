@@ -1,13 +1,15 @@
+// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/ui/MenuAction.kt
 package com.hereliesaz.cuedetatlite.ui
 
-/**
- * A sealed class to represent all possible user actions originating from UI menus or buttons.
- * This provides a clean, type-safe way to pass events from the UI to the ViewModel.
- */
 sealed class MenuAction {
-    object Reset : MenuAction()
     object ToggleHelp : MenuAction()
-    object ToggleJumpingBall : MenuAction()
+    object StartTutorial : MenuAction()
+    object Reset : MenuAction()
+    object ToggleActualCueBall : MenuAction()
+    object ToggleBankingMode : MenuAction()
+    object ToggleForceTheme : MenuAction()
+    object ToggleLuminanceDialog : MenuAction()
+    object ViewArt : MenuAction()
+    object ShowDonationOptions : MenuAction()
     object CheckForUpdate : MenuAction()
-    object ToggleTheme : MenuAction()
 }
