@@ -11,9 +11,10 @@ import com.hereliesaz.cuedetat.ui.state.UiEvent
 fun ShotControls(
     shotPower: Float,
     spin: Offset,
-    onEvent: (UiEvent) -> Unit
+    onEvent: (UiEvent) -> Unit,
+    onMenuClick: () -> Unit // This parameter was missing
 ) {
-    // TODO: Re-implement the full shot controls UI using onEvent
+    // TODO: Re-implement the full shot controls UI using onEvent, including a menu button that calls onMenuClick
     Slider(value = shotPower, onValueChange = { onEvent(UiEvent.SetShotPower(it)) })
     Button(onClick = { onEvent(UiEvent.ExecuteShot) }) {
         Text("Shoot")

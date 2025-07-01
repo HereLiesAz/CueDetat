@@ -1,23 +1,8 @@
-/*
- * Copyright 2021 Google LLC
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package com.hereliesaz.cuedetat.ar.jetpack.rendering
 
 import android.opengl.GLES20
+import android.opengl.Matrix // <-- Add this import
 import com.google.ar.core.Anchor
-import com.google.ar.core.Pose
 import com.hereliesaz.cuedetat.ar.jetpack.rendering.ShaderUtil.checkGLError
 import com.hereliesaz.cuedetat.ar.jetpack.rendering.ShaderUtil.loadGLShader
 import java.nio.ByteBuffer
@@ -65,8 +50,8 @@ class ObjectRenderer {
     private var indexBuffer: ShortBuffer
 
     private val modelMatrix = FloatArray(16)
-    private val viewMatrix = FloatArray(16)
-    private val projectionMatrix = FloatArray(16)
+    // private val viewMatrix = FloatArray(16) // Not needed as property
+    // private val projectionMatrix = FloatArray(16) // Not needed as property
     private val modelViewProjectionMatrix = FloatArray(16)
 
     init {

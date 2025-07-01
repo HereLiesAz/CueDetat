@@ -15,73 +15,49 @@ import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
-import com.hereliesaz.cuedetat.ui.AppRoot
 import com.hereliesaz.cuedetat.ui.MainScreen
 import com.hereliesaz.cuedetat.ui.MainViewModel
+import com.hereliesaz.cuedetat.ui.state.UiEvent
+import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
-    var arSession: Session? = null
+    private var arSession: Session? = null
     private var userRequestedInstall = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        setContent {
-            val uiState by viewModel.uiState.collectAsState()
-            AppRoot(uiState = uiState) {
-                MainScreen(
-                    uiState = uiState,
-                    onEvent = viewModel::onEvent,
-                    arSession = arSession
-                )
-            }
-        }
     }
 
     override fun onResume() {
         super.onResume()
         if (arSession == null) {
-            if (!requestCameraPermission()) {
+            if (!hasCameraPermission()) {
+                requestCameraPermission()
                 return
             }
-            try {
-                when (ArCoreApk.getInstance().requestInstall(this, userRequestedInstall)) {
-                    ArCoreApk.InstallStatus.INSTALLED -> {
-                        arSession = Session(this)
-                    }
-                    ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
-                        userRequestedInstall = false
-                        return
-                    }
-                    else -> {
-                        // Another state, just return for now
-                        return
-                    }
-                }
-            } catch (e: UnavailableUserDeclinedInstallationException) {
-                Toast.makeText(this, "Please install ARCore", Toast.LENGTH_LONG).show()
-                finish()
+            if (!isArCoreAvailableAndInstalled()) {
                 return
-            } catch (e: Exception) {
-                Toast.makeText(this, "Failed to create AR session: $e", Toast.LENGTH_LONG).show()
-                finish()
-                return
+            }
+            arSession = Session(this).also {
+                viewModel.onEvent(UiEvent.SetSession(it))
             }
         }
 
         try {
             arSession?.resume()
         } catch (e: CameraNotAvailableException) {
-            Toast.makeText(this, "Camera not available. Try restarting the app.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Camera not available. Try restarting.", Toast.LENGTH_LONG).show()
             arSession = null
             return
         }
-        // Redraw the composable to pass the session
+
         setContent {
             val uiState by viewModel.uiState.collectAsState()
-            AppRoot(uiState = uiState) {
+            CueDetatTheme(darkTheme = uiState.isDarkMode) {
                 MainScreen(
                     uiState = uiState,
                     onEvent = viewModel::onEvent,
@@ -102,12 +78,44 @@ class MainActivity : ComponentActivity() {
         arSession = null
     }
 
-    private fun requestCameraPermission(): Boolean {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 0)
-            return false
+    private fun isArCoreAvailableAndInstalled(): Boolean {
+        return try {
+            when (ArCoreApk.getInstance().requestInstall(this, userRequestedInstall)) {
+                ArCoreApk.InstallStatus.INSTALLED -> true
+                ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
+                    userRequestedInstall = false
+                    false
+                }
+                else -> {
+                    Toast.makeText(this, "ARCore is not available on this device.", Toast.LENGTH_LONG).show()
+                    finish()
+                    false
+                }
+            }
+        } catch (e: UnavailableUserDeclinedInstallationException) {
+            Toast.makeText(this, "ARCore is required. Please install it.", Toast.LENGTH_LONG).show()
+            finish()
+            false
+        } catch (e: Exception) {
+            Toast.makeText(this, "Failed to create AR session: $e", Toast.LENGTH_LONG).show()
+            finish()
+            false
         }
-        return true
+    }
+
+    private fun hasCameraPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestCameraPermission() {
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.CAMERA),
+            0
+        )
     }
 
     override fun onRequestPermissionsResult(
@@ -116,16 +124,12 @@ class MainActivity : ComponentActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 0) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Permission granted, onResume will handle the rest.
-            } else {
-                Toast.makeText(this, "Camera permission is needed to run this application", Toast.LENGTH_LONG).show()
-                if (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA)) {
-                    // User selected "Don't ask again". Direct them to settings.
-                }
-                finish()
+        if (!hasCameraPermission()) {
+            Toast.makeText(this, "Camera permission is required.", Toast.LENGTH_LONG).show()
+            if (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA)) {
+                // User has selected "Don't ask again".
             }
+            finish()
         }
     }
 }

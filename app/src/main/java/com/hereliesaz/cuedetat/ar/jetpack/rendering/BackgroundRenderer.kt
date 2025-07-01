@@ -15,6 +15,8 @@
  */
 package com.hereliesaz.cuedetat.ar.jetpack.rendering
 
+import android.opengl.GLES11Ext
+import android.opengl.GLES20
 import com.google.ar.core.Coordinates2d
 import com.google.ar.core.Frame
 import com.hereliesaz.cuedetat.ar.jetpack.rendering.ShaderUtil.checkGLError

@@ -3,9 +3,11 @@ package com.hereliesaz.cuedetat.ui
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.xr.runtime.Session
-import androidx.xr.arcore.Plane
-import androidx.xr.scenecore.Entity
+import com.google.ar.core.Anchor
+import com.google.ar.core.HitResult
+import com.google.ar.core.Plane
+import com.google.ar.core.Session
+import com.google.ar.core.TrackingState
 import com.hereliesaz.cuedetat.data.UserPreferenceRepository
 import com.hereliesaz.cuedetat.ui.state.UiEvent
 import com.hereliesaz.cuedetat.ui.state.UiState
@@ -24,7 +26,7 @@ class MainViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(UiState())
     val uiState = _uiState.asStateFlow()
 
-    private var session: Session? = null
+    private var arSession: Session? = null
 
     init {
         viewModelScope.launch {
@@ -32,7 +34,8 @@ class MainViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isDarkMode = preferences.isDarkMode,
-                        showHelp = preferences.showHelp
+                        showHelp = preferences.showHelp,
+                        shotType = preferences.shotType
                     )
                 }
             }
@@ -48,51 +51,69 @@ class MainViewModel @Inject constructor(
                 is UiEvent.SetSpin -> setSpin(event.spin)
                 is UiEvent.ExecuteShot -> executeShot()
                 is UiEvent.SetSession -> setSession(event.session)
-                is UiEvent.ToggleHelp -> toggleHelp()
+                is UiEvent.ToggleHelpDialog -> toggleHelpDialog()
             }
         }
     }
 
     private fun setSession(session: Session?) {
-        this.session = session
+        this.arSession = session
     }
 
     private fun handleScreenTap(offset: Offset) {
-        val currentSession = session ?: return
-        if (_uiState.value.table != null) return
+        val session = arSession ?: return
 
-        // The correct way to get frame data is to subscribe to frame updates.
-        currentSession.subscribe(this) { frame ->
-            val hitResults = frame.hitTest(offset.x, offset.y)
-            val planeHit = hitResults.firstOrNull {
-                it.trackable is Plane && (it.trackable as Plane).type == Plane.Type.HORIZONTAL_UPWARD_FACING
-            }
+        // We get the current frame here, on demand, when a tap happens.
+        val frame = try {
+            session.update()
+        } catch (e: Exception) {
+            // Can happen if the session is paused or shutting down
+            null
+        } ?: return
 
-            if (planeHit != null) {
-                // An entity is created via the session, not by direct instantiation.
-                val tableEntity = currentSession.createEntity().apply {
-                    // An anchor is created from the hit result's pose.
-                    addAnchor(currentSession.createAnchor(planeHit.pose))
-                }
-                _uiState.update {
-                    it.copy(table = tableEntity)
-                }
+        if (frame.camera.trackingState != TrackingState.TRACKING) return
 
-                // Unsubscribe after we've found a plane and placed the table.
-                currentSession.unsubscribe(this)
+        // Perform the hit test inside the ViewModel
+        val hitResults = frame.hitTest(offset.x, offset.y)
+        val hitResult = hitResults.firstOrNull {
+            val trackable = it.trackable
+            trackable is Plane && trackable.isPoseInPolygon(it.hitPose)
+        } ?: return
+
+        // Now call the logic to handle the specific hit
+        handleHitResult(hitResult)
+    }
+
+    private fun handleHitResult(hitResult: HitResult) {
+        val session = arSession ?: return
+        if (_uiState.value.table != null) return // Only place table once
+
+        val trackable = hitResult.trackable
+        if (trackable is Plane && trackable.isPoseInPolygon(hitResult.hitPose) && trackable.type == Plane.Type.HORIZONTAL_UPWARD_FACING) {
+            val newAnchor = session.createAnchor(hitResult.hitPose)
+            _uiState.update {
+                it.copy(table = newAnchor)
             }
         }
     }
 
     private fun resetScene() {
-        // TODO: Properly dispose of entities before nulling them out.
+        // Dispose of anchors before removing them from state to clean up ARCore resources
+        _uiState.value.table?.detach()
+        _uiState.value.cueBall?.detach()
+        _uiState.value.objectBall?.detach()
+
         _uiState.update {
             it.copy(table = null, cueBall = null, objectBall = null, isAiming = true)
         }
     }
 
-    private fun toggleHelp() {
-        _uiState.update { it.copy(showHelp = !it.showHelp) }
+    private fun toggleHelpDialog() {
+        val show = !_uiState.value.showHelp
+        _uiState.update { it.copy(showHelp = show) }
+        viewModelScope.launch {
+            userPreferenceRepository.saveShowHelp(show)
+        }
     }
 
     private fun setShotPower(power: Float) {
