@@ -1,4 +1,3 @@
-// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/view/renderer/OverlayRenderer.kt
 package com.hereliesaz.cuedetatlite.view.renderer
 
 import android.graphics.Canvas
@@ -20,8 +19,9 @@ class OverlayRenderer(
         paintCache.updateColors(state, true) // Assuming dark mode for now
 
         if (state.isBankingMode) {
-            tableRenderer.draw(canvas, state)
-            railRenderer.draw(canvas, state)
+            // FIX: Pass both screenState and the full overlayState
+            tableRenderer.draw(canvas, state.screenState, state)
+            railRenderer.draw(canvas, state.screenState, state)
         }
 
         lineRenderer.draw(canvas, state.screenState, state)

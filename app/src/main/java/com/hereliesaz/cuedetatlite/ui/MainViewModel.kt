@@ -1,10 +1,10 @@
-// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/ui/MainViewModel.kt
 package com.hereliesaz.cuedetatlite.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetatlite.data.SensorRepository
 import com.hereliesaz.cuedetatlite.data.UpdateChecker
+import com.hereliesaz.cuedetatlite.data.UpdateResult
 import com.hereliesaz.cuedetatlite.domain.StateReducer
 import com.hereliesaz.cuedetatlite.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
@@ -32,13 +32,14 @@ class MainViewModel(
     private val _uiEvents = Channel<UiEvent>()
     val uiEvents = _uiEvents.receiveAsFlow()
 
+    // FIX: Combine with the new updateResult StateFlow from UpdateChecker
     val uiState: StateFlow<MainScreenUiState> =
         combine(
             _overlayState,
-            updateChecker.isUpdateAvailable
-        ) { overlay, isUpdateAvailable ->
+            updateChecker.updateResult
+        ) { overlay, updateResult ->
             MainScreenUiState(
-                isUpdateAvailable = isUpdateAvailable,
+                isUpdateAvailable = updateResult is UpdateResult.UpdateAvailable,
                 isForceLightMode = overlay.isForceLightMode,
                 showLuminanceDialog = overlay.showLuminanceDialog,
                 warningMessage = overlay.screenState.warningText?.name
@@ -72,12 +73,32 @@ class MainViewModel(
                 is MainScreenEvent.DismissLuminanceDialog -> currentState.copy(showLuminanceDialog = false)
                 is MainScreenEvent.ToggleBankingMode -> currentState.copy(isBankingMode = !currentState.isBankingMode)
                 is MainScreenEvent.BankingAimTargetChanged -> currentState.copy(bankingAimTarget = event.position)
+                // ADDED: Handle the new event
+                is MainScreenEvent.ToggleActualCueBall -> {
+                    val newScreenState = currentState.screenState.copy(showActualCueBall = !currentState.screenState.showActualCueBall)
+                    currentState.copy(screenState = newScreenState)
+                }
+
                 // Events that trigger a one-off UI action
                 is MainScreenEvent.DownloadUpdate -> {
+                    // FIX: Call the correct method
                     updateChecker.getLatestReleaseUrl()?.let {
                         _uiEvents.send(UiEvent.OpenUrl(it))
                     }
-                    currentState // No state change
+                    currentState // No state change from this event itself
+                }
+                // ADDED: Handle meta events
+                is MainScreenEvent.ViewArt -> {
+                    _uiEvents.send(UiEvent.OpenUrl("https://herelies.art"))
+                    currentState
+                }
+                is MainScreenEvent.ShowDonationOptions -> {
+                    _uiEvents.send(UiEvent.OpenUrl("https://www.buymeacoffee.com/hereliesaz"))
+                    currentState
+                }
+                is MainScreenEvent.CheckForUpdate -> {
+                    checkForUpdates() // Re-trigger the check
+                    currentState
                 }
                 // Events handled by other flows or with no state change
                 is MainScreenEvent.DismissUpdateDialog -> currentState

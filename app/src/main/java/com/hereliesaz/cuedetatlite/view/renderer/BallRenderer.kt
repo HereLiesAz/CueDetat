@@ -1,4 +1,3 @@
-// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/view/renderer/BallRenderer.kt
 package com.hereliesaz.cuedetatlite.view.renderer
 
 import android.graphics.Canvas
@@ -27,7 +26,8 @@ class BallRenderer(
         if (screenState.showActualCueBall) {
             screenState.actualCueBall?.let {
                 drawBall(canvas, it, paints.actualCueBallBasePaint, paints.actualCueBallCenterMarkPaint)
-                ballTextRenderer.draw(canvas, "A", it.logicalPosition, paints.actualCueBallTextPaint, overlayState.zoomSliderPosition)
+                // FIX: Corrected arguments for ballTextRenderer.draw
+                ballTextRenderer.draw(canvas, paints.actualCueBallTextPaint, overlayState.zoomSliderPosition, it.logicalPosition.x, it.logicalPosition.y, it.radius, "A")
             }
         }
         canvas.restore()
@@ -37,11 +37,13 @@ class BallRenderer(
         val protractorUnit = screenState.protractorUnit
         // Draw Target Ball
         drawBall(canvas, protractorUnit.targetBall, paints.targetCirclePaint, paints.targetCenterMarkPaint)
-        ballTextRenderer.draw(canvas, "T", protractorUnit.targetBall.logicalPosition, paints.targetBallTextPaint, overlayState.zoomSliderPosition)
+        // FIX: Corrected arguments for ballTextRenderer.draw
+        ballTextRenderer.draw(canvas, paints.targetBallTextPaint, overlayState.zoomSliderPosition, protractorUnit.targetBall.logicalPosition.x, protractorUnit.targetBall.logicalPosition.y, protractorUnit.targetBall.radius, "T")
 
         // Draw Cue Ball
         drawBall(canvas, protractorUnit.cueBall, paints.cueCirclePaint, paints.cueCenterMarkPaint)
-        ballTextRenderer.draw(canvas, "C", protractorUnit.cueBall.logicalPosition, paints.cueBallTextPaint, overlayState.zoomSliderPosition)
+        // FIX: Corrected arguments for ballTextRenderer.draw
+        ballTextRenderer.draw(canvas, paints.cueBallTextPaint, overlayState.zoomSliderPosition, protractorUnit.cueBall.logicalPosition.x, protractorUnit.cueBall.logicalPosition.y, protractorUnit.cueBall.radius, "C")
     }
 
     private fun drawBall(canvas: Canvas, ball: IlogicalBall, circlePaint: Paint, centerPaint: Paint) {

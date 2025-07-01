@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-// import androidx.compose.material.icons.automirrored.outlined.HelpOutline // Not used
 import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.BrightnessMedium
 import androidx.compose.material.icons.outlined.LightMode
@@ -36,7 +35,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetatlite.R
 import com.hereliesaz.cuedetatlite.ui.MainScreenEvent
-// import com.hereliesaz.cuedetatlite.ui.theme.AccentGold // Use MaterialTheme.colorScheme.primary
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
 
 @Composable
@@ -78,7 +76,6 @@ fun MenuDrawerContent(
             text = "Show Tutorial",
             onClick = { onEvent(MainScreenEvent.StartTutorial); onCloseDrawer() }
         )
-        // "More Help Info" removed
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             color = MaterialTheme.colorScheme.outline
@@ -110,21 +107,21 @@ fun MenuDrawerContent(
         )
 
         // --- Theme and Appearance (for Drawn Elements) ---
-        val systemIsCurrentlyDark = isSystemInDarkTheme() // For determining default state text
+        val systemIsCurrentlyDark = isSystemInDarkTheme()
         val (themeToggleText, themeToggleIcon) = when (uiState.isForceLightMode) {
-            true -> "Embrace the Dark" to Icons.Outlined.Nightlight   // Currently Light, offer Dark
-            false -> "Use System Theme" to Icons.Outlined.BrightnessMedium // Currently Dark, offer System
+            true -> "Embrace the Dark" to Icons.Outlined.Nightlight
+            false -> "Use System Theme" to Icons.Outlined.BrightnessMedium
             null -> if (systemIsCurrentlyDark) "Let there be Light" to Icons.Outlined.LightMode else "Embrace the Dark" to Icons.Outlined.Nightlight
         }
         MenuItem(
             icon = themeToggleIcon,
             text = themeToggleText,
-            onClick = { onEvent(MainScreenEvent.ToggleForceTheme); onCloseDrawer() }
+            onClick = { onEvent(MainScreenEvent.ForceLightMode(uiState.isForceLightMode?.not())); onCloseDrawer() }
         )
         MenuItem(
             icon = Icons.Outlined.BrightnessMedium,
-            text = "Luminance", // Text updated
-            onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog); onCloseDrawer() }
+            text = "Luminance",
+            onClick = { onEvent(MainScreenEvent.ShowLuminanceDialog); onCloseDrawer() }
         )
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
