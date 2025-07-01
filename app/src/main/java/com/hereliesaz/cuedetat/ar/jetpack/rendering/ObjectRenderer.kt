@@ -1,7 +1,7 @@
 package com.hereliesaz.cuedetat.ar.jetpack.rendering
 
 import android.opengl.GLES20
-import android.opengl.Matrix // <-- Add this import
+import android.opengl.Matrix
 import com.google.ar.core.Anchor
 import com.hereliesaz.cuedetat.ar.jetpack.rendering.ShaderUtil.checkGLError
 import com.hereliesaz.cuedetat.ar.jetpack.rendering.ShaderUtil.loadGLShader
@@ -49,9 +49,6 @@ class ObjectRenderer {
     private var vertexBuffer: FloatBuffer
     private var indexBuffer: ShortBuffer
 
-    private val modelMatrix = FloatArray(16)
-    // private val viewMatrix = FloatArray(16) // Not needed as property
-    // private val projectionMatrix = FloatArray(16) // Not needed as property
     private val modelViewProjectionMatrix = FloatArray(16)
 
     init {
@@ -87,19 +84,16 @@ class ObjectRenderer {
         checkGLError(TAG, "Program parameters")
     }
 
+    /**
+     * Draws the virtual object.
+     *
+     * @param modelMatrix The 4x4 model matrix.
+     * @param viewMatrix The 4x4 view matrix.
+     * @param projectionMatrix The 4x4 projection matrix.
+     * @param color The color of the object, as a 4-element RGBA float array.
+     */
+    // REMOVED `private` to make this function public and accessible from ArRenderer
     fun draw(
-        anchor: Anchor,
-        viewMatrix: FloatArray,
-        projectionMatrix: FloatArray,
-        color: FloatArray,
-        scaleFactor: Float
-    ) {
-        anchor.pose.toMatrix(modelMatrix, 0)
-        Matrix.scaleM(modelMatrix, 0, scaleFactor, scaleFactor, scaleFactor)
-        draw(modelMatrix, viewMatrix, projectionMatrix, color)
-    }
-
-    private fun draw(
         modelMatrix: FloatArray,
         viewMatrix: FloatArray,
         projectionMatrix: FloatArray,

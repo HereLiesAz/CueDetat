@@ -2,18 +2,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Core XR Feature Declaration -->
-    <uses-feature android:name="android.hardware.xr.spatial" android:required="true" />
+    <!--
+      The uses-feature tags are for Google Play Store filtering.
+      Setting 'required' to 'false' makes the app available to more devices,
+      while the runtime checks in MainActivity handle devices that don't support AR.
+    -->
+    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
+    <uses-feature android:name="android.hardware.xr.spatial" android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="true" />
 
     <!-- Required for AR passthrough -->
     <uses-permission android:name="android.permission.CAMERA" />
 
-    <!-- Permissions for advanced perception features -->
-    <uses-permission android:name="android.permission.HAND_TRACKING" />
-    <uses-permission android:name="android.permission.SCENE_UNDERSTANDING_COARSE" />
-
-
     <application
+        android:name=".di.CueDetatApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -24,6 +28,14 @@
         android:theme="@style/Theme.CueDetat"
         tools:targetApi="31">
 
+        <!--
+          This meta-data tag is required by ARCore at runtime to initialize the session.
+          'required' means the app cannot function without AR.
+        -->
+        <meta-data
+            android:name="com.google.ar.core"
+            android:value="required" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -33,7 +45,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Configure the activity to launch into Full Space mode by default -->
             <property
                 android:name="android.window.PROPERTY_XR_ACTIVITY_START_MODE"
                 android:value="XR_ACTIVITY_START_MODE_FULL_SPACE_MANAGED" />

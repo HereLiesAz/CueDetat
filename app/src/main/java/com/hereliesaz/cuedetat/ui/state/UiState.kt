@@ -13,5 +13,8 @@ data class UiState(
     val shotType: ShotType = ShotType.CUT,
     val isDarkMode: Boolean = false,
     val showHelp: Boolean = false,
-    val isArMode: Boolean = true
+    val isArMode: Boolean = true,
+
+    // Add this line to hold the current instruction text
+    val instructionText: String = "Move phone to find a surface..."
 )

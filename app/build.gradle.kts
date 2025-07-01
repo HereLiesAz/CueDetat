@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.composeCompiler)
+    kotlin("kapt")
+
 }
 
 android {
@@ -12,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId = "com.hereliesaz.cuedetat"
-        minSdk = 34
+        minSdk = 28
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -61,6 +63,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.guava)
     implementation(libs.sceneform.base)
     implementation(libs.androidx.graphics.shapes)
+    implementation(libs.androidx.ui.geometry)
 
     // Use to write unit tests
     testImplementation(libs.androidx.scenecore.testing)
@@ -117,4 +120,8 @@ dependencies {
 
     // Use in environments that do not support OpenXR
     testImplementation(libs.androidx.runtime.testing)
+}
+
+kapt {
+    correctErrorTypes = true
 }

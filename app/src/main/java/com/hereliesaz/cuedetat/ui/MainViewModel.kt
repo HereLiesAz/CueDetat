@@ -62,49 +62,52 @@ class MainViewModel @Inject constructor(
 
     private fun handleScreenTap(offset: Offset) {
         val session = arSession ?: return
-
-        // We get the current frame here, on demand, when a tap happens.
         val frame = try {
             session.update()
         } catch (e: Exception) {
-            // Can happen if the session is paused or shutting down
             null
         } ?: return
-
         if (frame.camera.trackingState != TrackingState.TRACKING) return
 
-        // Perform the hit test inside the ViewModel
-        val hitResults = frame.hitTest(offset.x, offset.y)
-        val hitResult = hitResults.firstOrNull {
-            val trackable = it.trackable
-            trackable is Plane && trackable.isPoseInPolygon(it.hitPose)
-        } ?: return
-
-        // Now call the logic to handle the specific hit
-        handleHitResult(hitResult)
+        if (_uiState.value.table == null) {
+            // Logic for placing the table
+            val hitResults = frame.hitTest(offset.x, offset.y)
+            val hitResult = hitResults.firstOrNull {
+                val trackable = it.trackable
+                trackable is Plane && trackable.isPoseInPolygon(it.hitPose)
+            } ?: return
+            handleTablePlacement(hitResult)
+        } else {
+            // TODO: Logic for placing balls will go here later
+        }
     }
 
-    private fun handleHitResult(hitResult: HitResult) {
+    private fun handleTablePlacement(hitResult: HitResult) {
         val session = arSession ?: return
-        if (_uiState.value.table != null) return // Only place table once
-
-        val trackable = hitResult.trackable
-        if (trackable is Plane && trackable.isPoseInPolygon(hitResult.hitPose) && trackable.type == Plane.Type.HORIZONTAL_UPWARD_FACING) {
+        if (hitResult.trackable.trackingState == TrackingState.TRACKING) {
             val newAnchor = session.createAnchor(hitResult.hitPose)
             _uiState.update {
-                it.copy(table = newAnchor)
+                it.copy(
+                    table = newAnchor,
+                    instructionText = "Tap on table to place balls" // Update instructions
+                )
             }
         }
     }
 
     private fun resetScene() {
-        // Dispose of anchors before removing them from state to clean up ARCore resources
         _uiState.value.table?.detach()
         _uiState.value.cueBall?.detach()
         _uiState.value.objectBall?.detach()
 
         _uiState.update {
-            it.copy(table = null, cueBall = null, objectBall = null, isAiming = true)
+            it.copy(
+                table = null,
+                cueBall = null,
+                objectBall = null,
+                isAiming = true,
+                instructionText = "Move phone to find a surface..." // Reset instructions
+            )
         }
     }
 

@@ -6,14 +6,17 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
+import com.google.ar.core.exceptions.UnavailableApkTooOldException
+import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
+import com.google.ar.core.exceptions.UnavailableSdkTooOldException
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
 import com.hereliesaz.cuedetat.ui.MainScreen
 import com.hereliesaz.cuedetat.ui.MainViewModel
@@ -28,25 +31,56 @@ class MainActivity : ComponentActivity() {
     private var arSession: Session? = null
     private var userRequestedInstall = true
 
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            if (isGranted) {
+                // Permission is granted. onResume will handle the setup.
+            } else {
+                Toast.makeText(this, "Camera permission is required to run this application", Toast.LENGTH_LONG).show()
+                finish()
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Set content will be called in onResume after checks.
     }
 
     override fun onResume() {
         super.onResume()
+
+        // 1. Check for Camera Permission
+        if (!hasCameraPermission()) {
+            requestCameraPermission()
+            return
+        }
+
+        // 2. Initialize ARCore session if it's null
         if (arSession == null) {
-            if (!hasCameraPermission()) {
-                requestCameraPermission()
-                return
-            }
-            if (!isArCoreAvailableAndInstalled()) {
-                return
-            }
-            arSession = Session(this).also {
-                viewModel.onEvent(UiEvent.SetSession(it))
+            try {
+                // Request installation if necessary
+                when (ArCoreApk.getInstance().requestInstall(this, userRequestedInstall)) {
+                    ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
+                        // Installation was requested, don't create a session yet.
+                        userRequestedInstall = false
+                        return
+                    }
+                    ArCoreApk.InstallStatus.INSTALLED -> {
+                        // ARCore is installed, proceed to create a session.
+                    }
+                }
+
+                // Create the ARCore session.
+                arSession = Session(this).also {
+                    viewModel.onEvent(UiEvent.SetSession(it))
+                }
+            } catch (e: Exception) {
+                handleSessionCreationException(e)
+                return // Stop if session creation fails
             }
         }
 
+        // 3. Resume the session and set the content
         try {
             arSession?.resume()
         } catch (e: CameraNotAvailableException) {
@@ -78,58 +112,23 @@ class MainActivity : ComponentActivity() {
         arSession = null
     }
 
-    private fun isArCoreAvailableAndInstalled(): Boolean {
-        return try {
-            when (ArCoreApk.getInstance().requestInstall(this, userRequestedInstall)) {
-                ArCoreApk.InstallStatus.INSTALLED -> true
-                ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
-                    userRequestedInstall = false
-                    false
-                }
-                else -> {
-                    Toast.makeText(this, "ARCore is not available on this device.", Toast.LENGTH_LONG).show()
-                    finish()
-                    false
-                }
-            }
-        } catch (e: UnavailableUserDeclinedInstallationException) {
-            Toast.makeText(this, "ARCore is required. Please install it.", Toast.LENGTH_LONG).show()
-            finish()
-            false
-        } catch (e: Exception) {
-            Toast.makeText(this, "Failed to create AR session: $e", Toast.LENGTH_LONG).show()
-            finish()
-            false
-        }
-    }
-
     private fun hasCameraPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.CAMERA
-        ) == PackageManager.PERMISSION_GRANTED
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun requestCameraPermission() {
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(Manifest.permission.CAMERA),
-            0
-        )
+        requestPermissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (!hasCameraPermission()) {
-            Toast.makeText(this, "Camera permission is required.", Toast.LENGTH_LONG).show()
-            if (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA)) {
-                // User has selected "Don't ask again".
-            }
-            finish()
+    private fun handleSessionCreationException(e: Exception) {
+        val message = when (e) {
+            is UnavailableApkTooOldException -> "Please update ARCore"
+            is UnavailableSdkTooOldException -> "Please update this app"
+            is UnavailableDeviceNotCompatibleException -> "This device does not support AR"
+            is UnavailableUserDeclinedInstallationException -> "ARCore installation is required"
+            else -> "Failed to create AR session: $e"
         }
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        finish()
     }
 }
