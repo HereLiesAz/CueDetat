@@ -2,16 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!--
-      The uses-feature tags are for Google Play Store filtering.
-      Setting 'required' to 'false' makes the app available to more devices,
-      while the runtime checks in MainActivity handle devices that don't support AR.
-    -->
-    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
-    <uses-feature android:name="android.hardware.xr.spatial" android:required="false" />
-    <uses-feature
-        android:name="android.hardware.camera"
-        android:required="true" />
+    <!-- This is the ONLY feature tag needed for a standard ARCore app. -->
+    <uses-feature android:name="android.hardware.camera.ar" android:required="true" />
 
     <!-- Required for AR passthrough -->
     <uses-permission android:name="android.permission.CAMERA" />
@@ -28,10 +20,7 @@
         android:theme="@style/Theme.CueDetat"
         tools:targetApi="31">
 
-        <!--
-          This meta-data tag is required by ARCore at runtime to initialize the session.
-          'required' means the app cannot function without AR.
-        -->
+        <!-- This meta-data tag is essential for ARCore to initialize. -->
         <meta-data
             android:name="com.google.ar.core"
             android:value="required" />
@@ -45,9 +34,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <property
-                android:name="android.window.PROPERTY_XR_ACTIVITY_START_MODE"
-                android:value="XR_ACTIVITY_START_MODE_FULL_SPACE_MANAGED" />
+            <!-- REMOVED the conflicting xr.spatial property tag -->
 
         </activity>
     </application>

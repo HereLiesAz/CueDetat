@@ -62,23 +62,32 @@ class MainViewModel @Inject constructor(
 
     private fun handleScreenTap(offset: Offset) {
         val session = arSession ?: return
-        val frame = try {
-            session.update()
-        } catch (e: Exception) {
-            null
-        } ?: return
+        val frame = try { session.update() } catch (e: Exception) { null } ?: return
         if (frame.camera.trackingState != TrackingState.TRACKING) return
 
-        if (_uiState.value.table == null) {
-            // Logic for placing the table
-            val hitResults = frame.hitTest(offset.x, offset.y)
-            val hitResult = hitResults.firstOrNull {
-                val trackable = it.trackable
-                trackable is Plane && trackable.isPoseInPolygon(it.hitPose)
-            } ?: return
-            handleTablePlacement(hitResult)
-        } else {
-            // TODO: Logic for placing balls will go here later
+        val hitResults = frame.hitTest(offset.x, offset.y)
+        val hitResult = hitResults.firstOrNull {
+            val trackable = it.trackable
+            trackable is Plane && trackable.isPoseInPolygon(it.hitPose)
+        } ?: return
+
+        when {
+            // If table isn't placed, place it.
+            _uiState.value.table == null -> {
+                handleTablePlacement(hitResult)
+            }
+            // If cue ball isn't placed, place it.
+            _uiState.value.cueBall == null -> {
+                handleBallPlacement(hitResult, isCueBall = true)
+            }
+            // If object ball isn't placed, place it.
+            _uiState.value.objectBall == null -> {
+                handleBallPlacement(hitResult, isCueBall = false)
+            }
+            // If all are placed, tapping moves the nearest ball.
+            else -> {
+                // TODO: Implement logic to move the closest ball to the tap location.
+            }
         }
     }
 
@@ -89,8 +98,30 @@ class MainViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     table = newAnchor,
-                    instructionText = "Tap on table to place balls" // Update instructions
+                    instructionText = "Tap on table to place Cue Ball"
                 )
+            }
+        }
+    }
+
+    private fun handleBallPlacement(hitResult: HitResult, isCueBall: Boolean) {
+        val session = arSession ?: return
+        if (hitResult.trackable.trackingState == TrackingState.TRACKING) {
+            val newAnchor = session.createAnchor(hitResult.hitPose)
+            if (isCueBall) {
+                _uiState.update {
+                    it.copy(
+                        cueBall = newAnchor,
+                        instructionText = "Tap on table to place Object Ball"
+                    )
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        objectBall = newAnchor,
+                        instructionText = "Aim your shot" // All pieces are placed
+                    )
+                }
             }
         }
     }
@@ -106,7 +137,7 @@ class MainViewModel @Inject constructor(
                 cueBall = null,
                 objectBall = null,
                 isAiming = true,
-                instructionText = "Move phone to find a surface..." // Reset instructions
+                instructionText = "Move phone to find a surface..."
             )
         }
     }

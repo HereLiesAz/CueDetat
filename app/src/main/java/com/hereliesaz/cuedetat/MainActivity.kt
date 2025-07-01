@@ -11,7 +11,9 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import com.google.ar.core.ArCoreApk
+import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableApkTooOldException
@@ -34,7 +36,7 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
-                // Permission is granted. onResume will handle the setup.
+                // Permission is granted. onResume will now handle the setup.
             } else {
                 Toast.makeText(this, "Camera permission is required to run this application", Toast.LENGTH_LONG).show()
                 finish()
@@ -43,44 +45,47 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Set content will be called in onResume after checks.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
     }
 
     override fun onResume() {
         super.onResume()
 
-        // 1. Check for Camera Permission
         if (!hasCameraPermission()) {
             requestCameraPermission()
             return
         }
 
-        // 2. Initialize ARCore session if it's null
         if (arSession == null) {
             try {
-                // Request installation if necessary
                 when (ArCoreApk.getInstance().requestInstall(this, userRequestedInstall)) {
                     ArCoreApk.InstallStatus.INSTALL_REQUESTED -> {
-                        // Installation was requested, don't create a session yet.
                         userRequestedInstall = false
                         return
                     }
-                    ArCoreApk.InstallStatus.INSTALLED -> {
-                        // ARCore is installed, proceed to create a session.
-                    }
+                    ArCoreApk.InstallStatus.INSTALLED -> {}
                 }
 
-                // Create the ARCore session.
-                arSession = Session(this).also {
-                    viewModel.onEvent(UiEvent.SetSession(it))
-                }
+                arSession = Session(this)
+
+                val config = Config(arSession)
+
+                // *** THIS IS THE CRUCIAL FIX ***
+                // Tell ARCore to analyze the latest camera image on every frame.
+                // This is required for reliable plane detection.
+                config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+
+                config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
+                arSession?.configure(config)
+
+                viewModel.onEvent(UiEvent.SetSession(arSession))
+
             } catch (e: Exception) {
                 handleSessionCreationException(e)
-                return // Stop if session creation fails
+                return
             }
         }
 
-        // 3. Resume the session and set the content
         try {
             arSession?.resume()
         } catch (e: CameraNotAvailableException) {
