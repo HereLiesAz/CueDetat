@@ -1,47 +1,21 @@
 package com.hereliesaz.cuedetat.ui.composables
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.material3.Button
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.unit.dp
+import com.hereliesaz.cuedetat.ui.state.UiEvent
 
 @Composable
 fun ShotControls(
-    power: Float,
+    shotPower: Float,
     spin: Offset,
-    onPowerChange: (Float) -> Unit,
-    onSpinChange: (Offset) -> Unit,
-    onExecuteShot: () -> Unit
+    onEvent: (UiEvent) -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text("Power: ${power.toInt()}", style = MaterialTheme.typography.bodyLarge)
-            Slider(
-                value = power,
-                onValueChange = onPowerChange,
-                valueRange = 0f..100f
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Spin", style = MaterialTheme.typography.bodyLarge)
-            SpinControl(
-                spinOffset = spin,
-                onSpinChanged = onSpinChange
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onExecuteShot) {
-                Text("Shoot")
-            }
-        }
+    // TODO: Re-implement the full shot controls UI using onEvent
+    Slider(value = shotPower, onValueChange = { onEvent(UiEvent.SetShotPower(it)) })
+    Button(onClick = { onEvent(UiEvent.ExecuteShot) }) {
+        Text("Shoot")
     }
 }

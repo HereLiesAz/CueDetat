@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.hereliesaz.cuedetat"
-        minSdk = 24
+        minSdk = 34
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -33,8 +33,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
         compose = true
@@ -48,6 +48,10 @@ android {
         }
     }
 }
+kotlin {
+    jvmToolchain(17)
+
+}
 
 dependencies {
 
@@ -55,6 +59,7 @@ dependencies {
     // Required for Java
     // Required for Kotlin
     implementation(libs.kotlinx.coroutines.guava)
+    implementation(libs.sceneform.base)
 
     // Use to write unit tests
     testImplementation(libs.androidx.scenecore.testing)
