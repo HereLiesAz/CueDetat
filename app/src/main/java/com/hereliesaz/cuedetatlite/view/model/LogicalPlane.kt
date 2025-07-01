@@ -1,31 +1,43 @@
 package com.hereliesaz.cuedetatlite.view.model
 
 import android.graphics.PointF
-import kotlin.math.cos
-import kotlin.math.sin
 
-object LogicalPlane {
-
-    data class ProtractorUnit(
-        val targetBallCenter: PointF = PointF(540f, 960f), // Default to center of a 1080x1920 screen
-        override val radius: Float = 100f,
-        val rotationDegrees: Float = 0f
-    ) : ILogicalBall {
-        override val center: PointF
-            get() = targetBallCenter
-
-        val protractorCueBallCenter: PointF
-            get() {
-                val angleRad = Math.toRadians(rotationDegrees.toDouble())
-                return PointF(
-                    targetBallCenter.x + (2 * radius * cos(angleRad)).toFloat(),
-                    targetBallCenter.y + (2 * radius * sin(angleRad)).toFloat()
-                )
-            }
-    }
-
-    data class ActualCueBall(
-        override val center: PointF = PointF(540f, 1500f),
-        override val radius: Float = 100f
-    ) : ILogicalBall
+/**
+ * Represents an object with a position and radius on the logical 2D plane.
+ */
+interface ILogicalBall {
+    val center: PointF
+    val radius: Float
 }
+
+/**
+ * The main aiming tool, consisting of a Target Ball and a Protractor Cue Ball.
+ * Its position is defined by the Target Ball's center.
+ */
+data class ProtractorUnit(
+    override val center: PointF,
+    override val radius: Float,
+    val rotationDegrees: Float
+) : ILogicalBall {
+
+    /**
+     * Calculates the position of the Protractor Cue Ball based on the unit's center and rotation.
+     */
+    val protractorCueBallCenter: PointF
+        get() {
+            val angleRad = Math.toRadians(rotationDegrees.toDouble())
+            val distance = 2 * radius
+            return PointF(
+                center.x - (distance * kotlin.math.sin(angleRad)).toFloat(),
+                center.y + (distance * kotlin.math.cos(angleRad)).toFloat()
+            )
+        }
+}
+
+/**
+ * The user-positioned aiming sight.
+ */
+data class ActualCueBall(
+    override val center: PointF,
+    override val radius: Float
+) : ILogicalBall

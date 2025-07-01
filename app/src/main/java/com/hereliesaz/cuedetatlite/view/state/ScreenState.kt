@@ -1,23 +1,11 @@
-// app/src/main/java/com/hereliesaz/cuedetatlite/view/state
-
 package com.hereliesaz.cuedetatlite.view.state
 
-import android.graphics.Matrix
-import android.graphics.PointF
+sealed class ToastMessage {
+    data class StringResource(val id: Int, val formatArgs: List<Any> = emptyList()) : ToastMessage()
+    data class PlainText(val text: String) : ToastMessage()
+}
 
-data class ScreenState(val width: Int, val height: Int) {
-
-    fun screenToLogical(x: Float, y: Float, pitchMatrix: Matrix): PointF {
-        val invertedMatrix = Matrix()
-        pitchMatrix.invert(invertedMatrix)
-        val point = floatArrayOf(x, y)
-        invertedMatrix.mapPoints(point)
-        return PointF(point[0], point[1])
-    }
-
-    fun logicalToScreen(logicalPoint: PointF, pitchMatrix: Matrix): PointF {
-        val point = floatArrayOf(logicalPoint.x, logicalPoint.y)
-        pitchMatrix.mapPoints(point)
-        return PointF(point[0], point[1])
-    }
+sealed class SingleEvent {
+    data class OpenUrl(val url: String) : SingleEvent()
+    object ShowDonationDialog : SingleEvent()
 }

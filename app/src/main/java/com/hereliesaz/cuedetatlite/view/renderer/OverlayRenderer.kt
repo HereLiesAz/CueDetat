@@ -1,44 +1,45 @@
 package com.hereliesaz.cuedetatlite.view.renderer
 
-import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Typeface
 import com.hereliesaz.cuedetatlite.view.PaintCache
-import com.hereliesaz.cuedetatlite.view.renderer.text.BallTextRenderer
-import com.hereliesaz.cuedetatlite.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
 
-class OverlayRenderer(context: Context) {
+class OverlayRenderer {
 
-    private val paintCache = PaintCache()
+    private val ballRenderer = BallRenderer()
+    private val lineRenderer = LineRenderer()
+    private val tableRenderer = TableRenderer()
+    private val railRenderer = RailRenderer()
 
-    // Text Renderers
-    private val ballTextRenderer = BallTextRenderer(paintCache)
-    private val lineTextRenderer = LineTextRenderer(paintCache)
+    fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
+        if (state.viewWidth == 0 || state.viewHeight == 0) return
 
-    // Component Renderers
-    private val ballRenderer = BallRenderer(paintCache, ballTextRenderer)
-    private val lineRenderer = LineRenderer(paintCache, lineTextRenderer)
-    private val tableRenderer = TableRenderer(paintCache)
-    private val railRenderer = RailRenderer(paintCache)
+        // --- Draw Banking Mode elements if active ---
+        if (state.isBankingMode) {
+            // Draw base table with the standard matrix
+            canvas.save()
+            canvas.concat(state.pitchMatrix)
+            tableRenderer.draw(canvas, state, paints)
+            canvas.restore()
 
-
-    fun draw(canvas: Canvas, state: OverlayState) {
-        if (state.isDarkMode) {
-            canvas.drawColor(android.graphics.Color.BLACK)
-        } else {
-            canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
+            // Draw rails with the special, lifted matrix
+            canvas.save()
+            canvas.concat(state.railPitchMatrix)
+            railRenderer.draw(canvas, state, paints)
+            canvas.restore()
         }
 
-        if (state.isProtractorMode) {
-            ballRenderer.draw(canvas, state)
-            lineRenderer.draw(canvas, state)
-        } else { // Banking Mode
-            state.tableModel?.let {
-                tableRenderer.draw(canvas, state)
-                railRenderer.draw(canvas, state)
-                ballRenderer.draw(canvas, state) // Draw ball on top of table
-                lineRenderer.draw(canvas, state)
-            }
-        }
+        // --- Draw all elements on the 3D logical plane ---
+        canvas.save()
+        canvas.concat(state.pitchMatrix)
+
+        lineRenderer.drawLogicalLines(canvas, state, paints, typeface)
+        ballRenderer.drawLogicalBalls(canvas, state, paints)
+
+        canvas.restore()
+
+        // --- Draw screen-space elements (ghosts) on top ---
+        ballRenderer.drawScreenSpaceBalls(canvas, state, paints, typeface)
     }
 }

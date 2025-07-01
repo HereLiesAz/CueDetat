@@ -1,39 +1,64 @@
+// app/src/main/java/com.hereliesaz.cuedetatlite/view/state/OverlayState.kt
 package com.hereliesaz.cuedetatlite.view.state
 
 import android.graphics.Matrix
 import android.graphics.PointF
-import com.hereliesaz.cuedetatlite.view.model.TableModel
-import com.hereliesaz.cuedetatlite.view.model.LogicalPlane
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.darkColorScheme
+import com.hereliesaz.cuedetatlite.data.FullOrientation // Import FullOrientation
+import com.hereliesaz.cuedetatlite.view.model.ActualCueBall
+import com.hereliesaz.cuedetatlite.view.model.ProtractorUnit
 
 data class OverlayState(
-    // Core state
-    val isProtractorMode: Boolean = true,
-    val isDarkMode: Boolean = false,
-    val isJumpShot: Boolean = false,
-    val showProtractorCueBall: Boolean = true,
-    val showActualCueBall: Boolean = true,
-    val zoomSliderPosition: Float = 0.5f,
+    // View dimensions
+    val viewWidth: Int = 0,
+    val viewHeight: Int = 0,
 
-    // Spatial state
-    val currentOrientation: FullOrientation = FullOrientation(),
+    // Core logical model
+    val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), 1f, 0f),
+    val actualCueBall: ActualCueBall? = null,
 
-    // Logical objects
-    val protractorUnit: LogicalPlane.ProtractorUnit = LogicalPlane.ProtractorUnit(),
-    val actualCueBall: LogicalPlane.ActualCueBall = LogicalPlane.ActualCueBall(),
-    val bankingAimTarget: PointF = PointF(540f, 500f),
+    // UI control state
+    val zoomSliderPosition: Float = 100f,
+    val areHelpersVisible: Boolean = false,
+    val isMoreHelpVisible: Boolean = false,
+    val valuesChangedSinceReset: Boolean = false,
+
+    // Banking mode specific state
+    val isBankingMode: Boolean = false,
     val tableRotationDegrees: Float = 0f,
+    val bankingAimTarget: PointF? = null,
 
-    // Derived state (calculated by UseCases)
+    // Theme and Appearance FOR DRAWN ELEMENTS on ProtractorOverlayView
+    val isForceLightMode: Boolean? = null,
+    val luminanceAdjustment: Float = 0f,
+    val showLuminanceDialog: Boolean = false,
+
+    // Tutorial State
+    val showTutorialOverlay: Boolean = false,
+    val currentTutorialStep: Int = 0,
+
+    // Sensor and perspective data
+    val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f), // Current real-time orientation
+    val anchorOrientation: FullOrientation? = null, // Stored orientation when locked
+
     val pitchMatrix: Matrix = Matrix(),
     val railPitchMatrix: Matrix = Matrix(),
-    val screenState: ScreenState = ScreenState(0, 0),
-    val tableModel: TableModel? = null,
-    val bankingPath: List<PointF> = emptyList()
-) {
-    data class FullOrientation(
-        val pitch: Float = 0f,
-        val roll: Float = 0f,
-        val yaw: Float = 0f
-    )
-}
+    val inversePitchMatrix: Matrix = Matrix(),
+    val hasInverseMatrix: Boolean = false,
 
+    // Derived state
+    val isImpossibleShot: Boolean = false,
+    val warningText: String? = null,
+
+    // Theming
+    val appControlColorScheme: ColorScheme = darkColorScheme(),
+
+    // Spatial Lock State
+    val isSpatiallyLocked: Boolean = false
+) {
+    // Convenience getter for the old pitchAngle, derived from currentOrientation
+    // This maintains compatibility with parts of the code still using pitchAngle directly.
+    val pitchAngle: Float
+        get() = currentOrientation.pitch
+}
