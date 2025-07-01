@@ -1,3 +1,4 @@
+// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/view/PaintCache.kt
 package com.hereliesaz.cuedetatlite.view
 
 import android.graphics.Color as AndroidColor
@@ -60,6 +61,10 @@ class PaintCache {
     }
 
     // Paint objects
+    val whitePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.WHITE; style = Paint.Style.FILL_AND_STROKE; strokeWidth = thickLineStrokeWidth }
+    val greenPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.GREEN }
+    val bluePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.BLUE }
+    val redPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.RED }
     val tableOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeWidth = thickLineStrokeWidth
     }

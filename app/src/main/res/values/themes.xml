@@ -1,7 +1,7 @@
 <resources>
     <!-- Base application theme. -->
     <!-- For Material 3 components like FloatingActionButton, prefer a Material3 theme -->
-    <style name="Theme.CueDetat" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.CueDetatLite" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Primary brand color. -->
         <item name="colorPrimary">@color/purple_500</item>
         <!-- <item name="colorPrimaryVariant">@color/purple_700</item> --> <!-- M3 uses colorPrimaryContainer, etc. -->

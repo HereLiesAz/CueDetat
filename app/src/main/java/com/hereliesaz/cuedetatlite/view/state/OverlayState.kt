@@ -8,6 +8,7 @@ import androidx.compose.material3.darkColorScheme
 import com.hereliesaz.cuedetatlite.data.FullOrientation // Import FullOrientation
 import com.hereliesaz.cuedetatlite.view.model.ActualCueBall
 import com.hereliesaz.cuedetatlite.view.model.ProtractorUnit
+import com.hereliesaz.cuedetatlite.view.model.IlogicalBall
 
 data class OverlayState(
     // View dimensions

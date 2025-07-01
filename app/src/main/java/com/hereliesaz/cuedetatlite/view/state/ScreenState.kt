@@ -1,11 +1,19 @@
+// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/view/state/ScreenState.kt
 package com.hereliesaz.cuedetatlite.view.state
 
-sealed class ToastMessage {
-    data class StringResource(val id: Int, val formatArgs: List<Any> = emptyList()) : ToastMessage()
-    data class PlainText(val text: String) : ToastMessage()
-}
+import android.graphics.PointF
+import com.hereliesaz.cuedetatlite.domain.WarningText
+import com.hereliesaz.cuedetatlite.view.model.IlogicalBall
+import com.hereliesaz.cuedetatlite.view.model.ProtractorUnit
+import com.hereliesaz.cuedetatlite.view.model.TableModel
 
-sealed class SingleEvent {
-    data class OpenUrl(val url: String) : SingleEvent()
-    object ShowDonationDialog : SingleEvent()
-}
+data class ScreenState(
+    val isProtractorMode: Boolean = false,
+    val showActualCueBall: Boolean = true,
+    val protractorUnit: ProtractorUnit = ProtractorUnit(),
+    val actualCueBall: IlogicalBall? = null,
+    val bankingPath: List<PointF> = emptyList(),
+    val tableModel: TableModel? = null,
+    val isBankingMode: Boolean = false,
+    val warningText: WarningText? = null
+)

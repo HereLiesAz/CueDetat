@@ -1,4 +1,4 @@
-// app/src/main/java/com/hereliesaz/cuedetatlite/view/model/TableModel.kt
+// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/view/model/TableModel.kt
 package com.hereliesaz.cuedetatlite.view.model
 
 import android.graphics.PointF
@@ -38,18 +38,19 @@ data class TableModel(
             )
 
             // Diamonds are defined in clockwise order starting from top-left pocket.
+            // Side pockets are included in the diamond count.
             val diamonds = listOf(
-                pockets[0].center, // 0
+                pockets[0].center, // 0 - TL Pocket
                 PointF(left + tableWidth / 4, top), // 1
-                pockets[4].center, // 2
+                pockets[4].center, // 2 - TM Pocket
                 PointF(left + 3 * tableWidth / 4, top), // 3
-                pockets[1].center, // 4
+                pockets[1].center, // 4 - TR Pocket
                 PointF(right, top + tableHeight / 2), // 5
-                pockets[3].center, // 6
+                pockets[3].center, // 6 - BR Pocket
                 PointF(right - tableWidth / 4, bottom), // 7
-                pockets[5].center, // 8
+                pockets[5].center, // 8 - BM Pocket
                 PointF(left + tableWidth / 4, bottom), // 9
-                pockets[2].center, // 10
+                pockets[2].center, // 10 - BL Pocket
                 PointF(left, top + tableHeight / 2) // 11
             )
 
@@ -77,7 +78,7 @@ data class TableModel(
 
             if (pocketHit != null && (railHit == null || pocketHit.first < railHit.first)) {
                 path.add(pocketHit.second)
-                return path
+                return path // End path in pocket
             }
 
             if (railHit != null) {
@@ -95,19 +96,20 @@ data class TableModel(
     }
 
     fun getDiamondValue(point: PointF): Float? {
+        val tolerance = 5f
         val railIndex = when {
-            abs(point.y - surface.top) < 1f -> 0
-            abs(point.x - surface.right) < 1f -> 1
-            abs(point.y - surface.bottom) < 1f -> 2
-            abs(point.x - surface.left) < 1f -> 3
+            abs(point.y - surface.top) < tolerance -> 0    // Top
+            abs(point.x - surface.right) < tolerance -> 1 // Right
+            abs(point.y - surface.bottom) < tolerance -> 2 // Bottom
+            abs(point.x - surface.left) < tolerance -> 3  // Left
             else -> return null
         }
 
-        val (railDiamonds, baseIndex) = when(railIndex) {
-            0 -> Pair(diamonds.slice(0..4), 0)
-            1 -> Pair(diamonds.slice(4..6), 4)
-            2 -> Pair(diamonds.slice(6..10).reversed(), 6)
-            3 -> Pair(listOf(diamonds[10], diamonds[11], diamonds[0]), 10)
+        val (railDiamonds, baseIndex, reversed) = when(railIndex) {
+            0 -> Triple(diamonds.slice(0..4), 0, false)
+            1 -> Triple(diamonds.slice(4..6), 4, false)
+            2 -> Triple(diamonds.slice(6..10), 6, true)
+            3 -> Triple(listOf(diamonds[10], diamonds[11], diamonds[0]), 10, false)
             else -> return null
         }
 
@@ -124,18 +126,24 @@ data class TableModel(
                 if (totalDist < 1e-6) continue
                 val partialDist = abs(p - start)
                 val fraction = partialDist / totalDist
-                return (baseIndex + i) + fraction
+                return (if(reversed) baseIndex + (railDiamonds.size - 2 - i) else baseIndex + i) + fraction
             }
         }
         return null
     }
 
+
     private fun findNextRailHit(p: PointF, dx: Float, dy: Float): Triple<Float, PointF, Int>? {
         var t = Float.MAX_VALUE
         var railIndex = -1
+
+        // Top rail (index 0)
         if (dy < 0) { val tRail = (surface.top - p.y) / dy; if (tRail > 1e-6 && tRail < t) { t = tRail; railIndex = 0 } }
+        // Right rail (index 1)
         if (dx > 0) { val tRail = (surface.right - p.x) / dx; if (tRail > 1e-6 && tRail < t) { t = tRail; railIndex = 1 } }
+        // Bottom rail (index 2)
         if (dy > 0) { val tRail = (surface.bottom - p.y) / dy; if (tRail > 1e-6 && tRail < t) { t = tRail; railIndex = 2 } }
+        // Left rail (index 3)
         if (dx < 0) { val tRail = (surface.left - p.x) / dx; if (tRail > 1e-6 && tRail < t) { t = tRail; railIndex = 3 } }
 
         return if (railIndex != -1) Triple(t, PointF(p.x + t * dx, p.y + t * dy), railIndex) else null
