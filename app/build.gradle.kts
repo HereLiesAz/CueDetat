@@ -64,6 +64,7 @@ dependencies {
     implementation(libs.sceneform.base)
     implementation(libs.androidx.graphics.shapes)
     implementation(libs.androidx.ui.geometry)
+    implementation(libs.rendering)
 
     // Use to write unit tests
     testImplementation(libs.androidx.scenecore.testing)

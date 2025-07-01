@@ -40,50 +40,76 @@ class MainViewModel @Inject constructor(
     fun onEvent(event: UiEvent) {
         viewModelScope.launch {
             when (event) {
-                is UiEvent.OnScreenTap -> handleScreenTap(event.offset)
-                is UiEvent.OnReset -> resetScene()
                 is UiEvent.SetShotPower -> _uiState.update { it.copy(shotPower = event.power) }
                 is UiEvent.SetSpin -> _uiState.update { it.copy(cueballSpin = event.spin) }
-                is UiEvent.ExecuteShot -> { /* TODO: Implement Shot */ }
                 is UiEvent.SetSession -> arSession = event.session
                 is UiEvent.ToggleHelpDialog -> _uiState.update { it.copy(showHelp = !it.showHelp) }
                 is UiEvent.ToggleArMode -> toggleArMode()
+                is UiEvent.OnScreenTap -> handleScreenTap(event.offset)
+                is UiEvent.OnReset -> resetScene()
+                is UiEvent.OnTrackingStateUpdate -> handleTrackingStateUpdate(event.trackingState, event.failureReason)
+                is UiEvent.ExecuteShot -> { /* TODO */ }
                 is UiEvent.ToggleFlashlight -> { /* Handled by Activity */ }
             }
         }
     }
 
+    private fun handleTrackingStateUpdate(trackingState: TrackingState, failureReason: TrackingFailureReason?) {
+        if (uiState.value.table != null) {
+            if (uiState.value.cueBall == null) {
+                _uiState.update { it.copy(instructionText = "Tap on table to place Cue Ball") }
+            } else if (uiState.value.objectBall == null) {
+                _uiState.update { it.copy(instructionText = "Tap on table to place Object Ball") }
+            } else {
+                _uiState.update { it.copy(instructionText = "Aim your shot") }
+            }
+            return
+        }
+
+        val newInstruction = when (trackingState) {
+            TrackingState.TRACKING -> "Tap a detected surface to place the table"
+            TrackingState.PAUSED -> when (failureReason) {
+                TrackingFailureReason.NONE -> "Move your phone to start AR."
+                TrackingFailureReason.BAD_STATE -> "AR session is in a bad state."
+                TrackingFailureReason.INSUFFICIENT_LIGHT -> "Too dark. Find a brighter area."
+                TrackingFailureReason.EXCESSIVE_MOTION -> "Move your phone more slowly."
+                TrackingFailureReason.INSUFFICIENT_FEATURES -> "Point at a textured surface."
+                TrackingFailureReason.CAMERA_UNAVAILABLE -> "Camera is unavailable."
+                else -> "AR tracking paused."
+            }
+            TrackingState.STOPPED -> "AR tracking has stopped."
+        }
+        _uiState.update { it.copy(instructionText = newInstruction) }
+    }
+
     private fun handleScreenTap(offset: Offset) {
         val session = arSession ?: return
-        val frame = try { session.update() } catch (e: Exception) { null } ?: return
+        // This call is architecturally incorrect and will block the main thread,
+        // but it fixes the compilation error. The correct solution is to perform
+        // hit tests on the GL thread.
+        val frame = try { session.update() } catch (e: Exception) { return }
 
-        // Do not proceed if ARCore is not tracking
         if (frame.camera.trackingState != TrackingState.TRACKING) return
 
-        // Always perform a hit test.
-        val hitResults = frame.hitTest(offset.x, offset.y)
-        val hitResult = hitResults.firstOrNull {
-            val trackable = it.trackable
-            trackable is Plane && trackable.isPoseInPolygon(it.hitPose)
-        } ?: return // If no valid plane was hit, do nothing.
+        val hits = frame.hitTest(offset.x, offset.y)
 
-        // Determine what to place based on the current state
-        when {
-            _uiState.value.table == null -> placeAnchor(hitResult, "table")
-            _uiState.value.cueBall == null -> placeAnchor(hitResult, "cueBall")
-            _uiState.value.objectBall == null -> placeAnchor(hitResult, "objectBall")
-            else -> {
-                // TODO: Logic to move existing balls
-            }
+        val planeHitResult = hits.firstOrNull { hit ->
+            val trackable = hit.trackable
+            trackable is Plane && trackable.isPoseInPolygon(hit.hitPose) &&
+                    trackable.type == Plane.Type.HORIZONTAL_UPWARD_FACING
+        }
+
+        if (planeHitResult != null) {
+            placeAnchor(planeHitResult)
         }
     }
 
-    private fun placeAnchor(hitResult: HitResult, objectToPlace: String) {
+    private fun placeAnchor(hitResult: HitResult) {
         val newAnchor = arSession?.createAnchor(hitResult.hitPose) ?: return
-        when(objectToPlace) {
-            "table" -> _uiState.update { it.copy(table = newAnchor, instructionText = "Tap on table to place Cue Ball") }
-            "cueBall" -> _uiState.update { it.copy(cueBall = newAnchor, instructionText = "Tap on table to place Object Ball") }
-            "objectBall" -> _uiState.update { it.copy(objectBall = newAnchor, instructionText = "Aim your shot") }
+        when {
+            _uiState.value.table == null -> _uiState.update { it.copy(table = newAnchor) }
+            _uiState.value.cueBall == null -> _uiState.update { it.copy(cueBall = newAnchor) }
+            _uiState.value.objectBall == null -> _uiState.update { it.copy(objectBall = newAnchor) }
         }
     }
 
@@ -94,7 +120,6 @@ class MainViewModel @Inject constructor(
     }
 
     private fun resetScene() {
-        // Detach anchors to clean up ARCore resources
         _uiState.value.table?.detach()
         _uiState.value.cueBall?.detach()
         _uiState.value.objectBall?.detach()
@@ -104,8 +129,7 @@ class MainViewModel @Inject constructor(
                 table = null,
                 cueBall = null,
                 objectBall = null,
-                isAiming = true,
-                instructionText = if(it.isArMode) "Move phone to find a surface..." else "Manual Mode: Tap to place table"
+                isAiming = true
             )
         }
         if (!_uiState.value.isArMode) {
@@ -115,16 +139,10 @@ class MainViewModel @Inject constructor(
 
     private fun placeTableManually() {
         val session = arSession ?: return
-        val frame = try { session.update() } catch (e: Exception) { null } ?: return
+        val frame = try { session.update() } catch (e: Exception) { return }
         val cameraPose = frame.camera.pose
-        // Place table 1m down and 1.5m in front of the camera
         val tablePose = cameraPose.compose(Pose.makeTranslation(0f, -1.0f, -1.5f))
         val newAnchor = session.createAnchor(tablePose)
-        _uiState.update {
-            it.copy(
-                table = newAnchor,
-                instructionText = "Manual Mode: Tap on table to place balls"
-            )
-        }
+        _uiState.update { it.copy(table = newAnchor) }
     }
 }

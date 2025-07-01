@@ -3,33 +3,37 @@ package com.hereliesaz.cuedetat.ar.jetpack
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
-import android.util.Log // <-- Add this import
-import com.google.ar.core.Frame
-import com.google.ar.core.Session
-import com.hereliesaz.cuedetat.MainActivity
+import android.util.Log
+import com.google.ar.core.*
 import com.hereliesaz.cuedetat.ar.ARConstants
 import com.hereliesaz.cuedetat.ar.jetpack.helpers.DisplayRotationHelper
 import com.hereliesaz.cuedetat.ar.jetpack.rendering.*
-import com.hereliesaz.cuedetat.ar.jetpack.rendering.ObjectRenderer
 import com.hereliesaz.cuedetat.ui.state.UiState
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 class ArRenderer(
-    val activity: MainActivity,
     private val session: Session,
     private val displayRotationHelper: DisplayRotationHelper,
-    private val uiState: UiState
+    private val onTrackingStateChanged: (TrackingState, TrackingFailureReason?) -> Unit
 ) : GLSurfaceView.Renderer {
 
-    // ... (rest of the class properties are the same)
+    private var uiState: UiState = UiState()
+
     private val backgroundRenderer = BackgroundRenderer()
     private val tableRenderer = ObjectRenderer()
     private val cueBallRenderer = SphereRenderer()
     private val objectBallRenderer = SphereRenderer()
     private val shotLineRenderer = LineRenderer()
     private val objectBallPathRenderer = LineRenderer()
+    private val planeMarkerRenderer = SphereRenderer()
 
+    private var lastTrackedState: TrackingState? = null
+    private var lastFailureReason: TrackingFailureReason? = null
+
+    fun updateState(newState: UiState) {
+        this.uiState = newState
+    }
 
     override fun onSurfaceCreated(gl: GL10, config: EGLConfig) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
@@ -39,6 +43,7 @@ class ArRenderer(
         objectBallRenderer.createOnGlThread()
         shotLineRenderer.createOnGlThread()
         objectBallPathRenderer.createOnGlThread()
+        planeMarkerRenderer.createOnGlThread()
         session.setCameraTextureName(backgroundRenderer.textureId)
     }
 
@@ -54,39 +59,57 @@ class ArRenderer(
 
         val frame: Frame = try {
             session.update()
-        } catch (e: Exception) {
-            Log.e("ArRenderer", "Failed to update session", e)
+        } catch (t: Throwable) {
+            Log.e("ArRenderer", "Exception on ArCore session update", t)
             return
+        }
+
+        val camera = frame.camera
+
+        val currentTrackingState = camera.trackingState
+        val currentFailureReason = if (currentTrackingState == TrackingState.PAUSED) camera.trackingFailureReason else null
+        if (currentTrackingState != lastTrackedState || currentFailureReason != lastFailureReason) {
+            onTrackingStateChanged.invoke(currentTrackingState, currentFailureReason)
+            lastTrackedState = currentTrackingState
+            lastFailureReason = currentFailureReason
         }
 
         backgroundRenderer.draw(frame)
-        val camera = frame.camera
 
-        // *** THIS IS THE DEBUGGING LINE ***
-        Log.d("ArRenderer", "Camera Tracking State: ${camera.trackingState}")
-
-        if (camera.trackingState != com.google.ar.core.TrackingState.TRACKING) {
-            // If it's not tracking, we print the failure reason to understand why.
-            if(camera.trackingState == com.google.ar.core.TrackingState.PAUSED) {
-                Log.d("ArRenderer", "Tracking Failure Reason: ${camera.trackingFailureReason}")
-            }
+        if (camera.trackingState == TrackingState.PAUSED) {
             return
         }
-
-        // ... (rest of the drawing logic remains the same)
 
         val projmtx = FloatArray(16)
         camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f)
         val viewmtx = FloatArray(16)
         camera.getViewMatrix(viewmtx, 0)
 
+        if (uiState.table == null) {
+            val planes = session.getAllTrackables(Plane::class.java)
+            for (plane in planes) {
+                if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
+                    val modelMatrix = FloatArray(16)
+                    plane.centerPose.toMatrix(modelMatrix, 0)
+                    Matrix.scaleM(modelMatrix, 0, 0.02f, 0.02f, 0.02f)
+                    planeMarkerRenderer.draw(
+                        modelMatrix = modelMatrix,
+                        viewMatrix = viewmtx,
+                        projectionMatrix = projmtx,
+                        color = floatArrayOf(0.0f, 0.5f, 1.0f, 0.5f)
+                    )
+                }
+            }
+        }
+
         val ballScale = ARConstants.BALL_RADIUS * 2
 
         uiState.table?.let { tableAnchor ->
-            val tableWidth = ARConstants.TABLE_WIDTH
-            val tableDepth = ARConstants.TABLE_DEPTH
+            if (tableAnchor.trackingState != TrackingState.TRACKING) return@let
             val tableModelMatrix = FloatArray(16)
             tableAnchor.pose.toMatrix(tableModelMatrix, 0)
+            val tableWidth = ARConstants.TABLE_WIDTH
+            val tableDepth = ARConstants.TABLE_DEPTH
             Matrix.scaleM(tableModelMatrix, 0, tableWidth, ARConstants.TABLE_HEIGHT, tableDepth)
 
             tableRenderer.draw(
@@ -107,7 +130,7 @@ class ArRenderer(
             shotLineRenderer.draw(
                 viewMatrix = viewmtx,
                 projectionMatrix = projmtx,
-                color = floatArrayOf(1.0f, 1.0f, 1.0f, 0.8f) // Translucent white
+                color = floatArrayOf(1.0f, 1.0f, 1.0f, 0.8f)
             )
             val direction = FloatArray(3).apply {
                 this[0] = objectBallPosition[0] - cueBallPosition[0]
@@ -115,9 +138,11 @@ class ArRenderer(
                 this[2] = objectBallPosition[2] - cueBallPosition[2]
             }
             val length = Matrix.length(direction[0], direction[1], direction[2])
-            direction[0] /= length
-            direction[1] /= length
-            direction[2] /= length
+            if (length > 0) {
+                direction[0] /= length
+                direction[1] /= length
+                direction[2] /= length
+            }
             val endPoint = FloatArray(3).apply {
                 this[0] = objectBallPosition[0] + direction[0] * 2.0f
                 this[1] = objectBallPosition[1]
@@ -127,33 +152,35 @@ class ArRenderer(
             objectBallPathRenderer.draw(
                 viewMatrix = viewmtx,
                 projectionMatrix = projmtx,
-                color = floatArrayOf(1.0f, 0.84f, 0.0f, 0.8f) // Translucent yellow
+                color = floatArrayOf(1.0f, 0.84f, 0.0f, 0.8f)
             )
         }
 
-        cueBallPose?.let { pose ->
+        uiState.cueBall?.let { anchor ->
+            if (anchor.trackingState != TrackingState.TRACKING) return@let
             val modelMatrix = FloatArray(16)
-            pose.toMatrix(modelMatrix, 0)
+            anchor.pose.toMatrix(modelMatrix, 0)
             Matrix.scaleM(modelMatrix, 0, ballScale, ballScale, ballScale)
 
             cueBallRenderer.draw(
                 modelMatrix = modelMatrix,
                 viewMatrix = viewmtx,
                 projectionMatrix = projmtx,
-                color = floatArrayOf(1.0f, 1.0f, 1.0f, 1.0f) // White
+                color = floatArrayOf(1.0f, 1.0f, 1.0f, 1.0f)
             )
         }
 
-        objectBallPose?.let { pose ->
+        uiState.objectBall?.let { anchor ->
+            if (anchor.trackingState != TrackingState.TRACKING) return@let
             val modelMatrix = FloatArray(16)
-            pose.toMatrix(modelMatrix, 0)
+            anchor.pose.toMatrix(modelMatrix, 0)
             Matrix.scaleM(modelMatrix, 0, ballScale, ballScale, ballScale)
 
             objectBallRenderer.draw(
                 modelMatrix = modelMatrix,
                 viewMatrix = viewmtx,
                 projectionMatrix = projmtx,
-                color = floatArrayOf(1.0f, 0.84f, 0.0f, 1.0f) // Yellow/Gold
+                color = floatArrayOf(1.0f, 0.84f, 0.0f, 1.0f)
             )
         }
     }

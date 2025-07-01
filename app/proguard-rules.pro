@@ -16,3 +16,7 @@
 -keep class dagger.hilt.internal.aggregatedroot.AggregatedRoot { *; }
 -keep class **_Factory { *; }
 -keep class **_MembersInjector { *; }
+-keep class com.google.android.gms.common.** { *; }
+-keep class com.google.android.gms.location.** { *; }
+-keep class com.google.android.gms.auth.** { *; }
+-keep class com.google.android.gms.tasks.** { *; }

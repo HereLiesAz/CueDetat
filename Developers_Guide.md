@@ -209,9 +209,43 @@ All 3D model loading logic must be updated. The Sceneform `ModelRenderable.build
 
 Finally, all AR-specific logic must be migrated to the new `ARCore for Jetpack XR` APIs. This centralizes AR functionality that was previously spread across different parts of the Sceneform and ARCore libraries. Plane detection, hit testing against real-world geometry, and the creation and management of persistent anchors are now all accessed through methods on the core `Session` object. This provides a unified and consistent API surface for all world-sensing capabilities. The migration also requires ensuring the `AndroidManifest.xml` contains the necessary permissions, such as `android.permission.SCENE_UNDERSTANDING_COARSE` for plane detection and `android.permission.HAND_TRACKING` for hand-based interactions.
 
-## Part 4: Advanced Implementation and Strategic Best Practices
+---
 
-Migrating an application to Android XR involves more than a one-to-one translation of features. To build a truly robust, performant, and maintainable spatial application, it is essential to address cross-cutting architectural concerns. This section details best practices for state management, input handling, and performance optimization, which are critical for ensuring the quality and longevity of the refactored application.
+### **Part 3.5: Navigating Common Migration Pitfalls and Debugging Runtime Issues**
+
+While the phased blueprint represents the ideal path, the practical reality of migrating a legacy application often involves navigating a series of non-obvious runtime issues. This section documents common problems encountered when bridging older AR implementations with the modern Android XR stack, providing concrete diagnostic techniques and robust solutions.
+
+#### **Pitfall 1: The Lifecycle Race Condition (`SessionPausedException`)**
+
+A frequent and critical issue when integrating a traditional `GLSurfaceView` into Jetpack Compose is a lifecycle mismatch that results in a `com.google.ar.core.exceptions.SessionPausedException`.
+
+* **Symptom**: The application crashes on startup or resume. Logcat reveals the renderer thread is attempting to call `session.update()` while the ARCore `Session` is in a `PAUSED` state.
+* **Root Cause**: This is a race condition between two different lifecycle management systems. The `Activity`'s `onResume()` callback resumes the ARCore `Session`. Separately, the `GLSurfaceView` within the Compose UI has its own lifecycle, which, if managed by a `DisposableEffect`, is also resumed when the composable enters the screen. The timing of these two `resume` calls is not guaranteed to be synchronized. If the `Activity` is paused and resumed quickly, or due to other system events, the `GLSurfaceView`'s rendering thread may start and call `session.update()` before the `Activity` has had a chance to fully resume the session, leading to the crash.
+* **Robust Solution**: The only way to guarantee the correct execution order is to centralize the lifecycle management. The `GLSurfaceView` instance must be owned by the `Activity`, not created within the composable. The `Activity`'s `onResume()` and `onPause()` methods should then explicitly call `onResume()` and `onPause()` on both the `Session` and the `GLSurfaceView` instances, in the correct order. The composable (`MainScreen`) is then simply passed the pre-initialized `GLSurfaceView` to be displayed via an `AndroidView`.
+
+#### **Pitfall 2: Tracking Failures ("Not Scanning for Surfaces")**
+
+A common developer experience is seeing the camera feed but no indication that ARCore is tracking the environment (i.e., no feature points or "dots" appear). This indicates the `Session` has failed to enter the `TRACKING` state.
+
+* **Diagnostic Technique**: The most effective way to debug this is to add logging directly to the `ArRenderer.onDrawFrame` method. On every frame, log the camera's tracking status: `Log.d("AR_DEBUG", "State: ${camera.trackingState}, Reason: ${camera.trackingFailureReason}")`. This will immediately reveal *why* tracking is failing.
+* **Common Failure Reasons & Solutions**:
+  * `INSUFFICIENT_FEATURES`: The camera is pointed at a surface without enough texture (a blank white wall, a glossy table). The solution is to move the camera to view a more detailed area. The UI should display this instruction to the user.
+  * `INSUFFICIENT_LIGHT`: The environment is too dark for the camera to see features. The UI should instruct the user to move to a brighter space.
+  * `EXCESSIVE_MOTION`: The device is being moved too quickly. The UI should instruct the user to move the device more slowly.
+* **Configuration-Based Solutions**: Logcat analysis can reveal deeper configuration issues.
+  * **Depth Errors**: If the logs show `NOT_FOUND: Not able to find any depth measurements`, this indicates a failure in the internal motion tracking algorithm. This can often be resolved by explicitly setting a depth mode in the `Session` configuration: `config.depthMode = Config.DepthMode.AUTOMATIC`.
+  * **Missing API Key**: A warning `The API key ... could not be obtained!` should be addressed. While not always the direct cause of tracking failure, it can prevent certain services from initializing correctly. The solution is to add the ARCore API Key to the `AndroidManifest.xml` via a `<meta-data>` tag.
+
+#### **Pitfall 3: UI Layering and Event conflicts**
+
+When overlaying Jetpack Compose UI on top of an AR view, conflicts can arise.
+
+* **Event Interception**: A composable that covers the screen, such as `ModalNavigationDrawer`, can intercept touch events intended for the underlying AR view (`GLSurfaceView`). The solution is to ensure the correct UI hierarchy. The screen's primary content (including the AR view) must be placed within the `content` lambda of the `ModalNavigationDrawer`, not as a sibling to it.
+* **Conditional UI Logic**: Complex `if-else if-else` chains used to show or hide UI based on state can easily lead to bugs. For instance, a button that is intended to toggle between "AR Mode" and "Manual Mode" might accidentally be hidden in one of those states due to a faulty condition. Simplifying conditional logic and carefully testing all state transitions is essential.
+
+---
+
+## Part 4: Advanced Implementation and Strategic Best Practices
 
 ### 4.1 State Management for a Declarative Spatial UI
 
@@ -239,9 +273,9 @@ Performance in XR is paramount. Unlike traditional apps where a stutter might be
 
 * **Performance Tools and Metrics**: The Android XR platform provides tools for performance analysis. Through OpenXR extensions, an application can query runtime performance metrics, including CPU and GPU frame times, hardware utilization percentages, and the current frames per second (FPS). This data is invaluable for identifying bottlenecks. For UI layout issues, the **Layout Inspector** in the preview versions of Android Studio has been updated to support spatialized UI components. It allows developers to visualize the 3D hierarchy of `SpatialPanel`s and other elements, making it possible to debug complex spatial layouts that would otherwise be opaque.
 * **Optimization Techniques**:
-    * **Compose Recomposition**: Standard Jetpack Compose performance best practices are directly applicable and even more crucial in XR. This includes ensuring that state objects passed to composables are stable (preferably immutable data classes) to allow Compose to intelligently skip recompositions. For state that is derived from other state, using `remember { derivedStateOf {... } }` can prevent expensive recalculations on every frame.
-    * **Lazy Layouts**: When displaying long, scrollable lists of content within a `SpatialPanel`, it is essential to use `LazyColumn` or `LazyRow`. These composables perform "virtualization," meaning they only compose and render the items currently visible to the user, preventing the performance cost of rendering hundreds or thousands of items at once.
-    * **Leveraging Hardware Features**: The underlying OpenXR platform exposes powerful hardware-level performance features that applications can leverage. These include **eye-tracked foveated rendering**, a technique that renders the scene at high resolution only at the user's focal point and at lower resolution in the periphery, significantly reducing the GPU load. Another key feature is **SpaceWarp**, which uses motion vectors and depth data to computationally generate intermediate frames, effectively doubling the perceived frame rate and smoothing out performance hiccups. While these are lower-level features, their support in the runtime is a key benefit of the platform.
+  * **Compose Recomposition**: Standard Jetpack Compose performance best practices are directly applicable and even more crucial in XR. This includes ensuring that state objects passed to composables are stable (preferably immutable data classes) to allow Compose to intelligently skip recompositions. For state that is derived from other state, using `remember { derivedStateOf {... } }` can prevent expensive recalculations on every frame.
+  * **Lazy Layouts**: When displaying long, scrollable lists of content within a `SpatialPanel`, it is essential to use `LazyColumn` or `LazyRow`. These composables perform "virtualization," meaning they only compose and render the items currently visible to the user, preventing the performance cost of rendering hundreds or thousands of items at once.
+  * **Leveraging Hardware Features**: The underlying OpenXR platform exposes powerful hardware-level performance features that applications can leverage. These include **eye-tracked foveated rendering**, a technique that renders the scene at high resolution only at the user's focal point and at lower resolution in the periphery, significantly reducing the GPU load. Another key feature is **SpaceWarp**, which uses motion vectors and depth data to computationally generate intermediate frames, effectively doubling the perceived frame rate and smoothing out a performance hiccups. While these are lower-level features, their support in the runtime is a key benefit of the platform.
 
 ## Conclusion and Strategic Roadmap
 
@@ -254,4 +288,4 @@ The core of this migration involves embracing three key architectural transforma
 
 By following the phased migration plan—establishing the core `Session`, spatializing the UI, and rebuilding the 3D/AR logic—development teams can systematically tackle this complex transition. The process provides a crucial opportunity to enforce modern architectural best practices, particularly a clean, unidirectional data flow with `ViewModel`s as the single source of truth, which is essential for the stability of a declarative UI.
 
-Looking forward, this architectural transformation positions the application to seamlessly integrate future advancements within the Android XR ecosystem. As Google continues to enhance the platform, features such as the direct integration of on-device Gemini AI models for intelligent interaction, more sophisticated world-sensing capabilities, and support for new input modalities can be incorporated into this clean, modular architecture with greater ease. The result of this refactoring effort is not merely a ported application, but an application that is architecturally sound, aligned with industry standards, and strategically prepared to thrive in the evolving landscape of spatial computi
+Looking forward, this architectural transformation positions the application to seamlessly integrate future advancements within the Android XR ecosystem. As Google continues to enhance the platform, features such as the direct integration of on-device Gemini AI models for intelligent interaction, more sophisticated world-sensing capabilities, and support for new input modalities can be incorporated into this clean, modular architecture with greater ease. The result of this refactoring effort is not merely a ported application, but an application that is architecturally sound, aligned with industry standards, and strategically prepared to thrive in the evolving landscape of spatial computing.
