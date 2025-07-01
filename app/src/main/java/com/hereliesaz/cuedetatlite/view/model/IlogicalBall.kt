@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/view/model/ILogicalBall.kt
 package com.hereliesaz.cuedetatlite.view.model
 
 import android.graphics.PointF

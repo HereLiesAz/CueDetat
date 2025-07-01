@@ -6,6 +6,8 @@ import android.graphics.PointF
 import com.hereliesaz.cuedetatlite.view.PaintCache
 import com.hereliesaz.cuedetatlite.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
+import com.hereliesaz.cuedetatlite.view.state.ScreenState
+
 import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -19,7 +21,7 @@ class LineRenderer(
         canvas.save()
         canvas.concat(state.pitchMatrix)
 
-        if (state.screenState.isProtractorMode) {
+        if (ScreenState.isProtractorMode) {
             drawProtractorLines(canvas, state)
         } else {
             drawBankingLines(canvas, state)

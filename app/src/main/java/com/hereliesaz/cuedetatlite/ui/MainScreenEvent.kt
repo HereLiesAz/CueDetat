@@ -13,4 +13,6 @@ sealed class MainScreenEvent {
     data class OnUpdate(val permissionGranted: Boolean) : MainScreenEvent()
     object OnUpdateDismissed : MainScreenEvent()
     object OnDownloadClicked : MainScreenEvent()
+    object Reset : MainScreenEvent()
+    object ToggleActualCueBall : MainScreenEvent()
 }

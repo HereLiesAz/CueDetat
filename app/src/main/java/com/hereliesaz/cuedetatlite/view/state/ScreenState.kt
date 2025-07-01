@@ -2,8 +2,8 @@
 package com.hereliesaz.cuedetatlite.view.state
 
 import android.graphics.PointF
-import com.hereliesaz.cuedetatlite.domain.WarningText
-import com.hereliesaz.cuedetatlite.view.model.IlogicalBall
+import com.hereliesaz.cuedetatlite.domain.WarningManager
+import com.hereliesaz.cuedetatlite.view.model.ILogicalBall
 import com.hereliesaz.cuedetatlite.view.model.ProtractorUnit
 import com.hereliesaz.cuedetatlite.view.model.TableModel
 
