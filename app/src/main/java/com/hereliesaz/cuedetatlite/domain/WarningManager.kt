@@ -1,32 +1,17 @@
+// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/domain/WarningManager.kt
 package com.hereliesaz.cuedetatlite.domain
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import javax.inject.Inject
+import com.hereliesaz.cuedetatlite.view.state.ScreenState
 
-class WarningManager @Inject constructor() {
-
-    private var warningIndex = 0
-    private var warningDismissJob: Job? = null
-
-    private val _currentWarning = MutableStateFlow<String?>(null)
-    val currentWarning = _currentWarning.asStateFlow()
-
-    fun triggerWarning(warnings: Array<String>, scope: CoroutineScope) {
-        warningDismissJob?.cancel()
-        _currentWarning.value = warnings[warningIndex]
-        warningIndex = (warningIndex + 1) % warnings.size
-        warningDismissJob = scope.launch {
-            delay(3000L)
-            dismissWarning()
+class WarningManager {
+    /**
+     * Determines the appropriate warning text based on the current screen state.
+     */
+    fun getWarning(state: ScreenState): WarningText? {
+        return when {
+            state.isImpossibleShot -> WarningText.IMPOSSIBLE_SHOT
+            // Add other conditions for different warnings here
+            else -> null
         }
-    }
-
-    private fun dismissWarning() {
-        _currentWarning.value = null
     }
 }
