@@ -3,7 +3,10 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!-- This is the ONLY feature tag needed for a standard ARCore app. -->
-    <uses-feature android:name="android.hardware.camera.ar" android:required="true" />
+    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
 
     <!-- Required for AR passthrough -->
     <uses-permission android:name="android.permission.CAMERA" />

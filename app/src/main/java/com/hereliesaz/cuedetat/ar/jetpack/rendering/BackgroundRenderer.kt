@@ -119,6 +119,7 @@ class BackgroundRenderer {
         """
 
         private const val FRAGMENT_SHADER = """
+            #extension GL_OES_EGL_image_external : require
             precision mediump float;
             uniform samplerExternalOES u_Texture;
             varying vec2 v_TexCoord;

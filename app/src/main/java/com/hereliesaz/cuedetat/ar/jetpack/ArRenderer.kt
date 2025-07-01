@@ -20,13 +20,15 @@ class ArRenderer(
 
     private var uiState: UiState = UiState()
 
+    // Renderers
     private val backgroundRenderer = BackgroundRenderer()
+    private val pointCloudRenderer = PointCloudRenderer() // New
+    private val planeRenderer = PlaneRenderer()           // New
     private val tableRenderer = ObjectRenderer()
     private val cueBallRenderer = SphereRenderer()
     private val objectBallRenderer = SphereRenderer()
     private val shotLineRenderer = LineRenderer()
     private val objectBallPathRenderer = LineRenderer()
-    private val planeMarkerRenderer = SphereRenderer()
 
     private var lastTrackedState: TrackingState? = null
     private var lastFailureReason: TrackingFailureReason? = null
@@ -38,12 +40,13 @@ class ArRenderer(
     override fun onSurfaceCreated(gl: GL10, config: EGLConfig) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
         backgroundRenderer.createOnGlThread()
+        pointCloudRenderer.createOnGlThread() // New
+        planeRenderer.createOnGlThread()      // New
         tableRenderer.createOnGlThread()
         cueBallRenderer.createOnGlThread()
         objectBallRenderer.createOnGlThread()
         shotLineRenderer.createOnGlThread()
         objectBallPathRenderer.createOnGlThread()
-        planeMarkerRenderer.createOnGlThread()
         session.setCameraTextureName(backgroundRenderer.textureId)
     }
 
@@ -85,22 +88,25 @@ class ArRenderer(
         val viewmtx = FloatArray(16)
         camera.getViewMatrix(viewmtx, 0)
 
-        if (uiState.table == null) {
-            val planes = session.getAllTrackables(Plane::class.java)
-            for (plane in planes) {
-                if (plane.trackingState == TrackingState.TRACKING && plane.subsumedBy == null) {
-                    val modelMatrix = FloatArray(16)
-                    plane.centerPose.toMatrix(modelMatrix, 0)
-                    Matrix.scaleM(modelMatrix, 0, 0.02f, 0.02f, 0.02f)
-                    planeMarkerRenderer.draw(
-                        modelMatrix = modelMatrix,
-                        viewMatrix = viewmtx,
-                        projectionMatrix = projmtx,
-                        color = floatArrayOf(0.0f, 0.5f, 1.0f, 0.5f)
-                    )
-                }
-            }
+        val viewProjMtx = FloatArray(16)
+        Matrix.multiplyMM(viewProjMtx, 0, projmtx, 0, viewmtx, 0)
+
+        // Draw the feature points
+        frame.acquirePointCloud().use { pointCloud ->
+            pointCloudRenderer.update(pointCloud)
+            pointCloudRenderer.draw(viewProjMtx)
         }
+
+        // Draw the planes if a table hasn't been placed yet
+        if (uiState.table == null) {
+            planeRenderer.drawPlanes(
+                session.getAllTrackables(Plane::class.java),
+                viewmtx,
+                projmtx
+            )
+        }
+
+        // --- All the ball, table, and line rendering logic remains the same below ---
 
         val ballScale = ARConstants.BALL_RADIUS * 2
 

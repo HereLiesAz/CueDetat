@@ -114,6 +114,7 @@ class MainActivity : ComponentActivity() {
             config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
             config.lightEstimationMode = Config.LightEstimationMode.AMBIENT_INTENSITY
             config.depthMode = Config.DepthMode.AUTOMATIC
+            config.depthMode = Config.DepthMode.AUTOMATIC
             arSession?.configure(config)
 
             glSurfaceView = GLSurfaceView(this).apply {
