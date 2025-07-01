@@ -91,6 +91,12 @@ dependencies {
     // ARCore
     implementation(libs.arcore.client)
 
+    // Android XR Dependencies (New)
+    val xrVersion = "1.0.0-alpha04"
+    implementation("androidx.xr.scenecore:scenecore:$xrVersion")
+    implementation("androidx.xr.compose:compose:$xrVersion")
+    implementation("androidx.xr.runtime:runtime-openxr:$xrVersion")
+    implementation("androidx.xr.arcore:arcore:$xrVersion")
 
     // Test
     testImplementation(libs.junit)
