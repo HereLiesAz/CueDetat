@@ -8,11 +8,11 @@ plugins {
 
 android {
 
-    namespace = "com.hereliesaz.cuedetat"
+    namespace = "com.hereliesaz.cuedetatlite"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.hereliesaz.cuedetat"
+        applicationId = "com.hereliesaz.cuedetatlite"
         minSdk = 26
         targetSdk = 36
         versionCode = 15
