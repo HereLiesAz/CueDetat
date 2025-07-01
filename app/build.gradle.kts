@@ -141,11 +141,18 @@ android {
         debugImplementation(libs.androidx.ui.test.manifest)
         implementation(libs.material)
         implementation(libs.androidx.material.icons.extended)
-
+        implementation(libs.material3)
+        implementation(libs.hilt.android)
+        kapt(libs.hilt.compiler)
+        implementation(libs.androidx.hilt.navigation.compose)
+        implementation(libs.accompanist.permissions)
+        implementation(libs.androidx.lifecycle.viewmodel.compose)
+        implementation(libs.androidx.lifecycle.runtime.compose)
+        implementation(libs.androidx.core.splashscreen)
+        implementation(libs.retrofit)
+        implementation(libs.converter.gson)
+        implementation(libs.ui)
     }
-}
-dependencies {
-    implementation(libs.ui)
 }
 
 kapt {

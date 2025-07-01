@@ -1,8 +1,13 @@
+// app/src/main/java/com/hereliesaz/cuedetat/view/model/ILogicalBall.kt
 package com.hereliesaz.cuedetatlite.view.model
 
 import android.graphics.PointF
 
+/**
+ * Interface for objects that represent a ball in the logical (table) space.
+ * 'logicalPosition' here refers to the center of the ball in the logical coordinate system.
+ */
 interface ILogicalBall {
-    val center: PointF
-    val radius: Float
+    val logicalPosition: PointF // The logical (table-space) center of the ball
+    val radius: Float // The radius of the ball in logical units
 }
