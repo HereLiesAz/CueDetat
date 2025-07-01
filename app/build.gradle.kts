@@ -60,6 +60,7 @@ dependencies {
     // Required for Kotlin
     implementation(libs.kotlinx.coroutines.guava)
     implementation(libs.sceneform.base)
+    implementation(libs.androidx.graphics.shapes)
 
     // Use to write unit tests
     testImplementation(libs.androidx.scenecore.testing)
@@ -73,6 +74,11 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.material.icons.extended)
+    implementation(libs.androidx.material.icons.core)
+    implementation(libs.androidx.adaptive)
+    implementation(libs.androidx.adaptive.layout)
+    implementation(libs.androidx.adaptive.navigation)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
