@@ -4,6 +4,7 @@ import android.opengl.GLES20
 import android.opengl.Matrix
 import com.hereliesaz.cuedetat.ar.jetpack.rendering.ShaderUtil.checkGLError
 import com.hereliesaz.cuedetat.ar.jetpack.rendering.ShaderUtil.loadGLShader
+import com.hereliesaz.cuedetat.ar.jetpack.rendering.ObjectRenderer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
