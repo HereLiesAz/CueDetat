@@ -31,10 +31,10 @@
 -keep interface okio.** { *; }
 
 # Keep your GithubApi interface and its methods
--keep interface com.hereliesaz.cuedetat.network.GithubApi { *; }
+-keep interface com.hereliesaz.cuedetatlite.network.GithubApi { *; }
 # Keep your GithubRelease data class and its members if used directly by Gson
--keep class com.hereliesaz.cuedetat.network.GithubRelease { *; }
--keepclassmembers class com.hereliesaz.cuedetat.network.GithubRelease {
+-keep class com.hereliesaz.cuedetatlite.network.GithubRelease { *; }
+-keepclassmembers class com.hereliesaz.cuedetatlite.network.GithubRelease {
     <fields>;
     <init>(...);
 }
