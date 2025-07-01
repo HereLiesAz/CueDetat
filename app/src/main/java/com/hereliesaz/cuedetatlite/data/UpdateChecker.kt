@@ -1,6 +1,9 @@
 package com.hereliesaz.cuedetatlite.data
 
 import com.hereliesaz.cuedetatlite.BuildConfig
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,26 +29,30 @@ sealed class UpdateResult {
 @Singleton
 class UpdateChecker @Inject constructor(private val githubRepository: GithubRepository) {
 
+    private val _updateResult = MutableStateFlow<UpdateResult>(UpdateResult.UpToDate)
+    val updateResult: StateFlow<UpdateResult> = _updateResult.asStateFlow()
+
+    private var latestVersionUrl: String? = null
+
     /**
-     * Checks for a new application version on GitHub.
-     * @return An [UpdateResult] indicating the outcome of the check.
+     * Checks for a new application version on GitHub and updates the public StateFlow.
      */
-    suspend fun checkForUpdate(): UpdateResult {
+    suspend fun checkForUpdate() {
         val versionResult = githubRepository.getLatestVersion()
         val currentVersion = BuildConfig.VERSION_NAME
 
-        return when (versionResult) {
+        _updateResult.value = when (versionResult) {
             is VersionResult.Success -> {
                 val comparableLatestVersion = versionResult.tagName.removePrefix("v")
                 if (comparableLatestVersion == currentVersion) {
                     UpdateResult.UpToDate
                 } else {
+                    latestVersionUrl = "https://github.com/hereliesaz/CueDetat/releases/latest"
                     UpdateResult.UpdateAvailable(versionResult.tagName)
                 }
             }
 
             is VersionResult.Failure -> {
-                // Provide a more descriptive reason based on the HTTP code.
                 val reason = if (versionResult.code == 404) {
                     "No public release found."
                 } else {
@@ -58,5 +65,12 @@ class UpdateChecker @Inject constructor(private val githubRepository: GithubRepo
                 UpdateResult.CheckFailed("A network error occurred.")
             }
         }
+    }
+
+    /**
+     * Returns the URL for the latest release if one is available.
+     */
+    fun getLatestReleaseUrl(): String? {
+        return latestVersionUrl
     }
 }

@@ -1,4 +1,3 @@
-// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/ui/MainScreenEvent.kt
 package com.hereliesaz.cuedetatlite.ui
 
 import android.graphics.PointF
@@ -27,4 +26,10 @@ sealed class MainScreenEvent {
     object ToggleSpatialLock : MainScreenEvent()
     object DismissUpdateDialog : MainScreenEvent()
     object DownloadUpdate : MainScreenEvent()
+    // ADDED a toggle for the aiming ball, which was missing.
+    object ToggleActualCueBall : MainScreenEvent()
+    // ADDED events for meta menu items
+    object ViewArt : MainScreenEvent()
+    object ShowDonationOptions : MainScreenEvent()
+    object CheckForUpdate : MainScreenEvent()
 }

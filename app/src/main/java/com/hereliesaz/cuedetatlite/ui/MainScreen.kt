@@ -1,16 +1,15 @@
 package com.hereliesaz.cuedetatlite.ui
 
-import android.app.Activity
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.cuedetatlite.ui.composables.*
 import com.hereliesaz.cuedetatlite.view.ProtractorOverlayView
-import com.hereliesaz.cuedetatlite.view.state.OverlayState
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -24,6 +23,9 @@ fun MainScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
+    // FIX: Call isSystemInDarkTheme() in a Composable context
+    val systemIsDark = isSystemInDarkTheme()
+
     // Update available dialog
     if (uiState.isUpdateAvailable) {
         UpdateAvailableDialog(
@@ -35,58 +37,68 @@ fun MainScreen(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            MenuDrawer(
-                onActionSelected = { action ->
-                    coroutineScope.launch { drawerState.close() }
-                    // Handle menu actions here, mapping them to events
-                    when (action) {
-                        MenuAction.TOGGLE_HELP -> viewModel.onEvent(MainScreenEvent.ToggleHelp)
-                        MenuAction.FORCE_LIGHT_MODE -> viewModel.onEvent(MainScreenEvent.ForceLightMode(!(uiState.isForceLightMode ?: false)))
-                        MenuAction.SHOW_LUMINANCE_DIALOG -> viewModel.onEvent(MainScreenEvent.ShowLuminanceDialog)
-                        MenuAction.START_TUTORIAL -> viewModel.onEvent(MainScreenEvent.StartTutorial)
-                        MenuAction.TOGGLE_BANKING_MODE -> viewModel.onEvent(MainScreenEvent.ToggleBankingMode)
-                    }
-                }
+            // FIX: Use the correct MenuDrawerContent composable
+            MenuDrawerContent(
+                uiState = overlayState,
+                onEvent = viewModel::onEvent, // Pass the event handler
+                onCloseDrawer = { coroutineScope.launch { drawerState.close() } }
             )
         }
     ) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
+                // FIX: Corrected parameters for TopControls
                 TopControls(
-                    onAction = { action ->
-                        when(action) {
-                            MenuAction.OPEN_DRAWER -> coroutineScope.launch { drawerState.open() }
-                            else -> { /* Other top bar actions if any */ }
-                        }
-                    },
-                    uiState = uiState
+                    uiState = overlayState,
+                    onMenuClick = { coroutineScope.launch { drawerState.open() } }
                 )
             },
             floatingActionButton = {
-                ActionFabs(
-                    onUndo = { viewModel.onEvent(MainScreenEvent.Reset) },
-                    onRedo = { viewModel.onEvent(MainScreenEvent.Redo) },
-                    onJumpShot = { viewModel.onEvent(MainScreenEvent.JumpShot) },
-                    uiState = uiState
-                )
-            }
+                // FIX: ActionFabs was split into multiple composables
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 32.dp, end = 32.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    ToggleCueBallFab(
+                        uiState = overlayState,
+                        onEvent = viewModel::onEvent
+                    )
+                    ResetFab(
+                        uiState = overlayState,
+                        onEvent = viewModel::onEvent
+                    )
+                }
+            },
+            // FIX: Position FABs correctly
+            floatingActionButtonPosition = FabPosition.Center
         ) { paddingValues ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                val activity = LocalContext.current as Activity
-                CameraBackground(activity = activity)
+                // FIX: CameraBackground no longer needs activity param
+                CameraBackground(modifier = Modifier.fillMaxSize())
 
-                ProtractorOverlayView(
-                    overlayState = overlayState,
-                    onEvent = viewModel::onEvent,
-                    modifier = Modifier.fillMaxSize()
+                // FIX: Correctly set up the AndroidView wrapper
+                AndroidView(
+                    factory = { context ->
+                        ProtractorOverlayView(context).apply {
+                            this.onEvent = { event ->
+                                viewModel.onEvent(event)
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    update = { view ->
+                        view.updateState(overlayState, systemIsDark)
+                    }
                 )
 
-                KineticWarning(warningText = uiState.warningMessage)
+                // FIX: Correct parameter name for KineticWarning
+                KineticWarning(text = uiState.warningMessage)
 
                 if (uiState.showLuminanceDialog) {
                     AlertDialog(
@@ -110,7 +122,7 @@ fun MainScreen(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .padding(16.dp),
-                    uiState = uiState,
+                    uiState = overlayState,
                     onEvent = viewModel::onEvent
                 )
             }
