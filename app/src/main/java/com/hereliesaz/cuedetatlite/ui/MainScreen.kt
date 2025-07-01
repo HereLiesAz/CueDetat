@@ -1,7 +1,6 @@
 package com.hereliesaz.cuedetatlite.ui
 
-import android.Manifest
-import android.widget.Toast
+import android.app.Activity
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -9,132 +8,111 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
 import com.hereliesaz.cuedetatlite.ui.composables.*
-import com.hereliesaz.cuedetatlite.ui.theme.CueDetatTheme
-import com.hereliesaz.cuedetatlite.utils.ToastMessage
 import com.hereliesaz.cuedetatlite.view.ProtractorOverlayView
+import com.hereliesaz.cuedetatlite.view.state.OverlayState
 import kotlinx.coroutines.launch
-import com.hereliesaz.cuedetatlite.ui.composables.Action
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    viewModel: MainViewModel = hiltViewModel()
+    viewModel: MainViewModel
 ) {
-    val overlayState by viewModel.overlayState.collectAsStateWithLifecycle()
-    val kineticWarning by viewModel.kineticWarning.collectAsStateWithLifecycle()
-    val isUpdateAvailable by viewModel.isUpdateAvailable.collectAsStateWithLifecycle()
-    val toastMessage by viewModel.toastMessage.collectAsStateWithLifecycle()
-
+    val uiState by viewModel.uiState.collectAsState()
+    val overlayState by viewModel.overlayState.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
 
-    val cameraPermissionState = rememberPermissionState(permission = Manifest.permission.CAMERA)
-
-    toastMessage?.let { msg ->
-        val context = LocalContext.current
-        LaunchedEffect(msg) {
-            val toastText = when (msg) {
-                is ToastMessage.StringResource -> context.getString(msg.id, *msg.formatArgs.toTypedArray())
-                is ToastMessage.Text -> msg.text
-            }
-            Toast.makeText(context, toastText, Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    if (isUpdateAvailable != null) {
-        UpdateAvailableDialogue(
-            onDismiss = { viewModel.onEvent(MainScreenEvent.OnUpdateDismissed) },
-            onConfirm = { viewModel.onEvent(MainScreenEvent.OnDownloadClicked) }
+    // Update available dialog
+    if (uiState.isUpdateAvailable) {
+        UpdateAvailableDialog(
+            onDismiss = { viewModel.onEvent(MainScreenEvent.DismissUpdateDialog) },
+            onConfirm = { viewModel.onEvent(MainScreenEvent.DownloadUpdate) }
         )
     }
 
-    CueDetatTheme {
-        ModalNavigationDrawer(
-            drawerState = drawerState,
-            drawerContent = {
-                MenuDrawer(
-                    onAction = { action ->
-                        // Handle menu actions
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            MenuDrawer(
+                onActionSelected = { action ->
+                    coroutineScope.launch { drawerState.close() }
+                    // Handle menu actions here, mapping them to events
+                    when (action) {
+                        MenuAction.TOGGLE_HELP -> viewModel.onEvent(MainScreenEvent.ToggleHelp)
+                        MenuAction.FORCE_LIGHT_MODE -> viewModel.onEvent(MainScreenEvent.ForceLightMode(!(uiState.isForceLightMode ?: false)))
+                        MenuAction.SHOW_LUMINANCE_DIALOG -> viewModel.onEvent(MainScreenEvent.ShowLuminanceDialog)
+                        MenuAction.START_TUTORIAL -> viewModel.onEvent(MainScreenEvent.StartTutorial)
+                        MenuAction.TOGGLE_BANKING_MODE -> viewModel.onEvent(MainScreenEvent.ToggleBankingMode)
                     }
+                }
+            )
+        }
+    ) {
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            topBar = {
+                TopControls(
+                    onAction = { action ->
+                        when(action) {
+                            MenuAction.OPEN_DRAWER -> coroutineScope.launch { drawerState.open() }
+                            else -> { /* Other top bar actions if any */ }
+                        }
+                    },
+                    uiState = uiState
+                )
+            },
+            floatingActionButton = {
+                ActionFabs(
+                    onUndo = { viewModel.onEvent(MainScreenEvent.Reset) },
+                    onRedo = { viewModel.onEvent(MainScreenEvent.Redo) },
+                    onJumpShot = { viewModel.onEvent(MainScreenEvent.JumpShot) },
+                    uiState = uiState
                 )
             }
-        ) {
-            Scaffold(
-                topBar = {
-                    TopControls(
-                        onMenuClick = {
-                            scope.launch {
-                                drawerState.open()
-                            }
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                val activity = LocalContext.current as Activity
+                CameraBackground(activity = activity)
+
+                ProtractorOverlayView(
+                    overlayState = overlayState,
+                    onEvent = viewModel::onEvent,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                KineticWarning(warningText = uiState.warningMessage)
+
+                if (uiState.showLuminanceDialog) {
+                    AlertDialog(
+                        onDismissRequest = { viewModel.onEvent(MainScreenEvent.DismissLuminanceDialog) },
+                        title = { Text("Adjust Luminance") },
+                        text = {
+                            VerticalSlider(
+                                value = overlayState.luminanceAdjustment,
+                                onValueChange = { viewModel.onEvent(MainScreenEvent.LuminanceChanged(it)) }
+                            )
                         },
-                        onLightModeClick = { viewModel.onEvent(MainScreenEvent.OnForceLightMode(it)) },
-                        onHelpClick = {
-                            // Show help
+                        confirmButton = {
+                            Button(onClick = { viewModel.onEvent(MainScreenEvent.DismissLuminanceDialog) }) {
+                                Text("OK")
+                            }
                         }
                     )
-                },
-                floatingActionButton = {
-                    ActionFabs(
-                        onUndo = { viewModel.onEvent(MainScreenEvent.OnUndo) },
-                        onRedo = { viewModel.onEvent(MainScreenEvent.OnRedo) },
-                        onJumpShot = { viewModel.onEvent(MainScreenEvent.OnJumpShot) }
-                    )
                 }
-            ) { paddingValues ->
-                Box(
+
+                ZoomControls(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                ) {
-                    if (cameraPermissionState.status.isGranted) {
-                        CameraPreview(modifier = Modifier.fillMaxSize())
-                    } else {
-                        CameraBackground(
-                            onUpdate = {
-                                cameraPermissionState.launchPermissionRequest()
-                                viewModel.onEvent(MainScreenEvent.OnUpdate(cameraPermissionState.status.isGranted))
-                            }
-                        )
-                    }
-
-                    overlayState?.let {
-                        ProtractorOverlayView(
-                            overlayState = it,
-                            onEvent = viewModel::onEvent,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-
-                    kineticWarning?.let {
-                        KineticWarning(
-                            message = it,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 80.dp)
-                        )
-                    }
-
-                    VerticalSlider(
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .padding(end = 16.dp),
-                        onValueChange = { viewModel.onEvent(MainScreenEvent.OnLuminanceChange(it)) }
-                    )
-
-                    ZoomControls(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(bottom = 16.dp, end = 16.dp),
-                        onZoomIn = { viewModel.onEvent(MainScreenEvent.OnScale(1.1f)) },
-                        onZoomOut = { viewModel.onEvent(MainScreenEvent.OnScale(0.9f)) }
-                    )
-                }
+                        .align(Alignment.CenterEnd)
+                        .padding(16.dp),
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent
+                )
             }
         }
     }

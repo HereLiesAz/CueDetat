@@ -35,7 +35,7 @@ import kotlin.random.Random
 
 @OptIn(ExperimentalTextApi::class)
 @Composable
-fun KineticWarningOverlay(text: String?, modifier: Modifier = Modifier) {
+fun KineticWarning(text: String?, modifier: Modifier = Modifier) {
     // Generate a random alignment each time a new warning appears
     val randomAlignment = remember(text) {
         if (text == null) Alignment.Center else

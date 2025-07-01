@@ -4,10 +4,10 @@ package com.hereliesaz.cuedetatlite.view.renderer
 import android.graphics.Canvas
 import android.graphics.PointF
 import com.hereliesaz.cuedetatlite.view.PaintCache
+import com.hereliesaz.cuedetatlite.view.model.TableModel
 import com.hereliesaz.cuedetatlite.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
 import com.hereliesaz.cuedetatlite.view.state.ScreenState
-
 import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -17,50 +17,50 @@ class LineRenderer(
     private val lineTextRenderer: LineTextRenderer
 ) {
 
-    fun draw(canvas: Canvas, state: OverlayState) {
+    fun draw(canvas: Canvas, screenState: ScreenState, overlayState: OverlayState) {
         canvas.save()
-        canvas.concat(state.pitchMatrix)
+        canvas.concat(overlayState.pitchMatrix)
 
-        if (ScreenState.isProtractorMode) {
-            drawProtractorLines(canvas, state)
+        if (screenState.isProtractorMode) {
+            drawProtractorLines(canvas, screenState)
         } else {
-            drawBankingLines(canvas, state)
+            drawBankingLines(canvas, screenState)
         }
 
         canvas.restore()
     }
 
-    private fun drawProtractorLines(canvas: Canvas, state: OverlayState) {
-        val protractorUnit = state.screenState.protractorUnit
+    private fun drawProtractorLines(canvas: Canvas, screenState: ScreenState) {
+        val protractorUnit = screenState.protractorUnit
 
         // Aiming line
         canvas.drawLine(
-            protractorUnit.targetBall.center.x,
-            protractorUnit.targetBall.center.y,
-            protractorUnit.cueBall.center.x,
-            protractorUnit.cueBall.center.y,
+            protractorUnit.targetBall.logicalPosition.x,
+            protractorUnit.targetBall.logicalPosition.y,
+            protractorUnit.cueBall.logicalPosition.x,
+            protractorUnit.cueBall.logicalPosition.y,
             paintCache.greenPaint
         )
 
         // Shot line
-        state.screenState.actualCueBall?.let { actualCueBall ->
-            if (state.screenState.showActualCueBall) {
-                val dx = protractorUnit.cueBall.center.x - actualCueBall.center.x
-                val dy = protractorUnit.cueBall.center.y - actualCueBall.center.y
+        screenState.actualCueBall?.let { actualCueBall ->
+            if (screenState.showActualCueBall) {
+                val dx = protractorUnit.cueBall.logicalPosition.x - actualCueBall.logicalPosition.x
+                val dy = protractorUnit.cueBall.logicalPosition.y - actualCueBall.logicalPosition.y
                 canvas.drawLine(
-                    actualCueBall.center.x,
-                    actualCueBall.center.y,
-                    actualCueBall.center.x + dx * 10,
-                    actualCueBall.center.y + dy * 10,
+                    actualCueBall.logicalPosition.x,
+                    actualCueBall.logicalPosition.y,
+                    actualCueBall.logicalPosition.x + dx * 10,
+                    actualCueBall.logicalPosition.y + dy * 10,
                     paintCache.redPaint
                 )
             }
         }
     }
 
-    private fun drawBankingLines(canvas: Canvas, state: OverlayState) {
-        val path = state.screenState.bankingPath
-        val tableModel = state.screenState.tableModel ?: return
+    private fun drawBankingLines(canvas: Canvas, screenState: ScreenState) {
+        val path = screenState.bankingPath
+        val tableModel = screenState.tableModel ?: return
         if (path.size < 2) return
 
         for (i in 0 until path.size - 1) {
@@ -68,7 +68,7 @@ class LineRenderer(
             val end = path[i + 1]
 
             // Check if the end of the path is a pocket
-            val isLastSegmentPocketed = (i == path.size - 2) && tableModel.pockets.any { pocket ->
+            val isLastSegmentPocketed = (i == path.size - 2) && tableModel.pockets.any { pocket: TableModel.Pocket ->
                 distance(end, pocket.center) < pocket.radius
             }
 
@@ -87,7 +87,7 @@ class LineRenderer(
             if (diamondValue != null) {
                 val text = "%.1f".format(diamondValue)
                 val textY = if (abs(point.y - tableModel.surface.top) < 5) point.y - 20 else point.y + 40
-                lineTextRenderer.draw(canvas, text, point.x, textY)
+                lineTextRenderer.draw(canvas, text, point.x, textY, paintCache.lineTextPaint)
             }
         }
     }

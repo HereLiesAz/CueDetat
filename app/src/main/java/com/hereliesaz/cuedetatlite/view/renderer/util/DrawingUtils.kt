@@ -2,7 +2,7 @@ package com.hereliesaz.cuedetatlite.view.renderer.util
 
 import android.graphics.Matrix
 import android.graphics.PointF
-import com.hereliesaz.cuedetatlite.view.model.ILogicalBall
+import com.hereliesaz.cuedetatlite.view.model.ActualCueBall
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
 import kotlin.math.abs
 import kotlin.math.pow
@@ -14,7 +14,7 @@ object DrawingUtils {
     data class PerspectiveRadiusInfo(val radius: Float, val lift: Float)
 
     fun getPerspectiveRadiusAndLift(
-        ball: ILogicalBall,
+        ball: ActualCueBall,
         state: OverlayState
     ): PerspectiveRadiusInfo {
         if (!state.hasInverseMatrix) return PerspectiveRadiusInfo(ball.radius, 0f)

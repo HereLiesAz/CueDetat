@@ -8,40 +8,52 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.hereliesaz.cuedetatlite.ui.MainScreen
 import com.hereliesaz.cuedetatlite.ui.MainViewModel
-import com.hereliesaz.cuedetatlite.ui.theme.CueDetatTheme
-import dagger.hilt.android.AndroidEntryPoint
+import com.hereliesaz.cuedetatlite.ui.UiEvent
+import com.hereliesaz.cuedetatlite.ui.theme.CueDetatLiteTheme
+import kotlinx.coroutines.flow.collectLatest
 
-@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: MainViewModel by viewModels()
+    private val viewModel: MainViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                val app = application as MyApplication
+                @Suppress("UNCHECKED_CAST")
+                return MainViewModel(
+                    app.stateReducer,
+                    app.updateStateUseCase,
+                    app.sensorRepository,
+                    app.updateChecker
+                ) as T
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        installSplashScreen()
+
+        lifecycle.addObserver(viewModel.sensorRepository)
 
         setContent {
-            CueDetatTheme {
-                MainScreen(viewModel = viewModel)
-
+            CueDetatLiteTheme {
                 LaunchedEffect(Unit) {
-                    viewModel.events.collect { event ->
-                        event?.getContentIfNotHandled()?.let { uiEvent ->
-                            when (uiEvent) {
-                                is MainViewModel.UiEvent.OpenUrl -> {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uiEvent.url))
-                                    startActivity(intent)
-                                }
-                                is MainViewModel.UiEvent.ShowUpdateAvailable -> {
-                                    // This is handled by the UI state, no action needed here.
-                                }
+                    viewModel.uiEvents.collectLatest { event ->
+                        when (event) {
+                            is UiEvent.OpenUrl -> {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
+                                startActivity(intent)
+                            }
+                            is UiEvent.ShowToast -> {
+                                // Handle toast messages
                             }
                         }
                     }
                 }
+                MainScreen(viewModel = viewModel)
             }
         }
     }

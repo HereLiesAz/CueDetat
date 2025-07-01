@@ -1,3 +1,4 @@
+// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/view/renderer/text/LineTextRenderer.kt
 package com.hereliesaz.cuedetatlite.view.renderer.text
 
 import android.graphics.Canvas
@@ -12,6 +13,9 @@ class LineTextRenderer {
     private val minLineTextSize = 18f
     private val maxLineTextSize = 70f
 
+    /**
+     * Draws text at a specific point, oriented to a line and scaled by zoom.
+     */
     fun draw(
         canvas: Canvas,
         text: String,
@@ -37,5 +41,12 @@ class LineTextRenderer {
         canvas.rotate(lineAngleDegrees + rotationOffsetDegrees, textX, textY)
         canvas.drawText(text, textX, textY, paint)
         canvas.restore()
+    }
+
+    /**
+     * Draws text at a simple X, Y coordinate with a given paint object.
+     */
+    fun draw(canvas: Canvas, text: String, x: Float, y: Float, paint: Paint) {
+        canvas.drawText(text, x, y, paint)
     }
 }
