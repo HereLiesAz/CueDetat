@@ -1,23 +1,19 @@
-// app/src/main/java/com.hereliesaz.cuedetatlite/view/state/OverlayState.kt
+// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/view/state/OverlayState.kt
 package com.hereliesaz.cuedetatlite.view.state
 
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
-import com.hereliesaz.cuedetatlite.data.FullOrientation // Import FullOrientation
-import com.hereliesaz.cuedetatlite.view.model.ActualCueBall
-import com.hereliesaz.cuedetatlite.view.model.ProtractorUnit
-import com.hereliesaz.cuedetatlite.view.model.IlogicalBall
+import com.hereliesaz.cuedetatlite.data.FullOrientation
 
 data class OverlayState(
     // View dimensions
     val viewWidth: Int = 0,
     val viewHeight: Int = 0,
 
-    // Core logical model
-    val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), 1f, 0f),
-    val actualCueBall: ActualCueBall? = null,
+    // Combined screen state
+    val screenState: ScreenState = ScreenState(),
 
     // UI control state
     val zoomSliderPosition: Float = 100f,
@@ -47,10 +43,6 @@ data class OverlayState(
     val railPitchMatrix: Matrix = Matrix(),
     val inversePitchMatrix: Matrix = Matrix(),
     val hasInverseMatrix: Boolean = false,
-
-    // Derived state
-    val isImpossibleShot: Boolean = false,
-    val warningText: String? = null,
 
     // Theming
     val appControlColorScheme: ColorScheme = darkColorScheme(),
