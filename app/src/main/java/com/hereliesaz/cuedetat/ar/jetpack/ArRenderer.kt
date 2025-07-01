@@ -10,6 +10,7 @@ import com.hereliesaz.cuedetat.MainActivity
 import com.hereliesaz.cuedetat.ar.ARConstants
 import com.hereliesaz.cuedetat.ar.jetpack.helpers.DisplayRotationHelper
 import com.hereliesaz.cuedetat.ar.jetpack.rendering.*
+import com.hereliesaz.cuedetat.ar.jetpack.rendering.ObjectRenderer
 import com.hereliesaz.cuedetat.ui.state.UiState
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
