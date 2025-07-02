@@ -1,191 +1,149 @@
-# Developer's Guide: Cue D'état Lite
+# Project Development Guide: Cue D'état
+This document outlines the core architecture, concepts, and future direction of the Cue D'état
+application. It serves as a single source of truth to prevent regressions and ensure consistent
+development. Consider it a note-to-self for the AI working on this project, and keep it updated
+accordingly with ANYTHING that will be useful to the next AI in the next chat.
 
-This document provides essential context for maintaining and developing the Cue D'état Lite Android application. It is intended for both human developers and AI assistants.
+NEVER change what is written here, only add to it. Always include anything that you note to yourself as a matter of clarification.
 
-## Core Concepts & Architecture
+## 1. Core Concepts & Official Terminology
+A precise vocabulary is critical. The following terms are to be used exclusively.
 
-The application's primary function is to overlay aiming graphics on a live camera feed of a pool table. The architecture is a blend of traditional Android Views (for camera and custom drawing) and Jetpack Compose (for the UI and state management), all orchestrated by a central `MainViewModel`.
+*   **Logical Plane:** An abstract, infinite 2D coordinate system (like graph paper) where all aiming
+    geometry is defined and calculated. This is the "world" of the simulation. The origin (0,0) of
+    this plane is conceptually at the top-left, but pivot points for transformations are usually
+    the center of the view (`viewWidth/2, viewHeight/2` in logical units).
+*   **Screen Plane:** The physical 2D plane of the device's screen. This is the "window" through
+    which the user views the Logical Plane.
+*   **Perspective Transformation:** The process, primarily handled by a `pitchMatrix` (and
+    `railPitchMatrix` for lifted elements), of projecting the Logical Plane onto the Screen Plane
+    to create the 3D illusion. Crucially, this transformation must always pivot around the absolute
+    center of the view (logical coordinates `viewWidth/2, viewHeight/2` map to screen coordinates
+    `viewWidth/2, viewHeight/2` as the pivot).
+*   **Global Zoom:** A single zoom factor, controlled by `zoomSliderPosition` and `ZoomMapping.kt`,
+    that determines the base logical radius for all interactive elements.
+*   **On-Screen Elements:**
 
+    *   **Protractor Unit (Protractor Mode Only):** The primary aiming apparatus for cut shots.
+        *   **Target Ball (Protractor):** The logical and visual center of the `ProtractorUnit`. Its
+            logical position is user-draggable. Its logical radius is set by Global Zoom.
+        *   **Ghost Cue Ball (Protractor):** The second ball in the `ProtractorUnit`. Its *absolute
+            logical position* is calculated based on the Target Ball's center, the unit's radius, and
+            `state.protractorUnit.aimingAngleDegrees`. Its logical radius is the same as the Target
+            Ball's. Both Target and Ghost Cue Ball have a 2D logical representation (drawn by
+            `BallRenderer.drawLogicalBalls`) and a 3D screen-space "ghost" effect (drawn by
+            `BallRenderer.drawScreenSpaceGhosts` with lift).
+    *   **ActualCueBall:** A user-draggable logical ball.
+        *   **In Protractor Mode (Optional):** Can be toggled by the user. Used for visualizing shots
+            originating from a specific point. Rendered with a "lifted" 3D ghost effect.
+            Its logical radius is set by Global Zoom.
+        *   **In Banking Mode (Mandatory, becomes the "Banking Ball"):** Always visible and represents
+            the
+            cue ball on the table. Its logical radius is set by Global Zoom. Rendered *on* the table
+            plane.
+    *   **Table Visuals (Banking Mode Only):** Wireframe representation of the pool table surface,
+        rails,
+        pockets, and diamonds.
+        *   Logically anchored at the view's center.
+        *   Its logical scale is determined by `tableToBallRatio * ActualCueBall.radius`.
+        *   The table surface is rendered on the `pitchMatrix`. Rails are rendered on the
+            `railPitchMatrix`.
+    *   **Lines:**
+        *   **Protractor Shot Line (Protractor Mode):** From `ActualCueBall.center` (if visible, else
+            a default
+            screen anchor's logical projection) through the `ProtractorUnit.GhostCueBall`'s absolute
+            logical center, extending to infinity. Drawn in absolute logical coordinates.
+        *   **Aiming Line (Protractor Mode):** From `ProtractorUnit.GhostCueBall`'s center
+            through `ProtractorUnit.TargetBall`'s center, extending to infinity.
+        *   **Tangent Lines & Angle Lines (Protractor Mode):** Originate from the Ghost Cue Ball's center. The tangent line indicates the cue ball's path post-collision, with one half becoming solid to show the direction. Angle lines show standard cut angles.
+*   **Gestures:** All gestures are handled by the `GestureHandler` class.
+    *   **Pinch-to-Zoom:** Controls the Global Zoom.
+    *   **Single-finger drag:** Behavior is contextual. On a ball, it moves that ball. Off a ball, it controls the `aimingAngleDegrees` of the protractor using a continuous rotational input.
+    *   **Tap:** Not currently implemented for specific actions, but recognized.
 
-CueDetatLite
-+-- .git
-|  +-- (files omitted for brevity)
-+-- .github
-|  \-- workflows
-|     +-- blank.yml
-|     \-- nextjs.yml
-+-- .gradle
-|  +-- (files omitted for brevity)
-+-- .idea
-|  +-- (files omitted for brevity)
-+-- .kotlin
-|  +-- (files omitted for brevity)
-+-- app
-|  +-- build
-|  |  +-- (files omitted for brevity)
-|  +-- release
-|  |  +-- (files omitted for brevity)
-|  +-- src
-|  |  \-- main
-|  |     +-- java
-|  |     |  \-- com
-|  |     |     \-- hereliesaz
-|  |     |        \-- cuedetatlite
-|  |     |           +-- data
-|  |     |           |  \-- SensorRepository.kt
-|  |     |           +-- domain
-|  |     |           |  +-- StateReducer.kt
-|  |     |           |  +-- UpdateStateUseCase.kt
-|  |     |           |  +-- WarningManager.kt
-|  |     |           |  \-- WarningText.kt
-|  |     |           +-- ui
-|  |     |           |  +-- composables
-|  |     |           |  |  +-- ActionFabs.kt
-|  |     |           |  |  +-- CameraBackground.kt
-|  |     |           |  |  +-- KineticWarning.kt
-|  |     |           |  |  +-- LuminanceDialog.kt  <-- NEW
-|  |     |           |  |  +-- MenuDrawer.kt
-|  |     |           |  |  +-- TopControls.kt
-|  |     |           |  |  \-- ZoomControls.kt
-|  |     |           |  +-- theme
-|  |     |           |  |  +-- Color.kt
-|  |     |           |  |  +-- Shape.kt
-|  |     |           |  |  +-- Theme.kt
-|  |     |           |  |  \-- Type.kt
-|  |     |           |  +-- MainScreen.kt
-|  |     |           |  +-- MainScreenEvent.kt
-|  |     |           |  +-- MainViewModel.kt
-|  |     |           |  +-- MenuAction.kt
-|  |     |           |  +-- UiEvents.kt
-|  |     |           |  +-- VerticalSlider.kt
-|  |     |           |  \-- ZoomMapping.kt
-|  |     |           +-- utils
-|  |     |           |  +-- SingleEvent.kt
-|  |     |           |  \-- ToastMessage.kt
-|  |     |           +-- view
-|  |     |           |  +-- gestures
-|  |     |           |  |  \-- GestureHandler.kt  <-- NEW
-|  |     |           |  +-- model
-|  |     |           |  |  +-- ActualCueBall.kt
-|  |     |           |  |  +-- ILogicalBall.kt  <-- RENAMED
-|  |     |           |  |  +-- Perspective.kt
-|  |     |           |  |  +-- ProtractorUnit.kt
-|  |     |           |  |  \-- TableModel.kt
-|  |     |           |  +-- renderer
-|  |     |           |  |  +-- text
-|  |     |           |  |  |  +-- BallTextRenderer.kt
-|  |     |           |  |  |  \-- LineTextRenderer.kt
-|  |     |           |  |  +-- util
-|  |     |           |  |  |  \-- DrawingUtils.kt
-|  |     |           |  |  +-- BallRenderer.kt
-|  |     |           |  |  +-- LineRenderer.kt
-|  |     |           |  |  +-- OverlayRenderer.kt
-|  |     |           |  |  +-- RailRenderer.kt
-|  |     |           |  |  \-- TableRenderer.kt
-|  |     |           |  +-- state
-|  |     |           |  |  +-- OverlayState.kt
-|  |     |           |  |  \-- ScreenState.kt
-|  |     |           |  +-- PaintCache.kt
-|  |     |           |  \-- ProtractorOverlayView.kt
-|  |     |           +-- MainActivity.kt
-|  |     |           \-- MyApplication.kt
-|  |     +-- res
-|  |     |  +-- (files omitted for brevity)
-|  |     +-- AndroidManifest.xml
-|  |     \-- ic_launcher-playstore.png
-|  +-- .gitignore
-|  +-- build.gradle.kts
-|  \-- proguard-rules.pro
-+-- build
-|  +-- (files omitted for brevity)
-+-- gradle
-|  +-- wrapper
-|  |  +-- gradle-wrapper.jar
-|  |  \-- gradle-wrapper.properties
-|  \-- libs.versions.toml
-+-- .gitignore
-+-- backup_for_ai.ps1
-+-- build.gradle.kts
-+-- Developers_Guide.md
-+-- gradle.properties
-+-- gradlew
-+-- gradlew.bat
-+-- LICENSE
-+-- local.properties
-+-- (old project context files)
-+-- README.md
-\-- settings.gradle.kts
+## 2. Architectural Model & File Structure
 
+The architecture strictly separates data, domain logic, and UI presentation following an MVI pattern.
 
-### Key Components
+`com/hereliesaz/cuedetatlite/`
+├── `data/`
+│ ├── `SensorRepository.kt` // Provides sensor data as a Flow.
+├── `di/`
+│ └── `AppModule.kt` // Hilt module for providing dependencies.
+├── `domain/`
+│ ├── `StateReducer.kt` // Pure function: (Current State, Event) -> New State.
+│ ├── `UpdateStateUseCase.kt` // Pure function: Calculates derived state (matrices, radii, impossible shots).
+│ └── `WarningManager.kt` // Manages warning logic.
+├── `ui/`
+│ ├── `composables/` // Self-contained, reusable UI pieces (Buttons, Sliders, Dialogs).
+│ ├── `theme/` // Material 3 Theme, Colors, Typography, Shapes.
+│ ├── `MainViewModel.kt` // Orchestrates events, manages side effects, holds state.
+│ ├── `MainScreen.kt` // The root Composable that builds the entire UI.
+│ └── `MainScreenEvent.kt` // Sealed class defining all user and system events.
+└── `view/`
+├── `gestures/`
+│ └── `GestureHandler.kt` // Encapsulates all MotionEvent logic.
+├── `model/` // Data classes representing logical objects.
+├── `renderer/` // Classes responsible for drawing on the Canvas.
+├── `state/` // Data classes for UI state (`OverlayState`, `ScreenState`).
+└── `ProtractorOverlayView.kt` // Custom Android View, embedded in Compose, that handles all Canvas drawing.
 
-1.  **`MainViewModel`**: The central brain of the application. It holds the canonical state, processes user and sensor events, and orchestrates updates between the UI and the rendering logic.
-2.  **`OverlayState`**: A comprehensive data class holding *all* state information for the UI and rendering, including screen dimensions, sensor data, zoom levels, user settings, and the state of the objects on the screen.
-3.  **`ScreenState`**: A nested data class within `OverlayState` that specifically holds the state of the logical objects to be rendered (e.g., the target ball, aiming angle).
-4.  **`ProtractorOverlayView`**: A custom Android `View` responsible for all the graphical rendering (balls, lines, etc.). It is placed on top of the camera preview. It receives the `OverlayState` from the ViewModel and uses a set of `renderer` classes to draw on its `Canvas`.
-5.  **`GestureHandler`**: A dedicated class that encapsulates all touch and gesture detection logic (drags, pinches). It is initialized by and receives events from `ProtractorOverlayView`, processes them, and sends the appropriate `MainScreenEvent` to the ViewModel.
-6.  **`UpdateStateUseCase`**: A domain-layer class responsible for taking the current `OverlayState` and calculating derived values, most importantly the perspective matrices for rendering based on sensor data (pitch/roll) and zoom level.
-7.  **`StateReducer`**: A domain-layer class responsible for handling discrete state changes, such as moving the target ball or resetting the view. It ensures state transitions are predictable.
-8.  **Jetpack Compose UI (`MainScreen.kt`, etc.)**: All UI controls (buttons, sliders, menus) are built with Compose. They read state from the `MainViewModel` and send `MainScreenEvent`s back to it to signal user actions.
+**The Golden Rule**: ViewModel orchestrates. StateReducer computes primary state. UpdateStateUseCase computes derived state. Renderers display.
 
-### Data Flow & Rendering Loop
+## 3. Rendering Pipeline (Conceptual)
 
-1.  **Event Occurs**: A user drags a finger (`GestureHandler`), moves a slider (`ZoomControls`), or a new sensor reading arrives (`SensorRepository`).
-2.  **Event Sent**: An appropriate `MainScreenEvent` is sent to the `MainViewModel`.
-3.  **ViewModel Processes**:
-    *   The `MainViewModel` receives the event.
-    *   It updates the relevant properties in a new `OverlayState` object (e.g., `zoomSliderPosition`, `aimingAngleDegrees`, `currentOrientation`).
-    *   For state changes like moving a ball, it uses the `StateReducer`.
-4.  **UseCase Calculates Derived State**: The ViewModel passes the new `OverlayState` to the `UpdateStateUseCase`. This use case calculates the complex perspective matrices needed for rendering based on the current orientation and zoom.
-5.  **State Emitted**: The ViewModel emits the final, updated `OverlayState` to its subscribers.
-6.  **UI Recomposition**:
-    *   Jetpack Compose UI elements observe the state and recompose if necessary (e.g., the zoom slider thumb moves).
-    *   The `AndroidView` wrapper for `ProtractorOverlayView` receives the new state and calls `view.updateState()`.
-7.  **Custom View Redraw**: `ProtractorOverlayView`'s `updateState` method triggers an `invalidate()`, causing its `onDraw()` method to be called. It then uses its internal `renderer` classes to draw the scene on the canvas using the new state and matrices.
+1.  **Event (UI -> ViewModel):** A user interaction (e.g., drag) occurs in a Composable or `ProtractorOverlayView`. An `MainScreenEvent` is sent to the `MainViewModel`.
+2.  **Orchestration (ViewModel):**
+    *   For screen-space events (like `BallMoved`), the ViewModel uses the `inversePitchMatrix` from the current state to convert screen coordinates to logical coordinates.
+    *   It then dispatches a new event with these logical coordinates.
+    *   It handles side-effects like showing dialogs or triggering warning text timers.
+3.  **Reduction (ViewModel -> StateReducer):** The ViewModel sends the event to the `StateReducer`. The reducer takes the current `ScreenState` and the event, and returns a new, updated `ScreenState` without any side effects.
+4.  **Derivation (ViewModel -> UpdateStateUseCase):** The ViewModel takes the new `ScreenState` and the current `OverlayState`, and passes them to the `UpdateStateUseCase`. This use case calculates all derived data:
+    *   Calculates the definitive logical radius for all balls based on the `zoomSliderPosition`.
+    *   Calculates the `pitchMatrix`, `railPitchMatrix`, and their inverse.
+    *   Determines the `isImpossibleShot` flag.
+    *   It returns a fully updated `OverlayState`.
+5.  **State Update (ViewModel -> UI):** The ViewModel updates its `_overlayState` Flow with the new state from the use case.
+6.  **Render (UI):**
+    *   The `MainScreen` and its child Composables recompose based on the new state.
+    *   The `AndroidView` containing `ProtractorOverlayView` is updated. Its `update` block calls `view.updateState(newState, systemIsDark)`.
+    *   `ProtractorOverlayView.onDraw` is triggered. It calls `OverlayRenderer`, which orchestrates the various sub-renderers (`BallRenderer`, `LineRenderer`, etc.) to draw the scene onto the `Canvas` using the matrices and logical data from the `OverlayState`.
 
-## Core Aiming Mechanic (As of July 2025)
+## 4. Core Operational Modes & Entity Behavior
 
-**SUCCESSFUL REFACTOR:** The aiming mechanic has been fundamentally changed. Previous attempts to manage separate cue and ghost balls were complex and buggy. The current system is more stable and predictable.
+The application operates in two distinct modes: Protractor Mode and Banking Mode.
 
-*   **No Movable Cue Ball:** The user does **not** directly drag a "cue ball" or "ghost ball" on the screen.
-*   **Target Ball is Key:** The user can drag and place the **Target Ball**. The entire view (camera and overlay) is centered on this Target Ball.
-*   **Rotation via Aiming Angle:** The "Ghost Ball" is now a calculated entity. Its position is determined by the `aimingAngleDegrees` property in the `ProtractorUnit`. It is always placed perfectly tangent to the Target Ball, at a distance of two ball radii, opposite the aiming angle.
-*   **Gesture Control:** A single-finger drag gesture that does not start on the Target Ball will modify the `aimingAngleDegrees`, causing the Ghost Ball and the aiming line to rotate around the Target Ball.
+### 4.1. Protractor Mode
 
-## Key Successes & Refactors
+*   **`ProtractorUnit`**: The primary aiming tool. Its `TargetBall` is user-draggable. Its `GhostCueBall`'s position is calculated based on the `aimingAngleDegrees`.
+*   **`ActualCueBall` (Optional)**: A user-draggable ball for visualizing specific shot origins.
+*   **Lines**: `AimingLine`, `ShotLine`, `TangentLines`, and `AngleLines` are all visible and interactive.
 
-*   **State Unification:** State has been successfully centralized into the `OverlayState` and `ScreenState` data classes, managed exclusively by the `MainViewModel`. This is a stable pattern that should be maintained.
-*   **UI Migration to Compose:** The entire UI layer has been successfully migrated to Jetpack Compose.
-*   **Gesture Logic Abstraction:** Touch and gesture logic was successfully extracted from `ProtractorOverlayView` into a dedicated `GestureHandler` class. This cleans up the View and isolates responsibilities.
-*   **Simplified Event Handling:** `ProtractorOverlayView` now uses a single `onEvent` listener, which simplifies its integration with Compose and the ViewModel.
-*   **Stable Aiming Mechanic:** The pivot to a target-ball-centric, angle-based aiming system was a major success.
+### 4.2. Banking Mode (`isBankingMode = true`)
 
-## Failures & Lessons Learned
+*   **`ActualCueBall` (as "Banking Ball")**: The primary interactive element. User can drag it on the table.
+*   **Table Visuals**: A logically scaled table with rails and pockets is drawn.
+*   **`bankingAimTarget`**: A logical point set by a user drag, determining the initial direction of the banking shot path.
+*   **Protractor Unit and its lines are NOT drawn.**
 
-*   **Manual Dependency Injection:** The initial project used manual DI within the `MyApplication` class. This was brittle and has been mostly replaced by Hilt and a custom ViewModel factory.
-*   **Dual-Movable Balls:** The original concept of allowing the user to drag both a cue ball and a target ball was a failure. The current single-movable-target system is the correct approach.
-*   **Build & Dependency Issues:** The project has been sensitive to dependency conflicts, particularly with CameraX and Guava. See the troubleshooting section below.
-*   **Incorrect State Access:** Bugs arose from different parts of the app trying to access state from the wrong source (e.g., a Composable reading from `overlayState` when it should have been `uiState`).
-    *   `MainViewModel.uiState`: For high-level UI elements in Compose (`MainScreen`).
-    *   `MainViewModel.overlayState`: For the detailed rendering logic within `ProtractorOverlayView`.
+## 5. Key Implementation Learnings & Mandates
 
-## Troubleshooting
+*   **Unidirectional Data Flow**: State flows down, events flow up. This is non-negotiable.
+*   **Coordinate Systems**: `GestureHandler` sends screen coords; `ViewModel` converts to logical using `inversePitchMatrix`; `StateReducer` works only with logical; `Renderers` use `pitchMatrix` to project logical to screen.
+*   **Single Source of Truth for Radius:** The `zoomSliderPosition` is the ultimate source of truth for zoom. `UpdateStateUseCase` is the *only* place where this slider position is converted into a definitive logical radius, which is then applied to all balls in the `ScreenState` for that frame. The `StateReducer` no longer calculates radii.
+*   **Gesture Handling (`GestureHandler.kt`):** This class encapsulates all `MotionEvent` logic. For rotation, it calculates the *change in angle* between move events relative to the protractor's center to provide a smooth, continuous "dial" interaction, rather than simply pointing at the user's finger.
+*   **Warning Logic:** The `MainViewModel` manages the display of warnings. It listens for `GestureEnded` events. If, at that moment, the state's `isImpossibleShot` flag is true, it selects the next warning from the resource array and updates the UI state. The warning is cleared when a new gesture begins.
+*   **Pure Compose UI:** The entire UI is built with Jetpack Compose. The `activity_main.xml` file is obsolete and has been removed. The `ProtractorOverlayView` is the only remaining Android `View`, and it is embedded via the `AndroidView` composable. The `VerticalSlider` is a custom-built Composable to meet the design requirements.
 
-### `Cannot access class 'ListenableFuture'` Build Error
+## 6. Future Development Plan
 
-This has been a recurring and persistent issue. It indicates a classpath conflict with the Guava library, which CameraX depends on.
-
-**Solution Steps:**
-
-1.  **Explicit Dependency:** Ensure the `build.gradle.kts` file for the `:app` module has an explicit dependency on both `guava` and `listenablefuture`. Refer to the `libs.versions.toml` and `app/build.gradle.kts` files in the project for the correct implementation.
-2.  **Robust CameraX Initialization:** The `CameraBackground.kt` composable has been refactored to use a standard `LaunchedEffect` and `suspendCoroutine` pattern. This seems to be more robust for the Gradle build system than the previous `addListener` pattern. **Do not revert to the old pattern.**
-3.  **Invalidate Caches:** If the error persists after verifying the dependencies, the final step is to clear Gradle's caches. In Android Studio, go to **File > Invalidate Caches / Restart...** and select **Invalidate and Restart**. This is often necessary to force Gradle to re-evaluate the now-correct dependency graph.
-
-## Guidance for AI Development
-
-*   **State is King:** **DO NOT** modify state directly within a `View` or `Composable`. All state changes **MUST** go through the `MainViewModel` by sending a `MainScreenEvent`. The ViewModel is the single source of truth for `OverlayState`.
-*   **Understand the Data Flow:** Before making a change, trace the data flow for your feature: Event -> ViewModel -> State Change -> UseCase -> State Emission -> UI Update/Redraw.
-*   **Rendering Logic Lives in Renderers:** To change *how* something is drawn (e.g., add a new line, change a color scheme), modify the appropriate class in `app/src/main/java/com/hereliesaz/cuedetatlite/view/renderer/`. The `PaintCache` class manages `Paint` objects and styling.
-*   **Gesture Logic Lives in `GestureHandler`:** To change *how* a gesture is interpreted (e.g., add a double-tap), the change should be made in `app/src/main/java/com/hereliesaz/cuedetatlite/view/gestures/GestureHandler.kt`.
-*   **UI Controls are in Compose:** To add a new UI element, create a new `@Composable` function in the `ui/composables` directory and integrate it into `MainScreen.kt`.
-*   **Aiming is Angle-Based:** To modify aiming, you should be modifying the `aimingAngleDegrees` in the `ProtractorUnit` state. Do not attempt to add a second movable ball. The position of the Ghost Ball is always *calculated* and should not be stored as independent state.
+*   **Bank/Kick Shot Calculator (Refinement):**
+    *   Improve reflection logic in `LineRenderer` for more than 2 banks.
+    *   Consider pocket geometry for line termination/success.
+*   **Object/Table Detection (Computer Vision):**
+    *   Use OpenCV or ML Kit to detect table boundaries and ball positions.
+    *   Project screen coordinates to Logical Plane to auto-place `ActualCueBall`.
+*   **"English" / Spin Visualization:** Add UI controls to simulate sidespin, altering tangent lines
+    or shot paths.
+*   **Tutorial Enhancements:** Make the tutorial more interactive, highlighting UI elements
+    corresponding to the current step.

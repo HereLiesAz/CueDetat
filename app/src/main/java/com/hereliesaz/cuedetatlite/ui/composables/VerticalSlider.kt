@@ -14,11 +14,17 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
@@ -39,7 +45,8 @@ fun VerticalSlider(
                     val valueRangeTotal = valueRange.endInclusive - valueRange.start
                     if (valueRangeTotal <= 0) return@detectDragGestures
 
-                    val rawValue = valueRange.start + ((height - change.position.y) / height) * valueRangeTotal
+                    val rawValue =
+                        valueRange.start + ((height - change.position.y) / height) * valueRangeTotal
                     onValueChange(rawValue.coerceIn(valueRange))
                     change.consume()
                 }
@@ -80,14 +87,26 @@ fun VerticalSlider(
                 center = Offset(centerX, thumbY)
             )
         }
-
+        var surfaceSize by remember { mutableStateOf(IntSize.Zero) }
         Surface(
             shape = RoundedCornerShape(8.dp),
             color = colors.thumbColor,
             contentColor = MaterialTheme.colorScheme.onPrimary,
             modifier = Modifier
+                .onGloballyPositioned { coordinates ->
+                    surfaceSize = coordinates.size
+                }
                 .absoluteOffset {
-                    IntOffset(0, (thumbY - this.size.height / 2).roundToInt().coerceIn(0, constraints.maxHeight - this.size.height) )
+                    if (surfaceSize.height > 0) { // Ensure surfaceSize is initialized
+                        IntOffset(
+                            0,
+                            (thumbY - surfaceSize.height / 2)
+                                .roundToInt()
+                                .coerceIn(0, constraints.maxHeight - surfaceSize.height)
+                        )
+                    } else {
+                        IntOffset.Zero
+                    }
                 }
         ) {
             Text(
