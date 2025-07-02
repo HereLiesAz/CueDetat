@@ -154,6 +154,8 @@ android {
         implementation(libs.androidx.runtime)
         implementation(libs.guava)
         implementation(libs.listenablefuture)
+        implementation(libs.androidx.hilt.navigation.compose)
+
     }
 }
 kapt {

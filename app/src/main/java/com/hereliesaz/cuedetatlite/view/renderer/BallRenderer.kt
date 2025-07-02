@@ -7,8 +7,8 @@ import com.hereliesaz.cuedetatlite.view.PaintCache
 import com.hereliesaz.cuedetatlite.view.model.ILogicalBall
 import com.hereliesaz.cuedetatlite.view.model.ProtractorUnit
 import com.hereliesaz.cuedetatlite.view.renderer.text.BallTextRenderer
+import com.hereliesaz.cuedetatlite.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
-import com.hereliesaz.cuedetatlite.view.state.ScreenState
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -17,40 +17,78 @@ class BallRenderer(
     private val ballTextRenderer: BallTextRenderer
 ) {
 
-    fun draw(canvas: Canvas, screenState: ScreenState, overlayState: OverlayState) {
+    fun drawLogicalBalls(canvas: Canvas, state: OverlayState) {
         canvas.save()
-        canvas.concat(overlayState.pitchMatrix)
+        canvas.concat(state.pitchMatrix)
 
-        if (screenState.isProtractorMode) {
-            drawProtractorBalls(canvas, screenState, overlayState)
+        if (state.screenState.isProtractorMode) {
+            drawProtractorLogicalBalls(canvas, state)
         }
 
-        if (screenState.showActualCueBall) {
-            screenState.actualCueBall?.let {
+        if (state.screenState.showActualCueBall) {
+            state.screenState.actualCueBall?.let {
                 drawBall(canvas, it, paints.actualCueBallBasePaint, paints.actualCueBallCenterMarkPaint)
-                ballTextRenderer.draw(canvas, paints.actualCueBallTextPaint, overlayState.zoomSliderPosition, it.logicalPosition.x, it.logicalPosition.y, it.radius, "A")
             }
         }
         canvas.restore()
     }
 
-    private fun drawProtractorBalls(canvas: Canvas, screenState: ScreenState, overlayState: OverlayState) {
-        val protractorUnit = screenState.protractorUnit
-        // Draw Target Ball
+    fun drawScreenSpaceGhosts(canvas: Canvas, state: OverlayState) {
+        if (state.screenState.isProtractorMode) {
+            drawProtractorGhosts(canvas, state)
+        }
+        if (state.screenState.showActualCueBall) {
+            state.screenState.actualCueBall?.let {
+                val screenCenter = DrawingUtils.mapPoint(it.logicalPosition, state.pitchMatrix)
+                val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(it, state)
+                val visualY = screenCenter.y - radiusInfo.lift
+
+                canvas.drawCircle(screenCenter.x, visualY, radiusInfo.radius, paints.actualCueBallGhostPaint)
+                if (state.areHelpersVisible) {
+                    ballTextRenderer.draw(canvas, paints.actualCueBallTextPaint, state.zoomSliderPosition, screenCenter.x, visualY, radiusInfo.radius, "Actual Cue Ball")
+                }
+            }
+        }
+    }
+
+    private fun drawProtractorLogicalBalls(canvas: Canvas, state: OverlayState) {
+        val protractorUnit = state.screenState.protractorUnit
         drawBall(canvas, protractorUnit.targetBall, paints.targetCirclePaint, paints.targetCenterMarkPaint)
-        ballTextRenderer.draw(canvas, paints.targetBallTextPaint, overlayState.zoomSliderPosition, protractorUnit.targetBall.logicalPosition.x, protractorUnit.targetBall.logicalPosition.y, protractorUnit.targetBall.radius, "T")
 
-        // --- Calculate and draw Ghost Ball ---
-        val targetBall = protractorUnit.targetBall
-        val angleRad = Math.toRadians(protractorUnit.aimingAngleDegrees.toDouble()).toFloat()
-        // The ghost ball is placed tangent to the target ball, opposite the aiming angle
-        val totalRadius = targetBall.radius * 2
-        val ghostBallX = targetBall.logicalPosition.x - cos(angleRad) * totalRadius
-        val ghostBallY = targetBall.logicalPosition.y - sin(angleRad) * totalRadius
-
-        val ghostBall = ProtractorUnit.LogicalBall(PointF(ghostBallX, ghostBallY), targetBall.radius)
+        val ghostBall = getGhostBall(protractorUnit)
         drawBall(canvas, ghostBall, paints.ghostCueOutlinePaint, paints.cueCenterMarkPaint)
-        ballTextRenderer.draw(canvas, paints.ghostBallTextPaint, overlayState.zoomSliderPosition, ghostBallX, ghostBallY, ghostBall.radius, "G")
+    }
+
+    private fun drawProtractorGhosts(canvas: Canvas, state: OverlayState) {
+        val protractorUnit = state.screenState.protractorUnit
+        val targetBall = protractorUnit.targetBall
+        val ghostBall = getGhostBall(protractorUnit)
+
+        // Target Ghost
+        val targetScreenCenter = DrawingUtils.mapPoint(targetBall.logicalPosition, state.pitchMatrix)
+        val targetRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(targetBall, state)
+        val targetVisualY = targetScreenCenter.y - targetRadiusInfo.lift
+        canvas.drawCircle(targetScreenCenter.x, targetVisualY, targetRadiusInfo.radius, paints.targetGhostBallOutlinePaint)
+        if (state.areHelpersVisible) {
+            ballTextRenderer.draw(canvas, paints.targetBallTextPaint, state.zoomSliderPosition, targetScreenCenter.x, targetVisualY, targetRadiusInfo.radius, "Target Ball")
+        }
+
+        // Cue Ghost
+        val ghostScreenCenter = DrawingUtils.mapPoint(ghostBall.logicalPosition, state.pitchMatrix)
+        val ghostRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ghostBall, state)
+        val ghostVisualY = ghostScreenCenter.y - ghostRadiusInfo.lift
+        canvas.drawCircle(ghostScreenCenter.x, ghostVisualY, ghostRadiusInfo.radius, paints.ghostCueOutlinePaint)
+        if (state.areHelpersVisible) {
+            ballTextRenderer.draw(canvas, paints.ghostBallTextPaint, state.zoomSliderPosition, ghostScreenCenter.x, ghostVisualY, ghostRadiusInfo.radius, "Ghost Cue Ball")
+        }
+    }
+
+    private fun getGhostBall(protractorUnit: ProtractorUnit): ILogicalBall {
+        val angleRad = Math.toRadians(protractorUnit.aimingAngleDegrees.toDouble()).toFloat()
+        val totalRadius = protractorUnit.targetBall.radius * 2
+        val ghostBallX = protractorUnit.targetBall.logicalPosition.x - cos(angleRad) * totalRadius
+        val ghostBallY = protractorUnit.targetBall.logicalPosition.y - sin(angleRad) * totalRadius
+        return ProtractorUnit.LogicalBall(PointF(ghostBallX, ghostBallY), protractorUnit.targetBall.radius)
     }
 
     private fun drawBall(canvas: Canvas, ball: ILogicalBall, circlePaint: Paint, centerPaint: Paint) {

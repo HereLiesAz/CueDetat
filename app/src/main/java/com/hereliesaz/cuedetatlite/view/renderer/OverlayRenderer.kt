@@ -31,7 +31,7 @@ class OverlayRenderer(
 
         // Draw all logical lines and 2D balls on the transformed plane
         lineRenderer.draw(canvas, state.screenState, state)
-        ballRenderer.drawLogicalBalls(canvas, state, paintCache)
+        ballRenderer.drawLogicalBalls(canvas, state)
 
         // Draw the 3D "ghost" ball effects on top, in screen space
         ballRenderer.drawScreenSpaceGhosts(canvas, state)

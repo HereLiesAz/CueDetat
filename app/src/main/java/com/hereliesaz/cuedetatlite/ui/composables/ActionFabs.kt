@@ -52,11 +52,10 @@ fun ToggleCueBallFab(
     modifier: Modifier = Modifier
 ) {
     FloatingActionButton(
-        onClick = { onEvent(MainScreenEvent.ToggleActualCueBall) }, // FIX: Use correct event
+        onClick = { onEvent(MainScreenEvent.ToggleActualCueBall) },
         modifier = modifier
             .padding(16.dp)
             .navigationBarsPadding(),
-        // FIX: Access property via screenState
         containerColor = if (uiState.screenState.actualCueBall != null) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
     ) {
         if (uiState.areHelpersVisible) {
@@ -64,14 +63,12 @@ fun ToggleCueBallFab(
                 text = "Cue Ball\nToggle",
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelSmall,
-                // FIX: Access property via screenState
                 color = if (uiState.screenState.actualCueBall != null) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
             Icon(
                 painter = painterResource(id = R.drawable.ic_jump_shot),
                 contentDescription = "Toggle Actual Cue Ball",
-                // FIX: Access property via screenState
                 tint = if (uiState.screenState.actualCueBall != null) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
