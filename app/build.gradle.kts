@@ -151,7 +151,6 @@ android {
         implementation(libs.androidx.core.splashscreen)
         implementation(libs.retrofit)
         implementation(libs.converter.gson)
-        implementation(libs.androidx.runtime)
         implementation(libs.guava)
         implementation(libs.listenablefuture)
         implementation(libs.androidx.hilt.navigation.compose)
