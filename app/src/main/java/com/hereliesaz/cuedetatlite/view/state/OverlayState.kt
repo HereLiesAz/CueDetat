@@ -1,4 +1,3 @@
-// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/view/state/OverlayState.kt
 package com.hereliesaz.cuedetatlite.view.state
 
 import android.graphics.Matrix
@@ -16,7 +15,7 @@ data class OverlayState(
     val screenState: ScreenState = ScreenState(),
 
     // UI control state
-    val zoomSliderPosition: Float = 100f,
+    val zoomSliderPosition: Float = 50f, // MODIFIED: Default to halfway point
     val areHelpersVisible: Boolean = false,
     val isMoreHelpVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
@@ -50,8 +49,6 @@ data class OverlayState(
     // Spatial Lock State
     val isSpatiallyLocked: Boolean = false
 ) {
-    // Convenience getter for the old pitchAngle, derived from currentOrientation
-    // This maintains compatibility with parts of the code still using pitchAngle directly.
     val pitchAngle: Float
         get() = currentOrientation.pitch
 }

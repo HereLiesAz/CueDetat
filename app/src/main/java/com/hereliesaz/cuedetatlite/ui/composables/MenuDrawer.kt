@@ -95,7 +95,7 @@ fun MenuDrawerContent(
             )
         }
         val bankingModeToggleText =
-            if (uiState.isBankingMode) "Visualize Ghost Ball" else "Calculate Bank" // Updated text
+            if (uiState.isBankingMode) "Visualize Ghost Ball" else "Calculate Bank"
         MenuItem(
             icon = Icons.Outlined.ViewInAr,
             text = bankingModeToggleText,
@@ -137,10 +137,7 @@ fun MenuDrawerContent(
             icon = Icons.Outlined.MonetizationOn,
             text = "Chalk Your Tip",
             onClick = { onEvent(MainScreenEvent.ShowDonationOptions); onCloseDrawer() })
-        MenuItem(
-            icon = Icons.Outlined.SystemUpdate,
-            text = "Check for Updates",
-            onClick = { onEvent(MainScreenEvent.CheckForUpdate); onCloseDrawer() })
+        // REMOVED: Check for Updates MenuItem
         Spacer(modifier = Modifier.height(12.dp))
     }
 }

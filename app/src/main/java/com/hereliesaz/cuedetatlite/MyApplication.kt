@@ -1,47 +1,27 @@
-// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/MyApplication.kt
 package com.hereliesaz.cuedetatlite
 
 import android.app.Application
-import com.hereliesaz.cuedetatlite.data.GithubRepository
+// REMOVED: import com.hereliesaz.cuedetatlite.data.GithubRepository
 import com.hereliesaz.cuedetatlite.data.SensorRepository
-import com.hereliesaz.cuedetatlite.data.UpdateChecker
+// REMOVED: import com.hereliesaz.cuedetatlite.data.UpdateChecker
 import com.hereliesaz.cuedetatlite.domain.StateReducer
 import com.hereliesaz.cuedetatlite.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetatlite.domain.WarningManager
-import com.hereliesaz.cuedetatlite.network.GithubApi
+// REMOVED: import com.hereliesaz.cuedetatlite.network.GithubApi
 import dagger.hilt.android.HiltAndroidApp
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
+// REMOVED: import retrofit2.Retrofit
+// REMOVED: import retrofit2.converter.gson.GsonConverterFactory
 
 @HiltAndroidApp
 class MyApplication : Application() {
     // --- Manual DI Setup ---
     // This setup is for components not managed by Hilt.
 
-    // Retrofit for network requests
-    private val retrofit: Retrofit by lazy {
-        Retrofit.Builder()
-            .baseUrl("https://api.github.com/")
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-
-    // API service
-    private val githubApi: GithubApi by lazy {
-        retrofit.create(GithubApi::class.java)
-    }
-
-    // Repositories
-    private val githubRepository: GithubRepository by lazy {
-        GithubRepository(githubApi)
-    }
+    // REMOVED: Retrofit, GithubApi, GithubRepository, and UpdateChecker lazy initializations.
 
     // Make dependencies public for the ViewModel Factory
     val sensorRepository: SensorRepository by lazy {
         SensorRepository(this)
-    }
-    val updateChecker: UpdateChecker by lazy {
-        UpdateChecker(githubRepository)
     }
 
     // Domain Logic

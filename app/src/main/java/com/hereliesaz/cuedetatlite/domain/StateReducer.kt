@@ -1,4 +1,3 @@
-// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/domain/StateReducer.kt
 package com.hereliesaz.cuedetatlite.domain
 
 import android.graphics.PointF
@@ -12,22 +11,22 @@ class StateReducer(private val warningManager: WarningManager) {
         val newState = when (event) {
             is MainScreenEvent.BallMoved -> reduceBallMoved(state, event.ballId, event.position)
             is MainScreenEvent.BallRadiusChanged -> reduceBallRadiusChanged(state, event.ballId, event.radius)
-            MainScreenEvent.Reset -> reduceReset(state)
+            MainScreenEvent.Reset -> reduceReset()
             else -> state
         }
         return newState.copy(warningText = warningManager.getWarning(newState))
     }
 
-    private fun reduceReset(state: ScreenState): ScreenState {
-        return state.copy(
-            protractorUnit = ProtractorUnit(),
+    private fun reduceReset(): ScreenState {
+        return ScreenState(
+            protractorUnit = ProtractorUnit(), // Resets to default target ball and angle
             warningText = null
         )
     }
 
     private fun reduceBallMoved(state: ScreenState, ballId: Int, position: PointF): ScreenState {
         val newProtractorUnit = when (ballId) {
-            0 -> state.protractorUnit.copy(cueBall = ProtractorUnit.LogicalBall(position, state.protractorUnit.cueBall.radius))
+            // ID 1 is the target ball
             1 -> state.protractorUnit.copy(targetBall = ProtractorUnit.LogicalBall(position, state.protractorUnit.targetBall.radius))
             else -> state.protractorUnit
         }
@@ -36,7 +35,6 @@ class StateReducer(private val warningManager: WarningManager) {
 
     private fun reduceBallRadiusChanged(state: ScreenState, ballId: Int, radius: Float): ScreenState {
         val newProtractorUnit = when (ballId) {
-            0 -> state.protractorUnit.copy(cueBall = ProtractorUnit.LogicalBall(state.protractorUnit.cueBall.logicalPosition, radius))
             1 -> state.protractorUnit.copy(targetBall = ProtractorUnit.LogicalBall(state.protractorUnit.targetBall.logicalPosition, radius))
             else -> state.protractorUnit
         }

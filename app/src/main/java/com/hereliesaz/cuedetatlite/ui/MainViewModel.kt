@@ -1,19 +1,19 @@
 package com.hereliesaz.cuedetatlite.ui
 
+import android.graphics.PointF
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hereliesaz.cuedetatlite.data.FullOrientation
 import com.hereliesaz.cuedetatlite.data.SensorRepository
-import com.hereliesaz.cuedetatlite.data.UpdateChecker
-import com.hereliesaz.cuedetatlite.data.UpdateResult
 import com.hereliesaz.cuedetatlite.domain.StateReducer
 import com.hereliesaz.cuedetatlite.domain.UpdateStateUseCase
+import com.hereliesaz.cuedetatlite.view.model.ProtractorUnit
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 data class MainScreenUiState(
-    val isUpdateAvailable: Boolean = false,
     val isForceLightMode: Boolean? = null,
     val showLuminanceDialog: Boolean = false,
     val warningMessage: String? = null
@@ -22,8 +22,7 @@ data class MainScreenUiState(
 class MainViewModel(
     private val stateReducer: StateReducer,
     private val updateStateUseCase: UpdateStateUseCase,
-    val sensorRepository: SensorRepository, // Make public
-    private val updateChecker: UpdateChecker
+    val sensorRepository: SensorRepository
 ) : ViewModel() {
 
     private val _overlayState = MutableStateFlow(OverlayState())
@@ -32,14 +31,9 @@ class MainViewModel(
     private val _uiEvents = Channel<UiEvent>()
     val uiEvents = _uiEvents.receiveAsFlow()
 
-    // FIX: Combine with the new updateResult StateFlow from UpdateChecker
     val uiState: StateFlow<MainScreenUiState> =
-        combine(
-            _overlayState,
-            updateChecker.updateResult
-        ) { overlay, updateResult ->
+        _overlayState.map { overlay ->
             MainScreenUiState(
-                isUpdateAvailable = updateResult is UpdateResult.UpdateAvailable,
                 isForceLightMode = overlay.isForceLightMode,
                 showLuminanceDialog = overlay.showLuminanceDialog,
                 warningMessage = overlay.screenState.warningText?.name
@@ -49,23 +43,53 @@ class MainViewModel(
 
     init {
         viewModelScope.launch {
-            sensorRepository.getOrientationFlow().collect {
-                // This would be where you update perspective based on sensor data
+            sensorRepository.getOrientationFlow().collect { orientation ->
+                onEvent(MainScreenEvent.OrientationChanged(orientation))
             }
         }
-        checkForUpdates()
     }
 
     fun onEvent(event: MainScreenEvent) {
         viewModelScope.launch {
             val currentState = _overlayState.value
-            val newOverlayState = when (event) {
-                // Events that modify ScreenState via the reducer
-                is MainScreenEvent.BallMoved, is MainScreenEvent.BallRadiusChanged, is MainScreenEvent.Reset -> {
-                    val newScreenState = stateReducer.reduce(currentState.screenState, event)
+            var newOverlayState = when (event) {
+                is MainScreenEvent.ViewResized -> {
+                    val newScreenState = currentState.screenState.copy(
+                        protractorUnit = ProtractorUnit(
+                            targetBall = ProtractorUnit.LogicalBall(PointF(event.width / 2f, event.height / 2f), 30f)
+                        )
+                    )
+                    currentState.copy(viewWidth = event.width, viewHeight = event.height, screenState = newScreenState)
+                }
+                is MainScreenEvent.OrientationChanged -> {
+                    currentState.copy(currentOrientation = event.orientation)
+                }
+                is MainScreenEvent.AimingAngleChanged -> {
+                    val newProtractorUnit = currentState.screenState.protractorUnit.copy(aimingAngleDegrees = event.degrees)
+                    val newScreenState = currentState.screenState.copy(protractorUnit = newProtractorUnit)
                     currentState.copy(screenState = newScreenState)
                 }
-                // Events that modify OverlayState directly
+                is MainScreenEvent.ZoomChanged -> {
+                    val currentZoom = ZoomMapping.sliderToZoom(currentState.zoomSliderPosition)
+                    val newZoom = (currentZoom * event.zoomFactor).coerceIn(ZoomMapping.MIN_ZOOM, ZoomMapping.MAX_ZOOM)
+                    val newSliderPosition = ZoomMapping.zoomToSlider(newZoom)
+                    currentState.copy(zoomSliderPosition = newSliderPosition)
+                }
+                is MainScreenEvent.BallMoved -> {
+                    if (event.ballId == 1) { // Only handle target ball moves
+                        val newProtractorUnit = currentState.screenState.protractorUnit.copy(
+                            targetBall = ProtractorUnit.LogicalBall(event.position, currentState.screenState.protractorUnit.targetBall.radius)
+                        )
+                        val newScreenState = currentState.screenState.copy(protractorUnit = newProtractorUnit)
+                        currentState.copy(screenState = newScreenState)
+                    } else {
+                        currentState
+                    }
+                }
+                is MainScreenEvent.Reset -> {
+                    val newScreenState = stateReducer.reduce(currentState.screenState, event)
+                    currentState.copy(screenState = newScreenState, zoomSliderPosition = 50f, currentOrientation = FullOrientation(0f, 0f, 0f), anchorOrientation = null)
+                }
                 is MainScreenEvent.ZoomSliderChanged -> currentState.copy(zoomSliderPosition = event.position)
                 is MainScreenEvent.ForceLightMode -> currentState.copy(isForceLightMode = event.enabled)
                 is MainScreenEvent.LuminanceChanged -> currentState.copy(luminanceAdjustment = event.value)
@@ -73,21 +97,10 @@ class MainViewModel(
                 is MainScreenEvent.DismissLuminanceDialog -> currentState.copy(showLuminanceDialog = false)
                 is MainScreenEvent.ToggleBankingMode -> currentState.copy(isBankingMode = !currentState.isBankingMode)
                 is MainScreenEvent.BankingAimTargetChanged -> currentState.copy(bankingAimTarget = event.position)
-                // ADDED: Handle the new event
                 is MainScreenEvent.ToggleActualCueBall -> {
                     val newScreenState = currentState.screenState.copy(showActualCueBall = !currentState.screenState.showActualCueBall)
                     currentState.copy(screenState = newScreenState)
                 }
-
-                // Events that trigger a one-off UI action
-                is MainScreenEvent.DownloadUpdate -> {
-                    // FIX: Call the correct method
-                    updateChecker.getLatestReleaseUrl()?.let {
-                        _uiEvents.send(UiEvent.OpenUrl(it))
-                    }
-                    currentState // No state change from this event itself
-                }
-                // ADDED: Handle meta events
                 is MainScreenEvent.ViewArt -> {
                     _uiEvents.send(UiEvent.OpenUrl("https://herelies.art"))
                     currentState
@@ -96,21 +109,11 @@ class MainViewModel(
                     _uiEvents.send(UiEvent.OpenUrl("https://www.buymeacoffee.com/hereliesaz"))
                     currentState
                 }
-                is MainScreenEvent.CheckForUpdate -> {
-                    checkForUpdates() // Re-trigger the check
-                    currentState
-                }
-                // Events handled by other flows or with no state change
-                is MainScreenEvent.DismissUpdateDialog -> currentState
                 else -> currentState
             }
+            // Always run the result through the use case to update derived state like matrices
+            newOverlayState = updateStateUseCase(newOverlayState)
             _overlayState.value = newOverlayState
-        }
-    }
-
-    private fun checkForUpdates() {
-        viewModelScope.launch {
-            updateChecker.checkForUpdate()
         }
     }
 }
