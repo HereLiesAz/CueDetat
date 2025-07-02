@@ -2,7 +2,7 @@ package com.hereliesaz.cuedetatlite.view.renderer.util
 
 import android.graphics.Matrix
 import android.graphics.PointF
-import com.hereliesaz.cuedetatlite.view.model.IlogicalBall // Changed from ActualCueBall
+import com.hereliesaz.cuedetatlite.view.model.ILogicalBall
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
 import kotlin.math.abs
 import kotlin.math.pow
@@ -14,12 +14,11 @@ object DrawingUtils {
     data class PerspectiveRadiusInfo(val radius: Float, val lift: Float)
 
     fun getPerspectiveRadiusAndLift(
-        ball: IlogicalBall, // Changed to use the interface
+        ball: ILogicalBall,
         state: OverlayState
     ): PerspectiveRadiusInfo {
         if (!state.hasInverseMatrix) return PerspectiveRadiusInfo(ball.radius, 0f)
 
-        // Use logicalPosition instead of center
         val screenCenter = mapPoint(ball.logicalPosition, state.pitchMatrix)
         val logicalHorizontalEdge = PointF(ball.logicalPosition.x + ball.radius, ball.logicalPosition.y)
         val screenHorizontalEdge = mapPoint(logicalHorizontalEdge, state.pitchMatrix)

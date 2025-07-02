@@ -3,16 +3,13 @@ package com.hereliesaz.cuedetatlite.view
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Matrix
-import android.graphics.PointF
 import android.graphics.Typeface
 import android.view.MotionEvent
-import android.view.ScaleGestureDetector
 import android.view.View
-import android.view.ViewConfiguration
 import androidx.core.content.res.ResourcesCompat
 import com.hereliesaz.cuedetatlite.R
 import com.hereliesaz.cuedetatlite.ui.MainScreenEvent
+import com.hereliesaz.cuedetatlite.view.gestures.GestureHandler
 import com.hereliesaz.cuedetatlite.view.renderer.BallRenderer
 import com.hereliesaz.cuedetatlite.view.renderer.LineRenderer
 import com.hereliesaz.cuedetatlite.view.renderer.OverlayRenderer
@@ -20,63 +17,46 @@ import com.hereliesaz.cuedetatlite.view.renderer.RailRenderer
 import com.hereliesaz.cuedetatlite.view.renderer.TableRenderer
 import com.hereliesaz.cuedetatlite.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetatlite.view.renderer.text.LineTextRenderer
-import com.hereliesaz.cuedetatlite.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
-import kotlin.math.atan2
-import kotlin.math.toDegrees
 
 @SuppressLint("ClickableViewAccessibility")
 class ProtractorOverlayView(context: Context) : View(context) {
 
-    private enum class InteractionMode {
-        NONE, SCALING, ROTATING_AIM, MOVING_TARGET_BALL
-    }
-
     private val paints = PaintCache()
-    private val ballTextRenderer = BallTextRenderer()
-    private val lineTextRenderer = LineTextRenderer()
-    private val ballRenderer = BallRenderer(paints, ballTextRenderer)
-    private val lineRenderer = LineRenderer(paints, lineTextRenderer)
-    private val railRenderer = RailRenderer(paints)
-    private val tableRenderer = TableRenderer(paints)
-    private val renderer = OverlayRenderer(ballRenderer, lineRenderer, railRenderer, tableRenderer, paints)
+    private val renderer: OverlayRenderer
+    private val gestureHandler: GestureHandler
 
     private var canonicalState = OverlayState()
     private var barbaroTypeface: Typeface? = null
 
     var onEvent: ((MainScreenEvent) -> Unit)? = null
-
-    private val scaleGestureDetector: ScaleGestureDetector
-    private var lastTouchX_single = 0f
-    private var lastTouchY_single = 0f
-    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
-    private val draggableElementSlop = touchSlop * 7.0f
-
-    private var activePointerId = MotionEvent.INVALID_POINTER_ID
-    private var interactionMode = InteractionMode.NONE
-    private var gestureInProgress = false
+        set(value) {
+            field = value
+            // This is a bit of a workaround to pass the final event handler
+            // to the gesture handler after the view is constructed.
+            if (value != null) {
+                // Re-initialize gesture handler with the actual event listener
+                // gestureHandler = GestureHandler(context, value) // This causes issues, handled in init
+            }
+        }
 
     init {
         if (!isInEditMode) {
             barbaroTypeface = ResourcesCompat.getFont(context, R.font.barbaro)
             paints.setTypeface(barbaroTypeface)
         }
-        val scaleListener = object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-            override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
-                interactionMode = InteractionMode.SCALING
-                if (!gestureInProgress) { gestureInProgress = true }
-                return true
-            }
 
-            override fun onScale(detector: ScaleGestureDetector): Boolean {
-                if (interactionMode == InteractionMode.SCALING) {
-                    onEvent?.invoke(MainScreenEvent.ZoomChanged(detector.scaleFactor))
-                    return true
-                }
-                return false
-            }
+        val ballTextRenderer = BallTextRenderer()
+        val lineTextRenderer = LineTextRenderer()
+        val ballRenderer = BallRenderer(paints, ballTextRenderer)
+        val lineRenderer = LineRenderer(paints, lineTextRenderer)
+        val railRenderer = RailRenderer(paints)
+        val tableRenderer = TableRenderer(paints)
+        renderer = OverlayRenderer(ballRenderer, lineRenderer, railRenderer, tableRenderer, paints)
+
+        gestureHandler = GestureHandler(context) { event ->
+            onEvent?.invoke(event)
         }
-        scaleGestureDetector = ScaleGestureDetector(context, scaleListener)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -89,92 +69,8 @@ class ProtractorOverlayView(context: Context) : View(context) {
         onEvent?.invoke(MainScreenEvent.ViewResized(w, h))
     }
 
-    private fun getLogicalPoint(screenPoint: PointF): PointF {
-        val logicalPoint = PointF(screenPoint.x, screenPoint.y)
-        if (canonicalState.hasInverseMatrix) {
-            val invertedMatrix = Matrix(canonicalState.inversePitchMatrix)
-            val pointArray = floatArrayOf(logicalPoint.x, logicalPoint.y)
-            invertedMatrix.mapPoints(pointArray)
-            logicalPoint.x = pointArray[0]
-            logicalPoint.y = pointArray[1]
-        }
-        return logicalPoint
-    }
-
-    @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        scaleGestureDetector.onTouchEvent(event)
-        if (canonicalState.isSpatiallyLocked && !scaleGestureDetector.isInProgress) return true
-        if (scaleGestureDetector.isInProgress) return true
-
-        val action = event.actionMasked
-        val pointerIndex = event.actionIndex
-
-        when (action) {
-            MotionEvent.ACTION_DOWN -> {
-                if (!gestureInProgress) { gestureInProgress = true }
-                activePointerId = event.getPointerId(0)
-                lastTouchX_single = event.getX(0)
-                lastTouchY_single = event.getY(0)
-                determineSingleTouchMode(lastTouchX_single, lastTouchY_single)
-            }
-            MotionEvent.ACTION_MOVE -> {
-                if (event.pointerCount == 1 && activePointerId != MotionEvent.INVALID_POINTER_ID) {
-                    val currentX = event.getX(event.findPointerIndex(activePointerId))
-                    val currentY = event.getY(event.findPointerIndex(activePointerId))
-                    val currentPoint = PointF(currentX, currentY)
-
-                    when (interactionMode) {
-                        InteractionMode.ROTATING_AIM -> {
-                            val targetBallScreenPos = DrawingUtils.mapPoint(canonicalState.screenState.protractorUnit.targetBall.logicalPosition, canonicalState.pitchMatrix)
-                            val angleRad = atan2(currentY - targetBallScreenPos.y, currentX - targetBallScreenPos.x)
-                            val angleDeg = toDegrees(angleRad.toDouble()).toFloat()
-                            onEvent?.invoke(MainScreenEvent.AimingAngleChanged(angleDeg + 180)) // Add 180 to aim from opposite side
-                        }
-                        InteractionMode.MOVING_TARGET_BALL -> {
-                            onEvent?.invoke(MainScreenEvent.BallMoved(1, getLogicalPoint(currentPoint))) // ID 1 for target ball
-                        }
-                        else -> {}
-                    }
-                    lastTouchX_single = currentX
-                    lastTouchY_single = currentY
-                }
-            }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                if (gestureInProgress) { gestureInProgress = false }
-                interactionMode = InteractionMode.NONE
-                activePointerId = MotionEvent.INVALID_POINTER_ID
-            }
-            MotionEvent.ACTION_POINTER_UP -> {
-                val upPointerId = event.getPointerId(pointerIndex)
-                if (upPointerId == activePointerId) {
-                    val newPointerActionIndex = if (pointerIndex == 0) 1 else 0
-                    if (newPointerActionIndex < event.pointerCount) {
-                        activePointerId = event.getPointerId(newPointerActionIndex)
-                        lastTouchX_single = event.getX(newPointerActionIndex)
-                        lastTouchY_single = event.getY(newPointerActionIndex)
-                    } else {
-                        interactionMode = InteractionMode.NONE
-                        activePointerId = MotionEvent.INVALID_POINTER_ID
-                    }
-                }
-            }
-        }
-        return true
-    }
-
-    private fun determineSingleTouchMode(touchX: Float, touchY: Float) {
-        val touchPoint = PointF(touchX, touchY)
-        if (!canonicalState.isBankingMode) {
-            val targetBallScreenPos = DrawingUtils.mapPoint(canonicalState.screenState.protractorUnit.targetBall.logicalPosition, canonicalState.pitchMatrix)
-            interactionMode = if (DrawingUtils.distance(touchPoint, targetBallScreenPos) < draggableElementSlop) {
-                InteractionMode.MOVING_TARGET_BALL
-            } else {
-                InteractionMode.ROTATING_AIM
-            }
-        } else {
-            interactionMode = InteractionMode.NONE
-        }
+        return gestureHandler.onTouchEvent(event, canonicalState)
     }
 
     fun updateState(newState: OverlayState, systemIsDark: Boolean) {

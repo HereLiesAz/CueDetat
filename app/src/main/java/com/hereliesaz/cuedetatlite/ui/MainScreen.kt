@@ -84,20 +84,9 @@ fun MainScreen(
                 KineticWarning(text = uiState.warningMessage)
 
                 if (uiState.showLuminanceDialog) {
-                    AlertDialog(
-                        onDismissRequest = { viewModel.onEvent(MainScreenEvent.DismissLuminanceDialog) },
-                        title = { Text("Adjust Luminance") },
-                        text = {
-                            VerticalSlider(
-                                value = overlayState.luminanceAdjustment,
-                                onValueChange = { viewModel.onEvent(MainScreenEvent.LuminanceChanged(it)) }
-                            )
-                        },
-                        confirmButton = {
-                            Button(onClick = { viewModel.onEvent(MainScreenEvent.DismissLuminanceDialog) }) {
-                                Text("OK")
-                            }
-                        }
+                    LuminanceDialog(
+                        currentLuminance = overlayState.luminanceAdjustment,
+                        onEvent = viewModel::onEvent
                     )
                 }
 
@@ -105,7 +94,7 @@ fun MainScreen(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .padding(end = 16.dp)
-                        .fillMaxHeight(0.5f), // Set slider height to 50%
+                        .fillMaxHeight(0.5f),
                     uiState = overlayState,
                     onEvent = viewModel::onEvent
                 )
