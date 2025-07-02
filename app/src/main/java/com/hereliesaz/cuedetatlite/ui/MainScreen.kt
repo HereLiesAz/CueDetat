@@ -48,10 +48,15 @@ fun MainScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    ToggleCueBallFab(
-                        uiState = overlayState,
-                        onEvent = viewModel::onEvent
-                    )
+                    if (!overlayState.isBankingMode) {
+                        ToggleCueBallFab(
+                            uiState = overlayState,
+                            onEvent = viewModel::onEvent
+                        )
+                    } else {
+                        Spacer(Modifier) // Keep the layout balanced
+                    }
+
                     ResetFab(
                         uiState = overlayState,
                         onEvent = viewModel::onEvent

@@ -37,7 +37,6 @@ listenablefuture = "9999.0-empty-to-avoid-conflict-with-guava"
 
 # Hilt (Dependency Injection)
 hilt = "2.56.2" # Matches plugin version
-
 # Networking
 retrofit = "3.0.0"
 converterGson = "3.0.0"
@@ -97,8 +96,8 @@ listenablefuture = { module = "com.google.guava:listenablefuture", version.ref =
 kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "stdlib" }
 
 # Hilt
-hilt-android = { group = "com.google.dagger", name = "hilt-android", version = "2.56.2" }
-hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version = "2.56.2" }
+hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
+hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
 
 # Retrofit
 material3 = { module = "androidx.compose.material3:material3" }

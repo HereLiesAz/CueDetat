@@ -18,12 +18,10 @@ class GestureHandler(
 ) {
 
     private enum class InteractionMode {
-        NONE, SCALING, ROTATING_AIM, MOVING_TARGET_BALL
+        NONE, SCALING, ROTATING_AIM, MOVING_TARGET_BALL, MOVING_ACTUAL_CUE_BALL, AIMING_BANK_SHOT
     }
 
     private val scaleGestureDetector: ScaleGestureDetector
-    private var lastTouchX_single = 0f
-    private var lastTouchY_single = 0f
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
     private val draggableElementSlop = touchSlop * 7.0f
 
@@ -63,9 +61,7 @@ class GestureHandler(
             MotionEvent.ACTION_DOWN -> {
                 if (!gestureInProgress) { gestureInProgress = true }
                 activePointerId = event.getPointerId(0)
-                lastTouchX_single = event.getX(0)
-                lastTouchY_single = event.getY(0)
-                determineSingleTouchMode(lastTouchX_single, lastTouchY_single, state)
+                determineSingleTouchMode(event.getX(0), event.getY(0), state)
             }
             MotionEvent.ACTION_MOVE -> {
                 if (event.pointerCount == 1 && activePointerId != MotionEvent.INVALID_POINTER_ID) {
@@ -83,13 +79,11 @@ class GestureHandler(
                             val angleDeg = toDegrees(angleRad.toDouble()).toFloat()
                             onEvent(MainScreenEvent.AimingAngleChanged(angleDeg + 180))
                         }
-                        InteractionMode.MOVING_TARGET_BALL -> {
-                            onEvent(MainScreenEvent.BallMoved(1, state.getLogicalPoint(currentPoint)))
-                        }
+                        InteractionMode.MOVING_TARGET_BALL -> onEvent(MainScreenEvent.BallMoved(1, currentPoint))
+                        InteractionMode.MOVING_ACTUAL_CUE_BALL -> onEvent(MainScreenEvent.BallMoved(2, currentPoint))
+                        InteractionMode.AIMING_BANK_SHOT -> onEvent(MainScreenEvent.BankingAimTargetChanged(currentPoint))
                         else -> {}
                     }
-                    lastTouchX_single = currentX
-                    lastTouchY_single = currentY
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -103,8 +97,6 @@ class GestureHandler(
                     val newPointerActionIndex = if (pointerIndex == 0) 1 else 0
                     if (newPointerActionIndex < event.pointerCount) {
                         activePointerId = event.getPointerId(newPointerActionIndex)
-                        lastTouchX_single = event.getX(newPointerActionIndex)
-                        lastTouchY_single = event.getY(newPointerActionIndex)
                     } else {
                         interactionMode = InteractionMode.NONE
                         activePointerId = MotionEvent.INVALID_POINTER_ID
@@ -117,26 +109,31 @@ class GestureHandler(
 
     private fun determineSingleTouchMode(touchX: Float, touchY: Float, state: OverlayState) {
         val touchPoint = PointF(touchX, touchY)
-        if (!state.isBankingMode) {
-            val targetBallScreenPos = DrawingUtils.mapPoint(state.screenState.protractorUnit.targetBall.logicalPosition, state.pitchMatrix)
-            interactionMode = if (DrawingUtils.distance(touchPoint, targetBallScreenPos) < draggableElementSlop) {
-                InteractionMode.MOVING_TARGET_BALL
-            } else {
-                InteractionMode.ROTATING_AIM
-            }
-        } else {
-            interactionMode = InteractionMode.NONE
-        }
-    }
+        interactionMode = InteractionMode.NONE
 
-    private fun OverlayState.getLogicalPoint(screenPoint: PointF): PointF {
-        val logicalPoint = PointF(screenPoint.x, screenPoint.y)
-        if (this.hasInverseMatrix) {
-            val pointArray = floatArrayOf(logicalPoint.x, logicalPoint.y)
-            this.inversePitchMatrix.mapPoints(pointArray)
-            logicalPoint.x = pointArray[0]
-            logicalPoint.y = pointArray[1]
+        if (state.isBankingMode) {
+            state.screenState.actualCueBall?.let {
+                val ballScreenPos = DrawingUtils.mapPoint(it.logicalPosition, state.pitchMatrix)
+                if (DrawingUtils.distance(touchPoint, ballScreenPos) < draggableElementSlop) {
+                    interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL; return
+                }
+            }
+            interactionMode = InteractionMode.AIMING_BANK_SHOT
+            onEvent(MainScreenEvent.BankingAimTargetChanged(touchPoint))
+        } else {
+            state.screenState.actualCueBall?.let {
+                val ballScreenPos = DrawingUtils.mapPoint(it.logicalPosition, state.pitchMatrix)
+                if (DrawingUtils.distance(touchPoint, ballScreenPos) < draggableElementSlop) {
+                    interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL; return
+                }
+            }
+
+            val targetBallScreenPos = DrawingUtils.mapPoint(state.screenState.protractorUnit.targetBall.logicalPosition, state.pitchMatrix)
+            if (DrawingUtils.distance(touchPoint, targetBallScreenPos) < draggableElementSlop) {
+                interactionMode = InteractionMode.MOVING_TARGET_BALL; return
+            }
+
+            interactionMode = InteractionMode.ROTATING_AIM
         }
-        return logicalPoint
     }
 }

@@ -30,4 +30,5 @@ sealed class MainScreenEvent {
     object ToggleActualCueBall : MainScreenEvent()
     object ViewArt : MainScreenEvent()
     object ShowDonationOptions : MainScreenEvent()
+    data class TableRotationChanged(val degrees: Float) : MainScreenEvent()
 }

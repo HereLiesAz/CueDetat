@@ -7,11 +7,7 @@ import com.hereliesaz.cuedetatlite.view.model.TableModel
 import com.hereliesaz.cuedetatlite.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
 import com.hereliesaz.cuedetatlite.view.state.ScreenState
-import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.pow
-import kotlin.math.sin
-import kotlin.math.sqrt
+import kotlin.math.*
 
 class LineRenderer(
     private val paintCache: PaintCache,
@@ -35,25 +31,18 @@ class LineRenderer(
         val protractorUnit = screenState.protractorUnit
         val targetBall = protractorUnit.targetBall
 
-        // --- Calculate Ghost Ball position to draw line ---
         val angleRad = Math.toRadians(protractorUnit.aimingAngleDegrees.toDouble()).toFloat()
         val totalRadius = targetBall.radius * 2
         val ghostBallX = targetBall.logicalPosition.x - cos(angleRad) * totalRadius
         val ghostBallY = targetBall.logicalPosition.y - sin(angleRad) * totalRadius
+        val ghostBallPos = PointF(ghostBallX, ghostBallY)
 
         // Aiming line from Ghost Ball to Target Ball
-        canvas.drawLine(
-            ghostBallX,
-            ghostBallY,
-            targetBall.logicalPosition.x,
-            targetBall.logicalPosition.y,
-            paintCache.greenPaint
-        )
+        canvas.drawLine(ghostBallX, ghostBallY, targetBall.logicalPosition.x, targetBall.logicalPosition.y, paintCache.aimingLinePaint)
 
         // Shot line (from actual cue ball, if present)
         screenState.actualCueBall?.let { actualCueBall ->
             if (screenState.showActualCueBall) {
-                // The shot line direction is from the actual cue ball towards the ghost ball
                 val dx = ghostBallX - actualCueBall.logicalPosition.x
                 val dy = ghostBallY - actualCueBall.logicalPosition.y
                 canvas.drawLine(
@@ -61,9 +50,46 @@ class LineRenderer(
                     actualCueBall.logicalPosition.y,
                     actualCueBall.logicalPosition.x + dx * 10,
                     actualCueBall.logicalPosition.y + dy * 10,
-                    paintCache.redPaint
+                    paintCache.shotLinePaint
                 )
             }
+        }
+
+        // Tangent Lines
+        drawTangentLines(canvas, targetBall.logicalPosition, ghostBallPos, paintCache)
+
+        // Protractor lines
+        drawProtractorAngleLines(canvas, targetBall.logicalPosition, ghostBallPos, paintCache)
+    }
+
+    private fun drawTangentLines(canvas: Canvas, targetCenter: PointF, ghostCenter: PointF, paints: PaintCache) {
+        val dx = targetCenter.x - ghostCenter.x
+        val dy = targetCenter.y - ghostCenter.y
+        val mag = sqrt(dx*dx + dy*dy)
+        if (mag == 0f) return
+
+        val tangentDx = -dy / mag
+        val tangentDy = dx / mag
+        val extend = 2000f
+
+        canvas.drawLine(ghostCenter.x, ghostCenter.y, ghostCenter.x + tangentDx * extend, ghostCenter.y + tangentDy * extend, paints.tangentLineDottedPaint)
+        canvas.drawLine(ghostCenter.x, ghostCenter.y, ghostCenter.x - tangentDx * extend, ghostCenter.y - tangentDy * extend, paints.tangentLineDottedPaint)
+    }
+
+    private fun drawProtractorAngleLines(canvas: Canvas, targetCenter: PointF, ghostCenter: PointF, paints: PaintCache) {
+        val baseAngleRad = atan2(ghostCenter.y - targetCenter.y, ghostCenter.x - targetCenter.x)
+        val extend = 2000f
+
+        listOf(15f, 30f, 45f).forEach { angleDeg ->
+            val angleRad = Math.toRadians(angleDeg.toDouble()).toFloat()
+
+            val pX = targetCenter.x + extend * cos(baseAngleRad + angleRad)
+            val pY = targetCenter.y + extend * sin(baseAngleRad + angleRad)
+            canvas.drawLine(targetCenter.x, targetCenter.y, pX, pY, paints.protractorLinePaint)
+
+            val nX = targetCenter.x + extend * cos(baseAngleRad - angleRad)
+            val nY = targetCenter.y + extend * sin(baseAngleRad - angleRad)
+            canvas.drawLine(targetCenter.x, targetCenter.y, nX, nY, paints.protractorLinePaint)
         }
     }
 
@@ -72,34 +98,14 @@ class LineRenderer(
         val tableModel = screenState.tableModel ?: return
         if (path.size < 2) return
 
+        val bankLinePaints = listOf(paintCache.bankShotLinePaint1, paintCache.bankShotLinePaint2, paintCache.bankShotLinePaint3)
+
         for (i in 0 until path.size - 1) {
             val start = path[i]
             val end = path[i + 1]
 
-            val isLastSegmentPocketed = (i == path.size - 2) && tableModel.pockets.any { pocket: TableModel.Pocket ->
-                distance(end, pocket.center) < pocket.radius
-            }
-
-            val paint = if (isLastSegmentPocketed) {
-                paintCache.whitePaint
-            } else {
-                paintCache.bluePaint
-            }
+            val paint = bankLinePaints.getOrElse(i) { bankLinePaints.last() }
             canvas.drawLine(start.x, start.y, end.x, end.y, paint)
         }
-
-        val reflectionPoints = path.drop(1).dropLast(if (path.size > 1) 1 else 0)
-        reflectionPoints.forEach { point ->
-            val diamondValue = tableModel.getDiamondValue(point)
-            if (diamondValue != null) {
-                val text = "%.1f".format(diamondValue)
-                val textY = if (abs(point.y - tableModel.surface.top) < 5) point.y - 20 else point.y + 40
-                lineTextRenderer.draw(canvas, text, point.x, textY, paintCache.lineTextPaint)
-            }
-        }
-    }
-
-    private fun distance(p1: PointF, p2: PointF): Float {
-        return sqrt((p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2))
     }
 }
