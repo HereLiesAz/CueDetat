@@ -2,42 +2,97 @@ package com.hereliesaz.cuedetatlite.domain
 
 import android.graphics.PointF
 import com.hereliesaz.cuedetatlite.ui.MainScreenEvent
+import com.hereliesaz.cuedetatlite.ui.ZoomMapping
+import com.hereliesaz.cuedetatlite.view.model.ActualCueBall
 import com.hereliesaz.cuedetatlite.view.model.ProtractorUnit
+import com.hereliesaz.cuedetatlite.view.model.TableModel
 import com.hereliesaz.cuedetatlite.view.state.ScreenState
+import javax.inject.Inject
 
-class StateReducer(private val warningManager: WarningManager) {
+class StateReducer @Inject constructor(private val warningManager: WarningManager) {
 
-    fun reduce(state: ScreenState, event: MainScreenEvent): ScreenState {
-        val newState = when (event) {
-            is MainScreenEvent.BallMoved -> reduceBallMoved(state, event.ballId, event.position)
-            is MainScreenEvent.BallRadiusChanged -> reduceBallRadiusChanged(state, event.ballId, event.radius)
-            MainScreenEvent.Reset -> reduceReset()
-            else -> state
-        }
-        return newState.copy(warningText = warningManager.getWarning(newState))
-    }
-
-    private fun reduceReset(): ScreenState {
+    private fun getInitialState(width: Int, height: Int): ScreenState {
+        val initialRadius = (width.coerceAtMost(height) * 0.30f / 2f) * ZoomMapping.DEFAULT_ZOOM
         return ScreenState(
-            protractorUnit = ProtractorUnit(), // Resets to default target ball and angle
-            warningText = null
+            protractorUnit = ProtractorUnit(
+                targetBall = ProtractorUnit.LogicalBall(PointF(width / 2f, height / 2f), initialRadius),
+                aimingAngleDegrees = 0f
+            ),
         )
     }
 
-    private fun reduceBallMoved(state: ScreenState, ballId: Int, position: PointF): ScreenState {
-        val newProtractorUnit = when (ballId) {
-            // ID 1 is the target ball
-            1 -> state.protractorUnit.copy(targetBall = ProtractorUnit.LogicalBall(position, state.protractorUnit.targetBall.radius))
-            else -> state.protractorUnit
-        }
-        return state.copy(protractorUnit = newProtractorUnit)
-    }
+    fun reduce(state: ScreenState, event: MainScreenEvent, viewWidth: Int, viewHeight: Int): ScreenState {
+        val newState = when (event) {
+            is MainScreenEvent.ViewResized -> getInitialState(event.width, event.height)
 
-    private fun reduceBallRadiusChanged(state: ScreenState, ballId: Int, radius: Float): ScreenState {
-        val newProtractorUnit = when (ballId) {
-            1 -> state.protractorUnit.copy(targetBall = ProtractorUnit.LogicalBall(state.protractorUnit.targetBall.logicalPosition, radius))
-            else -> state.protractorUnit
+            is MainScreenEvent.BallMoved -> {
+                when (event.ballId) {
+                    1 -> {
+                        val newTargetBall = ProtractorUnit.LogicalBall(event.position, state.protractorUnit.targetBall.radius)
+                        state.copy(protractorUnit = state.protractorUnit.copy(targetBall = newTargetBall))
+                    }
+                    2 -> {
+                        val newActualCueBall = state.actualCueBall?.let { ActualCueBall(event.position, it.radius) }
+                        state.copy(actualCueBall = newActualCueBall)
+                    }
+                    else -> state
+                }
+            }
+
+            is MainScreenEvent.BallRadiusChanged -> {
+                when (event.ballId) {
+                    1 -> {
+                        val newTargetBall = ProtractorUnit.LogicalBall(state.protractorUnit.targetBall.logicalPosition, event.radius)
+                        state.copy(protractorUnit = state.protractorUnit.copy(targetBall = newTargetBall))
+                    }
+                    2 -> {
+                        val newActualCueBall = state.actualCueBall?.let { ActualCueBall(it.logicalPosition, event.radius) }
+                        state.copy(actualCueBall = newActualCueBall)
+                    }
+                    else -> state
+                }
+            }
+
+            is MainScreenEvent.ToggleActualCueBall -> {
+                if (state.isBankingMode) {
+                    return state // Correct way to return early from the function
+                }
+                if (state.actualCueBall == null) {
+                    state.copy(actualCueBall = ActualCueBall(PointF(viewWidth / 2f, viewHeight * 0.75f), state.protractorUnit.targetBall.radius))
+                } else {
+                    state.copy(actualCueBall = null)
+                }
+            }
+
+            is MainScreenEvent.ToggleBankingMode -> {
+                if (!state.isBankingMode) {
+                    state.copy(
+                        isBankingMode = true,
+                        isProtractorMode = false,
+                        tableModel = TableModel.create(viewWidth.toFloat(), viewHeight.toFloat()),
+                        actualCueBall = ActualCueBall(PointF(viewWidth / 2f, viewHeight / 2f), state.protractorUnit.targetBall.radius)
+                    )
+                } else {
+                    state.copy(
+                        isBankingMode = false,
+                        isProtractorMode = true,
+                        tableModel = null,
+                        bankingPath = emptyList(),
+                        actualCueBall = null // Remove the banking ball when leaving mode
+                    )
+                }
+            }
+
+            is MainScreenEvent.BankingAimTargetChanged -> {
+                if (state.isBankingMode && state.tableModel != null && state.actualCueBall != null) {
+                    val path = state.tableModel.calculateBankingPath(state.actualCueBall.logicalPosition, event.position)
+                    state.copy(bankingPath = path)
+                } else state
+            }
+
+            MainScreenEvent.Reset -> getInitialState(viewWidth, viewHeight)
+            else -> state
         }
-        return state.copy(protractorUnit = newProtractorUnit)
+        return newState.copy(warningText = warningManager.getWarning(newState))
     }
 }

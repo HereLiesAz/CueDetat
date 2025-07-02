@@ -12,19 +12,28 @@ class OverlayRenderer(
     private val paintCache: PaintCache
 ) {
     fun draw(canvas: Canvas, state: OverlayState) {
-        // Clear canvas
+        // Clear canvas for transparency
         canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
 
-        // Update paint colors based on the current state
-        paintCache.updateColors(state, true) // Assuming dark mode for now
-
         if (state.isBankingMode) {
-            // FIX: Pass both screenState and the full overlayState
+            // Draw table surface with the standard matrix
+            canvas.save()
+            canvas.concat(state.pitchMatrix)
             tableRenderer.draw(canvas, state.screenState, state)
+            canvas.restore()
+
+            // Draw rails with the special, lifted matrix
+            canvas.save()
+            canvas.concat(state.railPitchMatrix)
             railRenderer.draw(canvas, state.screenState, state)
+            canvas.restore()
         }
 
+        // Draw all logical lines and 2D balls on the transformed plane
         lineRenderer.draw(canvas, state.screenState, state)
-        ballRenderer.draw(canvas, state.screenState, state)
+        ballRenderer.drawLogicalBalls(canvas, state, paintCache)
+
+        // Draw the 3D "ghost" ball effects on top, in screen space
+        ballRenderer.drawScreenSpaceGhosts(canvas, state)
     }
 }

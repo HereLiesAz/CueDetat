@@ -1,17 +1,17 @@
 package com.hereliesaz.cuedetatlite.ui
 
-import android.graphics.PointF
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.hereliesaz.cuedetatlite.data.FullOrientation
 import com.hereliesaz.cuedetatlite.data.SensorRepository
 import com.hereliesaz.cuedetatlite.domain.StateReducer
 import com.hereliesaz.cuedetatlite.domain.UpdateStateUseCase
-import com.hereliesaz.cuedetatlite.view.model.ProtractorUnit
+import com.hereliesaz.cuedetatlite.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 data class MainScreenUiState(
     val isForceLightMode: Boolean? = null,
@@ -19,7 +19,8 @@ data class MainScreenUiState(
     val warningMessage: String? = null
 )
 
-class MainViewModel(
+@HiltViewModel
+class MainViewModel @Inject constructor(
     private val stateReducer: StateReducer,
     private val updateStateUseCase: UpdateStateUseCase,
     val sensorRepository: SensorRepository
@@ -31,15 +32,8 @@ class MainViewModel(
     private val _uiEvents = Channel<UiEvent>()
     val uiEvents = _uiEvents.receiveAsFlow()
 
-    val uiState: StateFlow<MainScreenUiState> =
-        _overlayState.map { overlay ->
-            MainScreenUiState(
-                isForceLightMode = overlay.isForceLightMode,
-                showLuminanceDialog = overlay.showLuminanceDialog,
-                warningMessage = overlay.screenState.warningText?.name
-            )
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MainScreenUiState())
-
+    private val _uiState = MutableStateFlow(MainScreenUiState())
+    val uiState: StateFlow<MainScreenUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -52,68 +46,71 @@ class MainViewModel(
     fun onEvent(event: MainScreenEvent) {
         viewModelScope.launch {
             val currentState = _overlayState.value
-            var newOverlayState = when (event) {
-                is MainScreenEvent.ViewResized -> {
-                    val newScreenState = currentState.screenState.copy(
-                        protractorUnit = ProtractorUnit(
-                            targetBall = ProtractorUnit.LogicalBall(PointF(event.width / 2f, event.height / 2f), 30f)
-                        )
-                    )
-                    currentState.copy(viewWidth = event.width, viewHeight = event.height, screenState = newScreenState)
-                }
-                is MainScreenEvent.OrientationChanged -> {
-                    currentState.copy(currentOrientation = event.orientation)
-                }
-                is MainScreenEvent.AimingAngleChanged -> {
-                    val newProtractorUnit = currentState.screenState.protractorUnit.copy(aimingAngleDegrees = event.degrees)
-                    val newScreenState = currentState.screenState.copy(protractorUnit = newProtractorUnit)
-                    currentState.copy(screenState = newScreenState)
-                }
-                is MainScreenEvent.ZoomChanged -> {
-                    val currentZoom = ZoomMapping.sliderToZoom(currentState.zoomSliderPosition)
-                    val newZoom = (currentZoom * event.zoomFactor).coerceIn(ZoomMapping.MIN_ZOOM, ZoomMapping.MAX_ZOOM)
-                    val newSliderPosition = ZoomMapping.zoomToSlider(newZoom)
-                    currentState.copy(zoomSliderPosition = newSliderPosition)
-                }
+
+            // Handle side-effects and one-off events here
+            when (event) {
+                is MainScreenEvent.ViewArt -> _uiEvents.send(UiEvent.OpenUrl("https://herelies.art"))
+                is MainScreenEvent.ShowDonationOptions -> _uiEvents.send(UiEvent.OpenUrl("https://www.buymeacoffee.com/hereliesaz"))
+                // Convert screen-space gestures to logical-space events before reducing
                 is MainScreenEvent.BallMoved -> {
-                    if (event.ballId == 1) { // Only handle target ball moves
-                        val newProtractorUnit = currentState.screenState.protractorUnit.copy(
-                            targetBall = ProtractorUnit.LogicalBall(event.position, currentState.screenState.protractorUnit.targetBall.radius)
-                        )
-                        val newScreenState = currentState.screenState.copy(protractorUnit = newProtractorUnit)
-                        currentState.copy(screenState = newScreenState)
-                    } else {
-                        currentState
+                    if (currentState.hasInverseMatrix) {
+                        val logicalPoint = DrawingUtils.mapPoint(event.position, currentState.inversePitchMatrix)
+                        // Create a new event with logical coordinates to send to reducer
+                        val logicalEvent = MainScreenEvent.BallMoved(event.ballId, logicalPoint)
+                        processStateUpdate(logicalEvent)
                     }
+                    return@launch // Return to prevent double processing
                 }
-                is MainScreenEvent.Reset -> {
-                    val newScreenState = stateReducer.reduce(currentState.screenState, event)
-                    currentState.copy(screenState = newScreenState, zoomSliderPosition = 50f, currentOrientation = FullOrientation(0f, 0f, 0f), anchorOrientation = null)
+                is MainScreenEvent.BankingAimTargetChanged -> {
+                    if(currentState.hasInverseMatrix){
+                        val logicalPoint = DrawingUtils.mapPoint(event.position, currentState.inversePitchMatrix)
+                        val logicalEvent = MainScreenEvent.BankingAimTargetChanged(logicalPoint)
+                        processStateUpdate(logicalEvent)
+                    }
+                    return@launch
                 }
-                is MainScreenEvent.ZoomSliderChanged -> currentState.copy(zoomSliderPosition = event.position)
-                is MainScreenEvent.ForceLightMode -> currentState.copy(isForceLightMode = event.enabled)
-                is MainScreenEvent.LuminanceChanged -> currentState.copy(luminanceAdjustment = event.value)
-                is MainScreenEvent.ShowLuminanceDialog -> currentState.copy(showLuminanceDialog = true)
-                is MainScreenEvent.DismissLuminanceDialog -> currentState.copy(showLuminanceDialog = false)
-                is MainScreenEvent.ToggleBankingMode -> currentState.copy(isBankingMode = !currentState.isBankingMode)
-                is MainScreenEvent.BankingAimTargetChanged -> currentState.copy(bankingAimTarget = event.position)
-                is MainScreenEvent.ToggleActualCueBall -> {
-                    val newScreenState = currentState.screenState.copy(showActualCueBall = !currentState.screenState.showActualCueBall)
-                    currentState.copy(screenState = newScreenState)
+                else -> {
+                    processStateUpdate(event)
                 }
-                is MainScreenEvent.ViewArt -> {
-                    _uiEvents.send(UiEvent.OpenUrl("https://herelies.art"))
-                    currentState
-                }
-                is MainScreenEvent.ShowDonationOptions -> {
-                    _uiEvents.send(UiEvent.OpenUrl("https://www.buymeacoffee.com/hereliesaz"))
-                    currentState
-                }
-                else -> currentState
             }
-            // Always run the result through the use case to update derived state like matrices
-            newOverlayState = updateStateUseCase(newOverlayState)
-            _overlayState.value = newOverlayState
         }
+    }
+
+    private fun processStateUpdate(event: MainScreenEvent) {
+        val currentState = _overlayState.value
+
+        // Centralized state reduction
+        val reducedScreenState = stateReducer.reduce(currentState.screenState, event, currentState.viewWidth, currentState.viewHeight)
+
+        // Other state changes not in ScreenState
+        var newOverlayState = currentState.copy(screenState = reducedScreenState)
+        newOverlayState = when (event) {
+            is MainScreenEvent.ViewResized -> newOverlayState.copy(viewWidth = event.width, viewHeight = event.height, valuesChangedSinceReset = true)
+            is MainScreenEvent.OrientationChanged -> newOverlayState.copy(currentOrientation = event.orientation)
+            is MainScreenEvent.ZoomChanged -> {
+                val currentZoom = ZoomMapping.sliderToZoom(currentState.zoomSliderPosition)
+                val newZoom = (currentZoom * event.zoomFactor).coerceIn(ZoomMapping.MIN_ZOOM, ZoomMapping.MAX_ZOOM)
+                val newSliderPosition = ZoomMapping.zoomToSlider(newZoom)
+                newOverlayState.copy(zoomSliderPosition = newSliderPosition, valuesChangedSinceReset = true)
+            }
+            is MainScreenEvent.ZoomSliderChanged -> newOverlayState.copy(zoomSliderPosition = event.position, valuesChangedSinceReset = true)
+            is MainScreenEvent.AimingAngleChanged -> newOverlayState.copy(screenState = newOverlayState.screenState.copy(protractorUnit = newOverlayState.screenState.protractorUnit.copy(aimingAngleDegrees = event.degrees)), valuesChangedSinceReset = true)
+            is MainScreenEvent.ForceLightMode -> newOverlayState.copy(isForceLightMode = event.enabled, valuesChangedSinceReset = true)
+            is MainScreenEvent.LuminanceChanged -> newOverlayState.copy(luminanceAdjustment = event.value, valuesChangedSinceReset = true)
+            is MainScreenEvent.ShowLuminanceDialog -> newOverlayState.copy(showLuminanceDialog = true)
+            is MainScreenEvent.DismissLuminanceDialog -> newOverlayState.copy(showLuminanceDialog = false)
+            is MainScreenEvent.ToggleHelp -> newOverlayState.copy(areHelpersVisible = !currentState.areHelpersVisible)
+            is MainScreenEvent.Reset -> newOverlayState.copy(zoomSliderPosition = 50f, anchorOrientation = null, valuesChangedSinceReset = false, tableRotationDegrees = 0f)
+            is MainScreenEvent.TableRotationChanged -> newOverlayState.copy(tableRotationDegrees = event.degrees, valuesChangedSinceReset = true)
+            else -> newOverlayState
+        }
+
+        // Always run the result through the use case to update derived state like matrices
+        _overlayState.value = updateStateUseCase(newOverlayState)
+        _uiState.value = _uiState.value.copy(
+            isForceLightMode = _overlayState.value.isForceLightMode,
+            showLuminanceDialog = _overlayState.value.showLuminanceDialog,
+            warningMessage = _overlayState.value.screenState.warningText?.name
+        )
     }
 }
