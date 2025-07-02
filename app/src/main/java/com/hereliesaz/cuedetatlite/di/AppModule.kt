@@ -3,7 +3,6 @@ package com.hereliesaz.cuedetatlite.di
 import android.content.Context
 import com.hereliesaz.cuedetatlite.data.SensorRepository
 import com.hereliesaz.cuedetatlite.domain.StateReducer
-import com.hereliesaz.cuedetatlite.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetatlite.domain.WarningManager
 import dagger.Module
 import dagger.Provides
@@ -29,14 +28,12 @@ object AppModule {
     }
 
     @Provides
-    // Provide as non-singleton, as it's a pure function with no internal state
+    @Singleton
     fun provideStateReducer(warningManager: WarningManager): StateReducer {
         return StateReducer(warningManager)
     }
 
-    @Provides
-    // Provide as non-singleton, as it's a pure function with no internal state
-    fun provideUpdateStateUseCase(warningManager: WarningManager): UpdateStateUseCase {
-        return UpdateStateUseCase(warningManager)
-    }
+    // REMOVED: The @Provides function for UpdateStateUseCase is not needed
+    // because the class uses @Inject on its constructor. Hilt already knows
+    // how to create it.
 }

@@ -1,20 +1,23 @@
 package com.hereliesaz.cuedetatlite.ui
 
-import kotlin.math.ln
-import kotlin.math.pow
+object ZoomMapping {
+    const val MIN_ZOOM = 1.475f
+    const val MAX_ZOOM = 2.6f
+    const val SLIDER_MIN = 0f
+    const val SLIDER_MAX = 100f
+    const val SLIDER_EFFECTIVE_MIN = 65f
 
-internal object ZoomMapping {
-    const val MIN_ZOOM = 0.084f
-    const val DEFAULT_ZOOM = 0.4f // Restoring this for text scaling normalization
-    const val MAX_ZOOM = 0.6f
+    fun sliderToZoom(sliderValue: Float): Float {
+        val range = MAX_ZOOM - MIN_ZOOM
+        val effectiveSliderValue = sliderValue.coerceIn(SLIDER_EFFECTIVE_MIN, SLIDER_MAX)
+        val normalized = (effectiveSliderValue - SLIDER_EFFECTIVE_MIN) / (SLIDER_MAX - SLIDER_EFFECTIVE_MIN)
+        return (range * normalized) + MIN_ZOOM
+    }
 
-    private val B = (MAX_ZOOM / MIN_ZOOM).pow(0.01f)
-
-    fun sliderToZoom(sliderValue: Float): Float = MIN_ZOOM * B.pow(sliderValue)
-
-    fun zoomToSlider(zoomFactor: Float): Float {
-        if (zoomFactor <= MIN_ZOOM) return 0f
-        if (zoomFactor >= MAX_ZOOM) return 100f
-        return (ln(zoomFactor / MIN_ZOOM) / ln(B))
+    fun zoomToSlider(zoomValue: Float): Float {
+        val range = MAX_ZOOM - MIN_ZOOM
+        if (range == 0f) return SLIDER_EFFECTIVE_MIN
+        val normalized = (zoomValue.coerceIn(MIN_ZOOM, MAX_ZOOM) - MIN_ZOOM) / range
+        return normalized * (SLIDER_MAX - SLIDER_EFFECTIVE_MIN) + SLIDER_EFFECTIVE_MIN
     }
 }

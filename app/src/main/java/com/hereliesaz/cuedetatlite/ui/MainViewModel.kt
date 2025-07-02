@@ -121,6 +121,7 @@ class MainViewModel @Inject constructor(
             else -> newOverlayState
         }
 
+        // CORRECTED: The invoke operator for the use case expects a single OverlayState argument.
         _overlayState.value = updateStateUseCase(newOverlayState)
 
         if (!isGestureInProgress) {

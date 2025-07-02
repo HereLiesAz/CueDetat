@@ -1,110 +1,135 @@
-package com.hereliesaz.cuedetatlite.domain
+package com.hereliesaz.cuedetatlite.ui
 
-import android.graphics.Matrix
-import android.graphics.PointF
-import com.hereliesaz.cuedetatlite.ui.ZoomMapping
-import com.hereliesaz.cuedetatlite.view.model.ActualCueBall
-import com.hereliesaz.cuedetatlite.view.model.Perspective
-import com.hereliesaz.cuedetatlite.view.model.ProtractorUnit
+import android.app.Application
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.hereliesaz.cuedetatlite.R
+import com.hereliesaz.cuedetatlite.data.SensorRepository
+import com.hereliesaz.cuedetatlite.domain.StateReducer
+import com.hereliesaz.cuedetatlite.domain.UpdateStateUseCase
+import com.hereliesaz.cuedetatlite.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
-import com.hereliesaz.cuedetatlite.view.state.ScreenState
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.math.*
 
-class UpdateStateUseCase @Inject constructor(private val warningManager: WarningManager) {
+data class MainScreenUiState(
+    val isForceLightMode: Boolean? = null,
+    val showLuminanceDialog: Boolean = false,
+    val warningMessage: String? = null
+)
 
-    private val ROLL_DAMPENING_FACTOR = 0.2f
+@HiltViewModel
+class MainViewModel @Inject constructor(
+    private val stateReducer: StateReducer,
+    private val updateStateUseCase: UpdateStateUseCase,
+    val sensorRepository: SensorRepository,
+    application: Application
+) : ViewModel() {
 
-    operator fun invoke(
-        overlayState: OverlayState
-    ): OverlayState {
-        val logicalRadius = if(overlayState.viewWidth == 0 || overlayState.viewHeight == 0) 30f else
-            (min(overlayState.viewWidth, overlayState.viewHeight) * 0.30f / 2f) * ZoomMapping.sliderToZoom(overlayState.zoomSliderPosition)
+    private val _overlayState = MutableStateFlow(OverlayState())
+    val overlayState: StateFlow<OverlayState> = _overlayState.asStateFlow()
 
-        var updatedScreenState = overlayState.screenState.copy(
-            protractorUnit = overlayState.screenState.protractorUnit.copy(
-                targetBall = ProtractorUnit.LogicalBall(overlayState.screenState.protractorUnit.targetBall.logicalPosition, logicalRadius)
-            ),
-            actualCueBall = overlayState.screenState.actualCueBall?.let { ActualCueBall(it.logicalPosition, logicalRadius) }
-        )
+    private val _uiEvents = Channel<UiEvent>()
+    val uiEvents = _uiEvents.receiveAsFlow()
 
-        val perspective = calculatePerspective(overlayState, updatedScreenState)
-        val impossibleShot = isImpossibleShot(updatedScreenState, perspective.inverseMatrix, overlayState.viewWidth, overlayState.viewHeight)
+    private val _uiState = MutableStateFlow(MainScreenUiState())
+    val uiState: StateFlow<MainScreenUiState> = _uiState.asStateFlow()
 
-        updatedScreenState = updatedScreenState.copy(
-            isImpossibleShot = impossibleShot
-        ).let { it.copy(warningText = warningManager.getWarning(it)) }
+    private val insultingWarnings: Array<String> = application.resources.getStringArray(R.array.insulting_warnings)
+    private var warningIndex = 0
+    private var isGestureInProgress = false
 
-        return overlayState.copy(
-            screenState = updatedScreenState,
-            pitchMatrix = perspective.pitchMatrix,
-            railPitchMatrix = perspective.railPitchMatrix,
-            inversePitchMatrix = perspective.inverseMatrix,
-            hasInverseMatrix = perspective.hasInverse
-        )
-    }
-
-    private fun calculatePerspective(state: OverlayState, screenState: ScreenState): Perspective {
-        val pitchMatrix = Matrix()
-        val railPitchMatrix = Matrix()
-
-        val orientation = state.anchorOrientation ?: state.currentOrientation
-        val pitchRadians = Math.toRadians(orientation.pitch.toDouble())
-        val rollRadians = Math.toRadians(orientation.roll.toDouble()) * ROLL_DAMPENING_FACTOR
-
-        val baseRadius = min(state.viewWidth, state.viewHeight) * 0.30f / 2f
-        val scaleFactor = if (baseRadius > 0) screenState.protractorUnit.targetBall.radius / baseRadius else 1f
-
-        pitchMatrix.postTranslate(-screenState.protractorUnit.targetBall.logicalPosition.x, -screenState.protractorUnit.targetBall.logicalPosition.y)
-        pitchMatrix.postScale(scaleFactor, scaleFactor)
-        pitchMatrix.postTranslate(state.viewWidth / 2f, state.viewHeight / 2f)
-
-        val yShear = sin(rollRadians).toFloat()
-        val xScale = cos(rollRadians).toFloat()
-        pitchMatrix.postSkew(yShear, 0f, state.viewWidth / 2f, state.viewHeight / 2f)
-        pitchMatrix.postScale(xScale, 1f, state.viewWidth / 2f, state.viewHeight / 2f)
-
-        val yPerspectiveScale = cos(pitchRadians).toFloat()
-        pitchMatrix.postScale(1f, yPerspectiveScale, state.viewWidth / 2f, state.viewHeight / 2f)
-
-        railPitchMatrix.set(pitchMatrix)
-        railPitchMatrix.postScale(1f, 1/yPerspectiveScale, state.viewWidth / 2f, state.viewHeight / 2f)
-
-        val inverseMatrix = Matrix()
-        val hasInverse = pitchMatrix.invert(inverseMatrix)
-
-        return Perspective(pitchMatrix, railPitchMatrix, inverseMatrix, hasInverse)
-    }
-
-    private fun isImpossibleShot(screenState: ScreenState, inverseMatrix: Matrix, viewWidth: Int, viewHeight: Int): Boolean {
-        if (screenState.isBankingMode) return false
-
-        val anchorPoint = screenState.actualCueBall?.logicalPosition ?: run {
-            if (!inverseMatrix.isIdentity) {
-                val screenAnchor = floatArrayOf(viewWidth / 2f, viewHeight.toFloat())
-                val logicalAnchor = floatArrayOf(0f, 0f)
-                inverseMatrix.mapPoints(logicalAnchor, screenAnchor)
-                PointF(logicalAnchor[0], logicalAnchor[1])
-            } else {
-                PointF(viewWidth / 2f, viewHeight.toFloat())
+    init {
+        viewModelScope.launch {
+            sensorRepository.getOrientationFlow().collect { orientation ->
+                onEvent(MainScreenEvent.OrientationChanged(orientation))
             }
         }
-
-        val targetBall = screenState.protractorUnit.targetBall
-
-        val angleRad = Math.toRadians(screenState.protractorUnit.aimingAngleDegrees.toDouble()).toFloat()
-        val totalRadius = targetBall.radius * 2
-        val ghostBallX = targetBall.logicalPosition.x - cos(angleRad) * totalRadius
-        val ghostBallY = targetBall.logicalPosition.y - sin(angleRad) * totalRadius
-        val ghostBallPos = PointF(ghostBallX, ghostBallY)
-
-        val distAnchorToTarget = distance(anchorPoint, targetBall.logicalPosition)
-        val distAnchorToGhost = distance(anchorPoint, ghostBallPos)
-
-        return distAnchorToGhost > distAnchorToTarget
     }
 
-    private fun distance(p1: PointF, p2: PointF): Float {
-        return sqrt((p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2))
+    fun onEvent(event: MainScreenEvent) {
+        viewModelScope.launch {
+            // Handle side-effects and one-off events here
+            when (event) {
+                is MainScreenEvent.ViewArt -> _uiEvents.send(UiEvent.OpenUrl("https://herelies.art"))
+                is MainScreenEvent.ShowDonationOptions -> _uiEvents.send(UiEvent.OpenUrl("https://www.buymeacoffee.com/hereliesaz"))
+                is MainScreenEvent.GestureStarted -> {
+                    isGestureInProgress = true
+                    _uiState.value = _uiState.value.copy(warningMessage = null)
+                    return@launch // Don't process state update yet
+                }
+                is MainScreenEvent.GestureEnded -> {
+                    isGestureInProgress = false
+                    // After the gesture ends, check if a warning should be displayed
+                    if (_overlayState.value.screenState.isImpossibleShot) {
+                        _uiState.value = _uiState.value.copy(warningMessage = insultingWarnings[warningIndex])
+                        warningIndex = (warningIndex + 1) % insultingWarnings.size
+                    }
+                    return@launch // Don't process state update yet
+                }
+                // Convert screen-space gestures to logical-space events before reducing
+                is MainScreenEvent.BallMoved -> {
+                    if (_overlayState.value.hasInverseMatrix) {
+                        val logicalPoint = DrawingUtils.mapPoint(event.position, _overlayState.value.inversePitchMatrix)
+                        val logicalEvent = MainScreenEvent.BallMoved(event.ballId, logicalPoint)
+                        processStateUpdate(logicalEvent)
+                    }
+                    return@launch // Return to prevent double processing
+                }
+                is MainScreenEvent.BankingAimTargetChanged -> {
+                    if(_overlayState.value.hasInverseMatrix){
+                        val logicalPoint = DrawingUtils.mapPoint(event.position, _overlayState.value.inversePitchMatrix)
+                        val logicalEvent = MainScreenEvent.BankingAimTargetChanged(logicalPoint)
+                        processStateUpdate(logicalEvent)
+                    }
+                    return@launch
+                }
+                else -> {
+                    processStateUpdate(event)
+                }
+            }
+        }
+    }
+
+    private fun processStateUpdate(event: MainScreenEvent) {
+        val currentState = _overlayState.value
+
+        val reducedScreenState = stateReducer.reduce(currentState.screenState, event, currentState.viewWidth, currentState.viewHeight)
+
+        var newOverlayState = currentState.copy(screenState = reducedScreenState)
+        newOverlayState = when (event) {
+            is MainScreenEvent.ViewResized -> newOverlayState.copy(viewWidth = event.width, viewHeight = event.height, valuesChangedSinceReset = true)
+            is MainScreenEvent.OrientationChanged -> newOverlayState.copy(currentOrientation = event.orientation)
+            is MainScreenEvent.ZoomChanged -> {
+                val currentZoom = ZoomMapping.sliderToZoom(currentState.zoomSliderPosition)
+                val newZoom = (currentZoom * event.zoomFactor).coerceIn(ZoomMapping.MIN_ZOOM, ZoomMapping.MAX_ZOOM)
+                val newSliderPosition = ZoomMapping.zoomToSlider(newZoom)
+                newOverlayState.copy(zoomSliderPosition = newSliderPosition, valuesChangedSinceReset = true)
+            }
+            is MainScreenEvent.ZoomSliderChanged -> newOverlayState.copy(zoomSliderPosition = event.position, valuesChangedSinceReset = true)
+            is MainScreenEvent.AimingAngleChanged -> newOverlayState.copy(screenState = newOverlayState.screenState.copy(protractorUnit = newOverlayState.screenState.protractorUnit.copy(aimingAngleDegrees = event.degrees)), valuesChangedSinceReset = true)
+            is MainScreenEvent.ForceLightMode -> newOverlayState.copy(isForceLightMode = event.enabled, valuesChangedSinceReset = true)
+            is MainScreenEvent.LuminanceChanged -> newOverlayState.copy(luminanceAdjustment = event.value, valuesChangedSinceReset = true)
+            is MainScreenEvent.ShowLuminanceDialog -> newOverlayState.copy(showLuminanceDialog = true)
+            is MainScreenEvent.DismissLuminanceDialog -> newOverlayState.copy(showLuminanceDialog = false)
+            is MainScreenEvent.ToggleHelp -> newOverlayState.copy(areHelpersVisible = !currentState.areHelpersVisible)
+            is MainScreenEvent.Reset -> newOverlayState.copy(zoomSliderPosition = 50f, anchorOrientation = null, valuesChangedSinceReset = false, tableRotationDegrees = 0f)
+            is MainScreenEvent.TableRotationChanged -> newOverlayState.copy(tableRotationDegrees = event.degrees, valuesChangedSinceReset = true)
+            else -> newOverlayState
+        }
+
+        // CORRECTED: The invoke operator for the use case expects a single OverlayState argument.
+        _overlayState.value = updateStateUseCase(newOverlayState)
+
+        if (!isGestureInProgress) {
+            _uiState.value = _uiState.value.copy(
+                isForceLightMode = _overlayState.value.isForceLightMode,
+                showLuminanceDialog = _overlayState.value.showLuminanceDialog,
+                warningMessage = if(_overlayState.value.screenState.isImpossibleShot) _uiState.value.warningMessage else null
+            )
+        }
     }
 }

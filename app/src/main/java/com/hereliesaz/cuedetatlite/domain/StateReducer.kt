@@ -16,7 +16,8 @@ class StateReducer @Inject constructor(private val warningManager: WarningManage
         val initialRadius = (min(width, height) * 0.30f / 2f) * ZoomMapping.sliderToZoom(50f)
         return ScreenState(
             protractorUnit = ProtractorUnit(
-                targetBall = ProtractorUnit.LogicalBall(PointF(width / 2f, height / 2f), initialRadius)
+                targetBall = ProtractorUnit.LogicalBall(PointF(width / 2f, height / 2f), initialRadius),
+                aimingAngleDegrees = -90f // Point straight up
             ),
         )
     }
