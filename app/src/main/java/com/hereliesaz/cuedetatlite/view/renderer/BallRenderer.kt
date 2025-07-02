@@ -2,11 +2,15 @@ package com.hereliesaz.cuedetatlite.view.renderer
 
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.PointF
 import com.hereliesaz.cuedetatlite.view.PaintCache
-import com.hereliesaz.cuedetatlite.view.model.IlogicalBall
+import com.hereliesaz.cuedetatlite.view.model.ILogicalBall
+import com.hereliesaz.cuedetatlite.view.model.ProtractorUnit
 import com.hereliesaz.cuedetatlite.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
 import com.hereliesaz.cuedetatlite.view.state.ScreenState
+import kotlin.math.cos
+import kotlin.math.sin
 
 class BallRenderer(
     private val paints: PaintCache,
@@ -17,16 +21,13 @@ class BallRenderer(
         canvas.save()
         canvas.concat(overlayState.pitchMatrix)
 
-        // Draw protractor balls
         if (screenState.isProtractorMode) {
             drawProtractorBalls(canvas, screenState, overlayState)
         }
 
-        // Draw actual cue ball if available and enabled
         if (screenState.showActualCueBall) {
             screenState.actualCueBall?.let {
                 drawBall(canvas, it, paints.actualCueBallBasePaint, paints.actualCueBallCenterMarkPaint)
-                // FIX: Corrected arguments for ballTextRenderer.draw
                 ballTextRenderer.draw(canvas, paints.actualCueBallTextPaint, overlayState.zoomSliderPosition, it.logicalPosition.x, it.logicalPosition.y, it.radius, "A")
             }
         }
@@ -37,16 +38,22 @@ class BallRenderer(
         val protractorUnit = screenState.protractorUnit
         // Draw Target Ball
         drawBall(canvas, protractorUnit.targetBall, paints.targetCirclePaint, paints.targetCenterMarkPaint)
-        // FIX: Corrected arguments for ballTextRenderer.draw
         ballTextRenderer.draw(canvas, paints.targetBallTextPaint, overlayState.zoomSliderPosition, protractorUnit.targetBall.logicalPosition.x, protractorUnit.targetBall.logicalPosition.y, protractorUnit.targetBall.radius, "T")
 
-        // Draw Cue Ball
-        drawBall(canvas, protractorUnit.cueBall, paints.cueCirclePaint, paints.cueCenterMarkPaint)
-        // FIX: Corrected arguments for ballTextRenderer.draw
-        ballTextRenderer.draw(canvas, paints.cueBallTextPaint, overlayState.zoomSliderPosition, protractorUnit.cueBall.logicalPosition.x, protractorUnit.cueBall.logicalPosition.y, protractorUnit.cueBall.radius, "C")
+        // --- Calculate and draw Ghost Ball ---
+        val targetBall = protractorUnit.targetBall
+        val angleRad = Math.toRadians(protractorUnit.aimingAngleDegrees.toDouble()).toFloat()
+        // The ghost ball is placed tangent to the target ball, opposite the aiming angle
+        val totalRadius = targetBall.radius * 2
+        val ghostBallX = targetBall.logicalPosition.x - cos(angleRad) * totalRadius
+        val ghostBallY = targetBall.logicalPosition.y - sin(angleRad) * totalRadius
+
+        val ghostBall = ProtractorUnit.LogicalBall(PointF(ghostBallX, ghostBallY), targetBall.radius)
+        drawBall(canvas, ghostBall, paints.ghostCueOutlinePaint, paints.cueCenterMarkPaint)
+        ballTextRenderer.draw(canvas, paints.ghostBallTextPaint, overlayState.zoomSliderPosition, ghostBallX, ghostBallY, ghostBall.radius, "G")
     }
 
-    private fun drawBall(canvas: Canvas, ball: IlogicalBall, circlePaint: Paint, centerPaint: Paint) {
+    private fun drawBall(canvas: Canvas, ball: ILogicalBall, circlePaint: Paint, centerPaint: Paint) {
         canvas.drawCircle(ball.logicalPosition.x, ball.logicalPosition.y, ball.radius, circlePaint)
         canvas.drawCircle(ball.logicalPosition.x, ball.logicalPosition.y, ball.radius / 4, centerPaint)
     }

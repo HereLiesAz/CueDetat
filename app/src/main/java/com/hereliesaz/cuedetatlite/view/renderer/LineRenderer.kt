@@ -1,4 +1,3 @@
-// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/view/renderer/LineRenderer.kt
 package com.hereliesaz.cuedetatlite.view.renderer
 
 import android.graphics.Canvas
@@ -9,7 +8,9 @@ import com.hereliesaz.cuedetatlite.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
 import com.hereliesaz.cuedetatlite.view.state.ScreenState
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.pow
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 class LineRenderer(
@@ -32,21 +33,29 @@ class LineRenderer(
 
     private fun drawProtractorLines(canvas: Canvas, screenState: ScreenState) {
         val protractorUnit = screenState.protractorUnit
+        val targetBall = protractorUnit.targetBall
 
-        // Aiming line
+        // --- Calculate Ghost Ball position to draw line ---
+        val angleRad = Math.toRadians(protractorUnit.aimingAngleDegrees.toDouble()).toFloat()
+        val totalRadius = targetBall.radius * 2
+        val ghostBallX = targetBall.logicalPosition.x - cos(angleRad) * totalRadius
+        val ghostBallY = targetBall.logicalPosition.y - sin(angleRad) * totalRadius
+
+        // Aiming line from Ghost Ball to Target Ball
         canvas.drawLine(
-            protractorUnit.targetBall.logicalPosition.x,
-            protractorUnit.targetBall.logicalPosition.y,
-            protractorUnit.cueBall.logicalPosition.x,
-            protractorUnit.cueBall.logicalPosition.y,
+            ghostBallX,
+            ghostBallY,
+            targetBall.logicalPosition.x,
+            targetBall.logicalPosition.y,
             paintCache.greenPaint
         )
 
-        // Shot line
+        // Shot line (from actual cue ball, if present)
         screenState.actualCueBall?.let { actualCueBall ->
             if (screenState.showActualCueBall) {
-                val dx = protractorUnit.cueBall.logicalPosition.x - actualCueBall.logicalPosition.x
-                val dy = protractorUnit.cueBall.logicalPosition.y - actualCueBall.logicalPosition.y
+                // The shot line direction is from the actual cue ball towards the ghost ball
+                val dx = ghostBallX - actualCueBall.logicalPosition.x
+                val dy = ghostBallY - actualCueBall.logicalPosition.y
                 canvas.drawLine(
                     actualCueBall.logicalPosition.x,
                     actualCueBall.logicalPosition.y,
@@ -67,20 +76,18 @@ class LineRenderer(
             val start = path[i]
             val end = path[i + 1]
 
-            // Check if the end of the path is a pocket
             val isLastSegmentPocketed = (i == path.size - 2) && tableModel.pockets.any { pocket: TableModel.Pocket ->
                 distance(end, pocket.center) < pocket.radius
             }
 
             val paint = if (isLastSegmentPocketed) {
-                paintCache.whitePaint // Use white paint for the final segment into a pocket
+                paintCache.whitePaint
             } else {
                 paintCache.bluePaint
             }
             canvas.drawLine(start.x, start.y, end.x, end.y, paint)
         }
 
-        // Draw diamond numbers at reflection points
         val reflectionPoints = path.drop(1).dropLast(if (path.size > 1) 1 else 0)
         reflectionPoints.forEach { point ->
             val diamondValue = tableModel.getDiamondValue(point)

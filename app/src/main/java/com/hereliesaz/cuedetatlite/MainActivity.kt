@@ -1,4 +1,3 @@
-// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/MainActivity.kt
 package com.hereliesaz.cuedetatlite
 
 import android.content.Intent
@@ -26,8 +25,8 @@ class MainActivity : ComponentActivity() {
                 return MainViewModel(
                     app.stateReducer,
                     app.updateStateUseCase,
-                    app.sensorRepository,
-                    app.updateChecker
+                    app.sensorRepository
+                    // REMOVED: app.updateChecker
                 ) as T
             }
         }

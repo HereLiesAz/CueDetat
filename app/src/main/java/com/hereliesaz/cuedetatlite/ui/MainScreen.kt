@@ -22,25 +22,14 @@ fun MainScreen(
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-
-    // FIX: Call isSystemInDarkTheme() in a Composable context
     val systemIsDark = isSystemInDarkTheme()
-
-    // Update available dialog
-    if (uiState.isUpdateAvailable) {
-        UpdateAvailableDialog(
-            onDismiss = { viewModel.onEvent(MainScreenEvent.DismissUpdateDialog) },
-            onConfirm = { viewModel.onEvent(MainScreenEvent.DownloadUpdate) }
-        )
-    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            // FIX: Use the correct MenuDrawerContent composable
             MenuDrawerContent(
                 uiState = overlayState,
-                onEvent = viewModel::onEvent, // Pass the event handler
+                onEvent = viewModel::onEvent,
                 onCloseDrawer = { coroutineScope.launch { drawerState.close() } }
             )
         }
@@ -48,14 +37,12 @@ fun MainScreen(
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
-                // FIX: Corrected parameters for TopControls
                 TopControls(
                     uiState = overlayState,
                     onMenuClick = { coroutineScope.launch { drawerState.open() } }
                 )
             },
             floatingActionButton = {
-                // FIX: ActionFabs was split into multiple composables
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(start = 32.dp, end = 32.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -71,7 +58,6 @@ fun MainScreen(
                     )
                 }
             },
-            // FIX: Position FABs correctly
             floatingActionButtonPosition = FabPosition.Center
         ) { paddingValues ->
             Box(
@@ -79,10 +65,8 @@ fun MainScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                // FIX: CameraBackground no longer needs activity param
                 CameraBackground(modifier = Modifier.fillMaxSize())
 
-                // FIX: Correctly set up the AndroidView wrapper
                 AndroidView(
                     factory = { context ->
                         ProtractorOverlayView(context).apply {
@@ -97,7 +81,6 @@ fun MainScreen(
                     }
                 )
 
-                // FIX: Correct parameter name for KineticWarning
                 KineticWarning(text = uiState.warningMessage)
 
                 if (uiState.showLuminanceDialog) {
@@ -121,7 +104,8 @@ fun MainScreen(
                 ZoomControls(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(16.dp),
+                        .padding(end = 16.dp)
+                        .fillMaxHeight(0.5f), // Set slider height to 50%
                     uiState = overlayState,
                     onEvent = viewModel::onEvent
                 )
