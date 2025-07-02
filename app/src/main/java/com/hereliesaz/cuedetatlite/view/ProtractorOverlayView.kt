@@ -6,7 +6,6 @@ import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.PointF
 import android.graphics.Typeface
-import android.util.Log
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
@@ -23,16 +22,16 @@ import com.hereliesaz.cuedetatlite.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetatlite.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetatlite.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
-import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.toDegrees
 
 @SuppressLint("ClickableViewAccessibility")
 class ProtractorOverlayView(context: Context) : View(context) {
 
     private enum class InteractionMode {
-        NONE, SCALING, ROTATING_PROTRACTOR, MOVING_CUE_BALL, AIMING_BANK_SHOT
+        NONE, SCALING, ROTATING_AIM, MOVING_TARGET_BALL
     }
 
-    // --- Renderer Setup ---
     private val paints = PaintCache()
     private val ballTextRenderer = BallTextRenderer()
     private val lineTextRenderer = LineTextRenderer()
@@ -45,7 +44,6 @@ class ProtractorOverlayView(context: Context) : View(context) {
     private var canonicalState = OverlayState()
     private var barbaroTypeface: Typeface? = null
 
-    // --- Simplified Event Listener ---
     var onEvent: ((MainScreenEvent) -> Unit)? = null
 
     private val scaleGestureDetector: ScaleGestureDetector
@@ -88,7 +86,7 @@ class ProtractorOverlayView(context: Context) : View(context) {
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        // onSizeChanged is no longer needed as the ViewModel can get this from the state
+        onEvent?.invoke(MainScreenEvent.ViewResized(w, h))
     }
 
     private fun getLogicalPoint(screenPoint: PointF): PointF {
@@ -107,11 +105,10 @@ class ProtractorOverlayView(context: Context) : View(context) {
     override fun onTouchEvent(event: MotionEvent): Boolean {
         scaleGestureDetector.onTouchEvent(event)
         if (canonicalState.isSpatiallyLocked && !scaleGestureDetector.isInProgress) return true
+        if (scaleGestureDetector.isInProgress) return true
 
         val action = event.actionMasked
         val pointerIndex = event.actionIndex
-
-        if (scaleGestureDetector.isInProgress) return true
 
         when (action) {
             MotionEvent.ACTION_DOWN -> {
@@ -125,18 +122,17 @@ class ProtractorOverlayView(context: Context) : View(context) {
                 if (event.pointerCount == 1 && activePointerId != MotionEvent.INVALID_POINTER_ID) {
                     val currentX = event.getX(event.findPointerIndex(activePointerId))
                     val currentY = event.getY(event.findPointerIndex(activePointerId))
-                    val dx = currentX - lastTouchX_single
                     val currentPoint = PointF(currentX, currentY)
 
                     when (interactionMode) {
-                        InteractionMode.ROTATING_PROTRACTOR -> {
-                            onEvent?.invoke(MainScreenEvent.TableRotationChanged(canonicalState.tableRotationDegrees - (dx * 0.3f)))
+                        InteractionMode.ROTATING_AIM -> {
+                            val targetBallScreenPos = DrawingUtils.mapPoint(canonicalState.screenState.protractorUnit.targetBall.logicalPosition, canonicalState.pitchMatrix)
+                            val angleRad = atan2(currentY - targetBallScreenPos.y, currentX - targetBallScreenPos.x)
+                            val angleDeg = toDegrees(angleRad.toDouble()).toFloat()
+                            onEvent?.invoke(MainScreenEvent.AimingAngleChanged(angleDeg + 180)) // Add 180 to aim from opposite side
                         }
-                        InteractionMode.MOVING_CUE_BALL -> {
-                            onEvent?.invoke(MainScreenEvent.BallMoved(0, getLogicalPoint(currentPoint))) // ID 0 for cue ball
-                        }
-                        InteractionMode.AIMING_BANK_SHOT -> {
-                            onEvent?.invoke(MainScreenEvent.BankingAimTargetChanged(getLogicalPoint(currentPoint)))
+                        InteractionMode.MOVING_TARGET_BALL -> {
+                            onEvent?.invoke(MainScreenEvent.BallMoved(1, getLogicalPoint(currentPoint))) // ID 1 for target ball
                         }
                         else -> {}
                     }
@@ -153,9 +149,14 @@ class ProtractorOverlayView(context: Context) : View(context) {
                 val upPointerId = event.getPointerId(pointerIndex)
                 if (upPointerId == activePointerId) {
                     val newPointerActionIndex = if (pointerIndex == 0) 1 else 0
-                    activePointerId = event.getPointerId(newPointerActionIndex)
-                    lastTouchX_single = event.getX(newPointerActionIndex)
-                    lastTouchY_single = event.getY(newPointerActionIndex)
+                    if (newPointerActionIndex < event.pointerCount) {
+                        activePointerId = event.getPointerId(newPointerActionIndex)
+                        lastTouchX_single = event.getX(newPointerActionIndex)
+                        lastTouchY_single = event.getY(newPointerActionIndex)
+                    } else {
+                        interactionMode = InteractionMode.NONE
+                        activePointerId = MotionEvent.INVALID_POINTER_ID
+                    }
                 }
             }
         }
@@ -164,15 +165,15 @@ class ProtractorOverlayView(context: Context) : View(context) {
 
     private fun determineSingleTouchMode(touchX: Float, touchY: Float) {
         val touchPoint = PointF(touchX, touchY)
-        interactionMode = if (canonicalState.isBankingMode) {
-            InteractionMode.AIMING_BANK_SHOT
-        } else {
-            val cueBallScreenPos = DrawingUtils.mapPoint(canonicalState.screenState.protractorUnit.cueBall.logicalPosition, canonicalState.pitchMatrix)
-            if (DrawingUtils.distance(touchPoint, cueBallScreenPos) < draggableElementSlop) {
-                InteractionMode.MOVING_CUE_BALL
+        if (!canonicalState.isBankingMode) {
+            val targetBallScreenPos = DrawingUtils.mapPoint(canonicalState.screenState.protractorUnit.targetBall.logicalPosition, canonicalState.pitchMatrix)
+            interactionMode = if (DrawingUtils.distance(touchPoint, targetBallScreenPos) < draggableElementSlop) {
+                InteractionMode.MOVING_TARGET_BALL
             } else {
-                InteractionMode.ROTATING_PROTRACTOR
+                InteractionMode.ROTATING_AIM
             }
+        } else {
+            interactionMode = InteractionMode.NONE
         }
     }
 
