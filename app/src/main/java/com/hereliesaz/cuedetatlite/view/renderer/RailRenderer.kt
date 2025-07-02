@@ -1,4 +1,3 @@
-// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/view/renderer/RailRenderer.kt
 package com.hereliesaz.cuedetatlite.view.renderer
 
 import android.graphics.Canvas
@@ -15,13 +14,14 @@ class RailRenderer(private val paints: PaintCache) {
         val tableModel = screenState.tableModel ?: return
         val railWidth = 20f
 
-        val railPaint = screenState.actualCueBall?.let {
-            if (it.logicalPosition.y > screenState.protractorUnit.cueBall.logicalPosition.y) {
+        val railPaint = screenState.actualCueBall?.let { actualCueBall ->
+            val targetBall = screenState.protractorUnit.targetBall
+            if (actualCueBall.logicalPosition.y > targetBall.logicalPosition.y) {
                 paints.bankShotLinePaint3
             } else {
                 paints.bankShotLinePaint1
             }
-        } ?: paints.bankShotLinePaint1 // Default paint if actualCueBall is null
+        } ?: paints.bankShotLinePaint1
 
         // Top rail
         canvas.drawRect(tableModel.surface.left - railWidth, tableModel.surface.top - railWidth, tableModel.surface.right + railWidth, tableModel.surface.top, railPaint)
@@ -31,7 +31,6 @@ class RailRenderer(private val paints: PaintCache) {
         canvas.drawRect(tableModel.surface.left - railWidth, tableModel.surface.top, tableModel.surface.left, tableModel.surface.bottom, railPaint)
         // Right rail
         canvas.drawRect(tableModel.surface.right, tableModel.surface.top, tableModel.surface.right + railWidth, tableModel.surface.bottom, railPaint)
-
 
         canvas.restore()
     }

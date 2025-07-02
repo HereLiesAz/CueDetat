@@ -8,4 +8,4 @@ import android.graphics.PointF
 data class ActualCueBall(
     override val logicalPosition: PointF,
     override val radius: Float
-) : ILogicalBall // FIX: Implement the correctly capitalized interface
+) : ILogicalBall
