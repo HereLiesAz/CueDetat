@@ -8,15 +8,15 @@ import com.hereliesaz.cuedetatlite.view.model.ProtractorUnit
 import com.hereliesaz.cuedetatlite.view.model.TableModel
 import com.hereliesaz.cuedetatlite.view.state.ScreenState
 import javax.inject.Inject
+import kotlin.math.min
 
 class StateReducer @Inject constructor(private val warningManager: WarningManager) {
 
     private fun getInitialState(width: Int, height: Int): ScreenState {
-        val initialRadius = (width.coerceAtMost(height) * 0.30f / 2f) * ZoomMapping.DEFAULT_ZOOM
+        val initialRadius = (min(width, height) * 0.30f / 2f) * ZoomMapping.sliderToZoom(50f)
         return ScreenState(
             protractorUnit = ProtractorUnit(
-                targetBall = ProtractorUnit.LogicalBall(PointF(width / 2f, height / 2f), initialRadius),
-                aimingAngleDegrees = 0f
+                targetBall = ProtractorUnit.LogicalBall(PointF(width / 2f, height / 2f), initialRadius)
             ),
         )
     }
@@ -39,23 +39,11 @@ class StateReducer @Inject constructor(private val warningManager: WarningManage
                 }
             }
 
-            is MainScreenEvent.BallRadiusChanged -> {
-                when (event.ballId) {
-                    1 -> {
-                        val newTargetBall = ProtractorUnit.LogicalBall(state.protractorUnit.targetBall.logicalPosition, event.radius)
-                        state.copy(protractorUnit = state.protractorUnit.copy(targetBall = newTargetBall))
-                    }
-                    2 -> {
-                        val newActualCueBall = state.actualCueBall?.let { ActualCueBall(it.logicalPosition, event.radius) }
-                        state.copy(actualCueBall = newActualCueBall)
-                    }
-                    else -> state
-                }
-            }
+            is MainScreenEvent.BallRadiusChanged -> state // Handled by UpdateStateUseCase
 
             is MainScreenEvent.ToggleActualCueBall -> {
                 if (state.isBankingMode) {
-                    return state // Correct way to return early from the function
+                    return state
                 }
                 if (state.actualCueBall == null) {
                     state.copy(actualCueBall = ActualCueBall(PointF(viewWidth / 2f, viewHeight * 0.75f), state.protractorUnit.targetBall.radius))
@@ -78,7 +66,7 @@ class StateReducer @Inject constructor(private val warningManager: WarningManage
                         isProtractorMode = true,
                         tableModel = null,
                         bankingPath = emptyList(),
-                        actualCueBall = null // Remove the banking ball when leaving mode
+                        actualCueBall = null
                     )
                 }
             }

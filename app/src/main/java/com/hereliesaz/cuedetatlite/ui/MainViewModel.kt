@@ -1,7 +1,9 @@
 package com.hereliesaz.cuedetatlite.ui
 
+import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hereliesaz.cuedetatlite.R
 import com.hereliesaz.cuedetatlite.data.SensorRepository
 import com.hereliesaz.cuedetatlite.domain.StateReducer
 import com.hereliesaz.cuedetatlite.domain.UpdateStateUseCase
@@ -23,7 +25,8 @@ data class MainScreenUiState(
 class MainViewModel @Inject constructor(
     private val stateReducer: StateReducer,
     private val updateStateUseCase: UpdateStateUseCase,
-    val sensorRepository: SensorRepository
+    val sensorRepository: SensorRepository,
+    application: Application
 ) : ViewModel() {
 
     private val _overlayState = MutableStateFlow(OverlayState())
@@ -35,6 +38,10 @@ class MainViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(MainScreenUiState())
     val uiState: StateFlow<MainScreenUiState> = _uiState.asStateFlow()
 
+    private val insultingWarnings: Array<String> = application.resources.getStringArray(R.array.insulting_warnings)
+    private var warningIndex = 0
+    private var isGestureInProgress = false
+
     init {
         viewModelScope.launch {
             sensorRepository.getOrientationFlow().collect { orientation ->
@@ -45,25 +52,36 @@ class MainViewModel @Inject constructor(
 
     fun onEvent(event: MainScreenEvent) {
         viewModelScope.launch {
-            val currentState = _overlayState.value
-
             // Handle side-effects and one-off events here
             when (event) {
                 is MainScreenEvent.ViewArt -> _uiEvents.send(UiEvent.OpenUrl("https://herelies.art"))
                 is MainScreenEvent.ShowDonationOptions -> _uiEvents.send(UiEvent.OpenUrl("https://www.buymeacoffee.com/hereliesaz"))
+                is MainScreenEvent.GestureStarted -> {
+                    isGestureInProgress = true
+                    _uiState.value = _uiState.value.copy(warningMessage = null)
+                    return@launch // Don't process state update yet
+                }
+                is MainScreenEvent.GestureEnded -> {
+                    isGestureInProgress = false
+                    // After the gesture ends, check if a warning should be displayed
+                    if (_overlayState.value.screenState.isImpossibleShot) {
+                        _uiState.value = _uiState.value.copy(warningMessage = insultingWarnings[warningIndex])
+                        warningIndex = (warningIndex + 1) % insultingWarnings.size
+                    }
+                    return@launch // Don't process state update yet
+                }
                 // Convert screen-space gestures to logical-space events before reducing
                 is MainScreenEvent.BallMoved -> {
-                    if (currentState.hasInverseMatrix) {
-                        val logicalPoint = DrawingUtils.mapPoint(event.position, currentState.inversePitchMatrix)
-                        // Create a new event with logical coordinates to send to reducer
+                    if (_overlayState.value.hasInverseMatrix) {
+                        val logicalPoint = DrawingUtils.mapPoint(event.position, _overlayState.value.inversePitchMatrix)
                         val logicalEvent = MainScreenEvent.BallMoved(event.ballId, logicalPoint)
                         processStateUpdate(logicalEvent)
                     }
                     return@launch // Return to prevent double processing
                 }
                 is MainScreenEvent.BankingAimTargetChanged -> {
-                    if(currentState.hasInverseMatrix){
-                        val logicalPoint = DrawingUtils.mapPoint(event.position, currentState.inversePitchMatrix)
+                    if(_overlayState.value.hasInverseMatrix){
+                        val logicalPoint = DrawingUtils.mapPoint(event.position, _overlayState.value.inversePitchMatrix)
                         val logicalEvent = MainScreenEvent.BankingAimTargetChanged(logicalPoint)
                         processStateUpdate(logicalEvent)
                     }
@@ -79,10 +97,8 @@ class MainViewModel @Inject constructor(
     private fun processStateUpdate(event: MainScreenEvent) {
         val currentState = _overlayState.value
 
-        // Centralized state reduction
         val reducedScreenState = stateReducer.reduce(currentState.screenState, event, currentState.viewWidth, currentState.viewHeight)
 
-        // Other state changes not in ScreenState
         var newOverlayState = currentState.copy(screenState = reducedScreenState)
         newOverlayState = when (event) {
             is MainScreenEvent.ViewResized -> newOverlayState.copy(viewWidth = event.width, viewHeight = event.height, valuesChangedSinceReset = true)
@@ -105,12 +121,14 @@ class MainViewModel @Inject constructor(
             else -> newOverlayState
         }
 
-        // Always run the result through the use case to update derived state like matrices
         _overlayState.value = updateStateUseCase(newOverlayState)
-        _uiState.value = _uiState.value.copy(
-            isForceLightMode = _overlayState.value.isForceLightMode,
-            showLuminanceDialog = _overlayState.value.showLuminanceDialog,
-            warningMessage = _overlayState.value.screenState.warningText?.name
-        )
+
+        if (!isGestureInProgress) {
+            _uiState.value = _uiState.value.copy(
+                isForceLightMode = _overlayState.value.isForceLightMode,
+                showLuminanceDialog = _overlayState.value.showLuminanceDialog,
+                warningMessage = if(_overlayState.value.screenState.isImpossibleShot) _uiState.value.warningMessage else null
+            )
+        }
     }
 }

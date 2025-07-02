@@ -1,17 +1,16 @@
-// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/view/PaintCache.kt
 package com.hereliesaz.cuedetatlite.view
 
 import android.graphics.Color as AndroidColor
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Typeface
-import androidx.compose.material3.ColorScheme // For M3 ColorScheme instances
-import androidx.compose.material3.darkColorScheme // For creating M3 darkColorScheme
-import androidx.compose.material3.lightColorScheme // For creating M3 lightColorScheme
-import androidx.compose.ui.graphics.Color // For Compose color manipulation
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.ColorUtils
-import com.hereliesaz.cuedetatlite.ui.theme.* // Import all your theme colors
+import com.hereliesaz.cuedetatlite.ui.theme.*
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
 
 class PaintCache {
@@ -24,18 +23,15 @@ class PaintCache {
     private val thickLineStrokeWidth = 6f * baseStrokeWidthMultiplier
     private val thinLineStrokeWidth = 3f * baseStrokeWidthMultiplier
 
-    // Define base M3 ColorSchemes for drawing elements.
-    // These will be used as the source for colors, then luminance adjusted.
     private val DrawingDarkColorScheme: ColorScheme = darkColorScheme(
         primary = AccentGold,
         secondary = AcidPatina,
         tertiary = MutedGray,
         outline = MutedGray.copy(alpha = 0.5f),
-        surface = Color(0xFF1E1E1E), // Used for text shadow base
-        onSurface = Color(0xFFE0E0E0), // Used for general text, lines
-        primaryContainer = DarkerAccentGold, // Used for default shot line
-        // Add other M3 slots if directly referenced below and not via primary/secondary/etc.
-        background = Color(0xFF121212) // For text shadow base too
+        surface = Color(0xFF1E1E1E),
+        onSurface = Color(0xFFE0E0E0),
+        primaryContainer = DarkerAccentGold,
+        background = Color(0xFF121212)
     )
     private val DrawingLightColorScheme: ColorScheme = lightColorScheme(
         primary = DarkerAccentGold,
@@ -62,9 +58,7 @@ class PaintCache {
 
     // Paint objects
     val whitePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.WHITE; style = Paint.Style.FILL_AND_STROKE; strokeWidth = thickLineStrokeWidth }
-    val greenPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.GREEN }
-    val bluePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.BLUE }
-    val redPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.RED }
+    val yellowCrosshairPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = RebelYellow.toArgb(); strokeWidth = thinLineStrokeWidth; style = Paint.Style.STROKE }
     val tableOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeWidth = thickLineStrokeWidth
     }
@@ -93,7 +87,7 @@ class PaintCache {
     val actualCueBallCenterMarkPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     val shotLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = thickLineStrokeWidth
+        style = Paint.Style.STROKE; strokeWidth = thickLineStrokeWidth; color = AndroidColor.WHITE
     }
     val aimingSightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         strokeWidth = lineStrokeWidth; style = Paint.Style.STROKE
@@ -129,9 +123,11 @@ class PaintCache {
     val warningPaintRed2 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeWidth = ballOutlineStrokeWidth
     }
-    val warningPaintRed3 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = thickLineStrokeWidth
+    val warningDottedPaintRed = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE; strokeWidth = thinLineStrokeWidth; pathEffect =
+        DashPathEffect(floatArrayOf(15f, 10f), 0f)
     }
+
 
     fun setTypeface(typeface: Typeface?) {
         cueBallTextPaint.typeface = typeface
@@ -157,6 +153,7 @@ class PaintCache {
         }
     }
 
+
     fun updateColors(uiState: OverlayState, systemIsDark: Boolean) {
         val LUMINANCE_ADJUST = uiState.luminanceAdjustment
         val baseDrawingScheme = when (uiState.isForceLightMode) {
@@ -165,7 +162,6 @@ class PaintCache {
             null -> if (systemIsDark) DrawingDarkColorScheme else DrawingLightColorScheme
         }
 
-        // Use properties from the M3 ColorScheme (baseDrawingScheme)
         val currentGlowColorCompose =
             baseDrawingScheme.primary.adjustLuminance(LUMINANCE_ADJUST * 0.5f)
         val currentGlowColorArgb = currentGlowColorCompose.copy(alpha = GLOW_ALPHA).toArgb()
@@ -173,12 +169,14 @@ class PaintCache {
             baseDrawingScheme.background.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.7f)
                 .toArgb()
 
-
         tableOutlinePaint.apply {
-            color = TargetAcid.adjustLuminance(LUMINANCE_ADJUST)
-                .toArgb() // TargetAcid is a specific brand color
+            color = TargetAcid.adjustLuminance(LUMINANCE_ADJUST).toArgb()
             applyGlow(TargetAcid.adjustLuminance(LUMINANCE_ADJUST))
         }
+
+        yellowCrosshairPaint.color = RebelYellow.adjustLuminance(LUMINANCE_ADJUST).toArgb()
+        yellowCrosshairPaint.applyGlow(RebelYellow.adjustLuminance(LUMINANCE_ADJUST))
+
 
         targetCirclePaint.color =
             baseDrawingScheme.primary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
@@ -189,31 +187,20 @@ class PaintCache {
         targetCenterMarkPaint.color =
             baseDrawingScheme.onPrimaryContainer.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         cueCenterMarkPaint.color =
-            baseDrawingScheme.onTertiaryContainer // Assuming onTertiaryContainer exists or use onTertiary
-                .let { it ?: baseDrawingScheme.onTertiary }.adjustLuminance(LUMINANCE_ADJUST)
-                .toArgb()
-
+            baseDrawingScheme.onTertiary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
 
         actualCueBallGhostPaint.color =
             baseDrawingScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         actualCueBallGhostPaint.applyGlow(
-            baseDrawingScheme.secondary.adjustLuminance(
-                LUMINANCE_ADJUST
-            )
+            baseDrawingScheme.secondary.adjustLuminance(LUMINANCE_ADJUST)
         )
         actualCueBallBasePaint.color =
-            baseDrawingScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.5f)
-                .toArgb()
+            baseDrawingScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.5f).toArgb()
         actualCueBallBasePaint.applyGlow(
-            baseDrawingScheme.secondary.adjustLuminance(
-                LUMINANCE_ADJUST
-            ), alpha = 0.3f
+            baseDrawingScheme.secondary.adjustLuminance(LUMINANCE_ADJUST), alpha = 0.3f
         )
         actualCueBallCenterMarkPaint.color =
-            baseDrawingScheme.onSecondaryContainer // Assuming onSecondaryContainer exists
-                .let { it ?: baseDrawingScheme.onSecondary }.adjustLuminance(LUMINANCE_ADJUST)
-                .toArgb()
-
+            baseDrawingScheme.onSecondary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
 
         ghostCueOutlinePaint.color =
             baseDrawingScheme.tertiary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.7f).toArgb()
@@ -224,14 +211,11 @@ class PaintCache {
         targetGhostBallOutlinePaint.color =
             baseDrawingScheme.primary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.7f).toArgb()
         targetGhostBallOutlinePaint.applyGlow(
-            baseDrawingScheme.primary.adjustLuminance(
-                LUMINANCE_ADJUST
-            ), alpha = 0.4f
+            baseDrawingScheme.primary.adjustLuminance(LUMINANCE_ADJUST), alpha = 0.4f
         )
 
         protractorLinePaint.color =
-            baseDrawingScheme.onSurface.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.4f)
-                .toArgb()
+            baseDrawingScheme.onSurface.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.4f).toArgb()
         protractorLinePaint.applyGlow(
             baseDrawingScheme.onSurface.adjustLuminance(LUMINANCE_ADJUST),
             alpha = 0.2f
@@ -239,10 +223,10 @@ class PaintCache {
 
         aimingLinePaint.apply {
             color = baseDrawingScheme.primary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
-            applyGlow(currentGlowColorArgb) // Use the pre-calculated ARGB glow
+            applyGlow(currentGlowColorArgb)
         }
 
-        val bankYellowBase = RebelYellow // Defined in your Color.kt
+        val bankYellowBase = RebelYellow
         bankShotLinePaint1.color = bankYellowBase.adjustLuminance(LUMINANCE_ADJUST + 0.1f).toArgb()
         bankShotLinePaint1.applyGlow(bankYellowBase.adjustLuminance(LUMINANCE_ADJUST + 0.1f))
         bankShotLinePaint2.color = bankYellowBase.adjustLuminance(LUMINANCE_ADJUST).toArgb()
@@ -250,24 +234,9 @@ class PaintCache {
         bankShotLinePaint3.color = bankYellowBase.adjustLuminance(LUMINANCE_ADJUST - 0.1f).toArgb()
         bankShotLinePaint3.applyGlow(bankYellowBase.adjustLuminance(LUMINANCE_ADJUST - 0.1f))
 
-        val defaultShotLineColorCompose =
-            baseDrawingScheme.primaryContainer.adjustLuminance(LUMINANCE_ADJUST)
-        shotLinePaint.apply {
-            val warningColor1Argb = AndroidColor.parseColor("#C05D5D")
-            val warningColor3BaseArgb = AndroidColor.parseColor("#80E57373")
+        shotLinePaint.color = Color.White.adjustLuminance(LUMINANCE_ADJUST).toArgb()
+        shotLinePaint.applyGlow(Color.White.adjustLuminance(LUMINANCE_ADJUST).copy(alpha=0.5f).toArgb())
 
-            if (this.color != warningColor1Argb && this.color != warningColor3BaseArgb) {
-                color = defaultShotLineColorCompose.toArgb()
-            }
-            if (this.color == defaultShotLineColorCompose.toArgb()) {
-                applyGlow(
-                    baseDrawingScheme.primary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.5f)
-                        .toArgb()
-                )
-            } else {
-                if (this.color != warningColor3BaseArgb) clearShadowLayer()
-            }
-        }
 
         aimingSightPaint.apply {
             color = baseDrawingScheme.primary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
@@ -288,54 +257,32 @@ class PaintCache {
         val baseOnSurfaceForText = baseDrawingScheme.onSurface
         cueBallTextPaint.apply {
             color = baseOnSurfaceForText.adjustLuminance(LUMINANCE_ADJUST).toArgb(); setShadowLayer(
-            2f,
-            1f,
-            1f,
-            currentTextShadowColorArgb
-        )
+            2f, 1f, 1f, currentTextShadowColorArgb)
         }
         targetBallTextPaint.apply {
             color = baseOnSurfaceForText.adjustLuminance(LUMINANCE_ADJUST).toArgb(); setShadowLayer(
-            2f,
-            1f,
-            1f,
-            currentTextShadowColorArgb
-        )
+            2f, 1f, 1f, currentTextShadowColorArgb)
         }
         actualCueBallTextPaint.apply {
             color = baseOnSurfaceForText.adjustLuminance(LUMINANCE_ADJUST).toArgb(); setShadowLayer(
-            2f,
-            1f,
-            1f,
-            currentTextShadowColorArgb
-        )
+            2f, 1f, 1f, currentTextShadowColorArgb)
         }
         ghostBallTextPaint.apply {
             color = baseOnSurfaceForText.adjustLuminance(LUMINANCE_ADJUST).toArgb(); setShadowLayer(
-            2f,
-            1f,
-            1f,
-            currentTextShadowColorArgb
-        )
+            2f, 1f, 1f, currentTextShadowColorArgb)
         }
         lineTextPaint.apply {
             color = baseOnSurfaceForText.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.8f)
                 .toArgb(); setShadowLayer(1f, 1f, 1f, currentTextShadowColorArgb)
         }
 
-        warningPaintRed1.color = AndroidColor.parseColor("#C05D5D")
-        warningPaintRed1.applyGlow(
-            WarningRed.toArgb(),
-            radius = 5f
-        ) // WarningRed is a Compose Color
-        warningPaintRed2.color = AndroidColor.parseColor("#A04C4C")
-        warningPaintRed2.applyGlow(WarningRed.copy(alpha = 0.8f).toArgb(), radius = 5f)
-        warningPaintRed3.color = AndroidColor.parseColor("#80E57373")
-        warningPaintRed3.setShadowLayer(
-            GLOW_RADIUS_DEFAULT,
-            0f,
-            0f,
-            AndroidColor.parseColor("#FF5252")
-        )
+        // Warning Colors
+        val warningColor = WarningRed.adjustLuminance(LUMINANCE_ADJUST)
+        warningPaintRed1.color = warningColor.toArgb()
+        warningPaintRed1.applyGlow(warningColor.toArgb(), radius = 5f)
+        warningPaintRed2.color = warningColor.toArgb()
+        warningPaintRed2.applyGlow(warningColor.toArgb(), radius = 5f)
+        warningDottedPaintRed.color = warningColor.toArgb()
+        warningDottedPaintRed.applyGlow(warningColor.toArgb(), radius = 5f)
     }
 }
