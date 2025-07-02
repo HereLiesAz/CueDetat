@@ -26,6 +26,7 @@ fun MainScreen(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = drawerState.isOpen, // This is the key change to disable swipe-to-open
         drawerContent = {
             MenuDrawerContent(
                 uiState = overlayState,

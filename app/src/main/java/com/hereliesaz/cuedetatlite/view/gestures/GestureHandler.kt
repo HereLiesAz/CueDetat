@@ -28,6 +28,7 @@ class GestureHandler(
     private var activePointerId = MotionEvent.INVALID_POINTER_ID
     private var interactionMode = InteractionMode.NONE
     private var gestureInProgress = false
+    private var lastAngle = 0f // Track last angle for continuous rotation
 
     init {
         val scaleListener = object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
@@ -75,9 +76,11 @@ class GestureHandler(
                     when (interactionMode) {
                         InteractionMode.ROTATING_AIM -> {
                             val targetBallScreenPos = DrawingUtils.mapPoint(state.screenState.protractorUnit.targetBall.logicalPosition, state.pitchMatrix)
-                            val angleRad = atan2(currentY - targetBallScreenPos.y, currentX - targetBallScreenPos.x)
-                            val angleDeg = toDegrees(angleRad.toDouble()).toFloat()
-                            onEvent(MainScreenEvent.AimingAngleChanged(angleDeg + 180))
+                            val currentAngle = toDegrees(atan2(currentY - targetBallScreenPos.y, currentX - targetBallScreenPos.x).toDouble()).toFloat()
+                            val deltaAngle = currentAngle - lastAngle
+                            // Use the delta to adjust the current rotation
+                            onEvent(MainScreenEvent.AimingAngleChanged(state.screenState.protractorUnit.aimingAngleDegrees + deltaAngle))
+                            lastAngle = currentAngle
                         }
                         InteractionMode.MOVING_TARGET_BALL -> onEvent(MainScreenEvent.BallMoved(1, currentPoint))
                         InteractionMode.MOVING_ACTUAL_CUE_BALL -> onEvent(MainScreenEvent.BallMoved(2, currentPoint))
@@ -133,7 +136,9 @@ class GestureHandler(
                 interactionMode = InteractionMode.MOVING_TARGET_BALL; return
             }
 
+            // For rotation, initialize the lastAngle to the starting touch angle
             interactionMode = InteractionMode.ROTATING_AIM
+            lastAngle = toDegrees(atan2(touchY - targetBallScreenPos.y, touchX - targetBallScreenPos.x).toDouble()).toFloat()
         }
     }
 }

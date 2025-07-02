@@ -25,10 +25,10 @@ class BallRenderer(
             drawProtractorLogicalBalls(canvas, state)
         }
 
-        if (state.screenState.showActualCueBall) {
-            state.screenState.actualCueBall?.let {
-                drawBall(canvas, it, paints.actualCueBallBasePaint, paints.actualCueBallCenterMarkPaint)
-            }
+        // Draw the logical ActualCueBall if it exists (in either mode)
+        state.screenState.actualCueBall?.let {
+            val paint = if(state.isBankingMode) paints.whitePaint else paints.actualCueBallBasePaint
+            drawBall(canvas, it, paint, paints.actualCueBallCenterMarkPaint)
         }
         canvas.restore()
     }
@@ -37,7 +37,8 @@ class BallRenderer(
         if (state.screenState.isProtractorMode) {
             drawProtractorGhosts(canvas, state)
         }
-        if (state.screenState.showActualCueBall) {
+        // Ghost for ActualCueBall in Protractor mode
+        if (state.screenState.isProtractorMode && state.screenState.showActualCueBall) {
             state.screenState.actualCueBall?.let {
                 val screenCenter = DrawingUtils.mapPoint(it.logicalPosition, state.pitchMatrix)
                 val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(it, state)
@@ -56,7 +57,8 @@ class BallRenderer(
         drawBall(canvas, protractorUnit.targetBall, paints.targetCirclePaint, paints.targetCenterMarkPaint)
 
         val ghostBall = getGhostBall(protractorUnit)
-        drawBall(canvas, ghostBall, paints.ghostCueOutlinePaint, paints.cueCenterMarkPaint)
+        val ghostCuePaint = if (state.screenState.isImpossibleShot) paints.warningPaintRed2 else paints.ghostCueOutlinePaint
+        drawBall(canvas, ghostBall, ghostCuePaint, paints.cueCenterMarkPaint)
     }
 
     private fun drawProtractorGhosts(canvas: Canvas, state: OverlayState) {
@@ -77,7 +79,14 @@ class BallRenderer(
         val ghostScreenCenter = DrawingUtils.mapPoint(ghostBall.logicalPosition, state.pitchMatrix)
         val ghostRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ghostBall, state)
         val ghostVisualY = ghostScreenCenter.y - ghostRadiusInfo.lift
-        canvas.drawCircle(ghostScreenCenter.x, ghostVisualY, ghostRadiusInfo.radius, paints.ghostCueOutlinePaint)
+        val ghostCueGhostPaint = if(state.screenState.isImpossibleShot) paints.warningPaintRed2 else paints.ghostCueOutlinePaint
+        canvas.drawCircle(ghostScreenCenter.x, ghostVisualY, ghostRadiusInfo.radius, ghostCueGhostPaint)
+
+        // Draw Yellow Crosshairs on Ghost Ball
+        val crosshairLength = ghostRadiusInfo.radius * 0.75f
+        canvas.drawLine(ghostScreenCenter.x - crosshairLength, ghostVisualY, ghostScreenCenter.x + crosshairLength, ghostVisualY, paints.yellowCrosshairPaint)
+        canvas.drawLine(ghostScreenCenter.x, ghostVisualY - crosshairLength, ghostScreenCenter.x, ghostVisualY + crosshairLength, paints.yellowCrosshairPaint)
+
         if (state.areHelpersVisible) {
             ballTextRenderer.draw(canvas, paints.ghostBallTextPaint, state.zoomSliderPosition, ghostScreenCenter.x, ghostVisualY, ghostRadiusInfo.radius, "Ghost Cue Ball")
         }
