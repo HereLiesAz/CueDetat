@@ -28,8 +28,6 @@ class BallRenderer(private val paints: PaintCache, private val textRenderer: Bal
     }
 
     fun drawScreenSpaceBalls(canvas: Canvas, state: OverlayState, typeface: Typeface?) {
-        textRenderer.setTypeface(typeface)
-
         state.screenState.actualCueBall?.let { currentActualCueBall ->
             val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(currentActualCueBall, state)
             val screenProjectedCenter = DrawingUtils.mapPoint(currentActualCueBall.logicalPosition, state.pitchMatrix)
