@@ -1,6 +1,7 @@
 package com.hereliesaz.cuedetatlite.view.renderer
 
 import android.graphics.Canvas
+import android.graphics.Typeface
 import com.hereliesaz.cuedetatlite.view.PaintCache
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
 
@@ -9,31 +10,29 @@ class OverlayRenderer(
     private val lineRenderer: LineRenderer,
     private val railRenderer: RailRenderer,
     private val tableRenderer: TableRenderer,
-    private val paintCache: PaintCache
+    private val paints: PaintCache
 ) {
-    fun draw(canvas: Canvas, state: OverlayState) {
-        // Clear canvas for transparency
-        canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
+    fun draw(canvas: Canvas, state: OverlayState, typeface: Typeface?) {
+        if (state.viewWidth == 0 || state.viewHeight == 0) return
 
-        if (state.isBankingMode) {
-            // Draw table surface with the standard matrix
+        if (state.screenState.isBankingMode) {
             canvas.save()
             canvas.concat(state.pitchMatrix)
-            tableRenderer.draw(canvas, state.screenState, state)
+            tableRenderer.draw(canvas, state)
             canvas.restore()
 
-            // Draw rails with the special, lifted matrix
             canvas.save()
             canvas.concat(state.railPitchMatrix)
-            railRenderer.draw(canvas, state.screenState, state)
+            railRenderer.draw(canvas, state)
             canvas.restore()
         }
 
-        // Draw all logical lines and 2D balls on the transformed plane
-        lineRenderer.draw(canvas, state.screenState, state)
+        canvas.save()
+        canvas.concat(state.pitchMatrix)
+        lineRenderer.drawLogicalLines(canvas, state)
         ballRenderer.drawLogicalBalls(canvas, state)
+        canvas.restore()
 
-        // Draw the 3D "ghost" ball effects on top, in screen space
-        ballRenderer.drawScreenSpaceGhosts(canvas, state)
+        ballRenderer.drawScreenSpaceBalls(canvas, state, typeface)
     }
 }

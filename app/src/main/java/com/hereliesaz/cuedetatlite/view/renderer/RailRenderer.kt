@@ -1,37 +1,53 @@
 package com.hereliesaz.cuedetatlite.view.renderer
 
 import android.graphics.Canvas
+import android.graphics.Paint
 import com.hereliesaz.cuedetatlite.view.PaintCache
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
-import com.hereliesaz.cuedetatlite.view.state.ScreenState
 
 class RailRenderer(private val paints: PaintCache) {
 
-    fun draw(canvas: Canvas, screenState: ScreenState, overlayState: OverlayState) {
-        canvas.save()
-        canvas.concat(overlayState.railPitchMatrix)
+    private val railVisualOffsetFromEdgeFactor = 0.75f
+    private val railVisualThicknessFactor = 0.5f
+    private val diamondSizeFactor = 0.25f
 
-        val tableModel = screenState.tableModel ?: return
-        val railWidth = 20f
+    fun draw(canvas: Canvas, state: OverlayState) {
+        val tableModel = state.screenState.tableModel ?: return
+        val referenceRadius = state.screenState.actualCueBall?.radius ?: state.screenState.protractorUnit.targetBall.radius
+        if (referenceRadius <= 0) return
 
-        val railPaint = screenState.actualCueBall?.let { actualCueBall ->
-            val targetBall = screenState.protractorUnit.targetBall
-            if (actualCueBall.logicalPosition.y > targetBall.logicalPosition.y) {
-                paints.bankShotLinePaint3
-            } else {
-                paints.bankShotLinePaint1
-            }
-        } ?: paints.bankShotLinePaint1
+        val railLinePaint = Paint(paints.tableOutlinePaint).apply {
+            strokeWidth = referenceRadius * railVisualThicknessFactor
+        }
 
-        // Top rail
-        canvas.drawRect(tableModel.surface.left - railWidth, tableModel.surface.top - railWidth, tableModel.surface.right + railWidth, tableModel.surface.top, railPaint)
-        // Bottom rail
-        canvas.drawRect(tableModel.surface.left - railWidth, tableModel.surface.bottom, tableModel.surface.right + railWidth, tableModel.surface.bottom + railWidth, railPaint)
-        // Left rail
-        canvas.drawRect(tableModel.surface.left - railWidth, tableModel.surface.top, tableModel.surface.left, tableModel.surface.bottom, railPaint)
-        // Right rail
-        canvas.drawRect(tableModel.surface.right, tableModel.surface.top, tableModel.surface.right + railWidth, tableModel.surface.bottom, railPaint)
+        val diamondRadius = referenceRadius * diamondSizeFactor
+        val diamondPaint = Paint(paints.tableOutlinePaint).apply {
+            strokeWidth = (referenceRadius * diamondSizeFactor) / 2f
+        }
 
-        canvas.restore()
+        val railOffsetAmount = referenceRadius * railVisualOffsetFromEdgeFactor
+        val tableBounds = tableModel.bounds
+
+        val railTopCenterY = tableBounds.top - railOffsetAmount
+        val railBottomCenterY = tableBounds.bottom + railOffsetAmount
+        val railLeftCenterX = tableBounds.left - railOffsetAmount
+        val railRightCenterX = tableBounds.right + railOffsetAmount
+
+        val railEndExtension = railOffsetAmount * 1.5f
+
+        // Draw rail lines
+        canvas.drawLine(tableBounds.left - railEndExtension, railTopCenterY, tableBounds.right + railEndExtension, railTopCenterY, railLinePaint)
+        canvas.drawLine(tableBounds.left - railEndExtension, railBottomCenterY, tableBounds.right + railEndExtension, railBottomCenterY, railLinePaint)
+        canvas.drawLine(railLeftCenterX, tableBounds.top - railEndExtension, railLeftCenterX, tableBounds.bottom + railEndExtension, railLinePaint)
+        canvas.drawLine(railRightCenterX, tableBounds.top - railEndExtension, railRightCenterX, tableBounds.bottom + railEndExtension, railLinePaint)
+
+        // Draw Diamonds on rails
+        for (i in 1..3) {
+            val xPos = tableBounds.left + (tableBounds.width() * (i / 4.0f))
+            canvas.drawCircle(xPos, railTopCenterY, diamondRadius, diamondPaint)
+            canvas.drawCircle(xPos, railBottomCenterY, diamondRadius, diamondPaint)
+        }
+        canvas.drawCircle(railLeftCenterX, tableBounds.centerY(), diamondRadius, diamondPaint)
+        canvas.drawCircle(railRightCenterX, tableBounds.centerY(), diamondRadius, diamondPaint)
     }
 }

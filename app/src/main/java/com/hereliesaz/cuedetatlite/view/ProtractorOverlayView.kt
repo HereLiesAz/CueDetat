@@ -61,7 +61,7 @@ class ProtractorOverlayView(context: Context) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        renderer.draw(canvas, canonicalState)
+        renderer.draw(canvas, canonicalState, barbaroTypeface)
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {

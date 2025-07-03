@@ -18,11 +18,8 @@ class LineRenderer(private val paints: PaintCache, private val textRenderer: Lin
 
     fun drawLogicalLines(
         canvas: Canvas,
-        state: OverlayState,
-        typeface: Typeface?
+        state: OverlayState
     ) {
-        textRenderer.setTypeface(typeface)
-
         if (state.screenState.isBankingMode) {
             drawBankingShotLines(canvas, state)
             return
