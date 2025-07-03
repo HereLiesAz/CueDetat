@@ -6,6 +6,7 @@ object ZoomMapping {
     const val SLIDER_MIN = 0f
     const val SLIDER_MAX = 100f
     const val SLIDER_EFFECTIVE_MIN = 65f
+    const val DEFAULT_ZOOM = 1.475f // Baseline for text scaling
 
     fun sliderToZoom(sliderValue: Float): Float {
         val range = MAX_ZOOM - MIN_ZOOM

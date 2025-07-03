@@ -1,170 +1,123 @@
-// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/view/model/TableModel.kt
 package com.hereliesaz.cuedetatlite.view.model
 
 import android.graphics.PointF
 import android.graphics.RectF
-import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sqrt
 
 data class TableModel(
-    val surface: RectF,
-    val pockets: List<Pocket>,
-    private val diamonds: List<PointF> // All diamonds in clockwise order
+    val bounds: RectF,
+    val pockets: List<PointF>
 ) {
-    data class Pocket(val center: PointF, val radius: Float)
+    private enum class Rail { TOP, BOTTOM, LEFT, RIGHT, NONE }
+    private data class IntersectionResult(val point: PointF?, val railHit: Rail, val distanceSq: Float)
 
     companion object {
-        fun create(width: Float, height: Float): TableModel {
-            val tableWidth = width * 0.8f
-            val tableHeight = tableWidth / 2
-            val left = (width - tableWidth) / 2
-            val top = (height - tableHeight) / 2
-            val right = left + tableWidth
-            val bottom = top + tableHeight
+        private const val TABLE_TO_BALL_RATIO_LONG = 88f
+        private const val TABLE_TO_BALL_RATIO_SHORT = 44f
+        private const val POCKET_TO_BALL_RATIO = 1.8f
 
-            val surface = RectF(left, top, right, bottom)
+        fun create(viewWidth: Float, viewHeight: Float, ballRadius: Float = 1f): TableModel {
+            val tableHeight = TABLE_TO_BALL_RATIO_SHORT * ballRadius
+            val tableWidth = TABLE_TO_BALL_RATIO_LONG * ballRadius
+            val centerX = viewWidth / 2f
+            val centerY = viewHeight / 2f
 
-            val cornerPocketRadius = tableWidth / 22f
-            val sidePocketRadius = tableWidth / 25f
+            val bounds = RectF(
+                centerX - tableWidth / 2,
+                centerY - tableHeight / 2,
+                centerX + tableWidth / 2,
+                centerY + tableHeight / 2
+            )
 
+            val pocketRadius = ballRadius * POCKET_TO_BALL_RATIO
             val pockets = listOf(
-                Pocket(PointF(left, top), cornerPocketRadius), // 0: TL
-                Pocket(PointF(right, top), cornerPocketRadius), // 1: TR
-                Pocket(PointF(left, bottom), cornerPocketRadius), // 2: BL
-                Pocket(PointF(right, bottom), cornerPocketRadius), // 3: BR
-                Pocket(PointF(left + tableWidth / 2, top), sidePocketRadius), // 4: TM
-                Pocket(PointF(left + tableWidth / 2, bottom), sidePocketRadius)  // 5: BM
+                PointF(bounds.left, bounds.top),
+                PointF(bounds.right, bounds.top),
+                PointF(bounds.left, bounds.bottom),
+                PointF(bounds.right, bounds.bottom),
+                PointF(centerX, bounds.top),
+                PointF(centerX, bounds.bottom)
             )
-
-            // Diamonds are defined in clockwise order starting from top-left pocket.
-            // Side pockets are included in the diamond count.
-            val diamonds = listOf(
-                pockets[0].center, // 0 - TL Pocket
-                PointF(left + tableWidth / 4, top), // 1
-                pockets[4].center, // 2 - TM Pocket
-                PointF(left + 3 * tableWidth / 4, top), // 3
-                pockets[1].center, // 4 - TR Pocket
-                PointF(right, top + tableHeight / 2), // 5
-                pockets[3].center, // 6 - BR Pocket
-                PointF(right - tableWidth / 4, bottom), // 7
-                pockets[5].center, // 8 - BM Pocket
-                PointF(left + tableWidth / 4, bottom), // 9
-                pockets[2].center, // 10 - BL Pocket
-                PointF(left, top + tableHeight / 2) // 11
-            )
-
-            return TableModel(surface, pockets, diamonds)
+            return TableModel(bounds, pockets)
         }
     }
 
-    fun getDiamonds(): List<PointF> = diamonds
-
-    fun calculateBankingPath(startPoint: PointF, aimPoint: PointF): List<PointF> {
+    fun calculateBankingPath(startPoint: PointF, aimTarget: PointF): List<PointF> {
         val path = mutableListOf<PointF>()
+        path.add(startPoint)
+
         var currentPoint = startPoint
-        path.add(currentPoint)
+        var currentAimVector = PointF(aimTarget.x - startPoint.x, aimTarget.y - startPoint.y)
+        var lastHitRail = Rail.NONE
 
-        var dx = aimPoint.x - currentPoint.x
-        var dy = aimPoint.y - currentPoint.y
-        val mag = sqrt(dx.pow(2) + dy.pow(2))
-        if (mag == 0f) return path
-        dx /= mag
-        dy /= mag
+        for (i in 0..2) { // Calculate up to 3 banks
+            val farOffTarget = PointF(currentPoint.x + currentAimVector.x * 1000, currentPoint.y + currentAimVector.y * 1000)
+            val hitResult = findClosestRailIntersection(currentPoint, farOffTarget, lastHitRail)
 
-        for (i in 0..5) { // Max 6 banks
-            val railHit = findNextRailHit(currentPoint, dx, dy)
-            val pocketHit = findNextPocketHit(currentPoint, dx, dy)
+            if (hitResult.point != null) {
+                path.add(hitResult.point)
+                currentPoint = hitResult.point
+                currentAimVector = reflectVector(currentAimVector, hitResult.railHit)
+                lastHitRail = hitResult.railHit
 
-            if (pocketHit != null && (railHit == null || pocketHit.first < railHit.first)) {
-                path.add(pocketHit.second)
-                return path // End path in pocket
-            }
-
-            if (railHit != null) {
-                path.add(railHit.second)
-                currentPoint = railHit.second
-                when (railHit.third) {
-                    0, 2 -> dy = -dy // Top/Bottom
-                    1, 3 -> dx = -dx // Left/Right
+                if (i == 2) { // Add a final segment for the 3rd bank
+                    path.add(PointF(currentPoint.x + currentAimVector.x * 1000, currentPoint.y + currentAimVector.y * 1000))
                 }
             } else {
-                return path
+                path.add(farOffTarget)
+                break // No more intersections found
             }
         }
         return path
     }
 
-    fun getDiamondValue(point: PointF): Float? {
-        val tolerance = 5f
-        val railIndex = when {
-            abs(point.y - surface.top) < tolerance -> 0    // Top
-            abs(point.x - surface.right) < tolerance -> 1 // Right
-            abs(point.y - surface.bottom) < tolerance -> 2 // Bottom
-            abs(point.x - surface.left) < tolerance -> 3  // Left
-            else -> return null
-        }
+    private fun findClosestRailIntersection(start: PointF, endRayTarget: PointF, ignoreRail: Rail): IntersectionResult {
+        var closestIntersection: PointF? = null
+        var railHit = Rail.NONE
+        var minDistanceSq = Float.MAX_VALUE
 
-        val (railDiamonds, baseIndex, reversed) = when(railIndex) {
-            0 -> Triple(diamonds.slice(0..4), 0, false)
-            1 -> Triple(diamonds.slice(4..6), 4, false)
-            2 -> Triple(diamonds.slice(6..10), 6, true)
-            3 -> Triple(listOf(diamonds[10], diamonds[11], diamonds[0]), 10, false)
-            else -> return null
-        }
+        val candidates = mutableListOf<IntersectionResult>()
+        if (ignoreRail != Rail.TOP) getLineSegmentRayIntersection(start, endRayTarget, PointF(bounds.left, bounds.top), PointF(bounds.right, bounds.top))?.let { candidates.add(IntersectionResult(it, Rail.TOP, distanceSq(start, it))) }
+        if (ignoreRail != Rail.BOTTOM) getLineSegmentRayIntersection(start, endRayTarget, PointF(bounds.left, bounds.bottom), PointF(bounds.right, bounds.bottom))?.let { candidates.add(IntersectionResult(it, Rail.BOTTOM, distanceSq(start, it))) }
+        if (ignoreRail != Rail.LEFT) getLineSegmentRayIntersection(start, endRayTarget, PointF(bounds.left, bounds.top), PointF(bounds.left, bounds.bottom))?.let { candidates.add(IntersectionResult(it, Rail.LEFT, distanceSq(start, it))) }
+        if (ignoreRail != Rail.RIGHT) getLineSegmentRayIntersection(start, endRayTarget, PointF(bounds.right, bounds.top), PointF(bounds.right, bounds.bottom))?.let { candidates.add(IntersectionResult(it, Rail.RIGHT, distanceSq(start, it))) }
 
-        val isHorizontal = railIndex == 0 || railIndex == 2
-        for (i in 0 until railDiamonds.size - 1) {
-            val d1 = railDiamonds[i]
-            val d2 = railDiamonds[i+1]
-            val p = if (isHorizontal) point.x else point.y
-            val start = if (isHorizontal) d1.x else d1.y
-            val end = if (isHorizontal) d2.x else d2.y
-
-            if ((p in start..end) || (p in end..start)) {
-                val totalDist = abs(start - end)
-                if (totalDist < 1e-6) continue
-                val partialDist = abs(p - start)
-                val fraction = partialDist / totalDist
-                return (if(reversed) baseIndex + (railDiamonds.size - 2 - i) else baseIndex + i) + fraction
-            }
-        }
-        return null
-    }
-
-
-    private fun findNextRailHit(p: PointF, dx: Float, dy: Float): Triple<Float, PointF, Int>? {
-        var t = Float.MAX_VALUE
-        var railIndex = -1
-
-        // Top rail (index 0)
-        if (dy < 0) { val tRail = (surface.top - p.y) / dy; if (tRail > 1e-6 && tRail < t) { t = tRail; railIndex = 0 } }
-        // Right rail (index 1)
-        if (dx > 0) { val tRail = (surface.right - p.x) / dx; if (tRail > 1e-6 && tRail < t) { t = tRail; railIndex = 1 } }
-        // Bottom rail (index 2)
-        if (dy > 0) { val tRail = (surface.bottom - p.y) / dy; if (tRail > 1e-6 && tRail < t) { t = tRail; railIndex = 2 } }
-        // Left rail (index 3)
-        if (dx < 0) { val tRail = (surface.left - p.x) / dx; if (tRail > 1e-6 && tRail < t) { t = tRail; railIndex = 3 } }
-
-        return if (railIndex != -1) Triple(t, PointF(p.x + t * dx, p.y + t * dy), railIndex) else null
-    }
-
-    private fun findNextPocketHit(p: PointF, dx: Float, dy: Float): Pair<Float, PointF>? {
-        var closestHit: Pair<Float, PointF>? = null
-        for (pocket in pockets) {
-            val oc = PointF(p.x - pocket.center.x, p.y - pocket.center.y)
-            val b = 2 * (oc.x * dx + oc.y * dy)
-            val c = oc.x * oc.x + oc.y * oc.y - pocket.radius * pocket.radius
-            val discriminant = b * b - 4 * c
-            if (discriminant >= 0) {
-                val t = (-b - sqrt(discriminant)) / 2
-                if (t > 1e-6) {
-                    if (closestHit == null || t < closestHit.first) {
-                        closestHit = Pair(t, PointF(p.x + t * dx, p.y + t * dy))
-                    }
+        for (candidate in candidates) {
+            if (candidate.point != null) {
+                val dotProduct = (candidate.point.x - start.x) * (endRayTarget.x - start.x) + (candidate.point.y - start.y) * (endRayTarget.y - start.y)
+                if (dotProduct >= -0.001f && candidate.distanceSq < minDistanceSq) {
+                    minDistanceSq = candidate.distanceSq
+                    closestIntersection = candidate.point
+                    railHit = candidate.railHit
                 }
             }
         }
-        return closestHit
+        return IntersectionResult(closestIntersection, railHit, minDistanceSq)
+    }
+
+    private fun getLineSegmentRayIntersection(rayOrigin: PointF, rayTarget: PointF, segP1: PointF, segP2: PointF): PointF? {
+        val rDx = rayTarget.x - rayOrigin.x; val rDy = rayTarget.y - rayOrigin.y
+        val sDx = segP2.x - segP1.x; val sDy = segP2.y - segP1.y
+        val rMagSq = rDx * rDx + rDy * rDy; val sMagSq = sDx * sDx + sDy * sDy
+        if (rMagSq < 0.0001f || sMagSq < 0.0001f) return null
+        val denominator = rDx * sDy - rDy * sDx
+        if (kotlin.math.abs(denominator) < 0.0001f) return null
+        val t = ((segP1.x - rayOrigin.x) * sDy - (segP1.y - rayOrigin.y) * sDx) / denominator
+        val u = ((segP1.x - rayOrigin.x) * rDy - (segP1.y - rayOrigin.y) * rDx) / denominator
+        if (t >= 0 && u >= 0 && u <= 1) return PointF(rayOrigin.x + t * rDx, rayOrigin.y + t * rDy)
+        return null
+    }
+
+    private fun distanceSq(p1: PointF, p2: PointF): Float {
+        val dx = p1.x - p2.x; val dy = p1.y - p2.y; return dx * dx + dy * dy
+    }
+
+    private fun reflectVector(incident: PointF, rail: Rail): PointF {
+        return when (rail) {
+            Rail.TOP, Rail.BOTTOM -> PointF(incident.x, -incident.y)
+            Rail.LEFT, Rail.RIGHT -> PointF(-incident.x, incident.y)
+            Rail.NONE -> incident
+        }
     }
 }

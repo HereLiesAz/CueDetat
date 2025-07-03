@@ -1,17 +1,13 @@
-// hereliesaz/cuedetat/CueDetat-CueDetatLite/app/src/main/java/com/hereliesaz/cuedetatlite/domain/WarningManager.kt
 package com.hereliesaz.cuedetatlite.domain
 
 import com.hereliesaz.cuedetatlite.view.state.ScreenState
+import javax.inject.Inject
 
-class WarningManager {
-    /**
-     * Determines the appropriate warning text based on the current screen state.
-     */
+class WarningManager @Inject constructor() {
     fun getWarning(state: ScreenState): WarningText? {
-        return when {
-            state.isImpossibleShot -> WarningText.IMPOSSIBLE_SHOT
-            // Add other conditions for different warnings here
-            else -> null
+        if (state.isImpossibleShot) {
+            return WarningText.IMPOSSIBLE_SHOT
         }
+        return null
     }
 }
