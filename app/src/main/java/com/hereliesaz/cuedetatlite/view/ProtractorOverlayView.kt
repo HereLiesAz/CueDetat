@@ -32,11 +32,9 @@ class ProtractorOverlayView(context: Context) : View(context) {
     var onEvent: ((MainScreenEvent) -> Unit)? = null
         set(value) {
             field = value
-            // This is a bit of a workaround to pass the final event handler
-            // to the gesture handler after the view is constructed.
             if (value != null) {
-                // Re-initialize gesture handler with the actual event listener
-                // gestureHandler = GestureHandler(context, value) // This causes issues, handled in init
+                // This is a bit of a workaround to pass the final event handler
+                // to the gesture handler after the view is constructed.
             }
         }
 

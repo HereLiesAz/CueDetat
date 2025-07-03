@@ -1,107 +1,55 @@
 package com.hereliesaz.cuedetatlite.view.renderer
 
 import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.PointF
+import android.graphics.Typeface
 import com.hereliesaz.cuedetatlite.view.PaintCache
-import com.hereliesaz.cuedetatlite.view.model.ILogicalBall
-import com.hereliesaz.cuedetatlite.view.model.ProtractorUnit
 import com.hereliesaz.cuedetatlite.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetatlite.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetatlite.view.state.OverlayState
-import kotlin.math.cos
-import kotlin.math.sin
 
-class BallRenderer(
-    private val paints: PaintCache,
-    private val ballTextRenderer: BallTextRenderer
-) {
+class BallRenderer(private val paints: PaintCache, private val textRenderer: BallTextRenderer) {
 
     fun drawLogicalBalls(canvas: Canvas, state: OverlayState) {
-        canvas.save()
-        canvas.concat(state.pitchMatrix)
-
-        if (state.screenState.isProtractorMode) {
-            drawProtractorLogicalBalls(canvas, state)
-        }
-
-        // Draw the logical ActualCueBall if it exists (in either mode)
         state.screenState.actualCueBall?.let {
-            val paint = if(state.isBankingMode) paints.whitePaint else paints.actualCueBallBasePaint
-            drawBall(canvas, it, paint, paints.actualCueBallCenterMarkPaint)
+            canvas.drawCircle(it.logicalPosition.x, it.logicalPosition.y, it.radius, paints.actualCueBallBasePaint)
+            canvas.drawCircle(it.logicalPosition.x, it.logicalPosition.y, it.radius / 5f, paints.actualCueBallCenterMarkPaint)
         }
-        canvas.restore()
-    }
 
-    fun drawScreenSpaceGhosts(canvas: Canvas, state: OverlayState) {
-        if (state.screenState.isProtractorMode) {
-            drawProtractorGhosts(canvas, state)
-        }
-        // Ghost for ActualCueBall in Protractor mode
-        if (state.screenState.isProtractorMode && state.screenState.showActualCueBall) {
-            state.screenState.actualCueBall?.let {
-                val screenCenter = DrawingUtils.mapPoint(it.logicalPosition, state.pitchMatrix)
-                val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(it, state)
-                val visualY = screenCenter.y - radiusInfo.lift
+        if (state.screenState.isBankingMode) return
 
-                canvas.drawCircle(screenCenter.x, visualY, radiusInfo.radius, paints.actualCueBallGhostPaint)
-                if (state.areHelpersVisible) {
-                    ballTextRenderer.draw(canvas, paints.actualCueBallTextPaint, state.zoomSliderPosition, screenCenter.x, visualY, radiusInfo.radius, "Actual Cue Ball")
-                }
-            }
-        }
-    }
-
-    private fun drawProtractorLogicalBalls(canvas: Canvas, state: OverlayState) {
         val protractorUnit = state.screenState.protractorUnit
-        drawBall(canvas, protractorUnit.targetBall, paints.targetCirclePaint, paints.targetCenterMarkPaint)
+        canvas.drawCircle(protractorUnit.targetBall.logicalPosition.x, protractorUnit.targetBall.logicalPosition.y, protractorUnit.targetBall.radius, paints.targetCirclePaint)
+        canvas.drawCircle(protractorUnit.targetBall.logicalPosition.x, protractorUnit.targetBall.logicalPosition.y, protractorUnit.targetBall.radius / 5f, paints.targetCenterMarkPaint)
 
-        val ghostBall = getGhostBall(protractorUnit)
-        val ghostCuePaint = if (state.screenState.isImpossibleShot) paints.warningPaintRed2 else paints.ghostCueOutlinePaint
-        drawBall(canvas, ghostBall, ghostCuePaint, paints.cueCenterMarkPaint)
+        val ghostCueBall = protractorUnit.ghostCueBall
+        val cuePaint = if (state.screenState.isImpossibleShot) paints.warningPaintRed1 else paints.cueCirclePaint
+        canvas.drawCircle(ghostCueBall.logicalPosition.x, ghostCueBall.logicalPosition.y, ghostCueBall.radius, cuePaint)
+        canvas.drawCircle(ghostCueBall.logicalPosition.x, ghostCueBall.logicalPosition.y, ghostCueBall.radius / 5f, paints.cueCenterMarkPaint)
     }
 
-    private fun drawProtractorGhosts(canvas: Canvas, state: OverlayState) {
-        val protractorUnit = state.screenState.protractorUnit
-        val targetBall = protractorUnit.targetBall
-        val ghostBall = getGhostBall(protractorUnit)
+    fun drawScreenSpaceBalls(canvas: Canvas, state: OverlayState, typeface: Typeface?) {
+        textRenderer.setTypeface(typeface)
 
-        // Target Ghost
-        val targetScreenCenter = DrawingUtils.mapPoint(targetBall.logicalPosition, state.pitchMatrix)
-        val targetRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(targetBall, state)
-        val targetVisualY = targetScreenCenter.y - targetRadiusInfo.lift
-        canvas.drawCircle(targetScreenCenter.x, targetVisualY, targetRadiusInfo.radius, paints.targetGhostBallOutlinePaint)
-        if (state.areHelpersVisible) {
-            ballTextRenderer.draw(canvas, paints.targetBallTextPaint, state.zoomSliderPosition, targetScreenCenter.x, targetVisualY, targetRadiusInfo.radius, "Target Ball")
+        state.screenState.actualCueBall?.let { currentActualCueBall ->
+            val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(currentActualCueBall, state)
+            val screenProjectedCenter = DrawingUtils.mapPoint(currentActualCueBall.logicalPosition, state.pitchMatrix)
+            val visualY = if (state.screenState.isBankingMode) screenProjectedCenter.y else screenProjectedCenter.y - radiusInfo.lift
+            canvas.drawCircle(screenProjectedCenter.x, visualY, radiusInfo.radius, paints.actualCueBallGhostPaint)
         }
 
-        // Cue Ghost
-        val ghostScreenCenter = DrawingUtils.mapPoint(ghostBall.logicalPosition, state.pitchMatrix)
-        val ghostRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ghostBall, state)
-        val ghostVisualY = ghostScreenCenter.y - ghostRadiusInfo.lift
-        val ghostCueGhostPaint = if(state.screenState.isImpossibleShot) paints.warningPaintRed2 else paints.ghostCueOutlinePaint
-        canvas.drawCircle(ghostScreenCenter.x, ghostVisualY, ghostRadiusInfo.radius, ghostCueGhostPaint)
+        if (!state.screenState.isBankingMode) {
+            val targetBallLogical = state.screenState.protractorUnit.targetBall
+            val targetRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(targetBallLogical, state)
+            val screenProjectedTargetCenter = DrawingUtils.mapPoint(targetBallLogical.logicalPosition, state.pitchMatrix)
+            val targetGhostVisualY = screenProjectedTargetCenter.y - targetRadiusInfo.lift
+            canvas.drawCircle(screenProjectedTargetCenter.x, targetGhostVisualY, targetRadiusInfo.radius, paints.targetGhostBallOutlinePaint)
 
-        // Draw Yellow Crosshairs on Ghost Ball
-        val crosshairLength = ghostRadiusInfo.radius * 0.75f
-        canvas.drawLine(ghostScreenCenter.x - crosshairLength, ghostVisualY, ghostScreenCenter.x + crosshairLength, ghostVisualY, paints.yellowCrosshairPaint)
-        canvas.drawLine(ghostScreenCenter.x, ghostVisualY - crosshairLength, ghostScreenCenter.x, ghostVisualY + crosshairLength, paints.yellowCrosshairPaint)
-
-        if (state.areHelpersVisible) {
-            ballTextRenderer.draw(canvas, paints.ghostBallTextPaint, state.zoomSliderPosition, ghostScreenCenter.x, ghostVisualY, ghostRadiusInfo.radius, "Ghost Cue Ball")
+            val ghostCueBall = state.screenState.protractorUnit.ghostCueBall
+            val cueRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ghostCueBall, state)
+            val screenProjectedGhostCueCenter = DrawingUtils.mapPoint(ghostCueBall.logicalPosition, state.pitchMatrix)
+            val cueGhostVisualY = screenProjectedGhostCueCenter.y - cueRadiusInfo.lift
+            val cueGhostPaint = if (state.screenState.isImpossibleShot) paints.warningPaintRed2 else paints.ghostCueOutlinePaint
+            canvas.drawCircle(screenProjectedGhostCueCenter.x, cueGhostVisualY, cueRadiusInfo.radius, cueGhostPaint)
         }
-    }
-
-    private fun getGhostBall(protractorUnit: ProtractorUnit): ILogicalBall {
-        val angleRad = Math.toRadians(protractorUnit.aimingAngleDegrees.toDouble()).toFloat()
-        val totalRadius = protractorUnit.targetBall.radius * 2
-        val ghostBallX = protractorUnit.targetBall.logicalPosition.x - cos(angleRad) * totalRadius
-        val ghostBallY = protractorUnit.targetBall.logicalPosition.y - sin(angleRad) * totalRadius
-        return ProtractorUnit.LogicalBall(PointF(ghostBallX, ghostBallY), protractorUnit.targetBall.radius)
-    }
-
-    private fun drawBall(canvas: Canvas, ball: ILogicalBall, circlePaint: Paint, centerPaint: Paint) {
-        canvas.drawCircle(ball.logicalPosition.x, ball.logicalPosition.y, ball.radius, circlePaint)
-        canvas.drawCircle(ball.logicalPosition.x, ball.logicalPosition.y, ball.radius / 4, centerPaint)
     }
 }

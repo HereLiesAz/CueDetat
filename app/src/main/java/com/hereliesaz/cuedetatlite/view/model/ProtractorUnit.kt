@@ -1,13 +1,24 @@
 package com.hereliesaz.cuedetatlite.view.model
 
 import android.graphics.PointF
+import kotlin.math.cos
+import kotlin.math.sin
 
 data class ProtractorUnit(
-    val targetBall: ILogicalBall = LogicalBall(PointF(100f, 100f), 30f),
-    val aimingAngleDegrees: Float = 0f // This now controls the ghost ball's position
+    val targetBall: LogicalBall,
+    val aimingAngleDegrees: Float = 0f,
 ) {
     data class LogicalBall(
         override val logicalPosition: PointF,
         override val radius: Float
     ) : ILogicalBall
+
+    val ghostCueBall: LogicalBall
+        get() {
+            val angleRad = Math.toRadians(aimingAngleDegrees.toDouble()).toFloat()
+            val totalRadius = targetBall.radius * 2
+            val ghostBallX = targetBall.logicalPosition.x - cos(angleRad) * totalRadius
+            val ghostBallY = targetBall.logicalPosition.y - sin(angleRad) * totalRadius
+            return LogicalBall(PointF(ghostBallX, ghostBallY), targetBall.radius)
+        }
 }

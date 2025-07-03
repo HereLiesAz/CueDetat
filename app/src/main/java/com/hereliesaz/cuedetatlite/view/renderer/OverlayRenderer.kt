@@ -29,7 +29,7 @@ class OverlayRenderer(
 
         canvas.save()
         canvas.concat(state.pitchMatrix)
-        lineRenderer.drawLogicalLines(canvas, state)
+        lineRenderer.drawLogicalLines(canvas, state, typeface)
         ballRenderer.drawLogicalBalls(canvas, state)
         canvas.restore()
 
