@@ -167,7 +167,6 @@ fun TutorialOverlay(
     }
 }
 
-
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
