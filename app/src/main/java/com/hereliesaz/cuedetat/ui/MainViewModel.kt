@@ -3,12 +3,13 @@ package com.hereliesaz.cuedetat.ui
 
 import android.app.Application
 import android.graphics.Camera
-// import android.graphics.PointF // Not directly used here, but in event types
+import android.graphics.Matrix
+import android.graphics.PointF
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.R
-// import com.hereliesaz.cuedetat.data.FullOrientation // Already imported via MainScreenEvent
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.UpdateChecker
 import com.hereliesaz.cuedetat.data.UpdateResult
@@ -50,10 +51,6 @@ class MainViewModel @Inject constructor(
     val singleEvent = _singleEvent.asStateFlow()
 
     init {
-        // sensorRepository.pitchAngleFlow // Old flow
-        //     .onEach { onEvent(MainScreenEvent.PitchAngleChanged(it)) } // Replaced
-        //     .launchIn(viewModelScope)
-
         sensorRepository.fullOrientationFlow
             .onEach { orientation -> onEvent(MainScreenEvent.FullOrientationChanged(orientation)) }
             .launchIn(viewModelScope)
@@ -63,50 +60,53 @@ class MainViewModel @Inject constructor(
         when (event) {
             is MainScreenEvent.ThemeChanged -> {
                 _uiState.value = _uiState.value.copy(appControlColorScheme = event.scheme)
-                return // Handled directly, no further reduction needed for this specific UI state
-            }
-            is MainScreenEvent.ActualCueBallMoved -> {
-                if (_uiState.value.hasInverseMatrix) {
-                    val logicalPos = Perspective.screenToLogical(event.position, _uiState.value.inversePitchMatrix)
-                    updateContinuousState(MainScreenEvent.UpdateLogicalActualCueBallPosition(logicalPos))
-                }
-                return // Event processed or passed to reducer
-            }
-            is MainScreenEvent.UnitMoved -> {
-                if (_uiState.value.hasInverseMatrix) {
-                    val logicalPos = Perspective.screenToLogical(event.position, _uiState.value.inversePitchMatrix)
-                    updateContinuousState(MainScreenEvent.UpdateLogicalUnitPosition(logicalPos))
-                }
-                return // Event processed or passed to reducer
-            }
-            is MainScreenEvent.BankingAimTargetDragged -> {
-                if (_uiState.value.hasInverseMatrix) {
-                    val logicalTarget = Perspective.screenToLogical(event.screenPoint, _uiState.value.inversePitchMatrix)
-                    updateContinuousState(MainScreenEvent.UpdateLogicalBankingAimTarget(logicalTarget))
-                }
-                return // Event processed or passed to reducer
+                return
             }
             is MainScreenEvent.CheckForUpdate -> checkForUpdate()
             is MainScreenEvent.ViewArt -> _singleEvent.value = SingleEvent.OpenUrl("https://instagram.com/hereliesaz")
             is MainScreenEvent.ShowDonationOptions -> _singleEvent.value = SingleEvent.ShowDonationDialog
-            is MainScreenEvent.FeatureComingSoon -> _toastMessage.value = ToastMessage.PlainText("Feature coming soon!")
             is MainScreenEvent.SingleEventConsumed -> _singleEvent.value = null
             is MainScreenEvent.ToastShown -> _toastMessage.value = null
-            is MainScreenEvent.GestureStarted -> {
-                _uiState.value = _uiState.value.copy(warningText = null)
-                // Fall through to updateContinuousState for other potential logic
+
+            is MainScreenEvent.ScreenGestureStarted -> {
+                if (_uiState.value.hasInverseMatrix) {
+                    val logicalPoint = Perspective.screenToLogical(event.position, _uiState.value.inversePitchMatrix)
+                    updateContinuousState(MainScreenEvent.LogicalGestureStarted(logicalPoint))
+                }
             }
-            // All other events, including FullOrientationChanged, will go through updateContinuousState
-            else -> Unit
+            is MainScreenEvent.Drag -> {
+                if (_uiState.value.hasInverseMatrix) {
+                    val logicalDelta = convertScreenVectorToLogicalVector(event.dragAmount, _uiState.value.inversePitchMatrix)
+                    updateContinuousState(MainScreenEvent.LogicalDragApplied(logicalDelta))
+                }
+            }
+
+            else -> updateContinuousState(event)
         }
-        updateContinuousState(event)
+    }
+
+    private fun convertScreenVectorToLogicalVector(screenVector: Offset, inverseMatrix: Matrix): PointF {
+        val screenStart = floatArrayOf(0f, 0f)
+        val screenEnd = floatArrayOf(screenVector.x, screenVector.y)
+
+        val matrixNoTranslate = Matrix(inverseMatrix)
+        val values = FloatArray(9)
+        matrixNoTranslate.getValues(values)
+        values[Matrix.MTRANS_X] = 0f
+        values[Matrix.MTRANS_Y] = 0f
+        matrixNoTranslate.setValues(values)
+
+        val logicalStart = FloatArray(2)
+        val logicalEnd = FloatArray(2)
+        matrixNoTranslate.mapPoints(logicalStart, screenStart)
+        matrixNoTranslate.mapPoints(logicalEnd, screenEnd)
+
+        return PointF(logicalEnd[0] - logicalStart[0], logicalEnd[1] - logicalStart[1])
     }
 
     private fun updateContinuousState(event: MainScreenEvent) {
         val oldState = _uiState.value
         val stateFromReducer = stateReducer.reduce(oldState, event)
-        // updateStateUseCase will use state.pitchAngle (derived from currentOrientation)
-        // or potentially the full current/anchor orientation if we modify it further
         val finalGeometricState = updateStateUseCase(stateFromReducer, graphicsCamera)
 
         var newWarningText = finalGeometricState.warningText
@@ -118,21 +118,19 @@ class MainViewModel @Inject constructor(
             } else {
                 newWarningText = null
             }
-        } else if (event !is MainScreenEvent.GestureStarted) {
-            // Preserve existing warning if shot is still impossible & not banking & not a new gesture start
+        } else if (event !is MainScreenEvent.ScreenGestureStarted && event !is MainScreenEvent.LogicalGestureStarted) {
             if (oldState.warningText != null && finalGeometricState.isImpossibleShot && !finalGeometricState.isBankingMode) {
                 newWarningText = oldState.warningText
             } else if (!finalGeometricState.isImpossibleShot || finalGeometricState.isBankingMode) {
-                // Clear warning if shot becomes possible or if we enter banking mode,
-                // or if it's any other event that shouldn't preserve a warning.
                 newWarningText = null
             }
+        } else {
+            newWarningText = null
         }
-        // If event is GestureStarted, warningText was already nulled in the onEvent handler.
 
         _uiState.value = finalGeometricState.copy(
             warningText = newWarningText,
-            appControlColorScheme = oldState.appControlColorScheme // Ensure app control theme is preserved
+            appControlColorScheme = oldState.appControlColorScheme
         )
     }
 

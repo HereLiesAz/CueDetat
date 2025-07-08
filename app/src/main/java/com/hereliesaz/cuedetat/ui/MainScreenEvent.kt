@@ -3,56 +3,44 @@ package com.hereliesaz.cuedetat.ui
 
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
-import com.hereliesaz.cuedetat.data.FullOrientation // Import
+import androidx.compose.ui.geometry.Offset
+import com.hereliesaz.cuedetat.data.FullOrientation
 
 sealed class MainScreenEvent {
+    // UI-Originated Events, using screen-space coordinates/deltas
+    data class ScreenGestureStarted(val position: PointF) : MainScreenEvent()
+    data class Drag(val dragAmount: Offset) : MainScreenEvent()
+    object GestureEnded : MainScreenEvent()
     data class SizeChanged(val width: Int, val height: Int) : MainScreenEvent()
-    data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
     data class ZoomScaleChanged(val scaleFactor: Float) : MainScreenEvent()
+    data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
 
-    // Protractor System Events
-    data class RotationChanged(val newRotation: Float) : MainScreenEvent()
-    data class UnitMoved(val position: PointF) : MainScreenEvent()
+    // Logical Events (dispatched by ViewModel after processing UI events)
+    internal data class LogicalGestureStarted(val logicalPoint: PointF) : MainScreenEvent()
+    internal data class LogicalDragApplied(val logicalDelta: PointF) : MainScreenEvent()
 
-    // ActualCueBall / BankingBall Events
-    data class ActualCueBallMoved(val position: PointF) : MainScreenEvent()
-
-    // Banking System Events
+    // Direct State Change Events
     data class TableRotationChanged(val degrees: Float) : MainScreenEvent()
-    data class BankingAimTargetDragged(val screenPoint: PointF) : MainScreenEvent()
-
-    internal data class UpdateLogicalActualCueBallPosition(val logicalPoint: PointF) : MainScreenEvent()
-    internal data class UpdateLogicalUnitPosition(val logicalPoint: PointF) : MainScreenEvent()
-    internal data class UpdateLogicalBankingAimTarget(val logicalPoint: PointF) : MainScreenEvent()
-
-    // data class PitchAngleChanged(val pitch: Float) : MainScreenEvent() // Replaced by FullOrientationChanged
     data class FullOrientationChanged(val orientation: FullOrientation) : MainScreenEvent()
-
-
     data class ThemeChanged(val scheme: ColorScheme) : MainScreenEvent()
-
-    object ToggleForceTheme : MainScreenEvent()
-    object ToggleLuminanceDialog : MainScreenEvent()
-    data class AdjustLuminance(val adjustment: Float) : MainScreenEvent()
-
-    object StartTutorial : MainScreenEvent()
-    object NextTutorialStep : MainScreenEvent()
-    object EndTutorial : MainScreenEvent()
-
     object Reset : MainScreenEvent()
     object ToggleHelp : MainScreenEvent()
     object ToggleMoreHelp : MainScreenEvent()
     object ToggleActualCueBall : MainScreenEvent()
     object ToggleBankingMode : MainScreenEvent()
+    object ToggleForceTheme : MainScreenEvent()
+    object ToggleLuminanceDialog : MainScreenEvent()
+    data class AdjustLuminance(val adjustment: Float) : MainScreenEvent()
 
-    object ToggleSpatialLock : MainScreenEvent()
+    // Tutorial Events
+    object StartTutorial : MainScreenEvent()
+    object NextTutorialStep : MainScreenEvent()
+    object EndTutorial : MainScreenEvent()
 
+    // Meta/Single Events
     object CheckForUpdate : MainScreenEvent()
     object ViewArt : MainScreenEvent()
-    object FeatureComingSoon : MainScreenEvent()
     object ShowDonationOptions : MainScreenEvent()
     object SingleEventConsumed : MainScreenEvent()
     object ToastShown : MainScreenEvent()
-    object GestureStarted : MainScreenEvent()
-    object GestureEnded : MainScreenEvent()
 }

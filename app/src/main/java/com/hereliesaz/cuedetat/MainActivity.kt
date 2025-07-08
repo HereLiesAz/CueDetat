@@ -10,10 +10,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect // For initial theme dispatch
-import androidx.compose.material3.MaterialTheme // For getting current theme
-// import androidx.compose.runtime.collectAsState // No longer needed here for theme
-// import androidx.compose.runtime.getValue // No longer needed here for theme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.MaterialTheme
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
@@ -35,11 +33,9 @@ class MainActivity : ComponentActivity() {
     private val requestCameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             if (isGranted) {
-                if (findViewById<android.view.ViewGroup>(android.R.id.content).childCount == 0) {
-                    setContent { AppContent(viewModel) }
-                }
+                setContent { AppContent(viewModel) }
             } else {
-                // TODO: Handle permission denial gracefully (e.g., show a message)
+                // Heresy is not tolerated. The user will comply or they will not use the app.
             }
         }
 
@@ -47,12 +43,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        if (hasCameraPermission()) {
-            setContent {
-                AppContent(viewModel)
+        when {
+            hasCameraPermission() -> {
+                setContent { AppContent(viewModel) }
             }
-        } else {
-            requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            else -> {
+                requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
         }
         observeSingleEvents()
     }
@@ -95,8 +92,7 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun AppContent(viewModel: MainViewModel) {
-        CueDetatTheme { // CueDetatTheme now manages its dark/light mode internally based on system
-            // Dispatch the initial app control theme to the ViewModel
+        CueDetatTheme {
             val currentAppControlColorScheme = MaterialTheme.colorScheme
             LaunchedEffect(currentAppControlColorScheme) {
                 viewModel.onEvent(MainScreenEvent.ThemeChanged(currentAppControlColorScheme))

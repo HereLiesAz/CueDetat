@@ -146,6 +146,7 @@ android {
 }
 dependencies {
     implementation(libs.ui)
+    implementation(libs.ui.graphics)
 }
 
 kapt {

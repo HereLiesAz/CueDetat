@@ -5,9 +5,18 @@ import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
-import com.hereliesaz.cuedetat.data.FullOrientation // Import FullOrientation
+import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.view.model.ActualCueBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
+
+enum class InteractionMode {
+    NONE,
+    SCALING,
+    ROTATING_PROTRACTOR,
+    MOVING_PROTRACTOR_UNIT,
+    MOVING_ACTUAL_CUE_BALL,
+    AIMING_BANK_SHOT
+}
 
 data class OverlayState(
     // View dimensions
@@ -29,7 +38,7 @@ data class OverlayState(
     val tableRotationDegrees: Float = 0f,
     val bankingAimTarget: PointF? = null,
 
-    // Theme and Appearance FOR DRAWN ELEMENTS on ProtractorOverlayView
+    // Theme and Appearance
     val isForceLightMode: Boolean? = null,
     val luminanceAdjustment: Float = 0f,
     val showLuminanceDialog: Boolean = false,
@@ -39,9 +48,7 @@ data class OverlayState(
     val currentTutorialStep: Int = 0,
 
     // Sensor and perspective data
-    val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f), // Current real-time orientation
-    val anchorOrientation: FullOrientation? = null, // Stored orientation when locked
-
+    val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f),
     val pitchMatrix: Matrix = Matrix(),
     val railPitchMatrix: Matrix = Matrix(),
     val inversePitchMatrix: Matrix = Matrix(),
@@ -54,11 +61,9 @@ data class OverlayState(
     // Theming
     val appControlColorScheme: ColorScheme = darkColorScheme(),
 
-    // Spatial Lock State
-    val isSpatiallyLocked: Boolean = false
+    // Gesture State
+    val interactionMode: InteractionMode = InteractionMode.NONE
 ) {
-    // Convenience getter for the old pitchAngle, derived from currentOrientation
-    // This maintains compatibility with parts of the code still using pitchAngle directly.
     val pitchAngle: Float
         get() = currentOrientation.pitch
 }

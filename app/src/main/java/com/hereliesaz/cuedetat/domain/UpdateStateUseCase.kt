@@ -20,22 +20,17 @@ class UpdateStateUseCase @Inject constructor() {
 
         val pitchMatrix = Perspective.createPitchMatrix(
             currentOrientation = state.currentOrientation,
-            anchorOrientation = state.anchorOrientation, // Passed correctly
-            isSpatiallyLocked = state.isSpatiallyLocked, // Pass the lock state explicitly
             viewWidth = state.viewWidth,
             viewHeight = state.viewHeight,
             camera = camera
         )
 
-        // For banking mode, referenceRadius should be actualCueBall.radius
         val referenceRadiusForTable = state.actualCueBall?.radius ?: state.protractorUnit.radius
         val logicalTableShortSide = tableToBallRatioShort * referenceRadiusForTable
         val railLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
 
         val railPitchMatrix = Perspective.createPitchMatrix(
             currentOrientation = state.currentOrientation,
-            anchorOrientation = state.anchorOrientation,
-            isSpatiallyLocked = state.isSpatiallyLocked,
             viewWidth = state.viewWidth,
             viewHeight = state.viewHeight,
             camera = camera,

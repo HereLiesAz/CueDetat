@@ -2,40 +2,147 @@
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
-import android.util.Log
 import androidx.compose.material3.ColorScheme
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.ActualCueBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
+import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
+import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
+import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.min
 
 class StateReducer @Inject constructor() {
 
     private val tableToBallRatioLong = 88f
     private val defaultBankingAimDistanceFactor = 15f
+    private val logicalTouchSlop = 5f
 
-    private fun getCurrentLogicalRadius(
-        stateWidth: Int,
-        stateHeight: Int,
-        zoomSliderPos: Float
-    ): Float {
+    fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
+        return when (event) {
+            is MainScreenEvent.LogicalGestureStarted -> handleGestureStarted(currentState, event)
+            is MainScreenEvent.LogicalDragApplied -> handleDrag(currentState, event)
+            is MainScreenEvent.GestureEnded -> currentState.copy(interactionMode = InteractionMode.NONE)
+            is MainScreenEvent.SizeChanged -> handleSizeChanged(currentState, event)
+            is MainScreenEvent.ZoomSliderChanged -> handleZoomSliderChanged(currentState, event)
+            is MainScreenEvent.ZoomScaleChanged -> handleZoomScaleChanged(currentState, event)
+            is MainScreenEvent.FullOrientationChanged -> currentState.copy(currentOrientation = event.orientation)
+            is MainScreenEvent.Reset -> createInitialState(currentState.viewWidth, currentState.viewHeight, currentState.appControlColorScheme)
+            is MainScreenEvent.TableRotationChanged -> currentState.copy(tableRotationDegrees = event.degrees, valuesChangedSinceReset = true)
+            is MainScreenEvent.ToggleActualCueBall -> handleToggleActualCueBall(currentState)
+            is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(currentState)
+            is MainScreenEvent.ToggleForceTheme -> {
+                val newMode = when (currentState.isForceLightMode) { null -> true; true -> false; false -> null }
+                currentState.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)
+            }
+            is MainScreenEvent.ToggleLuminanceDialog -> currentState.copy(showLuminanceDialog = !currentState.showLuminanceDialog)
+            is MainScreenEvent.AdjustLuminance -> currentState.copy(luminanceAdjustment = event.adjustment.coerceIn(-0.4f, 0.4f), valuesChangedSinceReset = true)
+            is MainScreenEvent.StartTutorial -> currentState.copy(
+                showTutorialOverlay = true, currentTutorialStep = 0, valuesChangedSinceReset = true,
+                areHelpersVisible = false, showLuminanceDialog = false, isMoreHelpVisible = false
+            )
+            is MainScreenEvent.NextTutorialStep -> currentState.copy(currentTutorialStep = currentState.currentTutorialStep + 1, valuesChangedSinceReset = true)
+            is MainScreenEvent.EndTutorial -> currentState.copy(showTutorialOverlay = false, currentTutorialStep = 0)
+            is MainScreenEvent.ToggleHelp -> currentState.copy(areHelpersVisible = !currentState.areHelpersVisible)
+            is MainScreenEvent.ToggleMoreHelp -> currentState.copy(isMoreHelpVisible = !currentState.isMoreHelpVisible)
+            else -> currentState
+        }
+    }
+
+    private fun handleGestureStarted(currentState: OverlayState, event: MainScreenEvent.LogicalGestureStarted): OverlayState {
+        val touchPoint = event.logicalPoint
+        var newMode = InteractionMode.NONE
+
+        if (currentState.isBankingMode) {
+            currentState.actualCueBall?.let {
+                if (distance(touchPoint, it.center) < it.radius + logicalTouchSlop) {
+                    newMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
+                }
+            }
+            if (newMode == InteractionMode.NONE) {
+                newMode = InteractionMode.AIMING_BANK_SHOT
+            }
+        } else {
+            currentState.actualCueBall?.let {
+                if (distance(touchPoint, it.center) < it.radius + logicalTouchSlop) {
+                    newMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
+                }
+            }
+            if (newMode == InteractionMode.NONE) {
+                if (distance(touchPoint, currentState.protractorUnit.center) < currentState.protractorUnit.radius + logicalTouchSlop) {
+                    newMode = InteractionMode.MOVING_PROTRACTOR_UNIT
+                }
+            }
+            if (newMode == InteractionMode.NONE) {
+                newMode = InteractionMode.ROTATING_PROTRACTOR
+            }
+        }
+        return currentState.copy(interactionMode = newMode, warningText = null)
+    }
+
+    private fun handleDrag(currentState: OverlayState, event: MainScreenEvent.LogicalDragApplied): OverlayState {
+        val logicalDelta = event.logicalDelta
+        return when (currentState.interactionMode) {
+            InteractionMode.ROTATING_PROTRACTOR -> {
+                val rotationDelta = logicalDelta.x * 0.5f
+                val newRotation = currentState.protractorUnit.rotationDegrees - rotationDelta
+                currentState.copy(protractorUnit = currentState.protractorUnit.copy(rotationDegrees = newRotation), valuesChangedSinceReset = true)
+            }
+            InteractionMode.MOVING_PROTRACTOR_UNIT -> {
+                val newCenter = PointF(currentState.protractorUnit.center.x + logicalDelta.x, currentState.protractorUnit.center.y + logicalDelta.y)
+                currentState.copy(protractorUnit = currentState.protractorUnit.copy(center = newCenter), valuesChangedSinceReset = true)
+            }
+            InteractionMode.MOVING_ACTUAL_CUE_BALL -> {
+                currentState.actualCueBall?.let {
+                    val newCenter = PointF(it.center.x + logicalDelta.x, it.center.y + logicalDelta.y)
+                    currentState.copy(actualCueBall = it.copy(center = newCenter), valuesChangedSinceReset = true)
+                } ?: currentState
+            }
+            InteractionMode.AIMING_BANK_SHOT -> {
+                currentState.bankingAimTarget?.let {
+                    val newTarget = PointF(it.x + logicalDelta.x, it.y + logicalDelta.y)
+                    currentState.copy(bankingAimTarget = newTarget, valuesChangedSinceReset = true)
+                } ?: currentState
+            }
+            else -> currentState
+        }
+    }
+
+    private fun distance(p1: PointF, p2: PointF): Float {
+        val dx = p1.x - p2.x
+        val dy = p1.y - p2.y
+        return kotlin.math.sqrt(dx * dx + dy * dy)
+    }
+
+    private fun createInitialState(viewWidth: Int, viewHeight: Int, appColorScheme: ColorScheme): OverlayState {
+        val initialSliderPos = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM)
+        val initialLogicalRadius = getCurrentLogicalRadius(viewWidth, viewHeight, initialSliderPos)
+        val initialCenter = PointF(viewWidth / 2f, viewHeight / 2f)
+        return OverlayState(
+            viewWidth = viewWidth, viewHeight = viewHeight,
+            protractorUnit = ProtractorUnit(center = initialCenter, radius = initialLogicalRadius, rotationDegrees = -90f),
+            actualCueBall = null, zoomSliderPosition = initialSliderPos,
+            isBankingMode = false, tableRotationDegrees = 0f, bankingAimTarget = null,
+            valuesChangedSinceReset = false, areHelpersVisible = false, isMoreHelpVisible = false,
+            isForceLightMode = null, luminanceAdjustment = 0f, showLuminanceDialog = false,
+            showTutorialOverlay = false, currentTutorialStep = 0,
+            appControlColorScheme = appColorScheme,
+            interactionMode = InteractionMode.NONE
+        )
+    }
+
+    private fun getCurrentLogicalRadius(stateWidth: Int, stateHeight: Int, zoomSliderPos: Float): Float {
         if (stateWidth == 0 || stateHeight == 0) return 1f
         val zoomFactor = ZoomMapping.sliderToZoom(zoomSliderPos)
         return (min(stateWidth, stateHeight) * 0.30f / 2f) * zoomFactor
     }
 
-    private fun adjustBallForCenteredZoom(
-        currentBall: ActualCueBall?, viewCenterX: Float, viewCenterY: Float,
-        oldZoomFactorFromSlider: Float, newZoomFactorFromSlider: Float
-    ): ActualCueBall? {
-        if (currentBall == null || oldZoomFactorFromSlider.ほぼEquals(0f) || newZoomFactorFromSlider.ほぼEquals(
-                0f
-            ) || oldZoomFactorFromSlider.ほぼEquals(newZoomFactorFromSlider)
-        ) {
+    private fun adjustBallForCenteredZoom(currentBall: ActualCueBall?, viewCenterX: Float, viewCenterY: Float, oldZoomFactorFromSlider: Float, newZoomFactorFromSlider: Float): ActualCueBall? {
+        if (currentBall == null || oldZoomFactorFromSlider.roughlyEquals(0f) || newZoomFactorFromSlider.roughlyEquals(0f) || oldZoomFactorFromSlider.roughlyEquals(newZoomFactorFromSlider)) {
             return currentBall
         }
         val scaleEffectRatio = oldZoomFactorFromSlider / newZoomFactorFromSlider
@@ -48,232 +155,128 @@ class StateReducer @Inject constructor() {
         return currentBall.copy(center = PointF(newCenterX, newCenterY))
     }
 
-    private fun Float.ほぼEquals(other: Float, tolerance: Float = 0.00001f): Boolean {
-        return kotlin.math.abs(this - other) < tolerance
+    private fun Float.roughlyEquals(other: Float, tolerance: Float = 0.00001f): Boolean {
+        return abs(this - other) < tolerance
     }
 
-    fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
+    private fun handleToggleActualCueBall(currentState: OverlayState): OverlayState {
         val viewCenterX = currentState.viewWidth / 2f
         val viewCenterY = currentState.viewHeight / 2f
-
-        if (currentState.isSpatiallyLocked) {
-            when (event) {
-                is MainScreenEvent.ToggleSpatialLock,
-                is MainScreenEvent.ZoomSliderChanged,
-                is MainScreenEvent.ZoomScaleChanged,
-                is MainScreenEvent.ToggleBankingMode,
-                is MainScreenEvent.FullOrientationChanged,
-                is MainScreenEvent.ToggleHelp,
-                is MainScreenEvent.ToggleMoreHelp,
-                is MainScreenEvent.ToggleForceTheme,
-                is MainScreenEvent.ToggleLuminanceDialog,
-                is MainScreenEvent.AdjustLuminance,
-                is MainScreenEvent.StartTutorial,
-                is MainScreenEvent.NextTutorialStep,
-                is MainScreenEvent.EndTutorial,
-                is MainScreenEvent.Reset,
-                is MainScreenEvent.ThemeChanged,
-                is MainScreenEvent.GestureStarted,
-                is MainScreenEvent.GestureEnded,
-                is MainScreenEvent.CheckForUpdate,
-                is MainScreenEvent.ViewArt,
-                is MainScreenEvent.FeatureComingSoon,
-                is MainScreenEvent.ShowDonationOptions,
-                is MainScreenEvent.SingleEventConsumed,
-                is MainScreenEvent.ToastShown -> {
-                    // Allowed events proceed
-                }
-                // All other events are IGNORED when locked by returning current state immediately
-                else -> return currentState
-            }
+        if (currentState.isBankingMode) return currentState
+        return if (currentState.actualCueBall == null) {
+            val newRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, currentState.zoomSliderPosition)
+            val initialCenter = PointF(viewCenterX, viewCenterY + newRadius * 4)
+            currentState.copy(actualCueBall = ActualCueBall(center = initialCenter, radius = newRadius), valuesChangedSinceReset = true)
+        } else {
+            currentState.copy(actualCueBall = null, valuesChangedSinceReset = true)
         }
+    }
 
-        // This is the main `when` block (around line 126) that needs to be exhaustive
-        return when (event) {
-            is MainScreenEvent.SizeChanged -> {
-                if (currentState.viewWidth == 0 && currentState.viewHeight == 0) {
-                    createInitialState(event.width, event.height, currentState.appControlColorScheme)
-                } else {
-                    val newLogicalRadius = getCurrentLogicalRadius(event.width, event.height, currentState.zoomSliderPosition)
-                    var updatedActualCueBall = currentState.actualCueBall?.copy(radius = newLogicalRadius)
-                    var protractorNewCenter = currentState.protractorUnit.center
-                    if (!currentState.isSpatiallyLocked) {
-                        if (currentState.protractorUnit.center.x.ほぼEquals(currentState.viewWidth / 2f) &&
-                            currentState.protractorUnit.center.y.ほぼEquals(currentState.viewHeight / 2f)) {
-                            protractorNewCenter = PointF(event.width / 2f, event.height / 2f)
-                        }
-                        if (currentState.isBankingMode && updatedActualCueBall != null) {
-                            if (updatedActualCueBall.center.x.ほぼEquals(currentState.viewWidth/2f) && updatedActualCueBall.center.y.ほぼEquals(currentState.viewHeight/2f)) {
-                                updatedActualCueBall = updatedActualCueBall.copy(center = PointF(event.width / 2f, event.height / 2f))
-                            }
-                        }
-                    }
-                    currentState.copy(
-                        viewWidth = event.width, viewHeight = event.height,
-                        protractorUnit = currentState.protractorUnit.copy(
-                            radius = newLogicalRadius,
-                            center = protractorNewCenter
-                        ),
-                        actualCueBall = updatedActualCueBall
-                    )
-                }
-            }
-            is MainScreenEvent.ZoomSliderChanged -> {
-                val oldZoomSliderPos = currentState.zoomSliderPosition
-                val oldZoomFactor = ZoomMapping.sliderToZoom(oldZoomSliderPos)
-                val newSliderPos = event.position.coerceIn(0f, 100f) // Directly use event.position
-                val newLogicalRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
-                val newZoomFactor = ZoomMapping.sliderToZoom(newSliderPos)
-                var updatedActualCueBall = currentState.actualCueBall?.copy(radius = newLogicalRadius)
-                if (currentState.isBankingMode && updatedActualCueBall != null) {
-                    updatedActualCueBall = adjustBallForCenteredZoom(updatedActualCueBall, viewCenterX, viewCenterY, oldZoomFactor, newZoomFactor)
-                }
-                currentState.copy(
-                    protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
-                    actualCueBall = updatedActualCueBall,
-                    zoomSliderPosition = newSliderPos,
-                    valuesChangedSinceReset = true
-                )
-            }
-            is MainScreenEvent.ZoomScaleChanged -> {
-                val oldZoomSliderPos = currentState.zoomSliderPosition
-                val oldZoomFactor = ZoomMapping.sliderToZoom(oldZoomSliderPos)
-                val currentZoomValue = ZoomMapping.sliderToZoom(oldZoomSliderPos)
-                val newZoomValue = (currentZoomValue * event.scaleFactor).coerceIn(ZoomMapping.MIN_ZOOM, ZoomMapping.MAX_ZOOM)
-                val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue) // Convert back to slider position
-                val newLogicalRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
-                val newZoomFactor = newZoomValue // Use the direct zoom value
-                var updatedActualCueBall = currentState.actualCueBall?.copy(radius = newLogicalRadius)
-                if (currentState.isBankingMode && updatedActualCueBall != null) {
-                    updatedActualCueBall = adjustBallForCenteredZoom(updatedActualCueBall, viewCenterX, viewCenterY, oldZoomFactor, newZoomFactor)
-                }
-                currentState.copy(
-                    protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
-                    actualCueBall = updatedActualCueBall,
-                    zoomSliderPosition = newSliderPos,
-                    valuesChangedSinceReset = true
-                )
-            }
-            is MainScreenEvent.FullOrientationChanged -> {
-                Log.d("StateReducer", "FullOrientationChanged: ${event.orientation}, Locked: ${currentState.isSpatiallyLocked}")
-                currentState.copy(currentOrientation = event.orientation)
-            }
-            is MainScreenEvent.ToggleSpatialLock -> {
-                val newLockState = !currentState.isSpatiallyLocked
-                if (newLockState) {
-                    currentState.copy(
-                        isSpatiallyLocked = true,
-                        anchorOrientation = currentState.currentOrientation,
-                        valuesChangedSinceReset = true
-                    )
-                } else {
-                    currentState.copy(
-                        isSpatiallyLocked = false,
-                        anchorOrientation = null,
-                        valuesChangedSinceReset = true
-                    )
-                }
-            }
-            is MainScreenEvent.Reset -> {
-                createInitialState(currentState.viewWidth, currentState.viewHeight, currentState.appControlColorScheme)
-            }
-            is MainScreenEvent.RotationChanged -> {
-                var normAng = event.newRotation % 360f; if (normAng < 0) normAng += 360f
-                currentState.copy(protractorUnit = currentState.protractorUnit.copy(rotationDegrees = normAng), valuesChangedSinceReset = true)
-            }
-            is MainScreenEvent.UpdateLogicalUnitPosition -> {
-                currentState.copy(protractorUnit = currentState.protractorUnit.copy(center = event.logicalPoint), valuesChangedSinceReset = true)
-            }
-            is MainScreenEvent.UpdateLogicalActualCueBallPosition -> {
-                currentState.actualCueBall?.let {
-                    currentState.copy(actualCueBall = it.copy(center = event.logicalPoint), valuesChangedSinceReset = true)
-                } ?: currentState
-            }
-            is MainScreenEvent.TableRotationChanged -> {
-                currentState.copy(tableRotationDegrees = event.degrees, valuesChangedSinceReset = true)
-            }
-            is MainScreenEvent.UpdateLogicalBankingAimTarget -> {
-                currentState.copy(bankingAimTarget = event.logicalPoint, valuesChangedSinceReset = true)
-            }
-            is MainScreenEvent.ToggleActualCueBall -> {
-                if (currentState.isBankingMode) return currentState
-                if (currentState.actualCueBall == null) {
-                    val newRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, currentState.zoomSliderPosition)
-                    val initialCenter = PointF(viewCenterX, viewCenterY + newRadius * 4)
-                    currentState.copy(actualCueBall = ActualCueBall(center = initialCenter, radius = newRadius), valuesChangedSinceReset = true)
-                } else {
-                    currentState.copy(actualCueBall = null, valuesChangedSinceReset = true)
-                }
-            }
-            is MainScreenEvent.ToggleBankingMode -> {
-                val bankingEnabled = !currentState.isBankingMode
-                val newState = if (bankingEnabled) {
-                    val bankingZoomSliderPos = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM * 0.8f)
-                    val newLogicalRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, bankingZoomSliderPos)
-                    val bankingBallCenter = PointF(viewCenterX, viewCenterY)
-                    val newBankingBall = ActualCueBall(center = bankingBallCenter, radius = newLogicalRadius)
-                    val initialAimTarget = calculateInitialBankingAimTarget(newBankingBall, 0f, newLogicalRadius)
-                    currentState.copy(
-                        isBankingMode = true, actualCueBall = newBankingBall,
-                        zoomSliderPosition = bankingZoomSliderPos, tableRotationDegrees = 0f,
-                        bankingAimTarget = initialAimTarget,
-                        protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
-                        warningText = null
-                    )
-                } else {
-                    val defaultSliderPos = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM)
-                    val defaultLogicalRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, defaultSliderPos)
-                    currentState.copy(
-                        isBankingMode = false, bankingAimTarget = null, actualCueBall = null,
-                        zoomSliderPosition = defaultSliderPos,
-                        protractorUnit = currentState.protractorUnit.copy(
-                            radius = defaultLogicalRadius,
-                            center = PointF(viewCenterX, viewCenterY)
-                        ),
-                        tableRotationDegrees = 0f, warningText = null
-                    )
-                }
-                return newState.copy(
-                    isSpatiallyLocked = false, anchorOrientation = null,
-                    valuesChangedSinceReset = true,
-                    showLuminanceDialog = false, showTutorialOverlay = false
-                )
-            }
-            is MainScreenEvent.ToggleForceTheme -> {
-                val newMode = when (currentState.isForceLightMode) { null -> true; true -> false; false -> null }
-                currentState.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)
-            }
-            is MainScreenEvent.ToggleLuminanceDialog -> currentState.copy(showLuminanceDialog = !currentState.showLuminanceDialog)
-            is MainScreenEvent.AdjustLuminance -> currentState.copy(luminanceAdjustment = event.adjustment.coerceIn(-0.4f, 0.4f), valuesChangedSinceReset = true)
-            is MainScreenEvent.StartTutorial -> currentState.copy(
-                showTutorialOverlay = true, currentTutorialStep = 0, valuesChangedSinceReset = true,
-                areHelpersVisible = false, showLuminanceDialog = false, isMoreHelpVisible = false,
-                isSpatiallyLocked = false, anchorOrientation = null
+    private fun handleToggleBankingMode(currentState: OverlayState): OverlayState {
+        val viewCenterX = currentState.viewWidth / 2f
+        val viewCenterY = currentState.viewHeight / 2f
+        val bankingEnabled = !currentState.isBankingMode
+        val newState = if (bankingEnabled) {
+            val bankingZoomSliderPos = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM * 0.8f)
+            val newLogicalRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, bankingZoomSliderPos)
+            val bankingBallCenter = PointF(viewCenterX, viewCenterY)
+            val newBankingBall = ActualCueBall(center = bankingBallCenter, radius = newLogicalRadius)
+            val initialAimTarget = calculateInitialBankingAimTarget(newBankingBall, 0f, newLogicalRadius)
+            currentState.copy(
+                isBankingMode = true, actualCueBall = newBankingBall,
+                zoomSliderPosition = bankingZoomSliderPos, tableRotationDegrees = 0f,
+                bankingAimTarget = initialAimTarget,
+                protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
+                warningText = null
             )
-            is MainScreenEvent.NextTutorialStep -> currentState.copy(currentTutorialStep = currentState.currentTutorialStep + 1, valuesChangedSinceReset = true)
-            is MainScreenEvent.EndTutorial -> currentState.copy(showTutorialOverlay = false, currentTutorialStep = 0)
-            is MainScreenEvent.ToggleHelp -> currentState.copy(areHelpersVisible = !currentState.areHelpersVisible)
-            is MainScreenEvent.ToggleMoreHelp -> currentState.copy(isMoreHelpVisible = !currentState.isMoreHelpVisible)
-
-            // Explicitly handle pass-through or VM-handled events
-            is MainScreenEvent.ThemeChanged -> currentState
-            is MainScreenEvent.CheckForUpdate -> currentState
-            is MainScreenEvent.ViewArt -> currentState
-            is MainScreenEvent.FeatureComingSoon -> currentState
-            is MainScreenEvent.ShowDonationOptions -> currentState
-            is MainScreenEvent.SingleEventConsumed -> currentState
-            is MainScreenEvent.ToastShown -> currentState
-            is MainScreenEvent.GestureStarted -> currentState
-            is MainScreenEvent.GestureEnded -> currentState
-
-            // These are the screen-based events that ViewModel converts to Logical.
-            // If they reach here, it means ViewModel didn't convert them or they are
-            // new events not yet handled by ViewModel's conversion logic.
-            // For safety, just return current state if they are not meant to be reduced directly.
-            is MainScreenEvent.UnitMoved -> currentState
-            is MainScreenEvent.ActualCueBallMoved -> currentState
-            is MainScreenEvent.BankingAimTargetDragged -> currentState
+        } else {
+            val defaultSliderPos = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM)
+            val defaultLogicalRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, defaultSliderPos)
+            currentState.copy(
+                isBankingMode = false, bankingAimTarget = null, actualCueBall = null,
+                zoomSliderPosition = defaultSliderPos,
+                protractorUnit = currentState.protractorUnit.copy(
+                    radius = defaultLogicalRadius,
+                    center = PointF(viewCenterX, viewCenterY)
+                ),
+                tableRotationDegrees = 0f, warningText = null
+            )
         }
+        return newState.copy(
+            valuesChangedSinceReset = true,
+            showLuminanceDialog = false, showTutorialOverlay = false
+        )
+    }
+
+    private fun handleSizeChanged(currentState: OverlayState, event: MainScreenEvent.SizeChanged): OverlayState {
+        if (currentState.viewWidth == 0 && currentState.viewHeight == 0) {
+            return createInitialState(event.width, event.height, currentState.appControlColorScheme)
+        } else {
+            val newLogicalRadius = getCurrentLogicalRadius(event.width, event.height, currentState.zoomSliderPosition)
+            var updatedActualCueBall = currentState.actualCueBall?.copy(radius = newLogicalRadius)
+            var protractorNewCenter = currentState.protractorUnit.center
+
+            if (currentState.protractorUnit.center.x.roughlyEquals(currentState.viewWidth / 2f) &&
+                currentState.protractorUnit.center.y.roughlyEquals(currentState.viewHeight / 2f)) {
+                protractorNewCenter = PointF(event.width / 2f, event.height / 2f)
+            }
+            if (currentState.isBankingMode && updatedActualCueBall != null) {
+                if (updatedActualCueBall.center.x.roughlyEquals(currentState.viewWidth/2f) && updatedActualCueBall.center.y.roughlyEquals(currentState.viewHeight/2f)) {
+                    updatedActualCueBall = updatedActualCueBall.copy(center = PointF(event.width / 2f, event.height / 2f))
+                }
+            }
+
+            return currentState.copy(
+                viewWidth = event.width, viewHeight = event.height,
+                protractorUnit = currentState.protractorUnit.copy(
+                    radius = newLogicalRadius,
+                    center = protractorNewCenter
+                ),
+                actualCueBall = updatedActualCueBall
+            )
+        }
+    }
+
+    private fun handleZoomSliderChanged(currentState: OverlayState, event: MainScreenEvent.ZoomSliderChanged): OverlayState {
+        val viewCenterX = currentState.viewWidth / 2f
+        val viewCenterY = currentState.viewHeight / 2f
+        val oldZoomSliderPos = currentState.zoomSliderPosition
+        val oldZoomFactor = ZoomMapping.sliderToZoom(oldZoomSliderPos)
+        val newSliderPos = event.position.coerceIn(0f, 100f)
+        val newLogicalRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
+        val newZoomFactor = ZoomMapping.sliderToZoom(newSliderPos)
+        var updatedActualCueBall = currentState.actualCueBall?.copy(radius = newLogicalRadius)
+        if (currentState.isBankingMode && updatedActualCueBall != null) {
+            updatedActualCueBall = adjustBallForCenteredZoom(updatedActualCueBall, viewCenterX, viewCenterY, oldZoomFactor, newZoomFactor)
+        }
+        return currentState.copy(
+            protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
+            actualCueBall = updatedActualCueBall,
+            zoomSliderPosition = newSliderPos,
+            valuesChangedSinceReset = true
+        )
+    }
+
+    private fun handleZoomScaleChanged(currentState: OverlayState, event: MainScreenEvent.ZoomScaleChanged): OverlayState {
+        val viewCenterX = currentState.viewWidth / 2f
+        val viewCenterY = currentState.viewHeight / 2f
+        val oldZoomSliderPos = currentState.zoomSliderPosition
+        val oldZoomFactor = ZoomMapping.sliderToZoom(oldZoomSliderPos)
+        val currentZoomValue = ZoomMapping.sliderToZoom(oldZoomSliderPos)
+        val newZoomValue = (currentZoomValue * event.scaleFactor).coerceIn(ZoomMapping.MIN_ZOOM, ZoomMapping.MAX_ZOOM)
+        val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue)
+        val newLogicalRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
+        val newZoomFactor = newZoomValue
+        var updatedActualCueBall = currentState.actualCueBall?.copy(radius = newLogicalRadius)
+        if (currentState.isBankingMode && updatedActualCueBall != null) {
+            updatedActualCueBall = adjustBallForCenteredZoom(updatedActualCueBall, viewCenterX, viewCenterY, oldZoomFactor, newZoomFactor)
+        }
+        return currentState.copy(
+            protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
+            actualCueBall = updatedActualCueBall,
+            zoomSliderPosition = newSliderPos,
+            valuesChangedSinceReset = true
+        )
     }
 
     private fun calculateInitialBankingAimTarget(
@@ -288,28 +291,4 @@ class StateReducer @Inject constructor() {
             cueBall.center.y + (aimDistance * kotlin.math.sin(angleRad)).toFloat()
         )
     }
-
-    private fun createInitialState(
-        viewWidth: Int,
-        viewHeight: Int,
-        appColorScheme: ColorScheme
-    ): OverlayState {
-        val initialSliderPos = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM)
-        val initialLogicalRadius = getCurrentLogicalRadius(viewWidth, viewHeight, initialSliderPos)
-        val initialCenter = PointF(viewWidth / 2f, viewHeight / 2f)
-        return OverlayState(
-            viewWidth = viewWidth, viewHeight = viewHeight,
-            protractorUnit = ProtractorUnit(center = initialCenter, radius = initialLogicalRadius, rotationDegrees = 0f),
-            actualCueBall = null, zoomSliderPosition = initialSliderPos,
-            isBankingMode = false, tableRotationDegrees = 0f, bankingAimTarget = null,
-            valuesChangedSinceReset = false, areHelpersVisible = false, isMoreHelpVisible = false,
-            isForceLightMode = null, luminanceAdjustment = 0f, showLuminanceDialog = false,
-            showTutorialOverlay = false, currentTutorialStep = 0,
-            appControlColorScheme = appColorScheme,
-            isSpatiallyLocked = false,
-            currentOrientation = FullOrientation(0f, 0f, 0f),
-            anchorOrientation = null
-        )
-    }
 }
-
