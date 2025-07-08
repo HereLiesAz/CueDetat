@@ -5,6 +5,7 @@ import android.app.Application
 import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
+import android.util.Log
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
@@ -26,6 +27,8 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+private const val GESTURE_TAG = "GestureDebug"
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -69,39 +72,36 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.ToastShown -> _toastMessage.value = null
 
             is MainScreenEvent.ScreenGestureStarted -> {
+                Log.d(GESTURE_TAG, "VIEWMODEL: Received ScreenGestureStarted.")
                 if (_uiState.value.hasInverseMatrix) {
                     val logicalPoint = Perspective.screenToLogical(event.position, _uiState.value.inversePitchMatrix)
+                    Log.d(GESTURE_TAG, "VIEWMODEL: Converted to LogicalGestureStarted at $logicalPoint. Dispatching to reducer.")
                     updateContinuousState(MainScreenEvent.LogicalGestureStarted(logicalPoint))
+                } else {
+                    Log.w(GESTURE_TAG, "VIEWMODEL: No inverse matrix, dropping gesture start.")
                 }
             }
             is MainScreenEvent.Drag -> {
                 if (_uiState.value.hasInverseMatrix) {
-                    val logicalDelta = convertScreenVectorToLogicalVector(event.dragAmount, _uiState.value.inversePitchMatrix)
-                    updateContinuousState(MainScreenEvent.LogicalDragApplied(logicalDelta))
+                    // Convert start and end points of drag to logical space
+                    val logicalPrev = Perspective.screenToLogical(event.previousPosition, _uiState.value.inversePitchMatrix)
+                    val logicalCurr = Perspective.screenToLogical(event.currentPosition, _uiState.value.inversePitchMatrix)
+                    // Calculate delta in logical space
+                    val logicalDelta = PointF(logicalCurr.x - logicalPrev.x, logicalCurr.y - logicalPrev.y)
+
+                    // Calculate screen delta for rotation
+                    val screenDelta = Offset(
+                        event.currentPosition.x - event.previousPosition.x,
+                        event.currentPosition.y - event.previousPosition.y
+                    )
+
+                    Log.d(GESTURE_TAG, "VIEWMODEL: Converted screen drag to logicalDelta $logicalDelta. Dispatching to reducer.")
+                    updateContinuousState(MainScreenEvent.LogicalDragApplied(logicalDelta, screenDelta))
                 }
             }
 
             else -> updateContinuousState(event)
         }
-    }
-
-    private fun convertScreenVectorToLogicalVector(screenVector: Offset, inverseMatrix: Matrix): PointF {
-        val screenStart = floatArrayOf(0f, 0f)
-        val screenEnd = floatArrayOf(screenVector.x, screenVector.y)
-
-        val matrixNoTranslate = Matrix(inverseMatrix)
-        val values = FloatArray(9)
-        matrixNoTranslate.getValues(values)
-        values[Matrix.MTRANS_X] = 0f
-        values[Matrix.MTRANS_Y] = 0f
-        matrixNoTranslate.setValues(values)
-
-        val logicalStart = FloatArray(2)
-        val logicalEnd = FloatArray(2)
-        matrixNoTranslate.mapPoints(logicalStart, screenStart)
-        matrixNoTranslate.mapPoints(logicalEnd, screenEnd)
-
-        return PointF(logicalEnd[0] - logicalStart[0], logicalEnd[1] - logicalStart[1])
     }
 
     private fun updateContinuousState(event: MainScreenEvent) {

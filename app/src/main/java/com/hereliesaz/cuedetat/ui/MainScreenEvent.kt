@@ -7,17 +7,17 @@ import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.cuedetat.data.FullOrientation
 
 sealed class MainScreenEvent {
-    // UI-Originated Events, using screen-space coordinates/deltas
+    // UI-Originated Events
     data class ScreenGestureStarted(val position: PointF) : MainScreenEvent()
-    data class Drag(val dragAmount: Offset) : MainScreenEvent()
+    data class Drag(val previousPosition: PointF, val currentPosition: PointF) : MainScreenEvent()
     object GestureEnded : MainScreenEvent()
     data class SizeChanged(val width: Int, val height: Int) : MainScreenEvent()
     data class ZoomScaleChanged(val scaleFactor: Float) : MainScreenEvent()
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
 
-    // Logical Events (dispatched by ViewModel after processing UI events)
+    // Logical Events (dispatched by ViewModel)
     internal data class LogicalGestureStarted(val logicalPoint: PointF) : MainScreenEvent()
-    internal data class LogicalDragApplied(val logicalDelta: PointF) : MainScreenEvent()
+    internal data class LogicalDragApplied(val logicalDelta: PointF, val screenDelta: Offset) : MainScreenEvent()
 
     // Direct State Change Events
     data class TableRotationChanged(val degrees: Float) : MainScreenEvent()

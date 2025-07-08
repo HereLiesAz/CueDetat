@@ -2,6 +2,7 @@ package com.hereliesaz.cuedetat.view
 
 import android.graphics.PointF
 import android.graphics.Typeface
+import android.util.Log
 import android.view.View
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -22,6 +23,8 @@ import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
 import com.hereliesaz.cuedetat.view.state.OverlayState
+
+private const val GESTURE_TAG = "GestureDebug"
 
 @Composable
 fun ProtractorOverlay(
@@ -65,12 +68,25 @@ fun ProtractorOverlay(
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { offset ->
+                        Log.d(GESTURE_TAG, "OVERLAY: onDragStart at screen offset $offset")
                         onEvent(MainScreenEvent.ScreenGestureStarted(PointF(offset.x, offset.y)))
                     },
-                    onDragEnd = { onEvent(MainScreenEvent.GestureEnded) },
-                    onDragCancel = { onEvent(MainScreenEvent.GestureEnded) }
-                ) { change, dragAmount ->
-                    onEvent(MainScreenEvent.Drag(dragAmount))
+                    onDragEnd = {
+                        Log.d(GESTURE_TAG, "OVERLAY: onDragEnd")
+                        onEvent(MainScreenEvent.GestureEnded)
+                    },
+                    onDragCancel = {
+                        Log.d(GESTURE_TAG, "OVERLAY: onDragCancel")
+                        onEvent(MainScreenEvent.GestureEnded)
+                    }
+                ) { change, _ ->
+                    Log.d(GESTURE_TAG, "OVERLAY: onDrag from ${change.previousPosition} to ${change.position}")
+                    onEvent(
+                        MainScreenEvent.Drag(
+                            previousPosition = PointF(change.previousPosition.x, change.previousPosition.y),
+                            currentPosition = PointF(change.position.x, change.position.y)
+                        )
+                    )
                     change.consume()
                 }
             }
