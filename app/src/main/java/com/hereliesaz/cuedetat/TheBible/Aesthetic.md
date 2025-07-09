@@ -9,7 +9,8 @@ This document details the required visual style of the application.
 * When the app is in its default dark mode, the button text must read "Walk toward the Light".
 * When in light mode, the button text must read "Embrace the darkness".
 * This button must dispatch the `ToggleForceTheme` event. The `StateReducer` will invert the `isForceLightMode` boolean in the state.
-* `PaintCache.kt` must use this flag to correctly select between light and dark color palettes for all rendered elements, ensuring the theme change is visually applied.
+* `PaintCache.kt` must use this flag to correctly select between light and dark color palettes for all rendered elements. This default is now overruled by the specific `AppearanceDecree` for each element, as defined in the holy scriptures.
+
 ## Stroke and Line Width
 * The `strokeWidth` for all rendered balls and lines in `PaintCache.kt` should be increased for better visibility and a more substantial feel.
 * A starting value of `3f` should be implemented.

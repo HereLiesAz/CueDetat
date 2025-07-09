@@ -6,8 +6,8 @@ import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import com.hereliesaz.cuedetat.data.FullOrientation
-import com.hereliesaz.cuedetat.view.model.ActualCueBall
-import com.hereliesaz.cuedetat.view.model.ProtractorUnit
+import com.hereliesaz.cuedetat.view.model.ActualCueBallModel
+import com.hereliesaz.cuedetat.view.model.ProtractorUnitModel
 
 enum class InteractionMode {
     NONE,
@@ -24,17 +24,18 @@ data class OverlayState(
     val viewHeight: Int = 0,
 
     // Core logical model
-    val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), 1f, 0f),
-    val actualCueBall: ActualCueBall? = null,
+    val protractorUnit: ProtractorUnitModel = ProtractorUnitModel(PointF(0f, 0f), 1f, 0f),
+    val actualCueBall: ActualCueBallModel? = null,
 
     // UI control state
-    val zoomSliderPosition: Float = 100f,
+    val zoomSliderPosition: Float = 0f, // Centered default
     val areHelpersVisible: Boolean = false,
     val isMoreHelpVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
 
     // Banking mode specific state
     val isBankingMode: Boolean = false,
+    val showTable: Boolean = false,
     val tableRotationDegrees: Float = 0f,
     val bankingAimTarget: PointF? = null,
 

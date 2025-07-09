@@ -1,122 +1,70 @@
-package com.hereliesaz.cuedetat.view.renderer
+package com.hereliesaz.cuedetat.view.renderer.ball
 
 import android.graphics.Canvas
-import android.graphics.Matrix
+import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.Typeface
-import android.util.Log
-import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.model.ILogicalBall
 import com.hereliesaz.cuedetat.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import kotlin.math.min
 
 class BallRenderer {
 
     private val textRenderer = BallTextRenderer()
-    private var lastLoggedPitchBanking = -9999f
 
-    fun drawLogicalBalls(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        state.actualCueBall?.let {
-            canvas.drawCircle(it.center.x, it.center.y, it.radius, paints.actualCueBallBasePaint)
-            canvas.drawCircle(it.center.x, it.center.y, it.radius / 5f, paints.actualCueBallCenterMarkPaint)
+    /**
+     * Draws the protractor unit (Target and Ghost balls) as "lifted" screen-space elements.
+     */
+    fun drawGhostedProtractor(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
+        val protractor = state.protractorUnit
+        val ghostCuePaint = if (state.isImpossibleShot) paints.warningPaint else paints.cueCirclePaint
+
+        // Draw glows first
+        drawLiftedBall(canvas, protractor.protractorCueBallCenter, protractor.radius, state, paints.glowPaint)
+        drawLiftedBall(canvas, protractor.center, protractor.radius, state, paints.glowPaint)
+
+        // Draw primary balls
+        drawLiftedBall(canvas, protractor.protractorCueBallCenter, protractor.radius, state, ghostCuePaint, paints.fillPaint)
+        drawLiftedBall(canvas, protractor.center, protractor.radius, state, paints.targetCirclePaint, paints.fillPaint)
+
+        // Draw text labels
+        if (state.areHelpersVisible) {
+            val textPaint = paints.textPaint.apply { this.typeface = typeface }
+            textRenderer.draw(canvas, textPaint, state.zoomSliderPosition, protractor, "T", state)
+            textRenderer.draw(canvas, textPaint, state.zoomSliderPosition, object : ILogicalBall {
+                override val center = protractor.protractorCueBallCenter
+                override val radius = protractor.radius
+            }, "G", state)
         }
-
-        if (state.isBankingMode) return
-
-        canvas.save()
-        canvas.translate(state.protractorUnit.center.x, state.protractorUnit.center.y)
-        canvas.rotate(state.protractorUnit.rotationDegrees)
-
-        canvas.drawCircle(0f, 0f, state.protractorUnit.radius, paints.targetCirclePaint)
-        canvas.drawCircle(0f, 0f, state.protractorUnit.radius / 5f, paints.targetCenterMarkPaint)
-
-        val distanceBetweenProtractorCenters = 2 * state.protractorUnit.radius
-        val unrotatedGhostCueLocalPos = PointF(0f, distanceBetweenProtractorCenters)
-
-        val cuePaint = if (state.isImpossibleShot && !state.isBankingMode) paints.warningPaintRed1 else paints.cueCirclePaint
-        canvas.drawCircle(unrotatedGhostCueLocalPos.x, unrotatedGhostCueLocalPos.y, state.protractorUnit.radius, cuePaint)
-        canvas.drawCircle(unrotatedGhostCueLocalPos.x, unrotatedGhostCueLocalPos.y, state.protractorUnit.radius / 5f, paints.cueCenterMarkPaint)
-
-        canvas.restore()
     }
 
-    fun drawScreenSpaceBalls(
-        canvas: Canvas,
-        state: OverlayState,
-        paints: PaintCache,
-        typeface: Typeface?
-    ) {
-        paints.actualCueBallTextPaint.typeface = typeface
+    /**
+     * Draws a single ball that exists on the logical plane (e.g., ActualCueBall or BankingBall).
+     * This method assumes the canvas is already transformed by the pitchMatrix.
+     */
+    fun drawOnPlaneBall(canvas: Canvas, ball: ILogicalBall, strokePaint: Paint, paints: PaintCache) {
+        // Since the canvas is already pitched, we draw at the logical coordinates.
+        // The perspective is handled by the canvas transformation.
+        canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, paints.glowPaint)
+        canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, strokePaint)
+        canvas.drawCircle(ball.center.x, ball.center.y, ball.radius / 5f, paints.fillPaint)
+    }
 
-        state.actualCueBall?.let { currentActualCueBall ->
-            val screenProjectedCenter = DrawingUtils.mapPoint(currentActualCueBall.center, state.pitchMatrix)
-            val visualRadiusOnScreen: Float
-            val effectiveCenterY: Float
-            val labelText: String
 
-            if (state.isBankingMode) {
-                effectiveCenterY = screenProjectedCenter.y
-                labelText = "Ball to Bank" // Updated label
+    /**
+     * Helper to draw a single "lifted" ball for the ghost effect.
+     * It projects logical coordinates to the screen and applies a manual lift.
+     */
+    private fun drawLiftedBall(canvas: Canvas, logicalCenter: PointF, logicalRadius: Float, state: OverlayState, strokePaint: Paint, fillPaint: Paint? = null) {
+        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(logicalCenter, logicalRadius, state)
+        val screenPos = DrawingUtils.mapPoint(logicalCenter, state.pitchMatrix)
+        val yPos = screenPos.y - radiusInfo.lift
 
-                val unitZoomScreenRadius = (min(state.viewWidth, state.viewHeight) * 0.30f / 2f)
-                val currentZoomLevel = ZoomMapping.sliderToZoom(state.zoomSliderPosition)
-                visualRadiusOnScreen = unitZoomScreenRadius * currentZoomLevel
-
-                if (kotlin.math.abs(state.pitchAngle - lastLoggedPitchBanking) > 0.5f || kotlin.math.abs(state.tableRotationDegrees % 360 - 0f) > 1f) {
-                    Log.i("BallRenderer_Banking", "PITCH: ${"%.1f".format(state.pitchAngle)}, " +
-                            "TableRot: ${"%.1f".format(state.tableRotationDegrees)}, " +
-                            "LogRadius (from state): ${"%.2f".format(currentActualCueBall.radius)}, " +
-                            "VISUAL ScreenRadius: ${"%.2f".format(visualRadiusOnScreen)}, " +
-                            "CurrentZoomLevel: ${"%.3f".format(currentZoomLevel)}")
-                    lastLoggedPitchBanking = state.pitchAngle
-                }
-
-            } else {
-                labelText = "Actual Cue Ball" // Default label for protractor mode
-                val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(currentActualCueBall, state)
-                visualRadiusOnScreen = radiusInfo.radius
-                effectiveCenterY = screenProjectedCenter.y - radiusInfo.lift
-            }
-
-            canvas.drawCircle(screenProjectedCenter.x, effectiveCenterY, visualRadiusOnScreen, paints.actualCueBallGhostPaint)
-            canvas.drawCircle(screenProjectedCenter.x, effectiveCenterY, visualRadiusOnScreen / 5f, paints.actualCueBallCenterMarkPaint)
-
-            if (state.areHelpersVisible) {
-                textRenderer.draw(canvas, paints.actualCueBallTextPaint, state.zoomSliderPosition,
-                    screenProjectedCenter.x, effectiveCenterY, visualRadiusOnScreen, labelText) // Use dynamic labelText
-            }
-        }
-
-        if (!state.isBankingMode) {
-            paints.targetBallTextPaint.typeface = typeface
-            paints.cueBallTextPaint.typeface = typeface
-
-            val targetBallLogical = state.protractorUnit
-            val targetRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(targetBallLogical, state)
-            val screenProjectedTargetCenter = DrawingUtils.mapPoint(targetBallLogical.center, state.pitchMatrix)
-            val targetGhostVisualY = screenProjectedTargetCenter.y - targetRadiusInfo.lift
-            canvas.drawCircle(screenProjectedTargetCenter.x, targetGhostVisualY, targetRadiusInfo.radius, paints.targetGhostBallOutlinePaint)
-            if (state.areHelpersVisible) {
-                textRenderer.draw(canvas, paints.targetBallTextPaint, state.zoomSliderPosition,
-                    screenProjectedTargetCenter.x, targetGhostVisualY, targetRadiusInfo.radius, "Target Ball")
-            }
-
-            val protractorGhostCueLogical = object : ILogicalBall {
-                override val center = state.protractorUnit.protractorCueBallCenter
-                override val radius = state.protractorUnit.radius
-            }
-            val cueRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(protractorGhostCueLogical, state)
-            val screenProjectedGhostCueCenter = DrawingUtils.mapPoint(protractorGhostCueLogical.center, state.pitchMatrix)
-            val cueGhostVisualY = screenProjectedGhostCueCenter.y - cueRadiusInfo.lift
-            val cueGhostPaint = if (state.isImpossibleShot) paints.warningPaintRed2 else paints.ghostCueOutlinePaint
-            canvas.drawCircle(screenProjectedGhostCueCenter.x, cueGhostVisualY, cueRadiusInfo.radius, cueGhostPaint)
-            if (state.areHelpersVisible) {
-                textRenderer.draw(canvas, paints.cueBallTextPaint, state.zoomSliderPosition,
-                    screenProjectedGhostCueCenter.x, cueGhostVisualY, cueRadiusInfo.radius, "Ghost Cue Ball")
-            }
+        canvas.drawCircle(screenPos.x, yPos, radiusInfo.radius, strokePaint)
+        fillPaint?.let {
+            canvas.drawCircle(screenPos.x, yPos, radiusInfo.radius / 5f, it)
         }
     }
 }

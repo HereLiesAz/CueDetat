@@ -5,49 +5,146 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDrawerState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import com.hereliesaz.cuedetat.ui.composables.CameraBackground
-import com.hereliesaz.cuedetat.ui.composables.KineticWarningOverlay
-import com.hereliesaz.cuedetat.ui.composables.MenuDrawerContent
-import com.hereliesaz.cuedetat.ui.composables.ResetFab
-import com.hereliesaz.cuedetat.ui.composables.ToggleCueBallFab
-import com.hereliesaz.cuedetat.ui.composables.TopControls
-import com.hereliesaz.cuedetat.ui.composables.ZoomControls
+import com.hereliesaz.cuedetat.ui.composables.*
+import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.view.state.SingleEvent
 import com.hereliesaz.cuedetat.view.state.ToastMessage
 import kotlinx.coroutines.launch
+
+@Composable
+fun MainScreen(viewModel: MainViewModel) {
+    val uiState by viewModel.uiState.collectAsState()
+    val toastMessage by viewModel.toastMessage.collectAsState()
+    val context = LocalContext.current
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val isSystemDark = isSystemInDarkTheme()
+
+    val useDarkTheme = when (uiState.isForceLightMode) {
+        true -> false
+        false -> true
+        null -> isSystemDark
+    }
+
+    CueDetatTheme(darkTheme = useDarkTheme) {
+        LaunchedEffect(toastMessage) {
+            toastMessage?.let {
+                val messageText = when (it) {
+                    is ToastMessage.StringResource -> context.getString(it.id, *it.formatArgs.toTypedArray())
+                    is ToastMessage.PlainText -> it.text
+                }
+                Toast.makeText(context, messageText, Toast.LENGTH_SHORT).show()
+                viewModel.onEvent(MainScreenEvent.ToastShown)
+            }
+        }
+
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            gesturesEnabled = drawerState.isOpen,
+            drawerContent = {
+                MenuDrawerContent(
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent,
+                    onCloseDrawer = { scope.launch { drawerState.close() } }
+                )
+            }
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                CameraBackground(modifier = Modifier.fillMaxSize().zIndex(0f))
+
+                ProtractorOverlay(
+                    uiState = uiState,
+                    systemIsDark = useDarkTheme,
+                    onEvent = viewModel::onEvent,
+                    modifier = Modifier.fillMaxSize().zIndex(1f)
+                )
+
+                TopControls(
+                    uiState = uiState,
+                    onMenuClick = { scope.launch { drawerState.open() } },
+                    modifier = Modifier.zIndex(2f)
+                )
+
+                val sliderWidth = with(LocalDensity.current) { (constraints.maxHeight * 0.6f).toDp() }
+                ZoomControls(
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight(0.6f)
+                        .width(sliderWidth) // Width must be set for offset to work correctly
+                        .offset(x = sliderWidth / 2) // Offset by half its own width
+                        .zIndex(5f)
+                )
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                        .navigationBarsPadding(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    TableRotationSlider(
+                        uiState = uiState,
+                        onEvent = viewModel::onEvent,
+                        modifier = Modifier
+                            .fillMaxWidth(0.8f)
+                            .padding(bottom = if (uiState.showTable) 8.dp else 0.dp)
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
+                        .navigationBarsPadding()
+                        .zIndex(2f),
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    if (!uiState.isBankingMode) {
+                        ToggleCueBallFab(
+                            uiState = uiState,
+                            onEvent = { viewModel.onEvent(MainScreenEvent.ToggleActualCueBall) }
+                        )
+                    } else {
+                        Spacer(Modifier)
+                    }
+
+                    ResetFab(
+                        uiState = uiState,
+                        onEvent = viewModel::onEvent
+                    )
+                }
+
+                KineticWarningOverlay(text = uiState.warningText, modifier = Modifier.zIndex(3f))
+                LuminanceAdjustmentDialog(
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent,
+                    onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleLuminanceDialog) }
+                )
+                TutorialOverlay(
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent
+                )
+            }
+        }
+    }
+}
 
 @Composable
 fun TableRotationSlider(
@@ -55,16 +152,14 @@ fun TableRotationSlider(
     onEvent: (MainScreenEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (uiState.isBankingMode) {
+    if (uiState.showTable) {
         val sliderColors = SliderDefaults.colors(
             activeTrackColor = MaterialTheme.colorScheme.primary,
             inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
             thumbColor = Color.Yellow
         )
         Column(
-            modifier = modifier
-                .fillMaxWidth()
-                .navigationBarsPadding(),
+            modifier = modifier,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -75,7 +170,7 @@ fun TableRotationSlider(
             Slider(
                 value = uiState.tableRotationDegrees,
                 onValueChange = { onEvent(MainScreenEvent.TableRotationChanged(it)) },
-                valueRange = 0f..359f,
+                valueRange = -179f..180f, // Centered range
                 steps = 358,
                 modifier = Modifier.fillMaxWidth(),
                 colors = sliderColors
@@ -119,178 +214,52 @@ fun LuminanceAdjustmentDialog(
 @Composable
 fun TutorialOverlay(
     uiState: OverlayState,
-    tutorialMessages: List<String>,
     onEvent: (MainScreenEvent) -> Unit
 ) {
-    if (uiState.showTutorialOverlay && uiState.currentTutorialStep < tutorialMessages.size) {
+    val tutorialSteps = remember {
+        listOf(
+            "Welcome. This is not a toy. It is a tool for geometric enlightenment. Pay attention.",
+            "This is Protractor Mode. Use it for cut shots. The elements you see are ghosts in the machine. They live on a logical plane, projected onto your reality.",
+            "Drag the 'T' (Target Ball) to align it with your object ball. Drag the 'G' (Ghost Cue Ball) to set your aiming line to the pocket.",
+            "This optional 'A' (Actual Cue Ball) can be dragged to match your real cue ball's position. The line from 'A' to 'G' is the path you must shoot.",
+            "The vertical slider on the right controls zoom. The slider on the bottom (in Banking Mode) rotates the table.",
+            "Open the menu to find more tools. 'Calculate Bank' switches to Banking Mode, where you can visualize multi-rail shots.",
+            "You have been instructed. Now, go and sin no more. Or at least, sin with better geometry. Press Finish."
+        )
+    }
+
+    if (uiState.showTutorialOverlay) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.85f))
-                .clickable(onClick = { /* Consume clicks */ })
-                .zIndex(5f),
+                .clickable(enabled = false, onClick = {}) // Block clicks
+                .zIndex(10f),
             contentAlignment = Alignment.Center
         ) {
             Column(
+                modifier = Modifier.padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .fillMaxWidth(0.85f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f), MaterialTheme.shapes.medium)
-                    .padding(24.dp)
+                verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = tutorialMessages[uiState.currentTutorialStep],
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = tutorialSteps.getOrNull(uiState.currentTutorialStep) ?: "The tutorial is over. Go away.",
                     style = MaterialTheme.typography.headlineSmall,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(Modifier.height(24.dp))
                 Row {
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    TextButton(onClick = {
-                        if (uiState.currentTutorialStep < tutorialMessages.size - 1) {
-                            onEvent(MainScreenEvent.NextTutorialStep)
-                        } else {
-                            onEvent(MainScreenEvent.EndTutorial)
+                    if (uiState.currentTutorialStep < tutorialSteps.lastIndex) {
+                        TextButton(onClick = { onEvent(MainScreenEvent.NextTutorialStep) }) {
+                            Text("Next")
                         }
-                    }) {
-                        Text(
-                            if (uiState.currentTutorialStep < tutorialMessages.size - 1) "Next" else "Got it!",
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelLarge
-                        )
+                    }
+                    TextButton(onClick = { onEvent(MainScreenEvent.EndTutorial) }) {
+                        Text("Finish")
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun MainScreen(viewModel: MainViewModel) {
-    val uiState by viewModel.uiState.collectAsState()
-    val toastMessage by viewModel.toastMessage.collectAsState()
-    val context = LocalContext.current
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
-    val systemIsDark = isSystemInDarkTheme()
-
-    val appControlColorScheme = MaterialTheme.colorScheme
-    LaunchedEffect(appControlColorScheme) {
-        viewModel.onEvent(MainScreenEvent.ThemeChanged(appControlColorScheme))
-    }
-
-    LaunchedEffect(toastMessage) {
-        toastMessage?.let {
-            val messageText = when (it) {
-                is ToastMessage.StringResource -> context.getString(it.id, *it.formatArgs.toTypedArray())
-                is ToastMessage.PlainText -> it.text
-            }
-            Toast.makeText(context, messageText, Toast.LENGTH_SHORT).show()
-            viewModel.onEvent(MainScreenEvent.ToastShown)
-        }
-    }
-
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        gesturesEnabled = drawerState.isOpen,
-        drawerContent = {
-            MenuDrawerContent(
-                uiState = uiState,
-                onEvent = viewModel::onEvent,
-                onCloseDrawer = { scope.launch { drawerState.close() } }
-            )
-        }
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            CameraBackground(modifier = Modifier.fillMaxSize().zIndex(0f))
-
-            ProtractorOverlay(
-                uiState = uiState,
-                systemIsDark = systemIsDark,
-                onEvent = viewModel::onEvent,
-                modifier = Modifier.fillMaxSize().zIndex(1f)
-            )
-
-            TopControls(
-                uiState = uiState,
-                onMenuClick = { scope.launch { drawerState.open() } },
-                modifier = Modifier.zIndex(2f)
-            )
-            ZoomControls(
-                uiState = uiState,
-                onEvent = viewModel::onEvent,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight(0.6f)
-                    .padding(end = 8.dp)
-                    .zIndex(5f)
-            )
-
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-                    .navigationBarsPadding()
-                    .zIndex(2f),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                TableRotationSlider(
-                    uiState = uiState,
-                    onEvent = viewModel::onEvent,
-                    modifier = Modifier
-                        .fillMaxWidth(0.8f)
-                        .padding(bottom = if (uiState.isBankingMode) 8.dp else 0.dp)
-                )
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 16.dp)
-                    .navigationBarsPadding()
-                    .zIndex(2f),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                if (!uiState.isBankingMode) {
-                    ToggleCueBallFab(
-                        uiState = uiState,
-                        onEvent = { viewModel.onEvent(MainScreenEvent.ToggleActualCueBall) }
-                    )
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                ResetFab(
-                    uiState = uiState,
-                    onEvent = viewModel::onEvent
-                )
-            }
-
-            KineticWarningOverlay(text = uiState.warningText, modifier = Modifier.zIndex(3f))
-            LuminanceAdjustmentDialog(
-                uiState = uiState,
-                onEvent = viewModel::onEvent,
-                onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleLuminanceDialog) })
-
-            val tutorialMessages = remember {
-                listOf(
-                    "Welcome to Cue D'état!\nTap 'Next' to learn the basics.",
-                    "PROTRACTOR MODE:\nDrag the Target Ball (center circle) to aim for cut shots.",
-                    "Rotate the Protractor: Single finger drag left/right (not on a ball).",
-                    "Zoom View: Pinch to zoom in or out.",
-                    "Optional Aiming Ball: Toggle with bottom-left FAB to visualize shots from a specific spot.",
-                    "BANKING MODE:\nSelect 'Calculate Bank' from menu. Table appears.",
-                    "Drag the Cue Ball on table. Drag elsewhere on screen to set your aim line for bank shots.",
-                    "Table Rotation: Use bottom slider. Zoom: Use side slider.",
-                    "Menu: Explore for theme options (for drawn lines), luminance, and this tutorial!"
-                )
-            }
-            TutorialOverlay(
-                uiState = uiState,
-                tutorialMessages = tutorialMessages,
-                onEvent = viewModel::onEvent
-            )
         }
     }
 }

@@ -3,6 +3,8 @@ package com.hereliesaz.cuedetat.view.renderer
 import android.graphics.Canvas
 import android.graphics.Typeface
 import com.hereliesaz.cuedetat.view.PaintCache
+import com.hereliesaz.cuedetat.view.renderer.ball.BallRenderer
+import com.hereliesaz.cuedetat.view.renderer.line.LineRenderer
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class OverlayRenderer {
@@ -15,31 +17,40 @@ class OverlayRenderer {
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         if (state.viewWidth == 0 || state.viewHeight == 0) return
 
-        // --- Draw Banking Mode elements if active ---
-        if (state.isBankingMode) {
-            // Draw base table with the standard matrix
+        // --- Pass 1: Draw On-Plane elements (Table, Rails, Actual/Banking Ball) ---
+        canvas.save()
+        if (state.showTable || state.isBankingMode) {
+            // Pitched Table Surface
             canvas.save()
             canvas.concat(state.pitchMatrix)
             tableRenderer.draw(canvas, state, paints)
             canvas.restore()
 
-            // Draw rails with the special, lifted matrix
+            // Lifted Rails
             canvas.save()
             canvas.concat(state.railPitchMatrix)
             railRenderer.draw(canvas, state, paints)
             canvas.restore()
         }
 
-        // --- Draw all elements on the 3D logical plane ---
+        // Pitched On-Plane Ball (Actual Cue Ball / Banking Ball)
         canvas.save()
         canvas.concat(state.pitchMatrix)
-
-        lineRenderer.drawLogicalLines(canvas, state, paints, typeface)
-        ballRenderer.drawLogicalBalls(canvas, state, paints)
-
+        state.actualCueBall?.let {
+            ballRenderer.drawOnPlaneBall(canvas, it, paints.actualCueBallPaint, paints)
+        }
         canvas.restore()
+        canvas.restore() // Corresponds to the top-level save
 
-        // --- Draw screen-space elements (ghosts) on top ---
-        ballRenderer.drawScreenSpaceBalls(canvas, state, paints, typeface)
+
+        // --- Pass 2: Draw Screen-Space Ghost/UI elements ---
+        // This pass does not use the pitchMatrix, applying lift manually for a 3D effect.
+        if (!state.isBankingMode) {
+            lineRenderer.draw(canvas, state, paints, typeface) // Lines need both logical and screen space info
+            ballRenderer.drawGhostedProtractor(canvas, state, paints, typeface)
+        } else {
+            // Draw banking lines in screen space as well if they need complex logic
+            lineRenderer.draw(canvas, state, paints, typeface)
+        }
     }
 }

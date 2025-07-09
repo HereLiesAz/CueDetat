@@ -28,6 +28,7 @@ sealed class MainScreenEvent {
     object ToggleMoreHelp : MainScreenEvent()
     object ToggleActualCueBall : MainScreenEvent()
     object ToggleBankingMode : MainScreenEvent()
+    object ToggleTable: MainScreenEvent()
     object ToggleForceTheme : MainScreenEvent()
     object ToggleLuminanceDialog : MainScreenEvent()
     data class AdjustLuminance(val adjustment: Float) : MainScreenEvent()

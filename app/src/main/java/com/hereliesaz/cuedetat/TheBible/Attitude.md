@@ -15,11 +15,11 @@ The application's persona is that of a cynical, long-suffering Kurt Vonnegut who
 ### Content Parameters
 
 * **Warning Messages**:
-    * All warnings must align with the established persona. They should never be simple statements of fact (e.g., "Impossible Shot").
-    * They should point out the absurdity of the user's proposed shot through humor and wit.
-    * The existing `insulting_warnings` string array from the v0.3.5 backup is the gold standard and should be used as the source pool.
+  * All warnings must align with the established persona. They should never be simple statements of fact (e.g., "Impossible Shot").
+  * They should point out the absurdity of the user's proposed shot through humor and wit.
+  * The existing `insulting_warnings` string array from the v0.3.5 backup is the gold standard and should be used as the source pool.
 * **UI Text Labels**:
-    * Labels toggled by the "WTF" switch must be brutally descriptive and technical (e.g., "Shot Line", "Aiming Line", "Tangent Line", "14°"). They are for clarification, not encouragement.
+  * Labels toggled by the "WTF" switch must be brutally descriptive and technical (e.g., "Shot Line", "Aiming Line", "Tangent Line", "14°"). They are for clarification, not encouragement.
 * **Menu Items**:
-    * Menu text must be contextual and slightly playful. Toggles must reflect the *action to be taken*, not the current state.
-    * Examples: "Walk toward the Light" / "Embrace the darkness", "WTF is all this?" / "OK, I get it.".
+  * Menu text must be contextual and slightly playful. Toggles must reflect the *action to be taken*, not the current state.
+  * Examples: "Walk toward the Light" / "Embrace the darkness", "WTF is all this?" / "OK, I get it.".

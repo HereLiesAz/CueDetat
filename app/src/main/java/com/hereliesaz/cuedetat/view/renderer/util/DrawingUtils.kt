@@ -14,13 +14,14 @@ object DrawingUtils {
     data class PerspectiveRadiusInfo(val radius: Float, val lift: Float)
 
     fun getPerspectiveRadiusAndLift(
-        ball: ILogicalBall,
+        logicalCenter: PointF,
+        logicalRadius: Float,
         state: OverlayState
     ): PerspectiveRadiusInfo {
-        if (!state.hasInverseMatrix) return PerspectiveRadiusInfo(ball.radius, 0f)
+        if (!state.hasInverseMatrix) return PerspectiveRadiusInfo(logicalRadius, 0f)
 
-        val screenCenter = mapPoint(ball.center, state.pitchMatrix)
-        val logicalHorizontalEdge = PointF(ball.center.x + ball.radius, ball.center.y)
+        val screenCenter = mapPoint(logicalCenter, state.pitchMatrix)
+        val logicalHorizontalEdge = PointF(logicalCenter.x + logicalRadius, logicalCenter.y)
         val screenHorizontalEdge = mapPoint(logicalHorizontalEdge, state.pitchMatrix)
         val radiusOnScreen = distance(screenCenter, screenHorizontalEdge)
         val lift = radiusOnScreen * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()

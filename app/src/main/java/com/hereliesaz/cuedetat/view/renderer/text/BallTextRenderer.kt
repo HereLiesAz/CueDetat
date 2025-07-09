@@ -3,32 +3,35 @@ package com.hereliesaz.cuedetat.view.renderer.text
 import android.graphics.Canvas
 import android.graphics.Paint
 import com.hereliesaz.cuedetat.ui.ZoomMapping
+import com.hereliesaz.cuedetat.view.model.LogicalCircular
+import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
+import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class BallTextRenderer {
 
-    private val baseGhostBallTextSize = 42f
-    private val minGhostBallTextSize = 20f
-    private val maxGhostBallTextSize = 80f
+    private val baseFontSize = 42f
+    private val minFontSize = 20f
+    private val maxFontSize = 80f
 
     fun draw(
         canvas: Canvas,
         paint: Paint,
         zoomSliderPosition: Float,
-        x: Float,
-        y: Float,
-        radius: Float,
-        text: String
+        ball: LogicalCircular,
+        text: String,
+        state: OverlayState
     ) {
         val zoomFactor = ZoomMapping.sliderToZoom(zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM
-        val currentTextSize = (baseGhostBallTextSize * zoomFactor).coerceIn(
-            minGhostBallTextSize,
-            maxGhostBallTextSize
-        )
+        val currentTextSize = (baseFontSize * zoomFactor).coerceIn(minFontSize, maxFontSize)
         paint.textSize = currentTextSize
+
+        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ball.center, ball.radius, state)
+        val screenPos = DrawingUtils.mapPoint(ball.center, state.pitchMatrix)
+
         val textMetrics = paint.fontMetrics
         val textPadding = 5f * zoomFactor.coerceAtLeast(0.5f)
-        val visualTop = y - radius
+        val visualTop = screenPos.y - radiusInfo.lift - radiusInfo.radius
         val baseline = visualTop - textPadding - textMetrics.descent
-        canvas.drawText(text, x, baseline, paint)
+        canvas.drawText(text, screenPos.x, baseline, paint)
     }
 }

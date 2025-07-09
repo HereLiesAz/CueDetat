@@ -38,6 +38,7 @@ class StateReducer @Inject constructor() {
             is MainScreenEvent.TableRotationChanged -> currentState.copy(tableRotationDegrees = event.degrees, valuesChangedSinceReset = true)
             is MainScreenEvent.ToggleActualCueBall -> handleToggleActualCueBall(currentState)
             is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(currentState)
+            is MainScreenEvent.ToggleTable -> currentState.copy(showTable = !currentState.showTable, valuesChangedSinceReset = true)
             is MainScreenEvent.ToggleForceTheme -> {
                 val newMode = when (currentState.isForceLightMode) { null -> true; true -> false; false -> null }
                 currentState.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)
@@ -130,14 +131,25 @@ class StateReducer @Inject constructor() {
     }
 
     private fun createInitialState(viewWidth: Int, viewHeight: Int, appColorScheme: ColorScheme): OverlayState {
-        val initialSliderPos = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM)
+        val initialSliderPos = 0f // Centered
         val initialLogicalRadius = getCurrentLogicalRadius(viewWidth, viewHeight, initialSliderPos)
-        val initialCenter = PointF(viewWidth / 2f, viewHeight / 2f)
+        val initialProtractorCenter = PointF(viewWidth / 2f, viewHeight / 2f)
+
+        // As per Balls.md, ActualCueBall should be at the head spot.
+        // Assuming table playing surface is 44 logical units wide, head spot is at 1/4 length from top.
+        val logicalTableHeight = initialLogicalRadius * 44f
+        val headSpotY = (viewHeight/2f) - (logicalTableHeight/4f)
+        val initialActualCueBall = ActualCueBall(
+            center = PointF(viewWidth / 2f, headSpotY),
+            radius = initialLogicalRadius
+        )
+
         return OverlayState(
             viewWidth = viewWidth, viewHeight = viewHeight,
-            protractorUnit = ProtractorUnit(center = initialCenter, radius = initialLogicalRadius, rotationDegrees = -90f),
-            actualCueBall = null, zoomSliderPosition = initialSliderPos,
-            isBankingMode = false, tableRotationDegrees = 0f, bankingAimTarget = null,
+            protractorUnit = ProtractorUnit(center = initialProtractorCenter, radius = initialLogicalRadius, rotationDegrees = -90f),
+            actualCueBall = null, // Default to null
+            zoomSliderPosition = initialSliderPos,
+            isBankingMode = false, showTable = false, tableRotationDegrees = 0f, bankingAimTarget = null,
             valuesChangedSinceReset = false, areHelpersVisible = false, isMoreHelpVisible = false,
             isForceLightMode = null, luminanceAdjustment = 0f, showLuminanceDialog = false,
             showTutorialOverlay = false, currentTutorialStep = 0,
@@ -176,7 +188,9 @@ class StateReducer @Inject constructor() {
         if (currentState.isBankingMode) return currentState
         return if (currentState.actualCueBall == null) {
             val newRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, currentState.zoomSliderPosition)
-            val initialCenter = PointF(viewCenterX, viewCenterY + newRadius * 4)
+            val logicalTableHeight = newRadius * 44f
+            val headSpotY = (currentState.viewHeight/2f) - (logicalTableHeight/4f)
+            val initialCenter = PointF(viewCenterX, headSpotY)
             currentState.copy(actualCueBall = ActualCueBall(center = initialCenter, radius = newRadius), valuesChangedSinceReset = true)
         } else {
             currentState.copy(actualCueBall = null, valuesChangedSinceReset = true)
@@ -188,7 +202,7 @@ class StateReducer @Inject constructor() {
         val viewCenterY = currentState.viewHeight / 2f
         val bankingEnabled = !currentState.isBankingMode
         val newState = if (bankingEnabled) {
-            val bankingZoomSliderPos = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM * 0.8f)
+            val bankingZoomSliderPos = 0f // Centered default
             val newLogicalRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, bankingZoomSliderPos)
             val bankingBallCenter = PointF(viewCenterX, viewCenterY)
             val newBankingBall = ActualCueBall(center = bankingBallCenter, radius = newLogicalRadius)
@@ -198,14 +212,16 @@ class StateReducer @Inject constructor() {
                 zoomSliderPosition = bankingZoomSliderPos, tableRotationDegrees = 0f,
                 bankingAimTarget = initialAimTarget,
                 protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
+                showTable = true, // Always show table in banking mode
                 warningText = null
             )
         } else {
-            val defaultSliderPos = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM)
+            val defaultSliderPos = 0f // Centered default
             val defaultLogicalRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, defaultSliderPos)
             currentState.copy(
                 isBankingMode = false, bankingAimTarget = null, actualCueBall = null,
                 zoomSliderPosition = defaultSliderPos,
+                showTable = false,
                 protractorUnit = currentState.protractorUnit.copy(
                     radius = defaultLogicalRadius,
                     center = PointF(viewCenterX, viewCenterY)
@@ -253,7 +269,7 @@ class StateReducer @Inject constructor() {
         val viewCenterY = currentState.viewHeight / 2f
         val oldZoomSliderPos = currentState.zoomSliderPosition
         val oldZoomFactor = ZoomMapping.sliderToZoom(oldZoomSliderPos)
-        val newSliderPos = event.position.coerceIn(0f, 100f)
+        val newSliderPos = event.position.coerceIn(-50f, 50f)
         val newLogicalRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
         val newZoomFactor = ZoomMapping.sliderToZoom(newSliderPos)
         var updatedActualCueBall = currentState.actualCueBall?.copy(radius = newLogicalRadius)
