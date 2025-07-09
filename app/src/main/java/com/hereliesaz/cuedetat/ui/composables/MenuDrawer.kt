@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-// import androidx.compose.material.icons.automirrored.outlined.HelpOutline // Not used
 import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.BrightnessMedium
 import androidx.compose.material.icons.outlined.LightMode
@@ -36,7 +35,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
-// import com.hereliesaz.cuedetat.ui.theme.AccentGold // Use MaterialTheme.colorScheme.primary
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
@@ -46,7 +44,7 @@ fun MenuDrawerContent(
     onCloseDrawer: () -> Unit
 ) {
     ModalDrawerSheet(
-        drawerContainerColor = MaterialTheme.colorScheme.surfaceVariant
+        drawerContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
     ) {
         Column(
             modifier = Modifier
@@ -67,7 +65,6 @@ fun MenuDrawerContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
 
-        // --- Help & Tutorial ---
         MenuItem(
             icon = ImageVector.vectorResource(R.drawable.ic_help_outline_24),
             text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
@@ -78,27 +75,13 @@ fun MenuDrawerContent(
             text = "Show Tutorial",
             onClick = { onEvent(MainScreenEvent.StartTutorial); onCloseDrawer() }
         )
-        // "More Help Info" removed
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             color = MaterialTheme.colorScheme.outline
         )
 
-        // --- View Controls ---
-        MenuItem(
-            icon = ImageVector.vectorResource(R.drawable.ic_undo_24),
-            text = "Reset View",
-            onClick = { onEvent(MainScreenEvent.Reset); onCloseDrawer() }
-        )
-        if (!uiState.isBankingMode) {
-            MenuItem(
-                icon = ImageVector.vectorResource(R.drawable.ic_jump_shot),
-                text = "Toggle Aiming Ball",
-                onClick = { onEvent(MainScreenEvent.ToggleActualCueBall); onCloseDrawer() }
-            )
-        }
         val bankingModeToggleText =
-            if (uiState.isBankingMode) "Visualize Ghost Ball" else "Calculate Bank" // Updated text
+            if (uiState.isBankingMode) "Ghost Ball Aiming" else "Calculate Bank"
         MenuItem(
             icon = Icons.Outlined.ViewInAr,
             text = bankingModeToggleText,
@@ -109,12 +92,11 @@ fun MenuDrawerContent(
             color = MaterialTheme.colorScheme.outline
         )
 
-        // --- Theme and Appearance (for Drawn Elements) ---
-        val systemIsCurrentlyDark = isSystemInDarkTheme() // For determining default state text
+        val systemIsCurrentlyDark = isSystemInDarkTheme()
         val (themeToggleText, themeToggleIcon) = when (uiState.isForceLightMode) {
-            true -> "Embrace the Dark" to Icons.Outlined.Nightlight   // Currently Light, offer Dark
-            false -> "Use System Theme" to Icons.Outlined.BrightnessMedium // Currently Dark, offer System
-            null -> if (systemIsCurrentlyDark) "Let there be Light" to Icons.Outlined.LightMode else "Embrace the Dark" to Icons.Outlined.Nightlight
+            true -> "Embrace the Darkness" to Icons.Outlined.Nightlight
+            false -> "Use System Theme" to Icons.Outlined.BrightnessMedium
+            null -> if (systemIsCurrentlyDark) "Walk toward the Light" to Icons.Outlined.LightMode else "Embrace the Darkness" to Icons.Outlined.Nightlight
         }
         MenuItem(
             icon = themeToggleIcon,
@@ -123,7 +105,7 @@ fun MenuDrawerContent(
         )
         MenuItem(
             icon = Icons.Outlined.BrightnessMedium,
-            text = "Luminance", // Text updated
+            text = "Luminance",
             onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog); onCloseDrawer() }
         )
         HorizontalDivider(
@@ -131,7 +113,6 @@ fun MenuDrawerContent(
             color = MaterialTheme.colorScheme.outline
         )
 
-        // --- Meta Section ---
         MenuItem(
             icon = Icons.Outlined.Brush,
             text = "About Me",

@@ -132,11 +132,22 @@ class StateReducer @Inject constructor() {
     private fun createInitialState(viewWidth: Int, viewHeight: Int, appColorScheme: ColorScheme): OverlayState {
         val initialSliderPos = ZoomMapping.zoomToSlider(ZoomMapping.DEFAULT_ZOOM)
         val initialLogicalRadius = getCurrentLogicalRadius(viewWidth, viewHeight, initialSliderPos)
-        val initialCenter = PointF(viewWidth / 2f, viewHeight / 2f)
+        val initialProtractorCenter = PointF(viewWidth / 2f, viewHeight / 2f)
+
+        // As per Balls.md, ActualCueBall should be at the head spot.
+        // Assuming table playing surface is 88 logical units long, head spot is at 1/4 length from top.
+        val logicalTableHeight = initialLogicalRadius * 44f
+        val headSpotY = (viewHeight/2f) - (logicalTableHeight/4f)
+        val initialActualCueBall = ActualCueBall(
+            center = PointF(viewWidth / 2f, headSpotY),
+            radius = initialLogicalRadius
+        )
+
         return OverlayState(
             viewWidth = viewWidth, viewHeight = viewHeight,
-            protractorUnit = ProtractorUnit(center = initialCenter, radius = initialLogicalRadius, rotationDegrees = -90f),
-            actualCueBall = null, zoomSliderPosition = initialSliderPos,
+            protractorUnit = ProtractorUnit(center = initialProtractorCenter, radius = initialLogicalRadius, rotationDegrees = -90f),
+            actualCueBall = initialActualCueBall,
+            zoomSliderPosition = initialSliderPos,
             isBankingMode = false, tableRotationDegrees = 0f, bankingAimTarget = null,
             valuesChangedSinceReset = false, areHelpersVisible = false, isMoreHelpVisible = false,
             isForceLightMode = null, luminanceAdjustment = 0f, showLuminanceDialog = false,
@@ -176,7 +187,9 @@ class StateReducer @Inject constructor() {
         if (currentState.isBankingMode) return currentState
         return if (currentState.actualCueBall == null) {
             val newRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, currentState.zoomSliderPosition)
-            val initialCenter = PointF(viewCenterX, viewCenterY + newRadius * 4)
+            val logicalTableHeight = newRadius * 44f
+            val headSpotY = (currentState.viewHeight/2f) - (logicalTableHeight/4f)
+            val initialCenter = PointF(viewCenterX, headSpotY)
             currentState.copy(actualCueBall = ActualCueBall(center = initialCenter, radius = newRadius), valuesChangedSinceReset = true)
         } else {
             currentState.copy(actualCueBall = null, valuesChangedSinceReset = true)
