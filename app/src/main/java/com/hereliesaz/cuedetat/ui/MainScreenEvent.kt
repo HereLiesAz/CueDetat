@@ -26,7 +26,7 @@ sealed class MainScreenEvent {
     object Reset : MainScreenEvent()
     object ToggleHelp : MainScreenEvent()
     object ToggleMoreHelp : MainScreenEvent()
-    object ToggleActualCueBall : MainScreenEvent()
+    object ToggleOnPlaneBall : MainScreenEvent()
     object ToggleBankingMode : MainScreenEvent()
     object ToggleTable: MainScreenEvent()
     object ToggleForceTheme : MainScreenEvent()

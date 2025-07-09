@@ -2,7 +2,7 @@ package com.hereliesaz.cuedetat.view.config.line
 
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.ui.theme.TacticalRust
-import com.hereliesaz.cuedetat.view.config.base.LineDecree
+import com.hereliesaz.cuedetat.view.config.base.LinesConfig
 
 data class BankLine2(
     override val label: String = "Bank 2",
@@ -12,4 +12,4 @@ data class BankLine2(
     override val strokeWidth: Float = 3f,
     override val strokeColor: Color = TacticalRust,
     override val additionalOffset: Float = 0f
-) : LineDecree
+) : LinesConfig

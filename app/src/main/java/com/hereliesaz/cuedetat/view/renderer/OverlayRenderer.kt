@@ -5,6 +5,8 @@ import android.graphics.Typeface
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.renderer.ball.BallRenderer
 import com.hereliesaz.cuedetat.view.renderer.line.LineRenderer
+import com.hereliesaz.cuedetat.view.renderer.table.RailRenderer
+import com.hereliesaz.cuedetat.view.renderer.table.TableRenderer
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class OverlayRenderer {
@@ -17,8 +19,7 @@ class OverlayRenderer {
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         if (state.viewWidth == 0 || state.viewHeight == 0) return
 
-        // --- Pass 1: Draw On-Plane elements (Table, Rails, Actual/Banking Ball) ---
-        canvas.save()
+        // --- Pass 1: Draw On-Plane elements (Table, Rails) ---
         if (state.showTable || state.isBankingMode) {
             // Pitched Table Surface
             canvas.save()
@@ -33,24 +34,16 @@ class OverlayRenderer {
             canvas.restore()
         }
 
-        // Pitched On-Plane Ball (Actual Cue Ball / Banking Ball)
+        // --- Pass 2: Draw all logical lines on the pitched canvas ---
         canvas.save()
         canvas.concat(state.pitchMatrix)
-        state.actualCueBall?.let {
-            ballRenderer.drawOnPlaneBall(canvas, it, paints.actualCueBallPaint, paints)
-        }
+        lineRenderer.draw(canvas, state, paints, typeface)
         canvas.restore()
-        canvas.restore() // Corresponds to the top-level save
 
 
-        // --- Pass 2: Draw Screen-Space Ghost/UI elements ---
-        // This pass does not use the pitchMatrix, applying lift manually for a 3D effect.
-        if (!state.isBankingMode) {
-            lineRenderer.draw(canvas, state, paints, typeface) // Lines need both logical and screen space info
-            ballRenderer.drawGhostedProtractor(canvas, state, paints, typeface)
-        } else {
-            // Draw banking lines in screen space as well if they need complex logic
-            lineRenderer.draw(canvas, state, paints, typeface)
-        }
+        // --- Pass 3: Draw all balls ---
+        // The BallRenderer handles its own rendering passes internally for on-plane and ghosted elements.
+        ballRenderer.draw(canvas, state, paints, typeface)
+
     }
 }

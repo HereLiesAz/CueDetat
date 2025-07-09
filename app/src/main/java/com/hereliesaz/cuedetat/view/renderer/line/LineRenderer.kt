@@ -1,4 +1,4 @@
-package com.hereliesaz.cuedetat.view.renderer
+package com.hereliesaz.cuedetat.view.renderer.line
 
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -8,6 +8,8 @@ import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 class LineRenderer {
@@ -33,7 +35,8 @@ class LineRenderer {
         } else {
             val shotLinePaint = if (state.isImpossibleShot) paints.warningPaint else paints.shotLinePaint
             val tangentPaint = if (state.isImpossibleShot) paints.tangentLineDottedPaint else paints.tangentLineSolidPaint
-            drawProtractorLines(canvas, state, paints.aimingLinePaint, shotLinePaint, tangentPaint, paints, typeface)
+            val aimingLinePaint = paints.targetCirclePaint // Using target paint as a logical default
+            drawProtractorLines(canvas, state, aimingLinePaint, shotLinePaint, tangentPaint, paints, typeface)
         }
     }
 
@@ -44,18 +47,18 @@ class LineRenderer {
     ) {
         val protractorUnit = state.protractorUnit
         val targetCenter = protractorUnit.center
-        val ghostCueCenter = protractorUnit.protractorCueBallCenter
+        val ghostCueCenter = protractorUnit.ghostCueBallCenter
 
         drawExtendedLine(canvas, ghostCueCenter, targetCenter, aimingPaint)
 
-        state.actualCueBall?.let {
+        state.onPlaneBall?.let {
             drawExtendedLine(canvas, it.center, ghostCueCenter, shotPaint)
         }
 
         drawTangentLines(canvas, ghostCueCenter, targetCenter, tangentPaint, allPaints?.tangentLineDottedPaint, state.protractorUnit.radius * 2)
 
         if (allPaints != null && typeface != null && state.areHelpersVisible) {
-            val angleGuidePaint = Paint(allPaints.aimingLinePaint).apply { alpha = 80 }
+            val angleGuidePaint = Paint(aimingPaint).apply { alpha = 80 }
             val textPaint = Paint(allPaints.textPaint).apply { alpha = 80; textSize = 30f }
 
             protractorAngles.forEach { angle ->
@@ -67,7 +70,7 @@ class LineRenderer {
     }
 
     private fun drawBankingLines(canvas: Canvas, state: OverlayState, paint: Paint, allPaints: PaintCache? = null, typeface: Typeface? = null) {
-        state.actualCueBall?.let { ball ->
+        state.onPlaneBall?.let { ball ->
             state.bankingAimTarget?.let { target ->
                 drawExtendedLine(canvas, ball.center, target, paint)
                 if (allPaints != null && typeface != null && state.areHelpersVisible) {
@@ -105,8 +108,8 @@ class LineRenderer {
         val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)
         val finalAngleRad = initialAngleRad + Math.toRadians(angleDegrees.toDouble())
         val length = 5000f
-        val endX = center.x + length * kotlin.math.cos(finalAngleRad).toFloat()
-        val endY = center.y + length * kotlin.math.sin(finalAngleRad).toFloat()
+        val endX = center.x + length * cos(finalAngleRad).toFloat()
+        val endY = center.y + length * sin(finalAngleRad).toFloat()
         canvas.drawLine(center.x, center.y, endX, endY, paint)
     }
 }

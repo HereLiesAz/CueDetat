@@ -48,8 +48,8 @@ class LineTextRenderer {
         draw(canvas, "Aiming Line", state.protractorUnit.center, state.protractorUnit.rotationDegrees, state.protractorUnit.radius * 2.5f, 0f, textPaint)
 
         // Shot Line Label
-        state.actualCueBall?.let {
-            val shotLineAngle = Math.toDegrees(atan2((state.protractorUnit.protractorCueBallCenter.y - it.center.y).toDouble(), (state.protractorUnit.protractorCueBallCenter.x - it.center.x).toDouble()).toDouble()).toFloat()
+        state.onPlaneBall?.let {
+            val shotLineAngle = Math.toDegrees(atan2((state.protractorUnit.ghostCueBallCenter.y - it.center.y).toDouble(), (state.protractorUnit.ghostCueBallCenter.x - it.center.x).toDouble()).toDouble()).toFloat()
             draw(canvas, "Shot Line", it.center, shotLineAngle, 150f, 0f, textPaint)
         }
     }

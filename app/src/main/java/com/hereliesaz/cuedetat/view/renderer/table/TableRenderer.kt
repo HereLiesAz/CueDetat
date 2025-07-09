@@ -1,4 +1,4 @@
-package com.hereliesaz.cuedetat.view.renderer
+package com.hereliesaz.cuedetat.view.renderer.table
 
 import android.graphics.Canvas
 import com.hereliesaz.cuedetat.view.PaintCache
@@ -11,7 +11,7 @@ class TableRenderer {
 
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         if (state.showTable || state.isBankingMode) {
-            val referenceRadius = state.actualCueBall?.radius ?: state.protractorUnit.radius
+            val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
             if (referenceRadius <= 0) return
 
             val tablePlayingSurfaceHeight = tableToBallRatioShort * referenceRadius

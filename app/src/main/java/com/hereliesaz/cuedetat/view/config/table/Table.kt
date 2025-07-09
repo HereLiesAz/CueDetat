@@ -2,7 +2,7 @@ package com.hereliesaz.cuedetat.view.config.table
 
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.ui.theme.AcidPatina
-import com.hereliesaz.cuedetat.view.config.base.TableComponentDecree
+import com.hereliesaz.cuedetat.view.config.base.TableComponentConfig
 
 data class Table(
     override val label: String = "Table Surface",
@@ -13,4 +13,4 @@ data class Table(
     override val strokeColor: Color = AcidPatina,
     override val additionalOffset: Float = 0f,
     override val fillColor: Color = Color.Transparent
-) : TableComponentDecree
+) : TableComponentConfig

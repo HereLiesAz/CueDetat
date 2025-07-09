@@ -2,7 +2,7 @@ package com.hereliesaz.cuedetat.view.config.line
 
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.ui.theme.RustedEmber
-import com.hereliesaz.cuedetat.view.config.base.LineDecree
+import com.hereliesaz.cuedetat.view.config.base.LinesConfig
 
 data class ShotGuideLine(
     override val label: String = "Shot Line",
@@ -12,4 +12,4 @@ data class ShotGuideLine(
     override val strokeWidth: Float = 3f,
     override val strokeColor: Color = RustedEmber,
     override val additionalOffset: Float = 0f
-) : LineDecree
+) : LinesConfig

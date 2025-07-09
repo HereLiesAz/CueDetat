@@ -3,7 +3,7 @@ package com.hereliesaz.cuedetat.view.model
 import android.graphics.PointF
 
 /**
- * The main aiming tool, consisting of a Target Ball and a Protractor Cue Ball.
+ * The data model for the main aiming tool, consisting of a Target Ball and a Ghost Cue Ball.
  * Its position is defined by the Target Ball's center.
  */
 data class ProtractorUnit(
@@ -13,9 +13,9 @@ data class ProtractorUnit(
 ) : LogicalCircular {
 
     /**
-     * Calculates the position of the Protractor Cue Ball based on the unit's center and rotation.
+     * Calculates the position of the Ghost Cue Ball based on the unit's center and rotation.
      */
-    val protractorCueBallCenter: PointF
+    val ghostCueBallCenter: PointF
         get() {
             val angleRad = Math.toRadians(rotationDegrees.toDouble())
             val distance = 2 * radius

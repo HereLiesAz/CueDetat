@@ -6,8 +6,9 @@ import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import com.hereliesaz.cuedetat.data.FullOrientation
-import com.hereliesaz.cuedetat.view.model.ActualCueBallModel
-import com.hereliesaz.cuedetat.view.model.ProtractorUnitModel
+import com.hereliesaz.cuedetat.view.config.ball.ActualCueBall
+import com.hereliesaz.cuedetat.view.model.OnPlaneBall
+import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 
 enum class InteractionMode {
     NONE,
@@ -24,8 +25,8 @@ data class OverlayState(
     val viewHeight: Int = 0,
 
     // Core logical model
-    val protractorUnit: ProtractorUnitModel = ProtractorUnitModel(PointF(0f, 0f), 1f, 0f),
-    val actualCueBall: ActualCueBallModel? = null,
+    val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), 1f, 0f),
+    val onPlaneBall: OnPlaneBall? = null,
 
     // UI control state
     val zoomSliderPosition: Float = 0f, // Centered default

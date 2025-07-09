@@ -62,7 +62,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 )
             }
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 CameraBackground(modifier = Modifier.fillMaxSize().zIndex(0f))
 
                 ProtractorOverlay(
@@ -78,15 +78,15 @@ fun MainScreen(viewModel: MainViewModel) {
                     modifier = Modifier.zIndex(2f)
                 )
 
-                val sliderWidth = with(LocalDensity.current) { (constraints.maxHeight * 0.6f).toDp() }
+                val sliderWidth = with(LocalDensity.current) { (maxHeight.toPx() * 0.6f).toDp() }
                 ZoomControls(
                     uiState = uiState,
                     onEvent = viewModel::onEvent,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight(0.6f)
-                        .width(sliderWidth) // Width must be set for offset to work correctly
-                        .offset(x = sliderWidth / 2) // Offset by half its own width
+                        .width(sliderWidth)
+                        .offset(x = sliderWidth / 2)
                         .zIndex(5f)
                 )
 
@@ -119,7 +119,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     if (!uiState.isBankingMode) {
                         ToggleCueBallFab(
                             uiState = uiState,
-                            onEvent = { viewModel.onEvent(MainScreenEvent.ToggleActualCueBall) }
+                            onEvent = { viewModel.onEvent(MainScreenEvent.ToggleOnPlaneBall) }
                         )
                     } else {
                         Spacer(Modifier)
@@ -220,8 +220,8 @@ fun TutorialOverlay(
         listOf(
             "Welcome. This is not a toy. It is a tool for geometric enlightenment. Pay attention.",
             "This is Protractor Mode. Use it for cut shots. The elements you see are ghosts in the machine. They live on a logical plane, projected onto your reality.",
-            "Drag the 'T' (Target Ball) to align it with your object ball. Drag the 'G' (Ghost Cue Ball) to set your aiming line to the pocket.",
-            "This optional 'A' (Actual Cue Ball) can be dragged to match your real cue ball's position. The line from 'A' to 'G' is the path you must shoot.",
+            "Drag the 'T' (Target Ball) to align it with your object ball. Drag with one finger to rotate the aiming line to the pocket.",
+            "This optional 'A' (Actual Cue Ball) can be dragged to match your real cue ball's position. The line from 'A' to 'G' (Ghost Cue Ball) is the path you must shoot.",
             "The vertical slider on the right controls zoom. The slider on the bottom (in Banking Mode) rotates the table.",
             "Open the menu to find more tools. 'Calculate Bank' switches to Banking Mode, where you can visualize multi-rail shots.",
             "You have been instructed. Now, go and sin no more. Or at least, sin with better geometry. Press Finish."
@@ -232,8 +232,10 @@ fun TutorialOverlay(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
                 .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.85f))
-                .clickable(enabled = false, onClick = {}) // Block clicks
+                .clickable(enabled = true, onClick = {}) // Block clicks
                 .zIndex(10f),
             contentAlignment = Alignment.Center
         ) {

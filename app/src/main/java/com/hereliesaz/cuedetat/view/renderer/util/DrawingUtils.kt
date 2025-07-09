@@ -2,7 +2,6 @@ package com.hereliesaz.cuedetat.view.renderer.util
 
 import android.graphics.Matrix
 import android.graphics.PointF
-import com.hereliesaz.cuedetat.view.model.ILogicalBall
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.abs
 import kotlin.math.pow

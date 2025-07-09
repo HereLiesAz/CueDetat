@@ -2,7 +2,7 @@ package com.hereliesaz.cuedetat.view.config.table
 
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.ui.theme.AcidPatina
-import com.hereliesaz.cuedetat.view.config.base.TableComponentDecree
+import com.hereliesaz.cuedetat.view.config.base.TableComponentConfig
 
 data class Rail(
     override val label: String = "Rails",
@@ -13,4 +13,4 @@ data class Rail(
     override val strokeColor: Color = AcidPatina.copy(alpha = 0.8f),
     override val additionalOffset: Float = 0f, // Lift is handled by railPitchMatrix
     override val fillColor: Color = Color.Transparent
-) : TableComponentDecree
+) : TableComponentConfig

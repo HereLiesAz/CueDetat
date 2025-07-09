@@ -1,7 +1,7 @@
 package com.hereliesaz.cuedetat.view.config.table
 
 import androidx.compose.ui.graphics.Color
-import com.hereliesaz.cuedetat.view.config.base.TableComponentDecree
+import com.hereliesaz.cuedetat.view.config.base.TableComponentConfig
 
 data class Holes(
     override val label: String = "Pockets",
@@ -12,4 +12,4 @@ data class Holes(
     override val strokeColor: Color = Color.Black,
     override val additionalOffset: Float = 0f,
     override val fillColor: Color = Color.Black
-) : TableComponentDecree
+) : TableComponentConfig

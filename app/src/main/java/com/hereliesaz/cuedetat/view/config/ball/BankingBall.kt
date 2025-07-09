@@ -2,7 +2,7 @@ package com.hereliesaz.cuedetat.view.config.ball
 
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.ui.theme.RebelYellow
-import com.hereliesaz.cuedetat.view.config.base.BallDecree
+import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
 
 data class BankingBall(
@@ -18,4 +18,4 @@ data class BankingBall(
     override val centerColor: Color = Color.White,
     override val fillColor: Color = Color.Transparent,
     override val additionalOffset3d: Float = 0f
-) : BallDecree
+) : BallsConfig

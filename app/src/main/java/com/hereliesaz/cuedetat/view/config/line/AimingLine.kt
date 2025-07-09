@@ -2,7 +2,7 @@ package com.hereliesaz.cuedetat.view.config.line
 
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.ui.theme.AccentGold
-import com.hereliesaz.cuedetat.view.config.base.LineDecree
+import com.hereliesaz.cuedetat.view.config.base.LinesConfig
 
 data class AimingLine(
     override val label: String = "Aiming Line",
@@ -12,4 +12,4 @@ data class AimingLine(
     override val strokeWidth: Float = 3f,
     override val strokeColor: Color = AccentGold,
     override val additionalOffset: Float = 0f
-) : LineDecree
+) : LinesConfig

@@ -25,8 +25,8 @@ class UpdateStateUseCase @Inject constructor() {
             camera = camera
         )
 
-        val referenceRadiusForTable = state.actualCueBall?.radius ?: state.protractorUnit.radius
-        val logicalTableShortSide = tableToBallRatioShort * referenceRadiusForTable
+        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
+        val logicalTableShortSide = tableToBallRatioShort * referenceRadius
         val railLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
 
         val railPitchMatrix = Perspective.createPitchMatrix(
@@ -54,7 +54,7 @@ class UpdateStateUseCase @Inject constructor() {
         val inverseMatrix = Matrix()
         val hasInverse = pitchMatrix.invert(inverseMatrix)
 
-        val anchorPointA: PointF? = state.actualCueBall?.center ?: run {
+        val anchorPointA: PointF? = state.onPlaneBall?.center ?: run {
             if (hasInverse) {
                 val screenAnchor = floatArrayOf(state.viewWidth / 2f, state.viewHeight.toFloat())
                 val logicalAnchorArray = FloatArray(2)
@@ -66,7 +66,7 @@ class UpdateStateUseCase @Inject constructor() {
         }
 
         val calculatedIsImpossibleShot = anchorPointA?.let { anchor ->
-            val distAtoG = distance(anchor, state.protractorUnit.protractorCueBallCenter)
+            val distAtoG = distance(anchor, state.protractorUnit.ghostCueBallCenter)
             val distAtoT = distance(anchor, state.protractorUnit.center)
             distAtoG > distAtoT
         } ?: false

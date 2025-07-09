@@ -13,7 +13,7 @@ enum class CenterShape {
  * Base interface for all visual configuration objects.
  * Provides common properties for styling rendered elements.
  */
-interface VisualConfig {
+interface VisualProperties {
     val label: String
     val opacity: Float
     val glowWidth: Float
@@ -26,7 +26,7 @@ interface VisualConfig {
 /**
  * An interface for visual configurations specific to ball-like objects.
  */
-interface BallConfig : VisualConfig {
+interface BallsConfig : VisualProperties {
     val centerShape: CenterShape
     val centerSize: Float
     val centerColor: Color
@@ -37,7 +37,7 @@ interface BallConfig : VisualConfig {
 /**
  * An interface for visual configurations specific to line-like objects.
  */
-interface LineConfig : VisualConfig {
+interface LinesConfig : VisualProperties {
     // Currently no line-specific properties beyond the base VisualConfig.
     // This interface exists for future expansion and type safety.
 }
@@ -45,6 +45,6 @@ interface LineConfig : VisualConfig {
 /**
  * An interface for visual configurations specific to table components.
  */
-interface TableComponentConfig : VisualConfig {
+interface TableComponentConfig : VisualProperties {
     val fillColor: Color
 }

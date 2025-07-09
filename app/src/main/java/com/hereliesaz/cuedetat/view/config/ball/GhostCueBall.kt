@@ -2,7 +2,7 @@ package com.hereliesaz.cuedetat.view.config.ball
 
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.ui.theme.MutedGray
-import com.hereliesaz.cuedetat.view.config.base.BallDecree
+import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
 
 data class GhostCueBall(
@@ -18,4 +18,4 @@ data class GhostCueBall(
     override val centerColor: Color = Color.White,
     override val fillColor: Color = Color.Transparent,
     override val additionalOffset3d: Float = 0f
-) : BallDecree
+) : BallsConfig

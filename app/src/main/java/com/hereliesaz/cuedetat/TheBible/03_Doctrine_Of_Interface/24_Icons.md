@@ -1,4 +1,4 @@
-# 13: Icon Specifications
+# Icon Specifications
 
 This document outlines the specific icons used in the application, their purpose, and their required behavior.
 

@@ -4,9 +4,6 @@ import android.graphics.BlurMaskFilter
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Typeface
-import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.ColorUtils
@@ -30,6 +27,8 @@ class PaintCache {
     val bankLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     val warningPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
+    val angleGuidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.5f }
+
 
     // --- Glow Paint Objects ---
     val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = glowStrokeWidth }
@@ -40,7 +39,7 @@ class PaintCache {
 
     fun updateColors(uiState: OverlayState, isDark: Boolean) {
         val LUMINANCE_ADJUST = uiState.luminanceAdjustment
-        val baseScheme = if (isDark) darkColorScheme() else lightColorScheme()
+        val baseScheme = uiState.appControlColorScheme
         val glowColor = (if(isDark) Color.White else Color.Black).copy(alpha = 0.5f).toArgb()
 
         val blurFilter = BlurMaskFilter(glowRadius, BlurMaskFilter.Blur.NORMAL)
@@ -58,6 +57,7 @@ class PaintCache {
         bankLinePaint.color = RebelYellow.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         textPaint.color = baseScheme.onSurface.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         warningPaint.color = baseScheme.error.adjustLuminance(LUMINANCE_ADJUST).toArgb()
+        angleGuidePaint.color = baseScheme.tertiary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.4f).toArgb()
     }
 
     private fun Color.adjustLuminance(factor: Float): Color {

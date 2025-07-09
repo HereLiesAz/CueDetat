@@ -2,7 +2,7 @@ package com.hereliesaz.cuedetat.view.config.line
 
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.ui.theme.RustedEmber
-import com.hereliesaz.cuedetat.view.config.base.LineDecree
+import com.hereliesaz.cuedetat.view.config.base.LinesConfig
 
 data class TangentLine(
     override val label: String = "Tangent Line",
@@ -12,4 +12,4 @@ data class TangentLine(
     override val strokeWidth: Float = 2.5f,
     override val strokeColor: Color = RustedEmber,
     override val additionalOffset: Float = 0f
-) : LineDecree
+) : LinesConfig

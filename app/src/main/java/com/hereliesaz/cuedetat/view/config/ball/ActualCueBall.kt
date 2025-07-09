@@ -2,7 +2,7 @@ package com.hereliesaz.cuedetat.view.config.ball
 
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.ui.theme.RustedEmber
-import com.hereliesaz.cuedetat.view.config.base.BallConfig
+import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
 
 data class ActualCueBall(
@@ -18,4 +18,4 @@ data class ActualCueBall(
     override val centerColor: Color = Color.White,
     override val fillColor: Color = Color.Transparent,
     override val additionalOffset3d: Float = 0f
-) : BallConfig
+) : BallsConfig

@@ -2,7 +2,7 @@ package com.hereliesaz.cuedetat.view.config.table
 
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.ui.theme.IcedOpal
-import com.hereliesaz.cuedetat.view.config.base.TableComponentDecree
+import com.hereliesaz.cuedetat.view.config.base.TableComponentConfig
 
 data class Diamonds(
     override val label: String = "Diamonds",
@@ -13,4 +13,4 @@ data class Diamonds(
     override val strokeColor: Color = IcedOpal.copy(alpha = 0.7f),
     override val additionalOffset: Float = 0f,
     override val fillColor: Color = IcedOpal.copy(alpha = 0.7f)
-) : TableComponentDecree
+) : TableComponentConfig

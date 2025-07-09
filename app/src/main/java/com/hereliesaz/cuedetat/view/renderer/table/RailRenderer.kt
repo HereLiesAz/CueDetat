@@ -1,4 +1,4 @@
-package com.hereliesaz.cuedetat.view.renderer
+package com.hereliesaz.cuedetat.view.renderer.table
 
 import android.graphics.Paint
 import android.graphics.Canvas
@@ -11,7 +11,7 @@ class RailRenderer {
     private val diamondSizeFactor = 0.25f
 
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        val referenceRadius = state.actualCueBall?.radius ?: state.protractorUnit.radius
+        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
         if (referenceRadius <= 0) return
 
         val tablePlayingSurfaceHeight = 44f * referenceRadius

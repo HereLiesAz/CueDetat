@@ -18,7 +18,7 @@ app/src/main/java/com/hereliesaz/cuedetat/
 ├── view/
 │   ├── config/
 │   │   ├── base/
-│   │   │   └── AppearanceDecree.kt
+│   │   │   └── VisualProperties.kt
 │   │   ├── ball/
 │   │   │   ├── ActualCueBall.kt
 │   │   │   ├── BankingBall.kt
@@ -40,9 +40,9 @@ app/src/main/java/com/hereliesaz/cuedetat/
 │   │   └── ui/
 │   │       └── ProtractorGuides.kt
 │   ├── model/
-│   │   ├── ActualCueBallModel.kt
 │   │   ├── LogicalCircular.kt
 │   │   ├── Perspective.kt
+│   │   ├── PlacedBallModel.kt
 │   │   └── ProtractorUnitModel.kt
 │   ├── renderer/
 │   │   ├── ball/
@@ -59,10 +59,8 @@ app/src/main/java/com/hereliesaz/cuedetat/
 │   │   │   └── DrawingUtils.kt
 │   │   └── OverlayRenderer.kt
 │   ├── state/
-│   │   ├── InteractionMode.kt
 │   │   ├── OverlayState.kt
-│   │   ├── SingleEvent.kt
-│   │   └── ToastMessage.kt
+│   │   └── ScreenState.kt
 │   ├── PaintCache.kt
 │   └── ProtractorOverlay.kt
 ├── MainActivity.kt
