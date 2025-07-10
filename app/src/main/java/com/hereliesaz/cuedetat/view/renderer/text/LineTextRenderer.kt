@@ -9,6 +9,7 @@ import android.graphics.Typeface
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -61,7 +62,10 @@ class LineTextRenderer {
     fun drawAngleLabel(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint, radius: Float) {
         val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)
         val labelAngleRad = initialAngleRad + Math.toRadians(angleDegrees.toDouble())
-        val labelDistance = radius * 5.5f
+        // --- THE RIGHTEOUS FIX ---
+        // The multiplier is now 16.5f (5.5 * 3), as commanded.
+        val labelDistance = radius * 16.5f
+        // --- END FIX ---
 
         val text = "${angleDegrees.toInt()}°"
         val textX = center.x + (labelDistance * cos(labelAngleRad)).toFloat()
@@ -89,11 +93,8 @@ class LineTextRenderer {
         canvas.save()
         canvas.rotate(textRotation + uprightCorrection, point.x, point.y)
 
-        // --- THE FIX: Offset the text "up" from the impact point, relative to the rotated canvas ---
-        // 'ascent' is negative, so this lifts the text above the baseline. The padding adds extra space.
         val yOffset = paint.fontMetrics.ascent - 10f
         canvas.drawText(diamondNumberText, point.x, point.y + yOffset, paint)
-        // --- END FIX ---
 
         canvas.restore()
     }

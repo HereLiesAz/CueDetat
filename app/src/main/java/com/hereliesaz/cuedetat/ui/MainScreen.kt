@@ -111,6 +111,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     )
                 }
 
+
                 ZoomControls(
                     uiState = uiState,
                     onEvent = viewModel::onEvent,
@@ -129,21 +130,28 @@ fun MainScreen(viewModel: MainViewModel) {
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                         .zIndex(2f),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment = Alignment.Bottom, // Use Bottom alignment
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     if (!uiState.isBankingMode) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        // --- THE RIGHTEOUS FIX ---
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            // Padding added to lift the entire column
+                            modifier = Modifier.padding(bottom = 48.dp)
+                        ) {
                             ToggleSpinControlFab(
                                 uiState = uiState,
                                 onEvent = { viewModel.onEvent(MainScreenEvent.ToggleSpinControl) }
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            // Spacer increased to add more distance between buttons
+                            Spacer(modifier = Modifier.height(16.dp))
                             ToggleCueBallFab(
                                 uiState = uiState,
                                 onEvent = { viewModel.onEvent(MainScreenEvent.ToggleOnPlaneBall) }
                             )
                         }
+                        // --- END FIX ---
 
                     } else {
                         Spacer(Modifier.size(40.dp))
