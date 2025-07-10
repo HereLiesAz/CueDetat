@@ -14,8 +14,12 @@ class RailRenderer {
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
         if (referenceRadius <= 0) return
 
-        val tablePlayingSurfaceHeight = 44f * referenceRadius
-        val tablePlayingSurfaceWidth = 88f * referenceRadius
+        val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
+        val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
+
+        val tablePlayingSurfaceWidth = tableToBallRatioLong * referenceRadius
+        val tablePlayingSurfaceHeight = tableToBallRatioShort * referenceRadius
+
         val tableCenterX = state.viewWidth / 2f
         val tableCenterY = state.viewHeight / 2f
 

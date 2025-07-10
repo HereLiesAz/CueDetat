@@ -21,6 +21,7 @@ import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SingleEvent
+import com.hereliesaz.cuedetat.view.state.TableSize
 import com.hereliesaz.cuedetat.view.state.ToastMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -81,11 +82,18 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.ToggleDistanceUnit -> {
                 val newUnit = if (uiState.value.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC
                 userPreferencesRepository.setDistanceUnit(newUnit)
-                updateState(event) // Pass event to reducer
+                updateState(event)
             }
             is MainScreenEvent.CycleTableSize -> {
                 val newSize = uiState.value.tableSize.next()
                 userPreferencesRepository.setTableSize(newSize)
+                updateState(event)
+            }
+            is MainScreenEvent.SetTableSize -> {
+                userPreferencesRepository.setTableSize(event.size)
+                updateState(event)
+            }
+            is MainScreenEvent.ToggleTableSizeDialog -> {
                 updateState(event)
             }
             else -> {

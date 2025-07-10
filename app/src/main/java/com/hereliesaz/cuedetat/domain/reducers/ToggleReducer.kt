@@ -19,6 +19,8 @@ class ToggleReducer @Inject constructor() {
             is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(currentState)
             is MainScreenEvent.ToggleTable -> currentState.copy(showTable = !currentState.showTable, valuesChangedSinceReset = true)
             is MainScreenEvent.CycleTableSize -> currentState.copy(tableSize = currentState.tableSize.next(), valuesChangedSinceReset = true)
+            is MainScreenEvent.SetTableSize -> currentState.copy(tableSize = event.size, valuesChangedSinceReset = true)
+            is MainScreenEvent.ToggleTableSizeDialog -> currentState.copy(showTableSizeDialog = !currentState.showTableSizeDialog)
             is MainScreenEvent.ToggleForceTheme -> {
                 val newMode = when (currentState.isForceLightMode) { null -> true; true -> false; false -> null }
                 currentState.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)

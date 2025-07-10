@@ -71,6 +71,7 @@ data class OverlayState(
     val bankShotPath: List<PointF> = emptyList(),
     val pocketedBankShotPocketIndex: Int? = null,
     val tableSize: TableSize = TableSize.EIGHT_FT,
+    val showTableSizeDialog: Boolean = false,
 
     // Theme and Appearance
     val isForceLightMode: Boolean? = null,

@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.cuedetat.ui.composables.*
 import com.hereliesaz.cuedetat.ui.composables.dialogs.LuminanceAdjustmentDialog
+import com.hereliesaz.cuedetat.ui.composables.dialogs.TableSizeSelectionDialog
 import com.hereliesaz.cuedetat.ui.composables.overlays.KineticWarningOverlay
 import com.hereliesaz.cuedetat.ui.composables.overlays.TutorialOverlay
 import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
@@ -71,6 +72,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
                 TopControls(
                     uiState = uiState,
+                    onEvent = viewModel::onEvent,
                     onMenuClick = { scope.launch { drawerState.open() } },
                     modifier = Modifier.zIndex(2f)
                 )
@@ -124,6 +126,12 @@ fun MainScreen(viewModel: MainViewModel) {
                     uiState = uiState,
                     onEvent = viewModel::onEvent,
                     onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleLuminanceDialog) }
+                )
+
+                TableSizeSelectionDialog(
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent,
+                    onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleTableSizeDialog) }
                 )
 
                 TutorialOverlay(

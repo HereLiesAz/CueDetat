@@ -5,6 +5,7 @@ import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.cuedetat.data.FullOrientation
+import com.hereliesaz.cuedetat.view.state.TableSize
 
 sealed class MainScreenEvent {
     // UI-Originated Events
@@ -32,6 +33,8 @@ sealed class MainScreenEvent {
     object ToggleBankingMode : MainScreenEvent()
     object ToggleTable: MainScreenEvent()
     object CycleTableSize: MainScreenEvent()
+    data class SetTableSize(val size: TableSize) : MainScreenEvent()
+    object ToggleTableSizeDialog : MainScreenEvent()
     object ToggleForceTheme : MainScreenEvent()
     object ToggleLuminanceDialog : MainScreenEvent()
     data class AdjustLuminance(val adjustment: Float) : MainScreenEvent()

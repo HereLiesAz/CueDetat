@@ -23,11 +23,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.cuedetat.R
+import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
 fun TopControls(
     uiState: OverlayState,
+    onEvent: (MainScreenEvent) -> Unit,
     onMenuClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -64,7 +66,10 @@ fun TopControls(
         }
 
         if(uiState.showTable || uiState.isBankingMode) {
-            Column(horizontalAlignment = Alignment.End) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.clickable { onEvent(MainScreenEvent.CycleTableSize) }
+            ) {
                 Text(
                     text = "Table Size",
                     style = MaterialTheme.typography.labelSmall,

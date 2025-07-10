@@ -83,8 +83,8 @@ fun MenuDrawerContent(
             onClick = { onEvent(MainScreenEvent.ToggleTable); onCloseDrawer() }
         )
         MenuItem(
-            text = "Table Size: ${uiState.tableSize.feet}'",
-            onClick = { onEvent(MainScreenEvent.CycleTableSize); onCloseDrawer() }
+            text = "Table Size",
+            onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog); onCloseDrawer() }
         )
         MenuDivider()
 
