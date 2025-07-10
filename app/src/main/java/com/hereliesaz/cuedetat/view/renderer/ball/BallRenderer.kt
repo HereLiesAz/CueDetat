@@ -22,7 +22,8 @@ class BallRenderer {
         if (state.isBankingMode) {
             // In Banking Mode, the ball is a simple on-plane circle.
             state.onPlaneBall?.let { bankingBall ->
-                drawOnPlaneBall(canvas, bankingBall, paints.bankLinePaint, paints, state)
+                // The Banking Ball shall use the color of the first and brightest bank line.
+                drawOnPlaneBall(canvas, bankingBall, paints.bankLine1Paint, paints, state)
             }
         } else {
             // In Protractor Mode, all balls are "ghosted" with a shadow and lifted effect.

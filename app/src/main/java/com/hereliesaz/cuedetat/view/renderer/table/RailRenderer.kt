@@ -24,7 +24,9 @@ class RailRenderer {
         val innerRight = tableCenterX + tablePlayingSurfaceWidth / 2
         val innerBottom = tableCenterY + tablePlayingSurfaceHeight / 2
 
-        val railLinePaint = Paint(paints.tableOutlinePaint).apply { strokeWidth = referenceRadius * railVisualThicknessFactor }
+        val railLinePaint = Paint(paints.tableOutlinePaint).apply {
+            strokeWidth = referenceRadius * railVisualThicknessFactor
+        }
         val railLineGlowPaint = Paint(paints.lineGlowPaint).apply { strokeWidth = railLinePaint.strokeWidth + 8f }
         val diamondPaint = Paint(paints.tableOutlinePaint).apply { strokeWidth = (referenceRadius * diamondSizeFactor) / 2f }
 

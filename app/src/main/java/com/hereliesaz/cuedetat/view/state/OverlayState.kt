@@ -42,6 +42,8 @@ data class OverlayState(
     val showTable: Boolean = false,
     val tableRotationDegrees: Float = 0f,
     val bankingAimTarget: PointF? = null,
+    val bankShotPath: List<PointF> = emptyList(),
+    val pocketedBankShotPocketIndex: Int? = null,
 
     // Theme and Appearance
     val isForceLightMode: Boolean? = null,
@@ -79,7 +81,7 @@ data class OverlayState(
     val latestVersionName: String? = null,
 
     // New properties for units and calculated distance
-    val distanceUnit: DistanceUnit = DistanceUnit.METRIC,
+    val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
     val targetBallDistance: Float = 0f
 ) {
     val pitchAngle: Float

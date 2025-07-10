@@ -40,30 +40,21 @@ class LineRenderer {
         val targetCenter = state.protractorUnit.center
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
 
-        // Determine paint for shot line based on warnings
-        val shotLinePaint = if (state.isImpossibleShot || state.isTiltBeyondLimit) {
-            paints.warningPaint // Use warning paint if shot is invalid
-        } else {
-            paints.shotLinePaint // Use standard paint otherwise
-        }
-        val shotLineGlow = if(state.isImpossibleShot || state.isTiltBeyondLimit) paints.lineGlowPaint.apply { color = paints.warningPaint.color } else paints.lineGlowPaint
+        val shotLinePaint = if (state.isImpossibleShot || state.isTiltBeyondLimit) paints.warningPaint else paints.shotLinePaint
+        val shotLineGlow = if (state.isImpossibleShot || state.isTiltBeyondLimit) paints.lineGlowPaint.apply { color = paints.warningPaint.color } else paints.lineGlowPaint
 
         // --- Draw Glows First ---
         drawExtendedLine(canvas, ghostCueCenter, targetCenter, paints.lineGlowPaint) // Aiming Line Glow
         drawExtendedLine(canvas, state.shotLineAnchor, ghostCueCenter, shotLineGlow) // Shot Line Glow (conditional color)
         drawTangentLines(canvas, ghostCueCenter, targetCenter, paints.lineGlowPaint, paints.lineGlowPaint, state.tangentDirection) // Tangent Glows
 
-
         // --- Draw Lines Second ---
         drawExtendedLine(canvas, ghostCueCenter, targetCenter, paints.targetCirclePaint) // Aiming Line
         drawExtendedLine(canvas, state.shotLineAnchor, ghostCueCenter, shotLinePaint) // Shot Line
         drawTangentLines(canvas, ghostCueCenter, targetCenter, paints.tangentLineSolidPaint, paints.tangentLineDottedPaint, state.tangentDirection) // Tangent Lines
 
-
-        // Labels are drawn on the pitched plane
         if (state.areHelpersVisible) {
             textRenderer.drawProtractorLabels(canvas, state, paints, typeface)
-            // Draw angle labels on the pitched plane as well
             val textPaint = Paint(paints.textPaint).apply { alpha = 80; textSize = 30f }
             protractorAngles.forEach { angle ->
                 textRenderer.drawAngleLabel(canvas, targetCenter, ghostCueCenter, angle, textPaint, state.protractorUnit.radius)
@@ -72,17 +63,38 @@ class LineRenderer {
     }
 
     private fun drawBankingLines(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
-        state.onPlaneBall?.let { ball ->
-            state.bankingAimTarget?.let { target ->
-                // Draw glow first
-                drawExtendedLine(canvas, ball.center, target, paints.lineGlowPaint)
-                // Then the line
-                drawExtendedLine(canvas, ball.center, target, paints.bankLinePaint)
+        if (state.bankShotPath.size < 2) return
 
-                if (state.areHelpersVisible) {
-                    textRenderer.drawBankingLabels(canvas, state, paints, typeface)
-                }
+        val bankLinePaints = listOf(paints.bankLine1Paint, paints.bankLine2Paint, paints.bankLine3Paint, paints.bankLine4Paint)
+        val lastSegmentIndex = state.bankShotPath.size - 2
+
+        for (i in 0..lastSegmentIndex) {
+            val start = state.bankShotPath[i]
+            val end = state.bankShotPath[i+1]
+
+            val isLastSegment = i == lastSegmentIndex
+            val isPocketed = state.pocketedBankShotPocketIndex != null
+
+            // Choose paint for the line based on segment index and whether it's the final, pocketed shot
+            val linePaint = if (isLastSegment && isPocketed) {
+                Paint(paints.shotLinePaint).apply { color = android.graphics.Color.WHITE }
+            } else {
+                bankLinePaints.getOrElse(i) { bankLinePaints.last() } // Fallback to the last color
             }
+
+            val glowPaint = Paint(paints.lineGlowPaint).apply {
+                color = linePaint.color
+                alpha = 100 // a consistent glow alpha
+            }
+
+            // Draw Glow
+            canvas.drawLine(start.x, start.y, end.x, end.y, glowPaint)
+            // Draw Line
+            canvas.drawLine(start.x, start.y, end.x, end.y, linePaint)
+        }
+
+        if (state.areHelpersVisible) {
+            textRenderer.drawBankingLabels(canvas, state, paints, typeface)
         }
     }
 

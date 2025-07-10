@@ -24,11 +24,17 @@ class PaintCache {
     val shotLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
     val tangentLineSolidPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth * 0.8f }
     val tangentLineDottedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth * 0.8f; pathEffect = DashPathEffect(floatArrayOf(15f, 10f), 0f) }
-    val bankLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     val warningPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
     val angleGuidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.5f }
+    val pocketFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = Color.Black.toArgb() }
 
+
+    // --- Bank Line Paints ---
+    val bankLine1Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
+    val bankLine2Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
+    val bankLine3Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
+    val bankLine4Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
 
     // --- Glow Paint Objects ---
     val lineGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL_AND_STROKE; strokeWidth = glowStrokeWidth }
@@ -50,7 +56,7 @@ class PaintCache {
         ballGlowPaint.color = glowColor
         ballGlowPaint.maskFilter = blurFilter
 
-        tableOutlinePaint.color = baseScheme.primary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
+        tableOutlinePaint.color = AcidPatina.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         targetCirclePaint.color = baseScheme.primary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         cueCirclePaint.color = baseScheme.tertiary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         actualCueBallPaint.color = baseScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
@@ -58,7 +64,12 @@ class PaintCache {
         shotLinePaint.color = baseScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         tangentLineSolidPaint.color = baseScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         tangentLineDottedPaint.color = baseScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.6f).toArgb()
-        bankLinePaint.color = RebelYellow.adjustLuminance(LUMINANCE_ADJUST).toArgb()
+
+        bankLine1Paint.color = BankLine1Yellow.adjustLuminance(LUMINANCE_ADJUST).toArgb()
+        bankLine2Paint.color = BankLine2Yellow.adjustLuminance(LUMINANCE_ADJUST).toArgb()
+        bankLine3Paint.color = BankLine3Yellow.adjustLuminance(LUMINANCE_ADJUST).toArgb()
+        bankLine4Paint.color = BankLine4Yellow.adjustLuminance(LUMINANCE_ADJUST).toArgb()
+
         textPaint.color = baseScheme.onSurface.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         warningPaint.color = baseScheme.error.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         angleGuidePaint.color = baseScheme.tertiary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.4f).toArgb()

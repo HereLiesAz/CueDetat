@@ -56,8 +56,6 @@ class UpdateStateUseCase @Inject constructor() {
         val inverseMatrix = Matrix()
         val hasInverse = pitchMatrix.invert(inverseMatrix)
 
-        // The anchor point must always be calculated. If the ActualCueBall is not visible,
-        // it defaults to a point logically below the screen. This is the crux of the bug fix.
         val shotLineAnchorPoint: PointF = state.onPlaneBall?.center ?: run {
             if (hasInverse) {
                 val screenAnchor = floatArrayOf(state.viewWidth / 2f, state.viewHeight.toFloat())
@@ -77,9 +75,16 @@ class UpdateStateUseCase @Inject constructor() {
 
         val isTiltBeyondLimit = !state.isBankingMode && shotLineAnchorPoint.y <= state.protractorUnit.ghostCueBallCenter.y
 
+        // Determine which ball is the focus for distance calculation
+        val (logicalCenterForDistance, logicalRadiusForDistance) = if (state.isBankingMode && state.onPlaneBall != null) {
+            state.onPlaneBall.center to state.onPlaneBall.radius
+        } else {
+            state.protractorUnit.center to state.protractorUnit.radius
+        }
+
         val targetBallOnScreenRadius = DrawingUtils.getPerspectiveRadiusAndLift(
-            logicalCenter = state.protractorUnit.center,
-            logicalRadius = state.protractorUnit.radius,
+            logicalCenter = logicalCenterForDistance,
+            logicalRadius = logicalRadiusForDistance,
             state = state.copy(pitchMatrix = pitchMatrix, hasInverseMatrix = hasInverse) // Pass updated matrix
         ).radius
 

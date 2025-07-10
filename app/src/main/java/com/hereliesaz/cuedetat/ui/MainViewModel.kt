@@ -13,6 +13,7 @@ import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
+import com.hereliesaz.cuedetat.domain.CalculateBankShot
 import com.hereliesaz.cuedetat.domain.StateReducer
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.view.model.Perspective
@@ -37,6 +38,7 @@ class MainViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     application: Application,
     private val updateStateUseCase: UpdateStateUseCase,
+    private val calculateBankShotUseCase: CalculateBankShot,
     private val stateReducer: StateReducer
 ) : ViewModel() {
 
@@ -119,7 +121,19 @@ class MainViewModel @Inject constructor(
         }
 
         val stateFromReducer = stateReducer.reduce(currentState, logicalEvent)
-        var finalState = updateStateUseCase(stateFromReducer, graphicsCamera)
+        var derivedState = updateStateUseCase(stateFromReducer, graphicsCamera)
+
+        if (derivedState.isBankingMode) {
+            val bankShotResult = calculateBankShotUseCase(derivedState)
+            derivedState = derivedState.copy(
+                bankShotPath = bankShotResult.path,
+                pocketedBankShotPocketIndex = bankShotResult.pocketedPocketIndex
+            )
+        } else {
+            derivedState = derivedState.copy(bankShotPath = emptyList(), pocketedBankShotPocketIndex = null)
+        }
+
+        var finalState = derivedState
 
         if (event is MainScreenEvent.GestureEnded) {
             val warningText = if (!finalState.isBankingMode && finalState.isImpossibleShot) {

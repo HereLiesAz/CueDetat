@@ -24,6 +24,13 @@ val ConcreteVein = Color(0xFF7D7D7D)    // Mid-gray, utility
 val MoltenBrass = Color(0xFFD9821B)     // Warm, edgy accent
 val GuerillaViolet = Color(0xFF6E44FF)  // Striking contrast color
 val AshlineFog = Color(0xFFBFBFBF)      // High-vis neutral
+
+// --- Bank Line Color Progression ---
+val BankLine1Yellow = Color(0xFFFFD000) // RebelYellow - Brightest
+val BankLine2Yellow = Color(0xFFDDC400) // Slightly less saturated/bright
+val BankLine3Yellow = Color(0xFFBBA800) // More ochre
+val BankLine4Yellow = Color(0xFF998C00) // Most muted, brownish
+
 val RebelYellow = Color(0xFFFFD000)  // Primary yellow
 val BurntBrass = Color(0xFF8A5A00)   // Dirty metallic accent
 val SmokeyGrunge = Color(0xFF3B3B3B) // Deep, gritty gray (but not black)
