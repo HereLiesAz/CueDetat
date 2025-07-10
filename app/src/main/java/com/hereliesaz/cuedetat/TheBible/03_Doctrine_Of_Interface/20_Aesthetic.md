@@ -23,3 +23,7 @@ This document details the required visual style of the application.
 ## Opacity
 * The menu background must be set to 80% opacity (`0.8f`).
 * All popup dialog windows must have their backgrounds set to 66% opacity (`0.66f`).
+## Spin Control Color Wheel
+* **Description:** A circular UI element for selecting cue ball spin (English).
+* **Gradient:** The wheel must be a radial gradient that transitions through the full spectrum as commanded: White (center) -> Yellow -> Red -> Violet -> Blue -> Green (edge).
+* **Interaction:** The user drags their finger on the wheel to select a point. A white circular indicator must show the precise point of selection.

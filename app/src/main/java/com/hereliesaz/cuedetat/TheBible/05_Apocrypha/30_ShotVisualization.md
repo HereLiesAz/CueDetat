@@ -16,6 +16,8 @@ The system works by creating a clear, geometric relationship between these three
 3.  If the **`ActualCueBall`** is enabled, the user drags its 3D ghost to match the real-world cue ball.
 4.  The rendered **Shot Line** now displays the exact path the user must strike the `ActualCueBall` along to hit the `GhostCueBall` position, thus executing the visualized shot.
 5.  The **Tangent Lines** show the path the cue ball will take after impact if no spin is applied.
+6.  Optionally, the user toggles and interacts with the **Spin Control** to apply English. A series of colored paths appear, branching from the tangent line, showing the cue ball's potential post-contact trajectories based on the selected spin.
+
 ## Addendum: Interaction Mandate
 
 * The aiming gesture is a **direct linear drag**. Dragging a finger anywhere on the screen (not on another interactive element) must control the `aimingAngle`. The horizontal (`dx`) and vertical (`dy`) components of the drag must be combined to produce a fluid rotation of the aiming line.

@@ -1,4 +1,3 @@
---- FILE: app/src/main/java/com/hereliesaz/cuedetat/TheBible/02_Doctrine_Of_Elements/14_Lines.md ---
 # The Lines
 
 *   **Aiming Line:** Drawn from the Ghost Cue Ball's center through the Target Ball's center. It terminates at the first rail it hits (if the table is visible) or a pocket edge.
@@ -38,5 +37,11 @@
 *   **Banking Shot Line** (Banking Mode)
 *   **Path**: A multi-segment line originating from the `ActualCueBall` (Banking Ball), and aimed at the `bankingAimTarget`, reflecting off the rails up to 4 times.
 *   **Style**: Solid lines, colored in a progressive, decaying sequence of yellows.
-*   **Termination**: If the path collides with a pocket, line rendering must cease at the pocket's edge. The final segment leading to the pocket must be colored `RebelYellow`.
+*   **Termination**: If the final segment of the path collides with a pocket's geometry, line rendering must cease at the pocket's edge. The final segment leading to the pocket must be colored `RebelYellow`.
 *   **Label**: A diamond number label must be rendered at each rail impact point.
+
+*   **Spin Paths** (Protractor Mode)
+*   **Purpose**: To visualize the cue ball's post-contact trajectory when English is applied.
+*   **Path**: A Bezier curve originating from the `GhostCueBall`'s position, branching off the active side of the tangent line.
+*   **Style**: The color of the path corresponds directly to the color on the `SpinControl` wheel where the user's finger is placed.
+*   **Behavior**: When the user releases their finger from the `SpinControl`, the last calculated path and its corresponding selection indicator on the wheel **must linger** for 5 seconds. After lingering, both must fade to complete invisibility over the next 5 seconds.

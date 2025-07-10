@@ -6,8 +6,6 @@
 ***
 ## Addendum: Detailed FAB Specifications
 
-Two to three `FloatingActionButton`s (FABs) must be persistently displayed at the bottom of the screen, outside of the menu.
-
 ### 1. Reset FAB
 
 * **Placement**: Aligned to the bottom-right of the screen (`Alignment.BottomEnd`).
@@ -21,9 +19,16 @@ Two to three `FloatingActionButton`s (FABs) must be persistently displayed at th
   * By default (`areHelpersVisible = false`), it displays the `ic_undo_24` icon.
   * When help text is enabled (`areHelpersVisible = true`), it displays the text "Reset\nView".
 
-### 2. Toggle Cue Ball FAB
+### 2. Toggle Spin Control FAB
 
-* **Placement**: Aligned to the bottom-left of the screen (`Alignment.BottomStart`).
+*   **Placement**: Aligned to the bottom-left, stacked vertically *above* the Toggle Cue Ball FAB.
+*   **Action**: Triggers the `ToggleSpinControl` event.
+*   **Dynamic Appearance**: Its `containerColor` must change to `MaterialTheme.colorScheme.secondaryContainer` when the spin control is visible (`isSpinControlVisible = true`).
+*   **Content**: A simple `Text` composable displaying "Spin".
+
+### 3. Toggle Cue Ball FAB
+
+* **Placement**: Aligned to the bottom-left of the screen (`Alignment.BottomStart`), below the Toggle Spin Control FAB.
 * **Action**: Triggers the `MainScreenEvent.ToggleOnPlaneBall` event. This button is only active and visible when not in Banking Mode.
 * **Dynamic Appearance**: The button's color must provide visual feedback on the toggle's state.
   * When `uiState.onPlaneBall` is `null`, its `containerColor` must be `MaterialTheme.colorScheme.surfaceVariant` (inactive state).
@@ -32,7 +37,7 @@ Two to three `FloatingActionButton`s (FABs) must be persistently displayed at th
   * By default (`areHelpersVisible = false`), it displays the `ic_jump_shot` icon.
   * When help text is enabled (`areHelpersVisible = true`), it displays the text "Cue Ball\nToggle".
 
-### 3. Toggle Table FAB
+### 4. Toggle Table FAB
 
 * **Placement**: Positioned horizontally between the `ToggleCueBallFab` and the `ResetFab`.
 * **Action**: Triggers the `MainScreenEvent.ToggleTable` event.
