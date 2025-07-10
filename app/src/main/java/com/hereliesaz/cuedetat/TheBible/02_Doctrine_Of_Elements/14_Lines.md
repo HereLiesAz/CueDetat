@@ -1,4 +1,4 @@
-# 18: The Lines
+# The Lines
 
 * **Aiming Line:** Drawn from the Ghost Cue Ball's center through the Target Ball's center, extending to infinity.
 * **Shot Line:** Drawn from the Actual Cue Ball's center (or a default anchor if hidden) through the Ghost Cue Ball's center, extending to infinity.
@@ -18,12 +18,12 @@
   * **Label**: "Shot Line", placed along the line.
 
 * **Tangent Lines** (Protractor Mode)
-  * **Path**: Two rays originating from the `GhostCueBall`'s center, drawn perpendicular to the Aiming Line and extending to the edge of the view.
+  * **Path**: Two rays originating from the `GhostCueBall` center, drawn perpendicular to the Aiming Line and extending to the edge of the view.
   * **Style**: The line indicating the cue ball's deflection path is solid; the other is dotted. The solid side is determined by the quadrant the `ShotGuideLine` occupies relative to the `AimingLine`.
   * **Label**: "Tangent Line", placed along both lines.
 
 * **Fixed Angle Guides** (Protractor Mode)
-  * **Path**: Lines radiating from the `TargetBall`'s center.
+  * **Path**: Lines radiating from the `TargetBall`'s center, drawn in screen-space so they are not affected by perspective.
   * **Style**: Subtle, thin lines.
   * **Angles**: Must be drawn at 14°, 30°, 43°, and 48°.
   * **Label**: The degree value (e.g., "30°"), placed at the end of each respective line.

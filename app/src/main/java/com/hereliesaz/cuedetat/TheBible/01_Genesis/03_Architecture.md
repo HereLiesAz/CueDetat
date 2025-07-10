@@ -1,4 +1,4 @@
-# 02: Architectural Model & File Structure
+# Architectural Model & File Structure
 
 The architecture strictly separates data, domain logic, and UI presentation following an MVI pattern.
 
@@ -14,53 +14,23 @@ app/src/main/java/com/hereliesaz/cuedetat/
 │   ├── theme/
 │   ├── MainScreen.kt
 │   ├── MainScreenEvent.kt
-│   └── MainViewModel.kt
+│   ├── MainViewModel.kt
+│   └── Modifiers.kt
 ├── view/
 │   ├── config/
 │   │   ├── base/
-│   │   │   └── VisualProperties.kt
 │   │   ├── ball/
-│   │   │   ├── ActualCueBall.kt
-│   │   │   ├── BankingBall.kt
-│   │   │   ├── GhostCueBall.kt
-│   │   │   └── TargetBall.kt
 │   │   ├── line/
-│   │   │   ├── AimingLine.kt
-│   │   │   ├── BankLine1.kt
-│   │   │   ├── BankLine2.kt
-│   │   │   ├── BankLine3.kt
-│   │   │   ├── BankLine4.kt
-│   │   │   ├── ShotGuideLine.kt
-│   │   │   └── TangentLine.kt
-│   │   ├── table/
-│   │   │   ├── Diamonds.kt
-│   │   │   ├── Holes.kt
-│   │   │   ├── Rail.kt
-│   │   │   └── Table.kt
-│   │   └── ui/
-│   │       └── ProtractorGuides.kt
+│   │   └── table/
+│   ├── gestures/
+│   │   └── GestureHandler.kt
 │   ├── model/
-│   │   ├── LogicalCircular.kt
-│   │   ├── Perspective.kt
-│   │   ├── PlacedBallModel.kt
-│   │   └── ProtractorUnitModel.kt
 │   ├── renderer/
 │   │   ├── ball/
-│   │   │   └── BallRenderer.kt
 │   │   ├── line/
-│   │   │   └── LineRenderer.kt
 │   │   ├── table/
-│   │   │   ├── RailRenderer.kt
-│   │   │   └── TableRenderer.kt
-│   │   ├── text/
-│   │   │   ├── BallTextRenderer.kt
-│   │   │   └── LineTextRenderer.kt
-│   │   ├── util/
-│   │   │   └── DrawingUtils.kt
-│   │   └── OverlayRenderer.kt
+│   │   └── text/
 │   ├── state/
-│   │   ├── OverlayState.kt
-│   │   └── ScreenState.kt
 │   ├── PaintCache.kt
 │   └── ProtractorOverlay.kt
 ├── MainActivity.kt

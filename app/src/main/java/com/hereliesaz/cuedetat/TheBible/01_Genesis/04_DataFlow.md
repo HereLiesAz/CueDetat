@@ -1,4 +1,4 @@
-# 03: Rendering Pipeline
+# Rendering Pipeline
 
 1.  **Event (UI -> ViewModel):** A user interaction occurs in a Composable. An `MainScreenEvent` is sent to the `MainViewModel`.
 
@@ -11,7 +11,7 @@
 4.  **Derivation (ViewModel -> UpdateStateUseCase):** The ViewModel takes the new state from the reducer and passes it to the `UpdateStateUseCase`. This use case calculates all derived data:
     * Calculates the `pitchMatrix` and its inverse based on orientation and zoom.
     * Calculates the position of the `ghostCueBall`.
-    * Determines the `isImpossibleShot` flag.
+    * Determines the `isImpossibleShot` flag and `tangentDirection`.
     * It returns a fully updated `OverlayState`.
 
 5.  **State Update (ViewModel -> UI):** The ViewModel updates its `_overlayState` Flow with the new, final state.
@@ -32,7 +32,7 @@ To avoid rendering artifacts and maintain sanity, the following order of operati
     * **Pass 1: Pitched Table Surface & On-Plane Elements:**
         * `canvas.save()`
         * `canvas.concat(pitchMatrix)`: The 3D perspective is applied to the entire canvas *once*. All subsequent drawing operations until `canvas.restore()` will be in the transformed (pitched) space.
-        * Draw all elements that exist *on* the 3D world plane (the `TableModel` and all lines and their labels) onto this single transformed canvas at their logical `(x, y)` coordinates.
+        * Draw all elements that exist *on* the 3D world plane (the `TableModel`, all lines and their labels, and the on-plane "shadows" of the ghosted balls) onto this single transformed canvas at their logical `(x, y)` coordinates.
         * `canvas.restore()`
     * **Pass 2: Lifted Rails (Banking Mode Only):**
         * `canvas.save()`
@@ -42,3 +42,5 @@ To avoid rendering artifacts and maintain sanity, the following order of operati
     * **Pass 3: Screen-Space "Ghost" Effects (Protractor Mode Only):**
         * These elements do not exist on the logical 3D plane. Their positions are calculated by projecting their logical counterparts' centers to the screen, and then applying a "lift" offset.
         * Draw the "ghost" versions of the `TargetBall`, `GhostCueBall`, and `ActualCueBall` directly onto the screen canvas, without the `pitchMatrix`.
+    * **Pass 4: Screen-Space Protractor Guides:**
+        * The radiating protractor lines are drawn last in pure screen-space so they are not affected by perspective.

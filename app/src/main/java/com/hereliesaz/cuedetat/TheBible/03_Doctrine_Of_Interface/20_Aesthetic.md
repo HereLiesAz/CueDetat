@@ -1,26 +1,22 @@
-# 07: Aesthetic Mandates
+# Aesthetic Mandates
 
 This document details the required visual style of the application.
 ## Core Style
 * **Visuals:** The default aesthetic is monochromatic, with a minimalistic but emotionally charged composition.
 * **Theme:** Dark mode is the default state.
+* **Menu Text:** All text within the navigation menu must use the primary theme color (`MaterialTheme.colorScheme.primary`) to maintain brand consistency.
 ## Theme Toggle Implementation
 * A text-only menu option must exist to toggle the color scheme.
 * When the app is in its default dark mode, the button text must read "Walk toward the Light".
 * When in light mode, the button text must read "Embrace the darkness".
 * This button must dispatch the `ToggleForceTheme` event. The `StateReducer` will invert the `isForceLightMode` boolean in the state.
-* `PaintCache.kt` must use this flag to correctly select between light and dark color palettes for all rendered elements. This default is now overruled by the specific `AppearanceDecree` for each element, as defined in the holy scriptures.
-
-## Stroke and Line Width
-* The `strokeWidth` for all rendered balls and lines in `PaintCache.kt` should be increased for better visibility and a more substantial feel.
-* A starting value of `3f` should be implemented.
-
+* `PaintCache.kt` must use this flag to correctly select between light and dark color palettes for all rendered elements.
 ## Glow Effect
 * A "glow" effect must be applied to key stroked elements for emphasis.
-* This is achieved in `PaintCache` by creating a secondary set of `Paint` objects.
-* These "glow" paints should have a significantly thicker `strokeWidth` (e.g., `10f`) and a `BlurMaskFilter`.
-* The `OverlayRenderer` must draw the glow paint object *before* drawing the primary paint object to create a halo effect.
-* A contrasting glow should be implemented: a dark glow for light primary strokes, and a light glow for dark primary strokes.
+* This is achieved in `PaintCache` by creating two distinct sets of `Paint` objects for glows.
+* **Line Glows:** To give lines a volumetric feel, their glow paint uses `Paint.Style.FILL_AND_STROKE`.
+* **Ball Glows:** To give balls a simple aura, their glow paint uses `Paint.Style.STROKE`.
+* These glow paints use a `BlurMaskFilter` and should be drawn *before* the primary paint object to create a halo effect.
 ## Opacity
 * The menu background must be set to 80% opacity (`0.8f`).
 * All popup dialog windows must have their backgrounds set to 66% opacity (`0.66f`).

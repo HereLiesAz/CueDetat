@@ -1,4 +1,4 @@
-# 21: Warnings
+# Warnings
 
 * The `WarningManager` class is responsible for managing the display logic of warning messages.
 * Warnings (e.g., "Impossible Shot") are displayed as large, semi-transparent kinetic text at random locations on the screen.

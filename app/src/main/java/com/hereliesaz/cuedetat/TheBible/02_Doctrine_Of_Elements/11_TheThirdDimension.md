@@ -1,4 +1,4 @@
-# 06: The Third Dimension - Perspective
+# The Third Dimension - Perspective
 
 ## Perspective Transformation
 
@@ -30,6 +30,4 @@ The rendering pipeline intentionally separates 3D and 2D transformations. The `p
 
 * **The Overhead Anomaly**: The initial "lift" logic for 3D ghost effects created a visual disconnect when viewed from directly overhead (0° pitch), making the ghost and base appear as two separate, non-concentric circles. The lift calculation was corrected to be proportional to the sine of the pitch angle (`lift = radius * sin(pitch)`). This ensures the lift is 0 at 0° pitch (perfect alignment) and increases smoothly as the phone tilts, preserving the 3D illusion.
 
-* **Banking Ball Visual Sizing**: To ensure the Banking Ball's visual size remains stable during phone tilt and table rotation, its on-screen radius must be calculated dynamically. This is achieved by projecting its logical horizontal diameter onto the screen plane using the current `pitchMatrix` and then halving the resulting screen-space distance. This method directly measures how the ball's logical diameter appears on screen under the full current perspective, ensuring visual consistency. This logic now resides in the `BankingBallRenderer`.
-
-* **3D "Ghost" Effect**: The "lifted" effect for the `TargetBall` and `GhostCueBall` in Protractor Mode must be a pure screen-space effect. A new renderer, `GhostEffectRenderer`, is responsible for this. It takes a logical ball model, projects its center to the screen, calculates the screen-space lift and radius, and draws both the "shadow" on the plane and the "lifted" ball above it. This separates the logical drawing from the screen-space visual effect.
+* **3D "Ghost" Effect**: The "lifted" effect for the `TargetBall`, `GhostCueBall`, and `ActualCueBall` in Protractor Mode must be a pure screen-space effect. This effect is achieved by the `BallRenderer`'s `drawLiftedBall` method, which projects the ball's logical center to the screen, calculates a screen-space lift and radius based on perspective, and then draws the "lifted" circle directly on the screen canvas.

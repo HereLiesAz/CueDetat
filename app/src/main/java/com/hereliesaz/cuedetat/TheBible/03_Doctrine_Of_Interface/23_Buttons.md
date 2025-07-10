@@ -1,4 +1,4 @@
-# 12: Buttons
+# Buttons
 
 * **Shape:** All buttons, including `FloatingActionButton` and standard `Button`s in dialogs and menus, must be circular (`CircleShape`).
 * **Persistent Cue Ball Toggle:** A circular `FloatingActionButton` must be present in the lower-left of the screen to toggle the visibility of the Actual Cue Ball. Its default state is to show an icon, not text.
@@ -11,7 +11,9 @@ Two `FloatingActionButton`s (FABs) must be persistently displayed at the bottom 
 ### 1. Reset FAB
 
 * **Placement**: Aligned to the bottom-right of the screen (`Alignment.BottomEnd`).
-* **Action**: Triggers the `MainScreenEvent.Reset` event.
+* **Action**: Triggers the `MainScreenEvent.Reset` event. This now functions as a two-state toggle.
+  * **First Press:** Saves the current positions and rotations of all elements and resets them to their default state. UI visibility toggles (like `showTable`) are preserved.
+  * **Second Press:** Reverts all positions and rotations to their saved state from before the first press.
 * **Dynamic Appearance**: The button's color must provide visual feedback on its relevance.
   * When `uiState.valuesChangedSinceReset` is `false`, its `containerColor` must be `MaterialTheme.colorScheme.surfaceVariant` (a neutral, inactive state).
   * When `uiState.valuesChangedSinceReset` is `true`, its `containerColor` must change to `MaterialTheme.colorScheme.secondaryContainer` to indicate that there are changes to reset.
@@ -22,10 +24,10 @@ Two `FloatingActionButton`s (FABs) must be persistently displayed at the bottom 
 ### 2. Toggle Cue Ball FAB
 
 * **Placement**: Aligned to the bottom-left of the screen (`Alignment.BottomStart`).
-* **Action**: Triggers the `MainScreenEvent.ToggleCueBall` event. This button is only active and visible when not in Banking Mode.
+* **Action**: Triggers the `MainScreenEvent.ToggleOnPlaneBall` event. This button is only active and visible when not in Banking Mode.
 * **Dynamic Appearance**: The button's color must provide visual feedback on the toggle's state.
-  * When `uiState.screenState.showActualCueBall` is `false`, its `containerColor` must be `MaterialTheme.colorScheme.surfaceVariant` (inactive state).
-  * When `uiState.screenState.showActualCueBall` is `true`, its `containerColor` must change to `MaterialTheme.colorScheme.secondaryContainer` (active state).
+  * When `uiState.onPlaneBall` is `null`, its `containerColor` must be `MaterialTheme.colorScheme.surfaceVariant` (inactive state).
+  * When `uiState.onPlaneBall` is not `null`, its `containerColor` must change to `MaterialTheme.colorScheme.secondaryContainer` (active state).
 * **Content (Icon vs. Text)**:
   * By default (`areHelpersVisible = false`), it displays the `ic_jump_shot` icon.
   * When help text is enabled (`areHelpersVisible = true`), it displays the text "Cue Ball\nToggle".
