@@ -28,6 +28,7 @@ class PaintCache {
     val warningPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
     val angleGuidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.5f }
     val pocketFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = Color.Black.toArgb() }
+    val gridLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.5f; pathEffect = DashPathEffect(floatArrayOf(15f, 15f), 0f) }
 
 
     // --- Bank Line Paints ---
@@ -73,6 +74,7 @@ class PaintCache {
         textPaint.color = baseScheme.onSurface.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         warningPaint.color = baseScheme.error.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         angleGuidePaint.color = baseScheme.tertiary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.4f).toArgb()
+        gridLinePaint.color = baseScheme.tertiary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.3f).toArgb()
     }
 
     private fun Color.adjustLuminance(factor: Float): Color {

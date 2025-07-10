@@ -39,18 +39,22 @@ class LineRenderer {
     ) {
         val targetCenter = state.protractorUnit.center
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
+        val shotLineAnchor = DrawingUtils.mapPoint(state.shotLineAnchor, state.inversePitchMatrix)
+
 
         val shotLinePaint = if (state.isImpossibleShot || state.isTiltBeyondLimit) paints.warningPaint else paints.shotLinePaint
         val shotLineGlow = if (state.isImpossibleShot || state.isTiltBeyondLimit) paints.lineGlowPaint.apply { color = paints.warningPaint.color } else paints.lineGlowPaint
+        val aimingLinePaint = if (state.aimedPocketIndex != null) Paint(paints.shotLinePaint).apply { color = android.graphics.Color.WHITE } else paints.targetCirclePaint
+        val aimingLineGlow = if (state.aimedPocketIndex != null) Paint(paints.lineGlowPaint).apply { color = android.graphics.Color.WHITE; alpha = 150 } else paints.lineGlowPaint
 
         // --- Draw Glows First ---
-        drawExtendedLine(canvas, ghostCueCenter, targetCenter, paints.lineGlowPaint) // Aiming Line Glow
-        drawExtendedLine(canvas, state.shotLineAnchor, ghostCueCenter, shotLineGlow) // Shot Line Glow (conditional color)
+        drawExtendedLine(canvas, ghostCueCenter, state.aimingLineEndPoint ?: targetCenter, aimingLineGlow)
+        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLineGlow)
         drawTangentLines(canvas, ghostCueCenter, targetCenter, paints.lineGlowPaint, paints.lineGlowPaint, state.tangentDirection) // Tangent Glows
 
         // --- Draw Lines Second ---
-        drawExtendedLine(canvas, ghostCueCenter, targetCenter, paints.targetCirclePaint) // Aiming Line
-        drawExtendedLine(canvas, state.shotLineAnchor, ghostCueCenter, shotLinePaint) // Shot Line
+        drawExtendedLine(canvas, ghostCueCenter, state.aimingLineEndPoint ?: targetCenter, aimingLinePaint)
+        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLinePaint) // Shot Line
         drawTangentLines(canvas, ghostCueCenter, targetCenter, paints.tangentLineSolidPaint, paints.tangentLineDottedPaint, state.tangentDirection) // Tangent Lines
 
         if (state.areHelpersVisible) {

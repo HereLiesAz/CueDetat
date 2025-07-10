@@ -96,6 +96,11 @@ data class OverlayState(
     val isTiltBeyondLimit: Boolean = false,
     val warningText: String? = null,
 
+    // Pocket aiming state
+    val aimedPocketIndex: Int? = null,
+    val aimingLineEndPoint: PointF? = null,
+
+
     // Theming
     val appControlColorScheme: ColorScheme = darkColorScheme(),
 

@@ -21,12 +21,16 @@ class StateReducer @Inject constructor(
         return when (event) {
             is MainScreenEvent.LogicalGestureStarted,
             is MainScreenEvent.LogicalDragApplied,
-            is MainScreenEvent.GestureEnded ->
+            is MainScreenEvent.GestureEnded,
+            is MainScreenEvent.AimBankShot ->
                 gestureReducer.reduce(currentState, event)
 
             is MainScreenEvent.ToggleOnPlaneBall,
             is MainScreenEvent.ToggleBankingMode,
             is MainScreenEvent.ToggleTable,
+            is MainScreenEvent.CycleTableSize,
+            is MainScreenEvent.SetTableSize,
+            is MainScreenEvent.ToggleTableSizeDialog,
             is MainScreenEvent.ToggleForceTheme,
             is MainScreenEvent.ToggleDistanceUnit,
             is MainScreenEvent.ToggleLuminanceDialog,

@@ -7,7 +7,9 @@ import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.sin
 
 private const val GESTURE_TAG = "GestureDebug"
 
@@ -35,7 +37,7 @@ class GestureReducer @Inject constructor() {
 
         if (currentState.isBankingMode) {
             currentState.onPlaneBall?.let {
-                val touchSlop = max(30f, it.radius * 0.5f)
+                val touchSlop = it.radius * 1.5f // Increased slop for easier grabbing
                 if (distance(touchPoint, it.center) < it.radius + touchSlop) {
                     newMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
                 }
@@ -45,13 +47,13 @@ class GestureReducer @Inject constructor() {
             }
         } else {
             currentState.onPlaneBall?.let {
-                val touchSlop = max(30f, it.radius * 0.5f)
+                val touchSlop = it.radius * 1.5f // Increased slop
                 if (distance(touchPoint, it.center) < it.radius + touchSlop) {
                     newMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
                 }
             }
             if (newMode == InteractionMode.NONE) {
-                val touchSlop = max(30f, currentState.protractorUnit.radius * 0.5f)
+                val touchSlop = currentState.protractorUnit.radius * 1.5f // Increased slop
                 if (distance(touchPoint, currentState.protractorUnit.center) < currentState.protractorUnit.radius + touchSlop) {
                     newMode = InteractionMode.MOVING_PROTRACTOR_UNIT
                 }
@@ -71,9 +73,20 @@ class GestureReducer @Inject constructor() {
 
         return when (currentState.interactionMode) {
             InteractionMode.ROTATING_PROTRACTOR -> {
-                val rotationDelta = (screenDelta.x - screenDelta.y) * 0.2f
-                Log.d(GESTURE_TAG, "REDUCER: ROTATING. screenDelta.x=${screenDelta.x}, screenDelta.y=${screenDelta.y}, rotationDelta=$rotationDelta")
+                val angleRad = Math.toRadians(-currentState.tableRotationDegrees.toDouble())
+                val cosAngle = cos(angleRad).toFloat()
+                val sinAngle = sin(angleRad).toFloat()
+
+                val screenDx = screenDelta.x
+                val screenDy = screenDelta.y
+
+                // Un-rotate the screen delta to align with the logical plane
+                val unrotatedDx = screenDx * cosAngle - screenDy * sinAngle
+                val unrotatedDy = screenDx * sinAngle + screenDy * cosAngle
+
+                val rotationDelta = (unrotatedDx - unrotatedDy) * 0.2f
                 val newRotation = currentState.protractorUnit.rotationDegrees - rotationDelta
+
                 currentState.copy(protractorUnit = currentState.protractorUnit.copy(rotationDegrees = newRotation), valuesChangedSinceReset = true)
             }
             InteractionMode.MOVING_PROTRACTOR_UNIT -> {

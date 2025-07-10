@@ -17,7 +17,7 @@ class ToggleReducer @Inject constructor() {
         return when (event) {
             is MainScreenEvent.ToggleOnPlaneBall -> handleToggleOnPlaneBall(currentState)
             is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(currentState)
-            is MainScreenEvent.ToggleTable -> currentState.copy(showTable = !currentState.showTable, valuesChangedSinceReset = true)
+            is MainScreenEvent.ToggleTable -> handleToggleTable(currentState)
             is MainScreenEvent.CycleTableSize -> currentState.copy(tableSize = currentState.tableSize.next(), valuesChangedSinceReset = true)
             is MainScreenEvent.SetTableSize -> currentState.copy(tableSize = event.size, valuesChangedSinceReset = true)
             is MainScreenEvent.ToggleTableSizeDialog -> currentState.copy(showTableSizeDialog = !currentState.showTableSizeDialog)
@@ -36,18 +36,40 @@ class ToggleReducer @Inject constructor() {
         }
     }
 
+    private fun handleToggleTable(currentState: OverlayState): OverlayState {
+        val newShowTable = !currentState.showTable
+        var newState = currentState.copy(showTable = newShowTable, valuesChangedSinceReset = true)
+
+        // If table is now shown in protractor mode and cue ball isn't there, add it.
+        if (newShowTable && !newState.isBankingMode && newState.onPlaneBall == null) {
+            newState = handleToggleOnPlaneBall(newState)
+        }
+        return newState
+    }
+
     private fun handleToggleOnPlaneBall(currentState: OverlayState): OverlayState {
         val viewCenterX = currentState.viewWidth / 2f
         val viewCenterY = currentState.viewHeight / 2f
-        val viewBottomY = currentState.viewHeight.toFloat()
 
         if (currentState.isBankingMode) return currentState
+
         return if (currentState.onPlaneBall == null) {
+            // Create the ball
             val newRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, currentState.zoomSliderPosition)
-            // Position halfway between screen center and screen bottom
-            val initialCenter = PointF(viewCenterX, (viewCenterY + viewBottomY) / 2f)
-            currentState.copy(onPlaneBall = OnPlaneBall(center = initialCenter, radius = newRadius), valuesChangedSinceReset = true)
+            val newCenter = if (currentState.showTable) {
+                // Place on table's head spot (center X, 1/4 from the top rail)
+                val tableToBallRatioLong = currentState.tableSize.getTableToBallRatioLong()
+                val tablePlayingSurfaceHeight = (tableToBallRatioLong / currentState.tableSize.aspectRatio) * newRadius
+                val tableTopY = viewCenterY - tablePlayingSurfaceHeight / 2f
+                PointF(viewCenterX, tableTopY + tablePlayingSurfaceHeight / 4f)
+            } else {
+                // Default position when no table is visible
+                val viewBottomY = currentState.viewHeight.toFloat()
+                PointF(viewCenterX, (viewCenterY + viewBottomY) / 2f)
+            }
+            currentState.copy(onPlaneBall = OnPlaneBall(center = newCenter, radius = newRadius), valuesChangedSinceReset = true)
         } else {
+            // Remove the ball
             currentState.copy(onPlaneBall = null, valuesChangedSinceReset = true)
         }
     }

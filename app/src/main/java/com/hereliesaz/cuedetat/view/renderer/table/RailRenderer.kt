@@ -55,12 +55,25 @@ class RailRenderer {
 
         // Draw Diamonds
         val diamondRadius = referenceRadius * diamondSizeFactor
+        val halfWidth = tablePlayingSurfaceWidth / 2f
+        val halfHeight = tablePlayingSurfaceHeight / 2f
+
+        // Long rails (3 diamonds between corner and side pockets)
         for (i in 1..3) {
-            val xPos = innerLeft + (tablePlayingSurfaceWidth * (i / 4.0f))
-            canvas.drawCircle(xPos, railTopCenterY, diamondRadius, diamondPaint)
-            canvas.drawCircle(xPos, railBottomCenterY, diamondRadius, diamondPaint)
+            val xOffset = halfWidth * (i / 4.0f)
+            canvas.drawCircle(tableCenterX - xOffset, railTopCenterY, diamondRadius, diamondPaint) // Top-left section
+            canvas.drawCircle(tableCenterX + xOffset, railTopCenterY, diamondRadius, diamondPaint) // Top-right section
+            canvas.drawCircle(tableCenterX - xOffset, railBottomCenterY, diamondRadius, diamondPaint) // Bottom-left section
+            canvas.drawCircle(tableCenterX + xOffset, railBottomCenterY, diamondRadius, diamondPaint) // Bottom-right section
         }
-        canvas.drawCircle(railLeftCenterX, tableCenterY, diamondRadius, diamondPaint)
-        canvas.drawCircle(railRightCenterX, tableCenterY, diamondRadius, diamondPaint)
+
+        // Short rails (3 diamonds between corner pockets)
+        for (i in 1..3) {
+            val yOffset = halfHeight * (i / 4.0f)
+            canvas.drawCircle(railLeftCenterX, tableCenterY - yOffset, diamondRadius, diamondPaint) // Left rail
+            canvas.drawCircle(railRightCenterX, tableCenterY - yOffset, diamondRadius, diamondPaint) // Right rail
+            canvas.drawCircle(railLeftCenterX, tableCenterY + yOffset, diamondRadius, diamondPaint) // Left rail
+            canvas.drawCircle(railRightCenterX, tableCenterY + yOffset, diamondRadius, diamondPaint) // Right rail
+        }
     }
 }

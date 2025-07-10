@@ -60,6 +60,7 @@ class SystemReducer @Inject constructor() {
         val initialSliderPos = 0f // Centered
         val initialLogicalRadius = ReducerUtils.getCurrentLogicalRadius(viewWidth, viewHeight, initialSliderPos)
         val initialProtractorCenter = PointF(viewWidth / 2f, viewHeight / 2f)
+        val initialTableRotation = if (viewWidth > viewHeight) 0f else 90f // Landscape vs Portrait
 
         return OverlayState(
             viewWidth = viewWidth,
@@ -73,7 +74,7 @@ class SystemReducer @Inject constructor() {
             zoomSliderPosition = initialSliderPos,
             isBankingMode = false,
             showTable = false,
-            tableRotationDegrees = 0f,
+            tableRotationDegrees = initialTableRotation,
             bankingAimTarget = null,
             valuesChangedSinceReset = false,
             areHelpersVisible = false,
