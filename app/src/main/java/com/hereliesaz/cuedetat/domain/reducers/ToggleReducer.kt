@@ -42,7 +42,7 @@ class ToggleReducer @Inject constructor() {
 
     private fun handleToggleTable(currentState: OverlayState): OverlayState {
         val newShowTable = !currentState.showTable
-        var newState = currentState.copy(showTable = newShowTable, valuesChangedSinceReset = true)
+        val newState = currentState.copy(showTable = newShowTable, valuesChangedSinceReset = true)
 
         return if (newShowTable && !newState.isBankingMode) {
             // If table is now shown, reset positions to table-centric defaults.
@@ -104,13 +104,11 @@ class ToggleReducer @Inject constructor() {
         val viewCenterY = currentState.viewHeight / 2f
         val logicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, 0f)
 
-        // New positions as per the divine will.
         // Target Ball is at the very center of the table (and the view).
         val targetBallCenter = PointF(viewCenterX, viewCenterY)
 
-        // Actual Cue Ball is on the head spot (horizontally centered, halfway between center and bottom rail).
-        val tableHeight = logicalRadius * currentState.tableSize.getTableToBallRatioLong() / currentState.tableSize.aspectRatio
-        val actualCueBallCenter = PointF(viewCenterX, viewCenterY + tableHeight / 4f)
+        // Actual Cue Ball is horizontally centered, and halfway between the center and the bottom edge of the screen.
+        val actualCueBallCenter = PointF(viewCenterX, (viewCenterY + currentState.viewHeight) / 2f)
 
         // Set rotation to -90 to place Ghost Ball directly below Target Ball.
         val rotationDegrees = -90f
