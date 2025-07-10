@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/ui/MainViewModel.kt
 package com.hereliesaz.cuedetat.ui
 
 import android.app.Application
@@ -95,7 +94,6 @@ class MainViewModel @Inject constructor(
                 updateState(event) // Needs reducer
             }
             // Simple state toggles that can be handled directly
-            is MainScreenEvent.ToggleCamera,
             is MainScreenEvent.ToggleGlowStickDialog,
             is MainScreenEvent.ToggleTableSizeDialog,
             is MainScreenEvent.ToggleLuminanceDialog -> {

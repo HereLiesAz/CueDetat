@@ -74,3 +74,21 @@ fun ToggleCueBallFab(
         }
     }
 }
+
+@Composable
+fun ToggleTableFab(
+    onEvent: (MainScreenEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FloatingActionButton(
+        onClick = { onEvent(MainScreenEvent.ToggleTable) },
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Icon(
+            painter = painterResource(id = R.drawable.pool_table),
+            contentDescription = "Toggle Table",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}

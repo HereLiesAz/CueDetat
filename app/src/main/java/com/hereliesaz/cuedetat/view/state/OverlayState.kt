@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/view/state/OverlayState.kt
 package com.hereliesaz.cuedetat.view.state
 
 import android.graphics.Matrix
@@ -104,7 +103,6 @@ data class OverlayState(
 
     // Ghost mode banking state
     val aimingLineBankPath: List<PointF> = emptyList(),
-    val shotGuideBankImpactPoint: PointF? = null,
 
 
     // Pocket aiming state

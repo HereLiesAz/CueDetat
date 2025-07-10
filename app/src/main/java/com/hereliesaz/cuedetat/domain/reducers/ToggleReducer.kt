@@ -44,14 +44,33 @@ class ToggleReducer @Inject constructor() {
         val newShowTable = !currentState.showTable
         var newState = currentState.copy(showTable = newShowTable, valuesChangedSinceReset = true)
 
-        // If table is now shown in protractor mode, perform a full reset of positions.
-        if (newShowTable && !newState.isBankingMode) {
-            newState = resetForTable(newState)
+        return if (newShowTable && !newState.isBankingMode) {
+            // If table is now shown, reset positions to table-centric defaults.
+            resetForTable(newState)
         } else if (!newShowTable && !newState.isBankingMode) {
-            // If table is hidden, remove the ball as well.
-            newState = newState.copy(onPlaneBall = null)
+            // If table is hidden, revert to original screen-centric defaults.
+            revertToOriginalDefaults(newState)
+        } else {
+            // This case handles banking mode, which is unaffected by this specific toggle logic.
+            newState
         }
-        return newState
+    }
+
+    private fun revertToOriginalDefaults(currentState: OverlayState): OverlayState {
+        val viewCenterX = currentState.viewWidth / 2f
+        val viewCenterY = currentState.viewHeight / 2f
+        val logicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, 0f)
+
+        val targetBallCenter = PointF(viewCenterX, viewCenterY)
+        val actualCueBallCenter = PointF(viewCenterX, viewCenterY + (currentState.viewHeight / 4f))
+
+        return currentState.copy(
+            protractorUnit = ProtractorUnit(center = targetBallCenter, radius = logicalRadius, rotationDegrees = -90f),
+            onPlaneBall = if (currentState.onPlaneBall != null) OnPlaneBall(center = actualCueBallCenter, radius = logicalRadius) else null,
+            tableRotationDegrees = 0f,
+            zoomSliderPosition = 0f,
+            valuesChangedSinceReset = true
+        )
     }
 
     private fun handleToggleOnPlaneBall(currentState: OverlayState): OverlayState {
@@ -85,14 +104,16 @@ class ToggleReducer @Inject constructor() {
         val viewCenterY = currentState.viewHeight / 2f
         val logicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, 0f)
 
-        // New positions: All balls on the vertical center line.
-        val actualCueBallCenter = PointF(viewCenterX, viewCenterY + logicalRadius * 4)
-        val targetBallCenter = PointF(viewCenterX, viewCenterY - logicalRadius * 4)
+        // New positions as per the divine will.
+        // Target Ball is at the very center of the table (and the view).
+        val targetBallCenter = PointF(viewCenterX, viewCenterY)
 
-        // Calculate rotation to make the aiming line vertical.
-        // Since x is the same, atan2 will return -PI/2 (-90 degrees).
-        val angleRad = atan2((targetBallCenter.y - actualCueBallCenter.y).toDouble(), (targetBallCenter.x - actualCueBallCenter.x).toDouble()).toFloat()
-        val rotationDegrees = Math.toDegrees(angleRad.toDouble()).toFloat() - 90f // This will result in -180 degrees, which is correct.
+        // Actual Cue Ball is on the head spot (horizontally centered, halfway between center and bottom rail).
+        val tableHeight = logicalRadius * currentState.tableSize.getTableToBallRatioLong() / currentState.tableSize.aspectRatio
+        val actualCueBallCenter = PointF(viewCenterX, viewCenterY + tableHeight / 4f)
+
+        // Set rotation to -90 to place Ghost Ball directly below Target Ball.
+        val rotationDegrees = -90f
 
         return currentState.copy(
             onPlaneBall = OnPlaneBall(center = actualCueBallCenter, radius = logicalRadius),

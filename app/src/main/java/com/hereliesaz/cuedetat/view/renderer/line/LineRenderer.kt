@@ -101,7 +101,8 @@ class LineRenderer {
         val aimingLineConfig = AimingLine()
         val shotGuideLineConfig = ShotGuideLine()
         val tangentLineConfig = TangentLine()
-        val bankLineConfig = BankLine1()
+        val bankLine1Config = BankLine1()
+        val bankLine2Config = BankLine2()
 
         // Configure paints based on configs and state
         val shotLinePaint = Paint(paints.shotLinePaint).apply {
@@ -112,8 +113,6 @@ class LineRenderer {
             color = shotLinePaint.color
             strokeWidth = shotGuideLineConfig.glowWidth
         }
-
-        // Aiming line color is NOT affected by pocketing in ghost mode, only its bank is.
         val aimingLinePaint = Paint(paints.targetCirclePaint).apply {
             color = aimingLineConfig.strokeColor.toArgb()
             strokeWidth = aimingLineConfig.strokeWidth
@@ -123,10 +122,6 @@ class LineRenderer {
             strokeWidth = aimingLineConfig.glowWidth
             alpha = (aimingLineConfig.glowColor.alpha * 255).toInt()
         }
-        val pocketedBankPaint = Paint(aimingLinePaint).apply { color = android.graphics.Color.WHITE }
-        val pocketedBankGlow = Paint(aimingLineGlow).apply { color = android.graphics.Color.WHITE }
-
-
         val tangentSolidPaint = Paint(paints.tangentLineSolidPaint).apply {
             color = tangentLineConfig.strokeColor.toArgb()
             strokeWidth = tangentLineConfig.strokeWidth
@@ -141,40 +136,69 @@ class LineRenderer {
             color = tangentLineConfig.glowColor.toArgb()
         }
 
-        val aimingLineEnd = state.aimingLineEndPoint ?: targetCenter
+        val bankMidPoint = if (state.aimingLineBankPath.size > 1) state.aimingLineBankPath[1] else null
+        val finalAimingLineEnd = bankMidPoint ?: state.aimingLineEndPoint ?: targetCenter
 
         // --- Draw Glows First ---
-        drawExtendedLine(canvas, ghostCueCenter, aimingLineEnd, aimingLineGlow)
+        if (bankMidPoint != null) {
+            canvas.drawLine(ghostCueCenter.x, ghostCueCenter.y, bankMidPoint.x, bankMidPoint.y, aimingLineGlow)
+        } else {
+            drawExtendedLine(canvas, ghostCueCenter, finalAimingLineEnd, aimingLineGlow)
+        }
         drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLineGlow)
         drawTangentLines(canvas, ghostCueCenter, targetCenter, tangentGlow, tangentGlow, state.tangentDirection)
 
         // --- Draw Lines Second ---
-        drawExtendedLine(canvas, ghostCueCenter, aimingLineEnd, aimingLinePaint)
+        if (bankMidPoint != null) {
+            canvas.drawLine(ghostCueCenter.x, ghostCueCenter.y, bankMidPoint.x, bankMidPoint.y, aimingLinePaint)
+        } else {
+            drawExtendedLine(canvas, ghostCueCenter, finalAimingLineEnd, aimingLinePaint)
+        }
         drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLinePaint)
         drawTangentLines(canvas, ghostCueCenter, targetCenter, tangentSolidPaint, tangentDottedPaint, state.tangentDirection)
 
-        // --- Draw Aiming Line Bank ---
-        if (state.aimingLineBankPath.size > 1) {
-            val bankStart = state.aimingLineBankPath[0]
-            val bankMid = state.aimingLineBankPath[1]
-            canvas.drawLine(bankStart.x, bankStart.y, bankMid.x, bankMid.y, aimingLinePaint)
-            if (state.aimingLineBankPath.size > 2) {
-                val bankEnd = state.aimingLineBankPath[2]
-                val bankPaint = if (state.aimedPocketIndex != null) pocketedBankPaint else aimingLinePaint
-                val bankGlow = if (state.aimedPocketIndex != null) pocketedBankGlow else aimingLineGlow
-                canvas.drawLine(bankMid.x, bankMid.y, bankEnd.x, bankEnd.y, bankGlow)
-                canvas.drawLine(bankMid.x, bankMid.y, bankEnd.x, bankEnd.y, bankPaint)
+        // --- Draw Aiming Line Bank Preview & Diamond Labels ---
+        if (state.showTable) {
+            // Draw Banked Path
+            if (state.aimingLineBankPath.size > 1) {
+                val bankStart = state.aimingLineBankPath[0]
+                val bankMid = state.aimingLineBankPath[1]
+
+                // The first segment of the bank path is just the aiming line to the rail, already drawn.
+                // Now draw the reflected part.
+                if (state.aimingLineBankPath.size > 2) {
+                    val bankEnd = state.aimingLineBankPath[2]
+                    val isPocketed = state.aimedPocketIndex != null
+
+                    val bank2Paint = Paint(paints.bankLine2Paint).apply { color = if (isPocketed) android.graphics.Color.WHITE else bankLine2Config.strokeColor.toArgb(); strokeWidth = bankLine2Config.strokeWidth }
+                    val bank2Glow = Paint(paints.lineGlowPaint).apply { color = bank2Paint.color; strokeWidth = bankLine2Config.glowWidth }
+
+                    canvas.drawLine(bankMid.x, bankMid.y, bankEnd.x, bankEnd.y, bank2Glow)
+                    canvas.drawLine(bankMid.x, bankMid.y, bankEnd.x, bankEnd.y, bank2Paint)
+                }
+            }
+
+            // Draw Diamond Labels if helpers are visible
+            if (state.areHelpersVisible) {
+                val textPaint = paints.textPaint.apply { this.typeface = typeface }
+                // For Aiming Line bank point
+                if (state.aimingLineBankPath.size > 1) {
+                    val bankPoint = state.aimingLineBankPath[1]
+                    getRailForPoint(bankPoint, state)?.let { railType ->
+                        textRenderer.drawDiamondLabel(canvas, bankPoint, railType, state, textPaint)
+                    }
+                }
+                // For Shot Guide Line impact point
+                state.shotGuideImpactPoint?.let { impactPoint ->
+                    getRailForPoint(impactPoint, state)?.let { railType ->
+                        textRenderer.drawDiamondLabel(canvas, impactPoint, railType, state, textPaint)
+                    }
+                }
             }
         }
 
         if (state.areHelpersVisible) {
             textRenderer.drawProtractorLabels(canvas, state, paints, typeface)
-            // Draw diamond label for shot guide impact point
-            state.shotGuideBankImpactPoint?.let { impactPoint ->
-                getRailForPoint(impactPoint, state)?.let { railType ->
-                    textRenderer.drawDiamondLabel(canvas, impactPoint, railType, state, paints.textPaint)
-                }
-            }
         }
     }
 

@@ -76,11 +76,14 @@ class BallRenderer {
             strokeWidth = config.glowWidth
         }
 
+        val dotPaint = Paint(paints.fillPaint).apply { color = android.graphics.Color.WHITE }
+        val dotRadius = ball.radius * 0.1f
 
         // --- Draw on-plane shadow first, using its pure logical radius ---
         canvas.save()
         canvas.concat(state.pitchMatrix)
         canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, strokePaint)
+        canvas.drawCircle(ball.center.x, ball.center.y, dotRadius, dotPaint) // Draw the holy dot
         canvas.restore()
 
         // --- Then draw the lifted ghost effect ---

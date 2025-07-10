@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt
 package com.hereliesaz.cuedetat.ui
 
 import android.widget.Toast
@@ -111,10 +110,17 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
 
                     Box(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
-                        TableRotationSlider(
-                            uiState = uiState,
-                            onEvent = viewModel::onEvent
-                        )
+                        if (uiState.showTable) {
+                            TableRotationSlider(
+                                uiState = uiState,
+                                onEvent = viewModel::onEvent
+                            )
+                        } else if (!uiState.isBankingMode) {
+                            ToggleTableFab(
+                                onEvent = viewModel::onEvent,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
                     }
 
                     ResetFab(

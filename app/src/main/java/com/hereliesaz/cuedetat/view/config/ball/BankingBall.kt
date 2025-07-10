@@ -14,7 +14,7 @@ data class BankingBall(
     override val strokeWidth: Float = 8f,
     override val strokeColor: Color = RustedEmber,
     override val additionalOffset: Float = 0f,
-    override val centerShape: CenterShape = CenterShape.NONE,
+    override val centerShape: CenterShape = CenterShape.DOT,
     override val centerSize: Float = 0.2f,
     override val centerColor: Color = Color.White,
     override val fillColor: Color = Color.Transparent,

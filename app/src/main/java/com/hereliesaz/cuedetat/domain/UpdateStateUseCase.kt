@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/domain/UpdateStateUseCase.kt
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.Camera
@@ -49,25 +48,35 @@ class UpdateStateUseCase @Inject constructor() {
             targetBall = state.protractorUnit.center
         )
         val targetBallDistance = calculateDistance(state, flatMatrix) // Use flat matrix for stable distance
-        val (aimedPocketIndex, aimingLineEndPoint) = if (!state.isBankingMode) {
+        var (aimedPocketIndex, aimingLineEndPoint) = if (!state.isBankingMode) {
             checkPocketAim(state)
         } else {
             Pair(null, null)
         }
-        val shotGuideImpactPoint = if (state.showTable) calculateShotGuideImpact(state) else null
+        val shotGuideImpactPoint = if (state.showTable && !state.isBankingMode) {
+            calculateShotGuideImpact(state, useShotGuideLine = true)
+        } else {
+            null
+        }
 
         // Calculate single bank for aiming line in ghost mode
-        val aimingLineBankPath = if (state.showTable && !state.isBankingMode) {
+        var aimingLineBankPath = if (state.showTable && !state.isBankingMode) {
             calculateSingleBank(state.protractorUnit.ghostCueBallCenter, state.protractorUnit.center, state)
         } else {
             emptyList()
         }
-        // Calculate impact point for shot guide line bank
-        val shotGuideBankImpactPoint = if (state.showTable && !state.isBankingMode) {
-            val impactPoint = calculateShotGuideImpact(state, useShotGuideLine = true)
-            impactPoint
-        } else {
-            null
+
+        // Check if the banked aiming line goes into a pocket
+        if(aimingLineBankPath.size > 2) {
+            val (bankedPocketIndex, intersectionPoint) = checkBankedPocketAim(
+                listOf(aimingLineBankPath[1], aimingLineBankPath[2]),
+                state
+            )
+            if (bankedPocketIndex != null && intersectionPoint != null) {
+                aimedPocketIndex = bankedPocketIndex
+                // Truncate the path to the intersection point
+                aimingLineBankPath = listOf(aimingLineBankPath[0], aimingLineBankPath[1], intersectionPoint)
+            }
         }
 
 
@@ -110,8 +119,7 @@ class UpdateStateUseCase @Inject constructor() {
             aimedPocketIndex = aimedPocketIndex,
             aimingLineEndPoint = aimingLineEndPoint,
             shotGuideImpactPoint = shotGuideImpactPoint,
-            aimingLineBankPath = aimingLineBankPath,
-            shotGuideBankImpactPoint = shotGuideBankImpactPoint
+            aimingLineBankPath = aimingLineBankPath
         )
     }
 
@@ -174,6 +182,42 @@ class UpdateStateUseCase @Inject constructor() {
             }
         }
         return Pair(null, null)
+    }
+
+    private fun checkBankedPocketAim(pathSegment: List<PointF>, state: OverlayState): Pair<Int?, PointF?> {
+        if (pathSegment.size < 2) return Pair(null, null)
+        val start = pathSegment[0]
+        val end = pathSegment[1]
+
+        val pockets = TableRenderer.getLogicalPockets(state)
+        val pocketRadius = state.protractorUnit.radius * 1.8f
+        var closestIntersection: PointF? = null
+        var closestPocketIndex: Int? = null
+        var minDistanceSq = Float.MAX_VALUE
+
+        pockets.forEachIndexed { index, pocketCenter ->
+            val intersection = getLineCircleIntersection(start, end, pocketCenter, pocketRadius)
+            if (intersection != null) {
+                // Check if intersection is on the segment
+                val dxSegment = end.x - start.x
+                val dySegment = end.y - start.y
+                val t = if (abs(dxSegment) > abs(dySegment)) {
+                    (intersection.x - start.x) / dxSegment
+                } else {
+                    if (abs(dySegment) > 0.001f) (intersection.y - start.y) / dySegment else 0f
+                }
+
+                if (t in 0.0f..1.0f) {
+                    val distSq = (intersection.x - start.x).pow(2) + (intersection.y - start.y).pow(2)
+                    if (distSq < minDistanceSq) {
+                        minDistanceSq = distSq
+                        closestIntersection = intersection
+                        closestPocketIndex = index
+                    }
+                }
+            }
+        }
+        return Pair(closestPocketIndex, closestIntersection)
     }
 
     private fun calculateShotGuideImpact(state: OverlayState, useShotGuideLine: Boolean = false): PointF? {
@@ -282,6 +326,7 @@ class UpdateStateUseCase @Inject constructor() {
         val dx = p2.x - p1.x
         val dy = p2.y - p1.y
         val a = dx * dx + dy * dy
+        if (a < 0.0001f) return null
         val b = 2 * (dx * (p1.x - circleCenter.x) + dy * (p1.y - circleCenter.y))
         val c = (p1.x - circleCenter.x).pow(2) + (p1.y - circleCenter.y).pow(2) - radius * radius
         val delta = b * b - 4 * a * c
