@@ -8,8 +8,6 @@ import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.cos
-import kotlin.math.sin
 
 @Singleton
 class ToggleReducer @Inject constructor() {
@@ -20,6 +18,7 @@ class ToggleReducer @Inject constructor() {
             is MainScreenEvent.ToggleOnPlaneBall -> handleToggleOnPlaneBall(currentState)
             is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(currentState)
             is MainScreenEvent.ToggleTable -> currentState.copy(showTable = !currentState.showTable, valuesChangedSinceReset = true)
+            is MainScreenEvent.CycleTableSize -> currentState.copy(tableSize = currentState.tableSize.next(), valuesChangedSinceReset = true)
             is MainScreenEvent.ToggleForceTheme -> {
                 val newMode = when (currentState.isForceLightMode) { null -> true; true -> false; false -> null }
                 currentState.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)
@@ -97,8 +96,8 @@ class ToggleReducer @Inject constructor() {
         val aimDistance = cueBallRadius * defaultBankingAimDistanceFactor
         val angleRad = Math.toRadians((tableRotationDegrees - 90.0))
         return PointF(
-            cueBall.center.x + (aimDistance * cos(angleRad)).toFloat(),
-            cueBall.center.y + (aimDistance * sin(angleRad)).toFloat()
+            cueBall.center.x + (aimDistance * kotlin.math.cos(angleRad)).toFloat(),
+            cueBall.center.y + (aimDistance * kotlin.math.sin(angleRad)).toFloat()
         )
     }
 }

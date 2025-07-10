@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -22,7 +23,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.cuedetat.R
-import com.hereliesaz.cuedetat.ui.theme.AccentGold
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
@@ -36,7 +36,7 @@ fun TopControls(
             .fillMaxWidth()
             .statusBarsPadding()
             .padding(start = 16.dp, end = 16.dp, top = 16.dp),
-        horizontalArrangement = Arrangement.Start,
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -49,7 +49,7 @@ fun TopControls(
                 Text(
                     text = stringResource(id = R.string.app_name),
                     style = MaterialTheme.typography.titleLarge.copy(fontSize = 28.sp),
-                    color = AccentGold,
+                    color = MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.Start
                 )
             } else {
@@ -59,6 +59,21 @@ fun TopControls(
                     modifier = Modifier
                         .size(64.dp)
                         .clip(CircleShape)
+                )
+            }
+        }
+
+        if(uiState.showTable || uiState.isBankingMode) {
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "Table Size",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+                Text(
+                    text = "${uiState.tableSize.feet}'",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
                 )
             }
         }

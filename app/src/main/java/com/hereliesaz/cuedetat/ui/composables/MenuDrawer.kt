@@ -82,6 +82,10 @@ fun MenuDrawerContent(
             text = tableToggleText,
             onClick = { onEvent(MainScreenEvent.ToggleTable); onCloseDrawer() }
         )
+        MenuItem(
+            text = "Table Size: ${uiState.tableSize.feet}'",
+            onClick = { onEvent(MainScreenEvent.CycleTableSize); onCloseDrawer() }
+        )
         MenuDivider()
 
         val systemIsCurrentlyDark = isSystemInDarkTheme()

@@ -51,7 +51,8 @@ class MainViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(
         OverlayState(
             appControlColorScheme = darkColorScheme(),
-            distanceUnit = userPreferencesRepository.getDistanceUnit() // Initialize from memory
+            distanceUnit = userPreferencesRepository.getDistanceUnit(),
+            tableSize = userPreferencesRepository.getTableSize()
         )
     )
     val uiState = _uiState.asStateFlow()
@@ -81,6 +82,11 @@ class MainViewModel @Inject constructor(
                 val newUnit = if (uiState.value.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC
                 userPreferencesRepository.setDistanceUnit(newUnit)
                 updateState(event) // Pass event to reducer
+            }
+            is MainScreenEvent.CycleTableSize -> {
+                val newSize = uiState.value.tableSize.next()
+                userPreferencesRepository.setTableSize(newSize)
+                updateState(event)
             }
             else -> {
                 updateState(event)

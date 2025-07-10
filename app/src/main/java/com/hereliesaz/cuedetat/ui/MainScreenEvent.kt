@@ -31,6 +31,7 @@ sealed class MainScreenEvent {
     object ToggleOnPlaneBall : MainScreenEvent()
     object ToggleBankingMode : MainScreenEvent()
     object ToggleTable: MainScreenEvent()
+    object CycleTableSize: MainScreenEvent()
     object ToggleForceTheme : MainScreenEvent()
     object ToggleLuminanceDialog : MainScreenEvent()
     data class AdjustLuminance(val adjustment: Float) : MainScreenEvent()

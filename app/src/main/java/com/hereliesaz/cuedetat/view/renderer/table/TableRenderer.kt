@@ -7,13 +7,14 @@ import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class TableRenderer {
 
-    private val tableToBallRatioLong = 88f
-    private val tableToBallRatioShort = 44f
-
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         if (state.showTable || state.isBankingMode) {
             val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
             if (referenceRadius <= 0) return
+
+            // Use the state's table size to determine proportions
+            val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
+            val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
 
             val tablePlayingSurfaceWidth = tableToBallRatioLong * referenceRadius
             val tablePlayingSurfaceHeight = tableToBallRatioShort * referenceRadius

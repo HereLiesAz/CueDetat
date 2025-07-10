@@ -22,6 +22,32 @@ enum class DistanceUnit {
     METRIC, IMPERIAL
 }
 
+enum class TableSize(val feet: Int, val aspectRatio: Float) {
+    SIX_FT(6, 2.0f),
+    SEVEN_FT(7, 2.0f),
+    EIGHT_FT(8, 2.0f),
+    NINE_FT(9, 2.0f),
+    TEN_FT(10, 2.0f);
+
+    fun next(): TableSize {
+        val nextOrdinal = (this.ordinal + 1) % entries.size
+        return entries[nextOrdinal]
+    }
+
+    // Ratio of long side to cue ball diameter (standard is 2.25 inches)
+    // Example: 9ft (100") table / 2.25" ball = ~44.44
+    // We will use this to scale the logical table size based on the ball's logical radius
+    fun getTableToBallRatioLong(): Float {
+        return when (this) {
+            SIX_FT -> 33f
+            SEVEN_FT -> 38f
+            EIGHT_FT -> 44f
+            NINE_FT -> 50f
+            TEN_FT -> 55f
+        }
+    }
+}
+
 data class OverlayState(
     // View dimensions
     val viewWidth: Int = 0,
@@ -44,6 +70,7 @@ data class OverlayState(
     val bankingAimTarget: PointF? = null,
     val bankShotPath: List<PointF> = emptyList(),
     val pocketedBankShotPocketIndex: Int? = null,
+    val tableSize: TableSize = TableSize.EIGHT_FT,
 
     // Theme and Appearance
     val isForceLightMode: Boolean? = null,

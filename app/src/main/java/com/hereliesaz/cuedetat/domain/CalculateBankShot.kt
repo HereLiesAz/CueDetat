@@ -15,8 +15,6 @@ data class BankShotResult(
 @Singleton
 class CalculateBankShot @Inject constructor() {
 
-    private val tableToBallRatioLong = 88f
-    private val tableToBallRatioShort = 44f
     private val maxBounces = 4 // Up to 4 rails
 
     operator fun invoke(state: OverlayState): BankShotResult {
@@ -24,24 +22,25 @@ class CalculateBankShot @Inject constructor() {
             return BankShotResult(emptyList(), null)
         }
 
-        // The center of the logical space where rendering occurs
         val canvasCenterX = state.viewWidth / 2f
         val canvasCenterY = state.viewHeight / 2f
 
-        // Translate incoming coordinates from the rendering space to the (0,0) calculation space
         val ballCenter = state.onPlaneBall.center
         val aimTarget = state.bankingAimTarget
         val calcBallCenter = PointF(ballCenter.x - canvasCenterX, ballCenter.y - canvasCenterY)
         val calcAimTarget = PointF(aimTarget.x - canvasCenterX, aimTarget.y - canvasCenterY)
 
         val referenceRadius = state.protractorUnit.radius
+        // Use the table size from the state to determine proportions
+        val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
+        val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
+
         val logicalTableWidth = tableToBallRatioLong * referenceRadius
         val logicalTableHeight = tableToBallRatioShort * referenceRadius
 
         val halfW = logicalTableWidth / 2f
         val halfH = logicalTableHeight / 2f
 
-        // Pockets are defined in the (0,0) calculation space
         val pocketRadius = referenceRadius * 1.8f
         val pockets = listOf(
             PointF(-halfW, -halfH), PointF(halfW, -halfH), // Top corners
@@ -59,7 +58,6 @@ class CalculateBankShot @Inject constructor() {
             var t = Float.MAX_VALUE
             var wallNormal: PointF? = null
 
-            // Time to hit vertical walls
             if (direction.x != 0f) {
                 val tLeft = (-halfW - currentPos.x) / direction.x
                 val tRight = (halfW - currentPos.x) / direction.x
@@ -72,7 +70,6 @@ class CalculateBankShot @Inject constructor() {
                     wallNormal = PointF(-1f, 0f)
                 }
             }
-            // Time to hit horizontal walls
             if (direction.y != 0f) {
                 val tTop = (-halfH - currentPos.y) / direction.y
                 val tBottom = (halfH - currentPos.y) / direction.y
@@ -102,7 +99,6 @@ class CalculateBankShot @Inject constructor() {
             direction = reflect(direction, wallNormal)
         }
 
-        // Translate the calculated path back to the rendering space
         val finalPath = pathInCalcSpace.map {
             PointF(it.x + canvasCenterX, it.y + canvasCenterY)
         }
