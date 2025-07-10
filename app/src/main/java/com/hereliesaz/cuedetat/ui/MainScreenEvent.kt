@@ -19,6 +19,7 @@ sealed class MainScreenEvent {
     // Logical Events (dispatched by ViewModel)
     internal data class LogicalGestureStarted(val logicalPoint: PointF) : MainScreenEvent()
     internal data class LogicalDragApplied(val logicalDelta: PointF, val screenDelta: Offset) : MainScreenEvent()
+    internal data class AimBankShot(val logicalTarget: PointF) : MainScreenEvent() // For direct bank aiming
 
     // Direct State Change Events
     data class TableRotationChanged(val degrees: Float) : MainScreenEvent() // For the slider (absolute)

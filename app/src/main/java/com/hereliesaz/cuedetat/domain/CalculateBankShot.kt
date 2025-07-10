@@ -24,6 +24,16 @@ class CalculateBankShot @Inject constructor() {
             return BankShotResult(emptyList(), null)
         }
 
+        // The center of the logical space where rendering occurs
+        val canvasCenterX = state.viewWidth / 2f
+        val canvasCenterY = state.viewHeight / 2f
+
+        // Translate incoming coordinates from the rendering space to the (0,0) calculation space
+        val ballCenter = state.onPlaneBall.center
+        val aimTarget = state.bankingAimTarget
+        val calcBallCenter = PointF(ballCenter.x - canvasCenterX, ballCenter.y - canvasCenterY)
+        val calcAimTarget = PointF(aimTarget.x - canvasCenterX, aimTarget.y - canvasCenterY)
+
         val referenceRadius = state.protractorUnit.radius
         val logicalTableWidth = tableToBallRatioLong * referenceRadius
         val logicalTableHeight = tableToBallRatioShort * referenceRadius
@@ -31,7 +41,7 @@ class CalculateBankShot @Inject constructor() {
         val halfW = logicalTableWidth / 2f
         val halfH = logicalTableHeight / 2f
 
-        // Pockets are defined in the same logical space
+        // Pockets are defined in the (0,0) calculation space
         val pocketRadius = referenceRadius * 1.8f
         val pockets = listOf(
             PointF(-halfW, -halfH), PointF(halfW, -halfH), // Top corners
@@ -39,11 +49,10 @@ class CalculateBankShot @Inject constructor() {
             PointF(0f, -halfH), PointF(0f, halfH)          // Side pockets
         )
 
-        var currentPos = state.onPlaneBall.center
-        val targetPos = state.bankingAimTarget
-        var direction = PointF(targetPos.x - currentPos.x, targetPos.y - currentPos.y).normalized()
+        var currentPos = calcBallCenter
+        var direction = PointF(calcAimTarget.x - currentPos.x, calcAimTarget.y - currentPos.y).normalized()
 
-        val path = mutableListOf(currentPos)
+        val pathInCalcSpace = mutableListOf(currentPos)
         var pocketedIndex: Int? = null
 
         for (i in 0 until maxBounces) {
@@ -81,20 +90,24 @@ class CalculateBankShot @Inject constructor() {
 
             val nextPos = PointF(currentPos.x + direction.x * t, currentPos.y + direction.y * t)
 
-            // Check for pocket collision along this segment
             val pocketResult = checkPocketCollision(currentPos, nextPos, pockets, pocketRadius)
             if (pocketResult.first) {
-                path.add(pocketResult.second) // Add the collision point on the pocket edge
+                pathInCalcSpace.add(pocketResult.second)
                 pocketedIndex = pocketResult.third
                 break
             }
 
-            path.add(nextPos)
+            pathInCalcSpace.add(nextPos)
             currentPos = nextPos
             direction = reflect(direction, wallNormal)
         }
 
-        return BankShotResult(path, pocketedIndex)
+        // Translate the calculated path back to the rendering space
+        val finalPath = pathInCalcSpace.map {
+            PointF(it.x + canvasCenterX, it.y + canvasCenterY)
+        }
+
+        return BankShotResult(finalPath, pocketedIndex)
     }
 
     private fun reflect(v: PointF, n: PointF): PointF {
@@ -123,7 +136,6 @@ class CalculateBankShot @Inject constructor() {
                 val t2 = (-b + discriminant) / (2 * a)
 
                 if (t1 in 0.0..1.0 || t2 in 0.0..1.0) {
-                    // Find the closest valid intersection time
                     val t = if (t1 in 0.0..1.0 && t2 in 0.0..1.0) {
                         minOf(t1, t2)
                     } else if (t1 in 0.0..1.0) {

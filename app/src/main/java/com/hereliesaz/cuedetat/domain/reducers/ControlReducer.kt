@@ -1,6 +1,7 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
+import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
@@ -24,17 +25,20 @@ class ControlReducer @Inject constructor() {
     }
 
     private fun handleZoomSliderChanged(currentState: OverlayState, event: MainScreenEvent.ZoomSliderChanged): OverlayState {
-        val viewCenterX = currentState.viewWidth / 2f
-        val viewCenterY = currentState.viewHeight / 2f
-        val oldZoomSliderPos = currentState.zoomSliderPosition
-        val oldZoomFactor = ZoomMapping.sliderToZoom(oldZoomSliderPos)
         val newSliderPos = event.position.coerceIn(-50f, 50f)
         val newLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
-        val newZoomFactor = ZoomMapping.sliderToZoom(newSliderPos)
+
+        // Only adjust ball positions if not in banking mode
         var updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
-        if (currentState.isBankingMode && updatedOnPlaneBall != null) {
+        if (!currentState.isBankingMode) {
+            val viewCenterX = currentState.viewWidth / 2f
+            val viewCenterY = currentState.viewHeight / 2f
+            val oldZoomSliderPos = currentState.zoomSliderPosition
+            val oldZoomFactor = ZoomMapping.sliderToZoom(oldZoomSliderPos)
+            val newZoomFactor = ZoomMapping.sliderToZoom(newSliderPos)
             updatedOnPlaneBall = adjustBallForCenteredZoom(updatedOnPlaneBall, viewCenterX, viewCenterY, oldZoomFactor, newZoomFactor)
         }
+
         return currentState.copy(
             protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
             onPlaneBall = updatedOnPlaneBall,
@@ -44,19 +48,21 @@ class ControlReducer @Inject constructor() {
     }
 
     private fun handleZoomScaleChanged(currentState: OverlayState, event: MainScreenEvent.ZoomScaleChanged): OverlayState {
-        val viewCenterX = currentState.viewWidth / 2f
-        val viewCenterY = currentState.viewHeight / 2f
         val oldZoomSliderPos = currentState.zoomSliderPosition
-        val oldZoomFactor = ZoomMapping.sliderToZoom(oldZoomSliderPos)
         val currentZoomValue = ZoomMapping.sliderToZoom(oldZoomSliderPos)
         val newZoomValue = (currentZoomValue * event.scaleFactor).coerceIn(ZoomMapping.MIN_ZOOM, ZoomMapping.MAX_ZOOM)
         val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue)
         val newLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
-        val newZoomFactor = newZoomValue
+
+        // Only adjust ball positions if not in banking mode
         var updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
-        if (currentState.isBankingMode && updatedOnPlaneBall != null) {
-            updatedOnPlaneBall = adjustBallForCenteredZoom(updatedOnPlaneBall, viewCenterX, viewCenterY, oldZoomFactor, newZoomFactor)
+        if (!currentState.isBankingMode) {
+            val viewCenterX = currentState.viewWidth / 2f
+            val viewCenterY = currentState.viewHeight / 2f
+            val oldZoomFactor = ZoomMapping.sliderToZoom(oldZoomSliderPos)
+            updatedOnPlaneBall = adjustBallForCenteredZoom(updatedOnPlaneBall, viewCenterX, viewCenterY, oldZoomFactor, newZoomValue)
         }
+
         return currentState.copy(
             protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
             onPlaneBall = updatedOnPlaneBall,

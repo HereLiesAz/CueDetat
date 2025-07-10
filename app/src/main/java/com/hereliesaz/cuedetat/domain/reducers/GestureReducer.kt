@@ -22,6 +22,9 @@ class GestureReducer @Inject constructor() {
                 Log.d(GESTURE_TAG, "REDUCER: GestureEnded. Resetting interaction mode.")
                 currentState.copy(interactionMode = InteractionMode.NONE)
             }
+            is MainScreenEvent.AimBankShot -> {
+                currentState.copy(bankingAimTarget = event.logicalTarget, valuesChangedSinceReset = true)
+            }
             else -> currentState
         }
     }
@@ -85,13 +88,7 @@ class GestureReducer @Inject constructor() {
                     currentState.copy(onPlaneBall = it.copy(center = newCenter), valuesChangedSinceReset = true)
                 } ?: currentState
             }
-            InteractionMode.AIMING_BANK_SHOT -> {
-                currentState.bankingAimTarget?.let {
-                    val newTarget = PointF(it.x + logicalDelta.x, it.y + logicalDelta.y)
-                    Log.d(GESTURE_TAG, "REDUCER: AIMING_BANK_SHOT to $newTarget")
-                    currentState.copy(bankingAimTarget = newTarget, valuesChangedSinceReset = true)
-                } ?: currentState
-            }
+            // AIMING_BANK_SHOT is now handled by AimBankShot event, so this case is removed from drag.
             else -> currentState
         }
     }

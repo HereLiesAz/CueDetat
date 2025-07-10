@@ -18,6 +18,7 @@ import com.hereliesaz.cuedetat.domain.StateReducer
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
+import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SingleEvent
 import com.hereliesaz.cuedetat.view.state.ToastMessage
@@ -99,7 +100,10 @@ class MainViewModel @Inject constructor(
 
         val logicalEvent = when (event) {
             is MainScreenEvent.Drag -> {
-                if (currentState.hasInverseMatrix) {
+                if (currentState.interactionMode == InteractionMode.AIMING_BANK_SHOT && currentState.hasInverseMatrix) {
+                    val logicalPoint = Perspective.screenToLogical(event.currentPosition, currentState.inversePitchMatrix)
+                    MainScreenEvent.AimBankShot(logicalPoint)
+                } else if (currentState.hasInverseMatrix) {
                     val logicalPrev = Perspective.screenToLogical(event.previousPosition, currentState.inversePitchMatrix)
                     val logicalCurr = Perspective.screenToLogical(event.currentPosition, currentState.inversePitchMatrix)
                     val logicalDelta = PointF(logicalCurr.x - logicalPrev.x, logicalCurr.y - logicalPrev.y)
@@ -120,6 +124,18 @@ class MainViewModel @Inject constructor(
             else -> event
         }
 
+        // Fast path for banking aim drags to improve responsiveness
+        if (logicalEvent is MainScreenEvent.AimBankShot) {
+            val stateFromReducer = stateReducer.reduce(currentState, logicalEvent)
+            val bankShotResult = calculateBankShotUseCase(stateFromReducer)
+            _uiState.value = stateFromReducer.copy(
+                bankShotPath = bankShotResult.path,
+                pocketedBankShotPocketIndex = bankShotResult.pocketedPocketIndex
+            )
+            return
+        }
+
+        // Full update path for all other events
         val stateFromReducer = stateReducer.reduce(currentState, logicalEvent)
         var derivedState = updateStateUseCase(stateFromReducer, graphicsCamera)
 

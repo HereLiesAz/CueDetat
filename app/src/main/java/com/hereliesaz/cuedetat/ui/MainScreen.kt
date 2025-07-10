@@ -82,7 +82,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight(0.6f) // Slider container is 60% of screen height
                         .padding(end = 16.dp)
-                        .width(90.dp)
+                        .width(120.dp) // WIDENED FOR EASIER TOUCH INTERACTION
                         .zIndex(5f)
                 )
 
@@ -119,11 +119,13 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
 
                 KineticWarningOverlay(text = uiState.warningText, modifier = Modifier.zIndex(3f))
+
                 LuminanceAdjustmentDialog(
                     uiState = uiState,
                     onEvent = viewModel::onEvent,
                     onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleLuminanceDialog) }
                 )
+
                 TutorialOverlay(
                     uiState = uiState,
                     onEvent = viewModel::onEvent

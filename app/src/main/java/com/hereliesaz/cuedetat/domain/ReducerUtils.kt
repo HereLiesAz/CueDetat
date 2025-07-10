@@ -1,4 +1,4 @@
-package com.hereliesaz.cuedetat.domain.reducers
+package com.hereliesaz.cuedetat.domain
 
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import kotlin.math.min
