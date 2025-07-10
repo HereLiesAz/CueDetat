@@ -73,6 +73,7 @@ class MainViewModel @Inject constructor(
     }
 
     fun onEvent(event: MainScreenEvent) {
+        // Handle events that don't need the full reducer/use-case pipeline
         when (event) {
             is MainScreenEvent.CheckForUpdate -> _singleEvent.value = SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat/releases")
             is MainScreenEvent.ViewArt -> _singleEvent.value = SingleEvent.OpenUrl("https://instagram.com/hereliesaz")
@@ -80,22 +81,27 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.SingleEventConsumed -> _singleEvent.value = null
             is MainScreenEvent.ToastShown -> _toastMessage.value = null
             is MainScreenEvent.ToggleDistanceUnit -> {
-                val newUnit = if (uiState.value.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC
+                val newUnit = if (uiState.value.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.IMPERIAL
                 userPreferencesRepository.setDistanceUnit(newUnit)
-                updateState(event)
+                updateState(event) // Still needs reducer
+            }
+            is MainScreenEvent.SetTableSize -> {
+                userPreferencesRepository.setTableSize(event.size)
+                updateState(event) // Needs reducer
             }
             is MainScreenEvent.CycleTableSize -> {
                 val newSize = uiState.value.tableSize.next()
                 userPreferencesRepository.setTableSize(newSize)
-                updateState(event)
+                updateState(event) // Needs reducer
             }
-            is MainScreenEvent.SetTableSize -> {
-                userPreferencesRepository.setTableSize(event.size)
-                updateState(event)
+            // Simple state toggles that can be handled directly
+            is MainScreenEvent.ToggleCamera,
+            is MainScreenEvent.ToggleGlowStickDialog,
+            is MainScreenEvent.ToggleTableSizeDialog,
+            is MainScreenEvent.ToggleLuminanceDialog -> {
+                _uiState.value = stateReducer.reduce(_uiState.value, event)
             }
-            is MainScreenEvent.ToggleTableSizeDialog -> {
-                updateState(event)
-            }
+            // All other events go through the full pipeline
             else -> {
                 updateState(event)
             }

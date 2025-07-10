@@ -2,16 +2,17 @@ package com.hereliesaz.cuedetat.view.config.ball
 
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.ui.theme.RustedEmber
+import com.hereliesaz.cuedetat.ui.theme.VioletResidue
 import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
 
 data class ActualCueBall(
-    override val label: String = "A",
+    override val label: String = "Actual Cue Ball",
     override val opacity: Float = 1.0f,
     override val glowWidth: Float = 12f,
     override val glowColor: Color = Color.White.copy(alpha = 0.5f),
-    override val strokeWidth: Float = 3f,
-    override val strokeColor: Color = RustedEmber,
+    override val strokeWidth: Float = 8f,
+    override val strokeColor: Color = VioletResidue,
     override val additionalOffset: Float = 0f,
     override val centerShape: CenterShape = CenterShape.DOT,
     override val centerSize: Float = 0.2f, // as a factor of radius

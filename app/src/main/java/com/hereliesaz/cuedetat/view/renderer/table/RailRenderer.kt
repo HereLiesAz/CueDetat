@@ -6,11 +6,13 @@ import android.graphics.PointF
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.table.Diamonds
+import com.hereliesaz.cuedetat.view.config.table.Rail
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class RailRenderer {
     private val railVisualOffsetFromEdgeFactor = 0.75f
     private val diamondSizeFactor = 0.25f
+    private val railConfig = Rail()
     private val diamondConfig = Diamonds()
 
     companion object {
@@ -69,8 +71,14 @@ class RailRenderer {
         val innerRight = tableCenterX + tablePlayingSurfaceWidth / 2
         val innerBottom = tableCenterY + tablePlayingSurfaceHeight / 2
 
-        val railLinePaint = paints.tableOutlinePaint
-        val railLineGlowPaint = Paint(paints.lineGlowPaint).apply { strokeWidth = railLinePaint.strokeWidth + 8f }
+        val railLinePaint = Paint(paints.tableOutlinePaint).apply {
+            color = railConfig.strokeColor.toArgb()
+            strokeWidth = railConfig.strokeWidth
+        }
+        val railLineGlowPaint = Paint(paints.lineGlowPaint).apply {
+            strokeWidth = railConfig.glowWidth
+            color = railConfig.glowColor.toArgb()
+        }
         val diamondPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
             color = diamondConfig.fillColor.toArgb()
@@ -82,7 +90,6 @@ class RailRenderer {
         val railBottomCenterY = innerBottom + railOffsetAmount
         val railLeftCenterX = innerLeft - railOffsetAmount
         val railRightCenterX = innerRight + railOffsetAmount
-        val railEndExtension = railOffsetAmount * 1.5f
 
         val pocketRadius = referenceRadius * 1.8f
 

@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.ColorUtils
 import com.hereliesaz.cuedetat.ui.theme.*
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import kotlin.math.abs
 
 class PaintCache {
     private val strokeWidth = 6f // Doubled as commanded
@@ -49,13 +50,25 @@ class PaintCache {
     fun updateColors(uiState: OverlayState, isDark: Boolean) {
         val LUMINANCE_ADJUST = uiState.luminanceAdjustment
         val baseScheme = uiState.appControlColorScheme
-        val glowColor = (if(isDark) Color.White else Color.Black).copy(alpha = 0.5f).toArgb()
 
-        val blurFilter = BlurMaskFilter(glowRadius, BlurMaskFilter.Blur.NORMAL)
-        lineGlowPaint.color = glowColor
-        lineGlowPaint.maskFilter = blurFilter
-        ballGlowPaint.color = glowColor
-        ballGlowPaint.maskFilter = blurFilter
+        // Handle Glow Stick
+        val glowValue = uiState.glowStickValue
+        val glowAlpha = (abs(glowValue) * 255).toInt() // Corrected to use full 0-255 range
+        val glowColor = if (glowValue > 0) Color.White.toArgb() else Color.Black.toArgb()
+        val blurRadius = glowRadius * abs(glowValue)
+        val blurFilter = if (blurRadius > 0.1f) BlurMaskFilter(blurRadius, BlurMaskFilter.Blur.NORMAL) else null
+
+        lineGlowPaint.apply {
+            this.color = glowColor
+            this.alpha = glowAlpha
+            this.maskFilter = blurFilter
+        }
+        ballGlowPaint.apply {
+            this.color = glowColor
+            this.alpha = glowAlpha
+            this.maskFilter = blurFilter
+        }
+
 
         tableOutlinePaint.color = AcidPatina.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         targetCirclePaint.color = baseScheme.primary.adjustLuminance(LUMINANCE_ADJUST).toArgb()

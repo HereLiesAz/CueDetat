@@ -33,6 +33,7 @@ class ToggleReducer @Inject constructor() {
                 valuesChangedSinceReset = true
             )
             is MainScreenEvent.ToggleLuminanceDialog -> currentState.copy(showLuminanceDialog = !currentState.showLuminanceDialog)
+            is MainScreenEvent.ToggleGlowStickDialog -> currentState.copy(showGlowStickDialog = !currentState.showGlowStickDialog)
             is MainScreenEvent.ToggleHelp -> currentState.copy(areHelpersVisible = !currentState.areHelpersVisible)
             is MainScreenEvent.ToggleMoreHelp -> currentState.copy(isMoreHelpVisible = !currentState.isMoreHelpVisible)
             else -> currentState
@@ -84,19 +85,14 @@ class ToggleReducer @Inject constructor() {
         val viewCenterY = currentState.viewHeight / 2f
         val logicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, 0f)
 
-        // Calculate table dimensions in the logical plane
-        val tableToBallRatioLong = currentState.tableSize.getTableToBallRatioLong()
-        val tableHeight = (tableToBallRatioLong / currentState.tableSize.aspectRatio) * logicalRadius
-        val halfHeight = tableHeight / 2f
-        val bottomRailY = viewCenterY + halfHeight
+        // New positions: All balls on the vertical center line.
+        val actualCueBallCenter = PointF(viewCenterX, viewCenterY + logicalRadius * 4)
+        val targetBallCenter = PointF(viewCenterX, viewCenterY - logicalRadius * 4)
 
-        // Define default logical positions
-        val targetBallCenter = PointF(viewCenterX, viewCenterY) // 4th diamond line (center)
-        val actualCueBallCenter = PointF(viewCenterX, bottomRailY - (tableHeight / 4f)) // 2nd diamond line (head spot)
-
-        // Calculate rotation to place Ghost Ball between the other two, making them collinear.
-        val angleRad = atan2((targetBallCenter.y - actualCueBallCenter.y), (targetBallCenter.x - actualCueBallCenter.x))
-        val rotationDegrees = Math.toDegrees(angleRad.toDouble()).toFloat() - 90f
+        // Calculate rotation to make the aiming line vertical.
+        // Since x is the same, atan2 will return -PI/2 (-90 degrees).
+        val angleRad = atan2((targetBallCenter.y - actualCueBallCenter.y).toDouble(), (targetBallCenter.x - actualCueBallCenter.x).toDouble()).toFloat()
+        val rotationDegrees = Math.toDegrees(angleRad.toDouble()).toFloat() - 90f // This will result in -180 degrees, which is correct.
 
         return currentState.copy(
             onPlaneBall = OnPlaneBall(center = actualCueBallCenter, radius = logicalRadius),

@@ -102,7 +102,7 @@ fun MenuDrawerContent(
             onClick = { onEvent(MainScreenEvent.ToggleForceTheme); onCloseDrawer() }
         )
 
-        val cameraToggleText = if (uiState.isCameraVisible) "Hide Camera" else "Show Camera"
+        val cameraToggleText = if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On"
         MenuItem(
             text = cameraToggleText,
             onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
@@ -118,6 +118,12 @@ fun MenuDrawerContent(
             text = "Luminance",
             onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog); onCloseDrawer() }
         )
+
+        MenuItem(
+            text = "Glow Stick",
+            onClick = { onEvent(MainScreenEvent.ToggleGlowStickDialog); onCloseDrawer() }
+        )
+
         MenuDivider()
 
         MenuItem(

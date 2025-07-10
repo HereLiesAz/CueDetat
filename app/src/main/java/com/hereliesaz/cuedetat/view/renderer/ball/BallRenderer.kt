@@ -2,7 +2,6 @@ package com.hereliesaz.cuedetat.view.renderer.ball
 
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.PointF
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.view.PaintCache
@@ -28,8 +27,7 @@ class BallRenderer {
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         if (state.isBankingMode) {
             state.onPlaneBall?.let { bankingBall ->
-                val bankingPaint = paints.bankLine1Paint
-                drawGhostedBall(canvas, bankingBall, BankingBall(), state, bankingPaint, paints.fillPaint, paints.ballGlowPaint)
+                drawGhostedBall(canvas, bankingBall, BankingBall(), state, paints)
             }
         } else {
             drawProtractorAndActual(canvas, state, paints)
@@ -42,30 +40,42 @@ class BallRenderer {
 
     private fun drawProtractorAndActual(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         val protractor = state.protractorUnit
-        val ghostCuePaint = if (state.isImpossibleShot) paints.warningPaint else paints.cueCirclePaint
-        val targetPaint = paints.targetCirclePaint
-        val actualCuePaint = paints.actualCueBallPaint
 
         // Target Ball
-        drawGhostedBall(canvas, protractor, TargetBall(), state, targetPaint, paints.fillPaint, paints.ballGlowPaint)
+        drawGhostedBall(canvas, protractor, TargetBall(), state, paints)
 
         // Ghost Cue Ball
         drawGhostedBall(canvas, object : LogicalCircular {
             override val center = protractor.ghostCueBallCenter
             override val radius = protractor.radius
-        }, GhostCueBall(), state, ghostCuePaint, paints.fillPaint, paints.ballGlowPaint)
+        }, GhostCueBall(), state, paints)
 
         // Actual Cue Ball
         state.onPlaneBall?.let {
-            drawGhostedBall(canvas, it, ActualCueBall(), state, actualCuePaint, paints.fillPaint, paints.ballGlowPaint)
+            drawGhostedBall(canvas, it, ActualCueBall(), state, paints)
         }
     }
 
-    private fun drawGhostedBall(canvas: Canvas, ball: LogicalCircular, config: BallsConfig, state: OverlayState, strokePaint: Paint, fillPaint: Paint?, glowPaint: Paint) {
+    private fun drawGhostedBall(canvas: Canvas, ball: LogicalCircular, config: BallsConfig, state: OverlayState, paints: PaintCache) {
         // Calculate the single source of truth for the ball's on-screen appearance.
         val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ball.center, ball.radius, state)
         val screenPos = DrawingUtils.mapPoint(ball.center, state.pitchMatrix)
         val yPosLifted = screenPos.y - radiusInfo.lift
+
+        // Configure paints based on the specific config object
+        val strokePaint = Paint(paints.targetCirclePaint).apply {
+            color = config.strokeColor.toArgb()
+            strokeWidth = config.strokeWidth
+            alpha = (config.opacity * 255).toInt()
+        }
+        if (state.isImpossibleShot && config is GhostCueBall) {
+            strokePaint.color = paints.warningPaint.color
+        }
+
+        val glowPaint = Paint(paints.ballGlowPaint).apply {
+            strokeWidth = config.glowWidth
+        }
+
 
         // --- Draw on-plane shadow first, using its pure logical radius ---
         canvas.save()
@@ -80,7 +90,7 @@ class BallRenderer {
         canvas.drawCircle(screenPos.x, yPosLifted, radiusInfo.radius, strokePaint)
 
         // Draw center shape
-        val centerPaint = Paint(fillPaint).apply { color = config.centerColor.toArgb() }
+        val centerPaint = Paint(paints.fillPaint).apply { color = config.centerColor.toArgb() }
         val crosshairPaint = Paint(strokePaint).apply { color = config.centerColor.toArgb(); strokeWidth = config.strokeWidth }
         val centerSize = radiusInfo.radius * config.centerSize
 
@@ -105,16 +115,16 @@ class BallRenderer {
         val textPaint = paints.textPaint.apply { this.typeface = typeface }
 
         state.onPlaneBall?.let {
-            val label = if (state.isBankingMode) "Banking Ball" else "Actual Cue Ball"
+            val label = if (state.isBankingMode) BankingBall().label else ActualCueBall().label
             textRenderer.draw(canvas, textPaint, state.zoomSliderPosition, it, label, state)
         }
 
         if (!state.isBankingMode) {
-            textRenderer.draw(canvas, textPaint, state.zoomSliderPosition, state.protractorUnit, "Target Ball", state)
+            textRenderer.draw(canvas, textPaint, state.zoomSliderPosition, state.protractorUnit, TargetBall().label, state)
             textRenderer.draw(canvas, textPaint, state.zoomSliderPosition, object : LogicalCircular {
                 override val center = state.protractorUnit.ghostCueBallCenter
                 override val radius = state.protractorUnit.radius
-            }, "Ghost Cue Ball", state)
+            }, GhostCueBall().label, state)
         }
     }
 }

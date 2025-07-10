@@ -3,7 +3,10 @@ package com.hereliesaz.cuedetat.view.renderer.table
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PointF
+import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.view.PaintCache
+import com.hereliesaz.cuedetat.view.config.table.Holes
+import com.hereliesaz.cuedetat.view.config.table.Table
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class TableRenderer {
@@ -38,6 +41,10 @@ class TableRenderer {
             val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
             if (referenceRadius <= 0) return
 
+            // Load configs
+            val tableConfig = Table()
+            val holesConfig = Holes()
+
             // Use the state's table size to determine proportions
             val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
             val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
@@ -53,13 +60,19 @@ class TableRenderer {
             val right = canvasCenterX + tablePlayingSurfaceWidth / 2
             val bottom = canvasCenterY + tablePlayingSurfaceHeight / 2
 
+            // Configure paint from config
+            val tableOutlinePaint = Paint(paints.tableOutlinePaint).apply {
+                color = tableConfig.strokeColor.toArgb()
+                strokeWidth = tableConfig.strokeWidth
+            }
+
             // Draw Outline Only, no fill.
-            canvas.drawRect(left, top, right, bottom, paints.tableOutlinePaint)
+            canvas.drawRect(left, top, right, bottom, tableOutlinePaint)
 
             // Draw Diamond Grid
             val diamondGridPaint = paints.gridLinePaint
-            val halfWidth = tablePlayingSurfaceWidth / 2f
-            val halfHeight = tablePlayingSurfaceHeight / 2f
+            val halfWidth = tablePlayingSurfaceWidth / 2
+            val halfHeight = tablePlayingSurfaceHeight / 2
 
             // Vertical lines (connecting long rail diamonds)
             for (i in 1..3) {
@@ -83,6 +96,14 @@ class TableRenderer {
 
             // Prepare the white paint for pocketed shots
             val pocketedPaint = Paint(paints.pocketFillPaint).apply { color = android.graphics.Color.WHITE }
+            val pocketOutlinePaint = Paint(paints.tableOutlinePaint).apply {
+                color = holesConfig.strokeColor.toArgb()
+                strokeWidth = holesConfig.strokeWidth
+            }
+            val pocketFillPaint = Paint(paints.pocketFillPaint).apply {
+                color = holesConfig.fillColor.toArgb()
+            }
+
 
             pockets.forEachIndexed { index, pos ->
                 val isAimedAt = state.aimedPocketIndex == index && !state.isBankingMode
@@ -91,12 +112,12 @@ class TableRenderer {
                 val fillPaint = if (isAimedAt || isPocketedInBank) {
                     pocketedPaint
                 } else {
-                    paints.pocketFillPaint
+                    pocketFillPaint
                 }
                 // Fill the pocket first
                 canvas.drawCircle(pos.x, pos.y, pocketRadius, fillPaint)
                 // Then draw the outline
-                canvas.drawCircle(pos.x, pos.y, pocketRadius, paints.tableOutlinePaint)
+                canvas.drawCircle(pos.x, pos.y, pocketRadius, pocketOutlinePaint)
             }
         }
     }

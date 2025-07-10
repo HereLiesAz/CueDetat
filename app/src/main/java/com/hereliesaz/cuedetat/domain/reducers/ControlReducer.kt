@@ -17,6 +17,7 @@ class ControlReducer @Inject constructor() {
             is MainScreenEvent.TableRotationApplied -> currentState.copy(tableRotationDegrees = currentState.tableRotationDegrees + event.degrees, valuesChangedSinceReset = true)
             is MainScreenEvent.TableRotationChanged -> currentState.copy(tableRotationDegrees = event.degrees, valuesChangedSinceReset = true)
             is MainScreenEvent.AdjustLuminance -> currentState.copy(luminanceAdjustment = event.adjustment.coerceIn(-0.4f, 0.4f), valuesChangedSinceReset = true)
+            is MainScreenEvent.AdjustGlow -> currentState.copy(glowStickValue = event.value.coerceIn(-1f, 1f), valuesChangedSinceReset = true)
             else -> currentState
         }
     }

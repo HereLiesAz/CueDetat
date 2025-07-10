@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.cuedetat.ui.composables.*
+import com.hereliesaz.cuedetat.ui.composables.dialogs.GlowStickDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.LuminanceAdjustmentDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.TableSizeSelectionDialog
 import com.hereliesaz.cuedetat.ui.composables.overlays.KineticWarningOverlay
@@ -128,6 +129,12 @@ fun MainScreen(viewModel: MainViewModel) {
                     uiState = uiState,
                     onEvent = viewModel::onEvent,
                     onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleLuminanceDialog) }
+                )
+
+                GlowStickDialog(
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent,
+                    onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleGlowStickDialog) }
                 )
 
                 TableSizeSelectionDialog(

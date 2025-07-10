@@ -1,7 +1,7 @@
-# 16: The Table
+# The Table
 
 *   **Visibility:** The table is hidden by default. Its visibility is controlled by the `"Toggle Table"` `TextButton` in the menu.
-*   **Rotation:** The table's default rotation is 0 degrees. Its rotation is controlled by both the horizontal rotation slider and a two-finger rotation gesture. Both controls are only active when the table is visible.
+*   **Rotation:** The table's default rotation when shown is 90 degrees (portrait). Its rotation is controlled by both the horizontal rotation slider and a two-finger rotation gesture.
 *   **Pivot Point:** The table must rotate around its logical center (0,0).
 *   **Table Size**:
 *   The application must support 6', 7', 8', 9', and 10' table sizes.
@@ -22,5 +22,5 @@
 *   **Diamonds**:
 *   Diamond markers must be rendered on the rails. They must be pure **white**.
 *   The side pockets are to be counted as diamonds in the numbering sequence.
-*   When in Banking Mode, the precise point of impact for a bank shot on a rail must be marked.
-*   A text label must be displayed above this impact point, indicating the diamond number with one decimal place of precision (e.g., "1.3"). The numbering is clockwise, starting from the top-left corner pocket as diamond 0.
+*   When in Banking Mode or when a bank is previewed in Protractor Mode, the precise point of impact on a rail must be marked.
+*   A text label must be displayed **directly at** this impact point, indicating the diamond number with one decimal place of precision (e.g., "1.3"). The numbering is clockwise, starting from the top-left corner pocket as diamond 0.

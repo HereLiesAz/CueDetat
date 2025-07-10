@@ -7,7 +7,6 @@ import com.hereliesaz.cuedetat.view.renderer.ball.BallRenderer
 import com.hereliesaz.cuedetat.view.renderer.line.LineRenderer
 import com.hereliesaz.cuedetat.view.renderer.table.RailRenderer
 import com.hereliesaz.cuedetat.view.renderer.table.TableRenderer
-import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class OverlayRenderer {
@@ -38,7 +37,18 @@ class OverlayRenderer {
         // --- Pass 2: Draw all logical lines on the pitched canvas ---
         canvas.save()
         canvas.concat(state.pitchMatrix)
-        lineRenderer.draw(canvas, state, paints, typeface)
+        lineRenderer.draw(canvas, state, paints, typeface) // Draws main aiming lines
+
+        // Draw protractor guides on the same pitched plane
+        if (!state.isBankingMode) {
+            lineRenderer.drawProtractorGuides(
+                canvas = canvas,
+                state = state,
+                paints = paints,
+                center = state.protractorUnit.ghostCueBallCenter, // Use logical center
+                referencePoint = state.protractorUnit.center // Use logical reference
+            )
+        }
         canvas.restore()
 
         // --- Pass 3: Draw banking labels on the lifted rail plane ---
@@ -53,11 +63,7 @@ class OverlayRenderer {
         // The BallRenderer handles its own rendering passes internally for on-plane and ghosted elements.
         ballRenderer.draw(canvas, state, paints, typeface)
 
-        // --- Pass 5: Draw Screen-Space UI (Protractor Guides) ---
-        if (!state.isBankingMode) {
-            val ghostCueScreenCenter = DrawingUtils.mapPoint(state.protractorUnit.ghostCueBallCenter, state.pitchMatrix)
-            val targetScreenCenter = DrawingUtils.mapPoint(state.protractorUnit.center, state.pitchMatrix)
-            lineRenderer.drawProtractorGuides(canvas, state, paints, ghostCueScreenCenter, targetScreenCenter)
-        }
+        // --- Pass 5: (Empty) Screen-space elements drawn by Composables ---
+        // Protractor guides have been moved to Pass 2.
     }
 }

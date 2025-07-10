@@ -15,8 +15,8 @@ android {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 26
         targetSdk = 36
-        versionCode = 16
-        versionName = "0.4.1"
+        versionCode = 17
+        versionName = "0.4.1.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -42,6 +42,12 @@ android {
         }
     }
     signingConfigs {
+        getByName("debug") {
+            storeFile = file("G:\\My Drive\\az_apk_keystore.jks")
+            storePassword = "18187077190901818"
+            keyAlias = "key0"
+            keyPassword = "18187077190901818"
+        }
         create("release") { // It's good practice to use create for release if it's not already defined elsewhere
             val userHome = System.getProperty("user.home")
             val tmpFilePath = "$userHome/work/_temp/keystore/"
@@ -151,11 +157,12 @@ android {
         implementation(libs.androidx.camera.lifecycle)
         implementation(libs.androidx.camera.view)
         androidTestImplementation(libs.androidx.junit)
+        testImplementation(libs.junit)
+        implementation(libs.androidx.animation.core)
+
     }
 }
-dependencies {
-    implementation(libs.androidx.animation.core)
-}
+
 
 
 kapt {

@@ -5,9 +5,8 @@ This document establishes the Appearance Decree Layer, a system designed for gra
 ## Doctrine of Configuration
 
 * **Granularity**: Every distinct visual component (e.g., `ActualCueBall`, `AimingLine`, `Table`) must have its own corresponding data class in the `app/src/main/java/com/hereliesaz/cuedetat/view/config/` package.
-* **Hierarchy**: These configuration classes inherit from base interfaces (`AppearanceDecree`, `BallDecree`, `LineDecree`, etc.) to ensure a consistent set of controllable properties.
-* **Overrides**: During the rendering process, the `OverlayRenderer` and its sub-renderers must first consult the specific appearance decree for an element. The properties defined within this object (e.g., `ActualCueBall.strokeColor`) override any default values set in `PaintCache`.
-* **Central Management**: All individual decree objects should be managed by a central `ConfigManager` to provide a single source of truth for all visual parameters, which is then passed down the rendering pipeline.
+* **Hierarchy**: These configuration classes inherit from base interfaces (`VisualProperties`, `BallsConfig`, `LinesConfig`, etc.) to ensure a consistent set of controllable properties.
+* **Mandate of Enforcement**: During the rendering process, all renderers (`BallRenderer`, `LineRenderer`, etc.) **must** first consult the specific appearance decree for an element. The properties defined within this object (e.g., `ActualCueBall.strokeColor`) override any default values set in `PaintCache`. This is not optional. A renderer that does not obey its specific config object is a heretical renderer.
 
 ## File Structure
 
@@ -15,7 +14,7 @@ The new configuration layer resides in its own package:
 
 app/src/main/java/com/hereliesaz/cuedetat/view/config/
 ├── base/
-│   └── AppearanceDecree.kt
+│   └── VisualProperties.kt
 ├── ball/
 │   ├── ActualCueBall.kt
 │   ├── BankingBall.kt

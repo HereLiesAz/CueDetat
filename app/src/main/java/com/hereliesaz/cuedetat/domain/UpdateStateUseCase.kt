@@ -56,6 +56,21 @@ class UpdateStateUseCase @Inject constructor() {
         }
         val shotGuideImpactPoint = if (state.showTable) calculateShotGuideImpact(state) else null
 
+        // Calculate single bank for aiming line in ghost mode
+        val aimingLineBankPath = if (state.showTable && !state.isBankingMode) {
+            calculateSingleBank(state.protractorUnit.ghostCueBallCenter, state.protractorUnit.center, state)
+        } else {
+            emptyList()
+        }
+        // Calculate impact point for shot guide line bank
+        val shotGuideBankImpactPoint = if (state.showTable && !state.isBankingMode) {
+            val impactPoint = calculateShotGuideImpact(state, useShotGuideLine = true)
+            impactPoint
+        } else {
+            null
+        }
+
+
         // --- Stage 3: Prepare Final Rotated Matrices for Rendering ---
         val finalPitchMatrix = Matrix(basePitchMatrix)
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
@@ -94,7 +109,9 @@ class UpdateStateUseCase @Inject constructor() {
             targetBallDistance = targetBallDistance,
             aimedPocketIndex = aimedPocketIndex,
             aimingLineEndPoint = aimingLineEndPoint,
-            shotGuideImpactPoint = shotGuideImpactPoint
+            shotGuideImpactPoint = shotGuideImpactPoint,
+            aimingLineBankPath = aimingLineBankPath,
+            shotGuideBankImpactPoint = shotGuideBankImpactPoint
         )
     }
 
@@ -108,12 +125,15 @@ class UpdateStateUseCase @Inject constructor() {
     }
 
     private fun calculateShotPossibilityAndTangent(shotAnchor: PointF, ghostBall: PointF, targetBall: PointF): Pair<Boolean, Float> {
-        val aimingAngle = atan2(targetBall.y - ghostBall.y, targetBall.x - ghostBall.x).toFloat()
-        val shotAngle = atan2(ghostBall.y - shotAnchor.y, ghostBall.x - shotAnchor.x).toFloat()
-        var angleDifference = aimingAngle - shotAngle
-        while (angleDifference <= -PI) angleDifference += (2 * PI).toFloat()
-        while (angleDifference > PI) angleDifference -= (2 * PI).toFloat()
-        val isImpossible = abs(angleDifference) > PI / 2
+        val aimingAngle = atan2(targetBall.y - ghostBall.y, targetBall.x - ghostBall.x)
+        val shotAngle = atan2(ghostBall.y - shotAnchor.y, ghostBall.x - shotAnchor.x)
+        var angleDifference = Math.toDegrees(aimingAngle.toDouble() - shotAngle.toDouble()).toFloat()
+
+        // Normalize the angle to be within -180 and 180
+        while (angleDifference <= -180) angleDifference += 360
+        while (angleDifference > 180) angleDifference -= 360
+
+        val isImpossible = abs(angleDifference) > 90.0f
         val tangentDirection = if (angleDifference < 0) 1.0f else -1.0f
         return Pair(isImpossible, tangentDirection)
     }
@@ -156,12 +176,27 @@ class UpdateStateUseCase @Inject constructor() {
         return Pair(null, null)
     }
 
-    private fun calculateShotGuideImpact(state: OverlayState): PointF? {
-        val p1 = state.shotLineAnchor
+    private fun calculateShotGuideImpact(state: OverlayState, useShotGuideLine: Boolean = false): PointF? {
+        val p1 = if (useShotGuideLine) state.shotLineAnchor else state.protractorUnit.center
         val p2 = state.protractorUnit.ghostCueBallCenter
         val dirX = p2.x - p1.x
         val dirY = p2.y - p1.y
 
+        return findRailIntersection(p1, dirX, dirY, state)
+    }
+
+    private fun calculateSingleBank(start: PointF, end: PointF, state: OverlayState): List<PointF> {
+        val dirX = end.x - start.x
+        val dirY = end.y - start.y
+        val intersection = findRailIntersection(start, dirX, dirY, state) ?: return emptyList()
+
+        val reflectedDir = reflect(PointF(dirX, dirY), intersection, state)
+        val reflectedEnd = findRailIntersection(intersection, reflectedDir.x, reflectedDir.y, state) ?: intersection
+
+        return listOf(start, intersection, reflectedEnd)
+    }
+
+    private fun findRailIntersection(startPoint: PointF, dirX: Float, dirY: Float, state: OverlayState): PointF? {
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
         if (referenceRadius <= 0) return null
 
@@ -182,22 +217,58 @@ class UpdateStateUseCase @Inject constructor() {
 
         var t = Float.MAX_VALUE
         if (dirX != 0f) {
-            val tLeft = (left - p1.x) / dirX
-            val tRight = (right - p1.x) / dirX
-            if (tLeft > 0 && tLeft < t) t = tLeft
-            if (tRight > 0 && tRight < t) t = tRight
+            val tLeft = (left - startPoint.x) / dirX
+            val tRight = (right - startPoint.x) / dirX
+            if (tLeft > 0.001f && tLeft < t) t = tLeft
+            if (tRight > 0.001f && tRight < t) t = tRight
         }
         if (dirY != 0f) {
-            val tTop = (top - p1.y) / dirY
-            val tBottom = (bottom - p1.y) / dirY
-            if (tTop > 0 && tTop < t) t = tTop
-            if (tBottom > 0 && tBottom < t) t = tBottom
+            val tTop = (top - startPoint.y) / dirY
+            val tBottom = (bottom - startPoint.y) / dirY
+            if (tTop > 0.001f && tTop < t) t = tTop
+            if (tBottom > 0.001f && tBottom < t) t = tBottom
         }
 
         return if (t != Float.MAX_VALUE) {
-            PointF(p1.x + t * dirX, p1.y + t * dirY)
+            PointF(startPoint.x + t * dirX, startPoint.y + t * dirY)
         } else {
             null
+        }
+    }
+
+    private fun reflect(v: PointF, p: PointF, state: OverlayState): PointF {
+        val n = getRailNormal(p, state) ?: PointF(0f, 0f)
+        val dot = v.x * n.x + v.y * n.y
+        return PointF(v.x - 2 * dot * n.x, v.y - 2 * dot * n.y)
+    }
+
+    private fun getRailNormal(point: PointF, state: OverlayState): PointF? {
+        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
+        if (referenceRadius <= 0) return null
+
+        val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
+        val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
+        val tableWidth = tableToBallRatioLong * referenceRadius
+        val tableHeight = tableToBallRatioShort * referenceRadius
+
+        val halfW = tableWidth / 2f
+        val halfH = tableHeight / 2f
+        val canvasCenterX = state.viewWidth / 2f
+        val canvasCenterY = state.viewHeight / 2f
+
+        val left = canvasCenterX - halfW
+        val top = canvasCenterY - halfH
+        val right = canvasCenterX + halfW
+        val bottom = canvasCenterY + halfH
+
+        val tolerance = 5f
+
+        return when {
+            abs(point.y - top) < tolerance -> PointF(0f, 1f)
+            abs(point.y - bottom) < tolerance -> PointF(0f, -1f)
+            abs(point.x - left) < tolerance -> PointF(1f, 0f)
+            abs(point.x - right) < tolerance -> PointF(-1f, 0f)
+            else -> null
         }
     }
 

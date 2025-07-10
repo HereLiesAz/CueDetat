@@ -18,7 +18,7 @@ This scripture defines the logical objects that represent pool balls.
   * **Purpose**: Represents the necessary impact point on the `TargetBall`.
   * **Model**: Its position is calculated within the `ProtractorUnit`. It is not an independent model.
   * **Label**: "Ghost Cue Ball".
-  * **Rendering**: Rendered as a "ghosted" ball, with a prominent **crosshair** at its center, consisting of a circle with four radiating lines.
+  * **Rendering**: Rendered as a "ghosted" ball, with a prominent **crosshair** at its center.
 
 * **Actual Cue Ball (Role)**
   * **Purpose**: An optional, user-draggable aiming reference in Protractor Mode.
@@ -35,7 +35,5 @@ This scripture defines the logical objects that represent pool balls.
 ## Default Positions & Properties
 * When the table is not visible, the **Target Ball** (`ProtractorUnit.center`) is at the screen's center and the **Actual Cue Ball** (if toggled) is halfway to the bottom edge.
 * When the table is first made visible (`ToggleTable` event), all positions are reset:
-  * The **Target Ball** is placed on the table's logical center spot (fourth diamond line).
-  * The **Actual Cue Ball** is placed on the table's head spot (second diamond line).
-  * The `ProtractorUnit`'s `rotationDegrees` is calculated so that the **Ghost Cue Ball** is placed directly between the Target and Actual Cue Balls, making all three collinear.
+  * All three balls (`ActualCueBall`, `TargetBall`, `GhostCueBall`) are aligned on the vertical center line of the view. The `ActualCueBall` is placed on the head spot, the `TargetBall` on the center spot, and the `GhostCueBall` is calculated to be collinear between them.
 * The logical size of the balls is determined by the global zoom factor.

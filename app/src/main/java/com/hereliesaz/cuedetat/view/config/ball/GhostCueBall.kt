@@ -11,11 +11,11 @@ data class GhostCueBall(
     override val opacity: Float = 1.0f,
     override val glowWidth: Float = 12f,
     override val glowColor: Color = Color.White.copy(alpha = 0.5f),
-    override val strokeWidth: Float = 3f,
+    override val strokeWidth: Float = 8f,
     override val strokeColor: Color = MutedGray,
     override val additionalOffset: Float = 0f,
     override val centerShape: CenterShape = CenterShape.CROSSHAIR,
-    override val centerSize: Float = 0.8f, // Made larger
+    override val centerSize: Float = 0.5f, // Made larger
     override val centerColor: Color = RebelYellow,
     override val fillColor: Color = Color.Transparent,
     override val additionalOffset3d: Float = 0f

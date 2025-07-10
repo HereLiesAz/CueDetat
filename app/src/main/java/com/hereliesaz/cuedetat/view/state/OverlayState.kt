@@ -78,6 +78,9 @@ data class OverlayState(
     val isForceLightMode: Boolean? = null,
     val luminanceAdjustment: Float = 0f,
     val showLuminanceDialog: Boolean = false,
+    val glowStickValue: Float = 0f,
+    val showGlowStickDialog: Boolean = false,
+
 
     // Tutorial State
     val showTutorialOverlay: Boolean = false,
@@ -98,6 +101,11 @@ data class OverlayState(
     val isTiltBeyondLimit: Boolean = false,
     val warningText: String? = null,
     val shotGuideImpactPoint: PointF? = null,
+
+    // Ghost mode banking state
+    val aimingLineBankPath: List<PointF> = emptyList(),
+    val shotGuideBankImpactPoint: PointF? = null,
+
 
     // Pocket aiming state
     val aimedPocketIndex: Int? = null,

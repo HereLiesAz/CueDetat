@@ -4,7 +4,16 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.Typeface
+import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.view.PaintCache
+import com.hereliesaz.cuedetat.view.config.line.AimingLine
+import com.hereliesaz.cuedetat.view.config.line.BankLine1
+import com.hereliesaz.cuedetat.view.config.line.BankLine2
+import com.hereliesaz.cuedetat.view.config.line.BankLine3
+import com.hereliesaz.cuedetat.view.config.line.BankLine4
+import com.hereliesaz.cuedetat.view.config.line.ShotGuideLine
+import com.hereliesaz.cuedetat.view.config.line.TangentLine
+import com.hereliesaz.cuedetat.view.config.ui.ProtractorGuides
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -29,11 +38,22 @@ class LineRenderer {
     fun drawProtractorGuides(canvas: Canvas, state: OverlayState, paints: PaintCache, center: PointF, referencePoint: PointF) {
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
         val targetCenter = state.protractorUnit.center
-        val textPaint = Paint(paints.textPaint).apply { alpha = 80; textSize = 30f }
+        val config = ProtractorGuides()
+
+        val guidePaint = Paint(paints.angleGuidePaint).apply {
+            color = config.strokeColor.toArgb()
+            strokeWidth = config.strokeWidth
+            alpha = (config.opacity * 255).toInt()
+        }
+        val textPaint = Paint(paints.textPaint).apply {
+            alpha = (config.opacity * 255).toInt()
+            textSize = 30f
+        }
+
 
         protractorAngles.forEach { angle ->
-            drawAngleGuide(canvas, center, referencePoint, angle, paints.angleGuidePaint)
-            drawAngleGuide(canvas, center, referencePoint, -angle, paints.angleGuidePaint) // Draw on both sides
+            drawAngleGuide(canvas, center, referencePoint, angle, guidePaint)
+            drawAngleGuide(canvas, center, referencePoint, -angle, guidePaint) // Draw on both sides
             textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, angle, textPaint, state.protractorUnit.radius)
             textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, -angle, textPaint, state.protractorUnit.radius)
         }
@@ -77,42 +97,91 @@ class LineRenderer {
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
         val shotLineAnchor = state.shotLineAnchor
 
+        // Load configs
+        val aimingLineConfig = AimingLine()
+        val shotGuideLineConfig = ShotGuideLine()
+        val tangentLineConfig = TangentLine()
+        val bankLineConfig = BankLine1()
 
-        val shotLinePaint = if (state.isImpossibleShot || state.isTiltBeyondLimit) paints.warningPaint else paints.shotLinePaint
-        val shotLineGlow = if (state.isImpossibleShot || state.isTiltBeyondLimit) {
-            Paint(paints.lineGlowPaint).apply { color = paints.warningPaint.color }
-        } else {
-            paints.lineGlowPaint
+        // Configure paints based on configs and state
+        val shotLinePaint = Paint(paints.shotLinePaint).apply {
+            color = if (state.isImpossibleShot || state.isTiltBeyondLimit) paints.warningPaint.color else shotGuideLineConfig.strokeColor.toArgb()
+            strokeWidth = shotGuideLineConfig.strokeWidth
+        }
+        val shotLineGlow = Paint(paints.lineGlowPaint).apply {
+            color = shotLinePaint.color
+            strokeWidth = shotGuideLineConfig.glowWidth
         }
 
-        val aimingLinePaint = if (state.aimedPocketIndex != null) Paint(paints.shotLinePaint).apply { color = android.graphics.Color.WHITE } else paints.targetCirclePaint
-        val aimingLineGlow = if (state.aimedPocketIndex != null) {
-            Paint(paints.lineGlowPaint).apply { color = android.graphics.Color.WHITE; alpha = 150 }
-        } else {
-            paints.lineGlowPaint
+        // Aiming line color is NOT affected by pocketing in ghost mode, only its bank is.
+        val aimingLinePaint = Paint(paints.targetCirclePaint).apply {
+            color = aimingLineConfig.strokeColor.toArgb()
+            strokeWidth = aimingLineConfig.strokeWidth
+        }
+        val aimingLineGlow = Paint(paints.lineGlowPaint).apply {
+            color = aimingLinePaint.color
+            strokeWidth = aimingLineConfig.glowWidth
+            alpha = (aimingLineConfig.glowColor.alpha * 255).toInt()
+        }
+        val pocketedBankPaint = Paint(aimingLinePaint).apply { color = android.graphics.Color.WHITE }
+        val pocketedBankGlow = Paint(aimingLineGlow).apply { color = android.graphics.Color.WHITE }
+
+
+        val tangentSolidPaint = Paint(paints.tangentLineSolidPaint).apply {
+            color = tangentLineConfig.strokeColor.toArgb()
+            strokeWidth = tangentLineConfig.strokeWidth
+        }
+        val tangentDottedPaint = Paint(paints.tangentLineDottedPaint).apply {
+            color = tangentLineConfig.strokeColor.toArgb()
+            strokeWidth = tangentLineConfig.strokeWidth
+            alpha = (tangentLineConfig.opacity * 255).toInt()
+        }
+        val tangentGlow = Paint(paints.lineGlowPaint).apply {
+            strokeWidth = tangentLineConfig.glowWidth
+            color = tangentLineConfig.glowColor.toArgb()
         }
 
         val aimingLineEnd = state.aimingLineEndPoint ?: targetCenter
 
         // --- Draw Glows First ---
-        drawExtendedLine(canvas, ghostCueCenter, aimingLineEnd, aimingLineGlow) // Aiming Line Glow
-        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLineGlow) // Shot Line Glow (conditional color)
-        drawTangentLines(canvas, ghostCueCenter, targetCenter, paints.lineGlowPaint, paints.lineGlowPaint, state.tangentDirection) // Tangent Glows
+        drawExtendedLine(canvas, ghostCueCenter, aimingLineEnd, aimingLineGlow)
+        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLineGlow)
+        drawTangentLines(canvas, ghostCueCenter, targetCenter, tangentGlow, tangentGlow, state.tangentDirection)
 
         // --- Draw Lines Second ---
-        drawExtendedLine(canvas, ghostCueCenter, aimingLineEnd, aimingLinePaint) // Aiming Line
-        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLinePaint) // Shot Line
-        drawTangentLines(canvas, ghostCueCenter, targetCenter, paints.tangentLineSolidPaint, paints.tangentLineDottedPaint, state.tangentDirection) // Tangent Lines
+        drawExtendedLine(canvas, ghostCueCenter, aimingLineEnd, aimingLinePaint)
+        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLinePaint)
+        drawTangentLines(canvas, ghostCueCenter, targetCenter, tangentSolidPaint, tangentDottedPaint, state.tangentDirection)
+
+        // --- Draw Aiming Line Bank ---
+        if (state.aimingLineBankPath.size > 1) {
+            val bankStart = state.aimingLineBankPath[0]
+            val bankMid = state.aimingLineBankPath[1]
+            canvas.drawLine(bankStart.x, bankStart.y, bankMid.x, bankMid.y, aimingLinePaint)
+            if (state.aimingLineBankPath.size > 2) {
+                val bankEnd = state.aimingLineBankPath[2]
+                val bankPaint = if (state.aimedPocketIndex != null) pocketedBankPaint else aimingLinePaint
+                val bankGlow = if (state.aimedPocketIndex != null) pocketedBankGlow else aimingLineGlow
+                canvas.drawLine(bankMid.x, bankMid.y, bankEnd.x, bankEnd.y, bankGlow)
+                canvas.drawLine(bankMid.x, bankMid.y, bankEnd.x, bankEnd.y, bankPaint)
+            }
+        }
 
         if (state.areHelpersVisible) {
             textRenderer.drawProtractorLabels(canvas, state, paints, typeface)
+            // Draw diamond label for shot guide impact point
+            state.shotGuideBankImpactPoint?.let { impactPoint ->
+                getRailForPoint(impactPoint, state)?.let { railType ->
+                    textRenderer.drawDiamondLabel(canvas, impactPoint, railType, state, paints.textPaint)
+                }
+            }
         }
     }
 
     private fun drawBankingLines(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         if (state.bankShotPath.size < 2) return
 
-        val bankLinePaints = listOf(paints.bankLine1Paint, paints.bankLine2Paint, paints.bankLine3Paint, paints.bankLine4Paint)
+        val bankLineConfigs = listOf(BankLine1(), BankLine2(), BankLine3(), BankLine4())
         val lastSegmentIndex = state.bankShotPath.size - 2
 
         for (i in 0..lastSegmentIndex) {
@@ -122,16 +191,18 @@ class LineRenderer {
             val isLastSegment = i == lastSegmentIndex
             val isPocketed = state.pocketedBankShotPocketIndex != null
 
-            // Choose paint for the line based on segment index and whether it's the final, pocketed shot
+            val config = bankLineConfigs.getOrElse(i) { bankLineConfigs.last() }
+
             val linePaint = if (isLastSegment && isPocketed) {
                 Paint(paints.shotLinePaint).apply { color = android.graphics.Color.WHITE }
             } else {
-                bankLinePaints.getOrElse(i) { bankLinePaints.last() } // Fallback to the last color
+                Paint(paints.bankLine1Paint).apply { color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
             }
 
             val glowPaint = Paint(paints.lineGlowPaint).apply {
                 color = linePaint.color
-                alpha = 100 // a consistent glow alpha
+                alpha = (config.glowColor.alpha * 255).toInt()
+                strokeWidth = config.glowWidth
             }
 
             // Draw Glow
