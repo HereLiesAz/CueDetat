@@ -49,8 +49,8 @@ class OverlayRenderer {
 
         // --- Pass 4: Draw Screen-Space UI (Protractor Guides) ---
         if (!state.isBankingMode) {
-            val screenCenter = DrawingUtils.mapPoint(state.protractorUnit.center, state.pitchMatrix)
-            lineRenderer.drawProtractorGuides(canvas, state, paints, screenCenter)
+            val ghostCueScreenCenter = DrawingUtils.mapPoint(state.protractorUnit.ghostCueBallCenter, state.pitchMatrix)
+            lineRenderer.drawProtractorGuides(canvas, state, paints, ghostCueScreenCenter)
         }
     }
 }

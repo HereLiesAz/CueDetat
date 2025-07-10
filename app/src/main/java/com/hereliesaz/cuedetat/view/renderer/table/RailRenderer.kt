@@ -78,41 +78,45 @@ class RailRenderer {
         val railBottomCenterY = innerBottom + railOffsetAmount
         val railLeftCenterX = innerLeft - railOffsetAmount
         val railRightCenterX = innerRight + railOffsetAmount
-        val railEndExtension = railOffsetAmount * 1.5f
 
-        // Draw rail glows
-        canvas.drawLine(innerLeft - railEndExtension, railTopCenterY, innerRight + railEndExtension, railTopCenterY, railLineGlowPaint)
-        canvas.drawLine(innerLeft - railEndExtension, railBottomCenterY, innerRight + railEndExtension, railBottomCenterY, railLineGlowPaint)
-        canvas.drawLine(railLeftCenterX, innerTop - railEndExtension, railLeftCenterX, innerBottom + railEndExtension, railLineGlowPaint)
-        canvas.drawLine(railRightCenterX, innerTop - railEndExtension, railRightCenterX, innerBottom + railEndExtension, railLineGlowPaint)
+        val pocketRadius = referenceRadius * 1.8f
 
-        // Draw rail lines
-        canvas.drawLine(innerLeft - railEndExtension, railTopCenterY, innerRight + railEndExtension, railTopCenterY, railLinePaint)
-        canvas.drawLine(innerLeft - railEndExtension, railBottomCenterY, innerRight + railEndExtension, railBottomCenterY, railLinePaint)
-        canvas.drawLine(railLeftCenterX, innerTop - railEndExtension, railLeftCenterX, innerBottom + railEndExtension, railLinePaint)
-        canvas.drawLine(railRightCenterX, innerTop - railEndExtension, railRightCenterX, innerBottom + railEndExtension, railLinePaint)
+        // --- Draw Rail Segments ---
+        val railSegments = listOf(
+            // Top rail
+            PointF(innerLeft + pocketRadius, railTopCenterY) to PointF(tableCenterX - pocketRadius, railTopCenterY),
+            PointF(tableCenterX + pocketRadius, railTopCenterY) to PointF(innerRight - pocketRadius, railTopCenterY),
+            // Bottom rail
+            PointF(innerLeft + pocketRadius, railBottomCenterY) to PointF(tableCenterX - pocketRadius, railBottomCenterY),
+            PointF(tableCenterX + pocketRadius, railBottomCenterY) to PointF(innerRight - pocketRadius, railBottomCenterY),
+            // Side rails
+            PointF(railLeftCenterX, innerTop + pocketRadius) to PointF(railLeftCenterX, innerBottom - pocketRadius),
+            PointF(railRightCenterX, innerTop + pocketRadius) to PointF(railRightCenterX, innerBottom - pocketRadius)
+        )
 
-        // Draw Diamond Grid
+        railSegments.forEach { (start, end) ->
+            canvas.drawLine(start.x, start.y, end.x, end.y, railLineGlowPaint)
+            canvas.drawLine(start.x, start.y, end.x, end.y, railLinePaint)
+        }
+
+        // --- Draw Diamond Grid (on rail plane) ---
         val diamondGridPaint = paints.gridLinePaint
         val halfWidth = tablePlayingSurfaceWidth / 2f
         val halfHeight = tablePlayingSurfaceHeight / 2f
-
-        // Vertical lines (connecting long rail diamonds)
+        // Vertical lines
         for (i in 1..3) {
             val xOffset = halfWidth * (i / 4.0f)
             canvas.drawLine(tableCenterX - xOffset, innerTop, tableCenterX - xOffset, innerBottom, diamondGridPaint)
             canvas.drawLine(tableCenterX + xOffset, innerTop, tableCenterX + xOffset, innerBottom, diamondGridPaint)
         }
-        // Horizontal lines (connecting short rail diamonds)
+        // Horizontal lines
         for (i in 1..1) {
             val yOffset = halfHeight * (i / 2.0f)
             canvas.drawLine(innerLeft, tableCenterY - yOffset, innerRight, tableCenterY - yOffset, diamondGridPaint)
             canvas.drawLine(innerLeft, tableCenterY + yOffset, innerRight, tableCenterY + yOffset, diamondGridPaint)
         }
-        // Center lines
         canvas.drawLine(tableCenterX, innerTop, tableCenterX, innerBottom, diamondGridPaint)
         canvas.drawLine(innerLeft, tableCenterY, innerRight, tableCenterY, diamondGridPaint)
-
 
         // Draw Diamonds on the rails
         val diamondRadius = referenceRadius * diamondSizeFactor

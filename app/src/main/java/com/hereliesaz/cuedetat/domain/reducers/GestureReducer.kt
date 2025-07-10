@@ -5,6 +5,7 @@ import android.util.Log
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.view.state.TableSize
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.cos
@@ -96,7 +97,16 @@ class GestureReducer @Inject constructor() {
             }
             InteractionMode.MOVING_ACTUAL_CUE_BALL -> {
                 currentState.onPlaneBall?.let {
-                    val newCenter = PointF(it.center.x + logicalDelta.x, it.center.y + logicalDelta.y)
+                    var newCenterX = it.center.x + logicalDelta.x
+                    var newCenterY = it.center.y + logicalDelta.y
+
+                    if (currentState.showTable || currentState.isBankingMode) {
+                        val (left, top, right, bottom) = getTableBoundaries(currentState)
+                        newCenterX = newCenterX.coerceIn(left, right)
+                        newCenterY = newCenterY.coerceIn(top, bottom)
+                    }
+
+                    val newCenter = PointF(newCenterX, newCenterY)
                     Log.d(GESTURE_TAG, "REDUCER: MOVING_ACTUAL_CUE_BALL to $newCenter")
                     currentState.copy(onPlaneBall = it.copy(center = newCenter), valuesChangedSinceReset = true)
                 } ?: currentState
@@ -104,6 +114,23 @@ class GestureReducer @Inject constructor() {
             // AIMING_BANK_SHOT is now handled by AimBankShot event, so this case is removed from drag.
             else -> currentState
         }
+    }
+
+    private fun getTableBoundaries(state: OverlayState): FloatArray {
+        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
+        val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
+        val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
+        val tablePlayingSurfaceWidth = tableToBallRatioLong * referenceRadius
+        val tablePlayingSurfaceHeight = tableToBallRatioShort * referenceRadius
+
+        val canvasCenterX = state.viewWidth / 2f
+        val canvasCenterY = state.viewHeight / 2f
+        val left = canvasCenterX - tablePlayingSurfaceWidth / 2
+        val top = canvasCenterY - tablePlayingSurfaceHeight / 2
+        val right = canvasCenterX + tablePlayingSurfaceWidth / 2
+        val bottom = canvasCenterY + tablePlayingSurfaceHeight / 2
+
+        return floatArrayOf(left, top, right, bottom)
     }
 
     private fun distance(p1: PointF, p2: PointF): Float {
