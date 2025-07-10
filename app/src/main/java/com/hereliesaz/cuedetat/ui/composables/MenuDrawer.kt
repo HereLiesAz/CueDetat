@@ -2,14 +2,7 @@ package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.DividerDefaults
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
@@ -20,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -45,12 +39,14 @@ fun MenuDrawerContent(
                 style = MaterialTheme.typography.displaySmall,
                 textAlign = TextAlign.Center
             )
+            val versionInfo = "v${BuildConfig.VERSION_NAME}" + (uiState.latestVersionName?.let { " (latest: $it)" } ?: "")
+            Text(
+                text = versionInfo,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall
+            )
         }
-        HorizontalDivider(
-            thickness = DividerDefaults.Thickness,
-            color = MaterialTheme.colorScheme.outline
-        )
-        Spacer(modifier = Modifier.height(8.dp))
+        MenuDivider()
 
         MenuItem(
             text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
@@ -60,10 +56,19 @@ fun MenuDrawerContent(
             text = "Show Tutorial",
             onClick = { onEvent(MainScreenEvent.StartTutorial); onCloseDrawer() }
         )
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            color = MaterialTheme.colorScheme.outline
+        MenuItem(
+            text = "Reset View",
+            onClick = { onEvent(MainScreenEvent.Reset); onCloseDrawer() }
         )
+        MenuDivider()
+
+        if (!uiState.isBankingMode) {
+            val cueBallToggleText = if (uiState.onPlaneBall == null) "Toggle Cue Ball" else "Hide Cue Ball"
+            MenuItem(
+                text = cueBallToggleText,
+                onClick = { onEvent(MainScreenEvent.ToggleOnPlaneBall); onCloseDrawer() }
+            )
+        }
 
         val bankingModeToggleText = if (uiState.isBankingMode) "Ghost Ball Aiming" else "Calculate Bank"
         MenuItem(
@@ -76,11 +81,7 @@ fun MenuDrawerContent(
             text = tableToggleText,
             onClick = { onEvent(MainScreenEvent.ToggleTable); onCloseDrawer() }
         )
-
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            color = MaterialTheme.colorScheme.outline
-        )
+        MenuDivider()
 
         val systemIsCurrentlyDark = isSystemInDarkTheme()
         val themeToggleText = when (uiState.isForceLightMode) {
@@ -96,10 +97,7 @@ fun MenuDrawerContent(
             text = "Luminance",
             onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog); onCloseDrawer() }
         )
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            color = MaterialTheme.colorScheme.outline
-        )
+        MenuDivider()
 
         MenuItem(
             text = "About Me",
@@ -123,12 +121,18 @@ private fun MenuItem(text: String, onClick: () -> Unit) {
             .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Icon removed as per mandate
-        Spacer(modifier = Modifier.width(16.dp))
         Text(
             text = text,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.primary
         )
     }
+}
+
+@Composable
+private fun MenuDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        color = MaterialTheme.colorScheme.outline
+    )
 }

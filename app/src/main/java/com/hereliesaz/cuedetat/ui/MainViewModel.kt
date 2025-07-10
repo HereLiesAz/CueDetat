@@ -3,7 +3,6 @@ package com.hereliesaz.cuedetat.ui
 
 import android.app.Application
 import android.graphics.Camera
-import android.graphics.Matrix
 import android.graphics.PointF
 import android.util.Log
 import androidx.compose.material3.darkColorScheme
@@ -11,9 +10,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.R
+import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.SensorRepository
-import com.hereliesaz.cuedetat.data.UpdateChecker
-import com.hereliesaz.cuedetat.data.UpdateResult
 import com.hereliesaz.cuedetat.domain.StateReducer
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.view.model.Perspective
@@ -33,7 +31,7 @@ private const val GESTURE_TAG = "GestureDebug"
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val sensorRepository: SensorRepository,
-    private val updateChecker: UpdateChecker,
+    private val githubRepository: GithubRepository,
     application: Application,
     private val updateStateUseCase: UpdateStateUseCase,
     private val stateReducer: StateReducer
@@ -57,27 +55,33 @@ class MainViewModel @Inject constructor(
         sensorRepository.fullOrientationFlow
             .onEach { orientation -> onEvent(MainScreenEvent.FullOrientationChanged(orientation)) }
             .launchIn(viewModelScope)
+
+        fetchLatestVersionName()
     }
 
     fun onEvent(event: MainScreenEvent) {
-        // Events that trigger a single state change or action
         when (event) {
-            is MainScreenEvent.CheckForUpdate -> checkForUpdate()
+            is MainScreenEvent.CheckForUpdate -> _singleEvent.value = SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat/releases")
             is MainScreenEvent.ViewArt -> _singleEvent.value = SingleEvent.OpenUrl("https://instagram.com/hereliesaz")
             is MainScreenEvent.ShowDonationOptions -> _singleEvent.value = SingleEvent.ShowDonationDialog
             is MainScreenEvent.SingleEventConsumed -> _singleEvent.value = null
             is MainScreenEvent.ToastShown -> _toastMessage.value = null
             else -> {
-                // For all other events, run the main state update logic
                 updateState(event)
             }
+        }
+    }
+
+    private fun fetchLatestVersionName() {
+        viewModelScope.launch {
+            val latestVersion = githubRepository.getLatestVersionName()
+            _uiState.value = _uiState.value.copy(latestVersionName = latestVersion)
         }
     }
 
     private fun updateState(event: MainScreenEvent) {
         val currentState = _uiState.value
 
-        // Convert screen-space gestures to logical-space gestures before reducing
         val logicalEvent = when (event) {
             is MainScreenEvent.Drag -> {
                 if (currentState.hasInverseMatrix) {
@@ -87,7 +91,7 @@ class MainViewModel @Inject constructor(
                     val screenDelta = Offset(event.currentPosition.x - event.previousPosition.x, event.currentPosition.y - event.previousPosition.y)
                     MainScreenEvent.LogicalDragApplied(logicalDelta, screenDelta)
                 } else {
-                    event // Pass original event if no matrix
+                    event
                 }
             }
             is MainScreenEvent.ScreenGestureStarted -> {
@@ -95,19 +99,15 @@ class MainViewModel @Inject constructor(
                     val logicalPoint = Perspective.screenToLogical(event.position, currentState.inversePitchMatrix)
                     MainScreenEvent.LogicalGestureStarted(logicalPoint)
                 } else {
-                    event // Pass original event if no matrix
+                    event
                 }
             }
             else -> event
         }
 
-        // Reduce the state based on the (potentially translated) event
         val stateFromReducer = stateReducer.reduce(currentState, logicalEvent)
-
-        // Calculate all derived geometric properties
         var finalState = updateStateUseCase(stateFromReducer, graphicsCamera)
 
-        // Handle final state adjustments that happen after a gesture ends
         if (event is MainScreenEvent.GestureEnded) {
             val warningText = if (!finalState.isBankingMode && finalState.isImpossibleShot) {
                 insultingWarnings[warningIndex].also {
@@ -124,16 +124,5 @@ class MainViewModel @Inject constructor(
         }
 
         _uiState.value = finalState
-    }
-
-    private fun checkForUpdate() {
-        viewModelScope.launch {
-            val result = updateChecker.checkForUpdate()
-            _toastMessage.value = when (result) {
-                is UpdateResult.UpdateAvailable -> ToastMessage.StringResource(R.string.update_available, listOf(result.latestVersion))
-                is UpdateResult.UpToDate -> ToastMessage.StringResource(R.string.update_no_new_release)
-                is UpdateResult.CheckFailed -> ToastMessage.PlainText(result.reason)
-            }
-        }
     }
 }

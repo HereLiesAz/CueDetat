@@ -5,27 +5,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Represents the result of a version fetch, providing more detail than a nullable string.
+ * Repository to fetch data from the project's GitHub page.
+ * It is simplified to only fetch the latest release tag name.
  */
-sealed class VersionResult {
-    /**
-     * Indicates a successful fetch.
-     * @param tagName The version tag from the release.
-     */
-    data class Success(val tagName: String) : VersionResult()
-
-    /**
-     * Indicates a failed API request.
-     * @param code The HTTP status code of the failure.
-     */
-    data class Failure(val code: Int) : VersionResult()
-
-    /**
-     * Indicates a network or other unknown error occurred.
-     */
-    object Error : VersionResult()
-}
-
 @Singleton
 class GithubRepository @Inject constructor(private val githubApi: GithubApi) {
 
@@ -36,23 +18,18 @@ class GithubRepository @Inject constructor(private val githubApi: GithubApi) {
 
     /**
      * Fetches the latest release version name from the project's GitHub repository.
-     * @return A [VersionResult] indicating success, failure with an HTTP code, or a generic error.
+     * @return The tag name as a String, or null if the request fails or an error occurs.
      */
-    suspend fun getLatestVersion(): VersionResult {
+    suspend fun getLatestVersionName(): String? {
         return try {
             val response = githubApi.getLatestRelease(REPO_OWNER, REPO_NAME)
             if (response.isSuccessful) {
-                // If successful, ensure the body and tag name are not null.
-                response.body()?.tag_name?.let {
-                    VersionResult.Success(it)
-                } ?: VersionResult.Failure(response.code()) // Success but empty body is a failure.
+                response.body()?.tag_name
             } else {
-                // If the request was not successful, return the HTTP error code.
-                VersionResult.Failure(response.code())
+                null
             }
         } catch (e: Exception) {
-            // Exceptions are the universe's way of saying "not today."
-            VersionResult.Error
+            null
         }
     }
 }

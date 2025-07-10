@@ -69,7 +69,10 @@ data class OverlayState(
     val interactionMode: InteractionMode = InteractionMode.NONE,
 
     // State for Reset/Revert functionality
-    val preResetState: OverlayState? = null
+    val preResetState: OverlayState? = null,
+
+    // Version Info
+    val latestVersionName: String? = null
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
