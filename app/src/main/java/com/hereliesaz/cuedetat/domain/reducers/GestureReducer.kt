@@ -13,6 +13,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.hypot
 
 private const val GESTURE_TAG = "GestureDebug"
 
@@ -21,7 +22,6 @@ class GestureReducer @Inject constructor() {
 
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         return when (event) {
-            // --- THE FIX: Routing restored to the logical event ---
             is MainScreenEvent.LogicalGestureStarted -> handleGestureStarted(currentState, event)
             is MainScreenEvent.LogicalDragApplied -> handleDrag(currentState, event)
             is MainScreenEvent.GestureEnded -> {
@@ -39,38 +39,49 @@ class GestureReducer @Inject constructor() {
         }
     }
 
-    // --- THE FIX: Function now accepts the logical event and uses its purified data ---
     private fun handleGestureStarted(currentState: OverlayState, event: MainScreenEvent.LogicalGestureStarted): OverlayState {
         val logicalPoint = event.logicalPoint
+        val screenPoint = PointF(event.screenOffset.x, event.screenOffset.y)
         var newMode = InteractionMode.NONE
 
-        if (currentState.isBankingMode) {
-            currentState.onPlaneBall?.let {
-                val touchSlop = it.radius * 1.5f
-                if (distance(logicalPoint, it.center) < it.radius + touchSlop) {
-                    newMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
-                }
-            }
-            if (newMode == InteractionMode.NONE) {
-                newMode = InteractionMode.AIMING_BANK_SHOT
-            }
-        } else {
-            currentState.onPlaneBall?.let {
-                val touchSlop = it.radius * 1.5f
-                if (distance(logicalPoint, it.center) < it.radius + touchSlop) {
-                    newMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
-                }
-            }
-            if (newMode == InteractionMode.NONE) {
-                val touchSlop = currentState.protractorUnit.radius * 1.5f
-                if (distance(logicalPoint, currentState.protractorUnit.center) < currentState.protractorUnit.radius + touchSlop) {
-                    newMode = InteractionMode.MOVING_PROTRACTOR_UNIT
-                }
-            }
-            if (newMode == InteractionMode.NONE) {
-                newMode = InteractionMode.ROTATING_PROTRACTOR
+        // THE FIX: Check for spin control interaction first, as it exists in screen space.
+        currentState.spinControlCenter?.let {
+            val spinControlScreenRadius = 100f // Effective radius in screen pixels (50dp * density, roughly)
+            if (distance(screenPoint, it) < spinControlScreenRadius) {
+                newMode = InteractionMode.MOVING_SPIN_CONTROL
             }
         }
+
+        if (newMode == InteractionMode.NONE) {
+            if (currentState.isBankingMode) {
+                currentState.onPlaneBall?.let {
+                    val touchSlop = it.radius * 1.5f
+                    if (distance(logicalPoint, it.center) < it.radius + touchSlop) {
+                        newMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
+                    }
+                }
+                if (newMode == InteractionMode.NONE) {
+                    newMode = InteractionMode.AIMING_BANK_SHOT
+                }
+            } else {
+                currentState.onPlaneBall?.let {
+                    val touchSlop = it.radius * 1.5f
+                    if (distance(logicalPoint, it.center) < it.radius + touchSlop) {
+                        newMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
+                    }
+                }
+                if (newMode == InteractionMode.NONE) {
+                    val touchSlop = currentState.protractorUnit.radius * 1.5f
+                    if (distance(logicalPoint, currentState.protractorUnit.center) < currentState.protractorUnit.radius + touchSlop) {
+                        newMode = InteractionMode.MOVING_PROTRACTOR_UNIT
+                    }
+                }
+                if (newMode == InteractionMode.NONE) {
+                    newMode = InteractionMode.ROTATING_PROTRACTOR
+                }
+            }
+        }
+
         Log.d(GESTURE_TAG, "REDUCER: GestureStarted. Determined Mode: $newMode")
 
         val showMagnifier = newMode == InteractionMode.MOVING_ACTUAL_CUE_BALL || newMode == InteractionMode.MOVING_PROTRACTOR_UNIT
@@ -161,6 +172,6 @@ class GestureReducer @Inject constructor() {
     private fun distance(p1: PointF, p2: PointF): Float {
         val dx = p1.x - p2.x
         val dy = p1.y - p2.y
-        return kotlin.math.sqrt(dx * dx + dy * dy)
+        return hypot(dx.toDouble(), dy.toDouble()).toFloat()
     }
 }

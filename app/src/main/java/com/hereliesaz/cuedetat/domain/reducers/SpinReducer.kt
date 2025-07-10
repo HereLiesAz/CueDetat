@@ -2,6 +2,7 @@
 
 package com.hereliesaz.cuedetat.domain.reducers
 
+import android.graphics.PointF
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
@@ -30,12 +31,9 @@ class SpinReducer @Inject constructor() {
             }
             is MainScreenEvent.DragSpinControl -> {
                 val currentCenter = currentState.spinControlCenter ?: return currentState
-                currentState.copy(
-                    spinControlCenter = currentCenter.apply {
-                        x += event.delta.x
-                        y += event.delta.y
-                    }
-                )
+                // THE FIX: Create a new PointF to ensure immutability.
+                val newCenter = PointF(currentCenter.x + event.delta.x, currentCenter.y + event.delta.y)
+                currentState.copy(spinControlCenter = newCenter)
             }
             is MainScreenEvent.ClearSpinState -> {
                 currentState.copy(
