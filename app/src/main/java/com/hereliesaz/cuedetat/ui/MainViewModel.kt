@@ -12,9 +12,11 @@ import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.SensorRepository
+import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.domain.StateReducer
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.view.model.Perspective
+import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SingleEvent
 import com.hereliesaz.cuedetat.view.state.ToastMessage
@@ -32,6 +34,7 @@ private const val GESTURE_TAG = "GestureDebug"
 class MainViewModel @Inject constructor(
     private val sensorRepository: SensorRepository,
     private val githubRepository: GithubRepository,
+    private val userPreferencesRepository: UserPreferencesRepository,
     application: Application,
     private val updateStateUseCase: UpdateStateUseCase,
     private val stateReducer: StateReducer
@@ -42,7 +45,12 @@ class MainViewModel @Inject constructor(
         application.resources.getStringArray(R.array.insulting_warnings)
     private var warningIndex = 0
 
-    private val _uiState = MutableStateFlow(OverlayState(appControlColorScheme = darkColorScheme()))
+    private val _uiState = MutableStateFlow(
+        OverlayState(
+            appControlColorScheme = darkColorScheme(),
+            distanceUnit = userPreferencesRepository.getDistanceUnit() // Initialize from memory
+        )
+    )
     val uiState = _uiState.asStateFlow()
 
     private val _toastMessage = MutableStateFlow<ToastMessage?>(null)
@@ -66,6 +74,11 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.ShowDonationOptions -> _singleEvent.value = SingleEvent.ShowDonationDialog
             is MainScreenEvent.SingleEventConsumed -> _singleEvent.value = null
             is MainScreenEvent.ToastShown -> _toastMessage.value = null
+            is MainScreenEvent.ToggleDistanceUnit -> {
+                val newUnit = if (uiState.value.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC
+                userPreferencesRepository.setDistanceUnit(newUnit)
+                updateState(event) // Pass event to reducer
+            }
             else -> {
                 updateState(event)
             }

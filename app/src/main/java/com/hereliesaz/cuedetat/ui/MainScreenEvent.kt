@@ -13,6 +13,7 @@ sealed class MainScreenEvent {
     object GestureEnded : MainScreenEvent()
     data class SizeChanged(val width: Int, val height: Int) : MainScreenEvent()
     data class ZoomScaleChanged(val scaleFactor: Float) : MainScreenEvent()
+    data class TableRotationApplied(val degrees: Float) : MainScreenEvent() // For gestures (delta)
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
 
     // Logical Events (dispatched by ViewModel)
@@ -20,7 +21,7 @@ sealed class MainScreenEvent {
     internal data class LogicalDragApplied(val logicalDelta: PointF, val screenDelta: Offset) : MainScreenEvent()
 
     // Direct State Change Events
-    data class TableRotationChanged(val degrees: Float) : MainScreenEvent()
+    data class TableRotationChanged(val degrees: Float) : MainScreenEvent() // For the slider (absolute)
     data class FullOrientationChanged(val orientation: FullOrientation) : MainScreenEvent()
     data class ThemeChanged(val scheme: ColorScheme) : MainScreenEvent()
     object Reset : MainScreenEvent()

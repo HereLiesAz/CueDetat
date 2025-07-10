@@ -50,19 +50,13 @@ class LineRenderer {
 
         // --- Draw Glows First ---
         drawExtendedLine(canvas, ghostCueCenter, targetCenter, paints.lineGlowPaint) // Aiming Line Glow
-        if (!state.isTiltBeyondLimit) {
-            drawExtendedLine(canvas, state.shotLineAnchor, ghostCueCenter, shotLineGlow) // Shot Line Glow (conditional color)
-        }
+        drawExtendedLine(canvas, state.shotLineAnchor, ghostCueCenter, shotLineGlow) // Shot Line Glow (conditional color)
         drawTangentLines(canvas, ghostCueCenter, targetCenter, paints.lineGlowPaint, paints.lineGlowPaint, state.tangentDirection) // Tangent Glows
 
 
         // --- Draw Lines Second ---
         drawExtendedLine(canvas, ghostCueCenter, targetCenter, paints.targetCirclePaint) // Aiming Line
-
-        if (!state.isTiltBeyondLimit) {
-            drawExtendedLine(canvas, state.shotLineAnchor, ghostCueCenter, shotLinePaint) // Shot Line
-        }
-
+        drawExtendedLine(canvas, state.shotLineAnchor, ghostCueCenter, shotLinePaint) // Shot Line
         drawTangentLines(canvas, ghostCueCenter, targetCenter, paints.tangentLineSolidPaint, paints.tangentLineDottedPaint, state.tangentDirection) // Tangent Lines
 
 

@@ -56,6 +56,8 @@ class UpdateStateUseCase @Inject constructor() {
         val inverseMatrix = Matrix()
         val hasInverse = pitchMatrix.invert(inverseMatrix)
 
+        // The anchor point must always be calculated. If the ActualCueBall is not visible,
+        // it defaults to a point logically below the screen. This is the crux of the bug fix.
         val shotLineAnchorPoint: PointF = state.onPlaneBall?.center ?: run {
             if (hasInverse) {
                 val screenAnchor = floatArrayOf(state.viewWidth / 2f, state.viewHeight.toFloat())
