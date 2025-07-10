@@ -28,16 +28,7 @@ class ControlReducer @Inject constructor() {
         val newSliderPos = event.position.coerceIn(-50f, 50f)
         val newLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
 
-        // Only adjust ball positions if not in banking mode
-        var updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
-        if (!currentState.isBankingMode) {
-            val viewCenterX = currentState.viewWidth / 2f
-            val viewCenterY = currentState.viewHeight / 2f
-            val oldZoomSliderPos = currentState.zoomSliderPosition
-            val oldZoomFactor = ZoomMapping.sliderToZoom(oldZoomSliderPos)
-            val newZoomFactor = ZoomMapping.sliderToZoom(newSliderPos)
-            updatedOnPlaneBall = adjustBallForCenteredZoom(updatedOnPlaneBall, viewCenterX, viewCenterY, oldZoomFactor, newZoomFactor)
-        }
+        val updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
 
         return currentState.copy(
             protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
@@ -54,14 +45,7 @@ class ControlReducer @Inject constructor() {
         val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue)
         val newLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
 
-        // Only adjust ball positions if not in banking mode
-        var updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
-        if (!currentState.isBankingMode) {
-            val viewCenterX = currentState.viewWidth / 2f
-            val viewCenterY = currentState.viewHeight / 2f
-            val oldZoomFactor = ZoomMapping.sliderToZoom(oldZoomSliderPos)
-            updatedOnPlaneBall = adjustBallForCenteredZoom(updatedOnPlaneBall, viewCenterX, viewCenterY, oldZoomFactor, newZoomValue)
-        }
+        val updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
 
         return currentState.copy(
             protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
@@ -69,23 +53,5 @@ class ControlReducer @Inject constructor() {
             zoomSliderPosition = newSliderPos,
             valuesChangedSinceReset = true
         )
-    }
-
-    private fun adjustBallForCenteredZoom(currentBall: OnPlaneBall?, viewCenterX: Float, viewCenterY: Float, oldZoomFactorFromSlider: Float, newZoomFactorFromSlider: Float): OnPlaneBall? {
-        if (currentBall == null || oldZoomFactorFromSlider.roughlyEquals(0f) || newZoomFactorFromSlider.roughlyEquals(0f) || oldZoomFactorFromSlider.roughlyEquals(newZoomFactorFromSlider)) {
-            return currentBall
-        }
-        val scaleEffectRatio = oldZoomFactorFromSlider / newZoomFactorFromSlider
-        val vecX = currentBall.center.x - viewCenterX
-        val vecY = currentBall.center.y - viewCenterY
-        val newVecX = vecX * scaleEffectRatio
-        val newVecY = vecY * scaleEffectRatio
-        val newCenterX = viewCenterX + newVecX
-        val newCenterY = viewCenterY + newVecY
-        return currentBall.copy(center = PointF(newCenterX, newCenterY))
-    }
-
-    private fun Float.roughlyEquals(other: Float, tolerance: Float = 0.00001f): Boolean {
-        return abs(this - other) < tolerance
     }
 }

@@ -60,7 +60,7 @@ class SystemReducer @Inject constructor() {
         val initialSliderPos = 0f // Centered
         val initialLogicalRadius = ReducerUtils.getCurrentLogicalRadius(viewWidth, viewHeight, initialSliderPos)
         val initialProtractorCenter = PointF(viewWidth / 2f, viewHeight / 2f)
-        val initialTableRotation = if (viewWidth > viewHeight) 0f else 90f // Landscape vs Portrait
+        val initialTableRotation = 90f // Default to Portrait orientation
 
         return OverlayState(
             viewWidth = viewWidth,

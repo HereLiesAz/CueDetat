@@ -87,6 +87,7 @@ data class OverlayState(
     val pitchMatrix: Matrix = Matrix(),
     val railPitchMatrix: Matrix = Matrix(),
     val inversePitchMatrix: Matrix = Matrix(),
+    val flatMatrix: Matrix = Matrix(),
     val hasInverseMatrix: Boolean = false,
 
     // Derived state

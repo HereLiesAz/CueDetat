@@ -60,12 +60,10 @@ class BallRenderer {
         val screenPos = DrawingUtils.mapPoint(ball.center, state.pitchMatrix)
         val yPosLifted = screenPos.y - radiusInfo.lift
 
-        // --- Draw on-plane shadow first, using the unified on-screen radius ---
+        // --- Draw on-plane shadow first, using its pure logical radius ---
         canvas.save()
         canvas.concat(state.pitchMatrix)
-        // We must map the screen radius back to a logical radius for drawing on the pitched canvas.
-        val logicalOnScreenRadius = state.inversePitchMatrix.mapRadius(radiusInfo.radius)
-        canvas.drawCircle(ball.center.x, ball.center.y, logicalOnScreenRadius, strokePaint)
+        canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, strokePaint)
         canvas.restore()
 
         // --- Then draw the lifted ghost effect ---

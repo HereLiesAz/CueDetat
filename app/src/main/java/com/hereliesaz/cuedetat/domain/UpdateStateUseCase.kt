@@ -4,6 +4,7 @@ package com.hereliesaz.cuedetat.domain
 import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
+import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.table.TableRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
@@ -29,6 +30,15 @@ class UpdateStateUseCase @Inject constructor() {
         )
         val baseInverseMatrix = Matrix().apply { basePitchMatrix.invert(this) }
 
+        // Create a "flat" matrix with zero pitch for stable radius calculations.
+        val flatMatrix = Perspective.createPitchMatrix(
+            currentOrientation = FullOrientation(0f, 0f, 0f),
+            viewWidth = state.viewWidth,
+            viewHeight = state.viewHeight,
+            camera = camera
+        )
+
+
         // --- Stage 2: Calculate Logical Values in a Stable Coordinate System ---
         val logicalShotLineAnchor = getLogicalShotLineAnchor(state, baseInverseMatrix)
         val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= state.protractorUnit.ghostCueBallCenter.y
@@ -38,7 +48,7 @@ class UpdateStateUseCase @Inject constructor() {
             ghostBall = state.protractorUnit.ghostCueBallCenter,
             targetBall = state.protractorUnit.center
         )
-        val targetBallDistance = calculateDistance(state, basePitchMatrix)
+        val targetBallDistance = calculateDistance(state, flatMatrix) // Use flat matrix for stable distance
         val (aimedPocketIndex, aimingLineEndPoint) = if (!state.isBankingMode) {
             checkPocketAim(state)
         } else {
@@ -74,6 +84,7 @@ class UpdateStateUseCase @Inject constructor() {
             pitchMatrix = finalPitchMatrix,
             railPitchMatrix = finalRailPitchMatrix,
             inversePitchMatrix = finalInverseMatrix,
+            flatMatrix = flatMatrix,
             hasInverseMatrix = hasFinalInverse,
             shotLineAnchor = logicalShotLineAnchor, // State now holds the true logical anchor
             isImpossibleShot = isImpossible,

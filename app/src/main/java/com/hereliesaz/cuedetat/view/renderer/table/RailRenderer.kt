@@ -92,10 +92,30 @@ class RailRenderer {
         canvas.drawLine(railLeftCenterX, innerTop - railEndExtension, railLeftCenterX, innerBottom + railEndExtension, railLinePaint)
         canvas.drawLine(railRightCenterX, innerTop - railEndExtension, railRightCenterX, innerBottom + railEndExtension, railLinePaint)
 
-        // Draw Diamonds on the rails
-        val diamondRadius = referenceRadius * diamondSizeFactor
+        // Draw Diamond Grid
+        val diamondGridPaint = paints.gridLinePaint
         val halfWidth = tablePlayingSurfaceWidth / 2f
         val halfHeight = tablePlayingSurfaceHeight / 2f
+
+        // Vertical lines (connecting long rail diamonds)
+        for (i in 1..3) {
+            val xOffset = halfWidth * (i / 4.0f)
+            canvas.drawLine(tableCenterX - xOffset, innerTop, tableCenterX - xOffset, innerBottom, diamondGridPaint)
+            canvas.drawLine(tableCenterX + xOffset, innerTop, tableCenterX + xOffset, innerBottom, diamondGridPaint)
+        }
+        // Horizontal lines (connecting short rail diamonds)
+        for (i in 1..1) {
+            val yOffset = halfHeight * (i / 2.0f)
+            canvas.drawLine(innerLeft, tableCenterY - yOffset, innerRight, tableCenterY - yOffset, diamondGridPaint)
+            canvas.drawLine(innerLeft, tableCenterY + yOffset, innerRight, tableCenterY + yOffset, diamondGridPaint)
+        }
+        // Center lines
+        canvas.drawLine(tableCenterX, innerTop, tableCenterX, innerBottom, diamondGridPaint)
+        canvas.drawLine(innerLeft, tableCenterY, innerRight, tableCenterY, diamondGridPaint)
+
+
+        // Draw Diamonds on the rails
+        val diamondRadius = referenceRadius * diamondSizeFactor
 
         // Long rails (3 diamonds between corner and side pockets)
         for (i in 1..3) {
