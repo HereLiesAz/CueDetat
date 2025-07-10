@@ -8,6 +8,7 @@ import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -15,7 +16,7 @@ import kotlin.math.sqrt
 
 class LineRenderer {
     private val textRenderer = LineTextRenderer()
-    private val protractorAngles = floatArrayOf(14f, 30f, 43f, 48f)
+    private val protractorAngles = floatArrayOf(5f, 10f, 15f, 20f, 25f, 30f, 35f, 40f, 45f)
 
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         if (state.isBankingMode) {
@@ -26,10 +27,40 @@ class LineRenderer {
     }
 
     // New public method for drawing screen-space guides
-    fun drawProtractorGuides(canvas: Canvas, state: OverlayState, paints: PaintCache, screenCenter: PointF) {
-        val ghostCueScreenCenter = DrawingUtils.mapPoint(state.protractorUnit.ghostCueBallCenter, state.pitchMatrix)
+    fun drawProtractorGuides(canvas: Canvas, state: OverlayState, paints: PaintCache, center: PointF, referencePoint: PointF) {
         protractorAngles.forEach { angle ->
-            drawAngleGuide(canvas, screenCenter, ghostCueScreenCenter, angle, paints.angleGuidePaint)
+            drawAngleGuide(canvas, center, referencePoint, angle, paints.angleGuidePaint)
+            drawAngleGuide(canvas, center, referencePoint, -angle, paints.angleGuidePaint) // Draw on both sides
+        }
+    }
+
+    private fun getRailForPoint(point: PointF, state: OverlayState): LineTextRenderer.RailType? {
+        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
+        if (referenceRadius <= 0) return null
+
+        val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
+        val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
+        val tableWidth = tableToBallRatioLong * referenceRadius
+        val tableHeight = tableToBallRatioShort * referenceRadius
+
+        val halfW = tableWidth / 2f
+        val halfH = tableHeight / 2f
+        val canvasCenterX = state.viewWidth / 2f
+        val canvasCenterY = state.viewHeight / 2f
+
+        val left = canvasCenterX - halfW
+        val top = canvasCenterY - halfH
+        val right = canvasCenterX + halfW
+        val bottom = canvasCenterY + halfH
+
+        val tolerance = 5f // A small tolerance in pixels
+
+        return when {
+            abs(point.y - top) < tolerance -> LineTextRenderer.RailType.TOP
+            abs(point.y - bottom) < tolerance -> LineTextRenderer.RailType.BOTTOM
+            abs(point.x - left) < tolerance -> LineTextRenderer.RailType.LEFT
+            abs(point.x - right) < tolerance -> LineTextRenderer.RailType.RIGHT
+            else -> null
         }
     }
 
@@ -106,6 +137,12 @@ class LineRenderer {
             canvas.drawLine(start.x, start.y, end.x, end.y, glowPaint)
             // Draw Line
             canvas.drawLine(start.x, start.y, end.x, end.y, linePaint)
+
+            // Draw diamond label at impact point
+            getRailForPoint(end, state)?.let { railType ->
+                val textPaint = paints.textPaint.apply { this.typeface = typeface }
+                textRenderer.drawDiamondLabel(canvas, end, railType, state, textPaint)
+            }
         }
 
         if (state.areHelpersVisible) {

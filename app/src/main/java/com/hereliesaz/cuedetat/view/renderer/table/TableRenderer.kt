@@ -56,6 +56,28 @@ class TableRenderer {
             // Draw Outline Only, no fill.
             canvas.drawRect(left, top, right, bottom, paints.tableOutlinePaint)
 
+            // Draw Diamond Grid
+            val diamondGridPaint = paints.gridLinePaint
+            val halfWidth = tablePlayingSurfaceWidth / 2
+            val halfHeight = tablePlayingSurfaceHeight / 2
+
+            // Vertical lines (connecting long rail diamonds)
+            for (i in 1..3) {
+                val xOffset = halfWidth * (i / 4.0f)
+                canvas.drawLine(canvasCenterX - xOffset, top, canvasCenterX - xOffset, bottom, diamondGridPaint)
+                canvas.drawLine(canvasCenterX + xOffset, top, canvasCenterX + xOffset, bottom, diamondGridPaint)
+            }
+            // Horizontal lines (connecting short rail diamonds)
+            for (i in 1..3) { // Corrected from 1..1 to 1..3 to match short rail diamonds
+                val yOffset = halfHeight * (i / 4.0f)
+                canvas.drawLine(left, canvasCenterY - yOffset, right, canvasCenterY - yOffset, diamondGridPaint)
+                canvas.drawLine(left, canvasCenterY + yOffset, right, canvasCenterY + yOffset, diamondGridPaint)
+            }
+            // Center lines
+            canvas.drawLine(canvasCenterX, top, canvasCenterX, bottom, diamondGridPaint)
+            canvas.drawLine(left, canvasCenterY, right, canvasCenterY, diamondGridPaint)
+
+
             // Draw Pockets
             val pocketRadius = referenceRadius * 1.8f
             val pockets = getLogicalPockets(state)

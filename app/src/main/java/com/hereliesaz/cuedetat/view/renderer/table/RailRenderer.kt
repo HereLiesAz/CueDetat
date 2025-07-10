@@ -99,27 +99,10 @@ class RailRenderer {
             canvas.drawLine(start.x, start.y, end.x, end.y, railLinePaint)
         }
 
-        // --- Draw Diamond Grid (on rail plane) ---
-        val diamondGridPaint = paints.gridLinePaint
-        val halfWidth = tablePlayingSurfaceWidth / 2f
-        val halfHeight = tablePlayingSurfaceHeight / 2f
-        // Vertical lines
-        for (i in 1..3) {
-            val xOffset = halfWidth * (i / 4.0f)
-            canvas.drawLine(tableCenterX - xOffset, innerTop, tableCenterX - xOffset, innerBottom, diamondGridPaint)
-            canvas.drawLine(tableCenterX + xOffset, innerTop, tableCenterX + xOffset, innerBottom, diamondGridPaint)
-        }
-        // Horizontal lines
-        for (i in 1..1) {
-            val yOffset = halfHeight * (i / 2.0f)
-            canvas.drawLine(innerLeft, tableCenterY - yOffset, innerRight, tableCenterY - yOffset, diamondGridPaint)
-            canvas.drawLine(innerLeft, tableCenterY + yOffset, innerRight, tableCenterY + yOffset, diamondGridPaint)
-        }
-        canvas.drawLine(tableCenterX, innerTop, tableCenterX, innerBottom, diamondGridPaint)
-        canvas.drawLine(innerLeft, tableCenterY, innerRight, tableCenterY, diamondGridPaint)
-
         // Draw Diamonds on the rails
         val diamondRadius = referenceRadius * diamondSizeFactor
+        val halfWidth = tablePlayingSurfaceWidth / 2f
+        val halfHeight = tablePlayingSurfaceHeight / 2f
 
         // Long rails (3 diamonds between corner and side pockets)
         for (i in 1..3) {
