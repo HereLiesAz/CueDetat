@@ -75,19 +75,22 @@ class ToggleReducer @Inject constructor() {
 
     private fun handleToggleOnPlaneBall(currentState: OverlayState): OverlayState {
         return if (currentState.onPlaneBall != null) {
-            // Hiding the ball
+            // Hiding the ball: This logic remains sound. It remembers if the table was on.
             currentState.copy(
                 onPlaneBall = null,
-                showTable = if (currentState.showTable) false else currentState.showTable, // Hide table only if it's currently shown
-                tableWasLastOnWithBall = currentState.showTable // Remember if the table was on
+                showTable = if (currentState.showTable) false else currentState.showTable,
+                tableWasLastOnWithBall = currentState.showTable
             )
         } else {
             // Showing the ball
-            if (currentState.tableWasLastOnWithBall) {
+            if (currentState.showTable) { // If table is already visible...
+                // ...just reset the ball positions to the table layout.
+                resetForTable(currentState)
+            } else if (currentState.tableWasLastOnWithBall) { // If table was on when ball was last hidden...
                 // Restore ball and table together, then clear the flag
                 resetForTable(currentState.copy(showTable = true, tableWasLastOnWithBall = false))
-            } else {
-                // Just show the ball, no table
+            } else { // Otherwise, we are in a no-table state.
+                // Just show the ball at its screen-relative default.
                 val newRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, currentState.zoomSliderPosition)
                 val newCenter = PointF(currentState.viewWidth / 2f, (currentState.viewHeight / 2f + currentState.viewHeight) / 2f)
                 currentState.copy(
