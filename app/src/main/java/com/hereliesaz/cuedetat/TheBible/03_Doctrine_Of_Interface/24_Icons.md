@@ -14,6 +14,12 @@ This document outlines the specific icons used in the application, their purpose
 *   **Component:** Used on the **Toggle Cue Ball FAB**.
 *   **Function:** Triggers the `MainScreenEvent.ToggleOnPlaneBall` event, which toggles the visibility of the `ActualCueBall` model on the logical plane.
 
+## Toggle Table FAB Icon (`pool_table`)
+
+*   **Description:** A stylized representation of a pool table.
+*   **Component:** Used on the **Toggle Table FAB**.
+*   **Function:** Triggers the `MainScreenEvent.ToggleTable` event when the table is not visible.
+
 ## Help Menu Icon (`ic_help_outline_24`)
 
 *   **Description:** A question mark within a circle.

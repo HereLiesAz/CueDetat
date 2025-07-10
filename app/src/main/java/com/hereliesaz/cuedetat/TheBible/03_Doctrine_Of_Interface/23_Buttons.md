@@ -6,13 +6,13 @@
 ***
 ## Addendum: Detailed FAB Specifications
 
-Two `FloatingActionButton`s (FABs) must be persistently displayed at the bottom of the screen, outside of the menu.
+Two to three `FloatingActionButton`s (FABs) must be persistently displayed at the bottom of the screen, outside of the menu.
 
 ### 1. Reset FAB
 
 * **Placement**: Aligned to the bottom-right of the screen (`Alignment.BottomEnd`).
 * **Action**: Triggers the `MainScreenEvent.Reset` event. This now functions as a two-state toggle.
-  * **First Press:** Saves the current positions and rotations of all elements and resets them to their default state. UI visibility toggles (like `showTable`) are preserved.
+  * **First Press:** Saves the current positions and rotations of all elements and resets them to their default state. If the table is visible, it resets to the table-centric default. If not, it resets to the screen-centric default. UI visibility toggles (like `showTable`) are preserved.
   * **Second Press:** Reverts all positions and rotations to their saved state from before the first press.
 * **Dynamic Appearance**: The button's color must provide visual feedback on its relevance.
   * When `uiState.valuesChangedSinceReset` is `false`, its `containerColor` must be `MaterialTheme.colorScheme.surfaceVariant` (a neutral, inactive state).
@@ -31,3 +31,10 @@ Two `FloatingActionButton`s (FABs) must be persistently displayed at the bottom 
 * **Content (Icon vs. Text)**:
   * By default (`areHelpersVisible = false`), it displays the `ic_jump_shot` icon.
   * When help text is enabled (`areHelpersVisible = true`), it displays the text "Cue Ball\nToggle".
+
+### 3. Toggle Table FAB
+
+* **Placement**: Positioned horizontally between the `ToggleCueBallFab` and the `ResetFab`.
+* **Action**: Triggers the `MainScreenEvent.ToggleTable` event.
+* **Visibility**: This button is **only** visible when in Protractor Mode and when the table is not currently shown (`!uiState.isBankingMode && !uiState.showTable`).
+* **Content**: It displays the `pool_table` icon.

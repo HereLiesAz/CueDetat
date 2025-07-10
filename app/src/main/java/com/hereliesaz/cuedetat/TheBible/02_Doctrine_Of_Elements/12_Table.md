@@ -1,6 +1,6 @@
 # The Table
 
-*   **Visibility:** The table is hidden by default. Its visibility is controlled by the `"Toggle Table"` `TextButton` in the menu.
+*   **Visibility:** The table is hidden by default. Its visibility is controlled by the `"Toggle Table"` `TextButton` in the menu and its dedicated `FloatingActionButton` when not visible.
 *   **Rotation:** The table's default rotation when shown is 90 degrees (portrait). Its rotation is controlled by both the horizontal rotation slider and a two-finger rotation gesture.
 *   **Pivot Point:** The table must rotate around its logical center (0,0).
 *   **Table Size**:
@@ -18,7 +18,7 @@
 *   **Rendering**: The table is rendered as a wireframe.
 *   The playing surface outline and pockets are drawn on the main `pitchMatrix`.
 *   The rails, along with their diamond markers, are drawn on the separate `railPitchMatrix` to give them a "lifted" 3D appearance.
-*   **Pockets**: Pockets are rendered as stroked circles at the corners and midpoints of the long rails. Their logical radius is proportional to the cue ball's radius (specifically, `1.8f` times the radius). They must be filled with black.
+*   **Pockets**: Pockets are rendered as stroked circles at the corners and midpoints of the long rails. Their logical radius is proportional to the cue ball's radius (specifically, `1.8f` times the radius). They must be filled with black, but turn pure white when a shot is aimed or banked into them.
 *   **Diamonds**:
 *   Diamond markers must be rendered on the rails. They must be pure **white**.
 *   The side pockets are to be counted as diamonds in the numbering sequence.

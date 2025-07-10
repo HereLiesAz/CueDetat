@@ -12,19 +12,19 @@ This scripture defines the logical objects that represent pool balls.
   * **Purpose**: The logical anchor of the aiming system in Protractor Mode. Represents the object ball.
   * **Model**: Defined by the `center` of the `ProtractorUnit`.
   * **Label**: "Target Ball".
-  * **Rendering**: Rendered as a "ghosted" ball, with a simple **dot** at its center.
+  * **Rendering**: Rendered as a "ghosted" ball, with a simple **dot** at its center. Its on-plane shadow also has a white dot at its center.
 
 * **Ghost Cue Ball**
   * **Purpose**: Represents the necessary impact point on the `TargetBall`.
   * **Model**: Its position is calculated within the `ProtractorUnit`. It is not an independent model.
   * **Label**: "Ghost Cue Ball".
-  * **Rendering**: Rendered as a "ghosted" ball, with a prominent **crosshair** at its center.
+  * **Rendering**: Rendered as a "ghosted" ball, with a prominent **crosshair** at its center. Its on-plane shadow has a white dot at its center.
 
 * **Actual Cue Ball (Role)**
   * **Purpose**: An optional, user-draggable aiming reference in Protractor Mode.
   * **Model**: An instance of `OnPlaneBall`.
   * **Label**: "Actual Cue Ball".
-  * **Rendering**: Rendered as a "ghosted" ball, with a simple **dot** at its center.
+  * **Rendering**: Rendered as a "ghosted" ball, with a simple **dot** at its center. Its on-plane shadow also has a white dot at its center.
 
 * **Banking Ball (Role)**
   * **Purpose**: The primary interactive element in Banking Mode, representing the ball to be banked.
@@ -33,7 +33,9 @@ This scripture defines the logical objects that represent pool balls.
   * **Rendering**: Rendered as a single circle directly on the pitched logical plane, with a simple **dot** at its center.
 
 ## Default Positions & Properties
-* When the table is not visible, the **Target Ball** (`ProtractorUnit.center`) is at the screen's center and the **Actual Cue Ball** (if toggled) is halfway to the bottom edge.
-* When the table is first made visible (`ToggleTable` event), all positions are reset:
-  * All three balls (`ActualCueBall`, `TargetBall`, `GhostCueBall`) are aligned on the vertical center line of the view. The `ActualCueBall` is placed on the head spot, the `TargetBall` on the center spot, and the `GhostCueBall` is calculated to be collinear between them.
+* **When the table is not visible**, the `TargetBall` (`ProtractorUnit.center`) is at the screen's center and the `ActualCueBall` (if toggled) is halfway to the bottom edge.
+* **When the table is first made visible** (via `ToggleTable` or `ToggleOnPlaneBall` while the table was previously visible), all positions are reset to a table-centric layout:
+  * The `TargetBall` is placed at the absolute center of the table (and view).
+  * The `ActualCueBall` is placed on the head spot (horizontally centered, halfway between the table's center and the bottom edge of the view).
+  * The `aimingAngle` is set to `-90f` to align the `GhostCueBall` directly below the `TargetBall` for a straight-in shot.
 * The logical size of the balls is determined by the global zoom factor.
