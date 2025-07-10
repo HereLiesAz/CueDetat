@@ -20,17 +20,22 @@ class LineRenderer {
 
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         if (state.isBankingMode) {
-            drawBankingLines(canvas, state, paints, typeface)
+            drawBankingLines(canvas, state, paints)
         } else {
             drawProtractorLines(canvas, state, paints, typeface)
         }
     }
 
-    // New public method for drawing screen-space guides
     fun drawProtractorGuides(canvas: Canvas, state: OverlayState, paints: PaintCache, center: PointF, referencePoint: PointF) {
+        val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
+        val targetCenter = state.protractorUnit.center
+        val textPaint = Paint(paints.textPaint).apply { alpha = 80; textSize = 30f }
+
         protractorAngles.forEach { angle ->
             drawAngleGuide(canvas, center, referencePoint, angle, paints.angleGuidePaint)
             drawAngleGuide(canvas, center, referencePoint, -angle, paints.angleGuidePaint) // Draw on both sides
+            textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, angle, textPaint, state.protractorUnit.radius)
+            textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, -angle, textPaint, state.protractorUnit.radius)
         }
     }
 
@@ -53,7 +58,7 @@ class LineRenderer {
         val right = canvasCenterX + halfW
         val bottom = canvasCenterY + halfH
 
-        val tolerance = 5f // A small tolerance in pixels
+        val tolerance = 5f // A small tolerance in logical units
 
         return when {
             abs(point.y - top) < tolerance -> LineTextRenderer.RailType.TOP
@@ -101,14 +106,10 @@ class LineRenderer {
 
         if (state.areHelpersVisible) {
             textRenderer.drawProtractorLabels(canvas, state, paints, typeface)
-            val textPaint = Paint(paints.textPaint).apply { alpha = 80; textSize = 30f }
-            protractorAngles.forEach { angle ->
-                textRenderer.drawAngleLabel(canvas, targetCenter, ghostCueCenter, angle, textPaint, state.protractorUnit.radius)
-            }
         }
     }
 
-    private fun drawBankingLines(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
+    private fun drawBankingLines(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         if (state.bankShotPath.size < 2) return
 
         val bankLinePaints = listOf(paints.bankLine1Paint, paints.bankLine2Paint, paints.bankLine3Paint, paints.bankLine4Paint)
@@ -137,16 +138,18 @@ class LineRenderer {
             canvas.drawLine(start.x, start.y, end.x, end.y, glowPaint)
             // Draw Line
             canvas.drawLine(start.x, start.y, end.x, end.y, linePaint)
+        }
+    }
 
-            // Draw diamond label at impact point
+    fun drawBankingLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
+        if (state.bankShotPath.size < 2) return
+
+        for (i in 0 until state.bankShotPath.size - 1) {
+            val end = state.bankShotPath[i+1]
             getRailForPoint(end, state)?.let { railType ->
                 val textPaint = paints.textPaint.apply { this.typeface = typeface }
                 textRenderer.drawDiamondLabel(canvas, end, railType, state, textPaint)
             }
-        }
-
-        if (state.areHelpersVisible) {
-            textRenderer.drawBankingLabels(canvas, state, paints, typeface)
         }
     }
 

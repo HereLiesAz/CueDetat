@@ -38,16 +38,22 @@ class OverlayRenderer {
         // --- Pass 2: Draw all logical lines on the pitched canvas ---
         canvas.save()
         canvas.concat(state.pitchMatrix)
-        // This draws Aiming, Shot, and Tangent lines. Angle guides are drawn later.
         lineRenderer.draw(canvas, state, paints, typeface)
         canvas.restore()
 
+        // --- Pass 3: Draw banking labels on the lifted rail plane ---
+        if (state.isBankingMode) {
+            canvas.save()
+            canvas.concat(state.railPitchMatrix)
+            lineRenderer.drawBankingLabels(canvas, state, paints, typeface)
+            canvas.restore()
+        }
 
-        // --- Pass 3: Draw all balls ---
+        // --- Pass 4: Draw all balls ---
         // The BallRenderer handles its own rendering passes internally for on-plane and ghosted elements.
         ballRenderer.draw(canvas, state, paints, typeface)
 
-        // --- Pass 4: Draw Screen-Space UI (Protractor Guides) ---
+        // --- Pass 5: Draw Screen-Space UI (Protractor Guides) ---
         if (!state.isBankingMode) {
             val ghostCueScreenCenter = DrawingUtils.mapPoint(state.protractorUnit.ghostCueBallCenter, state.pitchMatrix)
             val targetScreenCenter = DrawingUtils.mapPoint(state.protractorUnit.center, state.pitchMatrix)

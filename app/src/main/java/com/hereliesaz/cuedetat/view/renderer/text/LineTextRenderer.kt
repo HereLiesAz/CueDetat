@@ -70,25 +70,30 @@ class LineTextRenderer {
     fun drawDiamondLabel(canvas: Canvas, point: PointF, railType: RailType, state: OverlayState, paint: Paint) {
         val diamondNumberText = calculateDiamondNumber(point, railType, state) ?: return
 
-        paint.textSize = getDynamicFontSize(24f, state.zoomSliderPosition) // A bit smaller for numbers
-        val textOffset = 25f * (ZoomMapping.sliderToZoom(state.zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM).coerceAtLeast(0.7f) // Dynamic offset
+        paint.textSize = getDynamicFontSize(50f, state.zoomSliderPosition)
+        val textOffset = 80f * (ZoomMapping.sliderToZoom(state.zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM).coerceAtLeast(0.7f) // Dynamic offset
 
         var textX = point.x
         var textY = point.y
-        val rotation: Float
+        var textRotation = 0f
 
         when (railType) {
-            RailType.TOP -> { textY -= textOffset; rotation = 0f }
-            RailType.BOTTOM -> { textY += textOffset; rotation = 0f }
-            RailType.LEFT -> { textX -= textOffset; rotation = 90f }
-            RailType.RIGHT -> { textX += textOffset; rotation = 90f }
+            RailType.TOP -> { textY -= textOffset; textRotation = 0f }
+            RailType.BOTTOM -> { textY += textOffset; textRotation = 0f }
+            RailType.LEFT -> { textX -= textOffset; textRotation = 90f }
+            RailType.RIGHT -> { textX += textOffset; textRotation = -90f }
         }
 
+        // Keep text right-side up for the user
+        val totalRotation = (state.tableRotationDegrees + textRotation) % 360
+        val uprightCorrection = if (totalRotation > 90 && totalRotation < 270) 180f else 0f
+
         canvas.save()
-        canvas.rotate(rotation, point.x, point.y) // Rotate around the impact point
+        canvas.rotate(textRotation + uprightCorrection, point.x, point.y)
         canvas.drawText(diamondNumberText, textX, textY, paint)
         canvas.restore()
     }
+
 
     private fun calculateDiamondNumber(point: PointF, railType: RailType, state: OverlayState): String? {
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
@@ -105,18 +110,18 @@ class LineTextRenderer {
         val logicalX = point.x - state.viewWidth / 2f
         val logicalY = point.y - state.viewHeight / 2f
 
-        // Short rails have 4 diamond units, Long rails have 8
+        // Short rails have 4 diamond units (0-4), Long rails have 8 (0-8).
         val diamondValue = when (railType) {
-            RailType.TOP -> ((logicalX + halfW) / tableWidth) * 4
-            RailType.BOTTOM -> ((logicalX + halfW) / tableWidth) * 4
-            RailType.LEFT -> ((logicalY + halfH) / tableHeight) * 8
-            RailType.RIGHT -> ((logicalY + halfH) / tableHeight) * 8
+            RailType.TOP -> ((logicalX + halfW) / tableWidth) * 4.0 // 0 at left, 4 at right
+            RailType.RIGHT -> ((logicalY + halfH) / tableHeight) * 8.0 // 0 at top, 8 at bottom
+            RailType.BOTTOM -> 4.0 - (((logicalX + halfW) / tableWidth) * 4.0) // 4 at right, 0 at left
+            RailType.LEFT -> 8.0 - (((logicalY + halfH) / tableHeight) * 8.0) // 8 at bottom, 0 at top
         }
 
         return String.format("%.1f", diamondValue)
     }
 
     fun drawBankingLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?){
-        // Banking label logic would be implemented here
+        // This function is deprecated as its logic has been moved to drawDiamondLabel and called from LineRenderer
     }
 }

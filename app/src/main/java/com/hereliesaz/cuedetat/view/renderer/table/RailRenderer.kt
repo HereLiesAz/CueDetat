@@ -112,11 +112,9 @@ class RailRenderer {
             canvas.drawCircle(tableCenterX - xOffset, railBottomCenterY, diamondRadius, diamondPaint)
             canvas.drawCircle(tableCenterX + xOffset, railBottomCenterY, diamondRadius, diamondPaint)
         }
-        // Short rails (3 diamonds between corner pockets)
-        for (i in 1..3) {
-            val yOffset = halfHeight * (i / 4.0f)
-            canvas.drawCircle(railLeftCenterX, tableCenterY - yOffset, diamondRadius, diamondPaint)
-            canvas.drawCircle(railRightCenterX, tableCenterY - yOffset, diamondRadius, diamondPaint)
+        // Short rails (3 diamonds per rail)
+        val shortRailYOffsets = listOf(-halfHeight / 2, 0f, halfHeight / 2)
+        for (yOffset in shortRailYOffsets) {
             canvas.drawCircle(railLeftCenterX, tableCenterY + yOffset, diamondRadius, diamondPaint)
             canvas.drawCircle(railRightCenterX, tableCenterY + yOffset, diamondRadius, diamondPaint)
         }
