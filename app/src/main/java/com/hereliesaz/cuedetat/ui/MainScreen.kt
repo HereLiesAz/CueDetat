@@ -2,6 +2,7 @@
 
 package com.hereliesaz.cuedetat.ui
 
+import android.graphics.PointF
 import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -12,6 +13,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.cuedetat.ui.composables.*
@@ -26,6 +29,7 @@ import com.hereliesaz.cuedetat.view.ProtractorOverlay
 import com.hereliesaz.cuedetat.view.state.ToastMessage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
@@ -43,6 +47,8 @@ fun MainScreen(viewModel: MainViewModel) {
     }
 
     CueDetatTheme(darkTheme = useDarkTheme) {
+        val alphaAnimatable = remember { Animatable(1.0f) }
+
         LaunchedEffect(toastMessage) {
             toastMessage?.let {
                 val messageText = when (it) {
@@ -54,11 +60,10 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
-        val alphaAnimatable = remember { Animatable(1.0f) }
         LaunchedEffect(uiState.lingeringSpinOffset) {
             if (uiState.lingeringSpinOffset != null) {
-                alphaAnimatable.snapTo(1.0f) // Reset alpha for new linger
-                delay(5000L) // 5-second linger
+                alphaAnimatable.snapTo(1.0f)
+                delay(5000L)
                 alphaAnimatable.animateTo(
                     targetValue = 0f,
                     animationSpec = tween(durationMillis = 5000)
@@ -86,7 +91,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
 
                 ProtractorOverlay(
-                    uiState = uiState.copy(spinPathsAlpha = alphaAnimatable.value), // Pass animated alpha
+                    uiState = uiState.copy(spinPathsAlpha = alphaAnimatable.value),
                     systemIsDark = useDarkTheme,
                     onEvent = viewModel::onEvent,
                     modifier = Modifier.fillMaxSize().zIndex(1f)
@@ -101,16 +106,25 @@ fun MainScreen(viewModel: MainViewModel) {
 
                 val spinControlCenter = uiState.spinControlCenter
                 if (!uiState.isBankingMode && uiState.isSpinControlVisible && spinControlCenter != null) {
+                    val spinControlSizeDp = 120.dp
+                    val spinControlSizePx = with(LocalDensity.current) { spinControlSizeDp.toPx() }
+
                     SpinControl(
-                        modifier = Modifier.zIndex(5f),
-                        centerPosition = spinControlCenter,
+                        modifier = Modifier
+                            .zIndex(5f)
+                            .offset {
+                                IntOffset(
+                                    (spinControlCenter.x - spinControlSizePx / 2).roundToInt(),
+                                    (spinControlCenter.y - spinControlSizePx / 2).roundToInt()
+                                )
+                            },
+                        centerPosition = PointF(0f, 0f), // Position is now handled by the offset modifier
                         selectedSpinOffset = uiState.selectedSpinOffset,
                         lingeringSpinOffset = uiState.lingeringSpinOffset,
                         spinPathAlpha = alphaAnimatable.value,
                         onEvent = viewModel::onEvent
                     )
                 }
-
 
                 ZoomControls(
                     uiState = uiState,
@@ -128,36 +142,36 @@ fun MainScreen(viewModel: MainViewModel) {
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(bottom = 8.dp)
                         .zIndex(2f),
-                    verticalAlignment = Alignment.Bottom, // Use Bottom alignment
+                    verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     if (!uiState.isBankingMode) {
-                        // --- THE RIGHTEOUS FIX ---
                         Column(
+                            modifier = Modifier.padding(start = 16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            // Padding added to lift the entire column
-                            modifier = Modifier.padding(bottom = 48.dp)
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             ToggleSpinControlFab(
                                 uiState = uiState,
-                                onEvent = { viewModel.onEvent(MainScreenEvent.ToggleSpinControl) }
+                                onEvent = viewModel::onEvent
                             )
-                            // Spacer increased to add more distance between buttons
-                            Spacer(modifier = Modifier.height(16.dp))
                             ToggleCueBallFab(
                                 uiState = uiState,
-                                onEvent = { viewModel.onEvent(MainScreenEvent.ToggleOnPlaneBall) }
+                                onEvent = viewModel::onEvent
                             )
                         }
-                        // --- END FIX ---
-
                     } else {
-                        Spacer(Modifier.size(40.dp))
+                        Spacer(Modifier.width(80.dp))
                     }
 
-                    Box(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 16.dp), // Padding to not overlap with FABs
+                        contentAlignment = Alignment.Center
+                    ) {
                         if (uiState.showTable) {
                             TableRotationSlider(
                                 uiState = uiState,
@@ -165,15 +179,15 @@ fun MainScreen(viewModel: MainViewModel) {
                             )
                         } else if (!uiState.isBankingMode) {
                             ToggleTableFab(
-                                onEvent = viewModel::onEvent,
-                                modifier = Modifier.align(Alignment.Center)
+                                onEvent = viewModel::onEvent
                             )
                         }
                     }
 
                     ResetFab(
                         uiState = uiState,
-                        onEvent = viewModel::onEvent
+                        onEvent = viewModel::onEvent,
+                        modifier = Modifier.padding(end = 16.dp)
                     )
                 }
 

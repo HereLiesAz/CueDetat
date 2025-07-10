@@ -19,8 +19,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
-import com.hereliesaz.cuedetat.ui.theme.RebelYellow
-import com.hereliesaz.cuedetat.ui.theme.WarningRed
+import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -30,7 +29,7 @@ import kotlin.math.sin
 @Composable
 fun SpinControl(
     modifier: Modifier = Modifier,
-    centerPosition: PointF,
+    centerPosition: PointF, // This is now unused but kept for API stability if needed later.
     selectedSpinOffset: PointF?,
     lingeringSpinOffset: PointF?,
     spinPathAlpha: Float,
@@ -38,7 +37,6 @@ fun SpinControl(
 ) {
     Box(
         modifier = modifier
-            .offset { IntOffset(centerPosition.x.roundToInt(), centerPosition.y.roundToInt()) }
             .pointerInput(Unit) {
                 detectDragGestures { change, dragAmount ->
                     change.consume()
@@ -48,7 +46,7 @@ fun SpinControl(
     ) {
         Canvas(
             modifier = Modifier
-                .size(120.dp) // Size increased
+                .size(120.dp)
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragStart = { offset ->
@@ -67,20 +65,30 @@ fun SpinControl(
             val radius = size.minDimension / 2f
             val center = Offset(radius, radius)
 
-            // Full spectrum color stops
-            val colorStops = arrayOf(
-                0.0f to Color.White,
-                0.17f to RebelYellow,
-                0.34f to Color.Red,
-                0.51f to Color(0.5f, 0f, 1f), // Violet
-                0.68f to Color.Blue,
-                0.85f to Color.Green,
-                1.0f to Color.Green.copy(alpha = 0.7f)
-            )
+            // --- THE RIGHTEOUS FIX ---
+            // The heretical SweepGradient is purged. The wheel is now built arc by arc,
+            // using the one true color calculation method.
+            val numArcs = 72
+            val arcAngle = 360f / numArcs
+            for (i in 0 until numArcs) {
+                val startAngle = i * arcAngle
+                // The color is sampled from the center of the arc for accuracy.
+                val colorSampleAngle = startAngle + (arcAngle / 2)
+                val color = SpinColorUtils.getColorFromAngleAndDistance(colorSampleAngle, 1.0f)
 
+                drawArc(
+                    color = color,
+                    startAngle = startAngle - 90, // -90 to align 0 degrees with the top
+                    sweepAngle = arcAngle,
+                    useCenter = true,
+                    alpha = spinPathAlpha
+                )
+            }
+            // Overlay a radial gradient from white in the center to transparent at the edge
+            // to wash out the colors towards the middle, replicating the reference image.
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = colorStops.map { it.second },
+                    colors = listOf(Color.White, Color.Transparent),
                     center = center,
                     radius = radius
                 ),
@@ -88,6 +96,7 @@ fun SpinControl(
                 center = center,
                 alpha = spinPathAlpha
             )
+            // --- END FIX ---
 
             drawCircle(
                 color = Color.White.copy(alpha = 0.5f * spinPathAlpha),

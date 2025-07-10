@@ -24,7 +24,6 @@ class UpdateStateUseCase @Inject constructor(
     operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
-        // --- Stage 1: Base Un-rotated Matrix for Stable Logic ---
         val basePitchMatrix = Perspective.createPitchMatrix(
             currentOrientation = state.currentOrientation,
             viewWidth = state.viewWidth,
@@ -33,7 +32,6 @@ class UpdateStateUseCase @Inject constructor(
         )
         val baseInverseMatrix = Matrix().apply { basePitchMatrix.invert(this) }
 
-        // Create a "flat" matrix with zero pitch for stable radius calculations.
         val flatMatrix = Perspective.createPitchMatrix(
             currentOrientation = FullOrientation(0f, 0f, 0f),
             viewWidth = state.viewWidth,
@@ -41,8 +39,6 @@ class UpdateStateUseCase @Inject constructor(
             camera = camera
         )
 
-
-        // --- Stage 2: Calculate Logical Values in a Stable Coordinate System ---
         val logicalShotLineAnchor = getLogicalShotLineAnchor(state, baseInverseMatrix)
         val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= state.protractorUnit.ghostCueBallCenter.y
 
@@ -51,7 +47,7 @@ class UpdateStateUseCase @Inject constructor(
             ghostBall = state.protractorUnit.ghostCueBallCenter,
             targetBall = state.protractorUnit.center
         )
-        val targetBallDistance = calculateDistance(state, flatMatrix) // Use flat matrix for stable distance
+        val targetBallDistance = calculateDistance(state, flatMatrix)
         var (aimedPocketIndex, aimingLineEndPoint) = if (!state.isBankingMode) {
             checkPocketAim(state)
         } else {
@@ -63,14 +59,12 @@ class UpdateStateUseCase @Inject constructor(
             null
         }
 
-        // Calculate single bank for aiming line in ghost mode
         var aimingLineBankPath = if (state.showTable && !state.isBankingMode) {
             calculateSingleBank(state.protractorUnit.ghostCueBallCenter, state.protractorUnit.center, state)
         } else {
             emptyList()
         }
 
-        // Check if the banked aiming line goes into a pocket
         if(aimingLineBankPath.size > 2) {
             val (bankedPocketIndex, intersectionPoint) = checkBankedPocketAim(
                 listOf(aimingLineBankPath[1], aimingLineBankPath[2]),
@@ -78,23 +72,28 @@ class UpdateStateUseCase @Inject constructor(
             )
             if (bankedPocketIndex != null && intersectionPoint != null) {
                 aimedPocketIndex = bankedPocketIndex
-                // Truncate the path to the intersection point
                 aimingLineBankPath = listOf(aimingLineBankPath[0], aimingLineBankPath[1], intersectionPoint)
             }
         }
 
+        // --- NEW: Calculate Banked Tangent Line ---
+        val tangentLineBankPath = if (state.showTable && !state.isBankingMode) {
+            val tangentStart = state.protractorUnit.ghostCueBallCenter
+            val tangentTarget = PointF(
+                tangentStart.x - (state.protractorUnit.center.y - tangentStart.y) * tangentDirection,
+                tangentStart.y + (state.protractorUnit.center.x - tangentStart.x) * tangentDirection
+            )
+            calculateSingleBank(tangentStart, tangentTarget, state)
+        } else {
+            emptyList()
+        }
+        // --- END NEW ---
 
-        // --- Stage 3: Prepare Final Rotated Matrices for Rendering ---
         val finalPitchMatrix = Matrix(basePitchMatrix)
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
         val logicalTableShortSide = tableToBallRatioShort * referenceRadius
-
-        // --- THE RIGHTEOUS FIX ---
-        // The rail lift is now proportional to the sine of the pitch angle.
         val baseRailLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
         val railLiftAmount = baseRailLiftAmount * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
-        // --- END FIX ---
-
         val finalRailPitchMatrix = Perspective.createPitchMatrix(
             currentOrientation = state.currentOrientation,
             viewWidth = state.viewWidth,
@@ -115,7 +114,6 @@ class UpdateStateUseCase @Inject constructor(
         }
         val hasFinalInverse = finalPitchMatrix.invert(finalInverseMatrix)
 
-        // --- Stage 4: Calculate Spin Paths ---
         val spinPaths = if (!state.isBankingMode) {
             calculateSpinPaths(state)
         } else {
@@ -137,34 +135,27 @@ class UpdateStateUseCase @Inject constructor(
             aimingLineEndPoint = aimingLineEndPoint,
             shotGuideImpactPoint = shotGuideImpactPoint,
             aimingLineBankPath = aimingLineBankPath,
+            tangentLineBankPath = tangentLineBankPath, // Add to state
             spinPaths = spinPaths
         )
     }
 
     private fun getLogicalShotLineAnchor(state: OverlayState, inverseMatrix: Matrix): PointF {
-        // If the on-plane ball exists, its logical center IS the anchor.
         state.onPlaneBall?.let { return it.center }
-
-        // If not, calculate the anchor based on a point at the bottom of the screen.
         val screenAnchor = PointF(state.viewWidth / 2f, state.viewHeight.toFloat())
         return Perspective.screenToLogical(screenAnchor, inverseMatrix)
     }
 
     private fun calculateShotPossibilityAndTangent(shotAnchor: PointF, ghostBall: PointF, targetBall: PointF): Pair<Boolean, Float> {
         val aimingAngle = atan2(targetBall.y - ghostBall.y, targetBall.x - ghostBall.x)
-
-        // The new righteousness: Distance-based impossibility check.
         val distToGhostSq = (ghostBall.y - shotAnchor.y).pow(2) + (ghostBall.x - shotAnchor.x).pow(2)
         val distToTargetSq = (targetBall.y - shotAnchor.y).pow(2) + (targetBall.x - shotAnchor.x).pow(2)
         val isImpossible = distToGhostSq > distToTargetSq
-
-        // Tangent direction is still based on the angle for visual cues.
         val shotAngle = atan2(ghostBall.y - shotAnchor.y, ghostBall.x - shotAnchor.x)
         var angleDifference = Math.toDegrees(aimingAngle.toDouble() - shotAngle.toDouble()).toFloat()
         while (angleDifference <= -180) angleDifference += 360
         while (angleDifference > 180) angleDifference -= 360
         val tangentDirection = if (angleDifference < 0) 1.0f else -1.0f
-
         return Pair(isImpossible, tangentDirection)
     }
 
@@ -193,7 +184,6 @@ class UpdateStateUseCase @Inject constructor(
         for ((index, pocket) in pockets.withIndex()) {
             val dist = linePointDistance(ghostBall, targetBall, pocket)
             if (dist < pocketRadius) {
-                // Check if pocket is in front of ghost ball
                 val vecToPocketX = pocket.x - ghostBall.x
                 val vecToPocketY = pocket.y - ghostBall.y
                 val dotProduct = vecToPocketX * dirX + vecToPocketY * dirY
@@ -220,7 +210,6 @@ class UpdateStateUseCase @Inject constructor(
         pockets.forEachIndexed { index, pocketCenter ->
             val intersection = getLineCircleIntersection(start, end, pocketCenter, pocketRadius)
             if (intersection != null) {
-                // Check if intersection is on the segment
                 val dxSegment = end.x - start.x
                 val dySegment = end.y - start.y
                 val t = if (abs(dxSegment) > abs(dySegment)) {

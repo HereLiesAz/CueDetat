@@ -6,8 +6,6 @@ import android.app.Application
 import android.graphics.Camera
 import android.graphics.PointF
 import android.util.Log
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
@@ -28,7 +26,6 @@ import com.hereliesaz.cuedetat.view.state.SingleEvent
 import com.hereliesaz.cuedetat.view.state.TableSize
 import com.hereliesaz.cuedetat.view.state.ToastMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
@@ -120,9 +117,9 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.Drag -> {
                 val logicalPrev = Perspective.screenToLogical(event.previousPosition, currentState.inversePitchMatrix)
                 val logicalCurr = Perspective.screenToLogical(event.currentPosition, currentState.inversePitchMatrix)
-                val logicalDelta = PointF(logicalCurr.x - logicalPrev.x, logicalCurr.y - logicalPrev.y)
                 val screenDelta = Offset(event.currentPosition.x - event.previousPosition.x, event.currentPosition.y - event.previousPosition.y)
 
+                // THE FIX: This interaction mode is now correctly handled by the GestureReducer
                 if (currentState.interactionMode == InteractionMode.MOVING_SPIN_CONTROL) {
                     return onEvent(MainScreenEvent.DragSpinControl(PointF(screenDelta.x, screenDelta.y)))
                 }
@@ -130,6 +127,7 @@ class MainViewModel @Inject constructor(
                 if (currentState.interactionMode == InteractionMode.AIMING_BANK_SHOT && currentState.hasInverseMatrix) {
                     MainScreenEvent.AimBankShot(logicalCurr)
                 } else if (currentState.hasInverseMatrix) {
+                    val logicalDelta = PointF(logicalCurr.x - logicalPrev.x, logicalCurr.y - logicalPrev.y)
                     MainScreenEvent.LogicalDragApplied(logicalDelta, screenDelta)
                 } else {
                     event

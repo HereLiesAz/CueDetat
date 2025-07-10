@@ -39,7 +39,8 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.ToggleLuminanceDialog,
             is MainScreenEvent.ToggleGlowStickDialog,
             is MainScreenEvent.ToggleHelp,
-            is MainScreenEvent.ToggleMoreHelp ->
+            is MainScreenEvent.ToggleMoreHelp,
+            is MainScreenEvent.ToggleSpinControl -> // Re-routed to the correct reducer
                 toggleReducer.reduce(currentState, event)
 
             is MainScreenEvent.ZoomSliderChanged,
@@ -63,7 +64,6 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.EndTutorial ->
                 tutorialReducer.reduce(currentState, event)
 
-            is MainScreenEvent.ToggleSpinControl,
             is MainScreenEvent.SpinApplied,
             is MainScreenEvent.SpinSelectionEnded,
             is MainScreenEvent.DragSpinControl,

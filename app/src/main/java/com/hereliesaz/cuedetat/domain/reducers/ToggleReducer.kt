@@ -19,6 +19,7 @@ class ToggleReducer @Inject constructor() {
 
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         return when (event) {
+            is MainScreenEvent.ToggleSpinControl -> currentState.copy(isSpinControlVisible = !currentState.isSpinControlVisible)
             is MainScreenEvent.ToggleOnPlaneBall -> handleToggleOnPlaneBall(currentState)
             is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(currentState)
             is MainScreenEvent.ToggleTable -> handleToggleTable(currentState)

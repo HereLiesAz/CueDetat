@@ -110,6 +110,7 @@ data class OverlayState(
     val warningText: String? = null,
     val shotGuideImpactPoint: PointF? = null,
     val aimingLineBankPath: List<PointF> = emptyList(),
+    val tangentLineBankPath: List<PointF> = emptyList(), // Added for banked tangent line
     val aimedPocketIndex: Int? = null,
     val aimingLineEndPoint: PointF? = null,
 

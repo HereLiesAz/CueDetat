@@ -47,13 +47,23 @@ class SystemReducer @Inject constructor() {
                 }
             }
 
+            // Also update the spin control's position if it's at its default location
+            var newSpinControlCenter = currentState.spinControlCenter
+            currentState.spinControlCenter?.let {
+                val oldDefaultY = currentState.viewHeight * 0.75f
+                if(it.x.roughlyEquals(currentState.viewWidth / 2f) && it.y.roughlyEquals(oldDefaultY)) {
+                    newSpinControlCenter = PointF(event.width / 2f, event.height * 0.75f)
+                }
+            }
+
             return currentState.copy(
                 viewWidth = event.width, viewHeight = event.height,
                 protractorUnit = currentState.protractorUnit.copy(
                     radius = newLogicalRadius,
                     center = protractorNewCenter
                 ),
-                onPlaneBall = updatedOnPlaneBall
+                onPlaneBall = updatedOnPlaneBall,
+                spinControlCenter = newSpinControlCenter
             )
         }
     }
@@ -64,11 +74,13 @@ class SystemReducer @Inject constructor() {
         val initialProtractorCenter = PointF(viewWidth / 2f, viewHeight / 2f)
         val initialTableRotation = 90f // Default to Portrait orientation
 
-        // Default position for the spin control (e.g., bottom left)
+        // --- THE RIGHTEOUS FIX ---
+        // Calculate the center of the bottom half of the screen.
         val initialSpinControlCenter = PointF(
-            64f, // A small padding from the left edge
-            viewHeight - 300f // Positioned above the bottom navigation/FABs
+            viewWidth / 2f,
+            viewHeight * 0.75f
         )
+        // --- END FIX ---
 
         return OverlayState(
             viewWidth = viewWidth,

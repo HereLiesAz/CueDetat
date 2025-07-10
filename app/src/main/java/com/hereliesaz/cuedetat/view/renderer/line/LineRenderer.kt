@@ -46,7 +46,6 @@ class LineRenderer {
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
         val shotLineAnchor = state.shotLineAnchor
 
-        // Load configs
         val aimingLineConfig = AimingLine()
         val shotGuideLineConfig = ShotGuideLine()
         val tangentLineConfig = TangentLine()
@@ -54,7 +53,6 @@ class LineRenderer {
 
         val isDirectPocketed = state.aimedPocketIndex != null && state.aimingLineBankPath.isEmpty()
 
-        // Configure paints based on configs and state
         val shotLinePaint = Paint(paints.shotLinePaint).apply {
             color = if (state.isImpossibleShot || state.isTiltBeyondLimit) paints.warningPaint.color else shotGuideLineConfig.strokeColor.toArgb()
             strokeWidth = shotGuideLineConfig.strokeWidth
@@ -72,45 +70,30 @@ class LineRenderer {
             strokeWidth = aimingLineConfig.glowWidth
             alpha = (aimingLineConfig.glowColor.alpha * 255).toInt()
         }
-        val tangentSolidPaint = Paint(paints.tangentLineSolidPaint).apply {
-            color = tangentLineConfig.strokeColor.toArgb()
-            strokeWidth = tangentLineConfig.strokeWidth
-        }
-        val tangentDottedPaint = Paint(paints.tangentLineDottedPaint).apply {
-            color = tangentLineConfig.strokeColor.toArgb()
-            strokeWidth = tangentLineConfig.strokeWidth
-            alpha = (tangentLineConfig.opacity * 255).toInt()
-        }
-        val tangentGlow = Paint(paints.lineGlowPaint).apply {
-            strokeWidth = tangentLineConfig.glowWidth
-            color = tangentLineConfig.glowColor.toArgb()
-        }
 
         val bankMidPoint = if (state.aimingLineBankPath.size > 1) state.aimingLineBankPath[1] else null
         val finalAimingLineEnd = bankMidPoint ?: state.aimingLineEndPoint ?: targetCenter
 
-        // --- Draw Glows First ---
+        // Draw Glows First
         if (bankMidPoint != null) {
             canvas.drawLine(ghostCueCenter.x, ghostCueCenter.y, bankMidPoint.x, bankMidPoint.y, aimingLineGlow)
         } else {
             drawExtendedLine(canvas, ghostCueCenter, finalAimingLineEnd, aimingLineGlow)
         }
         drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLineGlow)
-        drawTangentLines(canvas, ghostCueCenter, targetCenter, tangentGlow, tangentGlow, state.tangentDirection)
+        drawTangentLines(canvas, state, paints) // Modified call
 
-        // --- Draw Lines Second ---
+        // Draw Lines Second
         if (bankMidPoint != null) {
             canvas.drawLine(ghostCueCenter.x, ghostCueCenter.y, bankMidPoint.x, bankMidPoint.y, aimingLinePaint)
         } else {
             drawExtendedLine(canvas, ghostCueCenter, finalAimingLineEnd, aimingLinePaint)
         }
         drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLinePaint)
-        drawTangentLines(canvas, ghostCueCenter, targetCenter, tangentSolidPaint, tangentDottedPaint, state.tangentDirection)
+        // Tangent lines are now drawn inside the modified drawTangentLines method
 
-        // Draw Spin Paths
         drawSpinPaths(canvas, state, paints)
 
-        // --- Draw Aiming Line Bank Preview & Diamond Labels ---
         if (state.showTable) {
             if (state.aimingLineBankPath.size > 1 && state.aimingLineEndPoint == null) {
                 val bankMid = state.aimingLineBankPath[1]
@@ -145,10 +128,63 @@ class LineRenderer {
                     textRenderer.drawDiamondLabel(canvas, impactPoint, railType, state, textPaint)
                 }
             }
+            if (state.tangentLineBankPath.size > 1) {
+                val tangentBankPoint = state.tangentLineBankPath[1]
+                getRailForPoint(tangentBankPoint, state)?.let { railType ->
+                    textRenderer.drawDiamondLabel(canvas, tangentBankPoint, railType, state, textPaint)
+                }
+            }
         }
 
         if (state.areHelpersVisible) {
             textRenderer.drawProtractorLabels(canvas, state, paints, typeface)
+        }
+    }
+
+    private fun drawTangentLines(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+        val from = state.protractorUnit.ghostCueBallCenter
+        val direction = state.tangentDirection
+        val tangentLineConfig = TangentLine()
+
+        val tangentSolidPaint = Paint(paints.tangentLineSolidPaint).apply {
+            color = tangentLineConfig.strokeColor.toArgb()
+            strokeWidth = tangentLineConfig.strokeWidth
+        }
+        val tangentDottedPaint = Paint(paints.tangentLineDottedPaint).apply {
+            color = tangentLineConfig.strokeColor.toArgb()
+            strokeWidth = tangentLineConfig.strokeWidth
+            alpha = (tangentLineConfig.opacity * 255).toInt()
+        }
+        val tangentGlow = Paint(paints.lineGlowPaint).apply {
+            strokeWidth = tangentLineConfig.glowWidth
+            color = tangentLineConfig.glowColor.toArgb()
+        }
+
+        if (state.showTable && state.tangentLineBankPath.isNotEmpty()) {
+            val path = state.tangentLineBankPath
+            canvas.drawLine(path[0].x, path[0].y, path[1].x, path[1].y, tangentGlow)
+            canvas.drawLine(path[0].x, path[0].y, path[1].x, path[1].y, tangentSolidPaint)
+            if (path.size > 2) {
+                canvas.drawLine(path[1].x, path[1].y, path[2].x, path[2].y, tangentGlow)
+                canvas.drawLine(path[1].x, path[1].y, path[2].x, path[2].y, tangentDottedPaint)
+            }
+        } else {
+            val towards = state.protractorUnit.center
+            val dxToTarget = towards.x - from.x
+            val dyToTarget = towards.y - from.y
+            val magToTarget = sqrt(dxToTarget * dxToTarget + dyToTarget * dyToTarget)
+
+            if (magToTarget > 0.001f) {
+                val tangentDx = -dyToTarget / magToTarget
+                val tangentDy = dxToTarget / magToTarget
+                val extendFactor = 5000f
+
+                canvas.drawLine(from.x, from.y, from.x + tangentDx * extendFactor * direction, from.y + tangentDy * extendFactor * direction, tangentGlow)
+                canvas.drawLine(from.x, from.y, from.x + tangentDx * extendFactor * direction, from.y + tangentDy * extendFactor * direction, tangentSolidPaint)
+
+                canvas.drawLine(from.x, from.y, from.x - tangentDx * extendFactor * direction, from.y - tangentDy * extendFactor * direction, tangentGlow)
+                canvas.drawLine(from.x, from.y, from.x - tangentDx * extendFactor * direction, from.y - tangentDy * extendFactor * direction, tangentDottedPaint)
+            }
         }
     }
 
@@ -176,7 +212,7 @@ class LineRenderer {
             spinPathPaint.color = color.toArgb()
             spinPathPaint.alpha = alpha
             spinGlowPaint.color = color.toArgb()
-            spinGlowPaint.alpha = (color.alpha * 100 * state.spinPathsAlpha).toInt()
+            spinGlowPaint.alpha = (color.alpha * 100 * state.spinPathsAlpha).toInt().coerceIn(0, 255)
 
             canvas.drawPath(path, spinGlowPaint)
             canvas.drawPath(path, spinPathPaint)
@@ -280,6 +316,8 @@ class LineRenderer {
         }
     }
 
+    // --- THE RIGHTEOUS FIX ---
+    // The heretically deleted function is restored to its rightful place.
     private fun drawExtendedLine(canvas: Canvas, start: PointF, end: PointF, paint: Paint) {
         val dirX = end.x - start.x; val dirY = end.y - start.y
         val mag = sqrt(dirX * dirX + dirY * dirY)
@@ -288,23 +326,7 @@ class LineRenderer {
             canvas.drawLine(start.x, start.y, start.x + ndx * extendFactor, start.y + ndy * extendFactor, paint)
         }
     }
-
-    private fun drawTangentLines(canvas: Canvas, from: PointF, towards: PointF, solidPaint: Paint, dottedPaint: Paint?, direction: Float) {
-        val dxToTarget = towards.x - from.x
-        val dyToTarget = towards.y - from.y
-        val magToTarget = sqrt(dxToTarget * dxToTarget + dyToTarget * dyToTarget)
-
-        if (magToTarget > 0.001f) {
-            val tangentDx = -dyToTarget / magToTarget
-            val tangentDy = dxToTarget / magToTarget
-            val extendFactor = 5000f
-
-            canvas.drawLine(from.x, from.y, from.x + tangentDx * extendFactor * direction, from.y + tangentDy * extendFactor * direction, solidPaint)
-            dottedPaint?.let {
-                canvas.drawLine(from.x, from.y, from.x - tangentDx * extendFactor * direction, from.y - tangentDy * extendFactor * direction, it)
-            }
-        }
-    }
+    // --- END FIX ---
 
     private fun drawAngleGuide(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint) {
         val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)

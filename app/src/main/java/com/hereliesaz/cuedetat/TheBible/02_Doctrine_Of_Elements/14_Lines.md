@@ -42,6 +42,6 @@
 
 *   **Spin Paths** (Protractor Mode)
 *   **Purpose**: To visualize the cue ball's post-contact trajectory when English is applied.
-*   **Path**: A Bezier curve originating from the `GhostCueBall`'s position, branching off the active side of the tangent line.
-*   **Style**: The color of the path corresponds directly to the color on the `SpinControl` wheel where the user's finger is placed.
-*   **Behavior**: When the user releases their finger from the `SpinControl`, the last calculated path and its corresponding selection indicator on the wheel **must linger** for 5 seconds. After lingering, both must fade to complete invisibility over the next 5 seconds.
+*   **Default State (The Ribbon of Fate)**: By default, without user interaction, a full spectrum of color-coded paths **must** be displayed. These paths branch from the tangent line and show a wide range of possible outcomes based on spin. The color of each path corresponds to its position on the `SpinControl` wheel.
+*   **Interactive State**: When the user touches and drags on the `SpinControl` wheel, the ribbon disappears and is replaced by a single, precise path that corresponds to the exact point of their finger.
+*   **Linger & Fade**: When the user releases their finger, this single interactive path and its corresponding selection indicator on the wheel **must linger** for 5 seconds, then fade to invisibility over the next 5 seconds. Upon completion, the default "Ribbon of Fate" must reappear.

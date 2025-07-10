@@ -4,9 +4,7 @@ package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
-import com.hereliesaz.cuedetat.ui.theme.RebelYellow
-import com.hereliesaz.cuedetat.ui.theme.WarningRed
+import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -20,8 +18,22 @@ class CalculateSpinPaths @Inject constructor() {
     private val maxPathLengthFactor = 20f
 
     operator fun invoke(state: OverlayState): Map<Color, List<PointF>> {
-        val spinOffset = state.lingeringSpinOffset ?: state.selectedSpinOffset ?: return emptyMap()
+        val interactiveSpinOffset = state.lingeringSpinOffset ?: state.selectedSpinOffset ?: return emptyMap()
 
+        return calculateSinglePath(state, interactiveSpinOffset)
+    }
+
+    private fun calculateSinglePath(state: OverlayState, spinOffset: PointF): Map<Color, List<PointF>> {
+        val spinControlRadius = 60f * 2
+        val spinMagnitude = hypot((spinOffset.x - spinControlRadius).toDouble(), (spinOffset.y - spinControlRadius).toDouble()).toFloat() / spinControlRadius
+        val angleDegrees = Math.toDegrees(atan2(spinOffset.y - spinControlRadius, spinOffset.x - spinControlRadius).toDouble()).toFloat()
+
+        val path = calculatePathForSpin(state, angleDegrees, spinMagnitude)
+        val color = SpinColorUtils.getColorFromAngleAndDistance(angleDegrees, spinMagnitude)
+        return mapOf(color to path)
+    }
+
+    private fun calculatePathForSpin(state: OverlayState, angleDegrees: Float, magnitude: Float): List<PointF> {
         val startPoint = state.protractorUnit.ghostCueBallCenter
         val targetPoint = state.protractorUnit.center
         val tangentDirection = state.tangentDirection
@@ -29,19 +41,14 @@ class CalculateSpinPaths @Inject constructor() {
         val dxToTarget = targetPoint.x - startPoint.x
         val dyToTarget = targetPoint.y - startPoint.y
         val magToTarget = hypot(dxToTarget.toDouble(), dyToTarget.toDouble()).toFloat()
-        if (magToTarget < 0.001f) return emptyMap()
+        if (magToTarget < 0.001f) return emptyList()
 
         val tangentDx = (-dyToTarget / magToTarget) * tangentDirection
         val tangentDy = (dxToTarget / magToTarget) * tangentDirection
 
-        val spinControlRadius = 60f * 2 // From SpinControl's new size of 120dp
-        val spinMagnitude = hypot((spinOffset.x - spinControlRadius).toDouble(), (spinOffset.y - spinControlRadius).toDouble()).toFloat() / spinControlRadius
-        val spinAngle = atan2(spinOffset.y - spinControlRadius, spinOffset.x - spinControlRadius)
-
+        val spinAngle = Math.toRadians(angleDegrees.toDouble()).toFloat()
         val maxCurveOffset = state.protractorUnit.radius * 2.5f
-        val curveAmount = spinMagnitude * maxCurveOffset
-
-        val pathColor = getColorFromSpin(spinOffset, spinControlRadius)
+        val curveAmount = magnitude * magnitude
 
         val controlPoint1 = PointF(
             startPoint.x + tangentDx * (maxPathLengthFactor * state.protractorUnit.radius * 0.33f),
@@ -58,9 +65,7 @@ class CalculateSpinPaths @Inject constructor() {
             endPoint.y - tangentDy * (maxPathLengthFactor * state.protractorUnit.radius * 0.33f)
         )
 
-        val path = generateBezierCurve(startPoint, controlPoint1, controlPoint2, endPoint)
-
-        return mapOf(pathColor to path)
+        return generateBezierCurve(startPoint, controlPoint1, controlPoint2, endPoint)
     }
 
     private fun generateBezierCurve(p0: PointF, p1: PointF, p2: PointF, p3: PointF, numPoints: Int = 20): List<PointF> {
@@ -78,33 +83,5 @@ class CalculateSpinPaths @Inject constructor() {
             curve.add(PointF(x, y))
         }
         return curve
-    }
-
-    private fun getColorFromSpin(offset: PointF, radius: Float): Color {
-        val distance = hypot((offset.x - radius).toDouble(), (offset.y - radius).toDouble()).toFloat()
-        val normalizedDistance = (distance / radius).coerceIn(0f, 1f)
-
-        val colorStops = listOf(
-            0.0f to Color.White,
-            0.17f to RebelYellow,
-            0.34f to Color.Red,
-            0.51f to Color(0.5f, 0f, 1f), // Violet
-            0.68f to Color.Blue,
-            0.85f to Color.Green,
-            1.0f to Color.Green.copy(alpha = 0.7f)
-        )
-
-        if (normalizedDistance <= 0f) return colorStops.first().second
-        if (normalizedDistance >= 1f) return colorStops.last().second
-
-        for (i in 0 until colorStops.size - 1) {
-            val (stop1, color1) = colorStops[i]
-            val (stop2, color2) = colorStops[i + 1]
-            if (normalizedDistance in stop1..stop2) {
-                val fraction = (normalizedDistance - stop1) / (stop2 - stop1)
-                return lerp(color1, color2, fraction)
-            }
-        }
-        return colorStops.last().second
     }
 }
