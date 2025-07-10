@@ -61,7 +61,7 @@ class BallRenderer {
         }
     }
 
-    private fun drawGhostedBall(canvas: Canvas, ball: LogicalCircular, config: BallsConfig, strokePaint: Paint, fillPaint: Paint?, glowPaint: Paint) {
+    private fun drawGhostedBall(canvas: Canvas, ball: LogicalCircular, config: BallsConfig, state: OverlayState, strokePaint: Paint, fillPaint: Paint?, glowPaint: Paint) {
         // Calculate the single source of truth for the ball's on-screen appearance.
         val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ball.center, ball.radius, state)
         val screenPos = DrawingUtils.mapPoint(ball.center, state.pitchMatrix)
