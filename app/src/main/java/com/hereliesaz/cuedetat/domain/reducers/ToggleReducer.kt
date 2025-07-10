@@ -27,6 +27,7 @@ class ToggleReducer @Inject constructor() {
                 val newMode = when (currentState.isForceLightMode) { null -> true; true -> false; false -> null }
                 currentState.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)
             }
+            is MainScreenEvent.ToggleCamera -> currentState.copy(isCameraVisible = !currentState.isCameraVisible)
             is MainScreenEvent.ToggleDistanceUnit -> currentState.copy(
                 distanceUnit = if (currentState.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC,
                 valuesChangedSinceReset = true
@@ -45,6 +46,9 @@ class ToggleReducer @Inject constructor() {
         // If table is now shown in protractor mode, perform a full reset of positions.
         if (newShowTable && !newState.isBankingMode) {
             newState = resetForTable(newState)
+        } else if (!newShowTable && !newState.isBankingMode) {
+            // If table is hidden, remove the ball as well.
+            newState = newState.copy(onPlaneBall = null)
         }
         return newState
     }
@@ -66,18 +70,18 @@ class ToggleReducer @Inject constructor() {
         val viewCenterY = currentState.viewHeight / 2f
         val logicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, 0f)
 
-        // Calculate table dimensions
+        // Calculate table dimensions in the logical plane
         val tableToBallRatioLong = currentState.tableSize.getTableToBallRatioLong()
-        val tableToBallRatioShort = tableToBallRatioLong / currentState.tableSize.aspectRatio
         val tableHeight = (tableToBallRatioLong / currentState.tableSize.aspectRatio) * logicalRadius
-        val tableTopY = viewCenterY - tableHeight / 2f
+        val halfHeight = tableHeight / 2f
+        val bottomRailY = viewCenterY + halfHeight
 
-        // Define default positions
-        val targetBallCenter = PointF(viewCenterX, viewCenterY)
-        val actualCueBallCenter = PointF(viewCenterX, tableTopY + tableHeight / 4f) // Head spot
+        // Define default logical positions
+        val targetBallCenter = PointF(viewCenterX, viewCenterY) // 4th diamond line (center)
+        val actualCueBallCenter = PointF(viewCenterX, bottomRailY - (tableHeight / 4f)) // 2nd diamond line (head spot)
 
-        // Calculate rotation to align Ghost Ball between Actual and Target
-        val angleRad = atan2(targetBallCenter.y - actualCueBallCenter.y, targetBallCenter.x - actualCueBallCenter.x)
+        // Calculate rotation to place Ghost Ball between the other two, making them collinear.
+        val angleRad = atan2((targetBallCenter.y - actualCueBallCenter.y), (targetBallCenter.x - actualCueBallCenter.x))
         val rotationDegrees = Math.toDegrees(angleRad.toDouble()).toFloat() - 90f
 
         return currentState.copy(

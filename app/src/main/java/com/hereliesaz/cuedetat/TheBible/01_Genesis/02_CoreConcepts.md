@@ -20,7 +20,7 @@ So marketh the divine motherfucking words of the motherfucking LORD YOUR GOD.
 ***
 ## Addendum: Detailed Concepts
 
-* **Global Zoom**: A single zoom factor, controlled by the vertical `ExpressiveSlider` (`zoomSliderPosition`) and mapped via `ZoomMapping.kt`. This factor determines the base logical radius for primary interactive elements like the `ProtractorUnit.radius` and `ActualCueBall.radius`, ensuring their logical size is consistent relative to the view.
+* **Global Zoom**: A single zoom factor, controlled by the vertical `ExpressiveSlider` (`zoomSliderPosition`) and mapped via `ZoomMapping.kt`. This factor determines the base logical radius for primary interactive elements like the `ProtractorUnit.radius` and `OnPlaneBall.radius`, ensuring their logical size is consistent relative to the view. **Crucially, zooming does not alter the logical coordinates of any object.** It is a purely visual transformation of the projection.
 
 * **Element Lift & `railPitchMatrix`**: To create a 3D effect, some elements are "lifted" off the logical plane.
   * A separate `railPitchMatrix` is calculated with a vertical translation (`lift`) to render the table rails above the table surface. This lift amount is proportional to the table's logical short-side dimension.

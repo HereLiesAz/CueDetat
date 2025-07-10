@@ -81,15 +81,22 @@ class BallRenderer {
 
         // Draw center shape
         val centerPaint = Paint(fillPaint).apply { color = config.centerColor.toArgb() }
-        val crosshairPaint = Paint(strokePaint).apply { color = config.centerColor.toArgb(); strokeWidth = config.strokeWidth * 0.5f }
+        val crosshairPaint = Paint(strokePaint).apply { color = config.centerColor.toArgb(); strokeWidth = config.strokeWidth }
         val centerSize = radiusInfo.radius * config.centerSize
 
         when(config.centerShape){
             CenterShape.NONE -> {}
             CenterShape.DOT -> canvas.drawCircle(screenPos.x, yPosLifted, centerSize, centerPaint)
             CenterShape.CROSSHAIR -> {
-                canvas.drawLine(screenPos.x - centerSize, yPosLifted, screenPos.x + centerSize, yPosLifted, crosshairPaint)
-                canvas.drawLine(screenPos.x, yPosLifted - centerSize, screenPos.x, yPosLifted + centerSize, crosshairPaint)
+                val circleRadius = centerSize * 0.4f // Inner circle is 40% of the crosshair arm length
+                crosshairPaint.style = Paint.Style.STROKE
+                // Draw the central circle
+                canvas.drawCircle(screenPos.x, yPosLifted, circleRadius, crosshairPaint)
+                // Draw the four radiating lines
+                canvas.drawLine(screenPos.x + circleRadius, yPosLifted, screenPos.x + centerSize, yPosLifted, crosshairPaint) // Right
+                canvas.drawLine(screenPos.x - circleRadius, yPosLifted, screenPos.x - centerSize, yPosLifted, crosshairPaint) // Left
+                canvas.drawLine(screenPos.x, yPosLifted + circleRadius, screenPos.x, yPosLifted + centerSize, crosshairPaint) // Bottom
+                canvas.drawLine(screenPos.x, yPosLifted - circleRadius, screenPos.x, yPosLifted - centerSize, crosshairPaint) // Top
             }
         }
     }

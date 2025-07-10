@@ -17,6 +17,9 @@ This document details the required visual style of the application.
 * **Line Glows:** To give lines a volumetric feel, their glow paint uses `Paint.Style.FILL_AND_STROKE`.
 * **Ball Glows:** To give balls a simple aura, their glow paint uses `Paint.Style.STROKE`.
 * These glow paints use a `BlurMaskFilter` and should be drawn *before* the primary paint object to create a halo effect.
+## Stroke & Glow Decrees
+* The base stroke width for all primary lines and outlines (balls, rails, aiming lines) shall be `6f`. The `PaintCache` must reflect this.
+* The base glow width shall be `12f` to provide a subtle but noticeable aura without being overpowering.
 ## Opacity
 * The menu background must be set to 80% opacity (`0.8f`).
 * All popup dialog windows must have their backgrounds set to 66% opacity (`0.66f`).

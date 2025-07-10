@@ -61,7 +61,9 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                CameraBackground(modifier = Modifier.fillMaxSize().zIndex(0f))
+                if (uiState.isCameraVisible) {
+                    CameraBackground(modifier = Modifier.fillMaxSize().zIndex(0f))
+                }
 
                 ProtractorOverlay(
                     uiState = uiState,

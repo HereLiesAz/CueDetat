@@ -36,10 +36,10 @@ sealed class MainScreenEvent {
     data class SetTableSize(val size: TableSize) : MainScreenEvent()
     object ToggleTableSizeDialog : MainScreenEvent()
     object ToggleForceTheme : MainScreenEvent()
+    object ToggleCamera: MainScreenEvent()
     object ToggleLuminanceDialog : MainScreenEvent()
     data class AdjustLuminance(val adjustment: Float) : MainScreenEvent()
     object ToggleDistanceUnit : MainScreenEvent()
-    object ToggleCamera : MainScreenEvent()
 
     // Tutorial Events
     object StartTutorial : MainScreenEvent()

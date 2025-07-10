@@ -11,8 +11,8 @@ import com.hereliesaz.cuedetat.ui.theme.*
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class PaintCache {
-    private val strokeWidth = 3f
-    private val glowStrokeWidth = 12f
+    private val strokeWidth = 6f // Doubled as commanded
+    private val glowStrokeWidth = 12f // Returned to original holy value
     private val glowRadius = 15f
 
     // --- Primary Paint Objects ---
@@ -26,9 +26,9 @@ class PaintCache {
     val tangentLineDottedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth * 0.8f; pathEffect = DashPathEffect(floatArrayOf(15f, 10f), 0f) }
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     val warningPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
-    val angleGuidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.5f }
+    val angleGuidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 3f } // Doubled
     val pocketFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = Color.Black.toArgb() }
-    val gridLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.5f; pathEffect = DashPathEffect(floatArrayOf(15f, 15f), 0f) }
+    val gridLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 3f; pathEffect = DashPathEffect(floatArrayOf(15f, 15f), 0f) } // Doubled
 
 
     // --- Bank Line Paints ---

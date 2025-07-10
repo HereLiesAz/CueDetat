@@ -62,6 +62,7 @@ data class OverlayState(
     val areHelpersVisible: Boolean = false,
     val isMoreHelpVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
+    val isCameraVisible: Boolean = true,
 
     // Banking mode specific state
     val isBankingMode: Boolean = false,
