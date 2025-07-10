@@ -5,7 +5,6 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.view.model.Perspective
-import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import kotlin.math.PI
@@ -18,10 +17,6 @@ class UpdateStateUseCase @Inject constructor() {
 
     private val tableToBallRatioShort = 44f
     private val railHeightToTableHeightRatio = 0.05f
-
-    // These constants are used for the distance estimation calculation.
-    private val LOGICAL_FOCAL_LENGTH_PX = 1500f
-    private val REAL_BALL_DIAMETER_INCHES = 2.25f
 
     operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
@@ -78,8 +73,6 @@ class UpdateStateUseCase @Inject constructor() {
 
         val isTiltBeyondLimit = !state.isBankingMode && shotLineAnchorPoint.y <= state.protractorUnit.ghostCueBallCenter.y
 
-        val estimatedDistance = calculateEstimatedDistance(state)
-
         return state.copy(
             pitchMatrix = pitchMatrix,
             railPitchMatrix = railPitchMatrix,
@@ -88,21 +81,8 @@ class UpdateStateUseCase @Inject constructor() {
             shotLineAnchor = shotLineAnchorPoint,
             isImpossibleShot = isImpossible,
             isTiltBeyondLimit = isTiltBeyondLimit,
-            tangentDirection = tangentDirection,
-            estimatedDistanceInches = estimatedDistance
+            tangentDirection = tangentDirection
         )
-    }
-
-    private fun calculateEstimatedDistance(state: OverlayState): Float {
-        val logicalBall = state.onPlaneBall ?: state.protractorUnit
-        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(logicalBall.center, logicalBall.radius, state)
-        val apparentDiameterPx = radiusInfo.radius * 2
-
-        return if (apparentDiameterPx > 0) {
-            (LOGICAL_FOCAL_LENGTH_PX * REAL_BALL_DIAMETER_INCHES) / apparentDiameterPx
-        } else {
-            0f
-        }
     }
 
     private fun calculateShotPossibilityAndTangent(shotAnchor: PointF, ghostBall: PointF, targetBall: PointF): Pair<Boolean, Float> {

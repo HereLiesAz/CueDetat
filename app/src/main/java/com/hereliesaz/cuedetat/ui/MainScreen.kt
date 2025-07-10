@@ -81,9 +81,9 @@ fun MainScreen(viewModel: MainViewModel) {
                     onEvent = viewModel::onEvent,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .fillMaxHeight(0.8f)
-                        .width(this@BoxWithConstraints.maxHeight * 0.6f)
+                        .fillMaxHeight(0.6f) // Slider container is 60% of screen height
                         .padding(end = 16.dp)
+                        .width(90.dp)
                         .zIndex(5f)
                 )
 

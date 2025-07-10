@@ -93,10 +93,6 @@ fun MenuDrawerContent(
             onClick = { onEvent(MainScreenEvent.ToggleForceTheme); onCloseDrawer() }
         )
         MenuItem(
-            text = if(uiState.useImperial) "Use Metric" else "Use Imperial",
-            onClick = { onEvent(MainScreenEvent.ToggleUnits); onCloseDrawer() }
-        )
-        MenuItem(
             text = "Luminance",
             onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog); onCloseDrawer() }
         )
@@ -132,7 +128,7 @@ private fun MenuItem(text: String, onClick: () -> Unit) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.primary // Corrected Color
+            color = MaterialTheme.colorScheme.primary
         )
     }
 }

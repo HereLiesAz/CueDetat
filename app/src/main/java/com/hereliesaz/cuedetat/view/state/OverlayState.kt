@@ -43,7 +43,6 @@ data class OverlayState(
     val isForceLightMode: Boolean? = null,
     val luminanceAdjustment: Float = 0f,
     val showLuminanceDialog: Boolean = false,
-    val useImperial: Boolean = true,
 
     // Tutorial State
     val showTutorialOverlay: Boolean = false,
@@ -61,7 +60,6 @@ data class OverlayState(
     val tangentDirection: Float = 1.0f, // 1.0f for one side, -1.0f for the other
     val isImpossibleShot: Boolean = false,
     val isTiltBeyondLimit: Boolean = false,
-    val estimatedDistanceInches: Float = 0f,
     val warningText: String? = null,
 
     // Theming

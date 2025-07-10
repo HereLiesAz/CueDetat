@@ -45,7 +45,6 @@ class StateReducer @Inject constructor() {
             }
             is MainScreenEvent.ToggleLuminanceDialog -> currentState.copy(showLuminanceDialog = !currentState.showLuminanceDialog)
             is MainScreenEvent.AdjustLuminance -> currentState.copy(luminanceAdjustment = event.adjustment.coerceIn(-0.4f, 0.4f), valuesChangedSinceReset = true)
-            is MainScreenEvent.ToggleUnits -> currentState.copy(useImperial = !currentState.useImperial)
             is MainScreenEvent.StartTutorial -> currentState.copy(
                 showTutorialOverlay = true, currentTutorialStep = 0, valuesChangedSinceReset = true,
                 areHelpersVisible = false, showLuminanceDialog = false, isMoreHelpVisible = false

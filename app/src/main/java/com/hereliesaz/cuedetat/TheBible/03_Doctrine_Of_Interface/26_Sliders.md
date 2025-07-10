@@ -37,14 +37,14 @@ This document outlines the non-negotiable rules for all sliders within the Cue D
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Preview
 @Composable
-fun VerticalCenteredSliderSample() {
+fun VerticalSliderSample() {
 val coroutineScope = rememberCoroutineScope()
 val sliderState =
 rememberSliderState(
 // Only allow multiples of 10. Excluding the endpoints of `valueRange`,
 // there are 9 steps (10, 20, ..., 90).
 steps = 9,
-valueRange = -50f..50f,
+valueRange = 0f..100f,
 )
 val snapAnimationSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
 var currentValue by rememberSaveable { mutableFloatStateOf(sliderState.value) }
@@ -88,7 +88,13 @@ sliderState.valueRange.start..sliderState.valueRange.endInclusive,
 sliderState.steps,
 ),
 interactionSource = interactionSource,
-track = { SliderDefaults.CenteredTrack(sliderState = sliderState) },
+track = {
+SliderDefaults.Track(
+sliderState = sliderState,
+modifier = Modifier.width(36.dp),
+trackCornerSize = 12.dp,
+)
+},
 reverseDirection = true,
 )
 }

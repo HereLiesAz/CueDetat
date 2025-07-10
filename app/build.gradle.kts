@@ -83,7 +83,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "17" // Match this with sourceCompatibility and targetCompatibility
     }
     buildFeatures {
         compose = true
@@ -109,6 +109,8 @@ android {
         implementation(libs.androidx.ui.tooling.preview)
         implementation(libs.androidx.material3)
         implementation(libs.androidx.compose.material3)
+        implementation(libs.androidx.material3)
+
 
         // Hilt for Dependency Injection
         implementation(libs.hilt.android)
@@ -136,18 +138,25 @@ android {
         androidTestImplementation(libs.androidx.junit)
         androidTestImplementation(libs.androidx.espresso.core)
         androidTestImplementation(platform(libs.androidx.compose.bom))
-        androidTestImplementation(libs.androidx.ui.test.junit4)
         debugImplementation(libs.androidx.ui.tooling)
         debugImplementation(libs.androidx.ui.test.manifest)
         implementation(libs.material)
         implementation(libs.androidx.material.icons.extended)
 
+        implementation(libs.material3)
+
+        // Declare individual CameraX library dependencies without versions
+        implementation(libs.androidx.camera.core)
+        implementation(libs.androidx.camera.camera2)
+        implementation(libs.androidx.camera.lifecycle)
+        implementation(libs.androidx.camera.view)
+        androidTestImplementation(libs.androidx.junit)
     }
 }
 dependencies {
-    implementation(libs.ui)
-    implementation(libs.ui.graphics)
+    implementation(libs.androidx.animation.core)
 }
+
 
 kapt {
     correctErrorTypes = true
