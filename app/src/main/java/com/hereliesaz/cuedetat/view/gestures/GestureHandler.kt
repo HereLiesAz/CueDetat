@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
@@ -26,10 +27,15 @@ fun Modifier.detectManualGestures(onEvent: (MainScreenEvent) -> Unit) =
                 if (!canceled) {
                     val zoom = event.calculateZoom()
                     val pan = event.calculatePan()
+                    val rotation = event.calculateRotation()
                     val centroid = event.calculateCentroid()
 
                     if (zoom != 1f) {
                         onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
+                    }
+
+                    if (rotation != 0f) {
+                        onEvent(MainScreenEvent.TableRotationApplied(rotation))
                     }
 
                     if (pan != Offset.Zero) {
