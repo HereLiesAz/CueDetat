@@ -6,7 +6,6 @@ import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import com.hereliesaz.cuedetat.data.FullOrientation
-import com.hereliesaz.cuedetat.view.config.ball.ActualCueBall
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 
@@ -44,6 +43,7 @@ data class OverlayState(
     val isForceLightMode: Boolean? = null,
     val luminanceAdjustment: Float = 0f,
     val showLuminanceDialog: Boolean = false,
+    val useImperial: Boolean = true,
 
     // Tutorial State
     val showTutorialOverlay: Boolean = false,
@@ -57,14 +57,21 @@ data class OverlayState(
     val hasInverseMatrix: Boolean = false,
 
     // Derived state
+    val shotLineAnchor: PointF = PointF(0f, 0f),
+    val tangentDirection: Float = 1.0f, // 1.0f for one side, -1.0f for the other
     val isImpossibleShot: Boolean = false,
+    val isTiltBeyondLimit: Boolean = false,
+    val estimatedDistanceInches: Float = 0f,
     val warningText: String? = null,
 
     // Theming
     val appControlColorScheme: ColorScheme = darkColorScheme(),
 
     // Gesture State
-    val interactionMode: InteractionMode = InteractionMode.NONE
+    val interactionMode: InteractionMode = InteractionMode.NONE,
+
+    // State for Reset/Revert functionality
+    val preResetState: OverlayState? = null
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch

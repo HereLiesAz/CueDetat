@@ -13,6 +13,7 @@ import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import kotlin.math.abs
+import kotlin.math.max
 import kotlin.math.min
 
 private const val GESTURE_TAG = "GestureDebug"
@@ -20,7 +21,6 @@ private const val GESTURE_TAG = "GestureDebug"
 class StateReducer @Inject constructor() {
 
     private val defaultBankingAimDistanceFactor = 15f
-    private val logicalTouchSlop = 15f
 
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         return when (event) {
@@ -34,7 +34,7 @@ class StateReducer @Inject constructor() {
             is MainScreenEvent.ZoomSliderChanged -> handleZoomSliderChanged(currentState, event)
             is MainScreenEvent.ZoomScaleChanged -> handleZoomScaleChanged(currentState, event)
             is MainScreenEvent.FullOrientationChanged -> currentState.copy(currentOrientation = event.orientation)
-            is MainScreenEvent.Reset -> createInitialState(currentState.viewWidth, currentState.viewHeight, currentState.appControlColorScheme)
+            is MainScreenEvent.Reset -> handleReset(currentState)
             is MainScreenEvent.TableRotationChanged -> currentState.copy(tableRotationDegrees = event.degrees, valuesChangedSinceReset = true)
             is MainScreenEvent.ToggleOnPlaneBall -> handleToggleOnPlaneBall(currentState)
             is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(currentState)
@@ -45,6 +45,7 @@ class StateReducer @Inject constructor() {
             }
             is MainScreenEvent.ToggleLuminanceDialog -> currentState.copy(showLuminanceDialog = !currentState.showLuminanceDialog)
             is MainScreenEvent.AdjustLuminance -> currentState.copy(luminanceAdjustment = event.adjustment.coerceIn(-0.4f, 0.4f), valuesChangedSinceReset = true)
+            is MainScreenEvent.ToggleUnits -> currentState.copy(useImperial = !currentState.useImperial)
             is MainScreenEvent.StartTutorial -> currentState.copy(
                 showTutorialOverlay = true, currentTutorialStep = 0, valuesChangedSinceReset = true,
                 areHelpersVisible = false, showLuminanceDialog = false, isMoreHelpVisible = false
@@ -57,13 +58,39 @@ class StateReducer @Inject constructor() {
         }
     }
 
+    private fun handleReset(currentState: OverlayState): OverlayState {
+        // If a pre-reset state exists, revert to it.
+        currentState.preResetState?.let {
+            return it.copy(preResetState = null) // Revert and clear the saved state
+        }
+
+        // Otherwise, this is the first press. Save the current positional state.
+        val stateToSave = currentState.copy()
+
+        // Create the default positional state
+        val initialSliderPos = 0f
+        val initialLogicalRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, initialSliderPos)
+        val initialProtractorCenter = PointF(currentState.viewWidth / 2f, currentState.viewHeight / 2f)
+
+        // Reset only positional and rotational properties, preserving toggles
+        return currentState.copy(
+            protractorUnit = ProtractorUnit(center = initialProtractorCenter, radius = initialLogicalRadius, rotationDegrees = 0f),
+            zoomSliderPosition = initialSliderPos,
+            tableRotationDegrees = 0f,
+            bankingAimTarget = null, // This is positional
+            luminanceAdjustment = 0f,
+            preResetState = stateToSave // Save the original state for reverting
+        )
+    }
+
     private fun handleGestureStarted(currentState: OverlayState, event: MainScreenEvent.LogicalGestureStarted): OverlayState {
         val touchPoint = event.logicalPoint
         var newMode = InteractionMode.NONE
 
         if (currentState.isBankingMode) {
             currentState.onPlaneBall?.let {
-                if (distance(touchPoint, it.center) < it.radius + logicalTouchSlop) {
+                val touchSlop = max(30f, it.radius * 0.5f)
+                if (distance(touchPoint, it.center) < it.radius + touchSlop) {
                     newMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
                 }
             }
@@ -72,12 +99,14 @@ class StateReducer @Inject constructor() {
             }
         } else {
             currentState.onPlaneBall?.let {
-                if (distance(touchPoint, it.center) < it.radius + logicalTouchSlop) {
+                val touchSlop = max(30f, it.radius * 0.5f)
+                if (distance(touchPoint, it.center) < it.radius + touchSlop) {
                     newMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
                 }
             }
             if (newMode == InteractionMode.NONE) {
-                if (distance(touchPoint, currentState.protractorUnit.center) < currentState.protractorUnit.radius + logicalTouchSlop) {
+                val touchSlop = max(30f, currentState.protractorUnit.radius * 0.5f)
+                if (distance(touchPoint, currentState.protractorUnit.center) < currentState.protractorUnit.radius + touchSlop) {
                     newMode = InteractionMode.MOVING_PROTRACTOR_UNIT
                 }
             }
@@ -96,8 +125,9 @@ class StateReducer @Inject constructor() {
 
         return when (currentState.interactionMode) {
             InteractionMode.ROTATING_PROTRACTOR -> {
-                val rotationDelta = screenDelta.x * 0.3f
-                Log.d(GESTURE_TAG, "REDUCER: ROTATING. screenDelta.x=${screenDelta.x}, rotationDelta=$rotationDelta")
+                // Combine horizontal and vertical drag components for a more fluid rotation
+                val rotationDelta = (screenDelta.x - screenDelta.y) * 0.2f
+                Log.d(GESTURE_TAG, "REDUCER: ROTATING. screenDelta.x=${screenDelta.x}, screenDelta.y=${screenDelta.y}, rotationDelta=$rotationDelta")
                 val newRotation = currentState.protractorUnit.rotationDegrees - rotationDelta
                 currentState.copy(protractorUnit = currentState.protractorUnit.copy(rotationDegrees = newRotation), valuesChangedSinceReset = true)
             }
@@ -137,8 +167,8 @@ class StateReducer @Inject constructor() {
 
         return OverlayState(
             viewWidth = viewWidth, viewHeight = viewHeight,
-            protractorUnit = ProtractorUnit(center = initialProtractorCenter, radius = initialLogicalRadius, rotationDegrees = -90f),
-            onPlaneBall = OnPlaneBall(center = initialProtractorCenter, radius = initialLogicalRadius), // Default to null
+            protractorUnit = ProtractorUnit(center = initialProtractorCenter, radius = initialLogicalRadius, rotationDegrees = 0f),
+            onPlaneBall = null, // Default to null
             zoomSliderPosition = initialSliderPos,
             isBankingMode = false, showTable = false, tableRotationDegrees = 0f, bankingAimTarget = null,
             valuesChangedSinceReset = false, areHelpersVisible = false, isMoreHelpVisible = false,
@@ -175,12 +205,14 @@ class StateReducer @Inject constructor() {
 
     private fun handleToggleOnPlaneBall(currentState: OverlayState): OverlayState {
         val viewCenterX = currentState.viewWidth / 2f
+        val viewCenterY = currentState.viewHeight / 2f
+        val viewBottomY = currentState.viewHeight.toFloat()
+
         if (currentState.isBankingMode) return currentState
         return if (currentState.onPlaneBall == null) {
             val newRadius = getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, currentState.zoomSliderPosition)
-            val logicalTableHeight = newRadius * 44f
-            val headSpotY = (currentState.viewHeight/2f) - (logicalTableHeight/4f)
-            val initialCenter = PointF(viewCenterX, headSpotY)
+            // Position halfway between screen center and screen bottom
+            val initialCenter = PointF(viewCenterX, (viewCenterY + viewBottomY) / 2f)
             currentState.copy(onPlaneBall = OnPlaneBall(center = initialCenter, radius = newRadius), valuesChangedSinceReset = true)
         } else {
             currentState.copy(onPlaneBall = null, valuesChangedSinceReset = true)

@@ -32,7 +32,7 @@ To avoid rendering artifacts and maintain sanity, the following order of operati
     * **Pass 1: Pitched Table Surface & On-Plane Elements:**
         * `canvas.save()`
         * `canvas.concat(pitchMatrix)`: The 3D perspective is applied to the entire canvas *once*. All subsequent drawing operations until `canvas.restore()` will be in the transformed (pitched) space.
-        * Draw all elements that exist *on* the 3D world plane (the `TableModel`, the `ActualCueBall`'s base, all lines and their labels) onto this single transformed canvas at their logical `(x, y)` coordinates.
+        * Draw all elements that exist *on* the 3D world plane (the `TableModel` and all lines and their labels) onto this single transformed canvas at their logical `(x, y)` coordinates.
         * `canvas.restore()`
     * **Pass 2: Lifted Rails (Banking Mode Only):**
         * `canvas.save()`
@@ -41,4 +41,4 @@ To avoid rendering artifacts and maintain sanity, the following order of operati
         * `canvas.restore()`
     * **Pass 3: Screen-Space "Ghost" Effects (Protractor Mode Only):**
         * These elements do not exist on the logical 3D plane. Their positions are calculated by projecting their logical counterparts' centers to the screen, and then applying a "lift" offset.
-        * Draw the "ghost" versions of the `TargetBall` and `GhostCueBall` directly onto the screen canvas, without the `pitchMatrix`.
+        * Draw the "ghost" versions of the `TargetBall`, `GhostCueBall`, and `ActualCueBall` directly onto the screen canvas, without the `pitchMatrix`.

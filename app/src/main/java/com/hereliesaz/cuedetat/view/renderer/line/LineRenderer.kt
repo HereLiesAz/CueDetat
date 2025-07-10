@@ -6,6 +6,7 @@ import android.graphics.PointF
 import android.graphics.Typeface
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
+import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -14,18 +15,26 @@ import kotlin.math.sqrt
 
 class LineRenderer {
     private val textRenderer = LineTextRenderer()
-    private val protractorAngles = floatArrayOf(14f, 30f)
+    private val protractorAngles = floatArrayOf(14f, 30f, 43f, 48f)
 
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         drawGlows(canvas, state, paints)
         drawLines(canvas, state, paints, typeface)
     }
 
+    // New public method for drawing screen-space guides
+    fun drawProtractorGuides(canvas: Canvas, state: OverlayState, paints: PaintCache, screenCenter: PointF) {
+        val ghostCueScreenCenter = DrawingUtils.mapPoint(state.protractorUnit.ghostCueBallCenter, state.pitchMatrix)
+        protractorAngles.forEach { angle ->
+            drawAngleGuide(canvas, screenCenter, ghostCueScreenCenter, angle, paints.angleGuidePaint)
+        }
+    }
+
     private fun drawGlows(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         if (state.isBankingMode) {
-            drawBankingLines(canvas, state, paints.glowPaint)
+            drawBankingLines(canvas, state, paints.lineGlowPaint)
         } else {
-            drawProtractorLines(canvas, state, paints.glowPaint, paints.glowPaint, paints.glowPaint)
+            drawProtractorLines(canvas, state, paints.lineGlowPaint, paints.lineGlowPaint, paints.lineGlowPaint)
         }
     }
 
@@ -33,9 +42,9 @@ class LineRenderer {
         if (state.isBankingMode) {
             drawBankingLines(canvas, state, paints.bankLinePaint, paints, typeface)
         } else {
-            val shotLinePaint = if (state.isImpossibleShot) paints.warningPaint else paints.shotLinePaint
-            val tangentPaint = if (state.isImpossibleShot) paints.tangentLineDottedPaint else paints.tangentLineSolidPaint
-            val aimingLinePaint = paints.targetCirclePaint // Using target paint as a logical default
+            val shotLinePaint = if (state.isImpossibleShot || state.isTiltBeyondLimit) paints.warningPaint else paints.shotLinePaint
+            val tangentPaint = paints.tangentLineSolidPaint
+            val aimingLinePaint = paints.targetCirclePaint
             drawProtractorLines(canvas, state, aimingLinePaint, shotLinePaint, tangentPaint, paints, typeface)
         }
     }
@@ -45,27 +54,26 @@ class LineRenderer {
         aimingPaint: Paint, shotPaint: Paint, tangentPaint: Paint,
         allPaints: PaintCache? = null, typeface: Typeface? = null
     ) {
-        val protractorUnit = state.protractorUnit
-        val targetCenter = protractorUnit.center
-        val ghostCueCenter = protractorUnit.ghostCueBallCenter
+        val targetCenter = state.protractorUnit.center
+        val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
 
         drawExtendedLine(canvas, ghostCueCenter, targetCenter, aimingPaint)
 
-        state.onPlaneBall?.let {
-            drawExtendedLine(canvas, it.center, ghostCueCenter, shotPaint)
+        if (!state.isTiltBeyondLimit) {
+            drawExtendedLine(canvas, state.shotLineAnchor, ghostCueCenter, shotPaint)
         }
 
-        drawTangentLines(canvas, ghostCueCenter, targetCenter, tangentPaint, allPaints?.tangentLineDottedPaint, state.protractorUnit.radius * 2)
+        drawTangentLines(canvas, ghostCueCenter, targetCenter, tangentPaint, allPaints?.tangentLineDottedPaint, state.tangentDirection)
 
+        // Labels are drawn on the pitched plane, so they stay here.
         if (allPaints != null && typeface != null && state.areHelpersVisible) {
-            val angleGuidePaint = Paint(aimingPaint).apply { alpha = 80 }
-            val textPaint = Paint(allPaints.textPaint).apply { alpha = 80; textSize = 30f }
+            textRenderer.drawProtractorLabels(canvas, state, allPaints, typeface)
 
+            // Draw angle labels on the pitched plane as well
+            val textPaint = Paint(allPaints.textPaint).apply { alpha = 80; textSize = 30f }
             protractorAngles.forEach { angle ->
-                drawAngleGuide(canvas, targetCenter, ghostCueCenter, angle, angleGuidePaint)
                 textRenderer.drawAngleLabel(canvas, targetCenter, ghostCueCenter, angle, textPaint, state.protractorUnit.radius)
             }
-            textRenderer.drawProtractorLabels(canvas, state, allPaints, typeface)
         }
     }
 
@@ -89,7 +97,7 @@ class LineRenderer {
         }
     }
 
-    private fun drawTangentLines(canvas: Canvas, from: PointF, towards: PointF, solidPaint: Paint, dottedPaint: Paint?, length: Float) {
+    private fun drawTangentLines(canvas: Canvas, from: PointF, towards: PointF, solidPaint: Paint, dottedPaint: Paint?, direction: Float) {
         val dxToTarget = towards.x - from.x
         val dyToTarget = towards.y - from.y
         val magToTarget = sqrt(dxToTarget * dxToTarget + dyToTarget * dyToTarget)
@@ -97,9 +105,11 @@ class LineRenderer {
         if (magToTarget > 0.001f) {
             val tangentDx = -dyToTarget / magToTarget
             val tangentDy = dxToTarget / magToTarget
-            canvas.drawLine(from.x, from.y, from.x + tangentDx * length, from.y + tangentDy * length, solidPaint)
+            val extendFactor = 5000f
+
+            canvas.drawLine(from.x, from.y, from.x + tangentDx * extendFactor * direction, from.y + tangentDy * extendFactor * direction, solidPaint)
             dottedPaint?.let {
-                canvas.drawLine(from.x, from.y, from.x - tangentDx * length, from.y - tangentDy * length, it)
+                canvas.drawLine(from.x, from.y, from.x - tangentDx * extendFactor * direction, from.y - tangentDy * extendFactor * direction, it)
             }
         }
     }

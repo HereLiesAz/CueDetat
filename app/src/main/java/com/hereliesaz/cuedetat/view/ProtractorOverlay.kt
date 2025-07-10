@@ -4,13 +4,15 @@ import android.graphics.PointF
 import android.graphics.Typeface
 import android.view.View
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.forEachGesture
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -18,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.res.ResourcesCompat
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.view.gestures.detectManualGestures
 import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
@@ -51,31 +54,10 @@ fun ProtractorOverlay(
             .onSizeChanged { size ->
                 onEvent(MainScreenEvent.SizeChanged(size.width, size.height))
             }
-            .pointerInput(Unit) {
-                detectTransformGestures { _, _, zoom, _ ->
-                    onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
-                }
-            }
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        onEvent(MainScreenEvent.ScreenGestureStarted(PointF(offset.x, offset.y)))
-                    },
-                    onDragEnd = { onEvent(MainScreenEvent.GestureEnded) },
-                    onDragCancel = { onEvent(MainScreenEvent.GestureEnded) }
-                ) { change, _ ->
-                    onEvent(
-                        MainScreenEvent.Drag(
-                            previousPosition = PointF(change.previousPosition.x, change.previousPosition.y),
-                            currentPosition = PointF(change.position.x, change.position.y)
-                        )
-                    )
-                    change.consume()
-                }
-            }
+            .detectManualGestures(onEvent)
     ) {
-        drawContext.canvas.nativeCanvas.also { canvas ->
-            renderer.draw(canvas, uiState, paints, barbaroTypeface)
+        drawIntoCanvas { canvas ->
+            renderer.draw(canvas.nativeCanvas, uiState, paints, barbaroTypeface)
         }
     }
 }

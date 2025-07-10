@@ -7,10 +7,8 @@
 ***
 ## Addendum: Impossible Shot Detection & Display
 
-* **The One True Principle**: Early warning systems are deprecated. The sole trigger for an "impossible shot" warning is now a purely geometric check. A shot is impossible if the distance from the observer's point (A) to the Ghost Cue Ball (G) is greater than the distance from the observer's point (A) to the Target Ball (T).
-    * If the `ActualCueBall` is visible, its logical center is point A.
-    * If the `ActualCueBall` is hidden, point A defaults to the logical point corresponding to the bottom-center of the screen. This unified logic applies universally.
+* **The One True Principle**: A shot is impossible if the cue ball would have to pass through the object ball to reach the ghost ball position. This is determined by checking if the angle of the `ShotGuideLine` falls outside the 180-degree arc defined by the `TangentLine`. If the shot line is not in the two valid 90-degree quadrants, the shot is physically impossible.
 
 * **Display Timing Mandate**: The visual feedback for an impossible shot must be bifurcated for clarity and responsiveness.
-    * **Immediate Feedback**: The `shotLine` and the `ghostCueBall` outline must change to a warning red *immediately* when the `isImpossibleShot` flag in the `OverlayState` becomes `true`. This must be a direct result of the state update, providing instant feedback during a gesture.
-    * **Delayed Feedback**: The kinetic text warning (the sarcastic message) must only be displayed *after* the user's gesture has concluded, triggered by the `GestureEnded` event. This prevents the screen from being cluttered with text while the user is actively making an adjustment.
+  * **Immediate Feedback**: The `shotLine` and the `ghostCueBall` outline must change to a warning red *immediately* when the `isImpossibleShot` flag in the `OverlayState` becomes `true`. This must be a direct result of the state update, providing instant feedback during a gesture.
+  * **Delayed Feedback**: The kinetic text warning (the sarcastic message) must only be displayed *after* the user's gesture has concluded, triggered by the `GestureEnded` event. This prevents the screen from being cluttered with text while the user is actively making an adjustment.

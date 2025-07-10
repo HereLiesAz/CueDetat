@@ -24,10 +24,7 @@ class TableRenderer {
             val right = tableCenterX + tablePlayingSurfaceWidth / 2
             val bottom = tableCenterY + tablePlayingSurfaceHeight / 2
 
-            // Draw Glow First
-            canvas.drawRect(left, top, right, bottom, paints.glowPaint)
-
-            // Draw Outline
+            // Draw Outline Only, no fill.
             canvas.drawRect(left, top, right, bottom, paints.tableOutlinePaint)
 
             // Draw Pockets

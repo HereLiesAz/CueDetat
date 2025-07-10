@@ -24,7 +24,7 @@ This scripture defines the logical objects that represent pool balls.
   * **Purpose**: An optional, user-draggable aiming reference in Protractor Mode.
   * **Model**: An instance of `OnPlaneBallModel`.
   * **Label**: "A".
-  * **Rendering**: Rendered as a single circle directly on the pitched logical plane.
+  * **Rendering**: Rendered as a "ghosted" ball, with both an on-plane shadow and a lifted 3D circle.
 
 * **Banking Ball (Role)**
   * **Purpose**: The primary interactive element in Banking Mode, representing the ball to be banked.
@@ -33,7 +33,7 @@ This scripture defines the logical objects that represent pool balls.
   * **Rendering**: Rendered as a single circle directly on the pitched logical plane.
 
 ## Default Positions & Properties
-* The **Target Ball** (`ProtractorUnitModel.center`) must be positioned at the absolute center of the logical table.
-* The **Actual Cue Ball** role, when first enabled, should position its `OnPlaneBallModel` instance at the table's head spot.
-* The default `rotationDegrees` of the `ProtractorUnitModel` must be `-90f`.
+* The **Target Ball** (`ProtractorUnitModel.center`) must be positioned at the absolute center of the screen.
+* The **Actual Cue Ball** role, when first enabled, should be positioned halfway between the center of the screen and the bottom edge of the screen.
+* The default `rotationDegrees` of the `ProtractorUnitModel` must be `0f` (placing the Ghost Cue Ball directly below the Target Ball, so the Aiming Line points straight up).
 * The logical size of the balls is determined by the global zoom factor.

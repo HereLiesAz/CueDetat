@@ -32,6 +32,7 @@ sealed class MainScreenEvent {
     object ToggleForceTheme : MainScreenEvent()
     object ToggleLuminanceDialog : MainScreenEvent()
     data class AdjustLuminance(val adjustment: Float) : MainScreenEvent()
+    object ToggleUnits : MainScreenEvent()
 
     // Tutorial Events
     object StartTutorial : MainScreenEvent()

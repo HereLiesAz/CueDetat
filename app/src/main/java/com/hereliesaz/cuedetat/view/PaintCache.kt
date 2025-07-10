@@ -31,7 +31,9 @@ class PaintCache {
 
 
     // --- Glow Paint Objects ---
-    val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = glowStrokeWidth }
+    val lineGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL_AND_STROKE; strokeWidth = glowStrokeWidth }
+    val ballGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = glowStrokeWidth }
+
 
     fun setTypeface(typeface: Typeface?) {
         textPaint.typeface = typeface
@@ -43,8 +45,10 @@ class PaintCache {
         val glowColor = (if(isDark) Color.White else Color.Black).copy(alpha = 0.5f).toArgb()
 
         val blurFilter = BlurMaskFilter(glowRadius, BlurMaskFilter.Blur.NORMAL)
-        glowPaint.color = glowColor
-        glowPaint.maskFilter = blurFilter
+        lineGlowPaint.color = glowColor
+        lineGlowPaint.maskFilter = blurFilter
+        ballGlowPaint.color = glowColor
+        ballGlowPaint.maskFilter = blurFilter
 
         tableOutlinePaint.color = baseScheme.primary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         targetCirclePaint.color = baseScheme.primary.adjustLuminance(LUMINANCE_ADJUST).toArgb()

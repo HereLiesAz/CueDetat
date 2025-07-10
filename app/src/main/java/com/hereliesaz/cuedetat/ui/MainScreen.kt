@@ -12,7 +12,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -20,7 +19,6 @@ import com.hereliesaz.cuedetat.ui.composables.*
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import com.hereliesaz.cuedetat.view.state.SingleEvent
 import com.hereliesaz.cuedetat.view.state.ToastMessage
 import kotlinx.coroutines.launch
 
@@ -78,42 +76,25 @@ fun MainScreen(viewModel: MainViewModel) {
                     modifier = Modifier.zIndex(2f)
                 )
 
-                val sliderWidth = with(LocalDensity.current) { (maxHeight.toPx() * 0.6f).toDp() }
                 ZoomControls(
                     uiState = uiState,
                     onEvent = viewModel::onEvent,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .fillMaxHeight(0.6f)
-                        .width(sliderWidth)
-                        .offset(x = sliderWidth / 2)
+                        .fillMaxHeight(0.8f)
+                        .width(this@BoxWithConstraints.maxHeight * 0.6f)
+                        .padding(end = 16.dp)
                         .zIndex(5f)
                 )
 
-                Column(
+                Row(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                        .navigationBarsPadding(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    TableRotationSlider(
-                        uiState = uiState,
-                        onEvent = viewModel::onEvent,
-                        modifier = Modifier
-                            .fillMaxWidth(0.8f)
-                            .padding(bottom = if (uiState.showTable) 8.dp else 0.dp)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 16.dp)
                         .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                         .zIndex(2f),
-                    verticalAlignment = Alignment.Bottom,
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     if (!uiState.isBankingMode) {
@@ -122,7 +103,14 @@ fun MainScreen(viewModel: MainViewModel) {
                             onEvent = { viewModel.onEvent(MainScreenEvent.ToggleOnPlaneBall) }
                         )
                     } else {
-                        Spacer(Modifier)
+                        Spacer(Modifier.size(40.dp)) // Mini FAB size is 40dp
+                    }
+
+                    Box(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
+                        TableRotationSlider(
+                            uiState = uiState,
+                            onEvent = viewModel::onEvent
+                        )
                     }
 
                     ResetFab(
@@ -130,6 +118,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         onEvent = viewModel::onEvent
                     )
                 }
+
 
                 KineticWarningOverlay(text = uiState.warningText, modifier = Modifier.zIndex(3f))
                 LuminanceAdjustmentDialog(

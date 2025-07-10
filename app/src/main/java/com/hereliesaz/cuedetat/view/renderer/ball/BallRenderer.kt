@@ -19,15 +19,14 @@ class BallRenderer {
      * for on-plane and ghosted/lifted elements.
      */
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
-        // --- On-Plane Ball (ActualCueBall / BankingBall) ---
-        state.onPlaneBall?.let { onPlaneBall ->
-            val strokePaint = if (state.isBankingMode) paints.bankLinePaint else paints.actualCueBallPaint
-            drawOnPlaneBall(canvas, onPlaneBall, strokePaint, paints, state)
-        }
-
-        // --- Ghosted Protractor Balls (Target / Ghost) ---
-        if (!state.isBankingMode) {
-            drawGhostedProtractor(canvas, state, paints)
+        if (state.isBankingMode) {
+            // In Banking Mode, the ball is a simple on-plane circle.
+            state.onPlaneBall?.let { bankingBall ->
+                drawOnPlaneBall(canvas, bankingBall, paints.bankLinePaint, paints, state)
+            }
+        } else {
+            // In Protractor Mode, all balls are "ghosted" with a shadow and lifted effect.
+            drawGhostedProtractorAndActual(canvas, state, paints)
         }
 
         // --- Labels (Drawn last in screen-space to be on top and not distorted) ---
@@ -37,34 +36,48 @@ class BallRenderer {
     }
 
     /**
-     * Draws the protractor unit (Target and Ghost balls) as "lifted" screen-space elements.
-     * Also draws their on-plane "shadows".
+     * Draws the protractor unit (Target and Ghost balls) and the ActualCueBall as "lifted"
+     * screen-space elements, along with their on-plane "shadows".
      */
-    private fun drawGhostedProtractor(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+    private fun drawGhostedProtractorAndActual(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         val protractor = state.protractorUnit
         val ghostCuePaint = if (state.isImpossibleShot) paints.warningPaint else paints.cueCirclePaint
         val targetPaint = paints.targetCirclePaint
+        val actualCuePaint = paints.actualCueBallPaint
 
-        // Draw on-plane shadows first
+        // --- Pass 1: Draw on-plane shadows first ---
         canvas.save()
         canvas.concat(state.pitchMatrix)
-        canvas.drawCircle(protractor.ghostCueBallCenter.x, protractor.ghostCueBallCenter.y, protractor.radius, ghostCuePaint)
+        // Target Ball Shadow
         canvas.drawCircle(protractor.center.x, protractor.center.y, protractor.radius, targetPaint)
+        // Ghost Cue Ball Shadow
+        canvas.drawCircle(protractor.ghostCueBallCenter.x, protractor.ghostCueBallCenter.y, protractor.radius, ghostCuePaint)
+        // Actual Cue Ball Shadow
+        state.onPlaneBall?.let {
+            canvas.drawCircle(it.center.x, it.center.y, it.radius, actualCuePaint)
+        }
         canvas.restore()
 
-        // Draw lifted ghost effects
-        drawLiftedBall(canvas, protractor.ghostCueBallCenter, protractor.radius, state, ghostCuePaint, paints.fillPaint, paints.glowPaint)
-        drawLiftedBall(canvas, protractor.center, protractor.radius, state, targetPaint, paints.fillPaint, paints.glowPaint)
+        // --- Pass 2: Draw lifted ghost effects ---
+        // Target Ball
+        drawLiftedBall(canvas, protractor.center, protractor.radius, state, targetPaint, paints.fillPaint, paints.ballGlowPaint)
+        // Ghost Cue Ball
+        drawLiftedBall(canvas, protractor.ghostCueBallCenter, protractor.radius, state, ghostCuePaint, paints.fillPaint, paints.ballGlowPaint)
+        // Actual Cue Ball
+        state.onPlaneBall?.let {
+            drawLiftedBall(canvas, it.center, it.radius, state, actualCuePaint, paints.fillPaint, paints.ballGlowPaint)
+        }
     }
 
+
     /**
-     * Draws a single ball that exists on the logical plane (e.g., ActualCueBall or BankingBall).
+     * Draws a single ball that exists on the logical plane (used for Banking Mode).
      */
     private fun drawOnPlaneBall(canvas: Canvas, ball: LogicalCircular, strokePaint: Paint, paints: PaintCache, state: OverlayState) {
         canvas.save()
         canvas.concat(state.pitchMatrix)
         // Draw glow first
-        canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, paints.glowPaint)
+        canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, paints.ballGlowPaint)
         // Then the ball
         canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, strokePaint)
         canvas.drawCircle(ball.center.x, ball.center.y, ball.radius / 5f, paints.fillPaint)
