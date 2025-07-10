@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/SystemReducer.kt
+
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
@@ -62,6 +64,12 @@ class SystemReducer @Inject constructor() {
         val initialProtractorCenter = PointF(viewWidth / 2f, viewHeight / 2f)
         val initialTableRotation = 90f // Default to Portrait orientation
 
+        // Default position for the spin control (e.g., bottom left)
+        val initialSpinControlCenter = PointF(
+            64f, // A small padding from the left edge
+            viewHeight - 300f // Positioned above the bottom navigation/FABs
+        )
+
         return OverlayState(
             viewWidth = viewWidth,
             viewHeight = viewHeight,
@@ -70,7 +78,7 @@ class SystemReducer @Inject constructor() {
                 radius = initialLogicalRadius,
                 rotationDegrees = 0f
             ),
-            onPlaneBall = null, // Default to null
+            onPlaneBall = null,
             zoomSliderPosition = initialSliderPos,
             isBankingMode = false,
             showTable = false,
@@ -85,7 +93,8 @@ class SystemReducer @Inject constructor() {
             showTutorialOverlay = false,
             currentTutorialStep = 0,
             appControlColorScheme = appColorScheme,
-            interactionMode = InteractionMode.NONE
+            interactionMode = InteractionMode.NONE,
+            spinControlCenter = initialSpinControlCenter // Set the initial position
         )
     }
 

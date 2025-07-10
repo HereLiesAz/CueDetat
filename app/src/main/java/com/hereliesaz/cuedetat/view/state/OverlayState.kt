@@ -7,6 +7,7 @@ import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
@@ -17,7 +18,8 @@ enum class InteractionMode {
     ROTATING_PROTRACTOR,
     MOVING_PROTRACTOR_UNIT,
     MOVING_ACTUAL_CUE_BALL,
-    AIMING_BANK_SHOT
+    AIMING_BANK_SHOT,
+    MOVING_SPIN_CONTROL // New mode for dragging the spin control
 }
 
 enum class DistanceUnit {
@@ -83,6 +85,12 @@ data class OverlayState(
     val glowStickValue: Float = 0f,
     val showGlowStickDialog: Boolean = false,
 
+    // Spin State
+    val selectedSpinOffset: PointF? = null,
+    val spinPaths: Map<Color, List<PointF>> = emptyMap(),
+    val spinControlCenter: PointF? = null, // Initial position, updated by drag
+    val lingeringSpinOffset: PointF? = null, // For fade-out effect
+    val spinPathsAlpha: Float = 1.0f, // For fade-out animation
 
     // Tutorial State
     val showTutorialOverlay: Boolean = false,
@@ -98,7 +106,7 @@ data class OverlayState(
 
     // Derived state
     val shotLineAnchor: PointF = PointF(0f, 0f),
-    val tangentDirection: Float = 1.0f, // 1.0f for one side, -1.0f for the other
+    val tangentDirection: Float = 1.0f,
     val isImpossibleShot: Boolean = false,
     val isTiltBeyondLimit: Boolean = false,
     val warningText: String? = null,
@@ -119,10 +127,8 @@ data class OverlayState(
     // Gesture State
     val interactionMode: InteractionMode = InteractionMode.NONE,
 
-    // --- NEW: Magnifier State ---
     val isMagnifierVisible: Boolean = false,
     val magnifierSourceCenter: Offset? = null,
-    // --- END NEW ---
 
     // State for Reset/Revert functionality
     val preResetState: OverlayState? = null,
@@ -130,8 +136,6 @@ data class OverlayState(
 
     // Version Info
     val latestVersionName: String? = null,
-
-    // New properties for units and calculated distance
     val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
     val targetBallDistance: Float = 0f
 ) {

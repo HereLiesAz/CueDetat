@@ -15,12 +15,12 @@ class StateReducer @Inject constructor(
     private val controlReducer: ControlReducer,
     private val systemReducer: SystemReducer,
     private val actionReducer: ActionReducer,
-    private val tutorialReducer: TutorialReducer
+    private val tutorialReducer: TutorialReducer,
+    private val spinReducer: SpinReducer
 ) {
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         // Delegate to the appropriate specialized reducer based on the event type.
         return when (event) {
-            // --- THE FIX: Routing restored to the logical event ---
             is MainScreenEvent.LogicalGestureStarted,
             is MainScreenEvent.LogicalDragApplied,
             is MainScreenEvent.GestureEnded,
@@ -62,6 +62,12 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.NextTutorialStep,
             is MainScreenEvent.EndTutorial ->
                 tutorialReducer.reduce(currentState, event)
+
+            is MainScreenEvent.SpinApplied,
+            is MainScreenEvent.SpinSelectionEnded,
+            is MainScreenEvent.DragSpinControl,
+            is MainScreenEvent.ClearSpinState ->
+                spinReducer.reduce(currentState, event)
 
             else -> currentState
         }

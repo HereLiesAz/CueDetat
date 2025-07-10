@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/UpdateStateUseCase.kt
+
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.Camera
@@ -11,7 +13,9 @@ import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import kotlin.math.*
 
-class UpdateStateUseCase @Inject constructor() {
+class UpdateStateUseCase @Inject constructor(
+    private val calculateSpinPaths: CalculateSpinPaths
+) {
 
     private val tableToBallRatioShort = 44f
     private val railHeightToTableHeightRatio = 0.05f
@@ -29,7 +33,6 @@ class UpdateStateUseCase @Inject constructor() {
         )
         val baseInverseMatrix = Matrix().apply { basePitchMatrix.invert(this) }
 
-        // Create a "flat" matrix with zero pitch for stable radius calculations.
         val flatMatrix = Perspective.createPitchMatrix(
             currentOrientation = FullOrientation(0f, 0f, 0f),
             viewWidth = state.viewWidth,
@@ -47,7 +50,7 @@ class UpdateStateUseCase @Inject constructor() {
             ghostBall = state.protractorUnit.ghostCueBallCenter,
             targetBall = state.protractorUnit.center
         )
-        val targetBallDistance = calculateDistance(state, flatMatrix) // Use flat matrix for stable distance
+        val targetBallDistance = calculateDistance(state, flatMatrix)
         var (aimedPocketIndex, aimingLineEndPoint) = if (!state.isBankingMode) {
             checkPocketAim(state)
         } else {
@@ -59,14 +62,12 @@ class UpdateStateUseCase @Inject constructor() {
             null
         }
 
-        // Calculate single bank for aiming line in ghost mode
         var aimingLineBankPath = if (state.showTable && !state.isBankingMode) {
             calculateSingleBank(state.protractorUnit.ghostCueBallCenter, state.protractorUnit.center, state)
         } else {
             emptyList()
         }
 
-        // Check if the banked aiming line goes into a pocket
         if(aimingLineBankPath.size > 2) {
             val (bankedPocketIndex, intersectionPoint) = checkBankedPocketAim(
                 listOf(aimingLineBankPath[1], aimingLineBankPath[2]),
@@ -74,7 +75,6 @@ class UpdateStateUseCase @Inject constructor() {
             )
             if (bankedPocketIndex != null && intersectionPoint != null) {
                 aimedPocketIndex = bankedPocketIndex
-                // Truncate the path to the intersection point
                 aimingLineBankPath = listOf(aimingLineBankPath[0], aimingLineBankPath[1], intersectionPoint)
             }
         }
@@ -105,13 +105,21 @@ class UpdateStateUseCase @Inject constructor() {
         }
         val hasFinalInverse = finalPitchMatrix.invert(finalInverseMatrix)
 
+        // --- Stage 4: Calculate Spin Paths ---
+        val spinPaths = if (!state.isBankingMode) {
+            calculateSpinPaths(state)
+        } else {
+            emptyMap()
+        }
+
+
         return state.copy(
             pitchMatrix = finalPitchMatrix,
             railPitchMatrix = finalRailPitchMatrix,
             inversePitchMatrix = finalInverseMatrix,
             flatMatrix = flatMatrix,
             hasInverseMatrix = hasFinalInverse,
-            shotLineAnchor = logicalShotLineAnchor, // State now holds the true logical anchor
+            shotLineAnchor = logicalShotLineAnchor,
             isImpossibleShot = isImpossible,
             isTiltBeyondLimit = isTiltBeyondLimit,
             tangentDirection = tangentDirection,
@@ -119,34 +127,27 @@ class UpdateStateUseCase @Inject constructor() {
             aimedPocketIndex = aimedPocketIndex,
             aimingLineEndPoint = aimingLineEndPoint,
             shotGuideImpactPoint = shotGuideImpactPoint,
-            aimingLineBankPath = aimingLineBankPath
+            aimingLineBankPath = aimingLineBankPath,
+            spinPaths = spinPaths
         )
     }
 
     private fun getLogicalShotLineAnchor(state: OverlayState, inverseMatrix: Matrix): PointF {
-        // If the on-plane ball exists, its logical center IS the anchor.
         state.onPlaneBall?.let { return it.center }
-
-        // If not, calculate the anchor based on a point at the bottom of the screen.
         val screenAnchor = PointF(state.viewWidth / 2f, state.viewHeight.toFloat())
         return Perspective.screenToLogical(screenAnchor, inverseMatrix)
     }
 
     private fun calculateShotPossibilityAndTangent(shotAnchor: PointF, ghostBall: PointF, targetBall: PointF): Pair<Boolean, Float> {
         val aimingAngle = atan2(targetBall.y - ghostBall.y, targetBall.x - ghostBall.x)
-
-        // The new righteousness: Distance-based impossibility check.
         val distToGhostSq = (ghostBall.y - shotAnchor.y).pow(2) + (ghostBall.x - shotAnchor.x).pow(2)
         val distToTargetSq = (targetBall.y - shotAnchor.y).pow(2) + (targetBall.x - shotAnchor.x).pow(2)
         val isImpossible = distToGhostSq > distToTargetSq
-
-        // Tangent direction is still based on the angle for visual cues.
         val shotAngle = atan2(ghostBall.y - shotAnchor.y, ghostBall.x - shotAnchor.x)
         var angleDifference = Math.toDegrees(aimingAngle.toDouble() - shotAngle.toDouble()).toFloat()
         while (angleDifference <= -180) angleDifference += 360
         while (angleDifference > 180) angleDifference -= 360
         val tangentDirection = if (angleDifference < 0) 1.0f else -1.0f
-
         return Pair(isImpossible, tangentDirection)
     }
 
@@ -175,7 +176,6 @@ class UpdateStateUseCase @Inject constructor() {
         for ((index, pocket) in pockets.withIndex()) {
             val dist = linePointDistance(ghostBall, targetBall, pocket)
             if (dist < pocketRadius) {
-                // Check if pocket is in front of ghost ball
                 val vecToPocketX = pocket.x - ghostBall.x
                 val vecToPocketY = pocket.y - ghostBall.y
                 val dotProduct = vecToPocketX * dirX + vecToPocketY * dirY
@@ -202,7 +202,6 @@ class UpdateStateUseCase @Inject constructor() {
         pockets.forEachIndexed { index, pocketCenter ->
             val intersection = getLineCircleIntersection(start, end, pocketCenter, pocketRadius)
             if (intersection != null) {
-                // Check if intersection is on the segment
                 val dxSegment = end.x - start.x
                 val dySegment = end.y - start.y
                 val t = if (abs(dxSegment) > abs(dySegment)) {

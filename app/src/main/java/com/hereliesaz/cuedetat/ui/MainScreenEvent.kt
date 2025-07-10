@@ -18,14 +18,19 @@ sealed class MainScreenEvent {
     data class TableRotationApplied(val degrees: Float) : MainScreenEvent() // For gestures (delta)
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
 
+    // Spin Control Events
+    data class SpinApplied(val offset: PointF) : MainScreenEvent()
+    object SpinSelectionEnded : MainScreenEvent()
+    data class DragSpinControl(val delta: PointF): MainScreenEvent()
+    object ClearSpinState : MainScreenEvent() // For ViewModel to call after fade
+
     // Logical Events (dispatched by ViewModel)
-    // --- RESTORED: This event is critical for the architectural pattern. ---
     internal data class LogicalGestureStarted(val logicalPoint: PointF, val screenOffset: Offset) : MainScreenEvent()
     internal data class LogicalDragApplied(val logicalDelta: PointF, val screenDelta: Offset) : MainScreenEvent()
-    internal data class AimBankShot(val logicalTarget: PointF) : MainScreenEvent() // For direct bank aiming
+    internal data class AimBankShot(val logicalTarget: PointF) : MainScreenEvent()
 
     // Direct State Change Events
-    data class TableRotationChanged(val degrees: Float) : MainScreenEvent() // For the slider (absolute)
+    data class TableRotationChanged(val degrees: Float) : MainScreenEvent()
     data class FullOrientationChanged(val orientation: FullOrientation) : MainScreenEvent()
     data class ThemeChanged(val scheme: ColorScheme) : MainScreenEvent()
     object Reset : MainScreenEvent()

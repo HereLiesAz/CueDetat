@@ -6,6 +6,8 @@ import android.app.Application
 import android.graphics.Camera
 import android.graphics.PointF
 import android.util.Log
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
@@ -15,6 +17,7 @@ import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.domain.CalculateBankShot
+import com.hereliesaz.cuedetat.domain.CalculateSpinPaths
 import com.hereliesaz.cuedetat.domain.StateReducer
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.view.model.Perspective
@@ -25,12 +28,15 @@ import com.hereliesaz.cuedetat.view.state.SingleEvent
 import com.hereliesaz.cuedetat.view.state.TableSize
 import com.hereliesaz.cuedetat.view.state.ToastMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.hypot
 
 private const val GESTURE_TAG = "GestureDebug"
 
@@ -42,6 +48,7 @@ class MainViewModel @Inject constructor(
     application: Application,
     private val updateStateUseCase: UpdateStateUseCase,
     private val calculateBankShotUseCase: CalculateBankShot,
+    private val calculateSpinPathsUseCase: CalculateSpinPaths,
     private val stateReducer: StateReducer
 ) : ViewModel() {
 
@@ -49,6 +56,7 @@ class MainViewModel @Inject constructor(
     private val insultingWarnings: Array<String> =
         application.resources.getStringArray(R.array.insulting_warnings)
     private var warningIndex = 0
+    private var spinFadeJob: Job? = null
 
     private val _uiState = MutableStateFlow(
         OverlayState(
@@ -74,7 +82,6 @@ class MainViewModel @Inject constructor(
     }
 
     fun onEvent(event: MainScreenEvent) {
-        // Handle events that don't need the full reducer/use-case pipeline
         when (event) {
             is MainScreenEvent.CheckForUpdate -> _singleEvent.value = SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat/releases")
             is MainScreenEvent.ViewArt -> _singleEvent.value = SingleEvent.OpenUrl("https://instagram.com/hereliesaz")
@@ -82,29 +89,47 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.SingleEventConsumed -> _singleEvent.value = null
             is MainScreenEvent.ToastShown -> _toastMessage.value = null
             is MainScreenEvent.ToggleDistanceUnit -> {
-                val newUnit = if (uiState.value.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.IMPERIAL
+                val newUnit = if (uiState.value.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC
                 userPreferencesRepository.setDistanceUnit(newUnit)
-                updateState(event) // Still needs reducer
+                updateState(event)
             }
             is MainScreenEvent.SetTableSize -> {
                 userPreferencesRepository.setTableSize(event.size)
-                updateState(event) // Needs reducer
+                updateState(event)
             }
             is MainScreenEvent.CycleTableSize -> {
                 val newSize = uiState.value.tableSize.next()
                 userPreferencesRepository.setTableSize(newSize)
-                updateState(event) // Needs reducer
-            }
-            // Simple state toggles that can be handled directly
-            is MainScreenEvent.ToggleGlowStickDialog,
-            is MainScreenEvent.ToggleTableSizeDialog,
-            is MainScreenEvent.ToggleLuminanceDialog -> {
-                _uiState.value = stateReducer.reduce(_uiState.value, event)
-            }
-            // All other events go through the full pipeline
-            else -> {
                 updateState(event)
             }
+            is MainScreenEvent.SpinApplied -> {
+                spinFadeJob?.cancel() // Cancel any ongoing fade when a new spin is applied
+                updateState(event)
+            }
+            is MainScreenEvent.SpinSelectionEnded -> {
+                updateState(event) // First, update the state to set the lingering offset
+                startSpinLingerAndFade() // Then, start the side effect
+            }
+            else -> updateState(event)
+        }
+    }
+
+    private fun startSpinLingerAndFade() {
+        spinFadeJob?.cancel()
+        spinFadeJob = viewModelScope.launch {
+            delay(5000L) // 5-second linger
+
+            val alpha = Animatable(1.0f)
+            alpha.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 5000)
+            ) {
+                // Update the state on each animation frame
+                _uiState.value = _uiState.value.copy(spinPathsAlpha = this.value)
+            }
+
+            // After animation, clear the state
+            onEvent(MainScreenEvent.ClearSpinState)
         }
     }
 
@@ -120,32 +145,42 @@ class MainViewModel @Inject constructor(
 
         val logicalEvent = when (event) {
             is MainScreenEvent.Drag -> {
+                val logicalPrev = Perspective.screenToLogical(event.previousPosition, currentState.inversePitchMatrix)
+                val logicalCurr = Perspective.screenToLogical(event.currentPosition, currentState.inversePitchMatrix)
+                val logicalDelta = PointF(logicalCurr.x - logicalPrev.x, logicalCurr.y - logicalPrev.y)
+                val screenDelta = Offset(event.currentPosition.x - event.previousPosition.x, event.currentPosition.y - event.previousPosition.y)
+
+                // Determine if we're dragging the spin control
+                val spinControlCenter = currentState.spinControlCenter
+                if (spinControlCenter != null) {
+                    val distanceToSpinControl = hypot(
+                        (event.previousPosition.x - spinControlCenter.x).toDouble(),
+                        (event.previousPosition.y - spinControlCenter.y).toDouble()
+                    ).toFloat()
+                    if (distanceToSpinControl < 100f) { // 100dp radius in screen space
+                        return onEvent(MainScreenEvent.DragSpinControl(PointF(screenDelta.x, screenDelta.y)))
+                    }
+                }
+
                 if (currentState.interactionMode == InteractionMode.AIMING_BANK_SHOT && currentState.hasInverseMatrix) {
-                    val logicalPoint = Perspective.screenToLogical(event.currentPosition, currentState.inversePitchMatrix)
-                    MainScreenEvent.AimBankShot(logicalPoint)
+                    MainScreenEvent.AimBankShot(logicalCurr)
                 } else if (currentState.hasInverseMatrix) {
-                    val logicalPrev = Perspective.screenToLogical(event.previousPosition, currentState.inversePitchMatrix)
-                    val logicalCurr = Perspective.screenToLogical(event.currentPosition, currentState.inversePitchMatrix)
-                    val logicalDelta = PointF(logicalCurr.x - logicalPrev.x, logicalCurr.y - logicalPrev.y)
-                    val screenDelta = Offset(event.currentPosition.x - event.previousPosition.x, event.currentPosition.y - event.previousPosition.y)
                     MainScreenEvent.LogicalDragApplied(logicalDelta, screenDelta)
                 } else {
                     event
                 }
             }
-            // --- THE FIX: ViewModel now performs the translation from Screen to Logical space ---
             is MainScreenEvent.ScreenGestureStarted -> {
                 if (currentState.hasInverseMatrix) {
                     val logicalPoint = Perspective.screenToLogical(event.position, currentState.inversePitchMatrix)
                     MainScreenEvent.LogicalGestureStarted(logicalPoint, Offset(event.position.x, event.position.y))
                 } else {
-                    event // Fallback if no matrix is ready
+                    event
                 }
             }
             else -> event
         }
 
-        // Fast path for banking aim drags to improve responsiveness
         if (logicalEvent is MainScreenEvent.AimBankShot) {
             val stateFromReducer = stateReducer.reduce(currentState, logicalEvent)
             val bankShotResult = calculateBankShotUseCase(stateFromReducer)
@@ -156,7 +191,6 @@ class MainViewModel @Inject constructor(
             return
         }
 
-        // Full update path for all other events
         val stateFromReducer = stateReducer.reduce(currentState, logicalEvent)
         var derivedState = updateStateUseCase(stateFromReducer, graphicsCamera)
 
@@ -166,8 +200,8 @@ class MainViewModel @Inject constructor(
                 bankShotPath = bankShotResult.path,
                 pocketedBankShotPocketIndex = bankShotResult.pocketedPocketIndex
             )
-        } else {
-            derivedState = derivedState.copy(bankShotPath = emptyList(), pocketedBankShotPocketIndex = null)
+        } else if (derivedState.selectedSpinOffset == null && derivedState.lingeringSpinOffset == null) {
+            derivedState = derivedState.copy(spinPaths = emptyMap())
         }
 
         var finalState = derivedState

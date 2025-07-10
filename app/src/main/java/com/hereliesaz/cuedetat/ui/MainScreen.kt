@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt
+
 package com.hereliesaz.cuedetat.ui
 
 import android.widget.Toast
@@ -78,6 +80,19 @@ fun MainScreen(viewModel: MainViewModel) {
                     onMenuClick = { scope.launch { drawerState.open() } },
                     modifier = Modifier.zIndex(2f)
                 )
+
+                // The Righteous Fix for the Smart Cast Heresy
+                val spinControlCenter = uiState.spinControlCenter
+                if (!uiState.isBankingMode && spinControlCenter != null) {
+                    SpinControl(
+                        modifier = Modifier.zIndex(5f),
+                        centerPosition = spinControlCenter,
+                        selectedSpinOffset = uiState.selectedSpinOffset,
+                        lingeringSpinOffset = uiState.lingeringSpinOffset,
+                        spinPathAlpha = uiState.spinPathsAlpha,
+                        onEvent = viewModel::onEvent
+                    )
+                }
 
                 ZoomControls(
                     uiState = uiState,
