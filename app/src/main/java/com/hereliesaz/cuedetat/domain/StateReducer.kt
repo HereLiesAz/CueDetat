@@ -9,6 +9,7 @@ import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
+import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
@@ -43,6 +44,10 @@ class StateReducer @Inject constructor() {
                 val newMode = when (currentState.isForceLightMode) { null -> true; true -> false; false -> null }
                 currentState.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)
             }
+            is MainScreenEvent.ToggleDistanceUnit -> currentState.copy(
+                distanceUnit = if (currentState.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC,
+                valuesChangedSinceReset = true
+            )
             is MainScreenEvent.ToggleLuminanceDialog -> currentState.copy(showLuminanceDialog = !currentState.showLuminanceDialog)
             is MainScreenEvent.AdjustLuminance -> currentState.copy(luminanceAdjustment = event.adjustment.coerceIn(-0.4f, 0.4f), valuesChangedSinceReset = true)
             is MainScreenEvent.StartTutorial -> currentState.copy(

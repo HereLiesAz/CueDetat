@@ -18,6 +18,10 @@ enum class InteractionMode {
     AIMING_BANK_SHOT
 }
 
+enum class DistanceUnit {
+    METRIC, IMPERIAL
+}
+
 data class OverlayState(
     // View dimensions
     val viewWidth: Int = 0,
@@ -72,7 +76,11 @@ data class OverlayState(
     val preResetState: OverlayState? = null,
 
     // Version Info
-    val latestVersionName: String? = null
+    val latestVersionName: String? = null,
+
+    // New properties for units and calculated distance
+    val distanceUnit: DistanceUnit = DistanceUnit.METRIC,
+    val targetBallDistance: Float = 0f
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch

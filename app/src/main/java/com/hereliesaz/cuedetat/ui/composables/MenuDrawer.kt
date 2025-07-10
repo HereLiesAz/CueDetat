@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
@@ -93,6 +94,13 @@ fun MenuDrawerContent(
             text = themeToggleText,
             onClick = { onEvent(MainScreenEvent.ToggleForceTheme); onCloseDrawer() }
         )
+
+        val distanceUnitToggleText = if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units"
+        MenuItem(
+            text = distanceUnitToggleText,
+            onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit); onCloseDrawer() }
+        )
+
         MenuItem(
             text = "Luminance",
             onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog); onCloseDrawer() }

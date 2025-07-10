@@ -5,6 +5,7 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.view.model.Perspective
+import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import kotlin.math.PI
@@ -17,6 +18,7 @@ class UpdateStateUseCase @Inject constructor() {
 
     private val tableToBallRatioShort = 44f
     private val railHeightToTableHeightRatio = 0.05f
+    private val distanceReferenceConstant = 6480f
 
     operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
@@ -73,6 +75,18 @@ class UpdateStateUseCase @Inject constructor() {
 
         val isTiltBeyondLimit = !state.isBankingMode && shotLineAnchorPoint.y <= state.protractorUnit.ghostCueBallCenter.y
 
+        val targetBallOnScreenRadius = DrawingUtils.getPerspectiveRadiusAndLift(
+            logicalCenter = state.protractorUnit.center,
+            logicalRadius = state.protractorUnit.radius,
+            state = state.copy(pitchMatrix = pitchMatrix, hasInverseMatrix = hasInverse) // Pass updated matrix
+        ).radius
+
+        val targetBallDistance = if (targetBallOnScreenRadius > 0) {
+            distanceReferenceConstant / targetBallOnScreenRadius
+        } else {
+            0f
+        }
+
         return state.copy(
             pitchMatrix = pitchMatrix,
             railPitchMatrix = railPitchMatrix,
@@ -81,7 +95,8 @@ class UpdateStateUseCase @Inject constructor() {
             shotLineAnchor = shotLineAnchorPoint,
             isImpossibleShot = isImpossible,
             isTiltBeyondLimit = isTiltBeyondLimit,
-            tangentDirection = tangentDirection
+            tangentDirection = tangentDirection,
+            targetBallDistance = targetBallDistance
         )
     }
 

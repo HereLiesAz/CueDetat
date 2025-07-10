@@ -91,19 +91,17 @@ class BallRenderer {
     private fun drawAllLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         val textPaint = paints.textPaint.apply { this.typeface = typeface }
 
-        // Label for the OnPlaneBall (Actual Cue or Banking)
         state.onPlaneBall?.let {
-            val label = if (state.isBankingMode) "B" else "A"
+            val label = if (state.isBankingMode) "Banking Ball" else "Actual Cue Ball"
             textRenderer.draw(canvas, textPaint, state.zoomSliderPosition, it, label, state)
         }
 
-        // Labels for the Protractor Unit
         if (!state.isBankingMode) {
-            textRenderer.draw(canvas, textPaint, state.zoomSliderPosition, state.protractorUnit, "T", state)
+            textRenderer.draw(canvas, textPaint, state.zoomSliderPosition, state.protractorUnit, "Target Ball", state)
             textRenderer.draw(canvas, textPaint, state.zoomSliderPosition, object : LogicalCircular {
                 override val center = state.protractorUnit.ghostCueBallCenter
                 override val radius = state.protractorUnit.radius
-            }, "G", state)
+            }, "Ghost Cue Ball", state)
         }
     }
 

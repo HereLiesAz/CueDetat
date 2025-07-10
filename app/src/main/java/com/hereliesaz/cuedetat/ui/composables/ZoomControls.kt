@@ -1,7 +1,6 @@
 // app/src/main/java/com/hereliesaz/cuedetat/ui/composables/ZoomControls.kt
 package com.hereliesaz.cuedetat.ui.composables
 
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -14,7 +13,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -23,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.VerticalSlider
+import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,18 +37,34 @@ fun ZoomControls(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        if (uiState.areHelpersVisible) {
-            Text(
-                text = "Zoom",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
-        } else {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_zoom_in_24),
                 contentDescription = stringResource(id = R.string.zoom_icon),
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 modifier = Modifier.size(36.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            if (uiState.areHelpersVisible) {
+                Text(
+                    text = "Distance",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            }
+            val distanceText = if (uiState.distanceUnit == DistanceUnit.METRIC) {
+                "${uiState.targetBallDistance.toInt()} cm"
+            } else {
+                val totalInches = (uiState.targetBallDistance / 2.54f).toInt()
+                val feet = totalInches / 12
+                val inches = totalInches % 12
+                "$feet' $inches\""
+            }
+            Text(
+                text = distanceText,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                modifier = Modifier.padding(top = 4.dp)
             )
         }
 

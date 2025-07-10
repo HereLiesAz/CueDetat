@@ -9,9 +9,9 @@ import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class BallTextRenderer {
 
-    private val baseFontSize = 42f
-    private val minFontSize = 20f
-    private val maxFontSize = 80f
+    private val baseFontSize = 30f // Reduced to better fit longer labels
+    private val minFontSize = 16f
+    private val maxFontSize = 60f
 
     fun draw(
         canvas: Canvas,
