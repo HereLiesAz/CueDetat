@@ -7,7 +7,6 @@ object ReducerUtils {
     fun getCurrentLogicalRadius(stateWidth: Int, stateHeight: Int, zoomSliderPos: Float): Float {
         if (stateWidth == 0 || stateHeight == 0) return 1f
         val zoomFactor = ZoomMapping.sliderToZoom(zoomSliderPos)
-        // This was the original logic. Base radius is proportional to screen size.
         return (min(stateWidth, stateHeight) * 0.30f / 2f) * zoomFactor
     }
 }

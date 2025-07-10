@@ -5,9 +5,7 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.data.FullOrientation
-import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.Perspective
-import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.renderer.table.TableRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -20,11 +18,8 @@ class UpdateStateUseCase @Inject constructor() {
     private val railHeightToTableHeightRatio = 0.05f
     private val distanceReferenceConstant = 6480f
 
-
     operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
-        val centerX = state.viewWidth / 2f
-        val centerY = state.viewHeight / 2f
 
         // --- Stage 1: Base Un-rotated Matrix for Stable Logic ---
         val basePitchMatrix = Perspective.createPitchMatrix(
@@ -33,7 +28,6 @@ class UpdateStateUseCase @Inject constructor() {
             viewHeight = state.viewHeight,
             camera = camera
         )
-
         val baseInverseMatrix = Matrix().apply { basePitchMatrix.invert(this) }
 
         // Create a "flat" matrix with zero pitch for stable radius calculations.
@@ -47,7 +41,7 @@ class UpdateStateUseCase @Inject constructor() {
 
         // --- Stage 2: Calculate Logical Values in a Stable Coordinate System ---
         val logicalShotLineAnchor = getLogicalShotLineAnchor(state, baseInverseMatrix)
-        val isTiltBeyondLimit = !state.isBankingMode && !state.showTable && logicalShotLineAnchor.y <= state.protractorUnit.ghostCueBallCenter.y
+        val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= state.protractorUnit.ghostCueBallCenter.y
 
         val (isImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
             shotAnchor = logicalShotLineAnchor,
@@ -79,6 +73,8 @@ class UpdateStateUseCase @Inject constructor() {
         if (state.showTable) {
             val effectiveTableRotation = state.tableRotationDegrees % 360f
             if (effectiveTableRotation != 0f) {
+                val centerX = state.viewWidth / 2f
+                val centerY = state.viewHeight / 2f
                 finalPitchMatrix.preRotate(effectiveTableRotation, centerX, centerY)
                 finalRailPitchMatrix.preRotate(effectiveTableRotation, centerX, centerY)
             }

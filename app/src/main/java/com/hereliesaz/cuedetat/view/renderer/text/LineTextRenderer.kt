@@ -10,7 +10,6 @@ import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.math.min
 
 class LineTextRenderer {
 
@@ -45,21 +44,21 @@ class LineTextRenderer {
     fun drawProtractorLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         val textPaint = paints.textPaint.apply { this.typeface = typeface }
         textPaint.textSize = getDynamicFontSize(38f, state.zoomSliderPosition)
+        val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM
 
         // Aiming Line Label
-        draw(canvas, "Aiming Line", state.protractorUnit.center, state.protractorUnit.rotationDegrees, state.protractorUnit.radius * 2.5f, 0f, textPaint)
+        draw(canvas, "Aiming Line", state.protractorUnit.center, state.protractorUnit.rotationDegrees, state.protractorUnit.radius * 5.0f * zoomFactor, 0f, textPaint)
 
-        // Shot Line Label
-        state.onPlaneBall?.let {
-            val shotLineAngle = Math.toDegrees(atan2((state.protractorUnit.ghostCueBallCenter.y - it.center.y).toDouble(), (state.protractorUnit.ghostCueBallCenter.x - it.center.x).toDouble()).toDouble()).toFloat()
-            draw(canvas, "Shot Line", it.center, shotLineAngle, 150f, 0f, textPaint)
-        }
+        // Shot Guide Line Label - Anchored to Ghost Ball
+        val shotLineAngle = Math.toDegrees(atan2((state.protractorUnit.ghostCueBallCenter.y - state.shotLineAnchor.y).toDouble(), (state.protractorUnit.ghostCueBallCenter.x - state.shotLineAnchor.x).toDouble()).toDouble()).toFloat()
+        draw(canvas, "Shot Guide Line", state.protractorUnit.ghostCueBallCenter, shotLineAngle, state.protractorUnit.radius * 2.5f * zoomFactor, 0f, textPaint)
     }
 
-    fun drawAngleLabel(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint, state: OverlayState) {
+
+    fun drawAngleLabel(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint, radius: Float) {
         val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)
         val labelAngleRad = initialAngleRad + Math.toRadians(angleDegrees.toDouble())
-        val labelDistance = min(state.viewWidth, state.viewHeight) / 2.5f
+        val labelDistance = radius * 5.5f
 
         val text = "${angleDegrees.toInt()}°"
         val textX = center.x + (labelDistance * cos(labelAngleRad)).toFloat()
@@ -120,5 +119,9 @@ class LineTextRenderer {
         }
 
         return String.format("%.1f", diamondValue)
+    }
+
+    fun drawBankingLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?){
+        // This function is deprecated as its logic has been moved to drawDiamondLabel and called from LineRenderer
     }
 }

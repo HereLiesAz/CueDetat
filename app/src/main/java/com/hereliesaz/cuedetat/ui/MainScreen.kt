@@ -2,7 +2,6 @@
 package com.hereliesaz.cuedetat.ui
 
 import android.widget.Toast
-import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -62,15 +61,7 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                if(uiState.isCameraVisible) {
-                    CameraBackground(modifier = Modifier.fillMaxSize().zIndex(0f))
-                } else {
-                    Box(modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background)
-                        .zIndex(0f))
-                }
-
+                CameraBackground(modifier = Modifier.fillMaxSize().zIndex(0f))
 
                 ProtractorOverlay(
                     uiState = uiState,

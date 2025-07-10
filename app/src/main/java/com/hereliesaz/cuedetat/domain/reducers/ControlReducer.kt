@@ -25,9 +25,11 @@ class ControlReducer @Inject constructor() {
         val newSliderPos = event.position.coerceIn(-50f, 50f)
         val newLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
 
+        val updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
+
         return currentState.copy(
             protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
-            onPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius),
+            onPlaneBall = updatedOnPlaneBall,
             zoomSliderPosition = newSliderPos,
             valuesChangedSinceReset = true
         )
@@ -40,9 +42,11 @@ class ControlReducer @Inject constructor() {
         val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue)
         val newLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
 
+        val updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
+
         return currentState.copy(
             protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
-            onPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius),
+            onPlaneBall = updatedOnPlaneBall,
             zoomSliderPosition = newSliderPos,
             valuesChangedSinceReset = true
         )

@@ -5,7 +5,7 @@ import com.hereliesaz.cuedetat.ui.theme.RustedEmber
 import com.hereliesaz.cuedetat.view.config.base.LinesConfig
 
 data class ShotGuideLine(
-    override val label: String = "Shot Line",
+    override val label: String = "Shot Guide Line",
     override val opacity: Float = 1.0f,
     override val glowWidth: Float = 10f,
     override val glowColor: Color = Color.White.copy(alpha = 0.4f),

@@ -63,7 +63,7 @@ fun MenuDrawerContent(
         )
         MenuDivider()
 
-        if (!uiState.isBankingMode) {
+        if (!uiState.isBankingMode && !uiState.showTable) {
             val cueBallToggleText = if (uiState.onPlaneBall == null) "Toggle Cue Ball" else "Hide Cue Ball"
             MenuItem(
                 text = cueBallToggleText,
@@ -90,12 +90,6 @@ fun MenuDrawerContent(
             onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog); onCloseDrawer() }
         )
         MenuDivider()
-
-        val cameraToggleText = if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On"
-        MenuItem(
-            text = cameraToggleText,
-            onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
-        )
 
         val systemIsCurrentlyDark = isSystemInDarkTheme()
         val themeToggleText = when (uiState.isForceLightMode) {
