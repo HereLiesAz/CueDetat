@@ -63,7 +63,7 @@ fun MenuDrawerContent(
         )
         MenuDivider()
 
-        if (!uiState.isBankingMode && !uiState.showTable) {
+        if (!uiState.isBankingMode) {
             val cueBallToggleText = if (uiState.onPlaneBall == null) "Toggle Cue Ball" else "Hide Cue Ball"
             MenuItem(
                 text = cueBallToggleText,
@@ -100,6 +100,12 @@ fun MenuDrawerContent(
         MenuItem(
             text = themeToggleText,
             onClick = { onEvent(MainScreenEvent.ToggleForceTheme); onCloseDrawer() }
+        )
+
+        val cameraToggleText = if (uiState.isCameraVisible) "Hide Camera" else "Show Camera"
+        MenuItem(
+            text = cameraToggleText,
+            onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
         )
 
         val distanceUnitToggleText = if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units"

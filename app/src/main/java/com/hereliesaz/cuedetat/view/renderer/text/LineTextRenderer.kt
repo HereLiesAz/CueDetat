@@ -10,6 +10,7 @@ import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 class LineTextRenderer {
 
@@ -71,17 +72,12 @@ class LineTextRenderer {
         val diamondNumberText = calculateDiamondNumber(point, railType, state) ?: return
 
         paint.textSize = getDynamicFontSize(60f, state.zoomSliderPosition)
-        val textOffset = 100f * (ZoomMapping.sliderToZoom(state.zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM).coerceAtLeast(0.7f) // Dynamic offset
 
-        var textX = point.x
-        var textY = point.y
         var textRotation = 0f
-
         when (railType) {
-            RailType.TOP -> { textY -= textOffset; textRotation = 0f }
-            RailType.BOTTOM -> { textY += textOffset; textRotation = 0f }
-            RailType.LEFT -> { textX -= textOffset; textRotation = 90f }
-            RailType.RIGHT -> { textX += textOffset; textRotation = -90f }
+            RailType.TOP, RailType.BOTTOM -> textRotation = 0f
+            RailType.LEFT -> textRotation = 90f
+            RailType.RIGHT -> textRotation = -90f
         }
 
         // Keep text right-side up for the user
@@ -90,7 +86,9 @@ class LineTextRenderer {
 
         canvas.save()
         canvas.rotate(textRotation + uprightCorrection, point.x, point.y)
-        canvas.drawText(diamondNumberText, textX, textY, paint)
+        // Draw text directly at the impact point, with a slight vertical offset for alignment.
+        val yOffset = paint.fontMetrics.ascent / 2
+        canvas.drawText(diamondNumberText, point.x, point.y - yOffset, paint)
         canvas.restore()
     }
 

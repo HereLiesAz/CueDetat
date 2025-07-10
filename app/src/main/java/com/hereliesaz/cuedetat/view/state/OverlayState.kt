@@ -112,6 +112,7 @@ data class OverlayState(
 
     // State for Reset/Revert functionality
     val preResetState: OverlayState? = null,
+    val tableWasLastOnWithBall: Boolean = false,
 
     // Version Info
     val latestVersionName: String? = null,

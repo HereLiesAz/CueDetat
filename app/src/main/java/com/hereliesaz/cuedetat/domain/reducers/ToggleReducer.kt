@@ -29,7 +29,7 @@ class ToggleReducer @Inject constructor() {
             }
             is MainScreenEvent.ToggleCamera -> currentState.copy(isCameraVisible = !currentState.isCameraVisible)
             is MainScreenEvent.ToggleDistanceUnit -> currentState.copy(
-                distanceUnit = if (currentState.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC,
+                distanceUnit = if (currentState.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.IMPERIAL,
                 valuesChangedSinceReset = true
             )
             is MainScreenEvent.ToggleLuminanceDialog -> currentState.copy(showLuminanceDialog = !currentState.showLuminanceDialog)
@@ -54,14 +54,28 @@ class ToggleReducer @Inject constructor() {
     }
 
     private fun handleToggleOnPlaneBall(currentState: OverlayState): OverlayState {
-        if (currentState.isBankingMode || currentState.showTable) return currentState
-
-        return if (currentState.onPlaneBall == null) {
-            val newRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, currentState.zoomSliderPosition)
-            val newCenter = PointF(currentState.viewWidth / 2f, (currentState.viewHeight / 2f + currentState.viewHeight) / 2f)
-            currentState.copy(onPlaneBall = OnPlaneBall(center = newCenter, radius = newRadius), valuesChangedSinceReset = true)
+        return if (currentState.onPlaneBall != null) {
+            // Hiding the ball
+            currentState.copy(
+                onPlaneBall = null,
+                showTable = if (currentState.showTable) false else currentState.showTable, // Hide table only if it's currently shown
+                tableWasLastOnWithBall = currentState.showTable // Remember if the table was on
+            )
         } else {
-            currentState.copy(onPlaneBall = null, valuesChangedSinceReset = true)
+            // Showing the ball
+            if (currentState.tableWasLastOnWithBall) {
+                // Restore ball and table together, then clear the flag
+                resetForTable(currentState.copy(showTable = true, tableWasLastOnWithBall = false))
+            } else {
+                // Just show the ball, no table
+                val newRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, currentState.zoomSliderPosition)
+                val newCenter = PointF(currentState.viewWidth / 2f, (currentState.viewHeight / 2f + currentState.viewHeight) / 2f)
+                currentState.copy(
+                    onPlaneBall = OnPlaneBall(center = newCenter, radius = newRadius),
+                    valuesChangedSinceReset = true,
+                    tableWasLastOnWithBall = false // Ensure flag is clear
+                )
+            }
         }
     }
 
@@ -102,10 +116,11 @@ class ToggleReducer @Inject constructor() {
             val newLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, bankingZoomSliderPos)
             val bankingBallCenter = PointF(viewCenterX, viewCenterY)
             val newBankingBall = OnPlaneBall(center = bankingBallCenter, radius = newLogicalRadius)
-            val initialAimTarget = calculateInitialBankingAimTarget(newBankingBall, 0f, newLogicalRadius)
+            val defaultTableRotation = if (currentState.viewWidth > currentState.viewHeight) 0f else 90f
+            val initialAimTarget = calculateInitialBankingAimTarget(newBankingBall, defaultTableRotation, newLogicalRadius)
             currentState.copy(
                 isBankingMode = true, onPlaneBall = newBankingBall,
-                zoomSliderPosition = bankingZoomSliderPos, tableRotationDegrees = 0f,
+                zoomSliderPosition = bankingZoomSliderPos, tableRotationDegrees = defaultTableRotation,
                 bankingAimTarget = initialAimTarget,
                 protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
                 showTable = true, // Always show table in banking mode
