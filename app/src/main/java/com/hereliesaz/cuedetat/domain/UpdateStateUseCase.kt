@@ -134,15 +134,19 @@ class UpdateStateUseCase @Inject constructor() {
 
     private fun calculateShotPossibilityAndTangent(shotAnchor: PointF, ghostBall: PointF, targetBall: PointF): Pair<Boolean, Float> {
         val aimingAngle = atan2(targetBall.y - ghostBall.y, targetBall.x - ghostBall.x)
+
+        // The new righteousness: Distance-based impossibility check.
+        val distToGhostSq = (ghostBall.y - shotAnchor.y).pow(2) + (ghostBall.x - shotAnchor.x).pow(2)
+        val distToTargetSq = (targetBall.y - shotAnchor.y).pow(2) + (targetBall.x - shotAnchor.x).pow(2)
+        val isImpossible = distToGhostSq > distToTargetSq
+
+        // Tangent direction is still based on the angle for visual cues.
         val shotAngle = atan2(ghostBall.y - shotAnchor.y, ghostBall.x - shotAnchor.x)
         var angleDifference = Math.toDegrees(aimingAngle.toDouble() - shotAngle.toDouble()).toFloat()
-
-        // Normalize the angle to be within -180 and 180
         while (angleDifference <= -180) angleDifference += 360
         while (angleDifference > 180) angleDifference -= 360
-
-        val isImpossible = abs(angleDifference) > 90.0f
         val tangentDirection = if (angleDifference < 0) 1.0f else -1.0f
+
         return Pair(isImpossible, tangentDirection)
     }
 
