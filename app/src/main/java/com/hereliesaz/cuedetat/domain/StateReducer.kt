@@ -1,4 +1,5 @@
-// app/src/main/java/com/hereliesaz/cuedetat/domain/StateReducer.kt
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/StateReducer.kt
+
 package com.hereliesaz.cuedetat.domain
 
 import com.hereliesaz.cuedetat.domain.reducers.*
@@ -19,6 +20,7 @@ class StateReducer @Inject constructor(
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         // Delegate to the appropriate specialized reducer based on the event type.
         return when (event) {
+            // --- THE FIX: Routing restored to the logical event ---
             is MainScreenEvent.LogicalGestureStarted,
             is MainScreenEvent.LogicalDragApplied,
             is MainScreenEvent.GestureEnded,
@@ -32,8 +34,10 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.SetTableSize,
             is MainScreenEvent.ToggleTableSizeDialog,
             is MainScreenEvent.ToggleForceTheme,
+            is MainScreenEvent.ToggleCamera,
             is MainScreenEvent.ToggleDistanceUnit,
             is MainScreenEvent.ToggleLuminanceDialog,
+            is MainScreenEvent.ToggleGlowStickDialog,
             is MainScreenEvent.ToggleHelp,
             is MainScreenEvent.ToggleMoreHelp ->
                 toggleReducer.reduce(currentState, event)
@@ -42,6 +46,7 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.ZoomScaleChanged,
             is MainScreenEvent.TableRotationApplied,
             is MainScreenEvent.TableRotationChanged,
+            is MainScreenEvent.AdjustGlow,
             is MainScreenEvent.AdjustLuminance ->
                 controlReducer.reduce(currentState, event)
 
@@ -58,7 +63,7 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.EndTutorial ->
                 tutorialReducer.reduce(currentState, event)
 
-            else -> currentState // For events that don't change state directly in the reducer
+            else -> currentState
         }
     }
 }

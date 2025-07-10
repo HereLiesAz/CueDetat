@@ -1,3 +1,4 @@
+--- FILE: app/src/main/java/com/hereliesaz/cuedetat/TheBible/02_Doctrine_Of_Elements/14_Lines.md ---
 # The Lines
 
 *   **Aiming Line:** Drawn from the Ghost Cue Ball's center through the Target Ball's center. It terminates at the first rail it hits (if the table is visible) or a pocket edge.
@@ -8,18 +9,19 @@
 ## Addendum: Detailed Line Specifications
 
 *   **Aiming Line** (Protractor Mode)
-*   **Path**: Drawn from the `GhostCueBall` center towards the `TargetBall` center. It terminates at the first point of contact, be it a pocket edge or a rail.
-*   **Banking Preview**: When the table is visible, this line will calculate a single reflection off the first rail it intersects.
-    *   The first segment (from `GhostCueBall` to rail) uses the styles defined in `BankLine1.kt`.
-    *   The second, reflected segment uses the styles from `BankLine2.kt` and has no label.
-    *   If this banked path aims at a pocket, the reflected segment must turn white, and the line must terminate at the pocket's edge.
-    *   A diamond number must be displayed at the bank point on the rail.
-*   **Style**: A solid, prominent color.
+*   **Path**: Drawn from the `GhostCueBall` center towards the `TargetBall` center.
+*   **Termination**: It terminates at the first point of contact, be it a pocket edge or a rail.
+*   **Color**: If the line terminates at a pocket, it must turn `RebelYellow`.
+*   **Banking Preview**:
+    *   When the table is visible and the direct aiming line does **not** terminate in a pocket, a single bank reflection shall be calculated and drawn.
+    *   The first segment (to the rail) uses the standard `AimingLine` style.
+    *   The second, reflected segment uses the styles from `BankLine3.kt`. If this reflected path aims at a pocket, it must turn `RebelYellow` and terminate at the pocket's edge.
+    *   A diamond number label must be rendered at the point of impact on the rail. This label is not considered "help text" and must always be visible.
 *   **Label**: "Aiming Line".
 
 *   **Shot Guide Line** (Protractor Mode)
 *   **Path**: Drawn from the `shotLineAnchor` point through the `GhostCueBall` center.
-*   **Banking Preview**: When the table is visible, the impact point where this line *would* strike a rail is calculated. A diamond number label must be drawn at this point, but the line itself does not reflect.
+*   **Banking Preview**: When the table is visible, the impact point where this line *would* strike a rail is calculated. A diamond number label must be drawn at this point.
 *   **Style**: A solid line. Its color must change to a warning red when an impossible shot is detected. Its color is **not** affected by aiming at a pocket.
 *   **Label**: "Shot Guide Line".
 
@@ -36,11 +38,5 @@
 *   **Banking Shot Line** (Banking Mode)
 *   **Path**: A multi-segment line originating from the `ActualCueBall` (Banking Ball), and aimed at the `bankingAimTarget`, reflecting off the rails up to 4 times.
 *   **Style**: Solid lines, colored in a progressive, decaying sequence of yellows.
-*   **Termination**: If the path collides with a pocket, line rendering must cease at the pocket's edge. The final segment leading to the pocket must be colored white.
-*   **Label**: Each segment is labeled sequentially, e.g., "Bank 1", "Bank 2".
-
-## Addendum: Spin/English Visualization (Future)
-
-*   **UI Control**: A color wheel UI element will allow the user to select a strike point on the cue ball.
-*   **Path Visualization**: When a spin is selected, the application will draw a set of potential cue ball paths post-impact.
-*   **Color Coding**: Each potential path line must be color-coded to correspond directly with the color of its respective strike spot on the color wheel key.
+*   **Termination**: If the path collides with a pocket, line rendering must cease at the pocket's edge. The final segment leading to the pocket must be colored `RebelYellow`.
+*   **Label**: A diamond number label must be rendered at each rail impact point.

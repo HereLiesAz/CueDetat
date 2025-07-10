@@ -1,3 +1,4 @@
+--- FILE: app/src/main/java/com/hereliesaz/cuedetat/TheBible/02_Doctrine_Of_Elements/13_Balls.md ---
 # The Balls
 
 This scripture defines the logical objects that represent pool balls.
@@ -36,6 +37,13 @@ This scripture defines the logical objects that represent pool balls.
 * **When the table is not visible**, the `TargetBall` (`ProtractorUnit.center`) is at the screen's center and the `ActualCueBall` (if toggled) is halfway to the bottom edge.
 * **When the table is first made visible** (via `ToggleTable` or `ToggleOnPlaneBall` while the table was previously visible), all positions are reset to a table-centric layout:
   * The `TargetBall` is placed at the absolute center of the table (and view).
-  * The `ActualCueBall` is placed on the head spot (horizontally centered, halfway between the table's center and the bottom edge of the view).
+  * The `ActualCueBall` is placed on the head spot (horizontally centered, halfway between the table's center and the bottom rail).
   * The `aimingAngle` is set to `-90f` to align the `GhostCueBall` directly below the `TargetBall` for a straight-in shot.
 * The logical size of the balls is determined by the global zoom factor.
+
+## Addendum: The Magnifier - A Tool of Truth
+* **Purpose**: To provide a magnified view for precise placement of the interactive balls (`TargetBall`, `ActualCueBall`, `BankingBall`).
+* **Activation**: The magnifier **must** become visible only when the user begins a drag gesture on one of the aforementioned balls.
+* **Behavior**: It must follow the user's finger (the `sourceCenter`) throughout the drag.
+* **Deactivation**: It **must** disappear immediately when the gesture concludes.
+* **Implementation**: This is achieved using the `Modifier.magnifier()` in Compose, bound to state flags (`isMagnifierVisible`, `magnifierSourceCenter`) controlled by the `GestureReducer`.

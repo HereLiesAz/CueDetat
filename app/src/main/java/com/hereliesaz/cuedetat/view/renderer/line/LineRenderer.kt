@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt
+
 package com.hereliesaz.cuedetat.view.renderer.line
 
 import android.graphics.Canvas
@@ -5,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
+import com.hereliesaz.cuedetat.ui.theme.RebelYellow
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.line.AimingLine
 import com.hereliesaz.cuedetat.view.config.line.BankLine1
@@ -101,8 +104,10 @@ class LineRenderer {
         val aimingLineConfig = AimingLine()
         val shotGuideLineConfig = ShotGuideLine()
         val tangentLineConfig = TangentLine()
-        val bankLine1Config = BankLine1()
-        val bankLine2Config = BankLine2()
+        val bankLine3Config = BankLine3()
+
+        // --- THE FIX: Conditional logic for pocketed shot color ---
+        val isDirectPocketed = state.aimedPocketIndex != null && state.aimingLineBankPath.isEmpty()
 
         // Configure paints based on configs and state
         val shotLinePaint = Paint(paints.shotLinePaint).apply {
@@ -114,7 +119,7 @@ class LineRenderer {
             strokeWidth = shotGuideLineConfig.glowWidth
         }
         val aimingLinePaint = Paint(paints.targetCirclePaint).apply {
-            color = aimingLineConfig.strokeColor.toArgb()
+            color = if (isDirectPocketed) RebelYellow.toArgb() else aimingLineConfig.strokeColor.toArgb()
             strokeWidth = aimingLineConfig.strokeWidth
         }
         val aimingLineGlow = Paint(paints.lineGlowPaint).apply {
@@ -159,40 +164,41 @@ class LineRenderer {
 
         // --- Draw Aiming Line Bank Preview & Diamond Labels ---
         if (state.showTable) {
-            // Draw Banked Path
-            if (state.aimingLineBankPath.size > 1) {
-                val bankStart = state.aimingLineBankPath[0]
+            // --- THE FIX: Hide bank line if direct shot is pocketed ---
+            if (state.aimingLineBankPath.size > 1 && state.aimingLineEndPoint == null) {
                 val bankMid = state.aimingLineBankPath[1]
 
-                // The first segment of the bank path is just the aiming line to the rail, already drawn.
-                // Now draw the reflected part.
                 if (state.aimingLineBankPath.size > 2) {
                     val bankEnd = state.aimingLineBankPath[2]
                     val isPocketed = state.aimedPocketIndex != null
 
-                    val bank2Paint = Paint(paints.bankLine2Paint).apply { color = if (isPocketed) android.graphics.Color.WHITE else bankLine2Config.strokeColor.toArgb(); strokeWidth = bankLine2Config.strokeWidth }
-                    val bank2Glow = Paint(paints.lineGlowPaint).apply { color = bank2Paint.color; strokeWidth = bankLine2Config.glowWidth }
+                    // --- THE FIX: Use RebelYellow for pocketed bank shot ---
+                    val bankPaint = Paint(paints.bankLine3Paint).apply {
+                        color = if (isPocketed) RebelYellow.toArgb() else bankLine3Config.strokeColor.toArgb()
+                        strokeWidth = bankLine3Config.strokeWidth
+                    }
+                    val bankGlow = Paint(paints.lineGlowPaint).apply {
+                        color = bankPaint.color
+                        strokeWidth = bankLine3Config.glowWidth
+                    }
 
-                    canvas.drawLine(bankMid.x, bankMid.y, bankEnd.x, bankEnd.y, bank2Glow)
-                    canvas.drawLine(bankMid.x, bankMid.y, bankEnd.x, bankEnd.y, bank2Paint)
+                    canvas.drawLine(bankMid.x, bankMid.y, bankEnd.x, bankEnd.y, bankGlow)
+                    canvas.drawLine(bankMid.x, bankMid.y, bankEnd.x, bankEnd.y, bankPaint)
                 }
             }
 
-            // Draw Diamond Labels if helpers are visible
-            if (state.areHelpersVisible) {
-                val textPaint = paints.textPaint.apply { this.typeface = typeface }
-                // For Aiming Line bank point
-                if (state.aimingLineBankPath.size > 1) {
-                    val bankPoint = state.aimingLineBankPath[1]
-                    getRailForPoint(bankPoint, state)?.let { railType ->
-                        textRenderer.drawDiamondLabel(canvas, bankPoint, railType, state, textPaint)
-                    }
+            val textPaint = paints.textPaint.apply { this.typeface = typeface }
+            // For Aiming Line bank point
+            if (state.aimingLineBankPath.size > 1) {
+                val bankPoint = state.aimingLineBankPath[1]
+                getRailForPoint(bankPoint, state)?.let { railType ->
+                    textRenderer.drawDiamondLabel(canvas, bankPoint, railType, state, textPaint)
                 }
-                // For Shot Guide Line impact point
-                state.shotGuideImpactPoint?.let { impactPoint ->
-                    getRailForPoint(impactPoint, state)?.let { railType ->
-                        textRenderer.drawDiamondLabel(canvas, impactPoint, railType, state, textPaint)
-                    }
+            }
+            // For Shot Guide Line impact point
+            state.shotGuideImpactPoint?.let { impactPoint ->
+                getRailForPoint(impactPoint, state)?.let { railType ->
+                    textRenderer.drawDiamondLabel(canvas, impactPoint, railType, state, textPaint)
                 }
             }
         }
@@ -218,7 +224,7 @@ class LineRenderer {
             val config = bankLineConfigs.getOrElse(i) { bankLineConfigs.last() }
 
             val linePaint = if (isLastSegment && isPocketed) {
-                Paint(paints.shotLinePaint).apply { color = android.graphics.Color.WHITE }
+                Paint(paints.shotLinePaint).apply { color = RebelYellow.toArgb() }
             } else {
                 Paint(paints.bankLine1Paint).apply { color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
             }

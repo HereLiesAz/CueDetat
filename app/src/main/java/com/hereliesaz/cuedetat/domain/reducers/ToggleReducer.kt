@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ToggleReducer.kt
+
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
@@ -110,8 +112,17 @@ class ToggleReducer @Inject constructor() {
         // Target Ball is at the very center of the table (and the view).
         val targetBallCenter = PointF(viewCenterX, viewCenterY)
 
-        // Actual Cue Ball is horizontally centered, and halfway between the center and the bottom edge of the screen.
-        val actualCueBallCenter = PointF(viewCenterX, (viewCenterY + currentState.viewHeight) / 2f)
+        // --- THE FIX: Calculate cue ball position relative to table boundaries ---
+        // Added: Calculate table height to find the bottom rail position
+        val tableToBallRatioLong = currentState.tableSize.getTableToBallRatioLong()
+        val tableToBallRatioShort = tableToBallRatioLong / currentState.tableSize.aspectRatio
+        val tablePlayingSurfaceHeight = tableToBallRatioShort * logicalRadius
+        val bottomRailY = viewCenterY + tablePlayingSurfaceHeight / 2f
+
+        // Changed: Place the cue ball on the head spot (halfway between center and bottom rail)
+        val actualCueBallCenter = PointF(viewCenterX, (viewCenterY + bottomRailY) / 2f)
+        // --- END FIX ---
+
 
         // Set rotation to -90 to place Ghost Ball directly below Target Ball.
         val rotationDegrees = -90f

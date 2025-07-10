@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainViewModel.kt
+
 package com.hereliesaz.cuedetat.ui
 
 import android.app.Application
@@ -131,12 +133,13 @@ class MainViewModel @Inject constructor(
                     event
                 }
             }
+            // --- THE FIX: ViewModel now performs the translation from Screen to Logical space ---
             is MainScreenEvent.ScreenGestureStarted -> {
                 if (currentState.hasInverseMatrix) {
                     val logicalPoint = Perspective.screenToLogical(event.position, currentState.inversePitchMatrix)
-                    MainScreenEvent.LogicalGestureStarted(logicalPoint)
+                    MainScreenEvent.LogicalGestureStarted(logicalPoint, Offset(event.position.x, event.position.y))
                 } else {
-                    event
+                    event // Fallback if no matrix is ready
                 }
             }
             else -> event
@@ -178,7 +181,7 @@ class MainViewModel @Inject constructor(
                 null
             }
             finalState = finalState.copy(warningText = warningText)
-        } else if (event !is MainScreenEvent.ScreenGestureStarted && event !is MainScreenEvent.LogicalGestureStarted) {
+        } else if (event !is MainScreenEvent.ScreenGestureStarted) {
             if (finalState.warningText != null && (!finalState.isImpossibleShot || finalState.isBankingMode)) {
                 finalState = finalState.copy(warningText = null)
             }

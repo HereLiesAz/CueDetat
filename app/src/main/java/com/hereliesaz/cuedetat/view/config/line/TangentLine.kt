@@ -1,6 +1,7 @@
 package com.hereliesaz.cuedetat.view.config.line
 
 import androidx.compose.ui.graphics.Color
+import com.hereliesaz.cuedetat.ui.theme.MutedGray
 import com.hereliesaz.cuedetat.ui.theme.RustedEmber
 import com.hereliesaz.cuedetat.ui.theme.VioletResidue
 import com.hereliesaz.cuedetat.view.config.base.LinesConfig
@@ -10,7 +11,7 @@ data class TangentLine(
     override val opacity: Float = 0.8f,
     override val glowWidth: Float = 8f,
     override val glowColor: Color = Color.White.copy(alpha = 0.3f),
-    override val strokeWidth: Float = 8f,
-    override val strokeColor: Color = VioletResidue,
+    override val strokeWidth: Float = 5f,
+    override val strokeColor: Color = MutedGray,
     override val additionalOffset: Float = 0f
 ) : LinesConfig

@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/renderer/text/LineTextRenderer.kt
+
 package com.hereliesaz.cuedetat.view.renderer.text
 
 import android.graphics.Canvas
@@ -86,9 +88,13 @@ class LineTextRenderer {
 
         canvas.save()
         canvas.rotate(textRotation + uprightCorrection, point.x, point.y)
-        // Draw text directly at the impact point, with a slight vertical offset for alignment.
-        val yOffset = paint.fontMetrics.ascent / 2
-        canvas.drawText(diamondNumberText, point.x, point.y - yOffset, paint)
+
+        // --- THE FIX: Offset the text "up" from the impact point, relative to the rotated canvas ---
+        // 'ascent' is negative, so this lifts the text above the baseline. The padding adds extra space.
+        val yOffset = paint.fontMetrics.ascent - 10f
+        canvas.drawText(diamondNumberText, point.x, point.y + yOffset, paint)
+        // --- END FIX ---
+
         canvas.restore()
     }
 

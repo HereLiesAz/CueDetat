@@ -9,7 +9,7 @@ data class Diamonds(
     override val opacity: Float = 0.7f,
     override val glowWidth: Float = 0f,
     override val glowColor: Color = Color.Transparent,
-    override val strokeWidth: Float = 1.5f,
+    override val strokeWidth: Float = 3f,
     override val strokeColor: Color = RebelYellow,
     override val additionalOffset: Float = 0f,
     override val fillColor: Color = Color.White

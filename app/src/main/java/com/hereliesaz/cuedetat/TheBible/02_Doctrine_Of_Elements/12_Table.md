@@ -1,3 +1,4 @@
+--- FILE: app/src/main/java/com/hereliesaz/cuedetat/TheBible/02_Doctrine_Of_Elements/12_Table.md ---
 # The Table
 
 *   **Visibility:** The table is hidden by default. Its visibility is controlled by the `"Toggle Table"` `TextButton` in the menu and its dedicated `FloatingActionButton` when not visible.
@@ -10,6 +11,7 @@
 *   A display in the top-right corner must indicate the current table size (e.g., "8'"). Tapping this display cycles through the available sizes.
 *   A menu option ("Table Size") must open a dialog allowing the user to select a specific size directly.
 *   **Proportionality**: The logical size of the table and its components (rails, pockets) **must** be derived from the logical size of the cue ball. The `TableSize` enum provides a `getTableToBallRatioLong()` function which is the single source of truth for this proportion. This ensures that as the ball's logical radius changes with zoom, the table scales with it perfectly.
+*   **Ball Confinement**: When the table is visible, all interactive balls (`ActualCueBall`, `TargetBall`, `BankingBall`) **must** be constrained to the logical boundaries of the playing surface.
 
 ***
 ## Addendum: Detailed Table Specifications
@@ -24,3 +26,4 @@
 *   The side pockets are to be counted as diamonds in the numbering sequence.
 *   When in Banking Mode or when a bank is previewed in Protractor Mode, the precise point of impact on a rail must be marked.
 *   A text label must be displayed **directly at** this impact point, indicating the diamond number with one decimal place of precision (e.g., "1.3"). The numbering is clockwise, starting from the top-left corner pocket as diamond 0.
+*   **Head Spot**: The `ActualCueBall`, when the table is first shown, must be placed on the head spot, which is geometrically defined as being halfway between the center of the table and the bottom rail.

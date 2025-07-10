@@ -1,15 +1,17 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt
+
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
 import android.util.Log
+import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import com.hereliesaz.cuedetat.view.state.TableSize
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.cos
-import kotlin.math.max
 import kotlin.math.sin
 
 private const val GESTURE_TAG = "GestureDebug"
@@ -19,11 +21,16 @@ class GestureReducer @Inject constructor() {
 
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         return when (event) {
+            // --- THE FIX: Routing restored to the logical event ---
             is MainScreenEvent.LogicalGestureStarted -> handleGestureStarted(currentState, event)
             is MainScreenEvent.LogicalDragApplied -> handleDrag(currentState, event)
             is MainScreenEvent.GestureEnded -> {
                 Log.d(GESTURE_TAG, "REDUCER: GestureEnded. Resetting interaction mode.")
-                currentState.copy(interactionMode = InteractionMode.NONE)
+                currentState.copy(
+                    interactionMode = InteractionMode.NONE,
+                    isMagnifierVisible = false,
+                    magnifierSourceCenter = null
+                )
             }
             is MainScreenEvent.AimBankShot -> {
                 currentState.copy(bankingAimTarget = event.logicalTarget, valuesChangedSinceReset = true)
@@ -32,14 +39,15 @@ class GestureReducer @Inject constructor() {
         }
     }
 
+    // --- THE FIX: Function now accepts the logical event and uses its purified data ---
     private fun handleGestureStarted(currentState: OverlayState, event: MainScreenEvent.LogicalGestureStarted): OverlayState {
-        val touchPoint = event.logicalPoint
+        val logicalPoint = event.logicalPoint
         var newMode = InteractionMode.NONE
 
         if (currentState.isBankingMode) {
             currentState.onPlaneBall?.let {
-                val touchSlop = it.radius * 1.5f // Increased slop for easier grabbing
-                if (distance(touchPoint, it.center) < it.radius + touchSlop) {
+                val touchSlop = it.radius * 1.5f
+                if (distance(logicalPoint, it.center) < it.radius + touchSlop) {
                     newMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
                 }
             }
@@ -48,14 +56,14 @@ class GestureReducer @Inject constructor() {
             }
         } else {
             currentState.onPlaneBall?.let {
-                val touchSlop = it.radius * 1.5f // Increased slop
-                if (distance(touchPoint, it.center) < it.radius + touchSlop) {
+                val touchSlop = it.radius * 1.5f
+                if (distance(logicalPoint, it.center) < it.radius + touchSlop) {
                     newMode = InteractionMode.MOVING_ACTUAL_CUE_BALL
                 }
             }
             if (newMode == InteractionMode.NONE) {
-                val touchSlop = currentState.protractorUnit.radius * 1.5f // Increased slop
-                if (distance(touchPoint, currentState.protractorUnit.center) < currentState.protractorUnit.radius + touchSlop) {
+                val touchSlop = currentState.protractorUnit.radius * 1.5f
+                if (distance(logicalPoint, currentState.protractorUnit.center) < currentState.protractorUnit.radius + touchSlop) {
                     newMode = InteractionMode.MOVING_PROTRACTOR_UNIT
                 }
             }
@@ -64,7 +72,14 @@ class GestureReducer @Inject constructor() {
             }
         }
         Log.d(GESTURE_TAG, "REDUCER: GestureStarted. Determined Mode: $newMode")
-        return currentState.copy(interactionMode = newMode, warningText = null)
+
+        val showMagnifier = newMode == InteractionMode.MOVING_ACTUAL_CUE_BALL || newMode == InteractionMode.MOVING_PROTRACTOR_UNIT
+        return currentState.copy(
+            interactionMode = newMode,
+            warningText = null,
+            isMagnifierVisible = showMagnifier,
+            magnifierSourceCenter = if (showMagnifier) event.screenOffset else null
+        )
     }
 
     private fun handleDrag(currentState: OverlayState, event: MainScreenEvent.LogicalDragApplied): OverlayState {
@@ -72,47 +87,57 @@ class GestureReducer @Inject constructor() {
         val screenDelta = event.screenDelta
         Log.d(GESTURE_TAG, "REDUCER: handleDrag with mode=${currentState.interactionMode}")
 
-        return when (currentState.interactionMode) {
+        val newMagnifierCenter = currentState.magnifierSourceCenter?.plus(screenDelta)
+        val stateWithUpdatedMagnifier = currentState.copy(magnifierSourceCenter = newMagnifierCenter)
+
+        return when (stateWithUpdatedMagnifier.interactionMode) {
             InteractionMode.ROTATING_PROTRACTOR -> {
-                val angleRad = Math.toRadians(-currentState.tableRotationDegrees.toDouble())
+                val angleRad = Math.toRadians(-stateWithUpdatedMagnifier.tableRotationDegrees.toDouble())
                 val cosAngle = cos(angleRad).toFloat()
                 val sinAngle = sin(angleRad).toFloat()
 
                 val screenDx = screenDelta.x
                 val screenDy = screenDelta.y
 
-                // Un-rotate the screen delta to align with the logical plane
                 val unrotatedDx = screenDx * cosAngle - screenDy * sinAngle
                 val unrotatedDy = screenDx * sinAngle + screenDy * cosAngle
 
                 val rotationDelta = (unrotatedDx - unrotatedDy) * 0.2f
-                val newRotation = currentState.protractorUnit.rotationDegrees - rotationDelta
+                val newRotation = stateWithUpdatedMagnifier.protractorUnit.rotationDegrees - rotationDelta
 
-                currentState.copy(protractorUnit = currentState.protractorUnit.copy(rotationDegrees = newRotation), valuesChangedSinceReset = true)
+                stateWithUpdatedMagnifier.copy(protractorUnit = stateWithUpdatedMagnifier.protractorUnit.copy(rotationDegrees = newRotation), valuesChangedSinceReset = true)
             }
             InteractionMode.MOVING_PROTRACTOR_UNIT -> {
-                val newCenter = PointF(currentState.protractorUnit.center.x + logicalDelta.x, currentState.protractorUnit.center.y + logicalDelta.y)
+                var newCenterX = stateWithUpdatedMagnifier.protractorUnit.center.x + logicalDelta.x
+                var newCenterY = stateWithUpdatedMagnifier.protractorUnit.center.y + logicalDelta.y
+
+                if (stateWithUpdatedMagnifier.showTable || stateWithUpdatedMagnifier.isBankingMode) {
+                    val (left, top, right, bottom) = getTableBoundaries(stateWithUpdatedMagnifier)
+                    newCenterX = newCenterX.coerceIn(left, right)
+                    newCenterY = newCenterY.coerceIn(top, bottom)
+                }
+
+                val newCenter = PointF(newCenterX, newCenterY)
                 Log.d(GESTURE_TAG, "REDUCER: MOVING_PROTRACTOR_UNIT to $newCenter")
-                currentState.copy(protractorUnit = currentState.protractorUnit.copy(center = newCenter), valuesChangedSinceReset = true)
+                stateWithUpdatedMagnifier.copy(protractorUnit = stateWithUpdatedMagnifier.protractorUnit.copy(center = newCenter), valuesChangedSinceReset = true)
             }
             InteractionMode.MOVING_ACTUAL_CUE_BALL -> {
-                currentState.onPlaneBall?.let {
+                stateWithUpdatedMagnifier.onPlaneBall?.let {
                     var newCenterX = it.center.x + logicalDelta.x
                     var newCenterY = it.center.y + logicalDelta.y
 
-                    if (currentState.showTable || currentState.isBankingMode) {
-                        val (left, top, right, bottom) = getTableBoundaries(currentState)
+                    if (stateWithUpdatedMagnifier.showTable || stateWithUpdatedMagnifier.isBankingMode) {
+                        val (left, top, right, bottom) = getTableBoundaries(stateWithUpdatedMagnifier)
                         newCenterX = newCenterX.coerceIn(left, right)
                         newCenterY = newCenterY.coerceIn(top, bottom)
                     }
 
                     val newCenter = PointF(newCenterX, newCenterY)
                     Log.d(GESTURE_TAG, "REDUCER: MOVING_ACTUAL_CUE_BALL to $newCenter")
-                    currentState.copy(onPlaneBall = it.copy(center = newCenter), valuesChangedSinceReset = true)
-                } ?: currentState
+                    stateWithUpdatedMagnifier.copy(onPlaneBall = it.copy(center = newCenter), valuesChangedSinceReset = true)
+                } ?: stateWithUpdatedMagnifier
             }
-            // AIMING_BANK_SHOT is now handled by AimBankShot event, so this case is removed from drag.
-            else -> currentState
+            else -> stateWithUpdatedMagnifier
         }
     }
 

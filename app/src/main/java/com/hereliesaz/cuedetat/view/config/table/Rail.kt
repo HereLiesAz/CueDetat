@@ -9,7 +9,7 @@ data class Rail(
     override val opacity: Float = 1.0f,
     override val glowWidth: Float = 12f,
     override val glowColor: Color = Color.White.copy(alpha = 0.3f),
-    override val strokeWidth: Float = 4f,
+    override val strokeWidth: Float = 3f,
     override val strokeColor: Color = AcidPatina, // Corrected to use the one true color
     override val additionalOffset: Float = 0f, // Lift is handled by railPitchMatrix
     override val fillColor: Color = Color.Transparent

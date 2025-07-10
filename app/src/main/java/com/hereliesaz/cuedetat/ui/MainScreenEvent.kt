@@ -1,4 +1,5 @@
-// app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreenEvent.kt
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreenEvent.kt
+
 package com.hereliesaz.cuedetat.ui
 
 import android.graphics.PointF
@@ -18,7 +19,8 @@ sealed class MainScreenEvent {
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
 
     // Logical Events (dispatched by ViewModel)
-    internal data class LogicalGestureStarted(val logicalPoint: PointF) : MainScreenEvent()
+    // --- RESTORED: This event is critical for the architectural pattern. ---
+    internal data class LogicalGestureStarted(val logicalPoint: PointF, val screenOffset: Offset) : MainScreenEvent()
     internal data class LogicalDragApplied(val logicalDelta: PointF, val screenDelta: Offset) : MainScreenEvent()
     internal data class AimBankShot(val logicalTarget: PointF) : MainScreenEvent() // For direct bank aiming
 

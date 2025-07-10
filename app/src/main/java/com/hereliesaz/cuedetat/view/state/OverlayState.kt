@@ -1,9 +1,12 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/state/OverlayState.kt
+
 package com.hereliesaz.cuedetat.view.state
 
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
@@ -115,6 +118,11 @@ data class OverlayState(
 
     // Gesture State
     val interactionMode: InteractionMode = InteractionMode.NONE,
+
+    // --- NEW: Magnifier State ---
+    val isMagnifierVisible: Boolean = false,
+    val magnifierSourceCenter: Offset? = null,
+    // --- END NEW ---
 
     // State for Reset/Revert functionality
     val preResetState: OverlayState? = null,
