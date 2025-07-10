@@ -5,7 +5,9 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.data.FullOrientation
+import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.Perspective
+import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.renderer.table.TableRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -18,8 +20,11 @@ class UpdateStateUseCase @Inject constructor() {
     private val railHeightToTableHeightRatio = 0.05f
     private val distanceReferenceConstant = 6480f
 
+
     operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
+        val centerX = state.viewWidth / 2f
+        val centerY = state.viewHeight / 2f
 
         // --- Stage 1: Base Un-rotated Matrix for Stable Logic ---
         val basePitchMatrix = Perspective.createPitchMatrix(
@@ -28,6 +33,7 @@ class UpdateStateUseCase @Inject constructor() {
             viewHeight = state.viewHeight,
             camera = camera
         )
+
         val baseInverseMatrix = Matrix().apply { basePitchMatrix.invert(this) }
 
         // Create a "flat" matrix with zero pitch for stable radius calculations.
@@ -41,7 +47,7 @@ class UpdateStateUseCase @Inject constructor() {
 
         // --- Stage 2: Calculate Logical Values in a Stable Coordinate System ---
         val logicalShotLineAnchor = getLogicalShotLineAnchor(state, baseInverseMatrix)
-        val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= state.protractorUnit.ghostCueBallCenter.y
+        val isTiltBeyondLimit = !state.isBankingMode && !state.showTable && logicalShotLineAnchor.y <= state.protractorUnit.ghostCueBallCenter.y
 
         val (isImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
             shotAnchor = logicalShotLineAnchor,
@@ -54,6 +60,7 @@ class UpdateStateUseCase @Inject constructor() {
         } else {
             Pair(null, null)
         }
+        val shotGuideImpactPoint = if (state.showTable) calculateShotGuideImpact(state) else null
 
         // --- Stage 3: Prepare Final Rotated Matrices for Rendering ---
         val finalPitchMatrix = Matrix(basePitchMatrix)
@@ -72,8 +79,6 @@ class UpdateStateUseCase @Inject constructor() {
         if (state.showTable) {
             val effectiveTableRotation = state.tableRotationDegrees % 360f
             if (effectiveTableRotation != 0f) {
-                val centerX = state.viewWidth / 2f
-                val centerY = state.viewHeight / 2f
                 finalPitchMatrix.preRotate(effectiveTableRotation, centerX, centerY)
                 finalRailPitchMatrix.preRotate(effectiveTableRotation, centerX, centerY)
             }
@@ -92,7 +97,8 @@ class UpdateStateUseCase @Inject constructor() {
             tangentDirection = tangentDirection,
             targetBallDistance = targetBallDistance,
             aimedPocketIndex = aimedPocketIndex,
-            aimingLineEndPoint = aimingLineEndPoint
+            aimingLineEndPoint = aimingLineEndPoint,
+            shotGuideImpactPoint = shotGuideImpactPoint
         )
     }
 
@@ -152,6 +158,51 @@ class UpdateStateUseCase @Inject constructor() {
             }
         }
         return Pair(null, null)
+    }
+
+    private fun calculateShotGuideImpact(state: OverlayState): PointF? {
+        val p1 = state.shotLineAnchor
+        val p2 = state.protractorUnit.ghostCueBallCenter
+        val dirX = p2.x - p1.x
+        val dirY = p2.y - p1.y
+
+        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
+        if (referenceRadius <= 0) return null
+
+        val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
+        val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
+        val tableWidth = tableToBallRatioLong * referenceRadius
+        val tableHeight = tableToBallRatioShort * referenceRadius
+
+        val halfW = tableWidth / 2f
+        val halfH = tableHeight / 2f
+        val canvasCenterX = state.viewWidth / 2f
+        val canvasCenterY = state.viewHeight / 2f
+
+        val left = canvasCenterX - halfW
+        val top = canvasCenterY - halfH
+        val right = canvasCenterX + halfW
+        val bottom = canvasCenterY + halfH
+
+        var t = Float.MAX_VALUE
+        if (dirX != 0f) {
+            val tLeft = (left - p1.x) / dirX
+            val tRight = (right - p1.x) / dirX
+            if (tLeft > 0 && tLeft < t) t = tLeft
+            if (tRight > 0 && tRight < t) t = tRight
+        }
+        if (dirY != 0f) {
+            val tTop = (top - p1.y) / dirY
+            val tBottom = (bottom - p1.y) / dirY
+            if (tTop > 0 && tTop < t) t = tTop
+            if (tBottom > 0 && tBottom < t) t = tBottom
+        }
+
+        return if (t != Float.MAX_VALUE) {
+            PointF(p1.x + t * dirX, p1.y + t * dirY)
+        } else {
+            null
+        }
     }
 
     private fun linePointDistance(p1: PointF, p2: PointF, p: PointF): Float {

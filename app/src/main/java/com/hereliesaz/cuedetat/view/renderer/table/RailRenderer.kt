@@ -7,8 +7,6 @@ import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class RailRenderer {
-    private val railVisualOffsetFromEdgeFactor = 0.75f
-    private val railVisualThicknessFactor = 0.5f
     private val diamondSizeFactor = 0.25f
 
     companion object {
@@ -67,31 +65,23 @@ class RailRenderer {
         val innerRight = tableCenterX + tablePlayingSurfaceWidth / 2
         val innerBottom = tableCenterY + tablePlayingSurfaceHeight / 2
 
-        val railLinePaint = Paint(paints.tableOutlinePaint).apply {
-            strokeWidth = referenceRadius * railVisualThicknessFactor
-        }
+        val railLinePaint = paints.tableOutlinePaint
         val railLineGlowPaint = Paint(paints.lineGlowPaint).apply { strokeWidth = railLinePaint.strokeWidth + 8f }
         val diamondPaint = Paint(paints.tableOutlinePaint).apply { style = Paint.Style.FILL_AND_STROKE }
-
-        val railOffsetAmount = referenceRadius * railVisualOffsetFromEdgeFactor
-        val railTopCenterY = innerTop - railOffsetAmount
-        val railBottomCenterY = innerBottom + railOffsetAmount
-        val railLeftCenterX = innerLeft - railOffsetAmount
-        val railRightCenterX = innerRight + railOffsetAmount
 
         val pocketRadius = referenceRadius * 1.8f
 
         // --- Draw Rail Segments ---
         val railSegments = listOf(
             // Top rail
-            PointF(innerLeft + pocketRadius, railTopCenterY) to PointF(tableCenterX - pocketRadius, railTopCenterY),
-            PointF(tableCenterX + pocketRadius, railTopCenterY) to PointF(innerRight - pocketRadius, railTopCenterY),
+            PointF(innerLeft + pocketRadius, innerTop) to PointF(tableCenterX - pocketRadius, innerTop),
+            PointF(tableCenterX + pocketRadius, innerTop) to PointF(innerRight - pocketRadius, innerTop),
             // Bottom rail
-            PointF(innerLeft + pocketRadius, railBottomCenterY) to PointF(tableCenterX - pocketRadius, railBottomCenterY),
-            PointF(tableCenterX + pocketRadius, railBottomCenterY) to PointF(innerRight - pocketRadius, railBottomCenterY),
+            PointF(innerLeft + pocketRadius, innerBottom) to PointF(tableCenterX - pocketRadius, innerBottom),
+            PointF(tableCenterX + pocketRadius, innerBottom) to PointF(innerRight - pocketRadius, innerBottom),
             // Side rails
-            PointF(railLeftCenterX, innerTop + pocketRadius) to PointF(railLeftCenterX, innerBottom - pocketRadius),
-            PointF(railRightCenterX, innerTop + pocketRadius) to PointF(railRightCenterX, innerBottom - pocketRadius)
+            PointF(innerLeft, innerTop + pocketRadius) to PointF(innerLeft, innerBottom - pocketRadius),
+            PointF(innerRight, innerTop + pocketRadius) to PointF(innerRight, innerBottom - pocketRadius)
         )
 
         railSegments.forEach { (start, end) ->
@@ -107,16 +97,16 @@ class RailRenderer {
         // Long rails (3 diamonds between corner and side pockets)
         for (i in 1..3) {
             val xOffset = halfWidth * (i / 4.0f)
-            canvas.drawCircle(tableCenterX - xOffset, railTopCenterY, diamondRadius, diamondPaint)
-            canvas.drawCircle(tableCenterX + xOffset, railTopCenterY, diamondRadius, diamondPaint)
-            canvas.drawCircle(tableCenterX - xOffset, railBottomCenterY, diamondRadius, diamondPaint)
-            canvas.drawCircle(tableCenterX + xOffset, railBottomCenterY, diamondRadius, diamondPaint)
+            canvas.drawCircle(tableCenterX - xOffset, innerTop, diamondRadius, diamondPaint)
+            canvas.drawCircle(tableCenterX + xOffset, innerTop, diamondRadius, diamondPaint)
+            canvas.drawCircle(tableCenterX - xOffset, innerBottom, diamondRadius, diamondPaint)
+            canvas.drawCircle(tableCenterX + xOffset, innerBottom, diamondRadius, diamondPaint)
         }
         // Short rails (3 diamonds per rail)
         val shortRailYOffsets = listOf(-halfHeight / 2, 0f, halfHeight / 2)
         for (yOffset in shortRailYOffsets) {
-            canvas.drawCircle(railLeftCenterX, tableCenterY + yOffset, diamondRadius, diamondPaint)
-            canvas.drawCircle(railRightCenterX, tableCenterY + yOffset, diamondRadius, diamondPaint)
+            canvas.drawCircle(innerLeft, tableCenterY + yOffset, diamondRadius, diamondPaint)
+            canvas.drawCircle(innerRight, tableCenterY + yOffset, diamondRadius, diamondPaint)
         }
     }
 }

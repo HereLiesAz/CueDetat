@@ -54,7 +54,7 @@ data class OverlayState(
     val viewHeight: Int = 0,
 
     // Core logical model
-    val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), 1f, 0f),
+    val protractorUnit: ProtractorUnit = ProtractorUnit(center = PointF(0f, 0f), rotationDegrees = 0f),
     val onPlaneBall: OnPlaneBall? = null,
 
     // UI control state
@@ -62,6 +62,8 @@ data class OverlayState(
     val areHelpersVisible: Boolean = false,
     val isMoreHelpVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
+    val isCameraVisible: Boolean = true,
+
 
     // Banking mode specific state
     val isBankingMode: Boolean = false,
@@ -96,6 +98,7 @@ data class OverlayState(
     val isImpossibleShot: Boolean = false,
     val isTiltBeyondLimit: Boolean = false,
     val warningText: String? = null,
+    val shotGuideImpactPoint: PointF? = null,
 
     // Pocket aiming state
     val aimedPocketIndex: Int? = null,
@@ -110,6 +113,10 @@ data class OverlayState(
 
     // State for Reset/Revert functionality
     val preResetState: OverlayState? = null,
+
+    // Ball/Table toggle memory
+    val wasTableVisibleBeforeBallToggle: Boolean = false,
+
 
     // Version Info
     val latestVersionName: String? = null,

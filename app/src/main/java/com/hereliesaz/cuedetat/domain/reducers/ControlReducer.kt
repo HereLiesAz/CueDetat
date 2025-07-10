@@ -1,14 +1,11 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
-import android.graphics.PointF
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.ZoomMapping
-import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.abs
 
 @Singleton
 class ControlReducer @Inject constructor() {
@@ -28,11 +25,9 @@ class ControlReducer @Inject constructor() {
         val newSliderPos = event.position.coerceIn(-50f, 50f)
         val newLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
 
-        val updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
-
         return currentState.copy(
             protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
-            onPlaneBall = updatedOnPlaneBall,
+            onPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius),
             zoomSliderPosition = newSliderPos,
             valuesChangedSinceReset = true
         )
@@ -45,11 +40,9 @@ class ControlReducer @Inject constructor() {
         val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue)
         val newLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
 
-        val updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
-
         return currentState.copy(
             protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
-            onPlaneBall = updatedOnPlaneBall,
+            onPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius),
             zoomSliderPosition = newSliderPos,
             valuesChangedSinceReset = true
         )

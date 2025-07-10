@@ -91,6 +91,12 @@ fun MenuDrawerContent(
         )
         MenuDivider()
 
+        val cameraToggleText = if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On"
+        MenuItem(
+            text = cameraToggleText,
+            onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
+        )
+
         val systemIsCurrentlyDark = isSystemInDarkTheme()
         val themeToggleText = when (uiState.isForceLightMode) {
             true -> "Embrace the Darkness"

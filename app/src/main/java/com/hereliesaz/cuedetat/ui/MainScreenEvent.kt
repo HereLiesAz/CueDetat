@@ -39,6 +39,7 @@ sealed class MainScreenEvent {
     object ToggleLuminanceDialog : MainScreenEvent()
     data class AdjustLuminance(val adjustment: Float) : MainScreenEvent()
     object ToggleDistanceUnit : MainScreenEvent()
+    object ToggleCamera : MainScreenEvent()
 
     // Tutorial Events
     object StartTutorial : MainScreenEvent()

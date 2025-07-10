@@ -12,6 +12,7 @@ import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.min
 import kotlin.math.sqrt
 
 class LineRenderer {
@@ -28,14 +29,13 @@ class LineRenderer {
 
     fun drawProtractorGuides(canvas: Canvas, state: OverlayState, paints: PaintCache, center: PointF, referencePoint: PointF) {
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
-        val targetCenter = state.protractorUnit.center
         val textPaint = Paint(paints.textPaint).apply { alpha = 80; textSize = 30f }
 
         protractorAngles.forEach { angle ->
-            drawAngleGuide(canvas, center, referencePoint, angle, paints.angleGuidePaint)
-            drawAngleGuide(canvas, center, referencePoint, -angle, paints.angleGuidePaint) // Draw on both sides
-            textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, angle, textPaint, state.protractorUnit.radius)
-            textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, -angle, textPaint, state.protractorUnit.radius)
+            drawAngleGuide(canvas, center, referencePoint, angle, paints.angleGuidePaint, state)
+            drawAngleGuide(canvas, center, referencePoint, -angle, paints.angleGuidePaint, state) // Draw on both sides
+            textRenderer.drawAngleLabel(canvas, ghostCueCenter, referencePoint, angle, textPaint, state)
+            textRenderer.drawAngleLabel(canvas, ghostCueCenter, referencePoint, -angle, textPaint, state)
         }
     }
 
@@ -106,6 +106,14 @@ class LineRenderer {
 
         if (state.areHelpersVisible) {
             textRenderer.drawProtractorLabels(canvas, state, paints, typeface)
+        }
+
+        // Draw diamond number for shot guide line impact
+        state.shotGuideImpactPoint?.let { impactPoint ->
+            getRailForPoint(impactPoint, state)?.let { railType ->
+                val textPaint = paints.textPaint.apply { this.typeface = typeface }
+                textRenderer.drawDiamondLabel(canvas, impactPoint, railType, state, textPaint)
+            }
         }
     }
 
@@ -179,10 +187,10 @@ class LineRenderer {
         }
     }
 
-    private fun drawAngleGuide(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint) {
+    private fun drawAngleGuide(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint, state: OverlayState) {
         val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)
         val finalAngleRad = initialAngleRad + Math.toRadians(angleDegrees.toDouble())
-        val length = 5000f
+        val length = min(state.viewWidth, state.viewHeight).toFloat()
         val endX = center.x + length * cos(finalAngleRad).toFloat()
         val endY = center.y + length * sin(finalAngleRad).toFloat()
         canvas.drawLine(center.x, center.y, endX, endY, paint)

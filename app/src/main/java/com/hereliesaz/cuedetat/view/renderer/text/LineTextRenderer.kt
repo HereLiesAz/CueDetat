@@ -10,6 +10,7 @@ import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.min
 
 class LineTextRenderer {
 
@@ -55,10 +56,10 @@ class LineTextRenderer {
         }
     }
 
-    fun drawAngleLabel(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint, radius: Float) {
+    fun drawAngleLabel(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint, state: OverlayState) {
         val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)
         val labelAngleRad = initialAngleRad + Math.toRadians(angleDegrees.toDouble())
-        val labelDistance = radius * 3.5f
+        val labelDistance = min(state.viewWidth, state.viewHeight) / 2.5f
 
         val text = "${angleDegrees.toInt()}°"
         val textX = center.x + (labelDistance * cos(labelAngleRad)).toFloat()
@@ -70,8 +71,8 @@ class LineTextRenderer {
     fun drawDiamondLabel(canvas: Canvas, point: PointF, railType: RailType, state: OverlayState, paint: Paint) {
         val diamondNumberText = calculateDiamondNumber(point, railType, state) ?: return
 
-        paint.textSize = getDynamicFontSize(50f, state.zoomSliderPosition)
-        val textOffset = 80f * (ZoomMapping.sliderToZoom(state.zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM).coerceAtLeast(0.7f) // Dynamic offset
+        paint.textSize = getDynamicFontSize(60f, state.zoomSliderPosition)
+        val textOffset = 100f * (ZoomMapping.sliderToZoom(state.zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM).coerceAtLeast(0.7f) // Dynamic offset
 
         var textX = point.x
         var textY = point.y
@@ -110,18 +111,14 @@ class LineTextRenderer {
         val logicalX = point.x - state.viewWidth / 2f
         val logicalY = point.y - state.viewHeight / 2f
 
-        // Short rails have 4 diamond units (0-4), Long rails have 8 (0-8).
+        // End rails (short) have 4 diamond units, Side rails (long) have 8.
         val diamondValue = when (railType) {
-            RailType.TOP -> ((logicalX + halfW) / tableWidth) * 4.0 // 0 at left, 4 at right
-            RailType.RIGHT -> ((logicalY + halfH) / tableHeight) * 8.0 // 0 at top, 8 at bottom
-            RailType.BOTTOM -> 4.0 - (((logicalX + halfW) / tableWidth) * 4.0) // 4 at right, 0 at left
-            RailType.LEFT -> 8.0 - (((logicalY + halfH) / tableHeight) * 8.0) // 8 at bottom, 0 at top
+            RailType.TOP -> ((logicalX + halfW) / tableWidth) * 8.0 // Left to Right: 0 -> 8
+            RailType.RIGHT -> ((logicalY + halfH) / tableHeight) * 4.0 // Top to Bottom: 0 -> 4
+            RailType.BOTTOM -> 8.0 - (((logicalX + halfW) / tableWidth) * 8.0) // Right to Left: 8 -> 0
+            RailType.LEFT -> 4.0 - (((logicalY + halfH) / tableHeight) * 4.0) // Bottom to Top: 4 -> 0
         }
 
         return String.format("%.1f", diamondValue)
-    }
-
-    fun drawBankingLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?){
-        // This function is deprecated as its logic has been moved to drawDiamondLabel and called from LineRenderer
     }
 }
