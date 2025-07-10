@@ -77,11 +77,14 @@ fun MenuDrawerContent(
             onClick = { onEvent(MainScreenEvent.ToggleBankingMode); onCloseDrawer() }
         )
 
-        val tableToggleText = if (uiState.showTable) "Hide Table" else "Show Table"
-        MenuItem(
-            text = tableToggleText,
-            onClick = { onEvent(MainScreenEvent.ToggleTable); onCloseDrawer() }
-        )
+        if(!uiState.isBankingMode) {
+            val tableToggleText = if (uiState.showTable) "Hide Table" else "Show Table"
+            MenuItem(
+                text = tableToggleText,
+                onClick = { onEvent(MainScreenEvent.ToggleTable); onCloseDrawer() }
+            )
+        }
+
         MenuItem(
             text = "Table Size",
             onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog); onCloseDrawer() }

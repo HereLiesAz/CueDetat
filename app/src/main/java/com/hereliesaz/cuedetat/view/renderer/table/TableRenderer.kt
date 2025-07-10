@@ -58,15 +58,18 @@ class TableRenderer {
 
             // Draw Diamond Grid
             val diamondGridPaint = paints.gridLinePaint
-            // Vertical lines (3 on each side of center)
+            val halfWidth = tablePlayingSurfaceWidth / 2
+            val halfHeight = tablePlayingSurfaceHeight / 2
+
+            // Vertical lines (connecting long rail diamonds)
             for (i in 1..3) {
-                val xOffset = tablePlayingSurfaceWidth * (i / 4.0f)
+                val xOffset = halfWidth * (i / 4.0f)
                 canvas.drawLine(canvasCenterX - xOffset, top, canvasCenterX - xOffset, bottom, diamondGridPaint)
                 canvas.drawLine(canvasCenterX + xOffset, top, canvasCenterX + xOffset, bottom, diamondGridPaint)
             }
-            // Horizontal lines (1 on each side of center)
+            // Horizontal lines (connecting short rail diamonds)
             for (i in 1..1) {
-                val yOffset = tablePlayingSurfaceHeight * (i / 2.0f)
+                val yOffset = halfHeight * (i / 2.0f)
                 canvas.drawLine(left, canvasCenterY - yOffset, right, canvasCenterY - yOffset, diamondGridPaint)
                 canvas.drawLine(left, canvasCenterY + yOffset, right, canvasCenterY + yOffset, diamondGridPaint)
             }

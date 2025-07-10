@@ -4,9 +4,7 @@ import android.graphics.Matrix
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.abs
-import kotlin.math.pow
 import kotlin.math.sin
-import kotlin.math.sqrt
 
 object DrawingUtils {
 
@@ -19,10 +17,11 @@ object DrawingUtils {
     ): PerspectiveRadiusInfo {
         if (!state.hasInverseMatrix) return PerspectiveRadiusInfo(logicalRadius, 0f)
 
-        val screenCenter = mapPoint(logicalCenter, state.pitchMatrix)
-        val logicalHorizontalEdge = PointF(logicalCenter.x + logicalRadius, logicalCenter.y)
-        val screenHorizontalEdge = mapPoint(logicalHorizontalEdge, state.pitchMatrix)
-        val radiusOnScreen = distance(screenCenter, screenHorizontalEdge)
+        // The righteous path: Use matrix.mapRadius to get an average scaled radius,
+        // which is robust against rotation and perspective distortion. This is the one true way.
+        val radiusOnScreen = state.pitchMatrix.mapRadius(logicalRadius)
+
+        // The lift remains a function of the on-screen radius and pitch angle.
         val lift = radiusOnScreen * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
         return PerspectiveRadiusInfo(radiusOnScreen, lift)
     }
@@ -33,6 +32,4 @@ object DrawingUtils {
         return PointF(arr[0], arr[1])
     }
 
-    fun distance(p1: PointF, p2: PointF): Float =
-        sqrt((p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2))
 }

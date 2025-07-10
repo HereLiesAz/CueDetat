@@ -20,6 +20,7 @@ class UpdateStateUseCase @Inject constructor() {
     operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
+        // --- Stage 1: Base Un-rotated Matrix for Stable Logic ---
         val basePitchMatrix = Perspective.createPitchMatrix(
             currentOrientation = state.currentOrientation,
             viewWidth = state.viewWidth,
@@ -28,11 +29,23 @@ class UpdateStateUseCase @Inject constructor() {
         )
         val baseInverseMatrix = Matrix().apply { basePitchMatrix.invert(this) }
 
+        // --- Stage 2: Calculate Logical Values in a Stable Coordinate System ---
         val logicalShotLineAnchor = getLogicalShotLineAnchor(state, baseInverseMatrix)
-        val unrotatedGhostBallCenter = unrotatePoint(state.protractorUnit.ghostCueBallCenter, state.protractorUnit.center, state.tableRotationDegrees)
+        val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= state.protractorUnit.ghostCueBallCenter.y
 
-        val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= unrotatedGhostBallCenter.y
+        val (isImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
+            shotAnchor = logicalShotLineAnchor,
+            ghostBall = state.protractorUnit.ghostCueBallCenter,
+            targetBall = state.protractorUnit.center
+        )
+        val targetBallDistance = calculateDistance(state, basePitchMatrix)
+        val (aimedPocketIndex, aimingLineEndPoint) = if (!state.isBankingMode) {
+            checkPocketAim(state)
+        } else {
+            Pair(null, null)
+        }
 
+        // --- Stage 3: Prepare Final Rotated Matrices for Rendering ---
         val finalPitchMatrix = Matrix(basePitchMatrix)
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
         val logicalTableShortSide = tableToBallRatioShort * referenceRadius
@@ -44,50 +57,25 @@ class UpdateStateUseCase @Inject constructor() {
             camera = camera,
             lift = railLiftAmount
         )
-
-        val centerX = state.viewWidth / 2f
-        val centerY = state.viewHeight / 2f
+        val finalInverseMatrix = Matrix()
 
         if (state.showTable) {
             val effectiveTableRotation = state.tableRotationDegrees % 360f
             if (effectiveTableRotation != 0f) {
+                val centerX = state.viewWidth / 2f
+                val centerY = state.viewHeight / 2f
                 finalPitchMatrix.preRotate(effectiveTableRotation, centerX, centerY)
                 finalRailPitchMatrix.preRotate(effectiveTableRotation, centerX, centerY)
             }
         }
-
-        val finalInverseMatrix = Matrix().apply { finalPitchMatrix.invert(this) }
-        val hasFinalInverse = !finalInverseMatrix.isIdentity
-
-        val screenSpaceShotLineAnchor = state.onPlaneBall?.let {
-            DrawingUtils.mapPoint(it.center, finalPitchMatrix)
-        } ?: PointF(state.viewWidth / 2f, state.viewHeight.toFloat())
-
-        val (isImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
-            shotAnchor = logicalShotLineAnchor,
-            ghostBall = unrotatedGhostBallCenter,
-            targetBall = state.protractorUnit.center.apply {
-                val p = unrotatePoint(this, state.protractorUnit.center, state.tableRotationDegrees)
-                x = p.x
-                y = p.y
-            }
-        )
-
-        val targetBallDistance = calculateDistance(state, basePitchMatrix)
-
-        val (aimedPocketIndex, aimingLineEndPoint) = if (!state.isBankingMode) {
-            checkPocketAim(state)
-        } else {
-            Pair(null, null)
-        }
-
+        val hasFinalInverse = finalPitchMatrix.invert(finalInverseMatrix)
 
         return state.copy(
             pitchMatrix = finalPitchMatrix,
             railPitchMatrix = finalRailPitchMatrix,
             inversePitchMatrix = finalInverseMatrix,
             hasInverseMatrix = hasFinalInverse,
-            shotLineAnchor = PointF(screenSpaceShotLineAnchor.x, screenSpaceShotLineAnchor.y),
+            shotLineAnchor = logicalShotLineAnchor, // State now holds the true logical anchor
             isImpossibleShot = isImpossible,
             isTiltBeyondLimit = isTiltBeyondLimit,
             tangentDirection = tangentDirection,
@@ -98,24 +86,12 @@ class UpdateStateUseCase @Inject constructor() {
     }
 
     private fun getLogicalShotLineAnchor(state: OverlayState, inverseMatrix: Matrix): PointF {
-        val screenAnchor = state.onPlaneBall?.let {
-            val arr = floatArrayOf(it.center.x, it.center.y)
-            Matrix().apply { state.pitchMatrix.invert(this) }.mapPoints(arr) // temp inverse to get screen point
-            PointF(arr[0], arr[1])
-        } ?: PointF(state.viewWidth / 2f, state.viewHeight.toFloat())
+        // If the on-plane ball exists, its logical center IS the anchor.
+        state.onPlaneBall?.let { return it.center }
 
+        // If not, calculate the anchor based on a point at the bottom of the screen.
+        val screenAnchor = PointF(state.viewWidth / 2f, state.viewHeight.toFloat())
         return Perspective.screenToLogical(screenAnchor, inverseMatrix)
-    }
-
-    private fun unrotatePoint(point: PointF, center: PointF, degrees: Float): PointF {
-        val angleRad = Math.toRadians(-degrees.toDouble())
-        val cosA = cos(angleRad).toFloat()
-        val sinA = sin(angleRad).toFloat()
-        val translatedX = point.x - center.x
-        val translatedY = point.y - center.y
-        val rotatedX = translatedX * cosA - translatedY * sinA
-        val rotatedY = translatedX * sinA + translatedY * cosA
-        return PointF(rotatedX + center.x, rotatedY + center.y)
     }
 
     private fun calculateShotPossibilityAndTangent(shotAnchor: PointF, ghostBall: PointF, targetBall: PointF): Pair<Boolean, Float> {
