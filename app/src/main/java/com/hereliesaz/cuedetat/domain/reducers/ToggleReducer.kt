@@ -31,7 +31,7 @@ class ToggleReducer @Inject constructor() {
             }
             is MainScreenEvent.ToggleCamera -> currentState.copy(isCameraVisible = !currentState.isCameraVisible)
             is MainScreenEvent.ToggleDistanceUnit -> currentState.copy(
-                distanceUnit = if (currentState.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.IMPERIAL,
+                distanceUnit = if (currentState.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC,
                 valuesChangedSinceReset = true
             )
             is MainScreenEvent.ToggleLuminanceDialog -> currentState.copy(showLuminanceDialog = !currentState.showLuminanceDialog)
@@ -47,13 +47,10 @@ class ToggleReducer @Inject constructor() {
         val newState = currentState.copy(showTable = newShowTable, valuesChangedSinceReset = true)
 
         return if (newShowTable && !newState.isBankingMode) {
-            // If table is now shown, reset positions to table-centric defaults.
             resetForTable(newState)
         } else if (!newShowTable && !newState.isBankingMode) {
-            // If table is hidden, revert to original screen-centric defaults.
             revertToOriginalDefaults(newState)
         } else {
-            // This case handles banking mode, which is unaffected by this specific toggle logic.
             newState
         }
     }
@@ -77,28 +74,23 @@ class ToggleReducer @Inject constructor() {
 
     private fun handleToggleOnPlaneBall(currentState: OverlayState): OverlayState {
         return if (currentState.onPlaneBall != null) {
-            // Hiding the ball: This logic remains sound. It remembers if the table was on.
             currentState.copy(
                 onPlaneBall = null,
                 showTable = if (currentState.showTable) false else currentState.showTable,
                 tableWasLastOnWithBall = currentState.showTable
             )
         } else {
-            // Showing the ball
-            if (currentState.showTable) { // If table is already visible...
-                // ...just reset the ball positions to the table layout.
+            if (currentState.showTable) {
                 resetForTable(currentState)
-            } else if (currentState.tableWasLastOnWithBall) { // If table was on when ball was last hidden...
-                // Restore ball and table together, then clear the flag
+            } else if (currentState.tableWasLastOnWithBall) {
                 resetForTable(currentState.copy(showTable = true, tableWasLastOnWithBall = false))
-            } else { // Otherwise, we are in a no-table state.
-                // Just show the ball at its screen-relative default.
+            } else {
                 val newRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, currentState.zoomSliderPosition)
                 val newCenter = PointF(currentState.viewWidth / 2f, (currentState.viewHeight / 2f + currentState.viewHeight) / 2f)
                 currentState.copy(
                     onPlaneBall = OnPlaneBall(center = newCenter, radius = newRadius),
                     valuesChangedSinceReset = true,
-                    tableWasLastOnWithBall = false // Ensure flag is clear
+                    tableWasLastOnWithBall = false
                 )
             }
         }
@@ -108,23 +100,12 @@ class ToggleReducer @Inject constructor() {
         val viewCenterX = currentState.viewWidth / 2f
         val viewCenterY = currentState.viewHeight / 2f
         val logicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, 0f)
-
-        // Target Ball is at the very center of the table (and the view).
         val targetBallCenter = PointF(viewCenterX, viewCenterY)
-
-        // --- THE FIX: Calculate cue ball position relative to table boundaries ---
-        // Added: Calculate table height to find the bottom rail position
         val tableToBallRatioLong = currentState.tableSize.getTableToBallRatioLong()
         val tableToBallRatioShort = tableToBallRatioLong / currentState.tableSize.aspectRatio
         val tablePlayingSurfaceHeight = tableToBallRatioShort * logicalRadius
         val bottomRailY = viewCenterY + tablePlayingSurfaceHeight / 2f
-
-        // Changed: Place the cue ball on the head spot (halfway between center and bottom rail)
         val actualCueBallCenter = PointF(viewCenterX, (viewCenterY + bottomRailY) / 2f)
-        // --- END FIX ---
-
-
-        // Set rotation to -90 to place Ghost Ball directly below Target Ball.
         val rotationDegrees = -90f
 
         return currentState.copy(
@@ -141,7 +122,7 @@ class ToggleReducer @Inject constructor() {
         val viewCenterY = currentState.viewHeight / 2f
         val bankingEnabled = !currentState.isBankingMode
         val newState = if (bankingEnabled) {
-            val bankingZoomSliderPos = 0f // Centered default
+            val bankingZoomSliderPos = 0f
             val newLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, bankingZoomSliderPos)
             val bankingBallCenter = PointF(viewCenterX, viewCenterY)
             val newBankingBall = OnPlaneBall(center = bankingBallCenter, radius = newLogicalRadius)
@@ -152,11 +133,11 @@ class ToggleReducer @Inject constructor() {
                 zoomSliderPosition = bankingZoomSliderPos, tableRotationDegrees = defaultTableRotation,
                 bankingAimTarget = initialAimTarget,
                 protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
-                showTable = true, // Always show table in banking mode
+                showTable = true,
                 warningText = null
             )
         } else {
-            val defaultSliderPos = 0f // Centered default
+            val defaultSliderPos = 0f
             val defaultLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, defaultSliderPos)
             currentState.copy(
                 isBankingMode = false, bankingAimTarget = null, onPlaneBall = null,

@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/ActionFabs.kt
+
 package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -14,6 +16,27 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
+
+@Composable
+fun ToggleSpinControlFab(
+    uiState: OverlayState,
+    onEvent: (MainScreenEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FloatingActionButton(
+        onClick = { onEvent(MainScreenEvent.ToggleSpinControl) },
+        modifier = modifier
+            .navigationBarsPadding(),
+        containerColor = if (uiState.isSpinControlVisible) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Text(
+            text = "Spin",
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (uiState.isSpinControlVisible) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
 
 @Composable
 fun ResetFab(
@@ -54,7 +77,6 @@ fun ToggleCueBallFab(
     FloatingActionButton(
         onClick = { onEvent(MainScreenEvent.ToggleOnPlaneBall) },
         modifier = modifier
-            .padding(16.dp)
             .navigationBarsPadding(),
         containerColor = if (uiState.onPlaneBall != null) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
     ) {

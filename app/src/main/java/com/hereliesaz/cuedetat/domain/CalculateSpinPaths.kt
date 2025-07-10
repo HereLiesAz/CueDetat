@@ -26,7 +26,6 @@ class CalculateSpinPaths @Inject constructor() {
         val targetPoint = state.protractorUnit.center
         val tangentDirection = state.tangentDirection
 
-        // Calculate tangent vector
         val dxToTarget = targetPoint.x - startPoint.x
         val dyToTarget = targetPoint.y - startPoint.y
         val magToTarget = hypot(dxToTarget.toDouble(), dyToTarget.toDouble()).toFloat()
@@ -35,7 +34,7 @@ class CalculateSpinPaths @Inject constructor() {
         val tangentDx = (-dyToTarget / magToTarget) * tangentDirection
         val tangentDy = (dxToTarget / magToTarget) * tangentDirection
 
-        val spinControlRadius = 50f * 2 // From SpinControl's size / 2 in dp, scaled for density
+        val spinControlRadius = 60f * 2 // From SpinControl's new size of 120dp
         val spinMagnitude = hypot((spinOffset.x - spinControlRadius).toDouble(), (spinOffset.y - spinControlRadius).toDouble()).toFloat() / spinControlRadius
         val spinAngle = atan2(spinOffset.y - spinControlRadius, spinOffset.x - spinControlRadius)
 
@@ -85,12 +84,27 @@ class CalculateSpinPaths @Inject constructor() {
         val distance = hypot((offset.x - radius).toDouble(), (offset.y - radius).toDouble()).toFloat()
         val normalizedDistance = (distance / radius).coerceIn(0f, 1f)
 
-        if (normalizedDistance < 0.1f) return Color.White
+        val colorStops = listOf(
+            0.0f to Color.White,
+            0.17f to RebelYellow,
+            0.34f to Color.Red,
+            0.51f to Color(0.5f, 0f, 1f), // Violet
+            0.68f to Color.Blue,
+            0.85f to Color.Green,
+            1.0f to Color.Green.copy(alpha = 0.7f)
+        )
 
-        return when {
-            normalizedDistance < 0.4f -> lerp(Color.White, RebelYellow, normalizedDistance / 0.4f)
-            normalizedDistance < 0.7f -> lerp(RebelYellow, WarningRed, (normalizedDistance - 0.4f) / 0.3f)
-            else -> lerp(WarningRed, Color.Blue, (normalizedDistance - 0.7f) / 0.3f)
+        if (normalizedDistance <= 0f) return colorStops.first().second
+        if (normalizedDistance >= 1f) return colorStops.last().second
+
+        for (i in 0 until colorStops.size - 1) {
+            val (stop1, color1) = colorStops[i]
+            val (stop2, color2) = colorStops[i + 1]
+            if (normalizedDistance in stop1..stop2) {
+                val fraction = (normalizedDistance - stop1) / (stop2 - stop1)
+                return lerp(color1, color2, fraction)
+            }
         }
+        return colorStops.last().second
     }
 }

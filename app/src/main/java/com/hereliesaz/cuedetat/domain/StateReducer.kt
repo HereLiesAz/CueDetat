@@ -63,6 +63,7 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.EndTutorial ->
                 tutorialReducer.reduce(currentState, event)
 
+            is MainScreenEvent.ToggleSpinControl,
             is MainScreenEvent.SpinApplied,
             is MainScreenEvent.SpinSelectionEnded,
             is MainScreenEvent.DragSpinControl,

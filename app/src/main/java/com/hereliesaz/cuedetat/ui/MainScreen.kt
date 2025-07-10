@@ -3,6 +3,8 @@
 package com.hereliesaz.cuedetat.ui
 
 import android.widget.Toast
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -22,6 +24,7 @@ import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
 import com.hereliesaz.cuedetat.view.state.ToastMessage
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -51,6 +54,21 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
+        val alphaAnimatable = remember { Animatable(1.0f) }
+        LaunchedEffect(uiState.lingeringSpinOffset) {
+            if (uiState.lingeringSpinOffset != null) {
+                alphaAnimatable.snapTo(1.0f) // Reset alpha for new linger
+                delay(5000L) // 5-second linger
+                alphaAnimatable.animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(durationMillis = 5000)
+                )
+                viewModel.onEvent(MainScreenEvent.ClearSpinState)
+            } else {
+                alphaAnimatable.snapTo(1.0f)
+            }
+        }
+
         ModalNavigationDrawer(
             drawerState = drawerState,
             gesturesEnabled = drawerState.isOpen,
@@ -68,7 +86,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 }
 
                 ProtractorOverlay(
-                    uiState = uiState,
+                    uiState = uiState.copy(spinPathsAlpha = alphaAnimatable.value), // Pass animated alpha
                     systemIsDark = useDarkTheme,
                     onEvent = viewModel::onEvent,
                     modifier = Modifier.fillMaxSize().zIndex(1f)
@@ -81,15 +99,14 @@ fun MainScreen(viewModel: MainViewModel) {
                     modifier = Modifier.zIndex(2f)
                 )
 
-                // The Righteous Fix for the Smart Cast Heresy
                 val spinControlCenter = uiState.spinControlCenter
-                if (!uiState.isBankingMode && spinControlCenter != null) {
+                if (!uiState.isBankingMode && uiState.isSpinControlVisible && spinControlCenter != null) {
                     SpinControl(
                         modifier = Modifier.zIndex(5f),
                         centerPosition = spinControlCenter,
                         selectedSpinOffset = uiState.selectedSpinOffset,
                         lingeringSpinOffset = uiState.lingeringSpinOffset,
-                        spinPathAlpha = uiState.spinPathsAlpha,
+                        spinPathAlpha = alphaAnimatable.value,
                         onEvent = viewModel::onEvent
                     )
                 }
@@ -99,9 +116,9 @@ fun MainScreen(viewModel: MainViewModel) {
                     onEvent = viewModel::onEvent,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .fillMaxHeight(0.6f) // Slider container is 60% of screen height
+                        .fillMaxHeight(0.6f)
                         .padding(end = 16.dp)
-                        .width(120.dp) // WIDENED FOR EASIER TOUCH INTERACTION
+                        .width(120.dp)
                         .zIndex(5f)
                 )
 
@@ -116,12 +133,20 @@ fun MainScreen(viewModel: MainViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     if (!uiState.isBankingMode) {
-                        ToggleCueBallFab(
-                            uiState = uiState,
-                            onEvent = { viewModel.onEvent(MainScreenEvent.ToggleOnPlaneBall) }
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            ToggleSpinControlFab(
+                                uiState = uiState,
+                                onEvent = { viewModel.onEvent(MainScreenEvent.ToggleSpinControl) }
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            ToggleCueBallFab(
+                                uiState = uiState,
+                                onEvent = { viewModel.onEvent(MainScreenEvent.ToggleOnPlaneBall) }
+                            )
+                        }
+
                     } else {
-                        Spacer(Modifier.size(40.dp)) // Mini FAB size is 40dp
+                        Spacer(Modifier.size(40.dp))
                     }
 
                     Box(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {

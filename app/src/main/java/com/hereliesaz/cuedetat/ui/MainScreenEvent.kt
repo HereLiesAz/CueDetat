@@ -19,6 +19,7 @@ sealed class MainScreenEvent {
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
 
     // Spin Control Events
+    object ToggleSpinControl : MainScreenEvent()
     data class SpinApplied(val offset: PointF) : MainScreenEvent()
     object SpinSelectionEnded : MainScreenEvent()
     data class DragSpinControl(val delta: PointF): MainScreenEvent()

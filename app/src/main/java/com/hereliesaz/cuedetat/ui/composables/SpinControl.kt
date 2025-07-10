@@ -48,7 +48,7 @@ fun SpinControl(
     ) {
         Canvas(
             modifier = Modifier
-                .size(100.dp)
+                .size(120.dp) // Size increased
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragStart = { offset ->
@@ -67,11 +67,15 @@ fun SpinControl(
             val radius = size.minDimension / 2f
             val center = Offset(radius, radius)
 
+            // Full spectrum color stops
             val colorStops = arrayOf(
                 0.0f to Color.White,
-                0.4f to RebelYellow.copy(alpha = 0.7f),
-                0.7f to WarningRed.copy(alpha = 0.8f),
-                1.0f to Color.Blue.copy(alpha = 0.9f)
+                0.17f to RebelYellow,
+                0.34f to Color.Red,
+                0.51f to Color(0.5f, 0f, 1f), // Violet
+                0.68f to Color.Blue,
+                0.85f to Color.Green,
+                1.0f to Color.Green.copy(alpha = 0.7f)
             )
 
             drawCircle(

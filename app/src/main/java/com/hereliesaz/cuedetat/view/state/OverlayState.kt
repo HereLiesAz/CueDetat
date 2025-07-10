@@ -19,7 +19,7 @@ enum class InteractionMode {
     MOVING_PROTRACTOR_UNIT,
     MOVING_ACTUAL_CUE_BALL,
     AIMING_BANK_SHOT,
-    MOVING_SPIN_CONTROL // New mode for dragging the spin control
+    MOVING_SPIN_CONTROL
 }
 
 enum class DistanceUnit {
@@ -38,9 +38,6 @@ enum class TableSize(val feet: Int, val aspectRatio: Float) {
         return entries[nextOrdinal]
     }
 
-    // Ratio of long side to cue ball diameter (standard is 2.25 inches)
-    // Example: 9ft (100") table / 2.25" ball = ~44.44
-    // We will use this to scale the logical table size based on the ball's logical radius
     fun getTableToBallRatioLong(): Float {
         return when (this) {
             SIX_FT -> 33f
@@ -62,7 +59,7 @@ data class OverlayState(
     val onPlaneBall: OnPlaneBall? = null,
 
     // UI control state
-    val zoomSliderPosition: Float = 0f, // Centered default
+    val zoomSliderPosition: Float = 0f,
     val areHelpersVisible: Boolean = false,
     val isMoreHelpVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
@@ -86,11 +83,12 @@ data class OverlayState(
     val showGlowStickDialog: Boolean = false,
 
     // Spin State
+    val isSpinControlVisible: Boolean = false,
     val selectedSpinOffset: PointF? = null,
     val spinPaths: Map<Color, List<PointF>> = emptyMap(),
-    val spinControlCenter: PointF? = null, // Initial position, updated by drag
-    val lingeringSpinOffset: PointF? = null, // For fade-out effect
-    val spinPathsAlpha: Float = 1.0f, // For fade-out animation
+    val spinControlCenter: PointF? = null,
+    val lingeringSpinOffset: PointF? = null,
+    val spinPathsAlpha: Float = 1.0f,
 
     // Tutorial State
     val showTutorialOverlay: Boolean = false,
@@ -111,22 +109,15 @@ data class OverlayState(
     val isTiltBeyondLimit: Boolean = false,
     val warningText: String? = null,
     val shotGuideImpactPoint: PointF? = null,
-
-    // Ghost mode banking state
     val aimingLineBankPath: List<PointF> = emptyList(),
-
-
-    // Pocket aiming state
     val aimedPocketIndex: Int? = null,
     val aimingLineEndPoint: PointF? = null,
-
 
     // Theming
     val appControlColorScheme: ColorScheme = darkColorScheme(),
 
     // Gesture State
     val interactionMode: InteractionMode = InteractionMode.NONE,
-
     val isMagnifierVisible: Boolean = false,
     val magnifierSourceCenter: Offset? = null,
 
