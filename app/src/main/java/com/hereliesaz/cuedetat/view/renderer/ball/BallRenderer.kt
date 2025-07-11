@@ -1,9 +1,12 @@
 package com.hereliesaz.cuedetat.view.renderer.ball
 
 import android.graphics.Canvas
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
+import com.hereliesaz.cuedetat.ui.theme.AcidPatina
+import com.hereliesaz.cuedetat.ui.theme.RebelYellow
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.ball.ActualCueBall
 import com.hereliesaz.cuedetat.view.config.ball.BankingBall
@@ -21,10 +24,6 @@ class BallRenderer {
 
     private val textRenderer = BallTextRenderer()
 
-    /**
-     * Main drawing method for all ball elements. It handles the different rendering passes
-     * for on-plane and ghosted/lifted elements.
-     */
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         if (state.isBankingMode) {
             state.onPlaneBall?.let { bankingBall ->
@@ -34,16 +33,28 @@ class BallRenderer {
             drawProtractorAndActual(canvas, state, paints)
         }
 
-        // Draw obstacle balls on the plane using the ghosted method
         state.obstacleBalls.forEach { obstacle ->
             drawGhostedBall(canvas, obstacle, ObstacleBall(), state, paints)
         }
 
-        // Draw CV-detected balls
-        state.visionData.balls.forEach { center ->
-            canvas.drawCircle(center.x, center.y, 15f, paints.cvResultPaint)
+        // Draw results from the generic ML Kit model (e.g., as blue outlines)
+        val genericPaint = Paint(paints.targetCirclePaint).apply {
+            color = AcidPatina.toArgb()
+            pathEffect = DashPathEffect(floatArrayOf(15f, 15f), 0f)
+            strokeWidth = 3f
+        }
+        state.visionData.genericBalls.forEach {
+            canvas.drawCircle(it.x, it.y, 25f, genericPaint)
         }
 
+        // Draw results from the custom TFLite model (e.g., as yellow outlines)
+        val customPaint = Paint(paints.targetCirclePaint).apply {
+            color = RebelYellow.toArgb()
+            strokeWidth = 4f
+        }
+        state.visionData.customBalls.forEach {
+            canvas.drawCircle(it.x, it.y, 25f, customPaint)
+        }
 
         if (state.areHelpersVisible) {
             drawAllLabels(canvas, state, paints, typeface)
@@ -69,12 +80,10 @@ class BallRenderer {
     }
 
     private fun drawGhostedBall(canvas: Canvas, ball: LogicalCircular, config: BallsConfig, state: OverlayState, paints: PaintCache) {
-        // Calculate the single source of truth for the ball's on-screen appearance.
         val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ball.center, ball.radius, state)
         val screenPos = DrawingUtils.mapPoint(ball.center, state.pitchMatrix)
         val yPosLifted = screenPos.y - radiusInfo.lift
 
-        // Configure paints based on the specific config object
         val strokePaint = Paint(paints.targetCirclePaint).apply {
             color = config.strokeColor.toArgb()
             strokeWidth = config.strokeWidth
@@ -86,24 +95,22 @@ class BallRenderer {
 
         val glowPaint = Paint(paints.ballGlowPaint).apply {
             strokeWidth = config.glowWidth
-            color = config.glowColor.toArgb() // Use color from config
+            color = config.glowColor.toArgb()
             alpha = (config.glowColor.alpha * 255).toInt()
         }
 
         val dotPaint = Paint(paints.fillPaint).apply { color = android.graphics.Color.WHITE }
         val dotRadius = ball.radius * 0.1f
 
-        // --- Draw on-plane shadow first, using its pure logical radius ---
+        // Draw on-plane shadow
         canvas.save()
         canvas.concat(state.pitchMatrix)
         canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, strokePaint)
-        canvas.drawCircle(ball.center.x, ball.center.y, dotRadius, dotPaint) // Draw the holy dot
+        canvas.drawCircle(ball.center.x, ball.center.y, dotRadius, dotPaint)
         canvas.restore()
 
-        // --- Then draw the lifted ghost effect ---
-        // Glow first
+        // Draw the lifted ghost effect
         canvas.drawCircle(screenPos.x, yPosLifted, radiusInfo.radius, glowPaint)
-        // Then the ball
         canvas.drawCircle(screenPos.x, yPosLifted, radiusInfo.radius, strokePaint)
 
         // Draw center shape
@@ -115,15 +122,13 @@ class BallRenderer {
             CenterShape.NONE -> {}
             CenterShape.DOT -> canvas.drawCircle(screenPos.x, yPosLifted, centerSize, centerPaint)
             CenterShape.CROSSHAIR -> {
-                val circleRadius = centerSize * 0.4f // Inner circle is 40% of the crosshair arm length
+                val circleRadius = centerSize * 0.4f
                 crosshairPaint.style = Paint.Style.STROKE
-                // Draw the central circle
                 canvas.drawCircle(screenPos.x, yPosLifted, circleRadius, crosshairPaint)
-                // Draw the four radiating lines
-                canvas.drawLine(screenPos.x + circleRadius, yPosLifted, screenPos.x + centerSize, yPosLifted, crosshairPaint) // Right
-                canvas.drawLine(screenPos.x - circleRadius, yPosLifted, screenPos.x - centerSize, yPosLifted, crosshairPaint) // Left
-                canvas.drawLine(screenPos.x, yPosLifted + circleRadius, screenPos.x, yPosLifted + centerSize, crosshairPaint) // Bottom
-                canvas.drawLine(screenPos.x, yPosLifted - circleRadius, screenPos.x, yPosLifted - centerSize, crosshairPaint) // Top
+                canvas.drawLine(screenPos.x + circleRadius, yPosLifted, screenPos.x + centerSize, yPosLifted, crosshairPaint)
+                canvas.drawLine(screenPos.x - circleRadius, yPosLifted, screenPos.x - centerSize, yPosLifted, crosshairPaint)
+                canvas.drawLine(screenPos.x, yPosLifted + circleRadius, screenPos.x, yPosLifted + centerSize, crosshairPaint)
+                canvas.drawLine(screenPos.x, yPosLifted - circleRadius, screenPos.x, yPosLifted - centerSize, crosshairPaint)
             }
         }
     }

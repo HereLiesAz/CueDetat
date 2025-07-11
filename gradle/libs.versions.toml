@@ -15,6 +15,7 @@ glanceAppwidget = "1.2.0-alpha01"
 hiltCompiler = "2.56.2"
 hiltNavigationCompose = "1.2.0"
 junit = "4.13.2"
+junitTest = "1.2.1"
 junitExt = "1.8.3"
 lifecycle = "2.9.1"
 lifecycleRuntimeCompose = "2.9.1"
@@ -24,6 +25,8 @@ material3Expressive = "1.0.0-alpha01"
 material3Version = "1.4.0-alpha17"
 materialIconsExtended = "1.7.8"
 multidex = "2.0.1"
+objectDetection = "17.0.2"
+objectDetectionCustom = "17.0.2"
 palette = "1.0.0"
 guava = "1.10.2"
 # Kotlin & Coroutines
@@ -49,6 +52,7 @@ tensorflowLiteTaskVision = "0.4.4"
 ui = "1.9.0-beta02"
 animationCore = "1.8.3"
 uiGraphics = "1.8.3"
+visionCommon = "17.3.0"
 
 [libraries]
 # AndroidX Core & UI
@@ -97,12 +101,14 @@ hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", v
 
 # Retrofit
 material3 = { module = "androidx.compose.material3:material3", version.ref = "material3Version" }
+object1-detection = { module = "com.google.mlkit:object-detection", version.ref = "objectDetection" }
+object1-detection-custom = { module = "com.google.mlkit:object-detection-custom", version.ref = "objectDetectionCustom" }
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
 converter-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
-androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitTest" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4", version.ref = "junitExt" }
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest", version.ref = "junitExt" }
@@ -112,7 +118,7 @@ androidx-palette = { group = "androidx.palette", name = "palette-ktx", version =
 compose-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "composeMaterial3" }
 androidx-animation-core = { group = "androidx.compose.animation", name = "animation-core", version.ref = "animationCore" }
 tensorflow-lite-task-vision = { module = "org.tensorflow:tensorflow-lite-task-vision", version.ref = "tensorflowLiteTaskVision" }
-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics", version.ref = "uiGraphics" }
+vision-common = { module = "com.google.mlkit:vision-common", version.ref = "visionCommon" }
 
 
 

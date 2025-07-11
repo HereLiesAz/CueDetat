@@ -1,6 +1,11 @@
 package com.hereliesaz.cuedetat.di
 
 import android.content.Context
+import com.google.mlkit.vision.detection.ObjectDetection
+import com.google.mlkit.vision.detection.ObjectDetector
+import com.google.mlkit.vision.detection.custom.CustomObjectDetectorOptions
+import com.google.mlkit.vision.detection.defaults.ObjectDetectorOptions
+import com.google.mlkit.vision.model.LocalModel
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.network.GithubApi
 import dagger.Module
@@ -8,9 +13,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import org.tensorflow.lite.task.vision.detector.ObjectDetector
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.io.IOException
 import javax.inject.Singleton
 
 @Module
@@ -35,13 +40,39 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideObjectDetector(@ApplicationContext context: Context): ObjectDetector {
-        // Configure the TFLite ObjectDetector
-        val options = ObjectDetector.ObjectDetectorOptions.builder()
-            .setMaxResults(15) // Max balls on a table
-            .setScoreThreshold(0.5f) // Confidence threshold
+    @GenericDetector
+    fun provideGenericObjectDetector(): ObjectDetector {
+        val options = ObjectDetectorOptions.Builder()
+            .setDetectorMode(ObjectDetectorOptions.STREAM_MODE)
+            .enableMultipleObjects()
+            .enableClassification()
             .build()
-        // Create the detector from the model file in the assets folder
-        return ObjectDetector.createFromFileAndOptions(context, "model.tflite", options)
+        return ObjectDetection.getClient(options)
+    }
+
+    @Provides
+    @Singleton
+    @CustomDetector
+    fun provideCustomObjectDetector(@ApplicationContext context: Context): ObjectDetector? {
+        val modelFile = "model.tflite"
+        val assetExists = try {
+            context.assets.open(modelFile).close(); true
+        } catch (e: IOException) {
+            false
+        }
+
+        return if (assetExists) {
+            val localModel = LocalModel.Builder().setAssetFilePath(modelFile).build()
+            val customOptions = CustomObjectDetectorOptions.Builder(localModel)
+                .setDetectorMode(CustomObjectDetectorOptions.STREAM_MODE)
+                .enableMultipleObjects()
+                .enableClassification()
+                .setClassificationConfidenceThreshold(0.5f)
+                .setMaxPerObjectLabelCount(3)
+                .build()
+            ObjectDetection.getClient(customOptions)
+        } else {
+            null // Return null if the custom model doesn't exist
+        }
     }
 }

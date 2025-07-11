@@ -165,7 +165,7 @@ android {
     }
 }
 dependencies {
-    implementation(libs.ui.graphics)
+    implementation(libs.androidx.ui.graphics)
     implementation(project(":opencv"))
     // CameraX core and required modules
     implementation(libs.androidx.camera.core)
@@ -177,7 +177,8 @@ dependencies {
     // The ImageAnalysis use case specifically
     implementation(libs.androidx.camera.video)
 
-
+    implementation(libs.object1.detection.custom)
+    implementation(libs.vision.common)
 
     // TensorFlow Lite Task Vision library for custom models
     implementation(libs.tensorflow.lite.task.vision)
@@ -185,6 +186,14 @@ dependencies {
     // Retrofit for GitHub API calls
     implementation(libs.retrofit)
     implementation(libs.converter.gson)
+
+    implementation(libs.object1.detection.custom)
+    implementation(libs.object1.detection)
+    implementation(libs.vision.common)
+
+    androidTestImplementation (libs.androidx.junit) // Or the latest version shown by Android Studio's lint
+    androidTestImplementation (libs.androidx.espresso.core)
+
 
 }
 
