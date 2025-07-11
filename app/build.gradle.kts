@@ -167,6 +167,15 @@ android {
 dependencies {
     implementation(libs.ui.graphics)
     implementation(project(":opencv"))
+    // CameraX core and required modules
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    val cameraxVersion = "1.4.2" // Use a recent stable version
+
+    // The ImageAnalysis use case specifically
+    implementation(libs.androidx.camera.video)
 }
 
 

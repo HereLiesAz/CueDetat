@@ -1,10 +1,10 @@
 // app/src/main/java/com/hereliesaz/cuedetat/ui/composables/CameraBackground.kt
 package com.hereliesaz.cuedetat.ui.composables
 
-import android.content.Context
 import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageAnalysis.*
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -16,8 +16,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.LifecycleOwner
 import com.hereliesaz.cuedetat.data.VisionAnalyzer
+import java.util.concurrent.Executors
 
 private const val TAG = "CameraBackground"
 
@@ -29,6 +29,7 @@ fun CameraBackground(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember { PreviewView(context) }
+    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
 
     DisposableEffect(lifecycleOwner, analyzer) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
@@ -43,9 +44,10 @@ fun CameraBackground(
                 }
 
                 val imageAnalysis = ImageAnalysis.Builder()
-                    .setBackpressureStrategy(androidx.camera.core.ImageAnalysis.STRATEGY_KEEP_LATEST)                    .build()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
                     .also {
-                        it.setAnalyzer(mainExecutor, analyzer)
+                        it.setAnalyzer(cameraExecutor, analyzer)
                     }
 
                 val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -69,6 +71,8 @@ fun CameraBackground(
                     Log.d(TAG, "Camera unbound on dispose.")
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to unbind camera on dispose", e)
+                } finally {
+                    cameraExecutor.shutdown()
                 }
             }, mainExecutor)
         }
