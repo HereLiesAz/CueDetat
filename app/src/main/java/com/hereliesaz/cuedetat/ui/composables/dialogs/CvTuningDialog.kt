@@ -1,0 +1,70 @@
+package com.hereliesaz.cuedetat.ui.composables.dialogs
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.view.state.OverlayState
+
+@Composable
+fun CvTuningDialog(
+    uiState: OverlayState,
+    onEvent: (MainScreenEvent) -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (uiState.showCvTuningDialog) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("CV Parameter Tuning", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+            text = {
+                Column {
+                    // HoughCircles Param 1
+                    Text("Hough P1 (Canny Edge): ${uiState.houghP1.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Slider(
+                        value = uiState.houghP1,
+                        onValueChange = { onEvent(MainScreenEvent.UpdateHoughP1(it)) },
+                        valueRange = 50f..250f
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // HoughCircles Param 2
+                    Text("Hough P2 (Accumulator): ${uiState.houghP2.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Slider(
+                        value = uiState.houghP2,
+                        onValueChange = { onEvent(MainScreenEvent.UpdateHoughP2(it)) },
+                        valueRange = 10f..100f
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Canny Threshold 1
+                    Text("Canny T1: ${uiState.cannyThreshold1.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Slider(
+                        value = uiState.cannyThreshold1,
+                        onValueChange = { onEvent(MainScreenEvent.UpdateCannyT1(it)) },
+                        valueRange = 10f..200f
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Canny Threshold 2
+                    Text("Canny T2: ${uiState.cannyThreshold2.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Slider(
+                        value = uiState.cannyThreshold2,
+                        onValueChange = { onEvent(MainScreenEvent.UpdateCannyT2(it)) },
+                        valueRange = 50f..300f
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = onDismiss) { Text("Done", color = MaterialTheme.colorScheme.primary) } }
+        )
+    }
+}

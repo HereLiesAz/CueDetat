@@ -1,22 +1,25 @@
 package com.hereliesaz.cuedetat.data
 
-import android.content.Context
+import android.annotation.SuppressLint
 import android.graphics.PointF
+import android.graphics.RectF
+import android.util.Log
 import androidx.camera.core.ImageProxy
-import dagger.hilt.android.qualifiers.ApplicationContext
+import com.google.mlkit.vision.common.InputImage
+import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.opencv.core.Core
 import org.opencv.core.Mat
 import org.opencv.core.Point
-import org.opencv.core.Scalar
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
+import org.tensorflow.lite.task.vision.detector.Detection
+import org.tensorflow.lite.task.vision.detector.ObjectDetector
+import java.nio.ByteBuffer
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.abs
 import kotlin.math.atan2
-import kotlin.math.roundToInt
 
 /**
  * Data class to hold the results of computer vision processing.
@@ -24,7 +27,7 @@ import kotlin.math.roundToInt
 data class VisionData(
     val tableCorners: List<PointF> = emptyList(),
     val balls: List<PointF> = emptyList(),
-    val detectedHsvColor: FloatArray? = null // HSV color detected automatically
+    val detectedHsvColor: FloatArray? = null
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -34,7 +37,7 @@ data class VisionData(
         if (balls != other.balls) return false
         if (detectedHsvColor != null && other.detectedHsvColor != null) {
             if (!detectedHsvColor.contentEquals(other.detectedHsvColor)) return false
-        } else if (detectedHsvColor != other.detectedHsvColor) return false
+        } else if (other.detectedHsvColor != null) return false
         return true
     }
 
@@ -48,161 +51,140 @@ data class VisionData(
 
 
 /**
- * Repository to handle computer vision tasks using OpenCV.
- * It processes camera frames to detect pool table geometry and ball positions.
+ * Repository to handle computer vision tasks using a hybrid TFLite and OpenCV approach.
  */
 @Singleton
 class VisionRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    private val detector: ObjectDetector
 ) {
 
     private val _visionDataFlow = MutableStateFlow(VisionData())
     val visionDataFlow = _visionDataFlow.asStateFlow()
 
-    @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
-    fun processImage(image: ImageProxy, expectedPixelRadius: Float, lockedHsvColor: FloatArray?) {
-        val yuvBytes = ByteArray(image.width * image.height * 3 / 2)
-        val yPlane = image.planes[0].buffer
-        val uPlane = image.planes[1].buffer
-        val vPlane = image.planes[2].buffer
+    @SuppressLint("UnsafeOptInUsageError")
+    fun processImage(imageProxy: ImageProxy, uiState: OverlayState) {
+        try {
+            val mediaImage = imageProxy.image ?: run { imageProxy.close(); return }
+            val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
 
-        yPlane.get(yuvBytes, 0, image.width * image.height)
-        vPlane.get(yuvBytes, image.width * image.height, image.width * image.height / 4)
-        uPlane.get(yuvBytes, image.width * image.height + image.width * image.height / 4, image.width * image.height / 4)
+            // --- TFLite Detection ---
+            val detectedObjects: List<Detection> = detector.detect(inputImage)
 
-        val yuvMat = Mat(image.height + image.height / 2, image.width, org.opencv.core.CvType.CV_8UC1)
-        yuvMat.put(0, 0, yuvBytes)
-        val rgbaMat = Mat()
-        Imgproc.cvtColor(yuvMat, rgbaMat, Imgproc.COLOR_YUV2RGBA_I420, 4)
+            // --- Mat conversion for OpenCV ---
+            val yBuffer: ByteBuffer = imageProxy.planes[0].buffer
+            val uBuffer: ByteBuffer = imageProxy.planes[1].buffer
+            val vBuffer: ByteBuffer = imageProxy.planes[2].buffer
+            val ySize: Int = yBuffer.remaining()
+            val uSize: Int = uBuffer.remaining()
+            val vSize: Int = vBuffer.remaining()
+            val nv21 = ByteArray(ySize + uSize + vSize)
+            yBuffer.get(nv21, 0, ySize)
+            vBuffer.get(nv21, ySize, vSize)
+            uBuffer.get(nv21, ySize + vSize, uSize)
+            val yuvMat = Mat(imageProxy.height + imageProxy.height / 2, imageProxy.width, org.opencv.core.CvType.CV_8UC1)
+            yuvMat.put(0, 0, nv21)
+            val rgbaMat = Mat()
+            Imgproc.cvtColor(yuvMat, rgbaMat, Imgproc.COLOR_YUV2RGBA_NV21, 4)
+            val rotatedRgbaMat = Mat()
+            Core.rotate(rgbaMat, rotatedRgbaMat, imageProxy.imageInfo.rotationDegrees.toCvRotateCode())
 
-        var rotatedRgbaMat = Mat()
-        when (image.imageInfo.rotationDegrees) {
-            90 -> Core.rotate(rgbaMat, rotatedRgbaMat, Core.ROTATE_90_CLOCKWISE)
-            180 -> Core.rotate(rgbaMat, rotatedRgbaMat, Core.ROTATE_180)
-            270 -> Core.rotate(rgbaMat, rotatedRgbaMat, Core.ROTATE_90_COUNTERCLOCKWISE)
-            else -> rotatedRgbaMat = rgbaMat
-        }
+            val refinedBalls = mutableListOf<PointF>()
+            val grayMat = Mat()
+            Imgproc.cvtColor(rotatedRgbaMat, grayMat, Imgproc.COLOR_RGBA2GRAY)
 
-        // --- Automatic Color Detection & Masking ---
-        val hsvMat = Mat()
-        Imgproc.cvtColor(rotatedRgbaMat, hsvMat, Imgproc.COLOR_RGBA2RGB)
-        Imgproc.cvtColor(hsvMat, hsvMat, Imgproc.COLOR_RGB2HSV)
-
-        val centerPixel = hsvMat.get(hsvMat.rows() / 2, hsvMat.cols() / 2)
-        val autoDetectedHsv = floatArrayOf(centerPixel[0].toFloat(), centerPixel[1].toFloat(), centerPixel[2].toFloat())
-
-        val targetHsv = lockedHsvColor ?: autoDetectedHsv
-
-        val h = targetHsv[0]; val s = targetHsv[1]; val v = targetHsv[2]
-        val h_tolerance = 15f; val s_tolerance = 75f; val v_tolerance = 75f
-
-        val lowerBound = Scalar((h - h_tolerance).toDouble(), (s - s_tolerance).toDouble(), (v - v_tolerance).toDouble())
-        val upperBound = Scalar((h + h_tolerance).toDouble(), (s + s_tolerance).toDouble(), (v + v_tolerance).toDouble())
-
-        val colorMask = Mat()
-        Core.inRange(hsvMat, lowerBound, upperBound, colorMask)
-
-        // --- Ball & Table Detection on Masked Image ---
-        val grayMat = Mat()
-        Imgproc.cvtColor(rotatedRgbaMat, grayMat, Imgproc.COLOR_RGBA2GRAY)
-        val maskedGray = Mat()
-        Core.bitwise_and(grayMat, colorMask, maskedGray)
-        Imgproc.GaussianBlur(maskedGray, maskedGray, Size(9.0, 9.0), 2.0, 2.0)
-
-        // Ball Detection
-        val circles = Mat()
-        val minRadius = (expectedPixelRadius * 0.50f).toInt().coerceAtLeast(10)
-        val maxRadius = (expectedPixelRadius * 1.50f).toInt().coerceAtLeast(20)
-
-        Imgproc.HoughCircles(
-            maskedGray, circles, Imgproc.HOUGH_GRADIENT, 1.0,
-            expectedPixelRadius.toDouble() * 2, 100.0, 30.0, minRadius, maxRadius
-        )
-
-        val detectedBalls = mutableListOf<PointF>()
-        for (i in 0 until circles.cols()) {
-            val circle = circles.get(0, i)
-            if (circle != null && circle.isNotEmpty()) {
-                val center = Point(circle[0].roundToInt().toDouble(), circle[1].roundToInt().toDouble())
-                detectedBalls.add(PointF(center.x.toFloat(), center.y.toFloat()))
+            for (obj in detectedObjects) {
+                val roiRect = obj.boundingBox.toOpenCvRect()
+                if (roiRect.x >= 0 && roiRect.y >= 0 && roiRect.x + roiRect.width <= grayMat.cols() && roiRect.y + roiRect.height <= grayMat.rows()) {
+                    val roi = Mat(grayMat, roiRect)
+                    val circles = Mat()
+                    // Run HoughCircles on the smaller ROI
+                    Imgproc.HoughCircles(
+                        roi, circles, Imgproc.HOUGH_GRADIENT, 1.0,
+                        roiRect.width.toDouble(),
+                        uiState.houghP1.toDouble(),
+                        uiState.houghP2.toDouble(),
+                        5,
+                        roiRect.width.coerceAtLeast(6)
+                    )
+                    if (!circles.empty()) {
+                        val circle = circles.get(0, 0)
+                        refinedBalls.add(PointF((circle[0] + roiRect.x).toFloat(), (circle[1] + roiRect.y).toFloat()))
+                    }
+                    roi.release()
+                    circles.release()
+                }
             }
+
+            // Table detection using Canny edge
+            val cannyEdges = Mat()
+            Imgproc.Canny(grayMat, cannyEdges, uiState.cannyThreshold1.toDouble(), uiState.cannyThreshold2.toDouble())
+            val lines = Mat()
+            Imgproc.HoughLinesP(cannyEdges, lines, 1.0, Math.PI / 180, 100, 100.0, 10.0)
+            val tableCorners = findTableCorners(lines, rotatedRgbaMat.size())
+
+            _visionDataFlow.value = VisionData(tableCorners = tableCorners, balls = refinedBalls)
+
+            // Release Mats
+            grayMat.release()
+            cannyEdges.release()
+            lines.release()
+            yuvMat.release()
+            rgbaMat.release()
+            rotatedRgbaMat.release()
+
+        } catch (e: Exception) {
+            Log.e("VisionRepository", "Error processing image with TFLite/OpenCV", e)
+        } finally {
+            imageProxy.close()
         }
-
-        // Table Detection
-        val cannyEdges = Mat()
-        Imgproc.Canny(maskedGray, cannyEdges, 50.0, 150.0)
-        val lines = Mat()
-        Imgproc.HoughLinesP(cannyEdges, lines, 1.0, Math.PI / 180, 100, 100.0, 10.0)
-
-        val tableCorners = findTableCorners(lines, rotatedRgbaMat.size())
-
-        _visionDataFlow.value = VisionData(
-            tableCorners = tableCorners,
-            balls = detectedBalls + tableCorners,
-            detectedHsvColor = autoDetectedHsv
-        )
-
-        // Release Mats
-        yuvMat.release()
-        rgbaMat.release()
-        rotatedRgbaMat.release()
-        grayMat.release()
-        maskedGray.release()
-        hsvMat.release()
-        colorMask.release()
-        circles.release()
-        cannyEdges.release()
-        lines.release()
-
-        image.close()
     }
 
     private fun findTableCorners(lines: Mat, imageSize: Size): List<PointF> {
         if (lines.empty()) return emptyList()
-
         var top: DoubleArray? = null
         var bottom: DoubleArray? = null
         var left: DoubleArray? = null
         var right: DoubleArray? = null
-
         for (i in 0 until lines.rows()) {
             val line = lines.get(i, 0)
             val x1 = line[0]; val y1 = line[1]; val x2 = line[2]; val y2 = line[3]
             val angle = atan2(y2 - y1, x2 - x1) * 180 / Math.PI
-
-            if (abs(angle) < 20 || abs(angle - 180) < 20) { // Horizontal
+            if (kotlin.math.abs(angle) < 20 || kotlin.math.abs(angle - 180) < 20) { // Horizontal
                 if (top == null || y1 < top[1]) top = line
                 if (bottom == null || y1 > bottom[1]) bottom = line
-            } else if (abs(angle - 90) < 20 || abs(angle + 90) < 20) { // Vertical
+            } else if (kotlin.math.abs(angle - 90) < 20 || kotlin.math.abs(angle + 90) < 20) { // Vertical
                 if (left == null || x1 < left[0]) left = line
                 if (right == null || x1 > right[0]) right = line
             }
         }
-
         if (top == null || bottom == null || left == null || right == null) return emptyList()
-
         val corners = mutableListOf<PointF>()
         corners.add(lineIntersection(left, top) ?: PointF(0f, 0f))
         corners.add(lineIntersection(right, top) ?: PointF(0f, 0f))
         corners.add(lineIntersection(right, bottom) ?: PointF(0f, 0f))
         corners.add(lineIntersection(left, bottom) ?: PointF(0f, 0f))
-
         return corners
     }
 
     private fun lineIntersection(line1: DoubleArray, line2: DoubleArray): PointF? {
         val x1 = line1[0]; val y1 = line1[1]; val x2 = line1[2]; val y2 = line1[3]
         val x3 = line2[0]; val y3 = line2[1]; val x4 = line2[2]; val y4 = line2[3]
-
         val den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
         if (den == 0.0) return null
-
         val t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den
-        val u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den
-
         val intersectX = x1 + t * (x2 - x1)
         val intersectY = y1 + t * (y2 - y1)
-
         return PointF(intersectX.toFloat(), intersectY.toFloat())
+    }
+
+    private fun Int.toCvRotateCode(): Int = when (this) {
+        90 -> Core.ROTATE_90_CLOCKWISE
+        180 -> Core.ROTATE_180
+        270 -> Core.ROTATE_90_COUNTERCLOCKWISE
+        else -> -1
+    }
+
+    private fun RectF.toOpenCvRect(): org.opencv.core.Rect {
+        return org.opencv.core.Rect(this.left.toInt(), this.top.toInt(), this.width().toInt(), this.height().toInt())
     }
 }

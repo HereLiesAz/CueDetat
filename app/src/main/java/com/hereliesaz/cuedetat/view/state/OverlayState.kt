@@ -108,6 +108,11 @@ data class OverlayState(
     // CV Data
     val visionData: VisionData = VisionData(),
     val lockedHsvColor: FloatArray? = null,
+    val showCvTuningDialog: Boolean = false,
+    val houghP1: Float = 100f,
+    val houghP2: Float = 20f,
+    val cannyThreshold1: Float = 50f,
+    val cannyThreshold2: Float = 150f,
 
     // Derived state
     val shotLineAnchor: PointF = PointF(0f, 0f),
@@ -191,6 +196,11 @@ data class OverlayState(
             if (other.lockedHsvColor == null) return false
             if (!lockedHsvColor.contentEquals(other.lockedHsvColor)) return false
         } else if (other.lockedHsvColor != null) return false
+        if (showCvTuningDialog != other.showCvTuningDialog) return false
+        if (houghP1 != other.houghP1) return false
+        if (houghP2 != other.houghP2) return false
+        if (cannyThreshold1 != other.cannyThreshold1) return false
+        if (cannyThreshold2 != other.cannyThreshold2) return false
         if (shotLineAnchor != other.shotLineAnchor) return false
         if (tangentDirection != other.tangentDirection) return false
         if (isImpossibleShot != other.isImpossibleShot) return false
@@ -255,6 +265,11 @@ data class OverlayState(
         result = 31 * result + hasInverseMatrix.hashCode()
         result = 31 * result + visionData.hashCode()
         result = 31 * result + (lockedHsvColor?.contentHashCode() ?: 0)
+        result = 31 * result + showCvTuningDialog.hashCode()
+        result = 31 * result + houghP1.hashCode()
+        result = 31 * result + houghP2.hashCode()
+        result = 31 * result + cannyThreshold1.hashCode()
+        result = 31 * result + cannyThreshold2.hashCode()
         result = 31 * result + shotLineAnchor.hashCode()
         result = 31 * result + tangentDirection.hashCode()
         result = 31 * result + isImpossibleShot.hashCode()

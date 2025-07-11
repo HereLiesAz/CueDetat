@@ -15,6 +15,10 @@ class UserPreferencesRepository @Inject constructor(@ApplicationContext context:
     companion object {
         private const val KEY_DISTANCE_UNIT = "distance_unit"
         private const val KEY_TABLE_SIZE = "table_size"
+        private const val KEY_CV_HOUGH_P1 = "cv_hough_p1"
+        private const val KEY_CV_HOUGH_P2 = "cv_hough_p2"
+        private const val KEY_CV_CANNY_T1 = "cv_canny_t1"
+        private const val KEY_CV_CANNY_T2 = "cv_canny_t2"
     }
 
     fun getDistanceUnit(): DistanceUnit {
@@ -43,4 +47,16 @@ class UserPreferencesRepository @Inject constructor(@ApplicationContext context:
     fun setTableSize(size: TableSize) {
         prefs.edit().putString(KEY_TABLE_SIZE, size.name).apply()
     }
+
+    fun getCvHoughP1(): Float = prefs.getFloat(KEY_CV_HOUGH_P1, 100f)
+    fun setCvHoughP1(value: Float) = prefs.edit().putFloat(KEY_CV_HOUGH_P1, value).apply()
+
+    fun getCvHoughP2(): Float = prefs.getFloat(KEY_CV_HOUGH_P2, 20f)
+    fun setCvHoughP2(value: Float) = prefs.edit().putFloat(KEY_CV_HOUGH_P2, value).apply()
+
+    fun getCvCannyT1(): Float = prefs.getFloat(KEY_CV_CANNY_T1, 50f)
+    fun setCvCannyT1(value: Float) = prefs.edit().putFloat(KEY_CV_CANNY_T1, value).apply()
+
+    fun getCvCannyT2(): Float = prefs.getFloat(KEY_CV_CANNY_T2, 150f)
+    fun setCvCannyT2(value: Float) = prefs.edit().putFloat(KEY_CV_CANNY_T2, value).apply()
 }

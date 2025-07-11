@@ -18,7 +18,8 @@ class StateReducer @Inject constructor(
     private val tutorialReducer: TutorialReducer,
     private val spinReducer: SpinReducer,
     private val obstacleReducer: ObstacleReducer,
-    private val cvReducer: CvReducer
+    private val cvReducer: CvReducer,
+    private val cvControlReducer: CvControlReducer
 ) {
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         // Delegate to the appropriate specialized reducer based on the event type.
@@ -78,6 +79,13 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.CvDataUpdated,
             is MainScreenEvent.LockOrUnlockColor ->
                 cvReducer.reduce(currentState, event)
+
+            is MainScreenEvent.ToggleCvTuningDialog,
+            is MainScreenEvent.UpdateHoughP1,
+            is MainScreenEvent.UpdateHoughP2,
+            is MainScreenEvent.UpdateCannyT1,
+            is MainScreenEvent.UpdateCannyT2 ->
+                cvControlReducer.reduce(currentState, event)
 
             else -> currentState
         }

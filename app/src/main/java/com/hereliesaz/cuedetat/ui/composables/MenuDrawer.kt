@@ -124,6 +124,11 @@ fun MenuDrawerContent(
             onClick = { onEvent(MainScreenEvent.ToggleGlowStickDialog); onCloseDrawer() }
         )
 
+        MenuItem(
+            text = "CV Tuning",
+            onClick = { onEvent(MainScreenEvent.ToggleCvTuningDialog); onCloseDrawer() }
+        )
+
         MenuDivider()
 
         MenuItem(

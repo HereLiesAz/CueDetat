@@ -58,7 +58,11 @@ class MainViewModel @Inject constructor(
         OverlayState(
             appControlColorScheme = darkColorScheme(),
             distanceUnit = userPreferencesRepository.getDistanceUnit(),
-            tableSize = userPreferencesRepository.getTableSize()
+            tableSize = userPreferencesRepository.getTableSize(),
+            houghP1 = userPreferencesRepository.getCvHoughP1(),
+            houghP2 = userPreferencesRepository.getCvHoughP2(),
+            cannyThreshold1 = userPreferencesRepository.getCvCannyT1(),
+            cannyThreshold2 = userPreferencesRepository.getCvCannyT2()
         )
     )
     val uiState = _uiState.asStateFlow()
@@ -77,6 +81,9 @@ class MainViewModel @Inject constructor(
         visionRepository.visionDataFlow
             .onEach { visionData -> onEvent(MainScreenEvent.CvDataUpdated(visionData)) }
             .launchIn(viewModelScope)
+
+        // Pass the initial state to the analyzer
+        visionAnalyzer.updateUiState(_uiState.value)
 
         fetchLatestVersionName()
     }
@@ -102,10 +109,17 @@ class MainViewModel @Inject constructor(
                 userPreferencesRepository.setTableSize(newSize)
                 updateState(event)
             }
+            // Persist CV param changes
+            is MainScreenEvent.UpdateHoughP1 -> userPreferencesRepository.setCvHoughP1(event.value)
+            is MainScreenEvent.UpdateHoughP2 -> userPreferencesRepository.setCvHoughP2(event.value)
+            is MainScreenEvent.UpdateCannyT1 -> userPreferencesRepository.setCvCannyT1(event.value)
+            is MainScreenEvent.UpdateCannyT2 -> userPreferencesRepository.setCvCannyT2(event.value)
+
             else -> {
-                updateState(event)
+                // For all other events, just proceed to update the state
             }
         }
+        updateState(event) // Update state for all events, including the ones handled above
     }
 
     private fun fetchLatestVersionName() {
@@ -176,14 +190,7 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        val expectedRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
-            logicalCenter = finalState.protractorUnit.center,
-            logicalRadius = finalState.protractorUnit.radius,
-            state = finalState
-        )
-        visionAnalyzer.updateExpectedRadius(expectedRadiusInfo.radius)
-        visionAnalyzer.updateLockedHsvColor(finalState.lockedHsvColor)
-
+        visionAnalyzer.updateUiState(finalState)
         _uiState.value = finalState
     }
 }

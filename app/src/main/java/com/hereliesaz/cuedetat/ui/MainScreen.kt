@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.cuedetat.ui.composables.*
+import com.hereliesaz.cuedetat.ui.composables.dialogs.CvTuningDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.GlowStickDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.LuminanceAdjustmentDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.TableSizeSelectionDialog
@@ -215,6 +216,12 @@ fun MainScreen(viewModel: MainViewModel) {
                     uiState = uiState,
                     onEvent = viewModel::onEvent,
                     onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleTableSizeDialog) }
+                )
+
+                CvTuningDialog(
+                    uiState = uiState,
+                    onEvent = viewModel::onEvent,
+                    onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleCvTuningDialog) }
                 )
 
                 TutorialOverlay(

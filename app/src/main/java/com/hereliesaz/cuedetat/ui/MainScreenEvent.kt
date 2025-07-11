@@ -58,6 +58,12 @@ sealed class MainScreenEvent {
     // CV Events
     data class CvDataUpdated(val data: VisionData) : MainScreenEvent()
     object LockOrUnlockColor : MainScreenEvent()
+    object ToggleCvTuningDialog : MainScreenEvent()
+    data class UpdateHoughP1(val value: Float) : MainScreenEvent()
+    data class UpdateHoughP2(val value: Float) : MainScreenEvent()
+    data class UpdateCannyT1(val value: Float) : MainScreenEvent()
+    data class UpdateCannyT2(val value: Float) : MainScreenEvent()
+
 
     // Tutorial Events
     object StartTutorial : MainScreenEvent()

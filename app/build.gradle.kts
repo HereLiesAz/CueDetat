@@ -176,6 +176,16 @@ dependencies {
 
     // The ImageAnalysis use case specifically
     implementation(libs.androidx.camera.video)
+
+
+
+    // TensorFlow Lite Task Vision library for custom models
+    implementation(libs.tensorflow.lite.task.vision)
+
+    // Retrofit for GitHub API calls
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
+
 }
 
 
