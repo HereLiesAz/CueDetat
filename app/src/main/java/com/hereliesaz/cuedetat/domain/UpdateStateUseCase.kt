@@ -6,7 +6,9 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.data.FullOrientation
+import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.Perspective
+import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.renderer.table.TableRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -25,6 +27,42 @@ class UpdateStateUseCase @Inject constructor(
     operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
+        // --- Ball Snapping Logic ---
+        val detectedBalls = state.visionData.genericBalls + state.visionData.customBalls
+        val allLogicalBalls = (listOfNotNull(state.onPlaneBall, state.protractorUnit) + state.obstacleBalls).map { it.center }
+        val remainingDetectedBalls = detectedBalls.filterNot { detected ->
+            allLogicalBalls.any { logical ->
+                hypot((logical.x - detected.x).toDouble(), (logical.y - detected.y).toDouble()) < (state.protractorUnit.radius * 2)
+            }
+        }
+
+        var updatedProtractorUnit = state.protractorUnit
+        var updatedOnPlaneBall = state.onPlaneBall
+        var updatedBankingBall = if (state.isBankingMode) state.onPlaneBall else null
+
+        if (detectedBalls.isNotEmpty()) {
+            val targetBallSnapPoint = detectedBalls.getOrNull(0)
+            val cueBallSnapPoint = detectedBalls.getOrNull(1)
+
+            if (targetBallSnapPoint != null) {
+                updatedProtractorUnit = state.protractorUnit.copy(center = targetBallSnapPoint)
+            }
+
+            if (cueBallSnapPoint != null) {
+                updatedOnPlaneBall = state.onPlaneBall?.copy(center = cueBallSnapPoint)
+                if (state.isBankingMode) {
+                    updatedBankingBall = updatedOnPlaneBall
+                }
+            }
+        }
+
+        val updatedStateWithSnapping = state.copy(
+            protractorUnit = updatedProtractorUnit,
+            onPlaneBall = updatedOnPlaneBall
+        )
+        // --- End Ball Snapping Logic ---
+
+
         val basePitchMatrix = Perspective.createPitchMatrix(
             currentOrientation = state.currentOrientation,
             viewWidth = state.viewWidth,
@@ -40,33 +78,33 @@ class UpdateStateUseCase @Inject constructor(
             camera = camera
         )
 
-        val logicalShotLineAnchor = getLogicalShotLineAnchor(state, baseInverseMatrix)
-        val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= state.protractorUnit.ghostCueBallCenter.y
+        val logicalShotLineAnchor = getLogicalShotLineAnchor(updatedStateWithSnapping, baseInverseMatrix)
+        val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= updatedStateWithSnapping.protractorUnit.ghostCueBallCenter.y
 
         val (isShotImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
             shotAnchor = logicalShotLineAnchor,
-            ghostBall = state.protractorUnit.ghostCueBallCenter,
-            targetBall = state.protractorUnit.center
+            ghostBall = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter,
+            targetBall = updatedStateWithSnapping.protractorUnit.center
         )
 
         // New obstruction check
-        val isObstructed = checkForObstructions(state)
+        val isObstructed = checkForObstructions(updatedStateWithSnapping)
         val isImpossible = isShotImpossible || isObstructed
 
-        val targetBallDistance = calculateDistance(state, flatMatrix)
+        val targetBallDistance = calculateDistance(updatedStateWithSnapping, flatMatrix)
         var (aimedPocketIndex, aimingLineEndPoint) = if (!state.isBankingMode) {
-            checkPocketAim(state)
+            checkPocketAim(updatedStateWithSnapping)
         } else {
             Pair(null, null)
         }
         val shotGuideImpactPoint = if (state.showTable && !state.isBankingMode) {
-            calculateShotGuideImpact(state, useShotGuideLine = true)
+            calculateShotGuideImpact(updatedStateWithSnapping, useShotGuideLine = true)
         } else {
             null
         }
 
         var aimingLineBankPath = if (state.showTable && !state.isBankingMode) {
-            calculateSingleBank(state.protractorUnit.ghostCueBallCenter, state.protractorUnit.center, state)
+            calculateSingleBank(updatedStateWithSnapping.protractorUnit.ghostCueBallCenter, updatedStateWithSnapping.protractorUnit.center, updatedStateWithSnapping)
         } else {
             emptyList()
         }
@@ -74,7 +112,7 @@ class UpdateStateUseCase @Inject constructor(
         if(aimingLineBankPath.size > 2) {
             val (bankedPocketIndex, intersectionPoint) = checkBankedPocketAim(
                 listOf(aimingLineBankPath[1], aimingLineBankPath[2]),
-                state
+                updatedStateWithSnapping
             )
             if (bankedPocketIndex != null && intersectionPoint != null) {
                 aimedPocketIndex = bankedPocketIndex
@@ -83,18 +121,18 @@ class UpdateStateUseCase @Inject constructor(
         }
 
         val tangentLineBankPath = if (state.showTable && !state.isBankingMode) {
-            val tangentStart = state.protractorUnit.ghostCueBallCenter
+            val tangentStart = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter
             val tangentTarget = PointF(
-                tangentStart.x - (state.protractorUnit.center.y - tangentStart.y) * tangentDirection,
-                tangentStart.y + (state.protractorUnit.center.x - tangentStart.x) * tangentDirection
+                tangentStart.x - (updatedStateWithSnapping.protractorUnit.center.y - tangentStart.y) * tangentDirection,
+                tangentStart.y + (updatedStateWithSnapping.protractorUnit.center.x - tangentStart.x) * tangentDirection
             )
-            calculateSingleBank(tangentStart, tangentTarget, state)
+            calculateSingleBank(tangentStart, tangentTarget, updatedStateWithSnapping)
         } else {
             emptyList()
         }
 
         val finalPitchMatrix = Matrix(basePitchMatrix)
-        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
+        val referenceRadius = updatedStateWithSnapping.onPlaneBall?.radius ?: updatedStateWithSnapping.protractorUnit.radius
         val logicalTableShortSide = tableToBallRatioShort * referenceRadius
         val baseRailLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
         val railLiftAmount = baseRailLiftAmount * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
@@ -119,16 +157,15 @@ class UpdateStateUseCase @Inject constructor(
         val hasFinalInverse = finalPitchMatrix.invert(finalInverseMatrix)
 
         val spinPaths = if (!state.isBankingMode) {
-            calculateSpinPaths(state)
+            calculateSpinPaths(updatedStateWithSnapping)
         } else {
             emptyMap()
         }
 
-        return state.copy(
+        return updatedStateWithSnapping.copy(
             pitchMatrix = finalPitchMatrix,
             railPitchMatrix = finalRailPitchMatrix,
             inversePitchMatrix = finalInverseMatrix,
-            flatMatrix = flatMatrix,
             hasInverseMatrix = hasFinalInverse,
             shotLineAnchor = logicalShotLineAnchor,
             isImpossibleShot = isImpossible,

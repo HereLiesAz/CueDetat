@@ -19,6 +19,7 @@ import com.hereliesaz.cuedetat.view.model.LogicalCircular
 import com.hereliesaz.cuedetat.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import kotlin.math.hypot
 
 class BallRenderer {
 
@@ -37,24 +38,27 @@ class BallRenderer {
             drawGhostedBall(canvas, obstacle, ObstacleBall(), state, paints)
         }
 
-        // Draw results from the generic ML Kit model (e.g., as blue outlines)
-        val genericPaint = Paint(paints.targetCirclePaint).apply {
-            color = AcidPatina.toArgb()
-            pathEffect = DashPathEffect(floatArrayOf(10f, 10f), 0f)
-            strokeWidth = 3f
-        }
-        state.visionData.genericBalls.forEach {
-            canvas.drawCircle(it.x, it.y, 25f, genericPaint)
+        // --- Visual Distinction for Snapped Balls ---
+        val detectedBalls = state.visionData.genericBalls + state.visionData.customBalls
+        val snappedPaint = Paint(paints.targetCirclePaint).apply {
+            color = RebelYellow.toArgb()
+            style = Paint.Style.FILL
+            alpha = 150
         }
 
-        // Draw results from the custom TFLite model (e.g., as yellow outlines)
-        val customPaint = Paint(paints.targetCirclePaint).apply {
-            color = RebelYellow.toArgb()
-            strokeWidth = 4f
+        val allLogicalBalls = (listOfNotNull(state.onPlaneBall, state.protractorUnit) + state.obstacleBalls)
+        allLogicalBalls.forEach { logicalBall ->
+            val isSnapped = detectedBalls.any { detected ->
+                hypot((logicalBall.center.x - detected.x).toDouble(), (logicalBall.center.y - detected.y).toDouble()) < 5.0 // 5px tolerance
+            }
+            if (isSnapped) {
+                canvas.save()
+                canvas.concat(state.pitchMatrix)
+                canvas.drawCircle(logicalBall.center.x, logicalBall.center.y, logicalBall.radius * 0.5f, snappedPaint)
+                canvas.restore()
+            }
         }
-        state.visionData.customBalls.forEach {
-            canvas.drawCircle(it.x, it.y, 25f, customPaint)
-        }
+        // --- End Visual Distinction ---
 
         if (state.areHelpersVisible) {
             drawAllLabels(canvas, state, paints, typeface)

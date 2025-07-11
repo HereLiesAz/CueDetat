@@ -49,11 +49,7 @@ fun MenuDrawerContent(
         }
         MenuDivider()
 
-        // Section: Core Controls
-        MenuItem(
-            text = "Reset View",
-            onClick = { onEvent(MainScreenEvent.Reset); onCloseDrawer() }
-        )
+        // Section 1: Core Controls
         val bankingModeToggleText = if (uiState.isBankingMode) "Ghost Ball Aiming" else "Calculate Bank"
         MenuItem(
             text = bankingModeToggleText,
@@ -65,15 +61,22 @@ fun MenuDrawerContent(
                 text = cueBallToggleText,
                 onClick = { onEvent(MainScreenEvent.ToggleOnPlaneBall); onCloseDrawer() }
             )
+        }
+        val cameraToggleText = if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On"
+        MenuItem(
+            text = cameraToggleText,
+            onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
+        )
+        MenuDivider()
+
+        // Section 2: Table & Unit Settings
+        if (!uiState.isBankingMode) {
             val tableToggleText = if (uiState.showTable) "Hide Table" else "Show Table"
             MenuItem(
                 text = tableToggleText,
                 onClick = { onEvent(MainScreenEvent.ToggleTable); onCloseDrawer() }
             )
         }
-        MenuDivider()
-
-        // Section: Settings & Appearance
         MenuItem(
             text = "Table Size",
             onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog); onCloseDrawer() }
@@ -83,11 +86,10 @@ fun MenuDrawerContent(
             text = distanceUnitToggleText,
             onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit); onCloseDrawer() }
         )
-        val cameraToggleText = if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On"
-        MenuItem(
-            text = cameraToggleText,
-            onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
-        )
+        MenuDivider()
+
+
+        // Section 3: Appearance
         val systemIsCurrentlyDark = isSystemInDarkTheme()
         val themeToggleText = when (uiState.isForceLightMode) {
             true -> "Embrace the Darkness"
@@ -108,19 +110,7 @@ fun MenuDrawerContent(
         )
         MenuDivider()
 
-        // Section: Developer
-        MenuItem(
-            text = "Too Advanced Options",
-            onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog); onCloseDrawer() }
-        )
-        val modelToggleText = if (uiState.useCustomModel) "Use Generic AI" else "Use Custom AI"
-        MenuItem(
-            text = modelToggleText,
-            onClick = { onEvent(MainScreenEvent.ToggleCvModel); onCloseDrawer() }
-        )
-        MenuDivider()
-
-        // Section: Help & Info
+        // Section 4: Help & Info
         MenuItem(
             text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
             onClick = { onEvent(MainScreenEvent.ToggleHelp); onCloseDrawer() }
@@ -129,6 +119,9 @@ fun MenuDrawerContent(
             text = "Show Tutorial",
             onClick = { onEvent(MainScreenEvent.StartTutorial); onCloseDrawer() }
         )
+        MenuDivider()
+
+        // Section 5: Meta
         MenuItem(
             text = "Check for Updates",
             onClick = { onEvent(MainScreenEvent.CheckForUpdate); onCloseDrawer() })
@@ -138,6 +131,13 @@ fun MenuDrawerContent(
         MenuItem(
             text = "Chalk Your Tip",
             onClick = { onEvent(MainScreenEvent.ShowDonationOptions); onCloseDrawer() })
+        MenuDivider()
+
+        // Section 6: Developer
+        MenuItem(
+            text = "Too Advanced Options",
+            onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog); onCloseDrawer() }
+        )
         Spacer(modifier = Modifier.height(12.dp))
     }
 }

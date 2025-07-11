@@ -30,6 +30,15 @@ fun AdvancedOptionsDialog(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
             text = {
                 Column {
+                    // CV Model Toggle
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Active AI Model:", modifier = Modifier.weight(1f))
+                        TextButton(onClick = { onEvent(MainScreenEvent.ToggleCvModel) }) {
+                            Text(if (uiState.useCustomModel) "Custom" else "Generic")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     // Refinement Method Toggle
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Refinement:", modifier = Modifier.weight(1f))
