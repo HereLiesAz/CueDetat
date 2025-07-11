@@ -6,7 +6,7 @@ import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
 
 data class ObstacleBall(
-    override val label: String = "O",
+    override val label: String = "Obstacle Ball",
     override val opacity: Float = 1.0f,
     override val glowWidth: Float = 12f,
     override val glowColor: Color = MutedMaroon.copy(alpha = 0.5f),

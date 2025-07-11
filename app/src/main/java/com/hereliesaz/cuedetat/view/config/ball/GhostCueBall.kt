@@ -7,7 +7,7 @@ import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
 
 data class GhostCueBall(
-    override val label: String = "G",
+    override val label: String = "Ghost Cue Ball",
     override val opacity: Float = 1.0f,
     override val glowWidth: Float = 12f,
     override val glowColor: Color = Color.White.copy(alpha = 0.5f),

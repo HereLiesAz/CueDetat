@@ -32,7 +32,7 @@ fun LockColorFab(
         containerColor = if (isColorLocked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
     ) {
         Text(
-            text = if (isColorLocked) "Unlock\nColor" else "Lock\nColor",
+            text = "Felt\nColor",
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.labelSmall,
             color = if (isColorLocked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
@@ -74,20 +74,12 @@ fun ResetFab(
             .navigationBarsPadding(),
         containerColor = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
     ) {
-        if (uiState.areHelpersVisible) {
-            Text(
-                text = "Reset\nView",
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_undo_24),
-                contentDescription = "Reset View",
-                tint = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Text(
+            text = "Reset\nView",
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -121,20 +113,12 @@ fun ToggleCueBallFab(
         modifier = modifier.navigationBarsPadding(),
         containerColor = if (uiState.onPlaneBall != null) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
     ) {
-        if (uiState.areHelpersVisible) {
-            Text(
-                text = "Cue Ball\nToggle",
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (uiState.onPlaneBall != null) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_jump_shot),
-                contentDescription = "Toggle Actual Cue Ball",
-                tint = if (uiState.onPlaneBall != null) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Text(
+            text = "Cue Ball\nToggle",
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (uiState.onPlaneBall != null) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

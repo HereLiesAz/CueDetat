@@ -55,7 +55,14 @@ class LineTextRenderer {
 
         // Shot Guide Line Label - Anchored to Ghost Ball
         val shotLineAngle = Math.toDegrees(atan2((state.protractorUnit.ghostCueBallCenter.y - state.shotLineAnchor.y).toDouble(), (state.protractorUnit.ghostCueBallCenter.x - state.shotLineAnchor.x).toDouble()).toDouble()).toFloat()
-        draw(canvas, "Shot Guide Line", state.protractorUnit.ghostCueBallCenter, shotLineAngle, state.protractorUnit.radius * 2.5f * zoomFactor, 0f, textPaint)
+        // The distance multiplier has been increased from 2.5f to 4.0f.
+        draw(canvas, "Shot Guide Line", state.protractorUnit.ghostCueBallCenter, shotLineAngle, state.protractorUnit.radius * 4.0f * zoomFactor, 0f, textPaint)
+
+        // Tangent Line Labels - Drawn on both sides
+        val tangentBaseAngle = shotLineAngle + 90f
+        val tangentDistance = state.protractorUnit.radius * 3.0f * zoomFactor
+        draw(canvas, "Tangent Line", state.protractorUnit.ghostCueBallCenter, tangentBaseAngle + (90 * state.tangentDirection), tangentDistance, 0f, textPaint)
+        draw(canvas, "Tangent Line", state.protractorUnit.ghostCueBallCenter, tangentBaseAngle - (90 * state.tangentDirection), tangentDistance, 0f, textPaint)
     }
 
 
