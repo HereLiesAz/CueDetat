@@ -8,13 +8,12 @@ import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.hypot
-import kotlin.math.sin
+import kotlin.math.*
 
 @Singleton
-class CalculateSpinPaths @Inject constructor() {
+class CalculateSpinPaths @Inject constructor(
+    private val reducerUtils: ReducerUtils
+) {
     private val maxPathLengthFactor = 20f
 
     operator fun invoke(state: OverlayState): Map<Color, List<PointF>> {
@@ -30,7 +29,14 @@ class CalculateSpinPaths @Inject constructor() {
 
         val path = calculatePathForSpin(state, angleDegrees, spinMagnitude)
         val color = SpinColorUtils.getColorFromAngleAndDistance(angleDegrees, spinMagnitude)
-        return mapOf(color to path)
+
+        val finalPath = if (state.showTable) {
+            bankCurve(path, state)
+        } else {
+            path
+        }
+
+        return mapOf(color to finalPath)
     }
 
     private fun calculatePathForSpin(state: OverlayState, angleDegrees: Float, magnitude: Float): List<PointF> {
@@ -48,7 +54,7 @@ class CalculateSpinPaths @Inject constructor() {
 
         val spinAngle = Math.toRadians(angleDegrees.toDouble()).toFloat()
         val maxCurveOffset = state.protractorUnit.radius * 2.5f
-        val curveAmount = magnitude * magnitude
+        val curveAmount = magnitude * magnitude * maxCurveOffset
 
         val controlPoint1 = PointF(
             startPoint.x + tangentDx * (maxPathLengthFactor * state.protractorUnit.radius * 0.33f),
@@ -68,7 +74,36 @@ class CalculateSpinPaths @Inject constructor() {
         return generateBezierCurve(startPoint, controlPoint1, controlPoint2, endPoint)
     }
 
-    private fun generateBezierCurve(p0: PointF, p1: PointF, p2: PointF, p3: PointF, numPoints: Int = 20): List<PointF> {
+    private fun bankCurve(path: List<PointF>, state: OverlayState): List<PointF> {
+        if (path.size < 2) return path
+
+        for (i in 0 until path.size - 1) {
+            val p1 = path[i]
+            val p2 = path[i + 1]
+            val intersectionResult = reducerUtils.findRailIntersectionAndNormal(p1, p2, state)
+
+            if (intersectionResult != null) {
+                val (intersectionPoint, railNormal) = intersectionResult
+                val truncatedPath = path.subList(0, i + 1).toMutableList()
+                truncatedPath.add(intersectionPoint)
+
+                val incidentVector = PointF(p2.x - p1.x, p2.y - p1.y)
+                val reflectedVector = reducerUtils.reflect(incidentVector, railNormal)
+
+                val extendedEndPoint = PointF(
+                    intersectionPoint.x + reflectedVector.x * 5000f,
+                    intersectionPoint.y + reflectedVector.y * 5000f
+                )
+                truncatedPath.add(extendedEndPoint)
+
+                return truncatedPath
+            }
+        }
+        return path
+    }
+
+
+    private fun generateBezierCurve(p0: PointF, p1: PointF, p2: PointF, p3: PointF, numPoints: Int = 30): List<PointF> {
         val curve = mutableListOf<PointF>()
         for (i in 0..numPoints) {
             val t = i.toFloat() / numPoints

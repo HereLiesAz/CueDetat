@@ -5,7 +5,6 @@ package com.hereliesaz.cuedetat.ui
 import android.app.Application
 import android.graphics.Camera
 import android.graphics.PointF
-import android.util.Log
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
@@ -15,7 +14,6 @@ import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.domain.CalculateBankShot
-import com.hereliesaz.cuedetat.domain.CalculateSpinPaths
 import com.hereliesaz.cuedetat.domain.StateReducer
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.view.model.Perspective
@@ -23,7 +21,6 @@ import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SingleEvent
-import com.hereliesaz.cuedetat.view.state.TableSize
 import com.hereliesaz.cuedetat.view.state.ToastMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +29,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.math.hypot
 
 private const val GESTURE_TAG = "GestureDebug"
 
@@ -44,7 +40,6 @@ class MainViewModel @Inject constructor(
     application: Application,
     private val updateStateUseCase: UpdateStateUseCase,
     private val calculateBankShotUseCase: CalculateBankShot,
-    private val calculateSpinPathsUseCase: CalculateSpinPaths,
     private val stateReducer: StateReducer
 ) : ViewModel() {
 
@@ -119,7 +114,6 @@ class MainViewModel @Inject constructor(
                 val logicalCurr = Perspective.screenToLogical(event.currentPosition, currentState.inversePitchMatrix)
                 val screenDelta = Offset(event.currentPosition.x - event.previousPosition.x, event.currentPosition.y - event.previousPosition.y)
 
-                // THE FIX: This interaction mode is now correctly handled by the GestureReducer
                 if (currentState.interactionMode == InteractionMode.MOVING_SPIN_CONTROL) {
                     return onEvent(MainScreenEvent.DragSpinControl(PointF(screenDelta.x, screenDelta.y)))
                 }
@@ -144,16 +138,6 @@ class MainViewModel @Inject constructor(
             else -> event
         }
 
-        if (logicalEvent is MainScreenEvent.AimBankShot) {
-            val stateFromReducer = stateReducer.reduce(currentState, logicalEvent)
-            val bankShotResult = calculateBankShotUseCase(stateFromReducer)
-            _uiState.value = stateFromReducer.copy(
-                bankShotPath = bankShotResult.path,
-                pocketedBankShotPocketIndex = bankShotResult.pocketedPocketIndex
-            )
-            return
-        }
-
         val stateFromReducer = stateReducer.reduce(currentState, logicalEvent)
         var derivedState = updateStateUseCase(stateFromReducer, graphicsCamera)
 
@@ -163,8 +147,6 @@ class MainViewModel @Inject constructor(
                 bankShotPath = bankShotResult.path,
                 pocketedBankShotPocketIndex = bankShotResult.pocketedPocketIndex
             )
-        } else if (derivedState.selectedSpinOffset == null && derivedState.lingeringSpinOffset == null) {
-            derivedState = derivedState.copy(spinPaths = emptyMap())
         }
 
         var finalState = derivedState

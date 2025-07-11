@@ -4,6 +4,8 @@ import android.graphics.PointF
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -16,6 +18,7 @@ data class BankShotResult(
 class CalculateBankShot @Inject constructor() {
 
     private val maxBounces = 4 // Up to 4 rails
+    private val spinThrowConstant = 0.3f // How much spin affects the rebound angle
 
     operator fun invoke(state: OverlayState): BankShotResult {
         if (!state.isBankingMode || state.onPlaneBall == null || state.bankingAimTarget == null) {
@@ -53,6 +56,8 @@ class CalculateBankShot @Inject constructor() {
 
         val pathInCalcSpace = mutableListOf(currentPos)
         var pocketedIndex: Int? = null
+
+        val spinOffset = state.selectedSpinOffset ?: state.lingeringSpinOffset
 
         for (i in 0 until maxBounces) {
             var t = Float.MAX_VALUE
@@ -96,7 +101,7 @@ class CalculateBankShot @Inject constructor() {
 
             pathInCalcSpace.add(nextPos)
             currentPos = nextPos
-            direction = reflect(direction, wallNormal)
+            direction = reflectWithSpin(direction, wallNormal, spinOffset)
         }
 
         val finalPath = pathInCalcSpace.map {
@@ -106,13 +111,41 @@ class CalculateBankShot @Inject constructor() {
         return BankShotResult(finalPath, pocketedIndex)
     }
 
+    private fun reflectWithSpin(v: PointF, n: PointF, spinOffset: PointF?): PointF {
+        val standardReflection = reflect(v, n)
+        if (spinOffset == null) {
+            return standardReflection
+        }
+
+        val spinControlRadius = 60f * 2
+        val spinControlCenter = PointF(spinControlRadius, spinControlRadius)
+        val relativeSpin = PointF(spinOffset.x - spinControlCenter.x, spinOffset.y - spinControlCenter.y)
+
+        // Project spin onto the vector perpendicular to the direction of travel
+        // This isolates the "sidespin" component.
+        val vNormalized = v.normalized()
+        val spinPerp = PointF(-vNormalized.y, vNormalized.x) // Perpendicular to velocity
+        val sideSpinFactor = (relativeSpin.dot(spinPerp)) / spinControlRadius
+
+        // The "throw" vector is parallel to the rail (perpendicular to the normal)
+        val throwVector = PointF(-n.y, n.x)
+
+        // Apply the throw, scaled by the sidespin factor and a constant
+        val finalVector = PointF(
+            standardReflection.x + throwVector.x * sideSpinFactor * spinThrowConstant,
+            standardReflection.y + throwVector.y * sideSpinFactor * spinThrowConstant
+        )
+
+        return finalVector.normalized()
+    }
+
     private fun reflect(v: PointF, n: PointF): PointF {
         val dot = v.x * n.x + v.y * n.y
         return PointF(v.x - 2 * dot * n.x, v.y - 2 * dot * n.y)
     }
 
     private fun PointF.normalized(): PointF {
-        val mag = sqrt(x * x + y * y)
+        val mag = hypot(x.toDouble(), y.toDouble()).toFloat()
         return if (mag != 0f) PointF(x / mag, y / mag) else PointF(0f, 0f)
     }
 

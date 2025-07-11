@@ -14,7 +14,8 @@ import javax.inject.Inject
 import kotlin.math.*
 
 class UpdateStateUseCase @Inject constructor(
-    private val calculateSpinPaths: CalculateSpinPaths
+    private val calculateSpinPaths: CalculateSpinPaths,
+    private val reducerUtils: ReducerUtils
 ) {
 
     private val tableToBallRatioShort = 44f
@@ -42,11 +43,16 @@ class UpdateStateUseCase @Inject constructor(
         val logicalShotLineAnchor = getLogicalShotLineAnchor(state, baseInverseMatrix)
         val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= state.protractorUnit.ghostCueBallCenter.y
 
-        val (isImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
+        val (isShotImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
             shotAnchor = logicalShotLineAnchor,
             ghostBall = state.protractorUnit.ghostCueBallCenter,
             targetBall = state.protractorUnit.center
         )
+
+        // New obstruction check
+        val isObstructed = checkForObstructions(state)
+        val isImpossible = isShotImpossible || isObstructed
+
         val targetBallDistance = calculateDistance(state, flatMatrix)
         var (aimedPocketIndex, aimingLineEndPoint) = if (!state.isBankingMode) {
             checkPocketAim(state)
@@ -76,7 +82,6 @@ class UpdateStateUseCase @Inject constructor(
             }
         }
 
-        // --- NEW: Calculate Banked Tangent Line ---
         val tangentLineBankPath = if (state.showTable && !state.isBankingMode) {
             val tangentStart = state.protractorUnit.ghostCueBallCenter
             val tangentTarget = PointF(
@@ -87,7 +92,6 @@ class UpdateStateUseCase @Inject constructor(
         } else {
             emptyList()
         }
-        // --- END NEW ---
 
         val finalPitchMatrix = Matrix(basePitchMatrix)
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
@@ -237,94 +241,59 @@ class UpdateStateUseCase @Inject constructor(
         val dirX = p2.x - p1.x
         val dirY = p2.y - p1.y
 
-        return findRailIntersection(p1, dirX, dirY, state)
+        return reducerUtils.findRailIntersectionAndNormal(p1, PointF(p1.x + dirX, p1.y + dirY), state)?.first
     }
 
     private fun calculateSingleBank(start: PointF, end: PointF, state: OverlayState): List<PointF> {
-        val dirX = end.x - start.x
-        val dirY = end.y - start.y
-        val intersection = findRailIntersection(start, dirX, dirY, state) ?: return emptyList()
+        val intersectionResult = reducerUtils.findRailIntersectionAndNormal(start, end, state) ?: return emptyList()
+        val (intersectionPoint, railNormal) = intersectionResult
 
-        val reflectedDir = reflect(PointF(dirX, dirY), intersection, state)
-        val reflectedEnd = findRailIntersection(intersection, reflectedDir.x, reflectedDir.y, state) ?: intersection
+        val incidentVector = PointF(end.x - start.x, end.y - start.y)
+        val reflectedDir = reducerUtils.reflect(incidentVector, railNormal)
+        val reflectedEnd = reducerUtils.findRailIntersectionAndNormal(intersectionPoint, PointF(intersectionPoint.x + reflectedDir.x, intersectionPoint.y + reflectedDir.y), state)?.first ?: intersectionPoint
 
-        return listOf(start, intersection, reflectedEnd)
+        return listOf(start, intersectionPoint, reflectedEnd)
     }
 
-    private fun findRailIntersection(startPoint: PointF, dirX: Float, dirY: Float, state: OverlayState): PointF? {
-        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
-        if (referenceRadius <= 0) return null
+    private fun checkForObstructions(state: OverlayState): Boolean {
+        if (state.obstacleBalls.isEmpty()) return false
 
-        val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
-        val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
-        val tableWidth = tableToBallRatioLong * referenceRadius
-        val tableHeight = tableToBallRatioShort * referenceRadius
+        val ballRadius = state.protractorUnit.radius
+        val collisionDistance = ballRadius * 2
 
-        val halfW = tableWidth / 2f
-        val halfH = tableHeight / 2f
-        val canvasCenterX = state.viewWidth / 2f
-        val canvasCenterY = state.viewHeight / 2f
-
-        val left = canvasCenterX - halfW
-        val top = canvasCenterY - halfH
-        val right = canvasCenterX + halfW
-        val bottom = canvasCenterY + halfH
-
-        var t = Float.MAX_VALUE
-        if (dirX != 0f) {
-            val tLeft = (left - startPoint.x) / dirX
-            val tRight = (right - startPoint.x) / dirX
-            if (tLeft > 0.001f && tLeft < t) t = tLeft
-            if (tRight > 0.001f && tRight < t) t = tRight
-        }
-        if (dirY != 0f) {
-            val tTop = (top - startPoint.y) / dirY
-            val tBottom = (bottom - startPoint.y) / dirY
-            if (tTop > 0.001f && tTop < t) t = tTop
-            if (tBottom > 0.001f && tBottom < t) t = tBottom
+        // Path 1: Cue Ball to Ghost Ball (Shot Guide Line)
+        val shotLineStart = state.shotLineAnchor
+        val shotLineEnd = state.protractorUnit.ghostCueBallCenter
+        for (obstacle in state.obstacleBalls) {
+            if (isSegmentObstructed(shotLineStart, shotLineEnd, obstacle.center, collisionDistance)) {
+                return true
+            }
         }
 
-        return if (t != Float.MAX_VALUE) {
-            PointF(startPoint.x + t * dirX, startPoint.y + t * dirY)
-        } else {
-            null
+        // Path 2: Ghost Ball to Target Ball (Aiming Line)
+        val aimingLineStart = state.protractorUnit.ghostCueBallCenter
+        val aimingLineEnd = state.protractorUnit.center
+        for (obstacle in state.obstacleBalls) {
+            if (isSegmentObstructed(aimingLineStart, aimingLineEnd, obstacle.center, collisionDistance)) {
+                return true
+            }
         }
+
+        return false
     }
 
-    private fun reflect(v: PointF, p: PointF, state: OverlayState): PointF {
-        val n = getRailNormal(p, state) ?: PointF(0f, 0f)
-        val dot = v.x * n.x + v.y * n.y
-        return PointF(v.x - 2 * dot * n.x, v.y - 2 * dot * n.y)
-    }
+    private fun isSegmentObstructed(p1: PointF, p2: PointF, center: PointF, minDist: Float): Boolean {
+        val l2 = (p2.x - p1.x).pow(2) + (p2.y - p1.y).pow(2)
+        if (l2 == 0f) return false // Line segment has zero length
 
-    private fun getRailNormal(point: PointF, state: OverlayState): PointF? {
-        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
-        if (referenceRadius <= 0) return null
+        // Project center point onto the line
+        var t = ((center.x - p1.x) * (p2.x - p1.x) + (center.y - p1.y) * (p2.y - p1.y)) / l2
+        t = t.coerceIn(0f, 1f) // Clamp projection to the segment
 
-        val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
-        val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
-        val tableWidth = tableToBallRatioLong * referenceRadius
-        val tableHeight = tableToBallRatioShort * referenceRadius
+        val projection = PointF(p1.x + t * (p2.x - p1.x), p1.y + t * (p2.y - p1.y))
+        val dist = hypot((center.x - projection.x).toDouble(), (center.y - projection.y).toDouble()).toFloat()
 
-        val halfW = tableWidth / 2f
-        val halfH = tableHeight / 2f
-        val canvasCenterX = state.viewWidth / 2f
-        val canvasCenterY = state.viewHeight / 2f
-
-        val left = canvasCenterX - halfW
-        val top = canvasCenterY - halfH
-        val right = canvasCenterX + halfW
-        val bottom = canvasCenterY + halfH
-
-        val tolerance = 5f
-
-        return when {
-            abs(point.y - top) < tolerance -> PointF(0f, 1f)
-            abs(point.y - bottom) < tolerance -> PointF(0f, -1f)
-            abs(point.x - left) < tolerance -> PointF(1f, 0f)
-            abs(point.x - right) < tolerance -> PointF(-1f, 0f)
-            else -> null
-        }
+        return dist < minDist
     }
 
     private fun linePointDistance(p1: PointF, p2: PointF, p: PointF): Float {

@@ -19,7 +19,8 @@ enum class InteractionMode {
     MOVING_PROTRACTOR_UNIT,
     MOVING_ACTUAL_CUE_BALL,
     AIMING_BANK_SHOT,
-    MOVING_SPIN_CONTROL
+    MOVING_SPIN_CONTROL,
+    MOVING_OBSTACLE_BALL // New mode
 }
 
 enum class DistanceUnit {
@@ -57,6 +58,7 @@ data class OverlayState(
     // Core logical model
     val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), 1f, 0f),
     val onPlaneBall: OnPlaneBall? = null,
+    val obstacleBalls: List<OnPlaneBall> = emptyList(), // New list for obstacles
 
     // UI control state
     val zoomSliderPosition: Float = 0f,
@@ -110,7 +112,7 @@ data class OverlayState(
     val warningText: String? = null,
     val shotGuideImpactPoint: PointF? = null,
     val aimingLineBankPath: List<PointF> = emptyList(),
-    val tangentLineBankPath: List<PointF> = emptyList(), // Added for banked tangent line
+    val tangentLineBankPath: List<PointF> = emptyList(),
     val aimedPocketIndex: Int? = null,
     val aimingLineEndPoint: PointF? = null,
 
@@ -119,6 +121,7 @@ data class OverlayState(
 
     // Gesture State
     val interactionMode: InteractionMode = InteractionMode.NONE,
+    val movingObstacleBallIndex: Int? = null, // New state to track which ball is being moved
     val isMagnifierVisible: Boolean = false,
     val magnifierSourceCenter: Offset? = null,
 

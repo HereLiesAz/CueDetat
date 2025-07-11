@@ -2,6 +2,8 @@
 
 package com.hereliesaz.cuedetat.ui.composables
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.FloatingActionButton
@@ -9,6 +11,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -69,6 +72,25 @@ fun ResetFab(
 }
 
 @Composable
+fun AddObstacleBallFab(
+    onEvent: (MainScreenEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FloatingActionButton(
+        onClick = { onEvent(MainScreenEvent.AddObstacleBall) },
+        modifier = modifier.navigationBarsPadding(),
+        containerColor = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Text(
+            text = "Add\nBall",
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
 fun ToggleCueBallFab(
     uiState: OverlayState,
     onEvent: (MainScreenEvent) -> Unit,
@@ -76,8 +98,7 @@ fun ToggleCueBallFab(
 ) {
     FloatingActionButton(
         onClick = { onEvent(MainScreenEvent.ToggleOnPlaneBall) },
-        modifier = modifier
-            .navigationBarsPadding(),
+        modifier = modifier.navigationBarsPadding(),
         containerColor = if (uiState.onPlaneBall != null) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
     ) {
         if (uiState.areHelpersVisible) {

@@ -28,6 +28,7 @@ class GestureReducer @Inject constructor() {
                 Log.d(GESTURE_TAG, "REDUCER: GestureEnded. Resetting interaction mode.")
                 currentState.copy(
                     interactionMode = InteractionMode.NONE,
+                    movingObstacleBallIndex = null, // Clear moving obstacle index
                     isMagnifierVisible = false,
                     magnifierSourceCenter = null
                 )
@@ -43,14 +44,27 @@ class GestureReducer @Inject constructor() {
         val logicalPoint = event.logicalPoint
         val screenPoint = PointF(event.screenOffset.x, event.screenOffset.y)
         var newMode = InteractionMode.NONE
+        var movingBallIndex: Int? = null
 
-        // THE FIX: Check for spin control interaction first, as it exists in screen space.
+        // Priority 1: Check for interaction with spin control
         currentState.spinControlCenter?.let {
-            val spinControlScreenRadius = 100f // Effective radius in screen pixels (50dp * density, roughly)
+            val spinControlScreenRadius = 100f
             if (distance(screenPoint, it) < spinControlScreenRadius) {
                 newMode = InteractionMode.MOVING_SPIN_CONTROL
             }
         }
+
+        // Priority 2: Check for interaction with obstacle balls
+        if (newMode == InteractionMode.NONE) {
+            for ((index, ball) in currentState.obstacleBalls.withIndex()) {
+                if (distance(logicalPoint, ball.center) < ball.radius) {
+                    newMode = InteractionMode.MOVING_OBSTACLE_BALL
+                    movingBallIndex = index
+                    break
+                }
+            }
+        }
+
 
         if (newMode == InteractionMode.NONE) {
             if (currentState.isBankingMode) {
@@ -84,9 +98,10 @@ class GestureReducer @Inject constructor() {
 
         Log.d(GESTURE_TAG, "REDUCER: GestureStarted. Determined Mode: $newMode")
 
-        val showMagnifier = newMode == InteractionMode.MOVING_ACTUAL_CUE_BALL || newMode == InteractionMode.MOVING_PROTRACTOR_UNIT
+        val showMagnifier = newMode == InteractionMode.MOVING_ACTUAL_CUE_BALL || newMode == InteractionMode.MOVING_PROTRACTOR_UNIT || newMode == InteractionMode.MOVING_OBSTACLE_BALL
         return currentState.copy(
             interactionMode = newMode,
+            movingObstacleBallIndex = movingBallIndex,
             warningText = null,
             isMagnifierVisible = showMagnifier,
             magnifierSourceCenter = if (showMagnifier) event.screenOffset else null
@@ -146,6 +161,24 @@ class GestureReducer @Inject constructor() {
                     val newCenter = PointF(newCenterX, newCenterY)
                     Log.d(GESTURE_TAG, "REDUCER: MOVING_ACTUAL_CUE_BALL to $newCenter")
                     stateWithUpdatedMagnifier.copy(onPlaneBall = it.copy(center = newCenter), valuesChangedSinceReset = true)
+                } ?: stateWithUpdatedMagnifier
+            }
+            InteractionMode.MOVING_OBSTACLE_BALL -> {
+                stateWithUpdatedMagnifier.movingObstacleBallIndex?.let { index ->
+                    val ballToMove = stateWithUpdatedMagnifier.obstacleBalls[index]
+                    var newCenterX = ballToMove.center.x + logicalDelta.x
+                    var newCenterY = ballToMove.center.y + logicalDelta.y
+
+                    if (stateWithUpdatedMagnifier.showTable || stateWithUpdatedMagnifier.isBankingMode) {
+                        val (left, top, right, bottom) = getTableBoundaries(stateWithUpdatedMagnifier)
+                        newCenterX = newCenterX.coerceIn(left, right)
+                        newCenterY = newCenterY.coerceIn(top, bottom)
+                    }
+
+                    val updatedBall = ballToMove.copy(center = PointF(newCenterX, newCenterY))
+                    val updatedList = stateWithUpdatedMagnifier.obstacleBalls.toMutableList()
+                    updatedList[index] = updatedBall
+                    stateWithUpdatedMagnifier.copy(obstacleBalls = updatedList, valuesChangedSinceReset = true)
                 } ?: stateWithUpdatedMagnifier
             }
             else -> stateWithUpdatedMagnifier

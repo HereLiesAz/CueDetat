@@ -8,6 +8,7 @@ import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.ball.ActualCueBall
 import com.hereliesaz.cuedetat.view.config.ball.BankingBall
 import com.hereliesaz.cuedetat.view.config.ball.GhostCueBall
+import com.hereliesaz.cuedetat.view.config.ball.ObstacleBall
 import com.hereliesaz.cuedetat.view.config.ball.TargetBall
 import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
@@ -31,6 +32,11 @@ class BallRenderer {
             }
         } else {
             drawProtractorAndActual(canvas, state, paints)
+        }
+
+        // Draw obstacle balls on the plane using the ghosted method
+        state.obstacleBalls.forEach { obstacle ->
+            drawGhostedBall(canvas, obstacle, ObstacleBall(), state, paints)
         }
 
         if (state.areHelpersVisible) {
@@ -74,6 +80,8 @@ class BallRenderer {
 
         val glowPaint = Paint(paints.ballGlowPaint).apply {
             strokeWidth = config.glowWidth
+            color = config.glowColor.toArgb() // Use color from config
+            alpha = (config.glowColor.alpha * 255).toInt()
         }
 
         val dotPaint = Paint(paints.fillPaint).apply { color = android.graphics.Color.WHITE }

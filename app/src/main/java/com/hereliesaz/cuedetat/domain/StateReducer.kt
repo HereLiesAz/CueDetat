@@ -2,7 +2,14 @@
 
 package com.hereliesaz.cuedetat.domain
 
-import com.hereliesaz.cuedetat.domain.reducers.*
+import com.hereliesaz.cuedetat.domain.reducers.ActionReducer
+import com.hereliesaz.cuedetat.domain.reducers.ControlReducer
+import com.hereliesaz.cuedetat.domain.reducers.GestureReducer
+import com.hereliesaz.cuedetat.domain.reducers.ObstacleReducer
+import com.hereliesaz.cuedetat.domain.reducers.SpinReducer
+import com.hereliesaz.cuedetat.domain.reducers.SystemReducer
+import com.hereliesaz.cuedetat.domain.reducers.ToggleReducer
+import com.hereliesaz.cuedetat.domain.reducers.TutorialReducer
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
@@ -16,7 +23,8 @@ class StateReducer @Inject constructor(
     private val systemReducer: SystemReducer,
     private val actionReducer: ActionReducer,
     private val tutorialReducer: TutorialReducer,
-    private val spinReducer: SpinReducer
+    private val spinReducer: SpinReducer,
+    private val obstacleReducer: ObstacleReducer
 ) {
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         // Delegate to the appropriate specialized reducer based on the event type.
@@ -40,7 +48,7 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.ToggleGlowStickDialog,
             is MainScreenEvent.ToggleHelp,
             is MainScreenEvent.ToggleMoreHelp,
-            is MainScreenEvent.ToggleSpinControl -> // Re-routed to the correct reducer
+            is MainScreenEvent.ToggleSpinControl ->
                 toggleReducer.reduce(currentState, event)
 
             is MainScreenEvent.ZoomSliderChanged,
@@ -69,6 +77,9 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.DragSpinControl,
             is MainScreenEvent.ClearSpinState ->
                 spinReducer.reduce(currentState, event)
+
+            is MainScreenEvent.AddObstacleBall ->
+                obstacleReducer.reduce(currentState, event)
 
             else -> currentState
         }

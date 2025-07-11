@@ -14,7 +14,7 @@ import javax.inject.Singleton
 import kotlin.math.atan2
 
 @Singleton
-class ToggleReducer @Inject constructor() {
+class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) {
     private val defaultBankingAimDistanceFactor = 15f
 
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
@@ -59,7 +59,7 @@ class ToggleReducer @Inject constructor() {
     private fun revertToOriginalDefaults(currentState: OverlayState): OverlayState {
         val viewCenterX = currentState.viewWidth / 2f
         val viewCenterY = currentState.viewHeight / 2f
-        val logicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, 0f)
+        val logicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, 0f)
 
         val targetBallCenter = PointF(viewCenterX, viewCenterY)
         val actualCueBallCenter = PointF(viewCenterX, viewCenterY + (currentState.viewHeight / 4f))
@@ -86,7 +86,7 @@ class ToggleReducer @Inject constructor() {
             } else if (currentState.tableWasLastOnWithBall) {
                 resetForTable(currentState.copy(showTable = true, tableWasLastOnWithBall = false))
             } else {
-                val newRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, currentState.zoomSliderPosition)
+                val newRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, currentState.zoomSliderPosition)
                 val newCenter = PointF(currentState.viewWidth / 2f, (currentState.viewHeight / 2f + currentState.viewHeight) / 2f)
                 currentState.copy(
                     onPlaneBall = OnPlaneBall(center = newCenter, radius = newRadius),
@@ -100,7 +100,7 @@ class ToggleReducer @Inject constructor() {
     private fun resetForTable(currentState: OverlayState): OverlayState {
         val viewCenterX = currentState.viewWidth / 2f
         val viewCenterY = currentState.viewHeight / 2f
-        val logicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, 0f)
+        val logicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, 0f)
         val targetBallCenter = PointF(viewCenterX, viewCenterY)
         val tableToBallRatioLong = currentState.tableSize.getTableToBallRatioLong()
         val tableToBallRatioShort = tableToBallRatioLong / currentState.tableSize.aspectRatio
@@ -124,7 +124,7 @@ class ToggleReducer @Inject constructor() {
         val bankingEnabled = !currentState.isBankingMode
         val newState = if (bankingEnabled) {
             val bankingZoomSliderPos = 0f
-            val newLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, bankingZoomSliderPos)
+            val newLogicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, bankingZoomSliderPos)
             val bankingBallCenter = PointF(viewCenterX, viewCenterY)
             val newBankingBall = OnPlaneBall(center = bankingBallCenter, radius = newLogicalRadius)
             val defaultTableRotation = if (currentState.viewWidth > currentState.viewHeight) 0f else 90f
@@ -139,7 +139,7 @@ class ToggleReducer @Inject constructor() {
             )
         } else {
             val defaultSliderPos = 0f
-            val defaultLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, defaultSliderPos)
+            val defaultLogicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, defaultSliderPos)
             currentState.copy(
                 isBankingMode = false, bankingAimTarget = null, onPlaneBall = null,
                 zoomSliderPosition = defaultSliderPos,

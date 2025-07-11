@@ -8,7 +8,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ControlReducer @Inject constructor() {
+class ControlReducer @Inject constructor(private val reducerUtils: ReducerUtils) {
 
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         return when (event) {
@@ -24,7 +24,7 @@ class ControlReducer @Inject constructor() {
 
     private fun handleZoomSliderChanged(currentState: OverlayState, event: MainScreenEvent.ZoomSliderChanged): OverlayState {
         val newSliderPos = event.position.coerceIn(-50f, 50f)
-        val newLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
+        val newLogicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
 
         val updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
 
@@ -41,7 +41,7 @@ class ControlReducer @Inject constructor() {
         val currentZoomValue = ZoomMapping.sliderToZoom(oldZoomSliderPos)
         val newZoomValue = (currentZoomValue * event.scaleFactor).coerceIn(ZoomMapping.MIN_ZOOM, ZoomMapping.MAX_ZOOM)
         val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue)
-        val newLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
+        val newLogicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
 
         val updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
 

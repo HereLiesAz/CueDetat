@@ -10,7 +10,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ActionReducer @Inject constructor() {
+class ActionReducer @Inject constructor(private val reducerUtils: ReducerUtils) {
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         return when (event) {
             is MainScreenEvent.Reset -> handleReset(currentState)
@@ -21,7 +21,8 @@ class ActionReducer @Inject constructor() {
     private fun handleReset(currentState: OverlayState): OverlayState {
         // If a pre-reset state exists, revert to it.
         currentState.preResetState?.let {
-            return it.copy(preResetState = null) // Revert and clear the saved state
+            // Also clear any obstacles that may have been added after the save
+            return it.copy(preResetState = null, obstacleBalls = emptyList())
         }
 
         // Otherwise, this is the first press. Save the current positional state.
@@ -29,7 +30,7 @@ class ActionReducer @Inject constructor() {
 
         // Create the default positional state based on table visibility
         val initialSliderPos = 0f
-        val initialLogicalRadius = ReducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, initialSliderPos)
+        val initialLogicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, initialSliderPos)
         val viewCenterX = currentState.viewWidth / 2f
         val viewCenterY = currentState.viewHeight / 2f
 
@@ -62,6 +63,7 @@ class ActionReducer @Inject constructor() {
         return currentState.copy(
             protractorUnit = newProtractorUnit,
             onPlaneBall = newOnPlaneBall,
+            obstacleBalls = emptyList(), // Clear obstacles on reset
             zoomSliderPosition = initialSliderPos,
             tableRotationDegrees = newTableRotation,
             bankingAimTarget = null,

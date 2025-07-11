@@ -2,6 +2,7 @@ package com.hereliesaz.cuedetat.di
 
 import android.content.Context
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
+import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.network.GithubApi
 import dagger.Module
 import dagger.Provides

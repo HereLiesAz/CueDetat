@@ -14,7 +14,7 @@ import javax.inject.Singleton
 import kotlin.math.abs
 
 @Singleton
-class SystemReducer @Inject constructor() {
+class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) {
 
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         return when (event) {
@@ -29,7 +29,7 @@ class SystemReducer @Inject constructor() {
         if (currentState.viewWidth == 0 && currentState.viewHeight == 0) {
             return createInitialState(event.width, event.height, currentState.appControlColorScheme)
         } else {
-            val newLogicalRadius = ReducerUtils.getCurrentLogicalRadius(event.width, event.height, currentState.zoomSliderPosition)
+            val newLogicalRadius = reducerUtils.getCurrentLogicalRadius(event.width, event.height, currentState.zoomSliderPosition)
             var updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
             var protractorNewCenter = currentState.protractorUnit.center
 
@@ -70,7 +70,7 @@ class SystemReducer @Inject constructor() {
 
     private fun createInitialState(viewWidth: Int, viewHeight: Int, appColorScheme: ColorScheme): OverlayState {
         val initialSliderPos = 0f // Centered
-        val initialLogicalRadius = ReducerUtils.getCurrentLogicalRadius(viewWidth, viewHeight, initialSliderPos)
+        val initialLogicalRadius = reducerUtils.getCurrentLogicalRadius(viewWidth, viewHeight, initialSliderPos)
         val initialProtractorCenter = PointF(viewWidth / 2f, viewHeight / 2f)
         val initialTableRotation = 90f // Default to Portrait orientation
 

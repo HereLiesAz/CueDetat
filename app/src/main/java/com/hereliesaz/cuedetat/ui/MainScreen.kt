@@ -105,7 +105,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 )
 
                 val spinControlCenter = uiState.spinControlCenter
-                if (!uiState.isBankingMode && uiState.isSpinControlVisible && spinControlCenter != null) {
+                if (uiState.isSpinControlVisible && spinControlCenter != null) {
                     val spinControlSizeDp = 120.dp
                     val spinControlSizePx = with(LocalDensity.current) { spinControlSizeDp.toPx() }
 
@@ -147,23 +147,22 @@ fun MainScreen(viewModel: MainViewModel) {
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    if (!uiState.isBankingMode) {
-                        Column(
-                            modifier = Modifier.padding(start = 16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            ToggleSpinControlFab(
-                                uiState = uiState,
-                                onEvent = viewModel::onEvent
-                            )
+                    Column(
+                        modifier = Modifier.padding(start = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        ToggleSpinControlFab(
+                            uiState = uiState,
+                            onEvent = viewModel::onEvent
+                        )
+                        AddObstacleBallFab(onEvent = viewModel::onEvent)
+                        if (!uiState.isBankingMode) {
                             ToggleCueBallFab(
                                 uiState = uiState,
                                 onEvent = viewModel::onEvent
                             )
                         }
-                    } else {
-                        Spacer(Modifier.width(80.dp))
                     }
 
                     Box(

@@ -45,6 +45,7 @@ class LineRenderer {
         val targetCenter = state.protractorUnit.center
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
         val shotLineAnchor = state.shotLineAnchor
+        val ballDiameter = state.protractorUnit.radius * 2
 
         val aimingLineConfig = AimingLine()
         val shotGuideLineConfig = ShotGuideLine()
@@ -70,27 +71,39 @@ class LineRenderer {
             strokeWidth = aimingLineConfig.glowWidth
             alpha = (aimingLineConfig.glowColor.alpha * 255).toInt()
         }
+        val obstructionPaint = Paint(paints.pathObstructionPaint)
 
         val bankMidPoint = if (state.aimingLineBankPath.size > 1) state.aimingLineBankPath[1] else null
         val finalAimingLineEnd = bankMidPoint ?: state.aimingLineEndPoint ?: targetCenter
 
-        // Draw Glows First
+        // --- Pass 1: Wide Pathways ---
+        obstructionPaint.strokeWidth = ballDiameter
+        // Shot guide pathway
+        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, obstructionPaint)
+        // Aiming line pathway
+        if (bankMidPoint != null) {
+            canvas.drawLine(ghostCueCenter.x, ghostCueCenter.y, bankMidPoint.x, bankMidPoint.y, obstructionPaint)
+        } else {
+            drawExtendedLine(canvas, ghostCueCenter, finalAimingLineEnd, obstructionPaint)
+        }
+
+
+        // --- Pass 2: Glows ---
         if (bankMidPoint != null) {
             canvas.drawLine(ghostCueCenter.x, ghostCueCenter.y, bankMidPoint.x, bankMidPoint.y, aimingLineGlow)
         } else {
             drawExtendedLine(canvas, ghostCueCenter, finalAimingLineEnd, aimingLineGlow)
         }
         drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLineGlow)
-        drawTangentLines(canvas, state, paints) // Modified call
+        drawTangentLines(canvas, state, paints)
 
-        // Draw Lines Second
+        // --- Pass 3: Core Lines ---
         if (bankMidPoint != null) {
             canvas.drawLine(ghostCueCenter.x, ghostCueCenter.y, bankMidPoint.x, bankMidPoint.y, aimingLinePaint)
         } else {
             drawExtendedLine(canvas, ghostCueCenter, finalAimingLineEnd, aimingLinePaint)
         }
         drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLinePaint)
-        // Tangent lines are now drawn inside the modified drawTangentLines method
 
         drawSpinPaths(canvas, state, paints)
 
@@ -316,8 +329,6 @@ class LineRenderer {
         }
     }
 
-    // --- THE RIGHTEOUS FIX ---
-    // The heretically deleted function is restored to its rightful place.
     private fun drawExtendedLine(canvas: Canvas, start: PointF, end: PointF, paint: Paint) {
         val dirX = end.x - start.x; val dirY = end.y - start.y
         val mag = sqrt(dirX * dirX + dirY * dirY)
@@ -326,7 +337,6 @@ class LineRenderer {
             canvas.drawLine(start.x, start.y, start.x + ndx * extendFactor, start.y + ndy * extendFactor, paint)
         }
     }
-    // --- END FIX ---
 
     private fun drawAngleGuide(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint) {
         val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)

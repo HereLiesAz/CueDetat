@@ -51,6 +51,9 @@ sealed class MainScreenEvent {
     object ToggleGlowStickDialog : MainScreenEvent()
     data class AdjustGlow(val value: Float) : MainScreenEvent()
 
+    // Obstacle Events
+    object AddObstacleBall : MainScreenEvent()
+
     // Tutorial Events
     object StartTutorial : MainScreenEvent()
     object NextTutorialStep : MainScreenEvent()
