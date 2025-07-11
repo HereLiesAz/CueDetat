@@ -47,12 +47,22 @@ fun TopControls(
                 .clickable(onClick = onMenuClick),
             contentAlignment = Alignment.CenterStart
         ) {
-            Text(
-                text = stringResource(id = R.string.app_name),
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 28.sp),
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Start
-            )
+            if (uiState.areHelpersVisible) {
+                Text(
+                    text = stringResource(id = R.string.app_name),
+                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 28.sp),
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Start
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_launcher),
+                    contentDescription = "Menu",
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                )
+            }
         }
 
         if(uiState.showTable || uiState.isBankingMode) {
