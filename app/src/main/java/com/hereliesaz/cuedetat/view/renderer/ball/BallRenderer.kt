@@ -40,7 +40,7 @@ class BallRenderer {
         // Draw results from the generic ML Kit model (e.g., as blue outlines)
         val genericPaint = Paint(paints.targetCirclePaint).apply {
             color = AcidPatina.toArgb()
-            pathEffect = DashPathEffect(floatArrayOf(15f, 15f), 0f)
+            pathEffect = DashPathEffect(floatArrayOf(10f, 10f), 0f)
             strokeWidth = 3f
         }
         state.visionData.genericBalls.forEach {

@@ -1,5 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/StateReducer.kt
-
 package com.hereliesaz.cuedetat.domain
 
 import com.hereliesaz.cuedetat.domain.reducers.*
@@ -19,10 +17,9 @@ class StateReducer @Inject constructor(
     private val spinReducer: SpinReducer,
     private val obstacleReducer: ObstacleReducer,
     private val cvReducer: CvReducer,
-    private val cvControlReducer: CvControlReducer
+    private val advancedOptionsReducer: AdvancedOptionsReducer
 ) {
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
-        // Delegate to the appropriate specialized reducer based on the event type.
         return when (event) {
             is MainScreenEvent.LogicalGestureStarted,
             is MainScreenEvent.LogicalDragApplied,
@@ -43,7 +40,8 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.ToggleGlowStickDialog,
             is MainScreenEvent.ToggleHelp,
             is MainScreenEvent.ToggleMoreHelp,
-            is MainScreenEvent.ToggleSpinControl ->
+            is MainScreenEvent.ToggleSpinControl,
+            is MainScreenEvent.ToggleCvModel ->
                 toggleReducer.reduce(currentState, event)
 
             is MainScreenEvent.ZoomSliderChanged,
@@ -80,12 +78,13 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.LockOrUnlockColor ->
                 cvReducer.reduce(currentState, event)
 
-            is MainScreenEvent.ToggleCvTuningDialog,
+            is MainScreenEvent.ToggleAdvancedOptionsDialog,
+            is MainScreenEvent.ToggleCvRefinementMethod,
             is MainScreenEvent.UpdateHoughP1,
             is MainScreenEvent.UpdateHoughP2,
             is MainScreenEvent.UpdateCannyT1,
             is MainScreenEvent.UpdateCannyT2 ->
-                cvControlReducer.reduce(currentState, event)
+                advancedOptionsReducer.reduce(currentState, event)
 
             else -> currentState
         }

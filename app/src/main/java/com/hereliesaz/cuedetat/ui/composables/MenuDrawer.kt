@@ -49,48 +49,45 @@ fun MenuDrawerContent(
         }
         MenuDivider()
 
-        MenuItem(
-            text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
-            onClick = { onEvent(MainScreenEvent.ToggleHelp); onCloseDrawer() }
-        )
-        MenuItem(
-            text = "Show Tutorial",
-            onClick = { onEvent(MainScreenEvent.StartTutorial); onCloseDrawer() }
-        )
+        // Section: Core Controls
         MenuItem(
             text = "Reset View",
             onClick = { onEvent(MainScreenEvent.Reset); onCloseDrawer() }
         )
-        MenuDivider()
-
+        val bankingModeToggleText = if (uiState.isBankingMode) "Ghost Ball Aiming" else "Calculate Bank"
+        MenuItem(
+            text = bankingModeToggleText,
+            onClick = { onEvent(MainScreenEvent.ToggleBankingMode); onCloseDrawer() }
+        )
         if (!uiState.isBankingMode) {
             val cueBallToggleText = if (uiState.onPlaneBall == null) "Toggle Cue Ball" else "Hide Cue Ball"
             MenuItem(
                 text = cueBallToggleText,
                 onClick = { onEvent(MainScreenEvent.ToggleOnPlaneBall); onCloseDrawer() }
             )
-        }
-
-        val bankingModeToggleText = if (uiState.isBankingMode) "Ghost Ball Aiming" else "Calculate Bank"
-        MenuItem(
-            text = bankingModeToggleText,
-            onClick = { onEvent(MainScreenEvent.ToggleBankingMode); onCloseDrawer() }
-        )
-
-        if(!uiState.isBankingMode) {
             val tableToggleText = if (uiState.showTable) "Hide Table" else "Show Table"
             MenuItem(
                 text = tableToggleText,
                 onClick = { onEvent(MainScreenEvent.ToggleTable); onCloseDrawer() }
             )
         }
+        MenuDivider()
 
+        // Section: Settings & Appearance
         MenuItem(
             text = "Table Size",
             onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog); onCloseDrawer() }
         )
-        MenuDivider()
-
+        val distanceUnitToggleText = if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units"
+        MenuItem(
+            text = distanceUnitToggleText,
+            onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit); onCloseDrawer() }
+        )
+        val cameraToggleText = if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On"
+        MenuItem(
+            text = cameraToggleText,
+            onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
+        )
         val systemIsCurrentlyDark = isSystemInDarkTheme()
         val themeToggleText = when (uiState.isForceLightMode) {
             true -> "Embrace the Darkness"
@@ -101,45 +98,46 @@ fun MenuDrawerContent(
             text = themeToggleText,
             onClick = { onEvent(MainScreenEvent.ToggleForceTheme); onCloseDrawer() }
         )
-
-        val cameraToggleText = if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On"
-        MenuItem(
-            text = cameraToggleText,
-            onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
-        )
-
-        val distanceUnitToggleText = if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units"
-        MenuItem(
-            text = distanceUnitToggleText,
-            onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit); onCloseDrawer() }
-        )
-
         MenuItem(
             text = "Luminance",
             onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog); onCloseDrawer() }
         )
-
         MenuItem(
             text = "Glow Stick",
             onClick = { onEvent(MainScreenEvent.ToggleGlowStickDialog); onCloseDrawer() }
         )
-
-        MenuItem(
-            text = "CV Tuning",
-            onClick = { onEvent(MainScreenEvent.ToggleCvTuningDialog); onCloseDrawer() }
-        )
-
         MenuDivider()
 
+        // Section: Developer
+        MenuItem(
+            text = "Too Advanced Options",
+            onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog); onCloseDrawer() }
+        )
+        val modelToggleText = if (uiState.useCustomModel) "Use Generic AI" else "Use Custom AI"
+        MenuItem(
+            text = modelToggleText,
+            onClick = { onEvent(MainScreenEvent.ToggleCvModel); onCloseDrawer() }
+        )
+        MenuDivider()
+
+        // Section: Help & Info
+        MenuItem(
+            text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
+            onClick = { onEvent(MainScreenEvent.ToggleHelp); onCloseDrawer() }
+        )
+        MenuItem(
+            text = "Show Tutorial",
+            onClick = { onEvent(MainScreenEvent.StartTutorial); onCloseDrawer() }
+        )
+        MenuItem(
+            text = "Check for Updates",
+            onClick = { onEvent(MainScreenEvent.CheckForUpdate); onCloseDrawer() })
         MenuItem(
             text = "About Me",
             onClick = { onEvent(MainScreenEvent.ViewArt); onCloseDrawer() })
         MenuItem(
             text = "Chalk Your Tip",
             onClick = { onEvent(MainScreenEvent.ShowDonationOptions); onCloseDrawer() })
-        MenuItem(
-            text = "Check for Updates",
-            onClick = { onEvent(MainScreenEvent.CheckForUpdate); onCloseDrawer() })
         Spacer(modifier = Modifier.height(12.dp))
     }
 }
@@ -150,7 +148,7 @@ private fun MenuItem(text: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .padding(horizontal = 24.dp, vertical = 12.dp), // Reduced vertical padding slightly
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -165,6 +163,6 @@ private fun MenuItem(text: String, onClick: () -> Unit) {
 private fun MenuDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        color = MaterialTheme.colorScheme.outline
+        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
     )
 }

@@ -1,5 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreenEvent.kt
-
 package com.hereliesaz.cuedetat.ui
 
 import android.graphics.PointF
@@ -58,12 +56,13 @@ sealed class MainScreenEvent {
     // CV Events
     data class CvDataUpdated(val data: VisionData) : MainScreenEvent()
     object LockOrUnlockColor : MainScreenEvent()
-    object ToggleCvTuningDialog : MainScreenEvent()
+    object ToggleAdvancedOptionsDialog : MainScreenEvent()
+    object ToggleCvRefinementMethod : MainScreenEvent()
     data class UpdateHoughP1(val value: Float) : MainScreenEvent()
     data class UpdateHoughP2(val value: Float) : MainScreenEvent()
     data class UpdateCannyT1(val value: Float) : MainScreenEvent()
     data class UpdateCannyT2(val value: Float) : MainScreenEvent()
-
+    object ToggleCvModel : MainScreenEvent()
 
     // Tutorial Events
     object StartTutorial : MainScreenEvent()

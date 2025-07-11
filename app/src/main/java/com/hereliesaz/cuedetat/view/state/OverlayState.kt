@@ -1,5 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/state/OverlayState.kt
-
 package com.hereliesaz.cuedetat.view.state
 
 import android.graphics.Matrix
@@ -12,6 +10,11 @@ import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.VisionData
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
+
+enum class CvRefinementMethod {
+    HOUGH, CONTOUR;
+    fun next(): CvRefinementMethod = if (this == HOUGH) CONTOUR else HOUGH
+}
 
 enum class InteractionMode {
     NONE,
@@ -108,7 +111,9 @@ data class OverlayState(
     // CV Data
     val visionData: VisionData = VisionData(),
     val lockedHsvColor: FloatArray? = null,
-    val showCvTuningDialog: Boolean = false,
+    val showAdvancedOptionsDialog: Boolean = false,
+    val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
+    val useCustomModel: Boolean = false,
     val houghP1: Float = 100f,
     val houghP2: Float = 20f,
     val cannyThreshold1: Float = 50f,
@@ -147,7 +152,6 @@ data class OverlayState(
     val pitchAngle: Float
         get() = currentOrientation.pitch
 
-    // Custom equals/hashCode needed for FloatArray property
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
@@ -196,7 +200,9 @@ data class OverlayState(
             if (other.lockedHsvColor == null) return false
             if (!lockedHsvColor.contentEquals(other.lockedHsvColor)) return false
         } else if (other.lockedHsvColor != null) return false
-        if (showCvTuningDialog != other.showCvTuningDialog) return false
+        if (showAdvancedOptionsDialog != other.showAdvancedOptionsDialog) return false
+        if (cvRefinementMethod != other.cvRefinementMethod) return false
+        if (useCustomModel != other.useCustomModel) return false
         if (houghP1 != other.houghP1) return false
         if (houghP2 != other.houghP2) return false
         if (cannyThreshold1 != other.cannyThreshold1) return false
@@ -265,7 +271,9 @@ data class OverlayState(
         result = 31 * result + hasInverseMatrix.hashCode()
         result = 31 * result + visionData.hashCode()
         result = 31 * result + (lockedHsvColor?.contentHashCode() ?: 0)
-        result = 31 * result + showCvTuningDialog.hashCode()
+        result = 31 * result + showAdvancedOptionsDialog.hashCode()
+        result = 31 * result + cvRefinementMethod.hashCode()
+        result = 31 * result + useCustomModel.hashCode()
         result = 31 * result + houghP1.hashCode()
         result = 31 * result + houghP2.hashCode()
         result = 31 * result + cannyThreshold1.hashCode()

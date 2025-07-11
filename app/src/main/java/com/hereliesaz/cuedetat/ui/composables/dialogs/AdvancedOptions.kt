@@ -1,33 +1,44 @@
 package com.hereliesaz.cuedetat.ui.composables.dialogs
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
-fun CvTuningDialog(
+fun AdvancedOptionsDialog(
     uiState: OverlayState,
     onEvent: (MainScreenEvent) -> Unit,
     onDismiss: () -> Unit
 ) {
-    if (uiState.showCvTuningDialog) {
+    if (uiState.showAdvancedOptionsDialog) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("CV Parameter Tuning", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            title = { Text("Too Advanced Options", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
             text = {
                 Column {
+                    // Refinement Method Toggle
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Refinement:", modifier = Modifier.weight(1f))
+                        TextButton(onClick = { onEvent(MainScreenEvent.ToggleCvRefinementMethod) }) {
+                            Text(uiState.cvRefinementMethod.name)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+
                     // HoughCircles Param 1
                     Text("Hough P1 (Canny Edge): ${uiState.houghP1.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Slider(

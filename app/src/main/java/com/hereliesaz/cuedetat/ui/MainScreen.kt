@@ -1,5 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt
-
 package com.hereliesaz.cuedetat.ui
 
 import android.graphics.PointF
@@ -18,7 +16,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.cuedetat.ui.composables.*
-import com.hereliesaz.cuedetat.ui.composables.dialogs.CvTuningDialog
+import com.hereliesaz.cuedetat.ui.composables.dialogs.AdvancedOptionsDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.GlowStickDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.LuminanceAdjustmentDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.TableSizeSelectionDialog
@@ -218,10 +216,10 @@ fun MainScreen(viewModel: MainViewModel) {
                     onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleTableSizeDialog) }
                 )
 
-                CvTuningDialog(
+                AdvancedOptionsDialog(
                     uiState = uiState,
                     onEvent = viewModel::onEvent,
-                    onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleCvTuningDialog) }
+                    onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }
                 )
 
                 TutorialOverlay(

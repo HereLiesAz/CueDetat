@@ -1,52 +1,37 @@
 # Buttons
 
-* **Shape:** All buttons, including `FloatingActionButton` and standard `Button`s in dialogs and menus, must be circular (`CircleShape`).
-* **Persistent Cue Ball Toggle:** A circular `FloatingActionButton` must be present in the lower-left of the screen to toggle the visibility of the Actual Cue Ball. Its default state is to show an icon, not text.
+* [cite_start]**Shape:** All buttons, including `FloatingActionButton` and standard `Button`s in dialogs and menus, must be circular (`CircleShape`). [cite: 783]
+* **Appearance Mandate:** As a general rule, buttons should use text labels. The one holy exception is the **Top-Left Menu Button**, which **must** display the application icon when helper text is hidden (`areHelpersVisible = false`), and the application title text otherwise. All other FABs must display text at all times.
 
 ***
 ## Addendum: Detailed FAB Specifications
 
-### 1. Reset FAB
+* **1. Reset FAB**
+  * [cite_start]**Placement**: Aligned to the bottom-right of the screen (`Alignment.BottomEnd`). [cite: 784]
+  * **Action**: Triggers the `MainScreenEvent.Reset` event. [cite_start]It functions as a two-state toggle, saving the current state on the first press and reverting to it on the second. [cite: 784]
+  * [cite_start]**Dynamic Appearance**: Its `containerColor` must change from `surfaceVariant` to `secondaryContainer` when `valuesChangedSinceReset` is `true`. [cite: 785]
+  * [cite_start]**Content**: Displays the text "Reset\nView". [cite: 785]
 
-* **Placement**: Aligned to the bottom-right of the screen (`Alignment.BottomEnd`).
-* **Action**: Triggers the `MainScreenEvent.Reset` event. This now functions as a two-state toggle.
-  * **First Press:** Saves the current positions and rotations of all elements and resets them to their default state. If the table is visible, it resets to the table-centric default. If not, it resets to the screen-centric default. UI visibility toggles (like `showTable`) are preserved.
-  * **Second Press:** Reverts all positions and rotations to their saved state from before the first press.
-* **Dynamic Appearance**: The button's color must provide visual feedback on its relevance.
-  * When `uiState.valuesChangedSinceReset` is `false`, its `containerColor` must be `MaterialTheme.colorScheme.surfaceVariant` (a neutral, inactive state).
-  * When `uiState.valuesChangedSinceReset` is `true`, its `containerColor` must change to `MaterialTheme.colorScheme.secondaryContainer` to indicate that there are changes to reset.
-* **Content (Icon vs. Text)**:
-  * By default (`areHelpersVisible = false`), it displays the `ic_undo_24` icon.
-  * When help text is enabled (`areHelpersVisible = true`), it displays the text "Reset\nView".
+* **2. Toggle Spin Control FAB**
+  * [cite_start]**Placement**: Aligned to the bottom-left, stacked vertically. [cite: 786]
+  * [cite_start]**Action**: Triggers the `ToggleSpinControl` event. [cite: 786]
+  * [cite_start]**Dynamic Appearance**: Its `containerColor` changes to `secondaryContainer` when the spin control is visible. [cite: 786]
+  * [cite_start]**Content**: Displays the text "Spin". [cite: 786]
 
-### 2. Toggle Spin Control FAB
+* **3. Toggle Cue Ball FAB**
+  * [cite_start]**Placement**: Aligned to the bottom-left of the screen (`Alignment.BottomStart`). [cite: 787]
+  * **Action**: Triggers the `MainScreenEvent.ToggleOnPlaneBall` event. [cite_start]This button is only active and visible when not in Banking Mode. [cite: 787]
+  * [cite_start]**Dynamic Appearance**: Its `containerColor` changes to `secondaryContainer` when `onPlaneBall` is not `null`. [cite: 787]
+  * [cite_start]**Content**: Displays the text "Cue Ball\nToggle". [cite: 787]
 
-* **Placement**: Aligned to the bottom-left, stacked vertically below the Lock Color FAB.
-* **Action**: Triggers the `ToggleSpinControl` event.
-* **Dynamic Appearance**: Its `containerColor` must change to `MaterialTheme.colorScheme.secondaryContainer` when the spin control is visible (`isSpinControlVisible = true`).
-* **Content**: A simple `Text` composable displaying "Spin".
+* **4. Toggle Table FAB**
+  * [cite_start]**Placement**: Positioned horizontally between the left-side FAB column and the `ResetFab`. [cite: 788]
+  * [cite_start]**Action**: Triggers the `MainScreenEvent.ToggleTable` event. [cite: 788]
+  * [cite_start]**Visibility**: This button is **only** visible when in Protractor Mode and when the table is not currently shown. [cite: 788]
+  * [cite_start]**Content**: It displays the `pool_table` icon. [cite: 788]
 
-### 3. Toggle Cue Ball FAB
-
-* **Placement**: Aligned to the bottom-left of the screen (`Alignment.BottomStart`), below the Add Obstacle Ball FAB.
-* **Action**: Triggers the `MainScreenEvent.ToggleOnPlaneBall` event. This button is only active and visible when not in Banking Mode.
-* **Dynamic Appearance**: The button's color must provide visual feedback on the toggle's state.
-  * When `uiState.onPlaneBall` is `null`, its `containerColor` must be `MaterialTheme.colorScheme.surfaceVariant` (inactive state).
-  * When `uiState.onPlaneBall` is not `null`, its `containerColor` must change to `MaterialTheme.colorScheme.secondaryContainer` (active state).
-* **Content (Icon vs. Text)**:
-  * By default (`areHelpersVisible = false`), it displays the `ic_jump_shot` icon.
-  * When help text is enabled (`areHelpersVisible = true`), it displays the text "Cue Ball\nToggle".
-
-### 4. Toggle Table FAB
-
-* **Placement**: Positioned horizontally between the left-side FAB column and the `ResetFab`.
-* **Action**: Triggers the `MainScreenEvent.ToggleTable` event.
-* **Visibility**: This button is **only** visible when in Protractor Mode and when the table is not currently shown (`!uiState.isBankingMode && !uiState.showTable`).
-* **Content**: It displays the `pool_table` icon.
-
-### 5. Lock Color FAB
-
-* **Placement**: Aligned to the bottom-left, at the top of the vertical FAB column.
-* **Action**: Triggers the `LockOrUnlockColor` event.
-* **Functionality**: Toggles between automatic color detection (sampling the center of the screen every frame) and locking the currently sampled color for stable detection.
-* **Content**: Text that reads "Lock\nColor" or "Unlock\nColor".
+* **5. Felt Color FAB**
+  * [cite_start]**Placement**: Aligned to the bottom-left, at the top of the vertical FAB column. [cite: 788]
+  * [cite_start]**Action**: Triggers the `LockOrUnlockColor` event. [cite: 788]
+  * [cite_start]**Functionality**: Toggles between automatic color detection and locking the currently sampled color. [cite: 788]
+  * **Content**: Text that reads "Felt\nColor".

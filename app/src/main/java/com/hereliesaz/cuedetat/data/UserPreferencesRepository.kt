@@ -1,6 +1,7 @@
 package com.hereliesaz.cuedetat.data
 
 import android.content.Context
+import com.hereliesaz.cuedetat.view.state.CvRefinementMethod
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.TableSize
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -15,6 +16,8 @@ class UserPreferencesRepository @Inject constructor(@ApplicationContext context:
     companion object {
         private const val KEY_DISTANCE_UNIT = "distance_unit"
         private const val KEY_TABLE_SIZE = "table_size"
+        private const val KEY_USE_CUSTOM_MODEL = "use_custom_model"
+        private const val KEY_CV_REFINEMENT_METHOD = "cv_refinement_method"
         private const val KEY_CV_HOUGH_P1 = "cv_hough_p1"
         private const val KEY_CV_HOUGH_P2 = "cv_hough_p2"
         private const val KEY_CV_CANNY_T1 = "cv_canny_t1"
@@ -35,7 +38,6 @@ class UserPreferencesRepository @Inject constructor(@ApplicationContext context:
     }
 
     fun getTableSize(): TableSize {
-        // Default to 8ft table.
         val sizeName = prefs.getString(KEY_TABLE_SIZE, TableSize.EIGHT_FT.name)
         return try {
             TableSize.valueOf(sizeName ?: TableSize.EIGHT_FT.name)
@@ -46,6 +48,22 @@ class UserPreferencesRepository @Inject constructor(@ApplicationContext context:
 
     fun setTableSize(size: TableSize) {
         prefs.edit().putString(KEY_TABLE_SIZE, size.name).apply()
+    }
+
+    fun getUseCustomModel(): Boolean = prefs.getBoolean(KEY_USE_CUSTOM_MODEL, false)
+    fun setUseCustomModel(useCustom: Boolean) = prefs.edit().putBoolean(KEY_USE_CUSTOM_MODEL, useCustom).apply()
+
+    fun getCvRefinementMethod(): CvRefinementMethod {
+        val methodName = prefs.getString(KEY_CV_REFINEMENT_METHOD, CvRefinementMethod.CONTOUR.name)
+        return try {
+            CvRefinementMethod.valueOf(methodName ?: CvRefinementMethod.CONTOUR.name)
+        } catch (e: IllegalArgumentException) {
+            CvRefinementMethod.CONTOUR
+        }
+    }
+
+    fun setCvRefinementMethod(method: CvRefinementMethod) {
+        prefs.edit().putString(KEY_CV_REFINEMENT_METHOD, method.name).apply()
     }
 
     fun getCvHoughP1(): Float = prefs.getFloat(KEY_CV_HOUGH_P1, 100f)

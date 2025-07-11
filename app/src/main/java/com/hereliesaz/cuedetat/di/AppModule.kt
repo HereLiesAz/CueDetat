@@ -1,11 +1,11 @@
 package com.hereliesaz.cuedetat.di
 
 import android.content.Context
-import com.google.mlkit.vision.detection.ObjectDetection
-import com.google.mlkit.vision.detection.ObjectDetector
-import com.google.mlkit.vision.detection.custom.CustomObjectDetectorOptions
-import com.google.mlkit.vision.detection.defaults.ObjectDetectorOptions
-import com.google.mlkit.vision.model.LocalModel
+import com.google.mlkit.vision.objects.ObjectDetection
+import com.google.mlkit.vision.objects.ObjectDetector
+import com.google.mlkit.vision.objects.custom.CustomObjectDetectorOptions
+import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
+import com.google.mlkit.common.model.LocalModel
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.network.GithubApi
 import dagger.Module

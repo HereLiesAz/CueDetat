@@ -1,6 +1,7 @@
 package com.hereliesaz.cuedetat.data
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.graphics.PointF
 import android.graphics.Rect
 import android.util.Log
@@ -10,14 +11,19 @@ import com.google.mlkit.vision.objects.DetectedObject
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.hereliesaz.cuedetat.di.CustomDetector
 import com.hereliesaz.cuedetat.di.GenericDetector
+import com.hereliesaz.cuedetat.view.state.CvRefinementMethod
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.opencv.core.Core
 import org.opencv.core.Mat
+import org.opencv.core.MatOfPoint
+import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
+import java.io.IOException
 import java.nio.ByteBuffer
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,9 +31,11 @@ import kotlin.math.atan2
 
 @Singleton
 class VisionRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     @GenericDetector private val genericDetector: ObjectDetector,
-    @CustomDetector private val customDetector: ObjectDetector? // Nullable for when model is not present
+    @CustomDetector private val customDetector: ObjectDetector?
 ) {
+
     private val _visionDataFlow = MutableStateFlow(VisionData())
     val visionDataFlow = _visionDataFlow.asStateFlow()
 
@@ -40,9 +48,8 @@ class VisionRepository @Inject constructor(
         var customResults: List<DetectedObject> = emptyList()
         var processedCount = 0
 
-        val detectorsToRun = listOfNotNull(genericDetector, customDetector)
+        val detectorsToRun = listOfNotNull(genericDetector, if (uiState.useCustomModel) customDetector else null)
         if (detectorsToRun.isEmpty()) {
-            // Fallback to close the image if no detectors are available for some reason
             imageProxy.close()
             return
         }
@@ -50,7 +57,6 @@ class VisionRepository @Inject constructor(
         val onComplete = {
             processedCount++
             if (processedCount == detectorsToRun.size) {
-                // Once all detectors have finished, process the results with OpenCV
                 processWithOpenCV(imageProxy, genericResults, customResults, uiState)
             }
         }
@@ -60,21 +66,16 @@ class VisionRepository @Inject constructor(
             .addOnFailureListener { Log.e("VisionRepo", "Generic detector failed.", it) }
             .addOnCompleteListener { onComplete() }
 
-        // Only process with custom detector if it exists
-        if (customDetector != null) {
+        if (uiState.useCustomModel && customDetector != null) {
             customDetector.process(inputImage)
                 .addOnSuccessListener { customResults = it }
                 .addOnFailureListener { Log.e("VisionRepo", "Custom detector failed.", it) }
                 .addOnCompleteListener { onComplete() }
-        } else {
-            // If there's no custom detector, we still need to call onComplete to trigger processing
-            onComplete()
         }
     }
 
     @SuppressLint("UnsafeOptInUsageError")
     private fun processWithOpenCV(imageProxy: ImageProxy, genericObjects: List<DetectedObject>, customObjects: List<DetectedObject>, uiState: OverlayState) {
-        // Mat conversion for OpenCV
         val yBuffer: ByteBuffer = imageProxy.planes[0].buffer
         val uBuffer: ByteBuffer = imageProxy.planes[1].buffer
         val vBuffer: ByteBuffer = imageProxy.planes[2].buffer
@@ -92,13 +93,9 @@ class VisionRepository @Inject constructor(
         val rotatedRgbaMat = Mat()
         Core.rotate(rgbaMat, rotatedRgbaMat, imageProxy.imageInfo.rotationDegrees.toCvRotateCode())
 
-        // Refine Generic Results
-        val genericBalls = refineDetections(genericObjects, rotatedRgbaMat, uiState)
+        val refinedGeneric = refineDetections(genericObjects, rotatedRgbaMat, uiState)
+        val refinedCustom = refineDetections(customObjects, rotatedRgbaMat, uiState)
 
-        // Refine Custom Results
-        val customBalls = refineDetections(customObjects, rotatedRgbaMat, uiState)
-
-        // Table Corner Detection Logic
         val cannyEdges = Mat()
         Imgproc.Canny(rotatedRgbaMat, cannyEdges, uiState.cannyThreshold1.toDouble(), uiState.cannyThreshold2.toDouble())
         val lines = Mat()
@@ -107,11 +104,10 @@ class VisionRepository @Inject constructor(
 
         _visionDataFlow.value = VisionData(
             tableCorners = tableCorners,
-            genericBalls = genericBalls,
-            customBalls = customBalls
+            genericBalls = refinedGeneric,
+            customBalls = refinedCustom
         )
 
-        // Release all Mats
         yuvMat.release()
         rgbaMat.release()
         rotatedRgbaMat.release()
@@ -121,6 +117,13 @@ class VisionRepository @Inject constructor(
     }
 
     private fun refineDetections(detectedObjects: List<DetectedObject>, imageMat: Mat, uiState: OverlayState): List<PointF> {
+        return when (uiState.cvRefinementMethod) {
+            CvRefinementMethod.HOUGH -> refineWithHoughCircles(detectedObjects, imageMat, uiState)
+            CvRefinementMethod.CONTOUR -> refineWithContours(detectedObjects, imageMat)
+        }
+    }
+
+    private fun refineWithHoughCircles(detectedObjects: List<DetectedObject>, imageMat: Mat, uiState: OverlayState): List<PointF> {
         val refinedPoints = mutableListOf<PointF>()
         val grayMat = Mat()
         Imgproc.cvtColor(imageMat, grayMat, Imgproc.COLOR_RGBA2GRAY)
@@ -132,8 +135,11 @@ class VisionRepository @Inject constructor(
                 val circles = Mat()
                 Imgproc.HoughCircles(
                     roi, circles, Imgproc.HOUGH_GRADIENT, 1.0,
-                    roiRect.width.toDouble(), uiState.houghP1.toDouble(), uiState.houghP2.toDouble(),
-                    5, roiRect.width.coerceAtLeast(6)
+                    roiRect.width.toDouble(),
+                    uiState.houghP1.toDouble(),
+                    uiState.houghP2.toDouble(),
+                    5,
+                    roiRect.width.coerceAtLeast(6)
                 )
                 if (!circles.empty()) {
                     val circle = circles.get(0, 0)
@@ -141,6 +147,42 @@ class VisionRepository @Inject constructor(
                 }
                 roi.release()
                 circles.release()
+            }
+        }
+        grayMat.release()
+        return refinedPoints
+    }
+
+    private fun refineWithContours(detectedObjects: List<DetectedObject>, imageMat: Mat): List<PointF> {
+        val refinedPoints = mutableListOf<PointF>()
+        val grayMat = Mat()
+        Imgproc.cvtColor(imageMat, grayMat, Imgproc.COLOR_RGBA2GRAY)
+
+        for (obj in detectedObjects) {
+            val roiRect = obj.boundingBox.toOpenCvRect()
+            if (roiRect.x >= 0 && roiRect.y >= 0 && roiRect.x + roiRect.width <= grayMat.cols() && roiRect.y + roiRect.height <= grayMat.rows() && roiRect.width > 0 && roiRect.height > 0) {
+                val roi = Mat(grayMat, roiRect)
+                val binaryRoi = Mat()
+
+                Imgproc.threshold(roi, binaryRoi, 100.0, 255.0, Imgproc.THRESH_BINARY)
+
+                val contours = mutableListOf<MatOfPoint>()
+                val hierarchy = Mat()
+
+                Imgproc.findContours(binaryRoi, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+
+                contours.maxByOrNull { Imgproc.contourArea(it) }?.let { bestContour ->
+                    val contour2f = MatOfPoint2f(*bestContour.toArray())
+                    val center = Point()
+                    val radius = FloatArray(1)
+                    Imgproc.minEnclosingCircle(contour2f, center, radius)
+
+                    refinedPoints.add(PointF((center.x + roiRect.x).toFloat(), (center.y + roiRect.y).toFloat()))
+                }
+
+                roi.release()
+                binaryRoi.release()
+                hierarchy.release()
             }
         }
         grayMat.release()
@@ -192,7 +234,7 @@ class VisionRepository @Inject constructor(
         else -> -1
     }
 
-    private fun Rect.toOpenCvRect(): org.opencv.core.Rect {
+    private fun android.graphics.Rect.toOpenCvRect(): org.opencv.core.Rect {
         return org.opencv.core.Rect(this.left, this.top, this.width(), this.height())
     }
 }
