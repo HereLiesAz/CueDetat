@@ -31,6 +31,7 @@ class PaintCache {
     val pocketFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = Color.Black.toArgb() }
     val gridLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 3f; pathEffect = DashPathEffect(floatArrayOf(15f, 15f), 0f) } // Doubled
     val pathObstructionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    val cvResultPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
 
 
     // --- Bank Line Paints ---
@@ -80,6 +81,7 @@ class PaintCache {
         tangentLineSolidPaint.color = baseScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         tangentLineDottedPaint.color = baseScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.6f).toArgb()
         pathObstructionPaint.color = baseScheme.tertiary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.2f).toArgb()
+        cvResultPaint.color = Color.Blue.copy(alpha = 0.5f).adjustLuminance(LUMINANCE_ADJUST).toArgb()
 
 
         bankLine1Paint.color = BankLine1Yellow.adjustLuminance(LUMINANCE_ADJUST).toArgb()

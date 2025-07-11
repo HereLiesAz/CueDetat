@@ -160,10 +160,13 @@ android {
         testImplementation(libs.junit)
         implementation(libs.androidx.animation.core)
 
+        // OpenCV for Computer Vision
+
     }
 }
 dependencies {
     implementation(libs.ui.graphics)
+    implementation(project(":opencv"))
 }
 
 

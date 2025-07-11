@@ -1,14 +1,7 @@
 # 22: General Roadmap
 
-* **Bank/Kick Shot Calculator (Refinement):**
-  * ~~Improve reflection logic for more than 2 banks.~~ **(Completed 07/10/2025)**
-  * ~~Consider pocket geometry for line termination and shot success/failure.~~ **(Completed 07/10/2025)**
-  * ~~Integrate spin/english to modify bank shot rebound angles.~~ **(Completed 07/10/2025)**
-* **"English" / Spin Visualization & Guide:**
-  * ~~Add a UI control to simulate striking the cue ball off-center.~~ **(Completed 07/10/2025)**
-  * ~~Display a standard set of resulting cue ball paths based on spin.~~ **(Completed 07/10/2025)**
-  * ~~Implement banking preview for spin paths.~~ **(Completed 07/10/2025)**
 * **Object/Table Detection (Computer Vision):**
+  * Initial OpenCV implementation for ball and table corner detection is complete. Awaiting real-world testing and parameter tuning.
   * Use OpenCV or ML Kit to detect table boundaries and ball positions automatically.
 * **Tutorial Enhancements:**
   * Make the tutorial more interactive.

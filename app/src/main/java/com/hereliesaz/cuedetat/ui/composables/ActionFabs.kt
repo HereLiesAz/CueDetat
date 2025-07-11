@@ -21,6 +21,26 @@ import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
+fun LockColorFab(
+    isColorLocked: Boolean,
+    onEvent: (MainScreenEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FloatingActionButton(
+        onClick = { onEvent(MainScreenEvent.LockOrUnlockColor) },
+        modifier = modifier.navigationBarsPadding(),
+        containerColor = if (isColorLocked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Text(
+            text = if (isColorLocked) "Unlock\nColor" else "Lock\nColor",
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isColorLocked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
 fun ToggleSpinControlFab(
     uiState: OverlayState,
     onEvent: (MainScreenEvent) -> Unit,

@@ -13,10 +13,13 @@ import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
+import com.hereliesaz.cuedetat.data.VisionAnalyzer
+import com.hereliesaz.cuedetat.data.VisionRepository
 import com.hereliesaz.cuedetat.domain.CalculateBankShot
 import com.hereliesaz.cuedetat.domain.StateReducer
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.view.model.Perspective
+import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -37,11 +40,14 @@ class MainViewModel @Inject constructor(
     private val sensorRepository: SensorRepository,
     private val githubRepository: GithubRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
+    visionRepository: VisionRepository,
     application: Application,
     private val updateStateUseCase: UpdateStateUseCase,
     private val calculateBankShotUseCase: CalculateBankShot,
     private val stateReducer: StateReducer
 ) : ViewModel() {
+
+    val visionAnalyzer = VisionAnalyzer(visionRepository)
 
     private val graphicsCamera = Camera()
     private val insultingWarnings: Array<String> =
@@ -66,6 +72,10 @@ class MainViewModel @Inject constructor(
     init {
         sensorRepository.fullOrientationFlow
             .onEach { orientation -> onEvent(MainScreenEvent.FullOrientationChanged(orientation)) }
+            .launchIn(viewModelScope)
+
+        visionRepository.visionDataFlow
+            .onEach { visionData -> onEvent(MainScreenEvent.CvDataUpdated(visionData)) }
             .launchIn(viewModelScope)
 
         fetchLatestVersionName()
@@ -165,6 +175,14 @@ class MainViewModel @Inject constructor(
                 finalState = finalState.copy(warningText = null)
             }
         }
+
+        val expectedRadiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
+            logicalCenter = finalState.protractorUnit.center,
+            logicalRadius = finalState.protractorUnit.radius,
+            state = finalState
+        )
+        visionAnalyzer.updateExpectedRadius(expectedRadiusInfo.radius)
+        visionAnalyzer.updateLockedHsvColor(finalState.lockedHsvColor)
 
         _uiState.value = finalState
     }

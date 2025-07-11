@@ -6,6 +6,7 @@ import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.cuedetat.data.FullOrientation
+import com.hereliesaz.cuedetat.data.VisionData
 import com.hereliesaz.cuedetat.view.state.TableSize
 
 sealed class MainScreenEvent {
@@ -15,7 +16,7 @@ sealed class MainScreenEvent {
     object GestureEnded : MainScreenEvent()
     data class SizeChanged(val width: Int, val height: Int) : MainScreenEvent()
     data class ZoomScaleChanged(val scaleFactor: Float) : MainScreenEvent()
-    data class TableRotationApplied(val degrees: Float) : MainScreenEvent() // For gestures (delta)
+    data class TableRotationApplied(val degrees: Float) : MainScreenEvent()
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
 
     // Spin Control Events
@@ -23,7 +24,7 @@ sealed class MainScreenEvent {
     data class SpinApplied(val offset: PointF) : MainScreenEvent()
     object SpinSelectionEnded : MainScreenEvent()
     data class DragSpinControl(val delta: PointF): MainScreenEvent()
-    object ClearSpinState : MainScreenEvent() // For ViewModel to call after fade
+    object ClearSpinState : MainScreenEvent()
 
     // Logical Events (dispatched by ViewModel)
     internal data class LogicalGestureStarted(val logicalPoint: PointF, val screenOffset: Offset) : MainScreenEvent()
@@ -53,6 +54,10 @@ sealed class MainScreenEvent {
 
     // Obstacle Events
     object AddObstacleBall : MainScreenEvent()
+
+    // CV Events
+    data class CvDataUpdated(val data: VisionData) : MainScreenEvent()
+    object LockOrUnlockColor : MainScreenEvent()
 
     // Tutorial Events
     object StartTutorial : MainScreenEvent()

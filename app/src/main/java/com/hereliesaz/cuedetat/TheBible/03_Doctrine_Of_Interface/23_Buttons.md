@@ -21,14 +21,14 @@
 
 ### 2. Toggle Spin Control FAB
 
-*   **Placement**: Aligned to the bottom-left, stacked vertically *above* the Toggle Cue Ball FAB.
-*   **Action**: Triggers the `ToggleSpinControl` event.
-*   **Dynamic Appearance**: Its `containerColor` must change to `MaterialTheme.colorScheme.secondaryContainer` when the spin control is visible (`isSpinControlVisible = true`).
-*   **Content**: A simple `Text` composable displaying "Spin".
+* **Placement**: Aligned to the bottom-left, stacked vertically below the Lock Color FAB.
+* **Action**: Triggers the `ToggleSpinControl` event.
+* **Dynamic Appearance**: Its `containerColor` must change to `MaterialTheme.colorScheme.secondaryContainer` when the spin control is visible (`isSpinControlVisible = true`).
+* **Content**: A simple `Text` composable displaying "Spin".
 
 ### 3. Toggle Cue Ball FAB
 
-* **Placement**: Aligned to the bottom-left of the screen (`Alignment.BottomStart`), below the Toggle Spin Control FAB.
+* **Placement**: Aligned to the bottom-left of the screen (`Alignment.BottomStart`), below the Add Obstacle Ball FAB.
 * **Action**: Triggers the `MainScreenEvent.ToggleOnPlaneBall` event. This button is only active and visible when not in Banking Mode.
 * **Dynamic Appearance**: The button's color must provide visual feedback on the toggle's state.
   * When `uiState.onPlaneBall` is `null`, its `containerColor` must be `MaterialTheme.colorScheme.surfaceVariant` (inactive state).
@@ -39,7 +39,14 @@
 
 ### 4. Toggle Table FAB
 
-* **Placement**: Positioned horizontally between the `ToggleCueBallFab` and the `ResetFab`.
+* **Placement**: Positioned horizontally between the left-side FAB column and the `ResetFab`.
 * **Action**: Triggers the `MainScreenEvent.ToggleTable` event.
 * **Visibility**: This button is **only** visible when in Protractor Mode and when the table is not currently shown (`!uiState.isBankingMode && !uiState.showTable`).
 * **Content**: It displays the `pool_table` icon.
+
+### 5. Lock Color FAB
+
+* **Placement**: Aligned to the bottom-left, at the top of the vertical FAB column.
+* **Action**: Triggers the `LockOrUnlockColor` event.
+* **Functionality**: Toggles between automatic color detection (sampling the center of the screen every frame) and locking the currently sampled color for stable detection.
+* **Content**: Text that reads "Lock\nColor" or "Unlock\nColor".

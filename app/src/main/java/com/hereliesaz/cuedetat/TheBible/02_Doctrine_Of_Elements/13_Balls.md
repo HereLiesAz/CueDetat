@@ -1,4 +1,3 @@
---- FILE: app/src/main/java/com/hereliesaz/cuedetat/TheBible/02_Doctrine_Of_Elements/13_Balls.md ---
 # The Balls
 
 This scripture defines the logical objects that represent pool balls.
@@ -40,6 +39,9 @@ This scripture defines the logical objects that represent pool balls.
   * The `ActualCueBall` is placed on the head spot (horizontally centered, halfway between the table's center and the bottom rail).
   * The `aimingAngle` is set to `-90f` to align the `GhostCueBall` directly below the `TargetBall` for a straight-in shot.
 * The logical size of the balls is determined by the global zoom factor.
+
+## Automated Detection
+* As of the computer vision update, the positions of balls can be automatically detected. These detected positions are rendered as distinct visual markers (semi-transparent blue dots) for verification. This system works in parallel with the user-controlled logical balls.
 
 ## Addendum: The Magnifier - A Tool of Truth
 * **Purpose**: To provide a magnified view for precise placement of the interactive balls (`TargetBall`, `ActualCueBall`, `BankingBall`).

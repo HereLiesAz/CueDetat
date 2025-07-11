@@ -14,7 +14,7 @@ glanceAppwidget = "1.2.0-alpha01"
 hiltCompiler = "2.56.2"
 hiltNavigationCompose = "1.2.0"
 junit = "4.13.2"
-junitExt = "1.2.1"
+junitExt = "1.8.3"
 lifecycle = "2.9.1"
 lifecycleRuntimeCompose = "2.9.1"
 material = "1.12.0"
@@ -36,6 +36,7 @@ hilt = "2.56.2" # Matches plugin version
 # Networking
 retrofit = "3.0.0"
 converterGson = "3.0.0"
+
 
 # Plugins
 androidApplication = "8.12.0" # Example, use your actual AGP version
@@ -107,6 +108,8 @@ androidx-palette = { group = "androidx.palette", name = "palette-ktx", version =
 compose-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "composeMaterial3" }
 androidx-animation-core = { group = "androidx.compose.animation", name = "animation-core", version.ref = "animationCore" }
 ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics", version.ref = "uiGraphics" }
+
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidApplication" }

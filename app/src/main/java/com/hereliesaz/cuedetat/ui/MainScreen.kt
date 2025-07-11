@@ -87,7 +87,10 @@ fun MainScreen(viewModel: MainViewModel) {
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 if (uiState.isCameraVisible) {
-                    CameraBackground(modifier = Modifier.fillMaxSize().zIndex(0f))
+                    CameraBackground(
+                        modifier = Modifier.fillMaxSize().zIndex(0f),
+                        analyzer = viewModel.visionAnalyzer
+                    )
                 }
 
                 ProtractorOverlay(
@@ -118,7 +121,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                     (spinControlCenter.y - spinControlSizePx / 2).roundToInt()
                                 )
                             },
-                        centerPosition = PointF(0f, 0f), // Position is now handled by the offset modifier
+                        centerPosition = PointF(0f, 0f),
                         selectedSpinOffset = uiState.selectedSpinOffset,
                         lingeringSpinOffset = uiState.lingeringSpinOffset,
                         spinPathAlpha = alphaAnimatable.value,
@@ -150,8 +153,12 @@ fun MainScreen(viewModel: MainViewModel) {
                     Column(
                         modifier = Modifier.padding(start = 16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        LockColorFab(
+                            isColorLocked = uiState.lockedHsvColor != null,
+                            onEvent = viewModel::onEvent
+                        )
                         ToggleSpinControlFab(
                             uiState = uiState,
                             onEvent = viewModel::onEvent
@@ -168,7 +175,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(horizontal = 16.dp), // Padding to not overlap with FABs
+                            .padding(horizontal = 16.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         if (uiState.showTable) {

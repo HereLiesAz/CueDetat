@@ -39,6 +39,12 @@ class BallRenderer {
             drawGhostedBall(canvas, obstacle, ObstacleBall(), state, paints)
         }
 
+        // Draw CV-detected balls
+        state.visionData.balls.forEach { center ->
+            canvas.drawCircle(center.x, center.y, 15f, paints.cvResultPaint)
+        }
+
+
         if (state.areHelpersVisible) {
             drawAllLabels(canvas, state, paints, typeface)
         }
