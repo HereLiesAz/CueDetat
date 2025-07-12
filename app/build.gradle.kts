@@ -20,20 +20,35 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
+            ndk.abiFilters.addAll(listOf("arm64-v8a"))
+
         }
         multiDexEnabled = true
         signingConfig = signingConfigs.getByName("debug")
     }
-
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+    splits {
+        abi {
+            reset() // Clear any existing ABI configurations
+            include("arm64-v8a")
+            // exclude "x86", "x86_64" // Exclude unwanted ABIs
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("debug")
             multiDexEnabled = true
+            //useLegacyPackaging = false
         }
         getByName("debug") {
             signingConfig = signingConfigs.getByName("debug")
