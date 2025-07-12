@@ -1,0 +1,79 @@
+/* src/styles/theme.css */
+
+/* ... (previous styles remain the same) ... */
+
+.menu {
+  position: absolute;
+  bottom: 20px;
+  width: calc(100% - 40px);
+  left: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  pointer-events: auto;
+}
+
+.menu-column {
+  display: flex;
+  flex-direction: column-reverse; /* Stack from bottom up */
+  gap: 10px;
+  align-items: center;
+}
+
+.menu-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+button {
+  background-color: rgba(34, 34, 34, 0.8);
+  color: var(--accent-gold);
+  border: 1px solid var(--steel-ash);
+  padding: 0;
+  cursor: pointer;
+  font-family: "barbaro", monospace;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+  border-radius: 50%;
+  width: 70px;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.1;
+}
+
+.zoom-slider-container {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 60%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+}
+
+.zoom-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    color: var(--muted-gray);
+    margin-bottom: 10px;
+    font-size: 0.8rem;
+}
+
+.zoom-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 10px;
+    transform: rotate(-90deg);
+    background: var(--steel-ash);
+    outline: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
