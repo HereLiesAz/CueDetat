@@ -1,6 +1,6 @@
 // src/App.js
 import React, { useReducer, useEffect, useRef, useLayoutEffect, useState } from 'react';
-import { drawScene } from './core/geometry';
+import { drawScene, calculateSpinPaths } from './core/geometry';
 import { reducer, initialState } from './core/stateReducer';
 import { useGestures } from './core/useGestures';
 import { insultingWarnings } from './core/warnings';
@@ -27,13 +27,25 @@ function App() {
 
   useGestures(canvasRef, dispatch);
 
+  // Effect for calculating derived state like spin paths
+  useEffect(() => {
+    if(state.mode === 'protractor' && (state.selectedSpinOffset || state.lingeringSpinOffset)) {
+        const paths = calculateSpinPaths(state);
+        dispatch({ type: 'SET_SPIN_PATHS', payload: paths });
+    } else if (state.spinPaths.length > 0) {
+        dispatch({ type: 'SET_SPIN_PATHS', payload: [] });
+    }
+  }, [state.selectedSpinOffset, state.lingeringSpinOffset, state.targetBall, state.onPlaneBall, state.aimingAngle, state.zoomFactor]);
+
+  // Main drawing effect
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     drawScene(ctx, state, dispatch);
-  }, [state]);
+  }, [state]); // Re-draw whenever state changes
 
+  // Warning trigger effect
   useEffect(() => {
     if (state.isImpossibleShot && !state.isDragging && !state.warning) {
       const warning = insultingWarnings[Math.floor(Math.random() * insultingWarnings.length)];
@@ -41,6 +53,7 @@ function App() {
       setTimeout(() => dispatch({ type: 'TRIGGER_WARNING', payload: null }), 3000);
     }
   }, [state.isImpossibleShot, state.isDragging, state.warning]);
+
 
   return (
     <div className="app-container">

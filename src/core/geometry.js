@@ -1,5 +1,6 @@
 // src/core/geometry.js
 import { insultingWarnings } from './warnings';
+import { getColorFromAngleAndDistance } from './spinColors';
 
 const BASE_BALL_RADIUS = 15;
 const COLORS = {
@@ -15,9 +16,10 @@ const COLORS = {
   warning: '#C05D5D',
   pocket: '#000000',
   pocketed: '#FFFFFF',
-  bankColors: ['#FFD000', '#DDC400', '#BBA800', '#998C00'] // RebelYellow to muted
+  bankColors: ['#FFD000', '#DDC400', '#BBA800', '#998C00']
 };
 
+// ... (drawBall, drawLine, drawText functions remain unchanged) ...
 function drawBall(ctx, ball, radius, color, shape = 'dot') {
   ctx.save();
   ctx.fillStyle = color;
@@ -58,17 +60,18 @@ function drawLine(ctx, from, to, color, width = 2, isDashed = false) {
     ctx.restore();
 }
 
-function drawText(ctx, text, pos, color, angle = 0) {
+function drawText(ctx, text, pos, color, angle = 0, zoomFactor = 1) {
     ctx.save();
     ctx.translate(pos.x, pos.y);
     ctx.rotate(angle);
     ctx.fillStyle = color;
-    ctx.font = `bold ${14 * (state.zoomFactor || 1)}px "barbaro", monospace`;
+    ctx.font = `bold ${14 * zoomFactor}px "barbaro", monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, 0, 10);
+    ctx.fillText(text, 0, 10 * zoomFactor);
     ctx.restore();
 }
+
 
 function getTableBoundaries(state) {
     const BALL_RADIUS = BASE_BALL_RADIUS * state.zoomFactor;
@@ -86,20 +89,16 @@ function getTableBoundaries(state) {
 
 function drawTable(ctx, state) {
     const { left, top, width, height } = getTableBoundaries(state);
-
     ctx.fillStyle = COLORS.tableFelt;
     ctx.fillRect(left, top, width, height);
-
     ctx.strokeStyle = COLORS.tableOutline;
     ctx.lineWidth = 5 * state.zoomFactor;
     ctx.strokeRect(left, top, width, height);
-
     const pocketRadius = BASE_BALL_RADIUS * 1.8 * state.zoomFactor;
     const pockets = [
         { x: left, y: top }, { x: left + width/2, y: top }, { x: left + width, y: top },
         { x: left, y: top + height }, { x: left + width/2, y: top + height }, { x: left + width, y: top + height }
     ];
-
     pockets.forEach(p => {
         ctx.fillStyle = COLORS.pocket;
         ctx.beginPath();
@@ -108,13 +107,63 @@ function drawTable(ctx, state) {
     });
 }
 
+function calculateSpinPaths(state) {
+    const spinOffset = state.lingeringSpinOffset || state.selectedSpinOffset;
+    if (!spinOffset) return []; // No spin, no paths
+
+    const { ghostBall, BALL_RADIUS } = calculateProtractorGeometry(state);
+    const tangentAngleRad = Math.atan2(ghostBall.y - state.targetBall.y, ghostBall.x - state.targetBall.x) + Math.PI / 2;
+    const tangentDx = Math.cos(tangentAngleRad);
+    const tangentDy = Math.sin(tangentAngleRad);
+
+    const spinControlRadius = 60;
+    const spinMagnitude = Math.hypot(spinOffset.x - spinControlRadius, spinOffset.y - spinControlRadius) / spinControlRadius;
+    const spinAngle = Math.atan2(spinOffset.y - spinControlRadius, spinOffset.x - spinControlRadius);
+
+    const maxCurveOffset = BALL_RADIUS * 2.5;
+    const curveAmount = spinMagnitude * spinMagnitude * maxCurveOffset;
+
+    const maxPathLength = 20 * BALL_RADIUS;
+
+    const controlPoint1 = {
+        x: ghostBall.x + tangentDx * maxPathLength * 0.33,
+        y: ghostBall.y + tangentDy * maxPathLength * 0.33,
+    };
+    const endPoint = {
+        x: ghostBall.x + tangentDx * maxPathLength + (curveAmount * Math.cos(spinAngle)),
+        y: ghostBall.y + tangentDy * maxPathLength + (curveAmount * Math.sin(spinAngle)),
+    };
+    const controlPoint2 = {
+        x: endPoint.x - tangentDx * maxPathLength * 0.33,
+        y: endPoint.y - tangentDy * maxPathLength * 0.33,
+    };
+
+    const color = getColorFromAngleAndDistance(spinAngle * (180/Math.PI), spinMagnitude);
+    return [{ p0: ghostBall, p1: controlPoint1, p2: controlPoint2, p3: endPoint, color }];
+}
+
+function drawSpinPaths(ctx, state) {
+    if (!state.spinPaths || state.spinPaths.length === 0) return;
+
+    state.spinPaths.forEach(path => {
+        ctx.beginPath();
+        ctx.moveTo(path.p0.x, path.p0.y);
+        ctx.bezierCurveTo(path.p1.x, path.p1.y, path.p2.x, path.p2.y, path.p3.x, path.p3.y);
+        ctx.strokeStyle = `rgb(${path.color.r}, ${path.color.g}, ${path.color.b})`;
+        ctx.lineWidth = 2 * state.zoomFactor;
+        ctx.stroke();
+    });
+}
+
 function calculateBankShotPath(state) {
     const bounds = getTableBoundaries(state);
+    if (!state.onPlaneBall) return [];
     let currentPos = state.onPlaneBall;
     const aimTarget = state.bankingAimTarget;
     let dx = aimTarget.x - currentPos.x;
     let dy = aimTarget.y - currentPos.y;
     const mag = Math.hypot(dx, dy);
+    if (mag === 0) return [];
     dx /= mag; dy /= mag;
 
     const path = [{...currentPos}];
@@ -143,7 +192,6 @@ function calculateBankShotPath(state) {
         path.push(nextPos);
         currentPos = nextPos;
 
-        // Reflect vector
         const dot = dx * wallNormal.x + dy * wallNormal.y;
         dx -= 2 * dot * wallNormal.x;
         dy -= 2 * dot * wallNormal.y;
@@ -197,6 +245,8 @@ export function drawScene(ctx, state, dispatch) {
     drawLine(ctx, ghostBall, aimingLineEnd, COLORS.aimingLine, 2 * state.zoomFactor);
     drawLine(ctx, shotLineAnchor, ghostBall, shotLineColor, 2 * state.zoomFactor);
 
+    drawSpinPaths(ctx, state);
+
     drawBall(ctx, state.targetBall, BALL_RADIUS, COLORS.targetBall, 'dot');
     drawBall(ctx, ghostBall, BALL_RADIUS, isImpossibleShot ? COLORS.warning : COLORS.ghostBall, 'crosshair');
     if (state.showOnPlaneBall) {
@@ -205,24 +255,26 @@ export function drawScene(ctx, state, dispatch) {
 
     if (state.showHelpers) {
         const labelOffset = BALL_RADIUS * 1.5 + 10;
-        drawText(ctx, "Target Ball", { x: state.targetBall.x, y: state.targetBall.y - labelOffset }, COLORS.text);
-        drawText(ctx, "Ghost Cue Ball", { x: ghostBall.x, y: ghostBall.y - labelOffset }, COLORS.text);
+        drawText(ctx, "Target Ball", { x: state.targetBall.x, y: state.targetBall.y - labelOffset }, COLORS.text, 0, state.zoomFactor);
+        drawText(ctx, "Ghost Cue Ball", { x: ghostBall.x, y: ghostBall.y - labelOffset }, COLORS.text, 0, state.zoomFactor);
         if (state.showOnPlaneBall) {
-            drawText(ctx, "Actual Cue Ball", { x: state.onPlaneBall.x, y: state.onPlaneBall.y - labelOffset }, COLORS.text);
+            drawText(ctx, "Actual Cue Ball", { x: state.onPlaneBall.x, y: state.onPlaneBall.y - labelOffset }, COLORS.text, 0, state.zoomFactor);
         }
         const shotLineMid = {x: (shotLineAnchor.x + ghostBall.x)/2, y: (shotLineAnchor.y + ghostBall.y)/2};
         const shotAngle = Math.atan2(ghostBall.y - shotLineAnchor.y, ghostBall.x - shotLineAnchor.x);
-        drawText(ctx, "Shot Guide Line", shotLineMid, COLORS.text, shotAngle);
+        drawText(ctx, "Shot Guide Line", shotLineMid, COLORS.text, shotAngle, state.zoomFactor);
 
         const aimingLineMid = {x: (ghostBall.x + state.targetBall.x)/2, y: (ghostBall.y + state.targetBall.y)/2};
-        drawText(ctx, "Aiming Line", aimingLineMid, COLORS.text, aimingAngleRad);
+        drawText(ctx, "Aiming Line", aimingLineMid, COLORS.text, aimingAngleRad, state.zoomFactor);
     }
   } else if (state.mode === 'banking') {
     const bankPath = calculateBankShotPath(state);
     dispatch({ type: 'SET_BANK_PATH', payload: bankPath });
 
     const BALL_RADIUS = BASE_BALL_RADIUS * state.zoomFactor;
-    drawBall(ctx, state.onPlaneBall, BALL_RADIUS, COLORS.cueBall, 'dot');
+    if (state.onPlaneBall) {
+        drawBall(ctx, state.onPlaneBall, BALL_RADIUS, COLORS.cueBall, 'dot');
+    }
 
     for (let i = 0; i < state.bankShotPath.length - 1; i++) {
         const start = state.bankShotPath[i];
@@ -232,3 +284,6 @@ export function drawScene(ctx, state, dispatch) {
     }
   }
 }
+
+// Attach the new geometry function to be accessible
+export { calculateSpinPaths };
