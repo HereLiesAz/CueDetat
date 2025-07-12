@@ -1,0 +1,12 @@
+on:
+  push:
+    branches:
+      - 'CueDetatWeb'
+ 
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - id: build-publish
+      uses: bitovi/github-actions-react-to-github-pages@v1.2.0
+        path: dist
