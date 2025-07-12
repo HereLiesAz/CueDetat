@@ -4,6 +4,7 @@ export const initialState = {
   // System state
   viewWidth: 800,
   viewHeight: 600,
+  mousePosition: { x: 400, y: 300 }, // New: to derive pitch
   toast: null,
   warning: null,
 
@@ -28,7 +29,7 @@ export const initialState = {
   spinControlCenter: { x: 120, y: window.innerHeight * 0.75 },
   selectedSpinOffset: null,
   lingeringSpinOffset: null,
-  spinPaths: [], // To hold calculated Bezier paths
+  spinPaths: [],
 
   // Interaction State
   interactionMode: 'NONE',
@@ -36,8 +37,8 @@ export const initialState = {
 };
 
 function resetPositions(state) {
-    const { viewWidth, viewHeight, showTable, tableSize, zoomFactor, mode } = state;
-    const BALL_RADIUS = 15 * zoomFactor;
+    const { viewWidth, viewHeight, showTable, tableSize, mode } = state;
+    const BALL_RADIUS = 15 * state.zoomFactor;
 
     if (mode === 'banking' || showTable) {
         const tableRatio = tableSize.ratio;
@@ -66,20 +67,26 @@ export function reducer(state, action) {
       const newState = { ...state, viewWidth: action.payload.width, viewHeight: action.payload.height, spinControlCenter: { x: 120, y: action.payload.height * 0.75 } };
       return { ...newState, ...resetPositions(newState) };
     }
+    case 'MOUSE_MOVE':
+        return { ...state, mousePosition: action.payload };
+
     case 'TOGGLE_HELPERS':
       return { ...state, showHelpers: !state.showHelpers };
+
     case 'TOGGLE_CUE_BALL':
       return { ...state, showOnPlaneBall: !state.showOnPlaneBall };
+
     case 'TOGGLE_SPIN_CONTROL':
       return { ...state, isSpinControlVisible: !state.isSpinControlVisible };
+
     case 'TOGGLE_TABLE': {
       const newShowTable = !state.showTable;
       const newState = { ...state, showTable: newShowTable };
-      return newShowTable ? { ...newState, ...resetPositions(newState) } : newState;
+      return { ...newState, ...resetPositions(newState) };
     }
     case 'TOGGLE_BANKING_MODE': {
         const isBanking = state.mode !== 'banking';
-        const newState = { ...state, mode: isBanking ? 'banking' : 'protractor', showTable: isBanking, onPlaneBall: isBanking ? state.onPlaneBall : null };
+        const newState = { ...state, mode: isBanking ? 'banking' : 'protractor', showTable: isBanking };
         return { ...newState, ...resetPositions(newState) };
     }
     case 'GESTURE_START': {
@@ -87,7 +94,6 @@ export function reducer(state, action) {
       const BALL_RADIUS = 15 * state.zoomFactor;
       const BALL_TOUCH_RADIUS = BALL_RADIUS * 1.5;
       let mode = 'NONE';
-
       if (state.mode === 'banking') {
           const bankBallDist = Math.hypot(x - state.onPlaneBall.x, y - state.onPlaneBall.y);
           if (bankBallDist < BALL_TOUCH_RADIUS) mode = 'MOVING_BANKING_BALL';

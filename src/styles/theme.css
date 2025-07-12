@@ -69,10 +69,24 @@ canvas {
   flex-direction: column-reverse;
   gap: 10px;
   align-items: center;
+  position: absolute;
+  bottom: 20px;
   pointer-events: auto;
 }
 
+.menu-column-left {
+  left: 20px;
+}
+
+.menu-column-right {
+  right: 20px;
+}
+
 .menu-center-button {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     pointer-events: auto;
 }
 
@@ -121,16 +135,35 @@ button.fab:hover {
     font-size: 0.8rem;
 }
 
-.zoom-slider {
+input[type=range].zoom-slider {
     -webkit-appearance: none;
     appearance: none;
-    width: 100%;
-    height: 10px;
+    width: 60%; /* The length of the slider */
+    height: 8px; /* The thickness of the track */
+    transform-origin: center;
     transform: rotate(-90deg);
     background: var(--steel-ash);
     outline: none;
     border-radius: 5px;
     cursor: pointer;
+}
+
+input[type=range].zoom-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: var(--accent-gold);
+    border-radius: 50%;
+    border: 2px solid var(--background-dark);
+}
+
+input[type=range].zoom-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: var(--accent-gold);
+    border-radius: 50%;
+    border: 2px solid var(--background-dark);
 }
 
 .impossible-shot-warning {
@@ -179,12 +212,15 @@ button.fab:hover {
 .menu-header {
     text-align: center;
     padding-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
 }
 
-.menu-header h2 {
-    margin: 0;
-    color: var(--accent-gold);
-    font-size: 2rem;
+.menu-logo {
+    width: 80%;
+    height: auto;
 }
 
 .menu-header span {

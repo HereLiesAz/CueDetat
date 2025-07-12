@@ -27,7 +27,16 @@ function App() {
 
   useGestures(canvasRef, dispatch);
 
-  // Effect for calculating derived state like spin paths
+  // Mouse move for perspective tilt
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+        dispatch({ type: 'MOUSE_MOVE', payload: { x: e.clientX, y: e.clientY } });
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+
   useEffect(() => {
     if(state.mode === 'protractor' && (state.selectedSpinOffset || state.lingeringSpinOffset)) {
         const paths = calculateSpinPaths(state);
@@ -35,17 +44,15 @@ function App() {
     } else if (state.spinPaths.length > 0) {
         dispatch({ type: 'SET_SPIN_PATHS', payload: [] });
     }
-  }, [state.selectedSpinOffset, state.lingeringSpinOffset, state.targetBall, state.onPlaneBall, state.aimingAngle, state.zoomFactor]);
+  }, [state.selectedSpinOffset, state.lingeringSpinOffset, state.targetBall, state.onPlaneBall, state.aimingAngle, state.zoomFactor, state.mode]);
 
-  // Main drawing effect
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     drawScene(ctx, state, dispatch);
-  }, [state]); // Re-draw whenever state changes
+  }, [state]);
 
-  // Warning trigger effect
   useEffect(() => {
     if (state.isImpossibleShot && !state.isDragging && !state.warning) {
       const warning = insultingWarnings[Math.floor(Math.random() * insultingWarnings.length)];

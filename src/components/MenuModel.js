@@ -1,5 +1,6 @@
 // src/components/MenuModal.js
 import React from 'react';
+import logo from '../assets/logo_cue_detat.png'; // The sacred import
 
 const MenuItem = ({ onClick, children }) => (
     <div className="menu-item" onClick={onClick}>
@@ -14,7 +15,7 @@ export default function MenuModal({ state, dispatch, onClose }) {
     <div className="menu-modal-overlay" onClick={onClose}>
         <div className="menu-modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="menu-header">
-                <h2>Cue D'état</h2>
+                <img src={logo} alt="Cue D'état Logo" className="menu-logo" />
                 <span>v0.1 (Web Edition)</span>
             </div>
             <MenuDivider />
@@ -24,7 +25,7 @@ export default function MenuModal({ state, dispatch, onClose }) {
                 <MenuItem onClick={() => { dispatch({ type: 'TOGGLE_BANKING_MODE' }); onClose(); }}>
                     {state.mode === 'banking' ? 'Ghost Ball Aiming' : 'Calculate Bank'}
                 </MenuItem>
-                {state.mode !== 'banking' && (
+                {state.mode !== 'protractor' && (
                     <MenuItem onClick={() => { dispatch({ type: 'TOGGLE_CUE_BALL' }); onClose(); }}>
                         {state.showOnPlaneBall ? 'Hide Cue Ball' : 'Toggle Cue Ball'}
                     </MenuItem>
