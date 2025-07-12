@@ -23,7 +23,8 @@ export function lerpColor(c1, c2, t) {
 export function getColorFromAngleAndDistance(angleDegrees, distance) {
     const normalizedAngle = (angleDegrees + 360) % 360;
 
-    let startStop, endStop;
+    let startStop = stops[0];
+    let endStop = stops[stops.length-1];
     for (let i = 0; i < stops.length - 1; i++) {
         if (normalizedAngle >= stops[i].angle && normalizedAngle <= stops[i+1].angle) {
             startStop = stops[i];

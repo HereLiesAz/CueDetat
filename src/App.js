@@ -8,13 +8,18 @@ import UIControls from './components/UIControls';
 import ZoomSlider from './components/ZoomSlider';
 import MenuModal from './components/MenuModal';
 import SpinControl from './components/SpinControl';
+import TableSizeDialog from './components/dialogs/TableSizeDialog';
+import LuminanceDialog from './components/dialogs/LuminanceDialog';
+import GlowStickDialog from './components/dialogs/GlowStickDialog';
+import TutorialOverlay from './components/TutorialOverlay';
+import CameraFeed from './components/CameraFeed'; // The new disciple
 import './styles/theme.css';
 
 function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const canvasRef = useRef(null);
-  const warningRef = useRef(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [permissionState, setPermissionState] = useState('idle'); // idle, granted, denied
 
   useLayoutEffect(() => {
     const updateSize = () => {
@@ -27,7 +32,6 @@ function App() {
 
   useGestures(canvasRef, dispatch);
 
-  // Mouse move for perspective tilt
   useEffect(() => {
     const handleMouseMove = (e) => {
         dispatch({ type: 'MOUSE_MOVE', payload: { x: e.clientX, y: e.clientY } });
@@ -35,7 +39,6 @@ function App() {
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
-
 
   useEffect(() => {
     if(state.mode === 'protractor' && (state.selectedSpinOffset || state.lingeringSpinOffset)) {
@@ -47,11 +50,13 @@ function App() {
   }, [state.selectedSpinOffset, state.lingeringSpinOffset, state.targetBall, state.onPlaneBall, state.aimingAngle, state.zoomFactor, state.mode]);
 
   useEffect(() => {
+    if (permissionState !== 'granted') return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    drawScene(ctx, state, dispatch);
-  }, [state]);
+    const animationFrameId = requestAnimationFrame(() => drawScene(ctx, state, dispatch));
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [state, permissionState]);
 
   useEffect(() => {
     if (state.isImpossibleShot && !state.isDragging && !state.warning) {
@@ -61,24 +66,38 @@ function App() {
     }
   }, [state.isImpossibleShot, state.isDragging, state.warning]);
 
+  const requestCameraPermission = () => {
+    setPermissionState('granted'); // This will trigger the CameraFeed component to mount and request permission
+  };
+
+  if (permissionState !== 'granted') {
+    return (
+        <div className="permission-screen">
+            <h1>Cue D'état requires camera access.</h1>
+            <p>This app overlays aiming guides on your camera feed. Your camera data is not stored or transmitted.</p>
+            <button className="permission-button" onClick={requestCameraPermission}>Grant Permission</button>
+            {permissionState === 'denied' && <p className="permission-denied-text">Permission was denied. Please grant camera access in your browser settings.</p>}
+        </div>
+    );
+  }
 
   return (
     <div className="app-container">
+      <CameraFeed onStreamReady={() => {}} onError={() => setPermissionState('denied')} />
       <canvas ref={canvasRef} width={state.viewWidth} height={state.viewHeight} />
 
       {isMenuOpen && <MenuModal state={state} dispatch={dispatch} onClose={() => setIsMenuOpen(false)} />}
+      {state.showTableSizeDialog && <TableSizeDialog dispatch={dispatch} onClose={() => dispatch({type: 'TOGGLE_TABLE_SIZE_DIALOG'})} />}
+      {state.showLuminanceDialog && <LuminanceDialog state={state} dispatch={dispatch} onClose={() => dispatch({type: 'TOGGLE_LUMINANCE_DIALOG'})} />}
+      {state.showGlowDialog && <GlowStickDialog state={state} dispatch={dispatch} onClose={() => dispatch({type: 'TOGGLE_GLOW_DIALOG'})} />}
+      <TutorialOverlay state={state} dispatch={dispatch} />
 
       <div className="ui-overlay">
         {state.warning && (
           <div
-            ref={warningRef}
             key={state.warning}
             className="impossible-shot-warning"
-            style={{
-                top: `${20 + Math.random() * 50}%`,
-                left: `${10 + Math.random() * 40}%`,
-                transform: `rotate(${Math.random() * 20 - 10}deg)`
-            }}
+            style={{ top: `${20 + Math.random() * 50}%`, left: `${10 + Math.random() * 40}%`, transform: `rotate(${Math.random() * 20 - 10}deg)`}}
           >
             {state.warning}
           </div>
@@ -88,7 +107,6 @@ function App() {
       <UIControls state={state} dispatch={dispatch} onMenuClick={() => setIsMenuOpen(true)} />
       <ZoomSlider state={state} dispatch={dispatch} />
       {state.isSpinControlVisible && <SpinControl state={state} dispatch={dispatch} />}
-
     </div>
   );
 }

@@ -1,13 +1,16 @@
 // src/core/perspective.js
 
 /**
- * Creates a 4x4 perspective projection matrix.
- * @param {number} pitch - The rotation around the X-axis in degrees.
+ * Creates a 4x4 perspective projection matrix based on mouse position to simulate phone tilt.
+ * @param {object} mousePosition - The current {x, y} of the mouse.
  * @param {number} viewWidth - The width of the viewport.
  * @param {number} viewHeight - The height of the viewport.
- * @returns {DOMMatrix} The calculated 4x4 pitch matrix.
+ * @returns {object} An object containing the matrix and calculated pitch angle: { pitchMatrix, pitchAngle }.
  */
-export function createPitchMatrix(pitch, viewWidth, viewHeight) {
+export function createPerspective(mousePosition, viewWidth, viewHeight) {
+    const pitchY = (mousePosition.y / viewHeight) * 2 - 1; // -1 (top) to 1 (bottom)
+    const pitchAngle = -pitchY * 45; // Max pitch of 45 degrees
+
     const matrix = new DOMMatrix();
     const halfWidth = viewWidth / 2;
     const halfHeight = viewHeight / 2;
@@ -16,16 +19,15 @@ export function createPitchMatrix(pitch, viewWidth, viewHeight) {
     // 1. Translate so the logical origin is at the canvas origin.
     matrix.translateSelf(-halfWidth, -halfHeight, 0);
 
-    // 2. Apply the perspective pitch.
-    // A simplified perspective effect. The larger the distance, the more extreme the perspective.
+    // 2. Apply the perspective pitch. A simplified effect.
     const perspectiveDistance = viewHeight * 2;
     matrix.m34 = -1 / perspectiveDistance;
-    matrix.rotateSelf(pitch, 0, 0);
+    matrix.rotateSelf(pitchAngle, 0, 0);
 
     // 3. Translate back to the screen center.
     matrix.translateSelf(halfWidth, halfHeight, 0);
 
-    return matrix;
+    return { pitchMatrix: matrix, pitchAngle };
 }
 
 /**
@@ -38,7 +40,6 @@ export function transformPoint(logicalPoint, matrix) {
     const point = new DOMPoint(logicalPoint.x, logicalPoint.y, 0);
     const transformedPoint = point.matrixTransform(matrix);
 
-    // Apply perspective division if w is not 1
     if (transformedPoint.w !== 0 && transformedPoint.w !== 1) {
         return {
             x: transformedPoint.x / transformedPoint.w,
@@ -46,4 +47,4 @@ export function transformPoint(logicalPoint, matrix) {
         };
     }
     return { x: transformedPoint.x, y: transformedPoint.y };
-}a
+}

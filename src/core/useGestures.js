@@ -38,7 +38,7 @@ export function useGestures(canvasRef, dispatch) {
 
     canvas.addEventListener('mousedown', handleMouseDown);
     canvas.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp); // Use window to catch mouse up events outside canvas
+    window.addEventListener('mouseup', handleMouseUp);
 
     return () => {
       canvas.removeEventListener('mousedown', handleMouseDown);

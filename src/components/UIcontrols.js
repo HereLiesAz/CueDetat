@@ -19,6 +19,7 @@ export default function UIControls({ state, dispatch, onMenuClick }) {
         <Fab onClick={onMenuClick}>Menu</Fab>
         <Fab onClick={() => alert('Felt Color Lock: Not Implemented.')}>Felt<br/>Color</Fab>
         <Fab onClick={() => dispatch({ type: 'TOGGLE_SPIN_CONTROL' })} active={state.isSpinControlVisible}>Spin</Fab>
+        <Fab onClick={() => dispatch({ type: 'ADD_OBSTACLE' })}>Add<br/>Ball</Fab>
         {state.mode !== 'banking' && (
           <Fab onClick={() => dispatch({ type: 'TOGGLE_CUE_BALL' })} active={state.showOnPlaneBall}>
             {state.showOnPlaneBall ? 'Hide\nCue' : 'Show\nCue'}
