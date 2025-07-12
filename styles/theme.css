@@ -1,0 +1,224 @@
+/* src/styles/theme.css */
+
+:root {
+  --accent-gold: #BDA559;
+  --darker-accent-gold: #968141;
+  --muted-maroon: #7E344D;
+  --muted-gray: #A9A9A9;
+  --warning-red: #C05D5D;
+  --acid-patina: #8EA96E;
+  --violet-residue: #8374A9;
+  --rebel-yellow: #FFD000;
+  --steel-ash: #4A4A4A;
+  --gunmetal-fog: #6A6A6A;
+  --cold-ash: #A6A6A6;
+  --background-dark: #121212;
+  --surface-dark: #212121;
+  --on-surface-dark: #E0E0E0;
+}
+
+body {
+  margin: 0;
+  background-color: var(--background-dark);
+  font-family: "barbaro", monospace;
+  color: var(--on-surface-dark);
+  overflow: hidden;
+  user-select: none;
+}
+
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  background-color: var(--background-dark);
+}
+
+canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.ui-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.ui-controls-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  pointer-events: none;
+  padding: 20px;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.menu-column-left, .menu-column-right {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.menu-center-button {
+    pointer-events: auto;
+}
+
+button.fab {
+  background-color: rgba(34, 34, 34, 0.8);
+  color: var(--accent-gold);
+  border: 1px solid var(--steel-ash);
+  padding: 0;
+  cursor: pointer;
+  font-family: "barbaro", monospace;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+  border-radius: 50%;
+  width: 70px;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.1;
+}
+
+button.fab:hover {
+  background-color: var(--steel-ash);
+}
+
+.zoom-slider-container {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 60%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    z-index: 10;
+}
+
+.zoom-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    color: var(--muted-gray);
+    margin-bottom: 10px;
+    font-size: 0.8rem;
+}
+
+.zoom-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 10px;
+    transform: rotate(-90deg);
+    background: var(--steel-ash);
+    outline: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.impossible-shot-warning {
+  position: absolute;
+  font-size: 5vw;
+  font-weight: bold;
+  color: rgba(192, 93, 93, 0.7);
+  text-align: center;
+  pointer-events: none;
+  text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
+  animation: fadeInOut 3s ease-in-out;
+}
+
+@keyframes fadeInOut {
+  0%, 100% { opacity: 0; }
+  20%, 80% { opacity: 0.7; }
+}
+
+.menu-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    z-index: 100;
+    pointer-events: auto;
+}
+
+.menu-modal-content {
+    background-color: rgba(33, 33, 33, 0.9);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    width: 280px;
+    max-width: 80%;
+    height: 100%;
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+.menu-header {
+    text-align: center;
+    padding-bottom: 16px;
+}
+
+.menu-header h2 {
+    margin: 0;
+    color: var(--accent-gold);
+    font-size: 2rem;
+}
+
+.menu-header span {
+    font-size: 0.8rem;
+    color: var(--muted-gray);
+}
+
+.menu-divider {
+    height: 1px;
+    width: 100%;
+    background-color: rgba(169, 169, 169, 0.5);
+    margin: 8px 0;
+}
+
+.menu-section {
+    padding: 8px 0;
+}
+
+.menu-item {
+    font-family: "barbaro", monospace;
+    font-size: 1.1rem;
+    color: var(--accent-gold);
+    padding: 12px 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    border-radius: 4px;
+}
+
+.menu-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.spin-control-container {
+    position: absolute;
+    pointer-events: auto;
+    z-index: 20;
+}

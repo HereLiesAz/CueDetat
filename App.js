@@ -1,17 +1,20 @@
 // src/App.js
-import React, { useReducer, useEffect, useRef, useLayoutEffect } from 'react';
+import React, { useReducer, useEffect, useRef, useLayoutEffect, useState } from 'react';
 import { drawScene } from './core/geometry';
 import { reducer, initialState } from './core/stateReducer';
 import { useGestures } from './core/useGestures';
 import { insultingWarnings } from './core/warnings';
-import Menu from './components/Menu';
+import UIControls from './components/UIControls';
 import ZoomSlider from './components/ZoomSlider';
+import MenuModal from './components/MenuModal';
+import SpinControl from './components/SpinControl';
 import './styles/theme.css';
 
 function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const canvasRef = useRef(null);
   const warningRef = useRef(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useLayoutEffect(() => {
     const updateSize = () => {
@@ -26,21 +29,24 @@ function App() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     drawScene(ctx, state, dispatch);
   }, [state]);
 
   useEffect(() => {
-    if (state.isImpossibleShot && !state.isDragging) {
+    if (state.isImpossibleShot && !state.isDragging && !state.warning) {
       const warning = insultingWarnings[Math.floor(Math.random() * insultingWarnings.length)];
       dispatch({ type: 'TRIGGER_WARNING', payload: warning });
+      setTimeout(() => dispatch({ type: 'TRIGGER_WARNING', payload: null }), 3000);
     }
-  }, [state.isImpossibleShot, state.isDragging]);
-
+  }, [state.isImpossibleShot, state.isDragging, state.warning]);
 
   return (
     <div className="app-container">
       <canvas ref={canvasRef} width={state.viewWidth} height={state.viewHeight} />
+
+      {isMenuOpen && <MenuModal state={state} dispatch={dispatch} onClose={() => setIsMenuOpen(false)} />}
 
       <div className="ui-overlay">
         {state.warning && (
@@ -57,11 +63,12 @@ function App() {
             {state.warning}
           </div>
         )}
-
-        <ZoomSlider state={state} dispatch={dispatch} />
-        <Menu state={state} dispatch={dispatch} />
-
       </div>
+
+      <UIControls state={state} dispatch={dispatch} onMenuClick={() => setIsMenuOpen(true)} />
+      <ZoomSlider state={state} dispatch={dispatch} />
+      {state.isSpinControlVisible && <SpinControl state={state} dispatch={dispatch} />}
+
     </div>
   );
 }
