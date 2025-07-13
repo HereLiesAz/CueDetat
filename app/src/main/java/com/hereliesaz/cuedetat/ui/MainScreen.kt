@@ -165,6 +165,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                 onEvent = viewModel::onEvent
                             )
                             ToggleTableFab(
+                                uiState = uiState,
                                 onEvent = viewModel::onEvent
                             )
                         }
