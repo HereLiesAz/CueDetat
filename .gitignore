@@ -2878,4 +2878,4 @@ project_context_for_ai_20250711_185947.txt
 /opencv/build/intermediates/cxx/RelWithDebInfo/1w35501q/logs/armeabi-v7a/generate_cxx_metadata_1442_timing.txt
 /opencv/build/intermediates/cxx/RelWithDebInfo/1w35501q/logs/x86_64/generate_cxx_metadata_1443_timing.txt
 /project_context_for_ai_20250711_213637.txt
-/opencv/build/intermediates/cxx/*
+/opencv/build/intermediates/cxx/generate_cxx_*

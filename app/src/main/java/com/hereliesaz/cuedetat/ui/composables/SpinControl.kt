@@ -4,10 +4,7 @@ package com.hereliesaz.cuedetat.ui.composables
 
 import android.graphics.PointF
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -19,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
@@ -42,21 +40,46 @@ fun SpinControl(
         modifier = modifier
             .pointerInput(Unit) {
                 awaitEachGesture {
-                    val firstDown = awaitFirstDown()
-                    // Wait for a second tap. If it doesn't happen, this gesture is ignored here.
-                    val secondDown = awaitSecondDown(firstDown)
+                    // Detect the first tap, but don't consume it yet.
+                    val firstDown = awaitFirstDown(requireUnconsumed = false)
 
-                    if (secondDown != null) {
-                        // Double tap confirmed. Consume the event and start listening for a drag.
-                        secondDown.consume()
-                        do {
-                            val event = awaitPointerEvent()
-                            val pan = event.calculatePan()
-                            if (pan != Offset.Zero) {
-                                onEvent(MainScreenEvent.DragSpinControl(PointF(pan.x, pan.y)))
-                                event.changes.forEach { it.consume() }
+                    // See if the first tap is followed by an up event.
+                    val firstUp = waitForUpOrCancellation()
+
+                    if (firstUp != null) {
+                        firstUp.consume() // Consume the up event of the first tap.
+
+                        // Now, wait for a potential second down within the double-tap timeout.
+                        val secondDown = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
+                            awaitFirstDown(requireUnconsumed = false)
+                        }
+
+                        if (secondDown != null) {
+                            // Double tap has been detected. Now we initiate a drag.
+                            secondDown.consume() // Consume the second tap to prevent other gestures.
+                            var pointerId = secondDown.id
+
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val dragChange = event.changes.find { it.id == pointerId }
+
+                                if (dragChange == null || !dragChange.pressed) {
+                                    // Pointer was lifted or the event is for another pointer, so the drag ends.
+                                    break
+                                }
+
+                                if (dragChange.isConsumed) {
+                                    continue
+                                }
+
+                                val pan = dragChange.positionChange()
+                                if (pan != Offset.Zero) {
+                                    onEvent(MainScreenEvent.DragSpinControl(PointF(pan.x, pan.y)))
+                                    // Consume the change to prevent it from propagating further.
+                                    dragChange.consume()
+                                }
                             }
-                        } while (event.changes.any { it.pressed })
+                        }
                     }
                 }
             }
