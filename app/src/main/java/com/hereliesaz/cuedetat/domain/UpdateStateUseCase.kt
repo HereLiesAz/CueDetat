@@ -5,6 +5,7 @@ package com.hereliesaz.cuedetat.domain
 import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
+import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.Perspective
@@ -119,7 +120,6 @@ class UpdateStateUseCase @Inject constructor(
 
 
         val inactiveTangentLineBankPath = if (state.showTable && !state.isBankingMode) {
-            // Inactive tangent does not bank.
             emptyList()
         } else { emptyList() }
 
@@ -152,7 +152,7 @@ class UpdateStateUseCase @Inject constructor(
         val spinPaths = if (!state.isBankingMode) {
             calculateSpinPaths(updatedStateWithSnapping)
         } else {
-            emptyMap()
+            emptyMap<Color, List<PointF>>()
         }
 
         return updatedStateWithSnapping.copy(
