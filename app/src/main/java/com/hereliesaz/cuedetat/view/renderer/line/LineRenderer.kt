@@ -46,8 +46,9 @@ class LineRenderer {
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
         val shotGuideLineConfig = ShotGuideLine()
 
+        val shotLineIsWarning = state.isGeometricallyImpossible || state.isTiltBeyondLimit || state.isObstructed || state.tangentAimedPocketIndex != null
         val shotLinePaint = Paint(paints.shotLinePaint).apply {
-            color = if (state.isImpossibleShot || state.isTiltBeyondLimit) paints.warningPaint.color else shotGuideLineConfig.strokeColor.toArgb()
+            color = if (shotLineIsWarning) paints.warningPaint.color else shotGuideLineConfig.strokeColor.toArgb()
             strokeWidth = shotGuideLineConfig.strokeWidth
         }
         val shotLineGlow = Paint(paints.lineGlowPaint).apply {
@@ -111,7 +112,6 @@ class LineRenderer {
         val aimingLineConfig = AimingLine()
         val isDirectPocketed = state.aimedPocketIndex != null
 
-        // Determine base color based on pocketing
         val baseAimingColor = if(isDirectPocketed && state.aimingLineBankPath.isEmpty()) RebelYellow else aimingLineConfig.strokeColor
 
         val aimingLinePaint = Paint(paints.targetCirclePaint).apply {
@@ -124,11 +124,10 @@ class LineRenderer {
             alpha = (aimingLineConfig.glowColor.alpha * 255).toInt()
         }
 
-        // If banked, draw the segments
         if (state.aimingLineBankPath.isNotEmpty()) {
             drawPath(canvas, state.aimingLineBankPath, aimingLineGlow)
             drawPath(canvas, state.aimingLineBankPath, aimingLinePaint)
-        } else { // Otherwise draw the single straight line
+        } else {
             drawExtendedLine(canvas, state.protractorUnit.ghostCueBallCenter, state.protractorUnit.center, aimingLineGlow)
             drawExtendedLine(canvas, state.protractorUnit.ghostCueBallCenter, state.protractorUnit.center, aimingLinePaint)
         }
@@ -159,12 +158,8 @@ class LineRenderer {
             drawExtendedLine(canvas, state.protractorUnit.ghostCueBallCenter, state, state.tangentDirection, tangentSolidPaint)
         }
 
-        if (state.inactiveTangentLineBankPath.isNotEmpty()) {
-            drawPath(canvas, state.inactiveTangentLineBankPath, tangentGlow)
-            drawPath(canvas, state.inactiveTangentLineBankPath, tangentDottedPaint)
-        } else {
-            drawExtendedLine(canvas, state.protractorUnit.ghostCueBallCenter, state, -state.tangentDirection, tangentDottedPaint)
-        }
+        // Inactive tangent line no longer banks
+        drawExtendedLine(canvas, state.protractorUnit.ghostCueBallCenter, state, -state.tangentDirection, tangentDottedPaint)
     }
 
 
@@ -335,8 +330,8 @@ class LineRenderer {
         val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)
         val finalAngleRad = initialAngleRad + Math.toRadians(angleDegrees.toDouble())
         val length = 5000f
-        val endX = center.x + length * cos(finalAngleRad).toFloat()
-        val endY = center.y + length * sin(finalAngleRad).toFloat()
+        val endX = center.x + (length * cos(finalAngleRad)).toFloat()
+        val endY = center.y + (length * sin(finalAngleRad)).toFloat()
         canvas.drawLine(center.x, center.y, endX, endY, paint)
     }
 }

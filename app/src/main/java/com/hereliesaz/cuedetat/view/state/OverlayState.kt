@@ -135,7 +135,8 @@ data class OverlayState(
     // Derived state
     val shotLineAnchor: PointF = PointF(0f, 0f),
     val tangentDirection: Float = 1.0f,
-    val isImpossibleShot: Boolean = false,
+    val isGeometricallyImpossible: Boolean = false,
+    val isObstructed: Boolean = false,
     val isTiltBeyondLimit: Boolean = false,
     val warningText: String? = null,
     val shotGuideImpactPoint: PointF? = null,

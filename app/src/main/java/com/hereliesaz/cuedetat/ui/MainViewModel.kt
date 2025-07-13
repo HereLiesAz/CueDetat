@@ -124,10 +124,9 @@ class MainViewModel @Inject constructor(
     private fun updateState(event: MainScreenEvent) {
         val currentState = _uiState.value
 
-        // Phase 1: Convert screen-space events to logical-space events
         val logicalEvent = when (event) {
             is MainScreenEvent.Drag -> {
-                if (!currentState.hasInverseMatrix) return // Guard against processing without a valid matrix
+                if (!currentState.hasInverseMatrix) return
 
                 val logicalCurr = Perspective.screenToLogical(event.currentPosition, currentState.inversePitchMatrix)
                 if (currentState.interactionMode == InteractionMode.AIMING_BANK_SHOT) {
@@ -150,7 +149,6 @@ class MainViewModel @Inject constructor(
             else -> event
         }
 
-        // Phase 2: Fast Path for Bank Shot Aiming
         if (logicalEvent is MainScreenEvent.AimBankShot) {
             val stateWithNewTarget = currentState.copy(bankingAimTarget = logicalEvent.logicalTarget)
             val bankShotResult = calculateBankShotUseCase(stateWithNewTarget)
@@ -160,10 +158,9 @@ class MainViewModel @Inject constructor(
             )
             _uiState.value = finalState
             visionAnalyzer.updateUiState(finalState)
-            return // Bypass the full reduction pipeline
+            return
         }
 
-        // Phase 3: Full Pipeline for all other events
         val stateFromReducer = stateReducer.reduce(currentState, logicalEvent)
         var derivedState = updateStateUseCase(stateFromReducer, graphicsCamera)
 
@@ -178,7 +175,7 @@ class MainViewModel @Inject constructor(
         var finalState = derivedState
 
         if (event is MainScreenEvent.GestureEnded) {
-            val warningText = if (!finalState.isBankingMode && finalState.isImpossibleShot) {
+            val warningText = if (!finalState.isBankingMode && finalState.isGeometricallyImpossible) {
                 insultingWarnings[warningIndex].also {
                     warningIndex = (warningIndex + 1) % insultingWarnings.size
                 }
@@ -187,7 +184,7 @@ class MainViewModel @Inject constructor(
             }
             finalState = finalState.copy(warningText = warningText)
         } else if (event !is MainScreenEvent.ScreenGestureStarted) {
-            if (finalState.warningText != null && (!finalState.isImpossibleShot || finalState.isBankingMode)) {
+            if (finalState.warningText != null && !finalState.isGeometricallyImpossible) {
                 finalState = finalState.copy(warningText = null)
             }
         }

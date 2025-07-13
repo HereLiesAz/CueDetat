@@ -48,15 +48,13 @@ class UpdateStateUseCase @Inject constructor(
         val logicalShotLineAnchor = getLogicalShotLineAnchor(updatedStateWithSnapping, baseInverseMatrix)
         val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= updatedStateWithSnapping.protractorUnit.ghostCueBallCenter.y
 
-        val (isShotImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
+        val (isGeometricallyImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
             shotAnchor = logicalShotLineAnchor,
             ghostBall = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter,
             targetBall = updatedStateWithSnapping.protractorUnit.center
         )
 
         val isObstructed = checkForObstructions(updatedStateWithSnapping)
-        val isImpossible = isShotImpossible || isObstructed
-
         val targetBallDistance = calculateDistance(updatedStateWithSnapping, flatMatrix)
 
         var (aimedPocketIndex, aimingLineEndPoint) = if (!state.isBankingMode && state.showTable) {
@@ -98,7 +96,12 @@ class UpdateStateUseCase @Inject constructor(
             tangentStart.y - (updatedStateWithSnapping.protractorUnit.center.x - tangentStart.x) * tangentDirection
         )
 
-        val (tangentAimedPocketIndex, tangentAimingEndPoint) = checkPocketAim(tangentStart, activeTangentTarget, updatedStateWithSnapping)
+        var (tangentAimedPocketIndex, tangentAimingEndPoint) = if(!state.isBankingMode && state.showTable) {
+            checkPocketAim(tangentStart, activeTangentTarget, updatedStateWithSnapping)
+        } else {
+            Pair(null, null)
+        }
+
 
         var tangentLineBankPath = if (state.showTable && !state.isBankingMode) {
             calculateSingleBank(tangentStart, activeTangentTarget, updatedStateWithSnapping)
@@ -107,6 +110,7 @@ class UpdateStateUseCase @Inject constructor(
         if(tangentLineBankPath.isNotEmpty()){
             val (bankedPocketIndex, intersectionPoint) = checkPocketAim(tangentLineBankPath[0], tangentLineBankPath[1], updatedStateWithSnapping)
             if (bankedPocketIndex != null && intersectionPoint != null) {
+                tangentAimedPocketIndex = bankedPocketIndex
                 tangentLineBankPath = listOf(tangentLineBankPath[0], intersectionPoint)
             }
         } else if(tangentAimedPocketIndex != null && tangentAimingEndPoint != null){
@@ -115,7 +119,8 @@ class UpdateStateUseCase @Inject constructor(
 
 
         val inactiveTangentLineBankPath = if (state.showTable && !state.isBankingMode) {
-            calculateSingleBank(tangentStart, inactiveTangentTarget, updatedStateWithSnapping)
+            // Inactive tangent does not bank.
+            emptyList()
         } else { emptyList() }
 
 
@@ -156,7 +161,8 @@ class UpdateStateUseCase @Inject constructor(
             inversePitchMatrix = finalInverseMatrix,
             hasInverseMatrix = hasFinalInverse,
             shotLineAnchor = logicalShotLineAnchor,
-            isImpossibleShot = isImpossible,
+            isGeometricallyImpossible = isGeometricallyImpossible,
+            isObstructed = isObstructed,
             isTiltBeyondLimit = isTiltBeyondLimit,
             tangentDirection = tangentDirection,
             targetBallDistance = targetBallDistance,

@@ -55,7 +55,6 @@ class LineTextRenderer {
 
         // Shot Guide Line Label - Anchored to Ghost Ball
         val shotLineAngle = Math.toDegrees(atan2((state.protractorUnit.ghostCueBallCenter.y - state.shotLineAnchor.y).toDouble(), (state.protractorUnit.ghostCueBallCenter.x - state.shotLineAnchor.x).toDouble()).toDouble()).toFloat()
-        // The distance multiplier has been increased from 2.5f to 4.0f.
         draw(canvas, "Shot Guide Line", state.protractorUnit.ghostCueBallCenter, shotLineAngle, state.protractorUnit.radius * 4.0f * zoomFactor, 0f, textPaint)
 
         // Tangent Line Labels - Drawn on both sides
@@ -69,10 +68,7 @@ class LineTextRenderer {
     fun drawAngleLabel(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint, radius: Float) {
         val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)
         val labelAngleRad = initialAngleRad + Math.toRadians(angleDegrees.toDouble())
-        // --- THE RIGHTEOUS FIX ---
-        // The multiplier is now 16.5f (5.5 * 3), as commanded.
         val labelDistance = radius * 16.5f
-        // --- END FIX ---
 
         val text = "${angleDegrees.toInt()}°"
         val textX = center.x + (labelDistance * cos(labelAngleRad)).toFloat()
@@ -84,25 +80,26 @@ class LineTextRenderer {
     fun drawDiamondLabel(canvas: Canvas, point: PointF, railType: RailType, state: OverlayState, paint: Paint) {
         val diamondNumberText = calculateDiamondNumber(point, railType, state) ?: return
 
-        paint.textSize = getDynamicFontSize(60f, state.zoomSliderPosition)
+        paint.textSize = getDynamicFontSize(30f, state.zoomSliderPosition) // Reduced size slightly for clarity
+        val padding = 15f // Distance from the rail line
 
         var textRotation = 0f
+        var textX = point.x
+        var textY = point.y
+
         when (railType) {
-            RailType.TOP, RailType.BOTTOM -> textRotation = 0f
-            RailType.LEFT -> textRotation = 90f
-            RailType.RIGHT -> textRotation = -90f
+            RailType.TOP -> { textY += padding; textRotation = 0f }
+            RailType.BOTTOM -> { textY -= padding; textRotation = 0f }
+            RailType.LEFT -> { textX += padding; textRotation = 90f }
+            RailType.RIGHT -> { textX -= padding; textRotation = -90f }
         }
 
-        // Keep text right-side up for the user
         val totalRotation = (state.tableRotationDegrees + textRotation) % 360
         val uprightCorrection = if (totalRotation > 90 && totalRotation < 270) 180f else 0f
 
         canvas.save()
-        canvas.rotate(textRotation + uprightCorrection, point.x, point.y)
-
-        val yOffset = paint.fontMetrics.ascent - 10f
-        canvas.drawText(diamondNumberText, point.x, point.y + yOffset, paint)
-
+        canvas.rotate(textRotation + uprightCorrection, textX, textY)
+        canvas.drawText(diamondNumberText, textX, textY, paint)
         canvas.restore()
     }
 
@@ -122,18 +119,25 @@ class LineTextRenderer {
         val logicalX = point.x - state.viewWidth / 2f
         val logicalY = point.y - state.viewHeight / 2f
 
-        // End rails (short) have 4 diamond units, Side rails (long) have 8.
         val diamondValue = when (railType) {
-            RailType.TOP -> ((logicalX + halfW) / tableWidth) * 8.0 // Left to Right: 0 -> 8
-            RailType.RIGHT -> ((logicalY + halfH) / tableHeight) * 4.0 // Top to Bottom: 0 -> 4
-            RailType.BOTTOM -> 8.0 - (((logicalX + halfW) / tableWidth) * 8.0) // Right to Left: 8 -> 0
-            RailType.LEFT -> 4.0 - (((logicalY + halfH) / tableHeight) * 4.0) // Bottom to Top: 4 -> 0
+            RailType.TOP -> ((logicalX + halfW) / tableWidth) * 8.0
+            RailType.RIGHT -> ((logicalY + halfH) / tableHeight) * 4.0
+            RailType.BOTTOM -> 8.0 - (((logicalX + halfW) / tableWidth) * 8.0)
+            RailType.LEFT -> 4.0 - (((logicalY + halfH) / tableHeight) * 4.0)
         }
 
         return String.format("%.1f", diamondValue)
     }
 
     fun drawBankingLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?){
-        // This function is deprecated as its logic has been moved to drawDiamondLabel and called from LineRenderer
+        if (state.bankShotPath.size < 2) return
+
+        for (i in 0 until state.bankShotPath.size - 1) {
+            val end = state.bankShotPath[i+1]
+            getRailForPoint(end, state)?.let { railType ->
+                val textPaint = paints.textPaint.apply { this.typeface = typeface }
+                drawDiamondLabel(canvas, end, railType, state, textPaint)
+            }
+        }
     }
 }
