@@ -8,10 +8,12 @@ import android.graphics.PointF
 import android.graphics.Rect
 import android.util.Log
 import androidx.camera.core.ImageProxy
+import com.google.mlkit.common.model.LocalModel
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.DetectedObject
+import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
-import com.hereliesaz.cuedetat.di.CustomDetector
+import com.google.mlkit.vision.objects.custom.CustomObjectDetectorOptions
 import com.hereliesaz.cuedetat.di.GenericDetector
 import com.hereliesaz.cuedetat.view.state.CvRefinementMethod
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -35,11 +37,36 @@ import kotlin.math.atan2
 class VisionRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     @GenericDetector private val genericDetector: ObjectDetector,
-    @CustomDetector private val customDetector: ObjectDetector?
 ) {
 
     private val _visionDataFlow = MutableStateFlow(VisionData())
     val visionDataFlow = _visionDataFlow.asStateFlow()
+    private val customDetector: ObjectDetector?
+
+    init {
+        val modelFile = "model.tflite"
+        val assetExists = try {
+            context.assets.open(modelFile).close()
+            true
+        } catch (e: IOException) {
+            false
+        }
+
+        customDetector = if (assetExists) {
+            val localModel = LocalModel.Builder().setAssetFilePath(modelFile).build()
+            val customOptions = CustomObjectDetectorOptions.Builder(localModel)
+                .setDetectorMode(CustomObjectDetectorOptions.STREAM_MODE)
+                .enableMultipleObjects()
+                .enableClassification()
+                .setClassificationConfidenceThreshold(0.5f)
+                .setMaxPerObjectLabelCount(3)
+                .build()
+            ObjectDetection.getClient(customOptions)
+        } else {
+            null
+        }
+    }
+
 
     @SuppressLint("UnsafeOptInUsageError")
     fun processImage(imageProxy: ImageProxy, uiState: OverlayState) {
