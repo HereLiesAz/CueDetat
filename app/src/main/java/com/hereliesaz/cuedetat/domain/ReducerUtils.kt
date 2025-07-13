@@ -3,6 +3,7 @@
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
+import android.graphics.Rect
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
@@ -18,24 +19,29 @@ class ReducerUtils @Inject constructor() {
         return (min(stateWidth, stateHeight) * 0.30f / 2f) * zoomFactor
     }
 
-    fun findRailIntersectionAndNormal(startPoint: PointF, endPoint: PointF, state: OverlayState): Pair<PointF, PointF>? {
+    fun getTableBoundaries(state: OverlayState): Rect {
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
-        if (referenceRadius <= 0) return null
-
         val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
         val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
-        val tableWidth = tableToBallRatioLong * referenceRadius
-        val tableHeight = tableToBallRatioShort * referenceRadius
+        val tablePlayingSurfaceWidth = tableToBallRatioLong * referenceRadius
+        val tablePlayingSurfaceHeight = tableToBallRatioShort * referenceRadius
 
-        val halfW = tableWidth / 2f
-        val halfH = tableHeight / 2f
         val canvasCenterX = state.viewWidth / 2f
         val canvasCenterY = state.viewHeight / 2f
+        val left = canvasCenterX - tablePlayingSurfaceWidth / 2
+        val top = canvasCenterY - tablePlayingSurfaceHeight / 2
+        val right = canvasCenterX + tablePlayingSurfaceWidth / 2
+        val bottom = canvasCenterY + tablePlayingSurfaceHeight / 2
 
-        val left = canvasCenterX - halfW
-        val top = canvasCenterY - halfH
-        val right = canvasCenterX + halfW
-        val bottom = canvasCenterY + halfH
+        return Rect(left.toInt(), top.toInt(), right.toInt(), bottom.toInt())
+    }
+
+    fun findRailIntersectionAndNormal(startPoint: PointF, endPoint: PointF, state: OverlayState): Pair<PointF, PointF>? {
+        val bounds = getTableBoundaries(state)
+        val left = bounds.left.toFloat()
+        val top = bounds.top.toFloat()
+        val right = bounds.right.toFloat()
+        val bottom = bounds.bottom.toFloat()
 
         val dirX = endPoint.x - startPoint.x
         val dirY = endPoint.y - startPoint.y

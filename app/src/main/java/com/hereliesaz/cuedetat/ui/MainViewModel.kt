@@ -82,7 +82,6 @@ class MainViewModel @Inject constructor(
             .onEach { visionData -> onEvent(MainScreenEvent.CvDataUpdated(visionData)) }
             .launchIn(viewModelScope)
 
-        // Pass the initial state to the analyzer
         visionAnalyzer.updateUiState(_uiState.value)
 
         fetchLatestVersionName()
@@ -98,28 +97,21 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.ToggleDistanceUnit -> {
                 val newUnit = if (uiState.value.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC
                 userPreferencesRepository.setDistanceUnit(newUnit)
-                updateState(event)
             }
             is MainScreenEvent.SetTableSize -> {
                 userPreferencesRepository.setTableSize(event.size)
-                updateState(event)
             }
             is MainScreenEvent.CycleTableSize -> {
                 val newSize = uiState.value.tableSize.next()
                 userPreferencesRepository.setTableSize(newSize)
-                updateState(event)
             }
-            // Persist CV param changes
             is MainScreenEvent.UpdateHoughP1 -> userPreferencesRepository.setCvHoughP1(event.value)
             is MainScreenEvent.UpdateHoughP2 -> userPreferencesRepository.setCvHoughP2(event.value)
             is MainScreenEvent.UpdateCannyT1 -> userPreferencesRepository.setCvCannyT1(event.value)
             is MainScreenEvent.UpdateCannyT2 -> userPreferencesRepository.setCvCannyT2(event.value)
-
-            else -> {
-                // For all other events, just proceed to update the state
-            }
+            else -> { /* Do nothing here, handled by updateState */ }
         }
-        updateState(event) // Update state for all events, including the ones handled above
+        updateState(event)
     }
 
     private fun fetchLatestVersionName() {
@@ -132,23 +124,19 @@ class MainViewModel @Inject constructor(
     private fun updateState(event: MainScreenEvent) {
         val currentState = _uiState.value
 
+        // Phase 1: Convert screen-space events to logical-space events
         val logicalEvent = when (event) {
             is MainScreenEvent.Drag -> {
-                val logicalPrev = Perspective.screenToLogical(event.previousPosition, currentState.inversePitchMatrix)
+                if (!currentState.hasInverseMatrix) return // Guard against processing without a valid matrix
+
                 val logicalCurr = Perspective.screenToLogical(event.currentPosition, currentState.inversePitchMatrix)
-                val screenDelta = Offset(event.currentPosition.x - event.previousPosition.x, event.currentPosition.y - event.previousPosition.y)
-
-                if (currentState.interactionMode == InteractionMode.MOVING_SPIN_CONTROL) {
-                    return onEvent(MainScreenEvent.DragSpinControl(PointF(screenDelta.x, screenDelta.y)))
-                }
-
-                if (currentState.interactionMode == InteractionMode.AIMING_BANK_SHOT && currentState.hasInverseMatrix) {
+                if (currentState.interactionMode == InteractionMode.AIMING_BANK_SHOT) {
                     MainScreenEvent.AimBankShot(logicalCurr)
-                } else if (currentState.hasInverseMatrix) {
+                } else {
+                    val logicalPrev = Perspective.screenToLogical(event.previousPosition, currentState.inversePitchMatrix)
+                    val screenDelta = Offset(event.currentPosition.x - event.previousPosition.x, event.currentPosition.y - event.previousPosition.y)
                     val logicalDelta = PointF(logicalCurr.x - logicalPrev.x, logicalCurr.y - logicalPrev.y)
                     MainScreenEvent.LogicalDragApplied(logicalDelta, screenDelta)
-                } else {
-                    event
                 }
             }
             is MainScreenEvent.ScreenGestureStarted -> {
@@ -162,6 +150,20 @@ class MainViewModel @Inject constructor(
             else -> event
         }
 
+        // Phase 2: Fast Path for Bank Shot Aiming
+        if (logicalEvent is MainScreenEvent.AimBankShot) {
+            val stateWithNewTarget = currentState.copy(bankingAimTarget = logicalEvent.logicalTarget)
+            val bankShotResult = calculateBankShotUseCase(stateWithNewTarget)
+            val finalState = stateWithNewTarget.copy(
+                bankShotPath = bankShotResult.path,
+                pocketedBankShotPocketIndex = bankShotResult.pocketedPocketIndex
+            )
+            _uiState.value = finalState
+            visionAnalyzer.updateUiState(finalState)
+            return // Bypass the full reduction pipeline
+        }
+
+        // Phase 3: Full Pipeline for all other events
         val stateFromReducer = stateReducer.reduce(currentState, logicalEvent)
         var derivedState = updateStateUseCase(stateFromReducer, graphicsCamera)
 

@@ -27,29 +27,8 @@ class UpdateStateUseCase @Inject constructor(
     operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
-        var updatedProtractorUnit = state.protractorUnit
-        var updatedOnPlaneBall = state.onPlaneBall
-
-        if (state.isSnappingEnabled) {
-            val detectedBalls = state.visionData.genericBalls + state.visionData.customBalls
-            if (detectedBalls.isNotEmpty()) {
-                if (!state.hasTargetBallBeenMoved) {
-                    detectedBalls.getOrNull(0)?.let {
-                        updatedProtractorUnit = state.protractorUnit.copy(center = it)
-                    }
-                }
-                if (!state.hasCueBallBeenMoved && state.onPlaneBall != null) {
-                    detectedBalls.getOrNull(1)?.let {
-                        updatedOnPlaneBall = state.onPlaneBall?.copy(center = it)
-                    }
-                }
-            }
-        }
-
-        val updatedStateWithSnapping = state.copy(
-            protractorUnit = updatedProtractorUnit,
-            onPlaneBall = updatedOnPlaneBall
-        )
+        val updatedProtractorUnit = state.protractorUnit
+        val updatedStateWithSnapping = state
 
         val basePitchMatrix = Perspective.createPitchMatrix(
             currentOrientation = state.currentOrientation,
@@ -80,7 +59,7 @@ class UpdateStateUseCase @Inject constructor(
 
         val targetBallDistance = calculateDistance(updatedStateWithSnapping, flatMatrix)
 
-        var (aimedPocketIndex, aimingLineEndPoint) = if (!state.isBankingMode) {
+        var (aimedPocketIndex, aimingLineEndPoint) = if (!state.isBankingMode && state.showTable) {
             checkPocketAim(updatedStateWithSnapping.protractorUnit.ghostCueBallCenter, updatedStateWithSnapping.protractorUnit.center, updatedStateWithSnapping)
         } else {
             Pair(null, null)
@@ -268,7 +247,7 @@ class UpdateStateUseCase @Inject constructor(
                     if (abs(dySegment) > 0.001f) (intersection.y - start.y) / dySegment else 0f
                 }
 
-                if (t >= 0.0f) { // Check if intersection is on the ray, not just the segment
+                if (t >= 0.0f) {
                     val distSq = (intersection.x - start.x).pow(2) + (intersection.y - start.y).pow(2)
                     if (distSq < minDistanceSq) {
                         minDistanceSq = distSq
@@ -313,7 +292,6 @@ class UpdateStateUseCase @Inject constructor(
         val ballRadius = state.protractorUnit.radius
         val collisionDistance = ballRadius * 2
 
-        // Path 1: Cue Ball to Ghost Ball (Shot Guide Line)
         val shotLineStart = state.shotLineAnchor
         val shotLineEnd = state.protractorUnit.ghostCueBallCenter
         for (obstacle in state.obstacleBalls) {
@@ -322,7 +300,6 @@ class UpdateStateUseCase @Inject constructor(
             }
         }
 
-        // Path 2: Ghost Ball to Target Ball (Aiming Line)
         val aimingLineStart = state.protractorUnit.ghostCueBallCenter
         val aimingLineEnd = state.protractorUnit.center
         for (obstacle in state.obstacleBalls) {
@@ -336,11 +313,10 @@ class UpdateStateUseCase @Inject constructor(
 
     private fun isSegmentObstructed(p1: PointF, p2: PointF, center: PointF, minDist: Float): Boolean {
         val l2 = (p2.x - p1.x).pow(2) + (p2.y - p1.y).pow(2)
-        if (l2 == 0f) return false // Line segment has zero length
+        if (l2 == 0f) return false
 
-        // Project center point onto the line
         var t = ((center.x - p1.x) * (p2.x - p1.x) + (center.y - p1.y) * (p2.y - p1.y)) / l2
-        t = t.coerceIn(0f, 1f) // Clamp projection to the segment
+        t = t.coerceIn(0f, 1f)
 
         val projection = PointF(p1.x + t * (p2.x - p1.x), p1.y + t * (p2.y - p1.y))
         val dist = hypot((center.x - projection.x).toDouble(), (center.y - projection.y).toDouble()).toFloat()

@@ -9,7 +9,6 @@ import android.graphics.Rect
  * Data class to hold the results of computer vision processing.
  */
 data class VisionData(
-    val tableCorners: List<PointF> = emptyList(),
     val genericBalls: List<PointF> = emptyList(), // Results from the generic ML Kit model
     val customBalls: List<PointF> = emptyList(),  // Results from your custom TFLite model
     val detectedHsvColor: FloatArray? = null,
@@ -21,7 +20,6 @@ data class VisionData(
 
         other as VisionData
 
-        if (tableCorners != other.tableCorners) return false
         if (genericBalls != other.genericBalls) return false
         if (customBalls != other.customBalls) return false
         if (detectedHsvColor != null) {
@@ -34,8 +32,7 @@ data class VisionData(
     }
 
     override fun hashCode(): Int {
-        var result = tableCorners.hashCode()
-        result = 31 * result + genericBalls.hashCode()
+        var result = genericBalls.hashCode()
         result = 31 * result + customBalls.hashCode()
         result = 31 * result + (detectedHsvColor?.contentHashCode() ?: 0)
         result = 31 * result + detectedBoundingBoxes.hashCode()

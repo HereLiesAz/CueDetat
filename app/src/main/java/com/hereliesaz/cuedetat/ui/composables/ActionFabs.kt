@@ -2,43 +2,17 @@
 
 package com.hereliesaz.cuedetat.ui.composables
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
-
-@Composable
-fun LockColorFab(
-    isColorLocked: Boolean,
-    onEvent: (MainScreenEvent) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    FloatingActionButton(
-        onClick = { onEvent(MainScreenEvent.LockOrUnlockColor) },
-        modifier = modifier.navigationBarsPadding(),
-        containerColor = if (isColorLocked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-    ) {
-        Text(
-            text = "Felt\nColor",
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (isColorLocked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
 
 @Composable
 fun ToggleSpinControlFab(
@@ -129,13 +103,14 @@ fun ToggleTableFab(
 ) {
     FloatingActionButton(
         onClick = { onEvent(MainScreenEvent.ToggleTable) },
-        modifier = modifier,
+        modifier = modifier.navigationBarsPadding(),
         containerColor = MaterialTheme.colorScheme.surfaceVariant
     ) {
-        Icon(
-            painter = painterResource(id = R.drawable.pool_table),
-            contentDescription = "Toggle Table",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        Text(
+            text = "Show\nTable",
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

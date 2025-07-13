@@ -14,6 +14,12 @@ import com.hereliesaz.cuedetat.data.VisionData
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 
+data class SnapCandidate(
+    val detectedPoint: PointF,
+    val firstSeenTimestamp: Long, // Time in millis
+    val isConfirmed: Boolean = false
+)
+
 enum class CvRefinementMethod {
     HOUGH, CONTOUR;
     fun next(): CvRefinementMethod = if (this == HOUGH) CONTOUR else HOUGH
@@ -113,6 +119,7 @@ data class OverlayState(
 
     // CV Data
     val visionData: VisionData = VisionData(),
+    val snapCandidates: List<SnapCandidate> = emptyList(),
     val lockedHsvColor: FloatArray? = null,
     val showAdvancedOptionsDialog: Boolean = false,
     val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
@@ -150,7 +157,6 @@ data class OverlayState(
 
     // State for Reset/Revert functionality
     val preResetState: OverlayState? = null,
-    val tableWasLastOnWithBall: Boolean = false,
 
     // Version Info
     val latestVersionName: String? = null,

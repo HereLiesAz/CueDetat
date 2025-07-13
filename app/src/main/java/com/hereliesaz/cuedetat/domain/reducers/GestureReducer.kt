@@ -5,6 +5,7 @@ package com.hereliesaz.cuedetat.domain.reducers
 import android.graphics.PointF
 import android.util.Log
 import androidx.compose.ui.geometry.Offset
+import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.InteractionMode
@@ -18,17 +19,21 @@ import kotlin.math.hypot
 private const val GESTURE_TAG = "GestureDebug"
 
 @Singleton
-class GestureReducer @Inject constructor() {
+class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils) {
 
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         return when (event) {
             is MainScreenEvent.LogicalGestureStarted -> handleGestureStarted(currentState, event)
             is MainScreenEvent.LogicalDragApplied -> handleDrag(currentState, event)
             is MainScreenEvent.GestureEnded -> {
+                if (currentState.interactionMode == InteractionMode.MOVING_SPIN_CONTROL) {
+                    return currentState
+                }
+
                 Log.d(GESTURE_TAG, "REDUCER: GestureEnded. Resetting interaction mode.")
                 currentState.copy(
                     interactionMode = InteractionMode.NONE,
-                    movingObstacleBallIndex = null, // Clear moving obstacle index
+                    movingObstacleBallIndex = null,
                     isMagnifierVisible = false,
                     magnifierSourceCenter = null
                 )
@@ -117,6 +122,7 @@ class GestureReducer @Inject constructor() {
         val stateWithUpdatedMagnifier = currentState.copy(magnifierSourceCenter = newMagnifierCenter)
 
         return when (stateWithUpdatedMagnifier.interactionMode) {
+            InteractionMode.MOVING_SPIN_CONTROL -> stateWithUpdatedMagnifier
             InteractionMode.ROTATING_PROTRACTOR -> {
                 val angleRad = Math.toRadians(-stateWithUpdatedMagnifier.tableRotationDegrees.toDouble())
                 val cosAngle = cos(angleRad).toFloat()
@@ -138,9 +144,9 @@ class GestureReducer @Inject constructor() {
                 var newCenterY = stateWithUpdatedMagnifier.protractorUnit.center.y + logicalDelta.y
 
                 if (stateWithUpdatedMagnifier.showTable || stateWithUpdatedMagnifier.isBankingMode) {
-                    val (left, top, right, bottom) = getTableBoundaries(stateWithUpdatedMagnifier)
-                    newCenterX = newCenterX.coerceIn(left, right)
-                    newCenterY = newCenterY.coerceIn(top, bottom)
+                    val bounds = reducerUtils.getTableBoundaries(stateWithUpdatedMagnifier)
+                    newCenterX = newCenterX.coerceIn(bounds.left.toFloat(), bounds.right.toFloat())
+                    newCenterY = newCenterY.coerceIn(bounds.top.toFloat(), bounds.bottom.toFloat())
                 }
 
                 val newCenter = PointF(newCenterX, newCenterY)
@@ -157,9 +163,9 @@ class GestureReducer @Inject constructor() {
                     var newCenterY = it.center.y + logicalDelta.y
 
                     if (stateWithUpdatedMagnifier.showTable || stateWithUpdatedMagnifier.isBankingMode) {
-                        val (left, top, right, bottom) = getTableBoundaries(stateWithUpdatedMagnifier)
-                        newCenterX = newCenterX.coerceIn(left, right)
-                        newCenterY = newCenterY.coerceIn(top, bottom)
+                        val bounds = reducerUtils.getTableBoundaries(stateWithUpdatedMagnifier)
+                        newCenterX = newCenterX.coerceIn(bounds.left.toFloat(), bounds.right.toFloat())
+                        newCenterY = newCenterY.coerceIn(bounds.top.toFloat(), bounds.bottom.toFloat())
                     }
 
                     val newCenter = PointF(newCenterX, newCenterY)
@@ -178,9 +184,9 @@ class GestureReducer @Inject constructor() {
                     var newCenterY = ballToMove.center.y + logicalDelta.y
 
                     if (stateWithUpdatedMagnifier.showTable || stateWithUpdatedMagnifier.isBankingMode) {
-                        val (left, top, right, bottom) = getTableBoundaries(stateWithUpdatedMagnifier)
-                        newCenterX = newCenterX.coerceIn(left, right)
-                        newCenterY = newCenterY.coerceIn(top, bottom)
+                        val bounds = reducerUtils.getTableBoundaries(stateWithUpdatedMagnifier)
+                        newCenterX = newCenterX.coerceIn(bounds.left.toFloat(), bounds.right.toFloat())
+                        newCenterY = newCenterY.coerceIn(bounds.top.toFloat(), bounds.bottom.toFloat())
                     }
 
                     val updatedBall = ballToMove.copy(center = PointF(newCenterX, newCenterY))
@@ -191,23 +197,6 @@ class GestureReducer @Inject constructor() {
             }
             else -> stateWithUpdatedMagnifier
         }
-    }
-
-    private fun getTableBoundaries(state: OverlayState): FloatArray {
-        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
-        val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
-        val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
-        val tablePlayingSurfaceWidth = tableToBallRatioLong * referenceRadius
-        val tablePlayingSurfaceHeight = tableToBallRatioShort * referenceRadius
-
-        val canvasCenterX = state.viewWidth / 2f
-        val canvasCenterY = state.viewHeight / 2f
-        val left = canvasCenterX - tablePlayingSurfaceWidth / 2
-        val top = canvasCenterY - tablePlayingSurfaceHeight / 2
-        val right = canvasCenterX + tablePlayingSurfaceWidth / 2
-        val bottom = canvasCenterY + tablePlayingSurfaceHeight / 2
-
-        return floatArrayOf(left, top, right, bottom)
     }
 
     private fun distance(p1: PointF, p2: PointF): Float {

@@ -154,10 +154,6 @@ fun MainScreen(viewModel: MainViewModel) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        LockColorFab(
-                            isColorLocked = uiState.lockedHsvColor != null,
-                            onEvent = viewModel::onEvent
-                        )
                         ToggleSpinControlFab(
                             uiState = uiState,
                             onEvent = viewModel::onEvent
@@ -166,6 +162,9 @@ fun MainScreen(viewModel: MainViewModel) {
                         if (!uiState.isBankingMode) {
                             ToggleCueBallFab(
                                 uiState = uiState,
+                                onEvent = viewModel::onEvent
+                            )
+                            ToggleTableFab(
                                 onEvent = viewModel::onEvent
                             )
                         }
@@ -180,10 +179,6 @@ fun MainScreen(viewModel: MainViewModel) {
                         if (uiState.showTable) {
                             TableRotationSlider(
                                 uiState = uiState,
-                                onEvent = viewModel::onEvent
-                            )
-                        } else if (!uiState.isBankingMode) {
-                            ToggleTableFab(
                                 onEvent = viewModel::onEvent
                             )
                         }

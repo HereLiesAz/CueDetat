@@ -72,10 +72,9 @@ fun MenuDrawerContent(
         MenuDivider()
 
         // Section 2: Table & Unit Settings
-        if (!uiState.isBankingMode) {
-            val tableToggleText = if (uiState.showTable) "Hide Table" else "Show Table"
+        if (!uiState.isBankingMode && !uiState.showTable) {
             MenuItem(
-                text = tableToggleText,
+                text = "Show Table",
                 onClick = { onEvent(MainScreenEvent.ToggleTable); onCloseDrawer() }
             )
         }
@@ -154,7 +153,7 @@ private fun MenuItem(text: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 12.dp), // Reduced vertical padding slightly
+            .padding(horizontal = 24.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(

@@ -122,21 +122,31 @@ class VisionRepository @Inject constructor(
         val rotatedRgbaMat = Mat()
         Core.rotate(rgbaMat, rotatedRgbaMat, imageProxy.imageInfo.rotationDegrees.toCvRotateCode())
 
-        val refinedGeneric = refineDetections(genericObjects, rotatedRgbaMat, uiState)
-        val refinedCustom = refineDetections(customObjects, rotatedRgbaMat, uiState)
+        val tableBoundaries = if (uiState.showTable) {
+            val referenceRadius = uiState.onPlaneBall?.radius ?: uiState.protractorUnit.radius
+            val tableToBallRatioLong = uiState.tableSize.getTableToBallRatioLong()
+            val tableToBallRatioShort = tableToBallRatioLong / uiState.tableSize.aspectRatio
+            val tablePlayingSurfaceWidth = tableToBallRatioLong * referenceRadius
+            val tablePlayingSurfaceHeight = tableToBallRatioShort * referenceRadius
+            val canvasCenterX = uiState.viewWidth / 2f
+            val canvasCenterY = uiState.viewHeight / 2f
+            Rect(
+                (canvasCenterX - tablePlayingSurfaceWidth / 2).toInt(),
+                (canvasCenterY - tablePlayingSurfaceHeight / 2).toInt(),
+                (canvasCenterX + tablePlayingSurfaceWidth / 2).toInt(),
+                (canvasCenterY + tablePlayingSurfaceHeight / 2).toInt()
+            )
+        } else {
+            null
+        }
+
+        val refinedGeneric = refineDetections(genericObjects, rotatedRgbaMat, uiState, tableBoundaries)
+        val refinedCustom = refineDetections(customObjects, rotatedRgbaMat, uiState, tableBoundaries)
 
         val allDetectedObjects = genericObjects + customObjects
         val boundingBoxes = allDetectedObjects.map { it.boundingBox }
 
-
-        val cannyEdges = Mat()
-        Imgproc.Canny(rotatedRgbaMat, cannyEdges, uiState.cannyThreshold1.toDouble(), uiState.cannyThreshold2.toDouble())
-        val lines = Mat()
-        Imgproc.HoughLinesP(cannyEdges, lines, 1.0, Math.PI / 180, 100, 100.0, 10.0)
-        val tableCorners = findTableCorners(lines, rotatedRgbaMat.size())
-
         _visionDataFlow.value = VisionData(
-            tableCorners = tableCorners,
             genericBalls = refinedGeneric,
             customBalls = refinedCustom,
             detectedBoundingBoxes = boundingBoxes
@@ -145,15 +155,19 @@ class VisionRepository @Inject constructor(
         yuvMat.release()
         rgbaMat.release()
         rotatedRgbaMat.release()
-        cannyEdges.release()
-        lines.release()
         imageProxy.close()
     }
 
-    private fun refineDetections(detectedObjects: List<DetectedObject>, imageMat: Mat, uiState: OverlayState): List<PointF> {
+    private fun refineDetections(detectedObjects: List<DetectedObject>, imageMat: Mat, uiState: OverlayState, tableBounds: Rect?): List<PointF> {
+        val filteredObjects = if (tableBounds != null) {
+            detectedObjects.filter { tableBounds.contains(it.boundingBox) }
+        } else {
+            detectedObjects
+        }
+
         return when (uiState.cvRefinementMethod) {
-            CvRefinementMethod.HOUGH -> refineWithHoughCircles(detectedObjects, imageMat, uiState)
-            CvRefinementMethod.CONTOUR -> refineWithContours(detectedObjects, imageMat)
+            CvRefinementMethod.HOUGH -> refineWithHoughCircles(filteredObjects, imageMat, uiState)
+            CvRefinementMethod.CONTOUR -> refineWithContours(filteredObjects, imageMat)
         }
     }
 
@@ -221,44 +235,6 @@ class VisionRepository @Inject constructor(
         }
         grayMat.release()
         return refinedPoints
-    }
-
-    private fun findTableCorners(lines: Mat, imageSize: Size): List<PointF> {
-        if (lines.empty()) return emptyList()
-        var top: DoubleArray? = null
-        var bottom: DoubleArray? = null
-        var left: DoubleArray? = null
-        var right: DoubleArray? = null
-        for (i in 0 until lines.rows()) {
-            val line = lines.get(i, 0)
-            val x1 = line[0]; val y1 = line[1]; val x2 = line[2]; val y2 = line[3]
-            val angle = atan2(y2 - y1, x2 - x1) * 180 / Math.PI
-            if (kotlin.math.abs(angle) < 20 || kotlin.math.abs(angle - 180) < 20) {
-                if (top == null || y1 < top[1]) top = line
-                if (bottom == null || y1 > bottom[1]) bottom = line
-            } else if (kotlin.math.abs(angle - 90) < 20 || kotlin.math.abs(angle + 90) < 20) {
-                if (left == null || x1 < left[0]) left = line
-                if (right == null || x1 > right[0]) right = line
-            }
-        }
-        if (top == null || bottom == null || left == null || right == null) return emptyList()
-        val corners = mutableListOf<PointF>()
-        corners.add(lineIntersection(left, top) ?: PointF(0f, 0f))
-        corners.add(lineIntersection(right, top) ?: PointF(0f, 0f))
-        corners.add(lineIntersection(right, bottom) ?: PointF(0f, 0f))
-        corners.add(lineIntersection(left, bottom) ?: PointF(0f, 0f))
-        return corners
-    }
-
-    private fun lineIntersection(line1: DoubleArray, line2: DoubleArray): PointF? {
-        val x1 = line1[0]; val y1 = line1[1]; val x2 = line1[2]; val y2 = line1[3]
-        val x3 = line2[0]; val y3 = line2[1]; val x4 = line2[2]; val y4 = line2[3]
-        val den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-        if (den == 0.0) return null
-        val t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den
-        val intersectX = x1 + t * (x2 - x1)
-        val intersectY = y1 + t * (y2 - y1)
-        return PointF(intersectX.toFloat(), intersectY.toFloat())
     }
 
     private fun Int.toCvRotateCode(): Int = when (this) {

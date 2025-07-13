@@ -17,7 +17,8 @@ class StateReducer @Inject constructor(
     private val spinReducer: SpinReducer,
     private val obstacleReducer: ObstacleReducer,
     private val cvReducer: CvReducer,
-    private val advancedOptionsReducer: AdvancedOptionsReducer
+    private val advancedOptionsReducer: AdvancedOptionsReducer,
+    private val snapReducer: SnapReducer
 ) {
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         return when (event) {
@@ -41,6 +42,7 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.ToggleHelp,
             is MainScreenEvent.ToggleMoreHelp,
             is MainScreenEvent.ToggleSpinControl,
+            is MainScreenEvent.ToggleSnapping, // Moved to ToggleReducer
             is MainScreenEvent.ToggleCvModel ->
                 toggleReducer.reduce(currentState, event)
 
@@ -74,7 +76,12 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.AddObstacleBall ->
                 obstacleReducer.reduce(currentState, event)
 
-            is MainScreenEvent.CvDataUpdated,
+            is MainScreenEvent.CvDataUpdated -> {
+                // First, process standard CV data changes (like color)
+                val stateAfterCv = cvReducer.reduce(currentState, event)
+                // Then, process snapping based on the new vision data
+                snapReducer.reduce(stateAfterCv, event.data)
+            }
             is MainScreenEvent.LockOrUnlockColor ->
                 cvReducer.reduce(currentState, event)
 
