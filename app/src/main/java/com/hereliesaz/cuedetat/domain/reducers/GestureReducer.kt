@@ -145,7 +145,11 @@ class GestureReducer @Inject constructor() {
 
                 val newCenter = PointF(newCenterX, newCenterY)
                 Log.d(GESTURE_TAG, "REDUCER: MOVING_PROTRACTOR_UNIT to $newCenter")
-                stateWithUpdatedMagnifier.copy(protractorUnit = stateWithUpdatedMagnifier.protractorUnit.copy(center = newCenter), valuesChangedSinceReset = true)
+                stateWithUpdatedMagnifier.copy(
+                    protractorUnit = stateWithUpdatedMagnifier.protractorUnit.copy(center = newCenter),
+                    valuesChangedSinceReset = true,
+                    hasTargetBallBeenMoved = true
+                )
             }
             InteractionMode.MOVING_ACTUAL_CUE_BALL -> {
                 stateWithUpdatedMagnifier.onPlaneBall?.let {
@@ -160,7 +164,11 @@ class GestureReducer @Inject constructor() {
 
                     val newCenter = PointF(newCenterX, newCenterY)
                     Log.d(GESTURE_TAG, "REDUCER: MOVING_ACTUAL_CUE_BALL to $newCenter")
-                    stateWithUpdatedMagnifier.copy(onPlaneBall = it.copy(center = newCenter), valuesChangedSinceReset = true)
+                    stateWithUpdatedMagnifier.copy(
+                        onPlaneBall = it.copy(center = newCenter),
+                        valuesChangedSinceReset = true,
+                        hasCueBallBeenMoved = true
+                    )
                 } ?: stateWithUpdatedMagnifier
             }
             InteractionMode.MOVING_OBSTACLE_BALL -> {

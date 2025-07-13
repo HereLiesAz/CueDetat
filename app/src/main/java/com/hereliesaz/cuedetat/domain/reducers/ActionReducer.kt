@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ActionReducer.kt
+
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
@@ -68,7 +70,9 @@ class ActionReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             tableRotationDegrees = newTableRotation,
             bankingAimTarget = null,
             valuesChangedSinceReset = false, // Resetting restores the "unchanged" state
-            preResetState = stateToSave // Save the original state for reverting
+            preResetState = stateToSave, // Save the original state for reverting
+            hasCueBallBeenMoved = false, // Reset interaction flags
+            hasTargetBallBeenMoved = false
         )
     }
 }

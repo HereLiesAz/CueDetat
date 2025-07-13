@@ -1,9 +1,12 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt
+
 package com.hereliesaz.cuedetat.view.renderer.table
 
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PointF
 import androidx.compose.ui.graphics.toArgb
+import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.table.Holes
 import com.hereliesaz.cuedetat.view.config.table.Table
@@ -94,8 +97,8 @@ class TableRenderer {
             val pocketRadius = referenceRadius * 1.8f
             val pockets = getLogicalPockets(state)
 
-            // Prepare the white paint for pocketed shots
-            val pocketedPaint = Paint(paints.pocketFillPaint).apply { color = android.graphics.Color.WHITE }
+            val pocketedPaintWhite = Paint(paints.pocketFillPaint).apply { color = android.graphics.Color.WHITE }
+            val pocketedPaintRed = Paint(paints.pocketFillPaint).apply { color = WarningRed.toArgb() }
             val pocketOutlinePaint = Paint(paints.tableOutlinePaint).apply {
                 color = holesConfig.strokeColor.toArgb()
                 strokeWidth = holesConfig.strokeWidth
@@ -106,17 +109,16 @@ class TableRenderer {
 
 
             pockets.forEachIndexed { index, pos ->
-                val isAimedAt = state.aimedPocketIndex == index && !state.isBankingMode
+                val isAimedAtByAimingLine = state.aimedPocketIndex == index && !state.isBankingMode
+                val isAimedAtByTangentLine = state.tangentAimedPocketIndex == index && !state.isBankingMode
                 val isPocketedInBank = state.isBankingMode && index == state.pocketedBankShotPocketIndex
 
-                val fillPaint = if (isAimedAt || isPocketedInBank) {
-                    pocketedPaint
-                } else {
-                    pocketFillPaint
+                val fillPaint = when {
+                    isAimedAtByAimingLine || isPocketedInBank -> pocketedPaintWhite
+                    isAimedAtByTangentLine -> pocketedPaintRed
+                    else -> pocketFillPaint
                 }
-                // Fill the pocket first
                 canvas.drawCircle(pos.x, pos.y, pocketRadius, fillPaint)
-                // Then draw the outline
                 canvas.drawCircle(pos.x, pos.y, pocketRadius, pocketOutlinePaint)
             }
         }

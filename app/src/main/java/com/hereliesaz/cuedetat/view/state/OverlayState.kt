@@ -1,7 +1,10 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/state/OverlayState.kt
+
 package com.hereliesaz.cuedetat.view.state
 
 import android.graphics.Matrix
 import android.graphics.PointF
+import android.graphics.Rect
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.geometry.Offset
@@ -114,6 +117,9 @@ data class OverlayState(
     val showAdvancedOptionsDialog: Boolean = false,
     val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
     val useCustomModel: Boolean = false,
+    val isSnappingEnabled: Boolean = true,
+    val hasTargetBallBeenMoved: Boolean = false,
+    val hasCueBallBeenMoved: Boolean = false,
     val houghP1: Float = 100f,
     val houghP2: Float = 20f,
     val cannyThreshold1: Float = 50f,
@@ -128,7 +134,9 @@ data class OverlayState(
     val shotGuideImpactPoint: PointF? = null,
     val aimingLineBankPath: List<PointF> = emptyList(),
     val tangentLineBankPath: List<PointF> = emptyList(),
+    val inactiveTangentLineBankPath: List<PointF> = emptyList(),
     val aimedPocketIndex: Int? = null,
+    val tangentAimedPocketIndex: Int? = null,
     val aimingLineEndPoint: PointF? = null,
 
     // Theming
@@ -151,153 +159,4 @@ data class OverlayState(
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as OverlayState
-
-        if (viewWidth != other.viewWidth) return false
-        if (viewHeight != other.viewHeight) return false
-        if (protractorUnit != other.protractorUnit) return false
-        if (onPlaneBall != other.onPlaneBall) return false
-        if (obstacleBalls != other.obstacleBalls) return false
-        if (zoomSliderPosition != other.zoomSliderPosition) return false
-        if (areHelpersVisible != other.areHelpersVisible) return false
-        if (isMoreHelpVisible != other.isMoreHelpVisible) return false
-        if (valuesChangedSinceReset != other.valuesChangedSinceReset) return false
-        if (isCameraVisible != other.isCameraVisible) return false
-        if (isBankingMode != other.isBankingMode) return false
-        if (showTable != other.showTable) return false
-        if (tableRotationDegrees != other.tableRotationDegrees) return false
-        if (bankingAimTarget != other.bankingAimTarget) return false
-        if (bankShotPath != other.bankShotPath) return false
-        if (pocketedBankShotPocketIndex != other.pocketedBankShotPocketIndex) return false
-        if (tableSize != other.tableSize) return false
-        if (showTableSizeDialog != other.showTableSizeDialog) return false
-        if (isForceLightMode != other.isForceLightMode) return false
-        if (luminanceAdjustment != other.luminanceAdjustment) return false
-        if (showLuminanceDialog != other.showLuminanceDialog) return false
-        if (glowStickValue != other.glowStickValue) return false
-        if (showGlowStickDialog != other.showGlowStickDialog) return false
-        if (isSpinControlVisible != other.isSpinControlVisible) return false
-        if (selectedSpinOffset != other.selectedSpinOffset) return false
-        if (spinPaths != other.spinPaths) return false
-        if (spinControlCenter != other.spinControlCenter) return false
-        if (lingeringSpinOffset != other.lingeringSpinOffset) return false
-        if (spinPathsAlpha != other.spinPathsAlpha) return false
-        if (showTutorialOverlay != other.showTutorialOverlay) return false
-        if (currentTutorialStep != other.currentTutorialStep) return false
-        if (currentOrientation != other.currentOrientation) return false
-        if (pitchMatrix != other.pitchMatrix) return false
-        if (railPitchMatrix != other.railPitchMatrix) return false
-        if (inversePitchMatrix != other.inversePitchMatrix) return false
-        if (flatMatrix != other.flatMatrix) return false
-        if (hasInverseMatrix != other.hasInverseMatrix) return false
-        if (visionData != other.visionData) return false
-        if (lockedHsvColor != null) {
-            if (other.lockedHsvColor == null) return false
-            if (!lockedHsvColor.contentEquals(other.lockedHsvColor)) return false
-        } else if (other.lockedHsvColor != null) return false
-        if (showAdvancedOptionsDialog != other.showAdvancedOptionsDialog) return false
-        if (cvRefinementMethod != other.cvRefinementMethod) return false
-        if (useCustomModel != other.useCustomModel) return false
-        if (houghP1 != other.houghP1) return false
-        if (houghP2 != other.houghP2) return false
-        if (cannyThreshold1 != other.cannyThreshold1) return false
-        if (cannyThreshold2 != other.cannyThreshold2) return false
-        if (shotLineAnchor != other.shotLineAnchor) return false
-        if (tangentDirection != other.tangentDirection) return false
-        if (isImpossibleShot != other.isImpossibleShot) return false
-        if (isTiltBeyondLimit != other.isTiltBeyondLimit) return false
-        if (warningText != other.warningText) return false
-        if (shotGuideImpactPoint != other.shotGuideImpactPoint) return false
-        if (aimingLineBankPath != other.aimingLineBankPath) return false
-        if (tangentLineBankPath != other.tangentLineBankPath) return false
-        if (aimedPocketIndex != other.aimedPocketIndex) return false
-        if (aimingLineEndPoint != other.aimingLineEndPoint) return false
-        if (appControlColorScheme != other.appControlColorScheme) return false
-        if (interactionMode != other.interactionMode) return false
-        if (movingObstacleBallIndex != other.movingObstacleBallIndex) return false
-        if (isMagnifierVisible != other.isMagnifierVisible) return false
-        if (magnifierSourceCenter != other.magnifierSourceCenter) return false
-        if (preResetState != other.preResetState) return false
-        if (tableWasLastOnWithBall != other.tableWasLastOnWithBall) return false
-        if (latestVersionName != other.latestVersionName) return false
-        if (distanceUnit != other.distanceUnit) return false
-        if (targetBallDistance != other.targetBallDistance) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = viewWidth
-        result = 31 * result + viewHeight
-        result = 31 * result + protractorUnit.hashCode()
-        result = 31 * result + (onPlaneBall?.hashCode() ?: 0)
-        result = 31 * result + obstacleBalls.hashCode()
-        result = 31 * result + zoomSliderPosition.hashCode()
-        result = 31 * result + areHelpersVisible.hashCode()
-        result = 31 * result + isMoreHelpVisible.hashCode()
-        result = 31 * result + valuesChangedSinceReset.hashCode()
-        result = 31 * result + isCameraVisible.hashCode()
-        result = 31 * result + isBankingMode.hashCode()
-        result = 31 * result + showTable.hashCode()
-        result = 31 * result + tableRotationDegrees.hashCode()
-        result = 31 * result + (bankingAimTarget?.hashCode() ?: 0)
-        result = 31 * result + bankShotPath.hashCode()
-        result = 31 * result + (pocketedBankShotPocketIndex ?: 0)
-        result = 31 * result + tableSize.hashCode()
-        result = 31 * result + showTableSizeDialog.hashCode()
-        result = 31 * result + (isForceLightMode?.hashCode() ?: 0)
-        result = 31 * result + luminanceAdjustment.hashCode()
-        result = 31 * result + showLuminanceDialog.hashCode()
-        result = 31 * result + glowStickValue.hashCode()
-        result = 31 * result + showGlowStickDialog.hashCode()
-        result = 31 * result + isSpinControlVisible.hashCode()
-        result = 31 * result + (selectedSpinOffset?.hashCode() ?: 0)
-        result = 31 * result + spinPaths.hashCode()
-        result = 31 * result + (spinControlCenter?.hashCode() ?: 0)
-        result = 31 * result + (lingeringSpinOffset?.hashCode() ?: 0)
-        result = 31 * result + spinPathsAlpha.hashCode()
-        result = 31 * result + showTutorialOverlay.hashCode()
-        result = 31 * result + currentTutorialStep
-        result = 31 * result + currentOrientation.hashCode()
-        result = 31 * result + pitchMatrix.hashCode()
-        result = 31 * result + railPitchMatrix.hashCode()
-        result = 31 * result + inversePitchMatrix.hashCode()
-        result = 31 * result + flatMatrix.hashCode()
-        result = 31 * result + hasInverseMatrix.hashCode()
-        result = 31 * result + visionData.hashCode()
-        result = 31 * result + (lockedHsvColor?.contentHashCode() ?: 0)
-        result = 31 * result + showAdvancedOptionsDialog.hashCode()
-        result = 31 * result + cvRefinementMethod.hashCode()
-        result = 31 * result + useCustomModel.hashCode()
-        result = 31 * result + houghP1.hashCode()
-        result = 31 * result + houghP2.hashCode()
-        result = 31 * result + cannyThreshold1.hashCode()
-        result = 31 * result + cannyThreshold2.hashCode()
-        result = 31 * result + shotLineAnchor.hashCode()
-        result = 31 * result + tangentDirection.hashCode()
-        result = 31 * result + isImpossibleShot.hashCode()
-        result = 31 * result + isTiltBeyondLimit.hashCode()
-        result = 31 * result + (warningText?.hashCode() ?: 0)
-        result = 31 * result + (shotGuideImpactPoint?.hashCode() ?: 0)
-        result = 31 * result + aimingLineBankPath.hashCode()
-        result = 31 * result + tangentLineBankPath.hashCode()
-        result = 31 * result + (aimedPocketIndex ?: 0)
-        result = 31 * result + (aimingLineEndPoint?.hashCode() ?: 0)
-        result = 31 * result + appControlColorScheme.hashCode()
-        result = 31 * result + interactionMode.hashCode()
-        result = 31 * result + (movingObstacleBallIndex ?: 0)
-        result = 31 * result + isMagnifierVisible.hashCode()
-        result = 31 * result + (magnifierSourceCenter?.hashCode() ?: 0)
-        result = 31 * result + (preResetState?.hashCode() ?: 0)
-        result = 31 * result + tableWasLastOnWithBall.hashCode()
-        result = 31 * result + (latestVersionName?.hashCode() ?: 0)
-        result = 31 * result + distanceUnit.hashCode()
-        result = 31 * result + targetBallDistance.hashCode()
-        return result
-    }
 }

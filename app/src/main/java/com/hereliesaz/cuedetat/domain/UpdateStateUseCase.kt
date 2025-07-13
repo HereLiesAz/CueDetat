@@ -27,31 +27,21 @@ class UpdateStateUseCase @Inject constructor(
     operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
-        // --- Ball Snapping Logic ---
-        val detectedBalls = state.visionData.genericBalls + state.visionData.customBalls
-        val allLogicalBalls = (listOfNotNull(state.onPlaneBall, state.protractorUnit) + state.obstacleBalls).map { it.center }
-        val remainingDetectedBalls = detectedBalls.filterNot { detected ->
-            allLogicalBalls.any { logical ->
-                hypot((logical.x - detected.x).toDouble(), (logical.y - detected.y).toDouble()) < (state.protractorUnit.radius * 2)
-            }
-        }
-
         var updatedProtractorUnit = state.protractorUnit
         var updatedOnPlaneBall = state.onPlaneBall
-        var updatedBankingBall = if (state.isBankingMode) state.onPlaneBall else null
 
-        if (detectedBalls.isNotEmpty()) {
-            val targetBallSnapPoint = detectedBalls.getOrNull(0)
-            val cueBallSnapPoint = detectedBalls.getOrNull(1)
-
-            if (targetBallSnapPoint != null) {
-                updatedProtractorUnit = state.protractorUnit.copy(center = targetBallSnapPoint)
-            }
-
-            if (cueBallSnapPoint != null) {
-                updatedOnPlaneBall = state.onPlaneBall?.copy(center = cueBallSnapPoint)
-                if (state.isBankingMode) {
-                    updatedBankingBall = updatedOnPlaneBall
+        if (state.isSnappingEnabled) {
+            val detectedBalls = state.visionData.genericBalls + state.visionData.customBalls
+            if (detectedBalls.isNotEmpty()) {
+                if (!state.hasTargetBallBeenMoved) {
+                    detectedBalls.getOrNull(0)?.let {
+                        updatedProtractorUnit = state.protractorUnit.copy(center = it)
+                    }
+                }
+                if (!state.hasCueBallBeenMoved && state.onPlaneBall != null) {
+                    detectedBalls.getOrNull(1)?.let {
+                        updatedOnPlaneBall = state.onPlaneBall?.copy(center = it)
+                    }
                 }
             }
         }
@@ -60,8 +50,6 @@ class UpdateStateUseCase @Inject constructor(
             protractorUnit = updatedProtractorUnit,
             onPlaneBall = updatedOnPlaneBall
         )
-        // --- End Ball Snapping Logic ---
-
 
         val basePitchMatrix = Perspective.createPitchMatrix(
             currentOrientation = state.currentOrientation,
@@ -87,16 +75,17 @@ class UpdateStateUseCase @Inject constructor(
             targetBall = updatedStateWithSnapping.protractorUnit.center
         )
 
-        // New obstruction check
         val isObstructed = checkForObstructions(updatedStateWithSnapping)
         val isImpossible = isShotImpossible || isObstructed
 
         val targetBallDistance = calculateDistance(updatedStateWithSnapping, flatMatrix)
+
         var (aimedPocketIndex, aimingLineEndPoint) = if (!state.isBankingMode) {
-            checkPocketAim(updatedStateWithSnapping)
+            checkPocketAim(updatedStateWithSnapping.protractorUnit.ghostCueBallCenter, updatedStateWithSnapping.protractorUnit.center, updatedStateWithSnapping)
         } else {
             Pair(null, null)
         }
+
         val shotGuideImpactPoint = if (state.showTable && !state.isBankingMode) {
             calculateShotGuideImpact(updatedStateWithSnapping, useShotGuideLine = true)
         } else {
@@ -109,27 +98,47 @@ class UpdateStateUseCase @Inject constructor(
             emptyList()
         }
 
-        if(aimingLineBankPath.size > 2) {
-            val (bankedPocketIndex, intersectionPoint) = checkBankedPocketAim(
-                listOf(aimingLineBankPath[1], aimingLineBankPath[2]),
-                updatedStateWithSnapping
-            )
+        if (aimingLineBankPath.isNotEmpty()) {
+            val (bankedPocketIndex, intersectionPoint) = checkPocketAim(aimingLineBankPath[0], aimingLineBankPath[1], updatedStateWithSnapping)
             if (bankedPocketIndex != null && intersectionPoint != null) {
                 aimedPocketIndex = bankedPocketIndex
-                aimingLineBankPath = listOf(aimingLineBankPath[0], aimingLineBankPath[1], intersectionPoint)
+                aimingLineBankPath = listOf(aimingLineBankPath[0], intersectionPoint)
             }
+        } else if(aimedPocketIndex != null && aimingLineEndPoint != null) {
+            aimingLineBankPath = listOf(updatedStateWithSnapping.protractorUnit.ghostCueBallCenter, aimingLineEndPoint)
         }
 
-        val tangentLineBankPath = if (state.showTable && !state.isBankingMode) {
-            val tangentStart = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter
-            val tangentTarget = PointF(
-                tangentStart.x - (updatedStateWithSnapping.protractorUnit.center.y - tangentStart.y) * tangentDirection,
-                tangentStart.y + (updatedStateWithSnapping.protractorUnit.center.x - tangentStart.x) * tangentDirection
-            )
-            calculateSingleBank(tangentStart, tangentTarget, updatedStateWithSnapping)
-        } else {
-            emptyList()
+
+        val tangentStart = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter
+        val activeTangentTarget = PointF(
+            tangentStart.x - (updatedStateWithSnapping.protractorUnit.center.y - tangentStart.y) * tangentDirection,
+            tangentStart.y + (updatedStateWithSnapping.protractorUnit.center.x - tangentStart.x) * tangentDirection
+        )
+        val inactiveTangentTarget = PointF(
+            tangentStart.x + (updatedStateWithSnapping.protractorUnit.center.y - tangentStart.y) * tangentDirection,
+            tangentStart.y - (updatedStateWithSnapping.protractorUnit.center.x - tangentStart.x) * tangentDirection
+        )
+
+        val (tangentAimedPocketIndex, tangentAimingEndPoint) = checkPocketAim(tangentStart, activeTangentTarget, updatedStateWithSnapping)
+
+        var tangentLineBankPath = if (state.showTable && !state.isBankingMode) {
+            calculateSingleBank(tangentStart, activeTangentTarget, updatedStateWithSnapping)
+        } else { emptyList() }
+
+        if(tangentLineBankPath.isNotEmpty()){
+            val (bankedPocketIndex, intersectionPoint) = checkPocketAim(tangentLineBankPath[0], tangentLineBankPath[1], updatedStateWithSnapping)
+            if (bankedPocketIndex != null && intersectionPoint != null) {
+                tangentLineBankPath = listOf(tangentLineBankPath[0], intersectionPoint)
+            }
+        } else if(tangentAimedPocketIndex != null && tangentAimingEndPoint != null){
+            tangentLineBankPath = listOf(tangentStart, tangentAimingEndPoint)
         }
+
+
+        val inactiveTangentLineBankPath = if (state.showTable && !state.isBankingMode) {
+            calculateSingleBank(tangentStart, inactiveTangentTarget, updatedStateWithSnapping)
+        } else { emptyList() }
+
 
         val finalPitchMatrix = Matrix(basePitchMatrix)
         val referenceRadius = updatedStateWithSnapping.onPlaneBall?.radius ?: updatedStateWithSnapping.protractorUnit.radius
@@ -173,10 +182,12 @@ class UpdateStateUseCase @Inject constructor(
             tangentDirection = tangentDirection,
             targetBallDistance = targetBallDistance,
             aimedPocketIndex = aimedPocketIndex,
+            tangentAimedPocketIndex = tangentAimedPocketIndex,
             aimingLineEndPoint = aimingLineEndPoint,
             shotGuideImpactPoint = shotGuideImpactPoint,
             aimingLineBankPath = aimingLineBankPath,
-            tangentLineBankPath = tangentLineBankPath, // Add to state
+            tangentLineBankPath = tangentLineBankPath,
+            inactiveTangentLineBankPath = inactiveTangentLineBankPath,
             spinPaths = spinPaths
         )
     }
@@ -212,24 +223,22 @@ class UpdateStateUseCase @Inject constructor(
         return if (screenRadius > 0) distanceReferenceConstant / screenRadius else 0f
     }
 
-    private fun checkPocketAim(state: OverlayState): Pair<Int?, PointF?> {
-        val ghostBall = state.protractorUnit.ghostCueBallCenter
-        val targetBall = state.protractorUnit.center
-        val dirX = targetBall.x - ghostBall.x
-        val dirY = targetBall.y - ghostBall.y
+    private fun checkPocketAim(start: PointF, end: PointF, state: OverlayState): Pair<Int?, PointF?> {
+        val dirX = end.x - start.x
+        val dirY = end.y - start.y
         val mag = sqrt(dirX * dirX + dirY * dirY)
         if (mag < 0.001f) return Pair(null, null)
         val pockets = TableRenderer.getLogicalPockets(state)
         val pocketRadius = state.protractorUnit.radius * 1.8f
 
         for ((index, pocket) in pockets.withIndex()) {
-            val dist = linePointDistance(ghostBall, targetBall, pocket)
+            val dist = linePointDistance(start, end, pocket)
             if (dist < pocketRadius) {
-                val vecToPocketX = pocket.x - ghostBall.x
-                val vecToPocketY = pocket.y - ghostBall.y
+                val vecToPocketX = pocket.x - start.x
+                val vecToPocketY = pocket.y - start.y
                 val dotProduct = vecToPocketX * dirX + vecToPocketY * dirY
                 if (dotProduct > 0) {
-                    val intersection = getLineCircleIntersection(ghostBall, targetBall, pocket, pocketRadius)
+                    val intersection = getLineCircleIntersection(start, end, pocket, pocketRadius)
                     if (intersection != null) return Pair(index, intersection)
                 }
             }
@@ -259,7 +268,7 @@ class UpdateStateUseCase @Inject constructor(
                     if (abs(dySegment) > 0.001f) (intersection.y - start.y) / dySegment else 0f
                 }
 
-                if (t in 0.0f..1.0f) {
+                if (t >= 0.0f) { // Check if intersection is on the ray, not just the segment
                     val distSq = (intersection.x - start.x).pow(2) + (intersection.y - start.y).pow(2)
                     if (distSq < minDistanceSq) {
                         minDistanceSq = distSq
@@ -272,13 +281,14 @@ class UpdateStateUseCase @Inject constructor(
         return Pair(closestPocketIndex, closestIntersection)
     }
 
+
     private fun calculateShotGuideImpact(state: OverlayState, useShotGuideLine: Boolean = false): PointF? {
         val p1 = if (useShotGuideLine) state.shotLineAnchor else state.protractorUnit.center
         val p2 = state.protractorUnit.ghostCueBallCenter
         val dirX = p2.x - p1.x
         val dirY = p2.y - p1.y
 
-        return reducerUtils.findRailIntersectionAndNormal(p1, PointF(p1.x + dirX, p1.y + dirY), state)?.first
+        return reducerUtils.findRailIntersectionAndNormal(p1, PointF(p1.x + dirX * 5000f, p1.y + dirY*5000f), state)?.first
     }
 
     private fun calculateSingleBank(start: PointF, end: PointF, state: OverlayState): List<PointF> {
@@ -287,10 +297,15 @@ class UpdateStateUseCase @Inject constructor(
 
         val incidentVector = PointF(end.x - start.x, end.y - start.y)
         val reflectedDir = reducerUtils.reflect(incidentVector, railNormal)
-        val reflectedEnd = reducerUtils.findRailIntersectionAndNormal(intersectionPoint, PointF(intersectionPoint.x + reflectedDir.x, intersectionPoint.y + reflectedDir.y), state)?.first ?: intersectionPoint
 
-        return listOf(start, intersectionPoint, reflectedEnd)
+        val extendedEndPoint = PointF(
+            intersectionPoint.x + reflectedDir.x * 5000f,
+            intersectionPoint.y + reflectedDir.y * 5000f
+        )
+
+        return listOf(start, intersectionPoint, extendedEndPoint)
     }
+
 
     private fun checkForObstructions(state: OverlayState): Boolean {
         if (state.obstacleBalls.isEmpty()) return false

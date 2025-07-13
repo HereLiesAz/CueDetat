@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/MenuDrawer.kt
+
 package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.clickable
@@ -137,6 +139,10 @@ fun MenuDrawerContent(
         MenuItem(
             text = "Too Advanced Options",
             onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog); onCloseDrawer() }
+        )
+        MenuItem(
+            text = if (uiState.isSnappingEnabled) "Disable Snapping" else "Enable Snapping",
+            onClick = { onEvent(MainScreenEvent.ToggleSnapping); onCloseDrawer() }
         )
         Spacer(modifier = Modifier.height(12.dp))
     }

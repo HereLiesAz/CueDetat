@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/data/VisionRepository.kt
+
 package com.hereliesaz.cuedetat.data
 
 import android.annotation.SuppressLint
@@ -96,6 +98,10 @@ class VisionRepository @Inject constructor(
         val refinedGeneric = refineDetections(genericObjects, rotatedRgbaMat, uiState)
         val refinedCustom = refineDetections(customObjects, rotatedRgbaMat, uiState)
 
+        val allDetectedObjects = genericObjects + customObjects
+        val boundingBoxes = allDetectedObjects.map { it.boundingBox }
+
+
         val cannyEdges = Mat()
         Imgproc.Canny(rotatedRgbaMat, cannyEdges, uiState.cannyThreshold1.toDouble(), uiState.cannyThreshold2.toDouble())
         val lines = Mat()
@@ -105,7 +111,8 @@ class VisionRepository @Inject constructor(
         _visionDataFlow.value = VisionData(
             tableCorners = tableCorners,
             genericBalls = refinedGeneric,
-            customBalls = refinedCustom
+            customBalls = refinedCustom,
+            detectedBoundingBoxes = boundingBoxes
         )
 
         yuvMat.release()

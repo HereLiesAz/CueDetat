@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/dialogs/AdvancedOptionsDialog.kt
+
 package com.hereliesaz.cuedetat.ui.composables.dialogs
 
 import androidx.compose.foundation.layout.Column
@@ -30,6 +32,15 @@ fun AdvancedOptionsDialog(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
             text = {
                 Column {
+                    // Snapping Toggle
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Auto-Snap Balls:", modifier = Modifier.weight(1f))
+                        TextButton(onClick = { onEvent(MainScreenEvent.ToggleSnapping) }) {
+                            Text(if (uiState.isSnappingEnabled) "On" else "Off")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     // CV Model Toggle
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Active AI Model:", modifier = Modifier.weight(1f))

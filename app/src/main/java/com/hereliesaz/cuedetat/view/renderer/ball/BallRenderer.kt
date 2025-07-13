@@ -1,8 +1,11 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt
+
 package com.hereliesaz.cuedetat.view.renderer.ball
 
 import android.graphics.Canvas
 import android.graphics.DashPathEffect
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.ui.theme.AcidPatina
@@ -38,6 +41,10 @@ class BallRenderer {
             drawGhostedBall(canvas, obstacle, ObstacleBall(), state, paints)
         }
 
+        // Draw the bounding boxes from CV
+        drawBoundingBoxes(canvas, state, paints)
+
+
         // --- Visual Distinction for Snapped Balls ---
         val detectedBalls = state.visionData.genericBalls + state.visionData.customBalls
         val snappedPaint = Paint(paints.targetCirclePaint).apply {
@@ -64,6 +71,21 @@ class BallRenderer {
             drawAllLabels(canvas, state, paints, typeface)
         }
     }
+
+    private fun drawBoundingBoxes(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+        val paint = Paint(paints.cvResultPaint).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+            alpha = 150
+        }
+        canvas.save()
+        canvas.concat(state.pitchMatrix) // Ensure boxes are drawn in the same perspective space
+        state.visionData.detectedBoundingBoxes.forEach { box ->
+            canvas.drawRect(RectF(box), paint)
+        }
+        canvas.restore()
+    }
+
 
     private fun drawProtractorAndActual(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         val protractor = state.protractorUnit

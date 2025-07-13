@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/ReducerUtils.kt
+
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
@@ -41,24 +43,23 @@ class ReducerUtils @Inject constructor() {
         var t = Float.MAX_VALUE
         var normal: PointF? = null
 
-        // Check against each of the four rails
         if (dirX != 0f) {
             val tLeft = (left - startPoint.x) / dirX
-            if (tLeft in 0.0..1.0 && tLeft < t) {
+            if (tLeft > 0.001f && tLeft < t) {
                 t = tLeft; normal = PointF(1f, 0f)
             }
             val tRight = (right - startPoint.x) / dirX
-            if (tRight in 0.0..1.0 && tRight < t) {
+            if (tRight > 0.001f && tRight < t) {
                 t = tRight; normal = PointF(-1f, 0f)
             }
         }
         if (dirY != 0f) {
             val tTop = (top - startPoint.y) / dirY
-            if (tTop in 0.0..1.0 && tTop < t) {
+            if (tTop > 0.001f && tTop < t) {
                 t = tTop; normal = PointF(0f, 1f)
             }
             val tBottom = (bottom - startPoint.y) / dirY
-            if (tBottom in 0.0..1.0 && tBottom < t) {
+            if (tBottom > 0.001f && tBottom < t) {
                 t = tBottom; normal = PointF(0f, -1f)
             }
         }

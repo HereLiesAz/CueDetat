@@ -1,0 +1,7 @@
+ninja: Entering directory `G:\My Drive\CueDetatLite\opencv\.cxx\Debug\5h3pad1c\x86'
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/Debug/5h3pad1c/x86
+[1/2] Building CXX object CMakeFiles/opencv_jni_shared.dir/dummy.cpp.o
+[2/2] Linking CXX static library libopencv_jni_shared.a

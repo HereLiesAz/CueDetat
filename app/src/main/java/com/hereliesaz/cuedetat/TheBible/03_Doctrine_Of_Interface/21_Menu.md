@@ -18,28 +18,29 @@
 The menu must contain the following items, triggering the specified events.
 
 * **Section 1: Core Controls**
-  * [cite_start]`"Calculate Bank"` / `"Ghost Ball Aiming"`: Toggles between Banking and Protractor modes. [cite: 777] Event: `ToggleBankingMode`.
+  * `"Calculate Bank"` / `"Ghost Ball Aiming"`: Toggles between Banking and Protractor modes. [cite: 777] Event: `ToggleBankingMode`.
   * `"Toggle Cue Ball"` / `"Hide Cue Ball"`: Toggles the `ActualCueBall` in Protractor mode. Event: `ToggleOnPlaneBall`.
-  * [cite_start]`"Turn Camera Off"` / `"Turn Camera On"`: Toggles the visibility of the live camera feed background. [cite: 778] Event: `ToggleCamera`.
+  * `"Turn Camera Off"` / `"Turn Camera On"`: Toggles the visibility of the live camera feed background. [cite: 778] Event: `ToggleCamera`.
 
 * **Section 2: Table & Unit Settings**
-  * `"Toggle Table"` / `"Hide Table"`: Toggles the visibility of the table wireframe. [cite_start]This is only visible in Protractor Mode. [cite: 778] Event: `ToggleTable`.
+  * `"Toggle Table"` / `"Hide Table"`: Toggles the visibility of the table wireframe. This is only visible in Protractor Mode. [cite: 778] Event: `ToggleTable`.
   * [cite_start]`"Table Size"`: Opens the table size selection dialog. [cite: 778] Event: `ToggleTableSizeDialog`.
   * [cite_start]`"Use Imperial Units"` / `"Use Metric Units"`: Toggles the distance unit display. [cite: 778] Event: `ToggleDistanceUnit`.
 
 * **Section 3: Appearance**
   * [cite_start]`"Embrace the Darkness"` / `"Walk toward the Light"` / `"Use System Theme"`: Toggles between dark, light, and system themes. [cite: 778] Event: `ToggleForceTheme`.
   * [cite_start]`"Luminance"`: Opens the luminance adjustment dialog. [cite: 778] Event: `ToggleLuminanceDialog`.
-  * [cite_start]`"Glow Stick"`: Opens the glow adjustment dialog. [cite: 778] Event: `ToggleGlowStickDialog`.
+  * `"Glow Stick"`: Opens the glow adjustment dialog. [cite: 778] Event: `ToggleGlowStickDialog`.
 
 * **Section 4: Help & Info**
-  * [cite_start]`"WTF is all this?"` / `"OK, I get it."`: Toggles help text visibility. [cite: 777] Event: `ToggleHelp`.
+  * `"WTF is all this?"` / `"OK, I get it."`: Toggles help text visibility. [cite: 777] Event: `ToggleHelp`.
   * [cite_start]`"Show Tutorial"`: Starts the interactive tutorial. [cite: 777] Event: `StartTutorial`.
 
 * **Section 5: Meta**
   * [cite_start]`"Check for Updates"`: Opens the project's GitHub releases page. [cite: 779] Event: `CheckForUpdate`.
-  * [cite_start]`"About Me"`: Launches an intent to open the developer's Instagram profile (`https://www.instagram.com/hereliesaz/`). [cite: 779] Event: `ViewArt`.
+  * `"About Me"`: Launches an intent to open the developer's Instagram profile (`https://www.instagram.com/hereliesaz/`). [cite: 779] Event: `ViewArt`.
   * [cite_start]`"Chalk Your Tip"`: Opens the donation dialog. [cite: 779] Event: `ShowDonationOptions`.
 
 * **Section 6: Developer**
   * `"Too Advanced Options"`: Opens the CV parameter tuning dialog. Event: `ToggleAdvancedOptionsDialog`.
+  * `"Toggle Snapping"` / `"Disable Snapping"`: Toggles the auto-snapping of logical balls to detected balls. Event: `ToggleSnapping`.
