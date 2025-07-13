@@ -4,6 +4,9 @@ package com.hereliesaz.cuedetat.ui.composables
 
 import android.graphics.PointF
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
@@ -29,7 +32,7 @@ import kotlin.math.sin
 @Composable
 fun SpinControl(
     modifier: Modifier = Modifier,
-    centerPosition: PointF, // This is now unused but kept for API stability if needed later.
+    centerPosition: PointF,
     selectedSpinOffset: PointF?,
     lingeringSpinOffset: PointF?,
     spinPathAlpha: Float,
@@ -38,9 +41,23 @@ fun SpinControl(
     Box(
         modifier = modifier
             .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
-                    onEvent(MainScreenEvent.DragSpinControl(PointF(dragAmount.x, dragAmount.y)))
+                awaitEachGesture {
+                    val firstDown = awaitFirstDown()
+                    // Wait for a second tap. If it doesn't happen, this gesture is ignored here.
+                    val secondDown = awaitSecondDown(firstDown)
+
+                    if (secondDown != null) {
+                        // Double tap confirmed. Consume the event and start listening for a drag.
+                        secondDown.consume()
+                        do {
+                            val event = awaitPointerEvent()
+                            val pan = event.calculatePan()
+                            if (pan != Offset.Zero) {
+                                onEvent(MainScreenEvent.DragSpinControl(PointF(pan.x, pan.y)))
+                                event.changes.forEach { it.consume() }
+                            }
+                        } while (event.changes.any { it.pressed })
+                    }
                 }
             }
     ) {
@@ -65,27 +82,21 @@ fun SpinControl(
             val radius = size.minDimension / 2f
             val center = Offset(radius, radius)
 
-            // --- THE RIGHTEOUS FIX ---
-            // The heretical SweepGradient is purged. The wheel is now built arc by arc,
-            // using the one true color calculation method.
             val numArcs = 72
             val arcAngle = 360f / numArcs
             for (i in 0 until numArcs) {
                 val startAngle = i * arcAngle
-                // The color is sampled from the center of the arc for accuracy.
                 val colorSampleAngle = startAngle + (arcAngle / 2)
                 val color = SpinColorUtils.getColorFromAngleAndDistance(colorSampleAngle, 1.0f)
 
                 drawArc(
                     color = color,
-                    startAngle = startAngle - 90, // -90 to align 0 degrees with the top
+                    startAngle = startAngle - 90,
                     sweepAngle = arcAngle,
                     useCenter = true,
                     alpha = spinPathAlpha
                 )
             }
-            // Overlay a radial gradient from white in the center to transparent at the edge
-            // to wash out the colors towards the middle, replicating the reference image.
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(Color.White, Color.Transparent),
@@ -96,7 +107,6 @@ fun SpinControl(
                 center = center,
                 alpha = spinPathAlpha
             )
-            // --- END FIX ---
 
             drawCircle(
                 color = Color.White.copy(alpha = 0.5f * spinPathAlpha),
@@ -105,12 +115,10 @@ fun SpinControl(
                 style = Stroke(width = 2.dp.toPx())
             )
 
-            // Draw the lingering indicator first, so the live one is on top
             lingeringSpinOffset?.let {
                 drawIndicator(it, center, radius, Color.White.copy(alpha = 0.6f * spinPathAlpha))
             }
 
-            // Draw live selection indicator
             selectedSpinOffset?.let {
                 drawIndicator(it, center, radius, Color.White)
             }

@@ -16,12 +16,9 @@ object SpinColorUtils {
      * @return The calculated Color.
      */
     fun getColorFromAngleAndDistance(angleDegrees: Float, distance: Float): Color {
-        // Normalize angle to be 0-360, with 0 at the right (3 o'clock).
-        val normalizedAngle = (angleDegrees + 360f) % 360f
+        // A 90-degree clockwise rotation means subtracting 90 degrees from the input angle.
+        val adjustedAngle = (angleDegrees - 90f + 360f) % 360f
 
-        // --- THE RIGHTEOUS FIX ---
-        // The color stops are now defined by the cardinal directions commanded.
-        // Red: 0/360, Yellow: 270, Green: 180, Blue: 90
         val stops = listOf(
             0f to Color.Red,
             90f to Color.Blue,
@@ -30,22 +27,19 @@ object SpinColorUtils {
             360f to Color.Red
         )
 
-        // Find which two color stops the angle falls between.
         val (start, end) = (0 until stops.size - 1)
-            .firstOrNull { normalizedAngle >= stops[it].first && normalizedAngle <= stops[it + 1].first }
+            .firstOrNull { adjustedAngle >= stops[it].first && adjustedAngle <= stops[it + 1].first }
             ?.let { stops[it] to stops[it + 1] }
-            ?: (stops.last() to stops.first()) // Fallback for edge cases
+            ?: (stops.last() to stops.first())
 
         val (startAngle, startColor) = start
         val (endAngle, endColor) = end
 
         val range = endAngle - startAngle
-        val fraction = if (range == 0f) 0f else (normalizedAngle - startAngle) / range
+        val fraction = if (range == 0f) 0f else (adjustedAngle - startAngle) / range
 
-        // Get the pure hue by interpolating.
         val baseHueColor = lerp(startColor, endColor, fraction)
 
-        // Now, use the distance to interpolate between white (center) and the pure hue (edge).
         return lerp(Color.White, baseHueColor, distance.coerceIn(0f, 1f))
     }
 }

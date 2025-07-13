@@ -24,13 +24,13 @@ fun ToggleSpinControlFab(
         onClick = { onEvent(MainScreenEvent.ToggleSpinControl) },
         modifier = modifier
             .navigationBarsPadding(),
-        containerColor = if (uiState.isSpinControlVisible) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
+        containerColor = if (uiState.isSpinControlVisible) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer
     ) {
         Text(
             text = "Spin",
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.labelSmall,
-            color = if (uiState.isSpinControlVisible) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (uiState.isSpinControlVisible) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
         )
     }
 }
@@ -46,13 +46,13 @@ fun ResetFab(
         modifier = modifier
             .padding(16.dp)
             .navigationBarsPadding(),
-        containerColor = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
+        containerColor = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer
     ) {
         Text(
             text = "Reset\nView",
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.labelSmall,
-            color = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
         )
     }
 }
@@ -65,13 +65,13 @@ fun AddObstacleBallFab(
     FloatingActionButton(
         onClick = { onEvent(MainScreenEvent.AddObstacleBall) },
         modifier = modifier.navigationBarsPadding(),
-        containerColor = MaterialTheme.colorScheme.surfaceVariant
+        containerColor = MaterialTheme.colorScheme.primaryContainer
     ) {
         Text(
             text = "Add\nBall",
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onPrimaryContainer
         )
     }
 }
@@ -82,35 +82,51 @@ fun ToggleCueBallFab(
     onEvent: (MainScreenEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isEnabled = !uiState.showTable
+    val containerColor = when {
+        !isEnabled -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        uiState.onPlaneBall != null -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.primaryContainer
+    }
+    val textColor = when {
+        !isEnabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        uiState.onPlaneBall != null -> MaterialTheme.colorScheme.onSecondaryContainer
+        else -> MaterialTheme.colorScheme.onPrimaryContainer
+    }
+
     FloatingActionButton(
-        onClick = { onEvent(MainScreenEvent.ToggleOnPlaneBall) },
+        onClick = { if (isEnabled) onEvent(MainScreenEvent.ToggleOnPlaneBall) },
         modifier = modifier.navigationBarsPadding(),
-        containerColor = if (uiState.onPlaneBall != null) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
+        containerColor = containerColor
     ) {
         Text(
             text = "Cue Ball\nToggle",
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.labelSmall,
-            color = if (uiState.onPlaneBall != null) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+            color = textColor
         )
     }
 }
 
 @Composable
 fun ToggleTableFab(
+    uiState: OverlayState,
     onEvent: (MainScreenEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val containerColor = if (uiState.showTable) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer
+    val textColor = if (uiState.showTable) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
+
     FloatingActionButton(
         onClick = { onEvent(MainScreenEvent.ToggleTable) },
         modifier = modifier.navigationBarsPadding(),
-        containerColor = MaterialTheme.colorScheme.surfaceVariant
+        containerColor = containerColor
     ) {
         Text(
-            text = "Show\nTable",
+            text = if (uiState.showTable) "Hide\nTable" else "Show\nTable",
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = textColor
         )
     }
 }
