@@ -37,3 +37,10 @@ app/src/main/java/com/hereliesaz/cuedetat/view/config/
 └── ProtractorGuides.kt
 
 This structure ensures that the laws governing the appearance of each element are as modular and explicit as the laws governing their logic. So it is written. So it shall be rendered.
+
+## Decrees of Appearance
+
+* **Glow Effect**: A "glow" effect must be applied to key stroked elements. This is achieved in `PaintCache` by creating two distinct sets of `Paint` objects for glows. **Line Glows** use `Paint.Style.FILL_AND_STROKE`. **Ball Glows** use `Paint.Style.STROKE`.
+* **Stroke & Glow Widths**: The base stroke width shall be `6f`. The base glow width shall be `12f`.
+* **Opacity**: Menu backgrounds must be 80% opaque (`0.8f`). Popup dialogs must be 66% opaque (`0.66f`).
+* **Spin Control Color Wheel**: The wheel must be a radial gradient. As of the final correction, its colors **must** be aligned thusly: Yellow at the top (270°/`Topspin`), Red at the right (0°/`Right English`), Blue at the bottom (90°/`Draw`), and Green at the left (180°/`Left English`).

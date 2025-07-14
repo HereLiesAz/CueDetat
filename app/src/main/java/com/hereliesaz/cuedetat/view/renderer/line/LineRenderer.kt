@@ -1,13 +1,18 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/renderer/text/LineTextRenderer.kt
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt
 
-package com.hereliesaz.cuedetat.view.renderer.text
+package com.hereliesaz.cuedetat.view.renderer.line
 
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.Typeface
-import com.hereliesaz.cuedetat.ui.ZoomMapping
+import androidx.compose.ui.graphics.toArgb
+import com.hereliesaz.cuedetat.ui.theme.RebelYellow
 import com.hereliesaz.cuedetat.view.PaintCache
+import com.hereliesaz.cuedetat.view.config.line.*
+import com.hereliesaz.cuedetat.view.config.ui.ProtractorGuides
+import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -15,121 +20,304 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-class LineTextRenderer {
+class LineRenderer {
+    private val textRenderer = LineTextRenderer()
+    private val protractorAngles = floatArrayOf(5f, 10f, 15f, 20f, 25f, 30f, 35f, 40f, 45f)
 
-    private val minFontSize = 18f
-    private val maxFontSize = 70f
-    enum class RailType { TOP, BOTTOM, LEFT, RIGHT }
-
-    private fun getDynamicFontSize(baseSize: Float, zoomSliderPosition: Float): Float {
-        val zoomFactor = ZoomMapping.sliderToZoom(zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM
-        return (baseSize * zoomFactor).coerceIn(minFontSize, maxFontSize)
+    fun drawLogicalLines(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
+        if (state.isBankingMode) {
+            drawBankingLines(canvas, state, paints)
+        } else {
+            drawProtractorLines(canvas, state, paints, typeface)
+            drawProtractorGuides(canvas, state, paints)
+        }
     }
 
-    private fun draw(
-        canvas: Canvas,
-        text: String,
-        origin: PointF,
-        angleDegrees: Float,
-        distanceFromOrigin: Float,
-        rotationOffset: Float,
-        paint: Paint
-    ) {
-        val textAngleRadians = Math.toRadians((angleDegrees - 90).toDouble())
-        val textX = origin.x + (distanceFromOrigin * cos(textAngleRadians)).toFloat()
-        val textY = origin.y + (distanceFromOrigin * sin(textAngleRadians)).toFloat()
+    fun drawRailLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
+        if (!state.showTable) return
 
-        canvas.save()
-        canvas.rotate(angleDegrees + rotationOffset, textX, textY)
-        canvas.drawText(text, textX, textY, paint)
-        canvas.restore()
-    }
-
-    fun drawProtractorLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         val textPaint = paints.textPaint.apply { this.typeface = typeface }
-        textPaint.textSize = getDynamicFontSize(38f, state.zoomSliderPosition)
-        val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM
 
-        // Aiming Line Label
-        draw(canvas, "Aiming Line", state.protractorUnit.center, state.protractorUnit.rotationDegrees, state.protractorUnit.radius * 5.0f * zoomFactor, 0f, textPaint)
-
-        // Shot Guide Line Label - Anchored to Ghost Ball
-        val shotLineAngle = Math.toDegrees(atan2((state.protractorUnit.ghostCueBallCenter.y - state.shotLineAnchor.y).toDouble(), (state.protractorUnit.ghostCueBallCenter.x - state.shotLineAnchor.x).toDouble()).toDouble()).toFloat()
-        draw(canvas, "Shot Guide Line", state.protractorUnit.ghostCueBallCenter, shotLineAngle, state.protractorUnit.radius * 4.0f * zoomFactor, 0f, textPaint)
-
-        // Tangent Line Labels - Drawn on both sides
-        val tangentBaseAngle = shotLineAngle + 90f
-        val tangentDistance = state.protractorUnit.radius * 3.0f * zoomFactor
-        draw(canvas, "Tangent Line", state.protractorUnit.ghostCueBallCenter, tangentBaseAngle + (90 * state.tangentDirection), tangentDistance, 0f, textPaint)
-        draw(canvas, "Tangent Line", state.protractorUnit.ghostCueBallCenter, tangentBaseAngle - (90 * state.tangentDirection), tangentDistance, 0f, textPaint)
+        // Diamond label for banked Aiming Line
+        if (state.aimingLineBankPath.size > 1) {
+            val bankPoint = state.aimingLineBankPath[1]
+            getRailForPoint(bankPoint, state)?.let { railType ->
+                textRenderer.drawDiamondLabel(canvas, bankPoint, railType, state, textPaint)
+            }
+        }
+        // Diamond label for banked Tangent Line
+        if (state.tangentLineBankPath.size > 1) {
+            val tangentBankPoint = state.tangentLineBankPath[1]
+            getRailForPoint(tangentBankPoint, state)?.let { railType ->
+                textRenderer.drawDiamondLabel(canvas, tangentBankPoint, railType, state, textPaint)
+            }
+        }
+        // Diamond label for Shot Guide Line
+        state.shotGuideImpactPoint?.let { impactPoint ->
+            getRailForPoint(impactPoint, state)?.let { railType ->
+                textRenderer.drawDiamondLabel(canvas, impactPoint, railType, state, textPaint)
+            }
+        }
     }
 
+    private fun drawProtractorLines(
+        canvas: Canvas, state: OverlayState,
+        paints: PaintCache, typeface: Typeface?
+    ) {
+        val shotLineAnchor = state.shotLineAnchor
+        val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
+        val shotGuideLineConfig = ShotGuideLine()
 
-    fun drawAngleLabel(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint, radius: Float) {
-        val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)
-        val labelAngleRad = initialAngleRad + Math.toRadians(angleDegrees.toDouble())
-        val labelDistance = radius * 16.5f
-
-        val text = "${angleDegrees.toInt()}°"
-        val textX = center.x + (labelDistance * cos(labelAngleRad)).toFloat()
-        val textY = center.y + (labelDistance * sin(labelAngleRad)).toFloat()
-
-        canvas.drawText(text, textX, textY, paint)
-    }
-
-    fun drawDiamondLabel(canvas: Canvas, point: PointF, railType: RailType, state: OverlayState, paint: Paint) {
-        val diamondNumberText = calculateDiamondNumber(point, railType, state) ?: return
-
-        paint.textSize = getDynamicFontSize(30f, state.zoomSliderPosition)
-        val padding = 15f
-
-        var textRotation = 0f
-        var textX = point.x
-        var textY = point.y
-
-        when (railType) {
-            RailType.TOP -> { textY += padding; textRotation = 0f }
-            RailType.BOTTOM -> { textY -= padding; textRotation = 0f }
-            RailType.LEFT -> { textX += padding; textRotation = 90f }
-            RailType.RIGHT -> { textX -= padding; textRotation = -90f }
+        val shotLineIsWarning = state.isGeometricallyImpossible || state.isTiltBeyondLimit || state.isObstructed || state.tangentAimedPocketIndex != null
+        val shotLinePaint = Paint(paints.shotLinePaint).apply {
+            color = if (shotLineIsWarning) paints.warningPaint.color else shotGuideLineConfig.strokeColor.toArgb()
+            strokeWidth = shotGuideLineConfig.strokeWidth
+        }
+        val shotLineGlow = Paint(paints.lineGlowPaint).apply {
+            color = shotLinePaint.color
+            strokeWidth = shotGuideLineConfig.glowWidth
+        }
+        val obstructionPaint = Paint(paints.pathObstructionPaint).apply {
+            strokeWidth = state.protractorUnit.radius * 2
         }
 
-        val totalRotation = (state.tableRotationDegrees + textRotation) % 360
-        val uprightCorrection = if (totalRotation > 90 && totalRotation < 270) 180f else 0f
+        // --- Pass 1: Wide Pathways ---
+        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, obstructionPaint)
+        if (state.aimingLineBankPath.isNotEmpty()) {
+            drawPath(canvas, state.aimingLineBankPath, obstructionPaint)
+        } else {
+            drawExtendedLine(canvas, ghostCueCenter, state.aimingLineEndPoint ?: state.protractorUnit.center, obstructionPaint)
+        }
 
-        canvas.save()
-        canvas.rotate(textRotation + uprightCorrection, textX, textY)
-        canvas.drawText(diamondNumberText, textX, textY, paint)
-        canvas.restore()
+        // --- Pass 2: Glows ---
+        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLineGlow)
+        drawTangentLines(canvas, state, paints)
+
+        // --- Pass 3: Core Lines ---
+        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLinePaint)
+        drawAimingLines(canvas, state, paints)
+        drawSpinPaths(canvas, state, paints)
+
+        if (state.areHelpersVisible) {
+            textRenderer.drawProtractorLabels(canvas, state, paints, typeface)
+        }
+    }
+
+    private fun drawAimingLines(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+        val aimingLineConfig = AimingLine()
+        val isDirectPocketed = state.aimedPocketIndex != null
+
+        val baseAimingColor = if(isDirectPocketed && state.aimingLineBankPath.isEmpty()) RebelYellow else aimingLineConfig.strokeColor
+
+        val aimingLinePaint = Paint(paints.targetCirclePaint).apply {
+            color = baseAimingColor.toArgb()
+            strokeWidth = aimingLineConfig.strokeWidth
+        }
+        val aimingLineGlow = Paint(paints.lineGlowPaint).apply {
+            color = aimingLinePaint.color
+            strokeWidth = aimingLineConfig.glowWidth
+            alpha = (aimingLineConfig.glowColor.alpha * 255).toInt()
+        }
+
+        if (state.aimingLineBankPath.isNotEmpty()) {
+            drawPath(canvas, state.aimingLineBankPath, aimingLineGlow)
+            drawPath(canvas, state.aimingLineBankPath, aimingLinePaint)
+        } else {
+            drawExtendedLine(canvas, state.protractorUnit.ghostCueBallCenter, state.protractorUnit.center, aimingLineGlow)
+            drawExtendedLine(canvas, state.protractorUnit.ghostCueBallCenter, state.protractorUnit.center, aimingLinePaint)
+        }
     }
 
 
-    private fun calculateDiamondNumber(point: PointF, railType: RailType, state: OverlayState): String? {
+    private fun drawTangentLines(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+        val tangentLineConfig = TangentLine()
+        val tangentSolidPaint = Paint(paints.tangentLineSolidPaint).apply {
+            color = tangentLineConfig.strokeColor.toArgb()
+            strokeWidth = tangentLineConfig.strokeWidth
+        }
+        val tangentDottedPaint = Paint(paints.tangentLineDottedPaint).apply {
+            color = tangentLineConfig.strokeColor.toArgb()
+            strokeWidth = tangentLineConfig.strokeWidth
+            alpha = (tangentLineConfig.opacity * 255).toInt()
+        }
+        val tangentGlow = Paint(paints.lineGlowPaint).apply {
+            strokeWidth = tangentLineConfig.glowWidth
+            color = tangentLineConfig.glowColor.toArgb()
+        }
+
+        if (state.tangentLineBankPath.isNotEmpty()) {
+            drawPath(canvas, state.tangentLineBankPath, tangentGlow)
+            drawPath(canvas, state.tangentLineBankPath, tangentSolidPaint)
+        } else {
+            drawExtendedLine(canvas, state.protractorUnit.ghostCueBallCenter, state, state.tangentDirection, tangentGlow)
+            drawExtendedLine(canvas, state.protractorUnit.ghostCueBallCenter, state, state.tangentDirection, tangentSolidPaint)
+        }
+
+        // Inactive tangent line no longer banks
+        drawExtendedLine(canvas, state.protractorUnit.ghostCueBallCenter, state, -state.tangentDirection, tangentDottedPaint)
+    }
+
+
+    private fun drawSpinPaths(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+        if (state.spinPaths.isEmpty()) return
+
+        val alpha = (255 * state.spinPathsAlpha).toInt()
+        val spinPathPaint = Paint(paints.shotLinePaint).apply {
+            strokeWidth = 4f
+        }
+
+        val spinGlowPaint = Paint(paints.lineGlowPaint).apply {
+            strokeWidth = 8f
+        }
+
+        state.spinPaths.forEach { (color, points) ->
+            if (points.size < 2) return@forEach
+
+            val path = Path()
+            path.moveTo(points.first().x, points.first().y)
+            for (i in 1 until points.size) {
+                path.lineTo(points[i].x, points[i].y)
+            }
+
+            spinPathPaint.color = color.toArgb()
+            spinPathPaint.alpha = alpha
+            spinGlowPaint.color = color.toArgb()
+            spinGlowPaint.alpha = (color.alpha * 100 * state.spinPathsAlpha).toInt().coerceIn(0, 255)
+
+            canvas.drawPath(path, spinGlowPaint)
+            canvas.drawPath(path, spinPathPaint)
+        }
+    }
+
+    private fun drawBankingLines(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+        if (state.bankShotPath.size < 2) return
+
+        val bankLineConfigs = listOf(BankLine1(), BankLine2(), BankLine3(), BankLine4())
+        val lastSegmentIndex = state.bankShotPath.size - 2
+
+        for (i in 0..lastSegmentIndex) {
+            val start = state.bankShotPath[i]
+            val end = state.bankShotPath[i+1]
+
+            val isLastSegment = i == lastSegmentIndex
+            val isPocketed = state.pocketedBankShotPocketIndex != null
+
+            val config = bankLineConfigs.getOrElse(i) { bankLineConfigs.last() }
+
+            val linePaint = if (isLastSegment && isPocketed) {
+                Paint(paints.shotLinePaint).apply { color = RebelYellow.toArgb() }
+            } else {
+                Paint(paints.bankLine1Paint).apply { color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
+            }
+
+            val glowPaint = Paint(paints.lineGlowPaint).apply {
+                color = linePaint.color
+                alpha = (config.glowColor.alpha * 255).toInt()
+                strokeWidth = config.glowWidth
+            }
+
+            canvas.drawLine(start.x, start.y, end.x, end.y, glowPaint)
+            canvas.drawLine(start.x, start.y, end.x, end.y, linePaint)
+        }
+    }
+
+    private fun drawProtractorGuides(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+        val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
+        val targetCenter = state.protractorUnit.center
+        val config = ProtractorGuides()
+
+        val guidePaint = Paint(paints.angleGuidePaint).apply {
+            color = config.strokeColor.toArgb()
+            strokeWidth = config.strokeWidth
+            alpha = (config.opacity * 255).toInt()
+        }
+        val textPaint = Paint(paints.textPaint).apply {
+            alpha = (config.opacity * 255).toInt()
+            textSize = 30f
+        }
+
+        protractorAngles.forEach { angle ->
+            drawAngleGuide(canvas, ghostCueCenter, targetCenter, angle, guidePaint)
+            drawAngleGuide(canvas, ghostCueCenter, targetCenter, -angle, guidePaint)
+            if (state.areHelpersVisible) {
+                textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, angle, textPaint, state.protractorUnit.radius)
+                textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, -angle, textPaint, state.protractorUnit.radius)
+            }
+        }
+    }
+
+    private fun getRailForPoint(point: PointF, state: OverlayState): LineTextRenderer.RailType? {
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
         if (referenceRadius <= 0) return null
 
-        val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
-        val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
-        val tableWidth = tableToBallRatioLong * referenceRadius
-        val tableHeight = tableToBallRatioShort * referenceRadius
+        val ballRealDiameter = 2.25f
+        val ballLogicalDiameter = referenceRadius * 2
+        val scale = ballLogicalDiameter / ballRealDiameter
+        val tableWidth = state.tableSize.longSideInches * scale
+        val tableHeight = state.tableSize.shortSideInches * scale
 
         val halfW = tableWidth / 2f
         val halfH = tableHeight / 2f
+        val canvasCenterX = state.viewWidth / 2f
+        val canvasCenterY = state.viewHeight / 2f
 
-        val logicalX = point.x - state.viewWidth / 2f
-        val logicalY = point.y - state.viewHeight / 2f
+        val left = canvasCenterX - halfW
+        val top = canvasCenterY - halfH
+        val right = canvasCenterX + halfW
+        val bottom = canvasCenterY + halfH
 
-        val diamondValue = when (railType) {
-            RailType.TOP -> ((logicalX + halfW) / tableWidth) * 8.0
-            RailType.RIGHT -> ((logicalY + halfH) / tableHeight) * 4.0
-            RailType.BOTTOM -> 8.0 - (((logicalX + halfW) / tableWidth) * 8.0)
-            RailType.LEFT -> 4.0 - (((logicalY + halfH) / tableHeight) * 4.0)
+        val tolerance = 5f
+
+        return when {
+            point.y > top - tolerance && point.y < top + tolerance -> LineTextRenderer.RailType.TOP
+            point.y > bottom - tolerance && point.y < bottom + tolerance -> LineTextRenderer.RailType.BOTTOM
+            point.x > left - tolerance && point.x < left + tolerance -> LineTextRenderer.RailType.LEFT
+            point.x > right - tolerance && point.x < right + tolerance -> LineTextRenderer.RailType.RIGHT
+            else -> null
         }
-
-        return String.format("%.1f", diamondValue)
     }
 
-    fun drawBankingLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?){
-        // This function is deprecated as its logic has been moved to LineRenderer, which has access to the necessary helper functions.
+    private fun drawExtendedLine(canvas: Canvas, start: PointF, end: PointF, paint: Paint) {
+        val dirX = end.x - start.x; val dirY = end.y - start.y
+        val mag = sqrt(dirX * dirX + dirY * dirY)
+        if (mag > 0.001f) {
+            val extendFactor = 5000f; val ndx = dirX / mag; val ndy = dirY / mag
+            canvas.drawLine(start.x, start.y, start.x + ndx * extendFactor, start.y + ndy * extendFactor, paint)
+        }
+    }
+
+    private fun drawExtendedLine(canvas: Canvas, start: PointF, state: OverlayState, direction: Float, paint: Paint) {
+        val towards = state.protractorUnit.center
+        val dxToTarget = towards.x - start.x
+        val dyToTarget = towards.y - start.y
+        val magToTarget = sqrt(dxToTarget * dxToTarget + dyToTarget * dyToTarget)
+
+        if (magToTarget > 0.001f) {
+            val tangentDx = -dyToTarget / magToTarget
+            val tangentDy = dxToTarget / magToTarget
+            val extendFactor = 5000f
+
+            canvas.drawLine(start.x, start.y, start.x + tangentDx * extendFactor * direction, start.y + tangentDy * extendFactor * direction, paint)
+        }
+    }
+
+
+    private fun drawPath(canvas: Canvas, path: List<PointF>, paint: Paint) {
+        if (path.size < 2) return
+        for (i in 0 until path.size - 1) {
+            val start = path[i]
+            val end = path[i + 1]
+            canvas.drawLine(start.x, start.y, end.x, end.y, paint)
+        }
+    }
+
+
+    private fun drawAngleGuide(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint) {
+        val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)
+        val finalAngleRad = initialAngleRad + Math.toRadians(angleDegrees.toDouble())
+        val length = 5000f
+        val endX = center.x + (length * cos(finalAngleRad)).toFloat()
+        val endY = center.y + (length * sin(finalAngleRad)).toFloat()
+        canvas.drawLine(center.x, center.y, endX, endY, paint)
     }
 }

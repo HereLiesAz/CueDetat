@@ -57,76 +57,77 @@ class UpdateStateUseCase @Inject constructor(
 
         val isObstructed = checkForObstructions(updatedStateWithSnapping)
         val targetBallDistance = calculateDistance(updatedStateWithSnapping, flatMatrix)
-
-        var (aimedPocketIndex, aimingLineEndPoint) = if (!state.isBankingMode && state.showTable) {
-            checkPocketAim(updatedStateWithSnapping.protractorUnit.ghostCueBallCenter, updatedStateWithSnapping.protractorUnit.center, updatedStateWithSnapping)
-        } else {
-            Pair(null, null)
-        }
-
         val shotGuideImpactPoint = if (state.showTable && !state.isBankingMode) {
             calculateShotGuideImpact(updatedStateWithSnapping, useShotGuideLine = true)
         } else {
             null
         }
 
-        var aimingLineBankPath = if (state.showTable && !state.isBankingMode) {
-            calculateSingleBank(updatedStateWithSnapping.protractorUnit.ghostCueBallCenter, updatedStateWithSnapping.protractorUnit.center, updatedStateWithSnapping)
+        // --- Aiming Line Logic ---
+        var (aimedPocketIndex, aimingLineEndPoint) = if (!state.isBankingMode && state.showTable) {
+            checkPocketAim(updatedStateWithSnapping.protractorUnit.ghostCueBallCenter, updatedStateWithSnapping.protractorUnit.center, updatedStateWithSnapping)
+        } else {
+            Pair(null, null)
+        }
+        var aimingLineBankPath: List<PointF> = if (aimedPocketIndex != null && aimingLineEndPoint != null) {
+            listOf(updatedStateWithSnapping.protractorUnit.ghostCueBallCenter, aimingLineEndPoint)
+        } else if (state.showTable && !state.isBankingMode) {
+            val bankPath = calculateSingleBank(updatedStateWithSnapping.protractorUnit.ghostCueBallCenter, updatedStateWithSnapping.protractorUnit.center, updatedStateWithSnapping)
+            if (bankPath.size > 2) {
+                val (bankedPocketIndex, intersectionPoint) = checkPocketAim(bankPath[1], bankPath[2], updatedStateWithSnapping)
+                if (bankedPocketIndex != null && intersectionPoint != null) {
+                    aimedPocketIndex = bankedPocketIndex
+                    listOf(bankPath[0], bankPath[1], intersectionPoint)
+                } else {
+                    emptyList()
+                }
+            } else {
+                emptyList()
+            }
         } else {
             emptyList()
         }
 
-        if (aimingLineBankPath.isNotEmpty()) {
-            val (bankedPocketIndex, intersectionPoint) = checkPocketAim(aimingLineBankPath[0], aimingLineBankPath[1], updatedStateWithSnapping)
-            if (bankedPocketIndex != null && intersectionPoint != null) {
-                aimedPocketIndex = bankedPocketIndex
-                aimingLineBankPath = listOf(aimingLineBankPath[0], intersectionPoint)
-            }
-        } else if(aimedPocketIndex != null && aimingLineEndPoint != null) {
-            aimingLineBankPath = listOf(updatedStateWithSnapping.protractorUnit.ghostCueBallCenter, aimingLineEndPoint)
-        }
-
-
+        // --- Tangent Line Logic ---
         val tangentStart = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter
         val activeTangentTarget = PointF(
             tangentStart.x - (updatedStateWithSnapping.protractorUnit.center.y - tangentStart.y) * tangentDirection,
             tangentStart.y + (updatedStateWithSnapping.protractorUnit.center.x - tangentStart.x) * tangentDirection
         )
-        val inactiveTangentTarget = PointF(
-            tangentStart.x + (updatedStateWithSnapping.protractorUnit.center.y - tangentStart.y) * tangentDirection,
-            tangentStart.y - (updatedStateWithSnapping.protractorUnit.center.x - tangentStart.x) * tangentDirection
-        )
-
         var (tangentAimedPocketIndex, tangentAimingEndPoint) = if(!state.isBankingMode && state.showTable) {
             checkPocketAim(tangentStart, activeTangentTarget, updatedStateWithSnapping)
         } else {
             Pair(null, null)
         }
-
-
-        var tangentLineBankPath = if (state.showTable && !state.isBankingMode) {
-            calculateSingleBank(tangentStart, activeTangentTarget, updatedStateWithSnapping)
-        } else { emptyList() }
-
-        if(tangentLineBankPath.isNotEmpty()){
-            val (bankedPocketIndex, intersectionPoint) = checkPocketAim(tangentLineBankPath[0], tangentLineBankPath[1], updatedStateWithSnapping)
-            if (bankedPocketIndex != null && intersectionPoint != null) {
-                tangentAimedPocketIndex = bankedPocketIndex
-                tangentLineBankPath = listOf(tangentLineBankPath[0], intersectionPoint)
+        var tangentLineBankPath = if(tangentAimedPocketIndex != null && tangentAimingEndPoint != null) {
+            listOf(tangentStart, tangentAimingEndPoint)
+        } else if (state.showTable && !state.isBankingMode) {
+            val bankPath = calculateSingleBank(tangentStart, activeTangentTarget, updatedStateWithSnapping)
+            if(bankPath.size > 2){
+                val (bankedPocketIndex, intersectionPoint) = checkPocketAim(bankPath[1], bankPath[2], updatedStateWithSnapping)
+                if (bankedPocketIndex != null && intersectionPoint != null) {
+                    tangentAimedPocketIndex = bankedPocketIndex
+                    listOf(bankPath[0], bankPath[1], intersectionPoint)
+                } else {
+                    emptyList()
+                }
+            } else {
+                emptyList()
             }
-        } else if(tangentAimedPocketIndex != null && tangentAimingEndPoint != null){
-            tangentLineBankPath = listOf(tangentStart, tangentAimingEndPoint)
+        } else {
+            emptyList()
         }
 
-
-        val inactiveTangentLineBankPath = if (state.showTable && !state.isBankingMode) {
-            emptyList()
-        } else { emptyList() }
+        // The inactive tangent line should never bank.
+        val inactiveTangentLineBankPath: List<PointF> = emptyList()
 
 
         val finalPitchMatrix = Matrix(basePitchMatrix)
         val referenceRadius = updatedStateWithSnapping.onPlaneBall?.radius ?: updatedStateWithSnapping.protractorUnit.radius
-        val logicalTableShortSide = tableToBallRatioShort * referenceRadius
+        val ballRealDiameter = 2.25f
+        val ballLogicalDiameter = referenceRadius * 2
+        val scale = ballLogicalDiameter / ballRealDiameter
+        val logicalTableShortSide = state.tableSize.shortSideInches * scale
         val baseRailLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
         val railLiftAmount = baseRailLiftAmount * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
         val finalRailPitchMatrix = Perspective.createPitchMatrix(
@@ -149,10 +150,10 @@ class UpdateStateUseCase @Inject constructor(
         }
         val hasFinalInverse = finalPitchMatrix.invert(finalInverseMatrix)
 
-        val spinPaths = if (!state.isBankingMode) {
+        val spinPaths: Map<Color, List<PointF>> = if (!state.isBankingMode) {
             calculateSpinPaths(updatedStateWithSnapping)
         } else {
-            emptyMap<Color, List<PointF>>()
+            emptyMap()
         }
 
         return updatedStateWithSnapping.copy(
@@ -213,17 +214,20 @@ class UpdateStateUseCase @Inject constructor(
         val dirY = end.y - start.y
         val mag = sqrt(dirX * dirX + dirY * dirY)
         if (mag < 0.001f) return Pair(null, null)
+
+        val extendedEnd = PointF(start.x + dirX / mag * 5000f, start.y + dirY / mag * 5000f)
+
         val pockets = TableRenderer.getLogicalPockets(state)
         val pocketRadius = state.protractorUnit.radius * 1.8f
 
         for ((index, pocket) in pockets.withIndex()) {
-            val dist = linePointDistance(start, end, pocket)
+            val dist = linePointDistance(start, extendedEnd, pocket)
             if (dist < pocketRadius) {
                 val vecToPocketX = pocket.x - start.x
                 val vecToPocketY = pocket.y - start.y
-                val dotProduct = vecToPocketX * dirX + vecToPocketY * dirY
+                val dotProduct = vecToPocketX * (dirX / mag) + vecToPocketY * (dirY / mag)
                 if (dotProduct > 0) {
-                    val intersection = getLineCircleIntersection(start, end, pocket, pocketRadius)
+                    val intersection = getLineCircleIntersection(start, extendedEnd, pocket, pocketRadius)
                     if (intersection != null) return Pair(index, intersection)
                 }
             }
@@ -277,18 +281,22 @@ class UpdateStateUseCase @Inject constructor(
     }
 
     private fun calculateSingleBank(start: PointF, end: PointF, state: OverlayState): List<PointF> {
-        val intersectionResult = reducerUtils.findRailIntersectionAndNormal(start, end, state) ?: return emptyList()
+        val dirX = end.x - start.x
+        val dirY = end.y - start.y
+        val extendedEnd = PointF(start.x + dirX * 5000f, start.y + dirY * 5000f)
+
+        val intersectionResult = reducerUtils.findRailIntersectionAndNormal(start, extendedEnd, state) ?: return emptyList()
         val (intersectionPoint, railNormal) = intersectionResult
 
-        val incidentVector = PointF(end.x - start.x, end.y - start.y)
+        val incidentVector = PointF(extendedEnd.x - start.x, extendedEnd.y - start.y)
         val reflectedDir = reducerUtils.reflect(incidentVector, railNormal)
 
-        val extendedEndPoint = PointF(
+        val finalEndPoint = PointF(
             intersectionPoint.x + reflectedDir.x * 5000f,
             intersectionPoint.y + reflectedDir.y * 5000f
         )
 
-        return listOf(start, intersectionPoint, extendedEndPoint)
+        return listOf(start, intersectionPoint, finalEndPoint)
     }
 
 

@@ -129,9 +129,6 @@ fun MenuDrawerContent(
         MenuItem(
             text = "About Me",
             onClick = { onEvent(MainScreenEvent.ViewArt); onCloseDrawer() })
-        MenuItem(
-            text = "Chalk Your Tip",
-            onClick = { onEvent(MainScreenEvent.ShowDonationOptions); onCloseDrawer() })
         MenuDivider()
 
         // Section 6: Developer

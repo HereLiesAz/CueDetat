@@ -13,9 +13,11 @@ object DrawingUtils {
     fun getPerspectiveRadiusAndLift(
         logicalCenter: PointF,
         logicalRadius: Float,
-        state: OverlayState
+        state: OverlayState,
+        matrix: Matrix? = null // Allow overriding the matrix
     ): PerspectiveRadiusInfo {
-        if (!state.hasInverseMatrix) return PerspectiveRadiusInfo(logicalRadius, 0f)
+        val usedMatrix = matrix ?: state.pitchMatrix
+        if (!state.hasInverseMatrix && matrix == null) return PerspectiveRadiusInfo(logicalRadius, 0f)
 
         // The righteous path: Use the pre-calculated flat matrix from the state
         // to get an average scaled radius that is robust against perspective distortion.
@@ -31,5 +33,4 @@ object DrawingUtils {
         m.mapPoints(arr)
         return PointF(arr[0], arr[1])
     }
-
 }

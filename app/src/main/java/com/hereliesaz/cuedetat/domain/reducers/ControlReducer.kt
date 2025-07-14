@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ControlReducer.kt
+
 package com.hereliesaz.cuedetat.domain.reducers
 
 import com.hereliesaz.cuedetat.domain.ReducerUtils

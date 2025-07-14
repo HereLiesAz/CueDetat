@@ -15,6 +15,7 @@ import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.custom.CustomObjectDetectorOptions
 import com.hereliesaz.cuedetat.di.GenericDetector
+import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.view.state.CvRefinementMethod
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -25,18 +26,17 @@ import org.opencv.core.Mat
 import org.opencv.core.MatOfPoint
 import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
-import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import java.io.IOException
 import java.nio.ByteBuffer
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.atan2
 
 @Singleton
 class VisionRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     @GenericDetector private val genericDetector: ObjectDetector,
+    private val reducerUtils: ReducerUtils // Injected for centralized boundary logic
 ) {
 
     private val _visionDataFlow = MutableStateFlow(VisionData())
@@ -103,8 +103,7 @@ class VisionRepository @Inject constructor(
         }
     }
 
-    @SuppressLint("UnsafeOptInUsageError")
-    private fun processWithOpenCV(imageProxy: ImageProxy, genericObjects: List<DetectedObject>, customObjects: List<DetectedObject>, uiState: OverlayState) {
+    private fun yuvToRotatedRgba(imageProxy: ImageProxy): Mat {
         val yBuffer: ByteBuffer = imageProxy.planes[0].buffer
         val uBuffer: ByteBuffer = imageProxy.planes[1].buffer
         val vBuffer: ByteBuffer = imageProxy.planes[2].buffer
@@ -115,30 +114,27 @@ class VisionRepository @Inject constructor(
         yBuffer.get(nv21, 0, ySize)
         vBuffer.get(nv21, ySize, vSize)
         uBuffer.get(nv21, ySize + vSize, uSize)
+
         val yuvMat = Mat(imageProxy.height + imageProxy.height / 2, imageProxy.width, org.opencv.core.CvType.CV_8UC1)
         yuvMat.put(0, 0, nv21)
+
         val rgbaMat = Mat()
         Imgproc.cvtColor(yuvMat, rgbaMat, Imgproc.COLOR_YUV2RGBA_NV21, 4)
+
         val rotatedRgbaMat = Mat()
         Core.rotate(rgbaMat, rotatedRgbaMat, imageProxy.imageInfo.rotationDegrees.toCvRotateCode())
 
-        val tableBoundaries = if (uiState.showTable) {
-            val referenceRadius = uiState.onPlaneBall?.radius ?: uiState.protractorUnit.radius
-            val tableToBallRatioLong = uiState.tableSize.getTableToBallRatioLong()
-            val tableToBallRatioShort = tableToBallRatioLong / uiState.tableSize.aspectRatio
-            val tablePlayingSurfaceWidth = tableToBallRatioLong * referenceRadius
-            val tablePlayingSurfaceHeight = tableToBallRatioShort * referenceRadius
-            val canvasCenterX = uiState.viewWidth / 2f
-            val canvasCenterY = uiState.viewHeight / 2f
-            Rect(
-                (canvasCenterX - tablePlayingSurfaceWidth / 2).toInt(),
-                (canvasCenterY - tablePlayingSurfaceHeight / 2).toInt(),
-                (canvasCenterX + tablePlayingSurfaceWidth / 2).toInt(),
-                (canvasCenterY + tablePlayingSurfaceHeight / 2).toInt()
-            )
-        } else {
-            null
-        }
+        yuvMat.release()
+        rgbaMat.release()
+
+        return rotatedRgbaMat
+    }
+
+    @SuppressLint("UnsafeOptInUsageError")
+    private fun processWithOpenCV(imageProxy: ImageProxy, genericObjects: List<DetectedObject>, customObjects: List<DetectedObject>, uiState: OverlayState) {
+        val rotatedRgbaMat = yuvToRotatedRgba(imageProxy)
+        // Use the centralized boundary definition
+        val tableBoundaries = if (uiState.showTable) reducerUtils.getTableBoundaries(uiState) else null
 
         val refinedGeneric = refineDetections(genericObjects, rotatedRgbaMat, uiState, tableBoundaries)
         val refinedCustom = refineDetections(customObjects, rotatedRgbaMat, uiState, tableBoundaries)
@@ -152,8 +148,6 @@ class VisionRepository @Inject constructor(
             detectedBoundingBoxes = boundingBoxes
         )
 
-        yuvMat.release()
-        rgbaMat.release()
         rotatedRgbaMat.release()
         imageProxy.close()
     }

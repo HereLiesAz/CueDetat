@@ -19,10 +19,12 @@ class TableRenderer {
             val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
             if (referenceRadius <= 0) return emptyList()
 
-            val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
-            val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
-            val tablePlayingSurfaceWidth = tableToBallRatioLong * referenceRadius
-            val tablePlayingSurfaceHeight = tableToBallRatioShort * referenceRadius
+            val ballRealDiameter = 2.25f
+            val ballLogicalDiameter = referenceRadius * 2
+            val scale = ballLogicalDiameter / ballRealDiameter
+
+            val tablePlayingSurfaceWidth = state.tableSize.longSideInches * scale
+            val tablePlayingSurfaceHeight = state.tableSize.shortSideInches * scale
 
             val canvasCenterX = state.viewWidth / 2f
             val canvasCenterY = state.viewHeight / 2f
@@ -31,96 +33,100 @@ class TableRenderer {
             val right = canvasCenterX + tablePlayingSurfaceWidth / 2
             val bottom = canvasCenterY + tablePlayingSurfaceHeight / 2
 
+            // Move side pockets outward by half a ball radius.
+            val sidePocketOffset = referenceRadius * 0.5f
+
             return listOf(
-                PointF(left, top), PointF(right, top),
-                PointF(left, bottom), PointF(right, bottom),
-                PointF(canvasCenterX, top), PointF(canvasCenterX, bottom)
+                PointF(left, top), PointF(right, top), // Top corners
+                PointF(left, bottom), PointF(right, bottom),   // Bottom corners
+                PointF(canvasCenterX, top - sidePocketOffset), PointF(canvasCenterX, bottom + sidePocketOffset) // Side pockets
             )
         }
     }
 
-    fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        if (state.showTable || state.isBankingMode) {
-            val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
-            if (referenceRadius <= 0) return
+    fun drawSurface(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+        if (!state.showTable && !state.isBankingMode) return
 
-            // Load configs
-            val tableConfig = Table()
-            val holesConfig = Holes()
+        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
+        if (referenceRadius <= 0) return
 
-            // Use the state's table size to determine proportions
-            val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
-            val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
+        val tableConfig = Table()
 
-            val tablePlayingSurfaceWidth = tableToBallRatioLong * referenceRadius
-            val tablePlayingSurfaceHeight = tableToBallRatioShort * referenceRadius
+        val ballRealDiameter = 2.25f
+        val ballLogicalDiameter = referenceRadius * 2
+        val scale = ballLogicalDiameter / ballRealDiameter
+        val tablePlayingSurfaceWidth = state.tableSize.longSideInches * scale
+        val tablePlayingSurfaceHeight = state.tableSize.shortSideInches * scale
 
-            val canvasCenterX = state.viewWidth / 2f
-            val canvasCenterY = state.viewHeight / 2f
+        val canvasCenterX = state.viewWidth / 2f
+        val canvasCenterY = state.viewHeight / 2f
 
-            val left = canvasCenterX - tablePlayingSurfaceWidth / 2
-            val top = canvasCenterY - tablePlayingSurfaceHeight / 2
-            val right = canvasCenterX + tablePlayingSurfaceWidth / 2
-            val bottom = canvasCenterY + tablePlayingSurfaceHeight / 2
+        val left = canvasCenterX - tablePlayingSurfaceWidth / 2
+        val top = canvasCenterY - tablePlayingSurfaceHeight / 2
+        val right = canvasCenterX + tablePlayingSurfaceWidth / 2
+        val bottom = canvasCenterY + tablePlayingSurfaceHeight / 2
 
-            // Configure paint from config
-            val tableOutlinePaint = Paint(paints.tableOutlinePaint).apply {
-                color = tableConfig.strokeColor.toArgb()
-                strokeWidth = tableConfig.strokeWidth
+        val tableOutlinePaint = Paint(paints.tableOutlinePaint).apply {
+            color = tableConfig.strokeColor.toArgb()
+            strokeWidth = tableConfig.strokeWidth
+        }
+
+        // Draw Outline Only, no fill.
+        canvas.drawRect(left, top, right, bottom, tableOutlinePaint)
+
+        // Draw Diamond Grid
+        val diamondGridPaint = paints.gridLinePaint
+        val halfWidth = tablePlayingSurfaceWidth / 2
+        val halfHeight = tablePlayingSurfaceHeight / 2
+
+        // Vertical lines (connecting long rail diamonds)
+        for (i in 1..3) {
+            val xOffset = halfWidth * (i / 4.0f)
+            canvas.drawLine(canvasCenterX - xOffset, top, canvasCenterX - xOffset, bottom, diamondGridPaint)
+            canvas.drawLine(canvasCenterX + xOffset, top, canvasCenterX + xOffset, bottom, diamondGridPaint)
+        }
+        // Horizontal lines (connecting short rail diamonds)
+        val shortRailYOffsets = listOf(-halfHeight / 2, 0f, halfHeight / 2)
+        for (yOffset in shortRailYOffsets) {
+            canvas.drawLine(left, canvasCenterY + yOffset, right, canvasCenterY + yOffset, diamondGridPaint)
+        }
+        // Center lines
+        canvas.drawLine(canvasCenterX, top, canvasCenterX, bottom, diamondGridPaint)
+        canvas.drawLine(left, canvasCenterY, right, canvasCenterY, diamondGridPaint)
+    }
+
+    fun drawPockets(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+        if (!state.showTable && !state.isBankingMode) return
+        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
+        if (referenceRadius <= 0) return
+
+        val holesConfig = Holes()
+        val pockets = getLogicalPockets(state)
+        val pocketRadius = referenceRadius * 1.8f
+
+        val pocketedPaintWhite = Paint(paints.pocketFillPaint).apply { color = android.graphics.Color.WHITE }
+        val pocketedPaintRed = Paint(paints.pocketFillPaint).apply { color = WarningRed.toArgb() }
+        val pocketOutlinePaint = Paint(paints.tableOutlinePaint).apply {
+            color = holesConfig.strokeColor.toArgb()
+            strokeWidth = holesConfig.strokeWidth
+        }
+        val pocketFillPaint = Paint(paints.pocketFillPaint).apply {
+            color = holesConfig.fillColor.toArgb()
+        }
+
+
+        pockets.forEachIndexed { index, pos ->
+            val isAimedAtByAimingLine = state.aimedPocketIndex == index && !state.isBankingMode
+            val isAimedAtByTangentLine = state.tangentAimedPocketIndex == index && !state.isBankingMode
+            val isPocketedInBank = state.isBankingMode && index == state.pocketedBankShotPocketIndex
+
+            val fillPaint = when {
+                isAimedAtByAimingLine || isPocketedInBank -> pocketedPaintWhite
+                isAimedAtByTangentLine -> pocketedPaintRed
+                else -> pocketFillPaint
             }
-
-            // Draw Outline Only, no fill.
-            canvas.drawRect(left, top, right, bottom, tableOutlinePaint)
-
-            // Draw Diamond Grid
-            val diamondGridPaint = paints.gridLinePaint
-            val halfWidth = tablePlayingSurfaceWidth / 2
-            val halfHeight = tablePlayingSurfaceHeight / 2
-
-            // Vertical lines (connecting long rail diamonds)
-            for (i in 1..3) {
-                val xOffset = halfWidth * (i / 4.0f)
-                canvas.drawLine(canvasCenterX - xOffset, top, canvasCenterX - xOffset, bottom, diamondGridPaint)
-                canvas.drawLine(canvasCenterX + xOffset, top, canvasCenterX + xOffset, bottom, diamondGridPaint)
-            }
-            // Horizontal lines (connecting short rail diamonds)
-            val shortRailYOffsets = listOf(-halfHeight / 2, 0f, halfHeight / 2)
-            for (yOffset in shortRailYOffsets) {
-                canvas.drawLine(left, canvasCenterY + yOffset, right, canvasCenterY + yOffset, diamondGridPaint)
-            }
-            // Center lines
-            canvas.drawLine(canvasCenterX, top, canvasCenterX, bottom, diamondGridPaint)
-            canvas.drawLine(left, canvasCenterY, right, canvasCenterY, diamondGridPaint)
-
-
-            // Draw Pockets
-            val pocketRadius = referenceRadius * 1.8f
-            val pockets = getLogicalPockets(state)
-
-            val pocketedPaintWhite = Paint(paints.pocketFillPaint).apply { color = android.graphics.Color.WHITE }
-            val pocketedPaintRed = Paint(paints.pocketFillPaint).apply { color = WarningRed.toArgb() }
-            val pocketOutlinePaint = Paint(paints.tableOutlinePaint).apply {
-                color = holesConfig.strokeColor.toArgb()
-                strokeWidth = holesConfig.strokeWidth
-            }
-            val pocketFillPaint = Paint(paints.pocketFillPaint).apply {
-                color = holesConfig.fillColor.toArgb()
-            }
-
-
-            pockets.forEachIndexed { index, pos ->
-                val isAimedAtByAimingLine = state.aimedPocketIndex == index && !state.isBankingMode
-                val isAimedAtByTangentLine = state.tangentAimedPocketIndex == index && !state.isBankingMode
-                val isPocketedInBank = state.isBankingMode && index == state.pocketedBankShotPocketIndex
-
-                val fillPaint = when {
-                    isAimedAtByAimingLine || isPocketedInBank -> pocketedPaintWhite
-                    isAimedAtByTangentLine -> pocketedPaintRed
-                    else -> pocketFillPaint
-                }
-                canvas.drawCircle(pos.x, pos.y, pocketRadius, fillPaint)
-                canvas.drawCircle(pos.x, pos.y, pocketRadius, pocketOutlinePaint)
-            }
+            canvas.drawCircle(pos.x, pos.y, pocketRadius, fillPaint)
+            canvas.drawCircle(pos.x, pos.y, pocketRadius, pocketOutlinePaint)
         }
     }
 }

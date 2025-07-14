@@ -40,26 +40,20 @@ enum class DistanceUnit {
     METRIC, IMPERIAL
 }
 
-enum class TableSize(val feet: Int, val aspectRatio: Float) {
-    SIX_FT(6, 2.0f),
-    SEVEN_FT(7, 2.0f),
-    EIGHT_FT(8, 2.0f),
-    NINE_FT(9, 2.0f),
-    TEN_FT(10, 2.0f);
+enum class TableSize(
+    val feet: Int,
+    val longSideInches: Float,
+    val shortSideInches: Float
+) {
+    SIX_FT(6, 74f, 41f),
+    SEVEN_FT(7, 78f, 39f),
+    EIGHT_FT(8, 88f, 44f),
+    NINE_FT(9, 100f, 50f),
+    TEN_FT(10, 112f, 56f);
 
     fun next(): TableSize {
         val nextOrdinal = (this.ordinal + 1) % entries.size
         return entries[nextOrdinal]
-    }
-
-    fun getTableToBallRatioLong(): Float {
-        return when (this) {
-            SIX_FT -> 33f
-            SEVEN_FT -> 38f
-            EIGHT_FT -> 44f
-            NINE_FT -> 50f
-            TEN_FT -> 55f
-        }
     }
 }
 

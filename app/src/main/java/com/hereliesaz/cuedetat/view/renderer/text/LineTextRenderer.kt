@@ -8,12 +8,12 @@ import android.graphics.PointF
 import android.graphics.Typeface
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.PaintCache
+import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.math.sqrt
 
 class LineTextRenderer {
 
@@ -80,26 +80,35 @@ class LineTextRenderer {
     fun drawDiamondLabel(canvas: Canvas, point: PointF, railType: RailType, state: OverlayState, paint: Paint) {
         val diamondNumberText = calculateDiamondNumber(point, railType, state) ?: return
 
-        paint.textSize = getDynamicFontSize(30f, state.zoomSliderPosition) // Reduced size slightly for clarity
-        val padding = 15f // Distance from the rail line
+        val ballRadiusOnRailPlane = DrawingUtils.getPerspectiveRadiusAndLift(
+            logicalCenter = point,
+            logicalRadius = state.protractorUnit.radius,
+            state = state,
+            matrix = state.railPitchMatrix
+        ).radius
+
+        paint.textSize = ballRadiusOnRailPlane * 2f
+
+        val padding = 15f
 
         var textRotation = 0f
         var textX = point.x
         var textY = point.y
+        val textHeight = paint.descent() - paint.ascent()
+        val textOffset = textHeight / 2 - paint.descent()
 
         when (railType) {
-            RailType.TOP -> { textY += padding; textRotation = 0f }
-            RailType.BOTTOM -> { textY -= padding; textRotation = 0f }
-            RailType.LEFT -> { textX += padding; textRotation = 90f }
+            RailType.TOP -> textY += padding + textHeight/2
+            RailType.BOTTOM -> textY -= padding
+            RailType.LEFT -> { textX += padding + textHeight/2; textRotation = 90f }
             RailType.RIGHT -> { textX -= padding; textRotation = -90f }
         }
 
-        val totalRotation = (state.tableRotationDegrees + textRotation) % 360
-        val uprightCorrection = if (totalRotation > 90 && totalRotation < 270) 180f else 0f
+        val uprightCorrection = if (state.tableRotationDegrees > 0 && state.tableRotationDegrees < 180) 180f else 0f
 
         canvas.save()
         canvas.rotate(textRotation + uprightCorrection, textX, textY)
-        canvas.drawText(diamondNumberText, textX, textY, paint)
+        canvas.drawText(diamondNumberText, textX, textY + textOffset, paint)
         canvas.restore()
     }
 
@@ -108,10 +117,11 @@ class LineTextRenderer {
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
         if (referenceRadius <= 0) return null
 
-        val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
-        val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
-        val tableWidth = tableToBallRatioLong * referenceRadius
-        val tableHeight = tableToBallRatioShort * referenceRadius
+        val ballRealDiameter = 2.25f
+        val ballLogicalDiameter = referenceRadius * 2
+        val scale = ballLogicalDiameter / ballRealDiameter
+        val tableWidth = state.tableSize.longSideInches * scale
+        val tableHeight = state.tableSize.shortSideInches * scale
 
         val halfW = tableWidth / 2f
         val halfH = tableHeight / 2f
@@ -130,14 +140,6 @@ class LineTextRenderer {
     }
 
     fun drawBankingLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?){
-        if (state.bankShotPath.size < 2) return
-
-        for (i in 0 until state.bankShotPath.size - 1) {
-            val end = state.bankShotPath[i+1]
-            getRailForPoint(end, state)?.let { railType ->
-                val textPaint = paints.textPaint.apply { this.typeface = typeface }
-                drawDiamondLabel(canvas, end, railType, state, textPaint)
-            }
-        }
+        // This function is deprecated as its logic has been moved to LineRenderer, which has access to the necessary helper functions.
     }
 }

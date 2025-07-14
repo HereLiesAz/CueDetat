@@ -3,12 +3,10 @@
 package com.hereliesaz.cuedetat.view.renderer.ball
 
 import android.graphics.Canvas
-import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
-import com.hereliesaz.cuedetat.ui.theme.AcidPatina
 import com.hereliesaz.cuedetat.ui.theme.RebelYellow
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.ball.ActualCueBall
@@ -115,7 +113,7 @@ class BallRenderer {
             strokeWidth = config.strokeWidth
             alpha = (config.opacity * 255).toInt()
         }
-        if (state.isImpossibleShot && config is GhostCueBall) {
+        if ((state.isGeometricallyImpossible || state.isObstructed) && config is GhostCueBall) {
             strokePaint.color = paints.warningPaint.color
         }
 

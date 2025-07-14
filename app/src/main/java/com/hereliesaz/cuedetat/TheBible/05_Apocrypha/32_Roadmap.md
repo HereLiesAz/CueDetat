@@ -1,8 +1,8 @@
 # 22: General Roadmap
 
-* **Object/Table Detection (Computer Vision):**
-  * Initial OpenCV implementation for ball and table corner detection is complete. Awaiting real-world testing and parameter tuning.
-  * Use OpenCV or ML Kit to detect table boundaries and ball positions automatically.
+* **Object/Ball Detection (Computer Vision):**
+  * Initial ML Kit implementation for ball detection is complete. Awaiting real-world testing and parameter tuning for the custom model.
+  * **Table Detection:** This feature has been **removed** as of 07/12/2025. All logic for finding table corners via CV has been purged from the codebase. It was deemed unreliable and may be revisited in a distant future.
 * **Tutorial Enhancements:**
   * Make the tutorial more interactive.
 * **Shot Difficulty Analysis:**

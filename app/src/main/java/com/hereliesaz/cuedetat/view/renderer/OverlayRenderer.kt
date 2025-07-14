@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/renderer/OverlayRenderer.kt
+
 package com.hereliesaz.cuedetat.view.renderer
 
 import android.graphics.Canvas
@@ -19,51 +21,38 @@ class OverlayRenderer {
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         if (state.viewWidth == 0 || state.viewHeight == 0) return
 
-        // --- Pass 1: Draw On-Plane elements (Table, Rails) ---
+        // Pass 1: Draw Table Surface
         if (state.showTable || state.isBankingMode) {
-            // Pitched Table Surface
             canvas.save()
             canvas.concat(state.pitchMatrix)
-            tableRenderer.draw(canvas, state, paints)
+            tableRenderer.drawSurface(canvas, state, paints)
             canvas.restore()
+        }
 
-            // Lifted Rails
+        // Pass 2: Draw all logical lines on the pitched canvas
+        canvas.save()
+        canvas.concat(state.pitchMatrix)
+        lineRenderer.drawLogicalLines(canvas, state, paints, typeface)
+        canvas.restore()
+
+        // Pass 3: Draw Lifted Rails & Their Labels
+        if (state.showTable || state.isBankingMode) {
             canvas.save()
             canvas.concat(state.railPitchMatrix)
             railRenderer.draw(canvas, state, paints)
+            lineRenderer.drawRailLabels(canvas, state, paints, typeface)
             canvas.restore()
         }
 
-        // --- Pass 2: Draw all logical lines on the pitched canvas ---
-        canvas.save()
-        canvas.concat(state.pitchMatrix)
-        lineRenderer.draw(canvas, state, paints, typeface) // Draws main aiming lines
-
-        // Draw protractor guides on the same pitched plane
-        if (!state.isBankingMode) {
-            lineRenderer.drawProtractorGuides(
-                canvas = canvas,
-                state = state,
-                paints = paints,
-                center = state.protractorUnit.ghostCueBallCenter, // Use logical center
-                referencePoint = state.protractorUnit.center // Use logical reference
-            )
-        }
-        canvas.restore()
-
-        // --- Pass 3: Draw banking labels on the lifted rail plane ---
-        if (state.isBankingMode) {
+        // Pass 4: Draw Pockets (on top of lines)
+        if (state.showTable || state.isBankingMode) {
             canvas.save()
-            canvas.concat(state.railPitchMatrix)
-            lineRenderer.drawBankingLabels(canvas, state, paints, typeface)
+            canvas.concat(state.pitchMatrix)
+            tableRenderer.drawPockets(canvas, state, paints)
             canvas.restore()
         }
 
-        // --- Pass 4: Draw all balls ---
-        // The BallRenderer handles its own rendering passes internally for on-plane and ghosted elements.
+        // Pass 5: Draw all balls
         ballRenderer.draw(canvas, state, paints, typeface)
-
-        // --- Pass 5: (Empty) Screen-space elements drawn by Composables ---
-        // Protractor guides have been moved to Pass 2.
     }
 }

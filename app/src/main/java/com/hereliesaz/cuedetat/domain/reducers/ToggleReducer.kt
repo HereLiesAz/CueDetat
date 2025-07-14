@@ -70,9 +70,11 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             val newCenter = if (currentState.showTable) {
                 // If table is on, place ball on head spot
                 val logicalRadiusForTable = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, 0f)
-                val tableToBallRatioLong = currentState.tableSize.getTableToBallRatioLong()
-                val tableToBallRatioShort = tableToBallRatioLong / currentState.tableSize.aspectRatio
-                val tablePlayingSurfaceHeight = tableToBallRatioShort * logicalRadiusForTable
+                val ballRealDiameter = 2.25f
+                val ballLogicalDiameter = logicalRadiusForTable * 2
+                val scale = ballLogicalDiameter / ballRealDiameter
+                val tablePlayingSurfaceHeight = currentState.tableSize.shortSideInches * scale
+
                 val viewCenterY = currentState.viewHeight / 2f
                 val bottomRailY = viewCenterY + tablePlayingSurfaceHeight / 2f
                 PointF(currentState.viewWidth / 2f, (viewCenterY + bottomRailY) / 2f)
@@ -93,9 +95,12 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
         val viewCenterY = currentState.viewHeight / 2f
         val logicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, 0f)
         val targetBallCenter = PointF(viewCenterX, viewCenterY)
-        val tableToBallRatioLong = currentState.tableSize.getTableToBallRatioLong()
-        val tableToBallRatioShort = tableToBallRatioLong / currentState.tableSize.aspectRatio
-        val tablePlayingSurfaceHeight = tableToBallRatioShort * logicalRadius
+
+        val ballRealDiameter = 2.25f
+        val ballLogicalDiameter = logicalRadius * 2
+        val scale = ballLogicalDiameter / ballRealDiameter
+        val tablePlayingSurfaceHeight = currentState.tableSize.shortSideInches * scale
+
         val bottomRailY = viewCenterY + tablePlayingSurfaceHeight / 2f
         val actualCueBallCenter = PointF(viewCenterX, (viewCenterY + bottomRailY) / 2f)
         val rotationDegrees = -90f

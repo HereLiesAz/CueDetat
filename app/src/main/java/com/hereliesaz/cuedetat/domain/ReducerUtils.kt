@@ -8,7 +8,6 @@ import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.abs
 import kotlin.math.min
 
 @Singleton
@@ -21,17 +20,19 @@ class ReducerUtils @Inject constructor() {
 
     fun getTableBoundaries(state: OverlayState): Rect {
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
-        val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
-        val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
-        val tablePlayingSurfaceWidth = tableToBallRatioLong * referenceRadius
-        val tablePlayingSurfaceHeight = tableToBallRatioShort * referenceRadius
+        val ballRealDiameter = 2.25f
+        val ballLogicalDiameter = referenceRadius * 2
+        val scale = ballLogicalDiameter / ballRealDiameter
+
+        val logicalWidth = state.tableSize.longSideInches * scale
+        val logicalHeight = state.tableSize.shortSideInches * scale
 
         val canvasCenterX = state.viewWidth / 2f
         val canvasCenterY = state.viewHeight / 2f
-        val left = canvasCenterX - tablePlayingSurfaceWidth / 2
-        val top = canvasCenterY - tablePlayingSurfaceHeight / 2
-        val right = canvasCenterX + tablePlayingSurfaceWidth / 2
-        val bottom = canvasCenterY + tablePlayingSurfaceHeight / 2
+        val left = canvasCenterX - logicalWidth / 2
+        val top = canvasCenterY - logicalHeight / 2
+        val right = canvasCenterX + logicalWidth / 2
+        val bottom = canvasCenterY + logicalHeight / 2
 
         return Rect(left.toInt(), top.toInt(), right.toInt(), bottom.toInt())
     }

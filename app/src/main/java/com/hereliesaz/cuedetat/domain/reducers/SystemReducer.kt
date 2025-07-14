@@ -26,8 +26,8 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
     }
 
     private fun handleSizeChanged(currentState: OverlayState, event: MainScreenEvent.SizeChanged): OverlayState {
-        if (currentState.viewWidth == 0 && currentState.viewHeight == 0) {
-            return createInitialState(event.width, event.height, currentState.appControlColorScheme)
+        val newState = if (currentState.viewWidth == 0 && currentState.viewHeight == 0) {
+            createInitialState(event.width, event.height, currentState.appControlColorScheme)
         } else {
             val newLogicalRadius = reducerUtils.getCurrentLogicalRadius(event.width, event.height, currentState.zoomSliderPosition)
             var updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
@@ -47,7 +47,6 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
                 }
             }
 
-            // Also update the spin control's position if it's at its default location
             var newSpinControlCenter = currentState.spinControlCenter
             currentState.spinControlCenter?.let {
                 val oldDefaultY = currentState.viewHeight * 0.75f
@@ -56,7 +55,7 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
                 }
             }
 
-            return currentState.copy(
+            currentState.copy(
                 viewWidth = event.width, viewHeight = event.height,
                 protractorUnit = currentState.protractorUnit.copy(
                     radius = newLogicalRadius,
@@ -66,21 +65,19 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
                 spinControlCenter = newSpinControlCenter
             )
         }
+        return confineAllBallsToTable(newState)
     }
 
     private fun createInitialState(viewWidth: Int, viewHeight: Int, appColorScheme: ColorScheme): OverlayState {
-        val initialSliderPos = 0f // Centered
+        val initialSliderPos = 0f
         val initialLogicalRadius = reducerUtils.getCurrentLogicalRadius(viewWidth, viewHeight, initialSliderPos)
         val initialProtractorCenter = PointF(viewWidth / 2f, viewHeight / 2f)
-        val initialTableRotation = 90f // Default to Portrait orientation
+        val initialTableRotation = 90f
 
-        // --- THE RIGHTEOUS FIX ---
-        // Calculate the center of the bottom half of the screen.
         val initialSpinControlCenter = PointF(
             viewWidth / 2f,
             viewHeight * 0.75f
         )
-        // --- END FIX ---
 
         return OverlayState(
             viewWidth = viewWidth,
@@ -106,11 +103,43 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             currentTutorialStep = 0,
             appControlColorScheme = appColorScheme,
             interactionMode = InteractionMode.NONE,
-            spinControlCenter = initialSpinControlCenter // Set the initial position
+            spinControlCenter = initialSpinControlCenter
         )
     }
 
     private fun Float.roughlyEquals(other: Float, tolerance: Float = 0.00001f): Boolean {
         return abs(this - other) < tolerance
+    }
+
+    private fun confineAllBallsToTable(state: OverlayState): OverlayState {
+        if (!state.showTable) {
+            return state
+        }
+        val bounds = reducerUtils.getTableBoundaries(state)
+
+        val confinedCueBall = state.onPlaneBall?.let {
+            it.copy(center = confinePoint(it.center, bounds))
+        }
+
+        val confinedObstacles = state.obstacleBalls.map {
+            it.copy(center = confinePoint(it.center, bounds))
+        }
+
+        val confinedTargetBall = state.protractorUnit.copy(
+            center = confinePoint(state.protractorUnit.center, bounds)
+        )
+
+        return state.copy(
+            onPlaneBall = confinedCueBall,
+            obstacleBalls = confinedObstacles,
+            protractorUnit = confinedTargetBall
+        )
+    }
+
+    private fun confinePoint(point: PointF, bounds: android.graphics.Rect): PointF {
+        return PointF(
+            point.x.coerceIn(bounds.left.toFloat(), bounds.right.toFloat()),
+            point.y.coerceIn(bounds.top.toFloat(), bounds.bottom.toFloat())
+        )
     }
 }

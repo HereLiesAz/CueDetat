@@ -43,8 +43,13 @@ class ActionReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
         if (currentState.showTable) {
             // Table is visible, use table-centric defaults.
             val targetBallCenter = PointF(viewCenterX, viewCenterY)
-            val tableHeight = initialLogicalRadius * currentState.tableSize.getTableToBallRatioLong() / currentState.tableSize.aspectRatio
-            val actualCueBallCenter = PointF(viewCenterX, viewCenterY + tableHeight / 4f)
+
+            val ballRealDiameter = 2.25f
+            val ballLogicalDiameter = initialLogicalRadius * 2
+            val scale = ballLogicalDiameter / ballRealDiameter
+            val tablePlayingSurfaceHeight = currentState.tableSize.shortSideInches * scale
+
+            val actualCueBallCenter = PointF(viewCenterX, viewCenterY + tablePlayingSurfaceHeight / 4f)
             val rotationDegrees = -90f
 
             newProtractorUnit = ProtractorUnit(center = targetBallCenter, radius = initialLogicalRadius, rotationDegrees = rotationDegrees)

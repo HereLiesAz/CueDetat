@@ -20,10 +20,11 @@ class RailRenderer {
             val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
             if (referenceRadius <= 0) return emptyList()
 
-            val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
-            val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
-            val tablePlayingSurfaceWidth = tableToBallRatioLong * referenceRadius
-            val tablePlayingSurfaceHeight = tableToBallRatioShort * referenceRadius
+            val ballRealDiameter = 2.25f
+            val ballLogicalDiameter = referenceRadius * 2
+            val scale = ballLogicalDiameter / ballRealDiameter
+            val tablePlayingSurfaceWidth = state.tableSize.longSideInches * scale
+            val tablePlayingSurfaceHeight = state.tableSize.shortSideInches * scale
 
             val canvasCenterX = state.viewWidth / 2f
             val canvasCenterY = state.viewHeight / 2f
@@ -57,11 +58,11 @@ class RailRenderer {
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
         if (referenceRadius <= 0) return
 
-        val tableToBallRatioLong = state.tableSize.getTableToBallRatioLong()
-        val tableToBallRatioShort = tableToBallRatioLong / state.tableSize.aspectRatio
-
-        val tablePlayingSurfaceWidth = tableToBallRatioLong * referenceRadius
-        val tablePlayingSurfaceHeight = tableToBallRatioShort * referenceRadius
+        val ballRealDiameter = 2.25f
+        val ballLogicalDiameter = referenceRadius * 2
+        val scale = ballLogicalDiameter / ballRealDiameter
+        val tablePlayingSurfaceWidth = state.tableSize.longSideInches * scale
+        val tablePlayingSurfaceHeight = state.tableSize.shortSideInches * scale
 
         val tableCenterX = state.viewWidth / 2f
         val tableCenterY = state.viewHeight / 2f
@@ -92,15 +93,17 @@ class RailRenderer {
         val railRightCenterX = innerRight + railOffsetAmount
 
         val pocketRadius = referenceRadius * 1.8f
+        // Reduce the gap for the side pockets to make them appear shallower.
+        val railGapRadius = pocketRadius * 0.75f
 
         // --- Draw Rail Segments ---
         val railSegments = listOf(
             // Top rail
-            PointF(innerLeft + pocketRadius, railTopCenterY) to PointF(tableCenterX - pocketRadius, railTopCenterY),
-            PointF(tableCenterX + pocketRadius, railTopCenterY) to PointF(innerRight - pocketRadius, railTopCenterY),
+            PointF(innerLeft + pocketRadius, railTopCenterY) to PointF(tableCenterX - railGapRadius, railTopCenterY),
+            PointF(tableCenterX + railGapRadius, railTopCenterY) to PointF(innerRight - pocketRadius, railTopCenterY),
             // Bottom rail
-            PointF(innerLeft + pocketRadius, railBottomCenterY) to PointF(tableCenterX - pocketRadius, railBottomCenterY),
-            PointF(tableCenterX + pocketRadius, railBottomCenterY) to PointF(innerRight - pocketRadius, railBottomCenterY),
+            PointF(innerLeft + pocketRadius, railBottomCenterY) to PointF(tableCenterX - railGapRadius, railBottomCenterY),
+            PointF(tableCenterX + railGapRadius, railBottomCenterY) to PointF(innerRight - pocketRadius, railBottomCenterY),
             // Side rails
             PointF(railLeftCenterX, innerTop + pocketRadius) to PointF(railLeftCenterX, innerBottom - pocketRadius),
             PointF(railRightCenterX, innerTop + pocketRadius) to PointF(railRightCenterX, innerBottom - pocketRadius)

@@ -15,7 +15,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.hereliesaz.cuedetat.ui.MainScreen
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.MainViewModel
@@ -62,32 +61,10 @@ class MainActivity : ComponentActivity() {
                     startActivity(intent)
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
-                is SingleEvent.ShowDonationDialog -> {
-                    showDonationDialog()
-                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
-                }
                 null -> { /* Do nothing */
                 }
             }
         }.launchIn(lifecycleScope)
-    }
-
-    private fun showDonationDialog() {
-        val items = arrayOf("PayPal", "Venmo", "CashApp")
-        val urls = arrayOf(
-            "https://paypal.me/azcamehere",
-            "https://venmo.com/u/hereliesaz",
-            "https://cash.app/\$azcamehere"
-        )
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Chalk Your Tip")
-            .setItems(items) { _, which ->
-                if (which < urls.size) {
-                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(urls[which])))
-                }
-            }
-            .setNegativeButton("Maybe Later", null)
-            .show()
     }
 
     @Composable

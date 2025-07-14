@@ -19,7 +19,6 @@ import com.hereliesaz.cuedetat.domain.CalculateBankShot
 import com.hereliesaz.cuedetat.domain.StateReducer
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.view.model.Perspective
-import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -91,7 +90,6 @@ class MainViewModel @Inject constructor(
         when (event) {
             is MainScreenEvent.CheckForUpdate -> _singleEvent.value = SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat/releases")
             is MainScreenEvent.ViewArt -> _singleEvent.value = SingleEvent.OpenUrl("https://instagram.com/hereliesaz")
-            is MainScreenEvent.ShowDonationOptions -> _singleEvent.value = SingleEvent.ShowDonationDialog
             is MainScreenEvent.SingleEventConsumed -> _singleEvent.value = null
             is MainScreenEvent.ToastShown -> _toastMessage.value = null
             is MainScreenEvent.ToggleDistanceUnit -> {
@@ -135,7 +133,7 @@ class MainViewModel @Inject constructor(
                     val logicalPrev = Perspective.screenToLogical(event.previousPosition, currentState.inversePitchMatrix)
                     val screenDelta = Offset(event.currentPosition.x - event.previousPosition.x, event.currentPosition.y - event.previousPosition.y)
                     val logicalDelta = PointF(logicalCurr.x - logicalPrev.x, logicalCurr.y - logicalPrev.y)
-                    MainScreenEvent.LogicalDragApplied(logicalDelta, screenDelta)
+                    MainScreenEvent.LogicalDragApplied(logicalDelta, screenDelta, logicalCurr)
                 }
             }
             is MainScreenEvent.ScreenGestureStarted -> {

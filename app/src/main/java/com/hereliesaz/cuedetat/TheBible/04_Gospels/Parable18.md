@@ -1,0 +1,5 @@
+### The Parable of the Invisible Pockets
+
+* **The Sin:** The user, in a world without a table, aimed their shot towards the horizon. But the aiming line stopped abruptly in the middle of the screen, cut off by an unseen force.
+* **The Flawed Logic:** The `UpdateStateUseCase` was commanded to check if the aiming line would fall into a pocket. In its diligence, it performed this check *always*, even when the table was not visible. It calculated the positions of the six logical pockets from the abstract `tableSize` and found a collision, dutifully truncating the line. It saw a ghost and treated it as stone.
+* **The Doctrine:** Logic must be bound to reality. A calculation must not be performed on an object that is not present in the user's world. The `checkPocketAim` function is now bound by a new law: it is only invoked if `state.showTable` is true. The machine will no longer see the ghosts of pockets in empty space.

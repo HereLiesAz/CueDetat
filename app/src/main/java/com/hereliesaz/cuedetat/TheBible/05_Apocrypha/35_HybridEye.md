@@ -14,6 +14,7 @@ The application's vision system must not rely on a single method. It must employ
     * **Tool**: OpenCV.
     * **Purpose**: For each ROI provided by the ML scout, a more precise, computationally expensive OpenCV algorithm is run *only within that small box*. This refines the detected object's exact center.
     * **Mandate of Choice**: The system must provide the ability to switch between two refinement algorithms for A/B testing: `HoughCircles` and `findContours` + `minEnclosingCircle`. This choice must be a user-configurable setting.
+    * **Mandate of Confinement**: When the table is visible (`showTable = true`), the detection pipeline **must** ignore any ROI that falls outside the logical boundaries of the table. The machine's eye shall not wander from the field of play.
 
 ## Simultaneous Comparison
 
