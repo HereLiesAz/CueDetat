@@ -68,10 +68,12 @@ class UpdateStateUseCase @Inject constructor(
         val ghostCueCenter = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter
         val targetCenter = updatedStateWithSnapping.protractorUnit.center
 
-        val (finalAimingLineBankPath, aimedPocketIndex) = if (state.showTable && !state.isBankingMode) {
-            calculateAimAndBank(ghostCueCenter, targetCenter, updatedStateWithSnapping)
+        val (finalAimingLineBankPath, aimedPocketIndex, aimingLineEndPoint) = if (state.showTable && !state.isBankingMode) {
+            val (path, pocketIndex, endPoint) = calculateAimAndBank(ghostCueCenter, targetCenter, updatedStateWithSnapping)
+            Triple(path, pocketIndex, endPoint)
         } else {
-            Pair(getExtendedLinePath(ghostCueCenter, targetCenter), null)
+            val extendedPath = getExtendedLinePath(ghostCueCenter, targetCenter)
+            Triple(extendedPath, null, extendedPath.last())
         }
 
         val activeTangentTarget = PointF(
@@ -79,10 +81,10 @@ class UpdateStateUseCase @Inject constructor(
             tangentStart.y + (targetCenter.x - tangentStart.x) * tangentDirection
         )
 
-        val (finalTangentLineBankPath, tangentAimedPocketIndex) = if (state.showTable && !state.isBankingMode) {
+        val (finalTangentLineBankPath, tangentAimedPocketIndex, _) = if (state.showTable && !state.isBankingMode) {
             calculateAimAndBank(tangentStart, activeTangentTarget, updatedStateWithSnapping)
         } else {
-            Pair(getExtendedLinePath(tangentStart, activeTangentTarget), null)
+            Triple(getExtendedLinePath(tangentStart, activeTangentTarget), null, null)
         }
 
         val finalPitchMatrix = Matrix(basePitchMatrix)
@@ -132,6 +134,7 @@ class UpdateStateUseCase @Inject constructor(
             targetBallDistance = targetBallDistance,
             aimedPocketIndex = aimedPocketIndex,
             tangentAimedPocketIndex = tangentAimedPocketIndex,
+            aimingLineEndPoint = aimingLineEndPoint,
             shotGuideImpactPoint = shotGuideImpactPoint,
             aimingLineBankPath = finalAimingLineBankPath,
             tangentLineBankPath = finalTangentLineBankPath,
@@ -184,20 +187,20 @@ class UpdateStateUseCase @Inject constructor(
         return listOf(start, extendedEnd)
     }
 
-    private fun calculateAimAndBank(start: PointF, end: PointF, state: OverlayState): Pair<List<PointF>, Int?> {
+    private fun calculateAimAndBank(start: PointF, end: PointF, state: OverlayState): Triple<List<PointF>, Int?, PointF> {
         val (directPocketIndex, directIntersection) = checkPocketAim(start, end, state)
         if (directPocketIndex != null && directIntersection != null) {
-            return Pair(listOf(start, directIntersection), directPocketIndex)
+            return Triple(listOf(start, directIntersection), directPocketIndex, directIntersection)
         }
 
         val bankPath = calculateSingleBank(start, end, state)
         if (bankPath.size > 2) {
             val (bankedPocketIndex, bankedIntersection) = checkPocketAim(bankPath[1], bankPath[2], state)
             if (bankedPocketIndex != null && bankedIntersection != null) {
-                return Pair(listOf(bankPath[0], bankPath[1], bankedIntersection), bankedPocketIndex)
+                return Triple(listOf(bankPath[0], bankPath[1], bankedIntersection), bankedPocketIndex, bankedIntersection)
             }
         }
-        return Pair(bankPath, null)
+        return Triple(bankPath, null, bankPath.last())
     }
 
     private fun checkPocketAim(start: PointF, end: PointF, state: OverlayState): Pair<Int?, PointF?> {

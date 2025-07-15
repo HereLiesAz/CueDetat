@@ -14,7 +14,6 @@ import com.hereliesaz.cuedetat.view.config.line.*
 import com.hereliesaz.cuedetat.view.config.ui.ProtractorGuides
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -82,19 +81,19 @@ class LineRenderer {
         }
 
         // --- Pass 1: Wide Pathways ---
-        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, obstructionPaint)
+        drawPath(canvas, listOf(shotLineAnchor, ghostCueCenter), obstructionPaint)
         if (state.aimingLineBankPath.isNotEmpty()) {
             drawPath(canvas, state.aimingLineBankPath, obstructionPaint)
         } else {
-            drawExtendedLine(canvas, ghostCueCenter, state.aimingLineEndPoint ?: state.protractorUnit.center, obstructionPaint)
+            drawPath(canvas, listOf(ghostCueCenter, state.aimingLineEndPoint ?: state.protractorUnit.center), obstructionPaint)
         }
 
         // --- Pass 2: Glows ---
-        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLineGlow)
+        drawPath(canvas, listOf(shotLineAnchor, ghostCueCenter), shotLineGlow)
         drawTangentLines(canvas, state, paints)
 
         // --- Pass 3: Core Lines ---
-        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLinePaint)
+        drawPath(canvas, listOf(shotLineAnchor, ghostCueCenter), shotLinePaint)
         drawAimingLines(canvas, state, paints)
         drawSpinPaths(canvas, state, paints)
 
@@ -105,9 +104,9 @@ class LineRenderer {
 
     private fun drawAimingLines(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         val aimingLineConfig = AimingLine()
-        val isDirectPocketed = state.aimedPocketIndex != null
+        val isPocketed = state.aimedPocketIndex != null
 
-        val baseAimingColor = if(isDirectPocketed && state.aimingLineBankPath.isEmpty()) RebelYellow else aimingLineConfig.strokeColor
+        val baseAimingColor = if (isPocketed) RebelYellow else aimingLineConfig.strokeColor
 
         val aimingLinePaint = Paint(paints.targetCirclePaint).apply {
             color = baseAimingColor.toArgb()
@@ -119,13 +118,8 @@ class LineRenderer {
             alpha = (aimingLineConfig.glowColor.alpha * 255).toInt()
         }
 
-        if (state.aimingLineBankPath.isNotEmpty()) {
-            drawPath(canvas, state.aimingLineBankPath, aimingLineGlow)
-            drawPath(canvas, state.aimingLineBankPath, aimingLinePaint)
-        } else {
-            drawExtendedLine(canvas, state.protractorUnit.ghostCueBallCenter, state.protractorUnit.center, aimingLineGlow)
-            drawExtendedLine(canvas, state.protractorUnit.ghostCueBallCenter, state.protractorUnit.center, aimingLinePaint)
-        }
+        drawPath(canvas, state.aimingLineBankPath, aimingLineGlow)
+        drawPath(canvas, state.aimingLineBankPath, aimingLinePaint)
     }
 
 
@@ -145,16 +139,24 @@ class LineRenderer {
             color = tangentLineConfig.glowColor.toArgb()
         }
 
-        if (state.tangentLineBankPath.isNotEmpty()) {
-            drawPath(canvas, state.tangentLineBankPath, tangentGlow)
-            drawPath(canvas, state.tangentLineBankPath, tangentSolidPaint)
-        } else {
-            drawExtendedLine(canvas, state.protractorUnit.ghostCueBallCenter, state, state.tangentDirection, tangentGlow)
-            drawExtendedLine(canvas, state.protractorUnit.ghostCueBallCenter, state, state.tangentDirection, tangentSolidPaint)
-        }
+        drawPath(canvas, state.tangentLineBankPath, tangentGlow)
+        drawPath(canvas, state.tangentLineBankPath, tangentSolidPaint)
 
-        // Inactive tangent line no longer banks
-        drawExtendedLine(canvas, state.protractorUnit.ghostCueBallCenter, state, -state.tangentDirection, tangentDottedPaint)
+        // Inactive tangent line
+        val start = state.protractorUnit.ghostCueBallCenter
+        val towards = state.protractorUnit.center
+        val dxToTarget = towards.x - start.x
+        val dyToTarget = towards.y - start.y
+        val magToTarget = sqrt(dxToTarget * dxToTarget + dyToTarget * dyToTarget)
+
+        if (magToTarget > 0.001f) {
+            val tangentDx = -dyToTarget / magToTarget
+            val tangentDy = dxToTarget / magToTarget
+            val extendFactor = 5000f
+            val endX = start.x + tangentDx * extendFactor * -state.tangentDirection
+            val endY = start.y + tangentDy * extendFactor * -state.tangentDirection
+            canvas.drawLine(start.x, start.y, endX, endY, tangentDottedPaint)
+        }
     }
 
 
@@ -276,31 +278,6 @@ class LineRenderer {
             else -> null
         }
     }
-
-    private fun drawExtendedLine(canvas: Canvas, start: PointF, end: PointF, paint: Paint) {
-        val dirX = end.x - start.x; val dirY = end.y - start.y
-        val mag = sqrt(dirX * dirX + dirY * dirY)
-        if (mag > 0.001f) {
-            val extendFactor = 5000f; val ndx = dirX / mag; val ndy = dirY / mag
-            canvas.drawLine(start.x, start.y, start.x + ndx * extendFactor, start.y + ndy * extendFactor, paint)
-        }
-    }
-
-    private fun drawExtendedLine(canvas: Canvas, start: PointF, state: OverlayState, direction: Float, paint: Paint) {
-        val towards = state.protractorUnit.center
-        val dxToTarget = towards.x - start.x
-        val dyToTarget = towards.y - start.y
-        val magToTarget = sqrt(dxToTarget * dxToTarget + dyToTarget * dyToTarget)
-
-        if (magToTarget > 0.001f) {
-            val tangentDx = -dyToTarget / magToTarget
-            val tangentDy = dxToTarget / magToTarget
-            val extendFactor = 5000f
-
-            canvas.drawLine(start.x, start.y, start.x + tangentDx * extendFactor * direction, start.y + tangentDy * extendFactor * direction, paint)
-        }
-    }
-
 
     private fun drawPath(canvas: Canvas, path: List<PointF>, paint: Paint) {
         if (path.size < 2) return
