@@ -23,6 +23,7 @@ class UpdateStateUseCase @Inject constructor(
 
     private val railHeightToTableHeightRatio = 0.05f
     private val distanceReferenceConstant = 6480f
+    private val lineExtensionFactor = 5000f
 
     operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
@@ -63,22 +64,25 @@ class UpdateStateUseCase @Inject constructor(
         }
 
         // --- Aiming Line & Tangent Line Logic ---
+        val tangentStart = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter
+        val ghostCueCenter = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter
+        val targetCenter = updatedStateWithSnapping.protractorUnit.center
+
         val (finalAimingLineBankPath, aimedPocketIndex) = if (state.showTable && !state.isBankingMode) {
-            calculateAimAndBank(updatedStateWithSnapping.protractorUnit.ghostCueBallCenter, updatedStateWithSnapping.protractorUnit.center, updatedStateWithSnapping)
+            calculateAimAndBank(ghostCueCenter, targetCenter, updatedStateWithSnapping)
         } else {
-            Pair(listOf(updatedStateWithSnapping.protractorUnit.ghostCueBallCenter, updatedStateWithSnapping.protractorUnit.center), null)
+            Pair(getExtendedLinePath(ghostCueCenter, targetCenter), null)
         }
 
-        val tangentStart = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter
         val activeTangentTarget = PointF(
-            tangentStart.x - (updatedStateWithSnapping.protractorUnit.center.y - tangentStart.y) * tangentDirection,
-            tangentStart.y + (updatedStateWithSnapping.protractorUnit.center.x - tangentStart.x) * tangentDirection
+            tangentStart.x - (targetCenter.y - tangentStart.y) * tangentDirection,
+            tangentStart.y + (targetCenter.x - tangentStart.x) * tangentDirection
         )
 
         val (finalTangentLineBankPath, tangentAimedPocketIndex) = if (state.showTable && !state.isBankingMode) {
             calculateAimAndBank(tangentStart, activeTangentTarget, updatedStateWithSnapping)
         } else {
-            Pair(listOf(tangentStart, activeTangentTarget), null)
+            Pair(getExtendedLinePath(tangentStart, activeTangentTarget), null)
         }
 
         val finalPitchMatrix = Matrix(basePitchMatrix)
@@ -166,15 +170,29 @@ class UpdateStateUseCase @Inject constructor(
         return if (screenRadius > 0) distanceReferenceConstant / screenRadius else 0f
     }
 
+    private fun getExtendedLinePath(start: PointF, end: PointF): List<PointF> {
+        val dirX = end.x - start.x
+        val dirY = end.y - start.y
+        val mag = sqrt(dirX * dirX + dirY * dirY)
+        val extendedEnd = if (mag > 0.001f) {
+            val ndx = dirX / mag
+            val ndy = dirY / mag
+            PointF(start.x + ndx * lineExtensionFactor, start.y + ndy * lineExtensionFactor)
+        } else {
+            end
+        }
+        return listOf(start, extendedEnd)
+    }
+
     private fun calculateAimAndBank(start: PointF, end: PointF, state: OverlayState): Pair<List<PointF>, Int?> {
-        val (directPocketIndex, directIntersection) = checkPocketAim(start, end, state, checkDirectPath = true)
+        val (directPocketIndex, directIntersection) = checkPocketAim(start, end, state)
         if (directPocketIndex != null && directIntersection != null) {
             return Pair(listOf(start, directIntersection), directPocketIndex)
         }
 
         val bankPath = calculateSingleBank(start, end, state)
         if (bankPath.size > 2) {
-            val (bankedPocketIndex, bankedIntersection) = checkPocketAim(bankPath[1], bankPath[2], state, checkDirectPath = false)
+            val (bankedPocketIndex, bankedIntersection) = checkPocketAim(bankPath[1], bankPath[2], state)
             if (bankedPocketIndex != null && bankedIntersection != null) {
                 return Pair(listOf(bankPath[0], bankPath[1], bankedIntersection), bankedPocketIndex)
             }
@@ -182,13 +200,13 @@ class UpdateStateUseCase @Inject constructor(
         return Pair(bankPath, null)
     }
 
-    private fun checkPocketAim(start: PointF, end: PointF, state: OverlayState, checkDirectPath: Boolean): Pair<Int?, PointF?> {
+    private fun checkPocketAim(start: PointF, end: PointF, state: OverlayState): Pair<Int?, PointF?> {
         val dirX = end.x - start.x
         val dirY = end.y - start.y
         val mag = sqrt(dirX * dirX + dirY * dirY)
         if (mag < 0.001f) return Pair(null, null)
 
-        val extendedEnd = if (checkDirectPath) end else PointF(start.x + dirX / mag * 5000f, start.y + dirY / mag * 5000f)
+        val extendedEnd = PointF(start.x + dirX / mag * lineExtensionFactor, start.y + dirY / mag * lineExtensionFactor)
 
         val pockets = TableRenderer.getLogicalPockets(state)
         val pocketRadius = state.protractorUnit.radius * 1.8f
@@ -229,17 +247,17 @@ class UpdateStateUseCase @Inject constructor(
     private fun calculateSingleBank(start: PointF, end: PointF, state: OverlayState): List<PointF> {
         val dirX = end.x - start.x
         val dirY = end.y - start.y
-        val extendedEnd = PointF(start.x + dirX * 5000f, start.y + dirY * 5000f)
+        val extendedEnd = PointF(start.x + dirX * lineExtensionFactor, start.y + dirY * lineExtensionFactor)
 
-        val intersectionResult = reducerUtils.findRailIntersectionAndNormal(start, extendedEnd, state) ?: return listOf(start, extendedEnd) // Return the non-banked line if no intersection
+        val intersectionResult = reducerUtils.findRailIntersectionAndNormal(start, extendedEnd, state) ?: return listOf(start, extendedEnd)
         val (intersectionPoint, railNormal) = intersectionResult
 
         val incidentVector = PointF(extendedEnd.x - start.x, extendedEnd.y - start.y)
         val reflectedDir = reducerUtils.reflect(incidentVector, railNormal)
 
         val finalEndPoint = PointF(
-            intersectionPoint.x + reflectedDir.x * 5000f,
-            intersectionPoint.y + reflectedDir.y * 5000f
+            intersectionPoint.x + reflectedDir.x * lineExtensionFactor,
+            intersectionPoint.y + reflectedDir.y * lineExtensionFactor
         )
 
         return listOf(start, intersectionPoint, finalEndPoint)
