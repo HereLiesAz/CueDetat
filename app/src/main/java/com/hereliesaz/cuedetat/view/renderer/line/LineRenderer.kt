@@ -13,7 +13,9 @@ import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.line.*
 import com.hereliesaz.cuedetat.view.config.ui.ProtractorGuides
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
+import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -258,19 +260,17 @@ class LineRenderer {
         val halfW = tableWidth / 2f
         val halfH = tableHeight / 2f
 
-        // Rail positions are relative to logical origin (0,0)
-        val left = -halfW
-        val top = -halfH
-        val right = halfW
-        val bottom = halfH
+        // Corrected: Use logical coordinates relative to (0,0)
+        val logicalX = point.x
+        val logicalY = point.y
 
-        val tolerance = 5f
+        val tolerance = 5f // This tolerance is in logical space now
 
         return when {
-            point.y > top - tolerance && point.y < top + tolerance -> LineTextRenderer.RailType.TOP
-            point.y > bottom - tolerance && point.y < bottom + tolerance -> LineTextRenderer.RailType.BOTTOM
-            point.x > left - tolerance && point.x < left + tolerance -> LineTextRenderer.RailType.LEFT
-            point.x > right - tolerance && point.x < right + tolerance -> LineTextRenderer.RailType.RIGHT
+            abs(logicalY - (-halfH)) < tolerance -> LineTextRenderer.RailType.TOP
+            abs(logicalY - halfH) < tolerance -> LineTextRenderer.RailType.BOTTOM
+            abs(logicalX - (-halfW)) < tolerance -> LineTextRenderer.RailType.LEFT
+            abs(logicalX - halfW) < tolerance -> LineTextRenderer.RailType.RIGHT
             else -> null
         }
     }

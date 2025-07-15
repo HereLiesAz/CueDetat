@@ -2,17 +2,17 @@
 
 <#
 .SYNOPSIS
-Backs up an Android project by letting the user interactively toggle which modules/folders to include.
+Backs up an Android project, including specified root files and interactively selected modules.
 .DESCRIPTION
-This script scans the project's root directory to find main folders/modules. It automatically ignores
-configuration folders (like .idea, .git) and build output. It then iterates through the remaining
-valid modules, prompting the user to either include or skip each one. A complete project tree is
-generated for the entire project, visually indicating the user's choices. The script then processes
-only the included modules, concatenating relevant text files and listing non-text assets.
-This version does NOT delete previous backups.
+This script scans the project's root directory to find main folders/modules and non-trivial root files.
+It automatically ignores configuration folders (like .idea, .git) and build output. It then iterates
+through the discovered modules, prompting the user to either include or skip each one. A complete
+project tree is generated for the entire project, visually indicating the user's choices. The script
+then processes only the included modules and root files, concatenating relevant text files and listing
+non-text assets. This version does NOT delete previous backups.
 .NOTES
 Author: Your Name/AI Assistant
-Version: 3.3
+Version: 3.4
 Place this script in the root of your Android project and run it from there.
 #>
 
@@ -40,14 +40,15 @@ $ExcludeFilesPatterns = @(
     "*.ps1", "project_context_for_ai_*.txt"
 )
 
-# Text file extensions/names to automatically include if found within a selected module
+# Text file extensions/names to automatically include if found
 $IncludeTextExtensionsOrNames = @(
     ".kt", ".java", ".scala", ".xml", ".gradle", "gradle.properties",
     "settings.gradle", ".pro", ".json", ".yaml", ".yml", ".md", ".txt",
-    ".gitignore", ".sh", ".bat", "gradlew"
+    ".gitignore", ".sh", ".bat", "gradlew", "build.gradle.kts", "settings.gradle.kts",
+    "gradle-wrapper.properties", "libs.versions.toml", "LICENSE"
 )
 
-# Common non-text asset extensions to list if found within a selected module
+# Common non-text asset extensions to list if found
 $NonTextAssetExtensions = @(
     ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ttf", ".otf",
     ".woff", ".woff2", ".mp3", ".wav", ".ogg", ".aac", ".mp4", ".mov",
@@ -106,7 +107,6 @@ Write-Host "Starting Android project backup for AI analysis..." -ForegroundColor
 Write-Host "Project root: $ProjectRoot"
 
 # --- Step 1: Discover available modules/folders ---
-# Automatically filter out ignored names and any folder starting with a dot.
 $moduleCandidates = Get-ChildItem -Path $ProjectRoot -Directory -Depth 0 | Where-Object {
     ($_.Name -notin $IgnoreModuleDirs) -and ($_.Name -notlike ".*")
 } | Select-Object Name, FullName
@@ -122,44 +122,44 @@ $selectedModules = foreach ($module in $moduleCandidates) {
     $choice = Read-Host -Prompt "  Include module '$($module.Name)'? (Y/n)"
     if ($choice -eq '' -or $choice.ToLower() -eq 'y') {
         Write-Host "    -> INCLUDING $($module.Name)" -ForegroundColor Green
-        $module # Output the module object to be collected in $selectedModules
+        $module
     } else {
         Write-Host "    -> SKIPPING $($module.Name)" -ForegroundColor Yellow
     }
 }
 
 if (-not $selectedModules) {
-    Write-Warning "No modules were included. Exiting."
-    exit
+    Write-Warning "No modules were included. Processing root files only."
 }
-$selectedModulePaths = $selectedModules.FullName
+$selectedModulePaths = if($selectedModules) { $selectedModules.FullName } else { @() }
 
 # --- Step 3: Setup output file ---
-# Automatic cleanup of old backups is DISABLED.
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $outputFileName = "project_context_for_ai_$timestamp.txt"
 $outputFilePath = Join-Path -Path $ProjectRoot -ChildPath $outputFileName
 Write-Host "`nOutput file will be: $outputFilePath"
 
-# --- Step 4: Full scan and categorization based on module selection ---
+# --- Step 4: Full scan and categorization based on selection ---
 Write-Host "`nCategorizing all project files..." -ForegroundColor Cyan
 $allItems = Get-ChildItem -Path $ProjectRoot -Recurse -Force -ErrorAction SilentlyContinue
 
 $filesToProcess = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
 $nonTextAssetsFound = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
+$includedRootFiles = [System.Collections.Generic.List[string]]::new()
 $fileStatusMap = @{}
 
 foreach ($item in $allItems) {
     # Determine if the item is inside a selected module
     $isInsideSelectedModule = $false
-    if ($selectedModulePaths) {
-        foreach ($modulePath in $selectedModulePaths) {
-            if ($item.FullName.StartsWith($modulePath)) {
-                $isInsideSelectedModule = $true
-                break
-            }
+    foreach ($modulePath in $selectedModulePaths) {
+        if ($item.FullName.StartsWith($modulePath)) {
+            $isInsideSelectedModule = $true
+            break
         }
     }
+
+    # Determine if the item is a file in the root directory
+    $isRootFile = (-not $item.PSIsContainer) -and ($item.PSParentPath -eq $ProjectRoot)
 
     # Set status for top-level modules themselves
     if ($item.PSIsContainer -and $item.PSParentPath -eq $ProjectRoot) {
@@ -172,41 +172,50 @@ foreach ($item in $allItems) {
         }
     }
 
-    if (-not $item.PSIsContainer -and -not $isInsideSelectedModule) { continue }
-
-    if ($isInsideSelectedModule) {
-        if ($item.PSIsContainer) {
-            if(Test-PathAgainstPatterns -Path $item.FullName -Patterns $ExcludeSubDirsPatterns) {
-                $fileStatusMap[$item.FullName] = "DIR EXCLUDED"
-            }
-            continue
+    # Skip directories immediately after setting their status
+    if ($item.PSIsContainer) {
+        if ($isInsideSelectedModule -and (Test-PathAgainstPatterns -Path $item.FullName -Patterns $ExcludeSubDirsPatterns)) {
+            $fileStatusMap[$item.FullName] = "DIR EXCLUDED"
         }
+        continue
+    }
 
+    # Process files within selected modules OR at the root level
+    if ($isInsideSelectedModule -or $isRootFile) {
         $parentDirFullName = Split-Path $item.FullName -Parent
         $isInExcludedSubDir = Test-PathAgainstPatterns -Path $parentDirFullName -Patterns $ExcludeSubDirsPatterns
         $isExcludedFile = Test-PathAgainstPatterns -Path $item.Name -Patterns $ExcludeFilesPatterns
+
         if ($isInExcludedSubDir -or $isExcludedFile) {
             $fileStatusMap[$item.FullName] = "EXCLUDED"
             continue
         }
+
         if (Is-TextFileToInclude -FileItem $item) {
             $filesToProcess.Add($item)
             $fileStatusMap[$item.FullName] = "INCLUDED"
+            if($isRootFile) { $includedRootFiles.Add($item.Name) }
         } elseif (Is-NonTextAssetToList -FileItem $item) {
             $nonTextAssetsFound.Add($item)
             $fileStatusMap[$item.FullName] = "ASSET"
+            if($isRootFile) { $includedRootFiles.Add($item.Name) }
         }
     }
 }
 
-Write-Host "Found $($filesToProcess.Count) text files to include from selected modules."
-Write-Host "Found $($nonTextAssetsFound.Count) non-text assets to list from selected modules."
+
+Write-Host "Found $($filesToProcess.Count) text files to include."
+Write-Host "Found $($nonTextAssetsFound.Count) non-text assets to list."
 
 # --- Step 5: Write output file ---
 Set-Content -Path $outputFilePath -Value "Android Project Backup for AI Analysis`n" -Encoding UTF8
 Add-Content -Path $outputFilePath -Value "Generated on: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')`n" -Encoding UTF8
 $includedModuleNames = if ($selectedModules) { $selectedModules.Name -join ', ' } else { "None" }
-Add-Content -Path $outputFilePath -Value "Included Modules: $includedModuleNames" -Encoding UTF8
+$includedItemsSummary = $includedModuleNames
+if($includedRootFiles.Count -gt 0) {
+    $includedItemsSummary += " (and root files: $($includedRootFiles -join ', '))"
+}
+Add-Content -Path $outputFilePath -Value "Included Modules/Files: $includedItemsSummary" -Encoding UTF8
 Add-Content -Path $outputFilePath -Value "`n`n" -Encoding UTF8
 
 Write-Host "Generating comprehensive project tree..." -ForegroundColor Cyan
@@ -217,7 +226,7 @@ Add-Content -Path $outputFilePath -Value ($projectTreeOutput -join "`n") -Encodi
 Add-Content -Path $outputFilePath -Value "`n`n" -Encoding UTF8
 
 if ($filesToProcess.Count -gt 0) {
-    Add-Content -Path $outputFilePath -Value "--- INCLUDED FILE CONTENTS (from selected modules) ---`n" -Encoding UTF8
+    Add-Content -Path $outputFilePath -Value "--- INCLUDED FILE CONTENTS (from selected modules & root) ---`n" -Encoding UTF8
     Add-Content -Path $outputFilePath -Value "Each file begins with a '--- FILE: [relative_path] ---' header.`n`n`n" -Encoding UTF8
     Write-Host "`nWriting included text files to output..." -ForegroundColor Cyan
     foreach ($file in ($filesToProcess | Sort-Object FullName)) {
@@ -233,7 +242,7 @@ if ($filesToProcess.Count -gt 0) {
 }
 
 if ($nonTextAssetsFound.Count -gt 0) {
-    Add-Content -Path $outputFilePath -Value "--- NON-TEXT ASSET FILE LIST (from selected modules) ---`n" -Encoding UTF8
+    Add-Content -Path $outputFilePath -Value "--- NON-TEXT ASSET FILE LIST (from selected modules & root) ---`n" -Encoding UTF8
     $nonTextAssetsFound | Sort-Object FullName | ForEach-Object {
         $relativeAssetPath = $_.FullName.Substring($ProjectRoot.Length).TrimStart("\/").Replace("\", "/")
         Add-Content -Path $outputFilePath -Value "- $relativeAssetPath`n" -Encoding UTF8

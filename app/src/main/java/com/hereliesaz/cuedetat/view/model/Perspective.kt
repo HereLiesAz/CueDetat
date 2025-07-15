@@ -1,4 +1,4 @@
-// app/src/main/java/com/hereliesaz/cuedetat/view/model/Perspective.kt
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/model/Perspective.kt
 package com.hereliesaz.cuedetat.view.model
 
 import android.graphics.Camera
@@ -17,6 +17,7 @@ object Perspective {
     ): Matrix {
         val matrix = Matrix()
         camera.save()
+        // The camera is at the logical origin, looking down the Z-axis.
         camera.setLocation(0f, 0f, -32f)
 
         if (lift != 0f) {
@@ -32,7 +33,8 @@ object Perspective {
 
         val pivotX = viewWidth / 2f
         val pivotY = viewHeight / 2f
-        matrix.preTranslate(-pivotX, -pivotY)
+        // The pre-translation was heresy. It has been removed.
+        // Post-translation correctly moves the logical origin (0,0) to the screen's center.
         matrix.postTranslate(pivotX, pivotY)
 
         return matrix

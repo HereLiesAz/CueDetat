@@ -86,8 +86,8 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
 
         return currentState.copy(
             onPlaneBall = updatedOnPlaneBall,
-            protractorUnit = ProtractorUnit(center = targetBallCenter, radius = logicalRadius, rotationDegrees = -90f),
-            tableRotationDegrees = 90f, // Corrected default to portrait
+            protractorUnit = ProtractorUnit(center = targetBallCenter, radius = logicalRadius, rotationDegrees = 180f), // Corrected to point UP
+            tableRotationDegrees = 90f,
             valuesChangedSinceReset = true,
             zoomSliderPosition = 0f,
             obstacleBalls = emptyList()
@@ -101,7 +101,7 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             val newLogicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, bankingZoomSliderPos)
             val bankingBallCenter = PointF(0f, 0f)
             val newBankingBall = OnPlaneBall(center = bankingBallCenter, radius = newLogicalRadius)
-            val defaultTableRotation = 90f // Corrected default to portrait
+            val defaultTableRotation = 90f
             val initialAimTarget = calculateInitialBankingAimTarget(newBankingBall, defaultTableRotation, newLogicalRadius)
             currentState.copy(
                 isBankingMode = true, onPlaneBall = newBankingBall,
@@ -121,7 +121,8 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
                 onPlaneBall = OnPlaneBall(PointF(0f, defaultLogicalRadius * 4), defaultLogicalRadius),
                 protractorUnit = currentState.protractorUnit.copy(
                     radius = defaultLogicalRadius,
-                    center = PointF(0f, 0f)
+                    center = PointF(0f, 0f),
+                    rotationDegrees = 180f // Corrected to point UP
                 ),
                 tableRotationDegrees = 0f, warningText = null
             )

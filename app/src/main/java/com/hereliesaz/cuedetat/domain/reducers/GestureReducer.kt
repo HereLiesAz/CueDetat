@@ -11,6 +11,7 @@ import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.hypot
 import kotlin.math.pow
 import kotlin.math.sqrt
 

@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt
+
 package com.hereliesaz.cuedetat.view.renderer.table
 
 import android.graphics.Paint
@@ -15,45 +17,6 @@ class RailRenderer {
     private val railConfig = Rail()
     private val diamondConfig = Diamonds()
 
-    companion object {
-        fun getDiamondPositions(state: OverlayState): List<PointF> {
-            val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
-            if (referenceRadius <= 0) return emptyList()
-
-            val ballRealDiameter = 2.25f
-            val ballLogicalDiameter = referenceRadius * 2
-            val scale = ballLogicalDiameter / ballRealDiameter
-            val tablePlayingSurfaceWidth = state.tableSize.longSideInches * scale
-            val tablePlayingSurfaceHeight = state.tableSize.shortSideInches * scale
-
-            val canvasCenterX = state.viewWidth / 2f
-            val canvasCenterY = state.viewHeight / 2f
-            val left = canvasCenterX - tablePlayingSurfaceWidth / 2
-            val top = canvasCenterY - tablePlayingSurfaceHeight / 2
-            val right = canvasCenterX + tablePlayingSurfaceWidth / 2
-            val bottom = canvasCenterY + tablePlayingSurfaceHeight / 2
-
-            val diamonds = mutableListOf<PointF>()
-            // Long rails
-            for (i in 1..3) {
-                val xOffset = tablePlayingSurfaceWidth * (i / 8.0f)
-                diamonds.add(PointF(left + xOffset, top))
-                diamonds.add(PointF(right - xOffset, top))
-                diamonds.add(PointF(left + xOffset, bottom))
-                diamonds.add(PointF(right - xOffset, bottom))
-            }
-            // Short rails
-            for (i in 1..1) {
-                val yOffset = tablePlayingSurfaceHeight * (i / 2.0f)
-                diamonds.add(PointF(left, top + yOffset))
-                diamonds.add(PointF(right, top + yOffset))
-                diamonds.add(PointF(left, bottom - yOffset))
-                diamonds.add(PointF(right, bottom - yOffset))
-            }
-            return diamonds
-        }
-    }
-
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
         if (referenceRadius <= 0) return
@@ -64,8 +27,9 @@ class RailRenderer {
         val tablePlayingSurfaceWidth = state.tableSize.longSideInches * scale
         val tablePlayingSurfaceHeight = state.tableSize.shortSideInches * scale
 
-        val tableCenterX = state.viewWidth / 2f
-        val tableCenterY = state.viewHeight / 2f
+        // Corrected: Use logical origin (0,0) instead of screen center
+        val tableCenterX = 0f
+        val tableCenterY = 0f
 
         val innerLeft = tableCenterX - tablePlayingSurfaceWidth / 2
         val innerTop = tableCenterY - tablePlayingSurfaceHeight / 2

@@ -26,12 +26,13 @@ class TableRenderer {
             val tablePlayingSurfaceWidth = state.tableSize.longSideInches * scale
             val tablePlayingSurfaceHeight = state.tableSize.shortSideInches * scale
 
-            val canvasCenterX = state.viewWidth / 2f
-            val canvasCenterY = state.viewHeight / 2f
-            val left = canvasCenterX - tablePlayingSurfaceWidth / 2
-            val top = canvasCenterY - tablePlayingSurfaceHeight / 2
-            val right = canvasCenterX + tablePlayingSurfaceWidth / 2
-            val bottom = canvasCenterY + tablePlayingSurfaceHeight / 2
+            // Corrected: Use logical origin (0,0) instead of screen center
+            val tableCenterX = 0f
+            val tableCenterY = 0f
+            val left = tableCenterX - tablePlayingSurfaceWidth / 2
+            val top = tableCenterY - tablePlayingSurfaceHeight / 2
+            val right = tableCenterX + tablePlayingSurfaceWidth / 2
+            val bottom = tableCenterY + tablePlayingSurfaceHeight / 2
 
             // Move side pockets outward by half a ball radius.
             val sidePocketOffset = referenceRadius * 0.5f
@@ -39,7 +40,7 @@ class TableRenderer {
             return listOf(
                 PointF(left, top), PointF(right, top), // Top corners
                 PointF(left, bottom), PointF(right, bottom),   // Bottom corners
-                PointF(canvasCenterX, top - sidePocketOffset), PointF(canvasCenterX, bottom + sidePocketOffset) // Side pockets
+                PointF(tableCenterX, top - sidePocketOffset), PointF(tableCenterX, bottom + sidePocketOffset) // Side pockets
             )
         }
     }
@@ -58,13 +59,14 @@ class TableRenderer {
         val tablePlayingSurfaceWidth = state.tableSize.longSideInches * scale
         val tablePlayingSurfaceHeight = state.tableSize.shortSideInches * scale
 
-        val canvasCenterX = state.viewWidth / 2f
-        val canvasCenterY = state.viewHeight / 2f
+        // Corrected: Use logical origin (0,0) instead of screen center
+        val tableCenterX = 0f
+        val tableCenterY = 0f
 
-        val left = canvasCenterX - tablePlayingSurfaceWidth / 2
-        val top = canvasCenterY - tablePlayingSurfaceHeight / 2
-        val right = canvasCenterX + tablePlayingSurfaceWidth / 2
-        val bottom = canvasCenterY + tablePlayingSurfaceHeight / 2
+        val left = tableCenterX - tablePlayingSurfaceWidth / 2
+        val top = tableCenterY - tablePlayingSurfaceHeight / 2
+        val right = tableCenterX + tablePlayingSurfaceWidth / 2
+        val bottom = tableCenterY + tablePlayingSurfaceHeight / 2
 
         val tableOutlinePaint = Paint(paints.tableOutlinePaint).apply {
             color = tableConfig.strokeColor.toArgb()
@@ -82,17 +84,17 @@ class TableRenderer {
         // Vertical lines (connecting long rail diamonds)
         for (i in 1..3) {
             val xOffset = halfWidth * (i / 4.0f)
-            canvas.drawLine(canvasCenterX - xOffset, top, canvasCenterX - xOffset, bottom, diamondGridPaint)
-            canvas.drawLine(canvasCenterX + xOffset, top, canvasCenterX + xOffset, bottom, diamondGridPaint)
+            canvas.drawLine(tableCenterX - xOffset, top, tableCenterX - xOffset, bottom, diamondGridPaint)
+            canvas.drawLine(tableCenterX + xOffset, top, tableCenterX + xOffset, bottom, diamondGridPaint)
         }
         // Horizontal lines (connecting short rail diamonds)
         val shortRailYOffsets = listOf(-halfHeight / 2, 0f, halfHeight / 2)
         for (yOffset in shortRailYOffsets) {
-            canvas.drawLine(left, canvasCenterY + yOffset, right, canvasCenterY + yOffset, diamondGridPaint)
+            canvas.drawLine(left, tableCenterY + yOffset, right, tableCenterY + yOffset, diamondGridPaint)
         }
         // Center lines
-        canvas.drawLine(canvasCenterX, top, canvasCenterX, bottom, diamondGridPaint)
-        canvas.drawLine(left, canvasCenterY, right, canvasCenterY, diamondGridPaint)
+        canvas.drawLine(tableCenterX, top, tableCenterX, bottom, diamondGridPaint)
+        canvas.drawLine(left, tableCenterY, right, tableCenterY, diamondGridPaint)
     }
 
     fun drawPockets(canvas: Canvas, state: OverlayState, paints: PaintCache) {
