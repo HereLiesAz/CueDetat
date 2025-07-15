@@ -65,7 +65,8 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
                 spinControlCenter = newSpinControlCenter
             )
         }
-        return confineAllBallsToTable(newState)
+        // Confinement is now handled by the calling function after all reducers have run.
+        return newState
     }
 
     private fun createInitialState(viewWidth: Int, viewHeight: Int, appColorScheme: ColorScheme): OverlayState {
@@ -109,37 +110,5 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
 
     private fun Float.roughlyEquals(other: Float, tolerance: Float = 0.00001f): Boolean {
         return abs(this - other) < tolerance
-    }
-
-    private fun confineAllBallsToTable(state: OverlayState): OverlayState {
-        if (!state.showTable) {
-            return state
-        }
-        val bounds = reducerUtils.getTableBoundaries(state)
-
-        val confinedCueBall = state.onPlaneBall?.let {
-            it.copy(center = confinePoint(it.center, bounds))
-        }
-
-        val confinedObstacles = state.obstacleBalls.map {
-            it.copy(center = confinePoint(it.center, bounds))
-        }
-
-        val confinedTargetBall = state.protractorUnit.copy(
-            center = confinePoint(state.protractorUnit.center, bounds)
-        )
-
-        return state.copy(
-            onPlaneBall = confinedCueBall,
-            obstacleBalls = confinedObstacles,
-            protractorUnit = confinedTargetBall
-        )
-    }
-
-    private fun confinePoint(point: PointF, bounds: android.graphics.Rect): PointF {
-        return PointF(
-            point.x.coerceIn(bounds.left.toFloat(), bounds.right.toFloat()),
-            point.y.coerceIn(bounds.top.toFloat(), bounds.bottom.toFloat())
-        )
     }
 }

@@ -2,12 +2,12 @@
 
 The laws of touch are complex, for the Creator's intent must be divined from simple movements. The `GestureReducer` is the temple where this divination occurs.
 
-## The Hierarchy of Touch
+## The Hierarchy of Touch (The Clarified Canon)
 
 When a finger touches the screen (`LogicalGestureStarted`), its intent is judged in a strict order of precedence. A touch is only judged once.
 
-1.  **The UI Elements:** The most sacred objects are checked first.
-    - If the `SpinControl` is visible, a touch upon it initiates `MOVING_SPIN_CONTROL` mode.
-2.  **The Obstacle Balls:** If the touch falls upon an `ObstacleBall`, the mode becomes `MOVING_OBSTACLE_BALL` for that specific ball.
-3.  **The Actual Cue Ball:** If the touch falls upon the `ActualCueBall` (`onPlaneBall`), the mode becomes `MOVING_ACTUAL_CUE_BALL`.
-4.  **The Target Ball:** If the touch falls upon the `TargetBall` (the center of the `protractorUnit`), the mode becomes `MOVING_PROTRACTOR_UNIT`.
+1.  **Object Interaction (Highest Priority):** A touch that begins directly upon any interactive element will manipulate that element exclusively. This includes the `SpinControl`, the `ActualCueBall`, the `TargetBall`, the `GhostCueBall`, and any `ObstacleBall`.
+
+2.  **Default Rotational Drag (The Fallback Action):** A touch that begins on **any empty space** on the screen defaults to controlling the protractor's rotation. The linear `dx` and `dy` of the subsequent drag are combined to produce a fluid rotation of the aiming line.
+
+This doctrine supersedes all previous interpretations. Rotation is no longer an action targeted at a specific object, but the fundamental behavior of an unallocated drag gesture.

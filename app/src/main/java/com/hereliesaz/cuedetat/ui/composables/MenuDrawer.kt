@@ -5,6 +5,8 @@ package com.hereliesaz.cuedetat.ui.composables
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
@@ -30,117 +32,119 @@ fun MenuDrawerContent(
     ModalDrawerSheet(
         drawerContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = stringResource(id = R.string.app_name),
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.displaySmall,
-                textAlign = TextAlign.Center
-            )
-            val versionInfo = "v${BuildConfig.VERSION_NAME}" + (uiState.latestVersionName?.let { " (latest: $it)" } ?: "")
-            Text(
-                text = versionInfo,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
-        MenuDivider()
+        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = stringResource(id = R.string.app_name),
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.displaySmall,
+                    textAlign = TextAlign.Center
+                )
+                val versionInfo = "v${BuildConfig.VERSION_NAME}" + (uiState.latestVersionName?.let { " (latest: $it)" } ?: "")
+                Text(
+                    text = versionInfo,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            MenuDivider()
 
-        // Section 1: Core Controls
-        val bankingModeToggleText = if (uiState.isBankingMode) "Ghost Ball Aiming" else "Calculate Bank"
-        MenuItem(
-            text = bankingModeToggleText,
-            onClick = { onEvent(MainScreenEvent.ToggleBankingMode); onCloseDrawer() }
-        )
-        if (!uiState.isBankingMode) {
-            val cueBallToggleText = if (uiState.onPlaneBall == null) "Toggle Cue Ball" else "Hide Cue Ball"
+            // Section 1: Core Controls
+            val bankingModeToggleText = if (uiState.isBankingMode) "Ghost Ball Aiming" else "Calculate Bank"
             MenuItem(
-                text = cueBallToggleText,
-                onClick = { onEvent(MainScreenEvent.ToggleOnPlaneBall); onCloseDrawer() }
+                text = bankingModeToggleText,
+                onClick = { onEvent(MainScreenEvent.ToggleBankingMode); onCloseDrawer() }
             )
-        }
-        val cameraToggleText = if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On"
-        MenuItem(
-            text = cameraToggleText,
-            onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
-        )
-        MenuDivider()
-
-        // Section 2: Table & Unit Settings
-        if (!uiState.isBankingMode && !uiState.showTable) {
+            if (!uiState.isBankingMode) {
+                val cueBallToggleText = if (uiState.onPlaneBall == null) "Toggle Cue Ball" else "Hide Cue Ball"
+                MenuItem(
+                    text = cueBallToggleText,
+                    onClick = { onEvent(MainScreenEvent.ToggleOnPlaneBall); onCloseDrawer() }
+                )
+            }
+            val cameraToggleText = if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On"
             MenuItem(
-                text = "Show Table",
-                onClick = { onEvent(MainScreenEvent.ToggleTable); onCloseDrawer() }
+                text = cameraToggleText,
+                onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
             )
+            MenuDivider()
+
+            // Section 2: Table & Unit Settings
+            if (!uiState.isBankingMode && !uiState.showTable) {
+                MenuItem(
+                    text = "Show Table",
+                    onClick = { onEvent(MainScreenEvent.ToggleTable); onCloseDrawer() }
+                )
+            }
+            MenuItem(
+                text = "Table Size",
+                onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog); onCloseDrawer() }
+            )
+            val distanceUnitToggleText = if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units"
+            MenuItem(
+                text = distanceUnitToggleText,
+                onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit); onCloseDrawer() }
+            )
+            MenuDivider()
+
+
+            // Section 3: Appearance
+            val systemIsCurrentlyDark = isSystemInDarkTheme()
+            val themeToggleText = when (uiState.isForceLightMode) {
+                true -> "Embrace the Darkness"
+                false -> "Use System Theme"
+                null -> if (systemIsCurrentlyDark) "Walk toward the Light" else "Embrace the Darkness"
+            }
+            MenuItem(
+                text = themeToggleText,
+                onClick = { onEvent(MainScreenEvent.ToggleForceTheme); onCloseDrawer() }
+            )
+            MenuItem(
+                text = "Luminance",
+                onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog); onCloseDrawer() }
+            )
+            MenuItem(
+                text = "Glow Stick",
+                onClick = { onEvent(MainScreenEvent.ToggleGlowStickDialog); onCloseDrawer() }
+            )
+            MenuDivider()
+
+            // Section 4: Help & Info
+            MenuItem(
+                text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
+                onClick = { onEvent(MainScreenEvent.ToggleHelp); onCloseDrawer() }
+            )
+            MenuItem(
+                text = "Show Tutorial",
+                onClick = { onEvent(MainScreenEvent.StartTutorial); onCloseDrawer() }
+            )
+            MenuDivider()
+
+            // Section 5: Meta
+            MenuItem(
+                text = "Check for Updates",
+                onClick = { onEvent(MainScreenEvent.CheckForUpdate); onCloseDrawer() })
+            MenuItem(
+                text = "About Me",
+                onClick = { onEvent(MainScreenEvent.ViewArt); onCloseDrawer() })
+            MenuDivider()
+
+            // Section 6: Developer
+            MenuItem(
+                text = "Too Advanced Options",
+                onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog); onCloseDrawer() }
+            )
+            MenuItem(
+                text = if (uiState.isSnappingEnabled) "Disable Snapping" else "Enable Snapping",
+                onClick = { onEvent(MainScreenEvent.ToggleSnapping); onCloseDrawer() }
+            )
+            Spacer(modifier = Modifier.height(12.dp))
         }
-        MenuItem(
-            text = "Table Size",
-            onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog); onCloseDrawer() }
-        )
-        val distanceUnitToggleText = if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units"
-        MenuItem(
-            text = distanceUnitToggleText,
-            onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit); onCloseDrawer() }
-        )
-        MenuDivider()
-
-
-        // Section 3: Appearance
-        val systemIsCurrentlyDark = isSystemInDarkTheme()
-        val themeToggleText = when (uiState.isForceLightMode) {
-            true -> "Embrace the Darkness"
-            false -> "Use System Theme"
-            null -> if (systemIsCurrentlyDark) "Walk toward the Light" else "Embrace the Darkness"
-        }
-        MenuItem(
-            text = themeToggleText,
-            onClick = { onEvent(MainScreenEvent.ToggleForceTheme); onCloseDrawer() }
-        )
-        MenuItem(
-            text = "Luminance",
-            onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog); onCloseDrawer() }
-        )
-        MenuItem(
-            text = "Glow Stick",
-            onClick = { onEvent(MainScreenEvent.ToggleGlowStickDialog); onCloseDrawer() }
-        )
-        MenuDivider()
-
-        // Section 4: Help & Info
-        MenuItem(
-            text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
-            onClick = { onEvent(MainScreenEvent.ToggleHelp); onCloseDrawer() }
-        )
-        MenuItem(
-            text = "Show Tutorial",
-            onClick = { onEvent(MainScreenEvent.StartTutorial); onCloseDrawer() }
-        )
-        MenuDivider()
-
-        // Section 5: Meta
-        MenuItem(
-            text = "Check for Updates",
-            onClick = { onEvent(MainScreenEvent.CheckForUpdate); onCloseDrawer() })
-        MenuItem(
-            text = "About Me",
-            onClick = { onEvent(MainScreenEvent.ViewArt); onCloseDrawer() })
-        MenuDivider()
-
-        // Section 6: Developer
-        MenuItem(
-            text = "Too Advanced Options",
-            onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog); onCloseDrawer() }
-        )
-        MenuItem(
-            text = if (uiState.isSnappingEnabled) "Disable Snapping" else "Enable Snapping",
-            onClick = { onEvent(MainScreenEvent.ToggleSnapping); onCloseDrawer() }
-        )
-        Spacer(modifier = Modifier.height(12.dp))
     }
 }
 

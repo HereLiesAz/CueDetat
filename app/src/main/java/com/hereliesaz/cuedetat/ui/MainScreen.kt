@@ -134,8 +134,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight(0.6f)
-                        .padding(end = 16.dp)
-                        .width(120.dp)
+                        .width(160.dp) // Increased width for a larger touch target
                         .zIndex(5f)
                 )
 
@@ -174,6 +173,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     Box(
                         modifier = Modifier
                             .weight(1f)
+                            .height(80.dp) // Increased height for a larger touch target
                             .padding(horizontal = 16.dp),
                         contentAlignment = Alignment.Center
                     ) {

@@ -37,6 +37,39 @@ class ReducerUtils @Inject constructor() {
         return Rect(left.toInt(), top.toInt(), right.toInt(), bottom.toInt())
     }
 
+    private fun confinePoint(point: PointF, bounds: Rect): PointF {
+        return PointF(
+            point.x.coerceIn(bounds.left.toFloat(), bounds.right.toFloat()),
+            point.y.coerceIn(bounds.top.toFloat(), bounds.bottom.toFloat())
+        )
+    }
+
+    fun confineAllBallsToTable(state: OverlayState): OverlayState {
+        if (!state.showTable) {
+            return state
+        }
+        val bounds = getTableBoundaries(state)
+
+        val confinedCueBall = state.onPlaneBall?.let {
+            it.copy(center = confinePoint(it.center, bounds))
+        }
+
+        val confinedObstacles = state.obstacleBalls.map {
+            it.copy(center = confinePoint(it.center, bounds))
+        }
+
+        val confinedTargetBall = state.protractorUnit.copy(
+            center = confinePoint(state.protractorUnit.center, bounds)
+        )
+
+        return state.copy(
+            onPlaneBall = confinedCueBall,
+            obstacleBalls = confinedObstacles,
+            protractorUnit = confinedTargetBall
+        )
+    }
+
+
     fun findRailIntersectionAndNormal(startPoint: PointF, endPoint: PointF, state: OverlayState): Pair<PointF, PointF>? {
         val bounds = getTableBoundaries(state)
         val left = bounds.left.toFloat()

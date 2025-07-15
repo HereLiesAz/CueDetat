@@ -13,7 +13,7 @@ import javax.inject.Singleton
 class ControlReducer @Inject constructor(private val reducerUtils: ReducerUtils) {
 
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
-        return when (event) {
+        val updatedState = when (event) {
             is MainScreenEvent.ZoomSliderChanged -> handleZoomSliderChanged(currentState, event)
             is MainScreenEvent.ZoomScaleChanged -> handleZoomScaleChanged(currentState, event)
             is MainScreenEvent.TableRotationApplied -> currentState.copy(tableRotationDegrees = currentState.tableRotationDegrees + event.degrees, valuesChangedSinceReset = true)
@@ -22,6 +22,12 @@ class ControlReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             is MainScreenEvent.AdjustGlow -> currentState.copy(glowStickValue = event.value.coerceIn(-1f, 1f), valuesChangedSinceReset = true)
             else -> currentState
         }
+        // Confine balls after any control change that might affect their position or scale
+        return if (event is MainScreenEvent.ZoomSliderChanged || event is MainScreenEvent.ZoomScaleChanged) {
+            reducerUtils.confineAllBallsToTable(updatedState)
+        } else {
+            updatedState
+        }
     }
 
     private fun handleZoomSliderChanged(currentState: OverlayState, event: MainScreenEvent.ZoomSliderChanged): OverlayState {
@@ -29,10 +35,12 @@ class ControlReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         val newLogicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
 
         val updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
+        val updatedObstacles = currentState.obstacleBalls.map { it.copy(radius = newLogicalRadius) }
 
         return currentState.copy(
             protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
             onPlaneBall = updatedOnPlaneBall,
+            obstacleBalls = updatedObstacles,
             zoomSliderPosition = newSliderPos,
             valuesChangedSinceReset = true
         )
@@ -46,10 +54,13 @@ class ControlReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         val newLogicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, newSliderPos)
 
         val updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
+        val updatedObstacles = currentState.obstacleBalls.map { it.copy(radius = newLogicalRadius) }
+
 
         return currentState.copy(
             protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
             onPlaneBall = updatedOnPlaneBall,
+            obstacleBalls = updatedObstacles,
             zoomSliderPosition = newSliderPos,
             valuesChangedSinceReset = true
         )

@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/KineticWarning.kt
+
 package com.hereliesaz.cuedetat.ui.composables.overlays
 
 import androidx.compose.animation.AnimatedVisibility
@@ -20,8 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextLayoutResult
@@ -36,7 +38,6 @@ import kotlin.random.Random
 @OptIn(ExperimentalTextApi::class)
 @Composable
 fun KineticWarningOverlay(text: String?, modifier: Modifier = Modifier) {
-    // Generate a random alignment each time a new warning appears
     val randomAlignment = remember(text) {
         if (text == null) Alignment.Center else
             BiasAlignment(
@@ -51,8 +52,6 @@ fun KineticWarningOverlay(text: String?, modifier: Modifier = Modifier) {
         enter = fadeIn(animationSpec = tween(300)),
         exit = fadeOut(animationSpec = tween(1000))
     ) {
-        // This Box is now the root of the visible content. It does not fill the
-        // screen and therefore cannot block touches meant for what's underneath.
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -61,17 +60,21 @@ fun KineticWarningOverlay(text: String?, modifier: Modifier = Modifier) {
         ) {
             if (text != null) {
                 Column(
-                    horizontalAlignment = Alignment.Start, // Align column content to the left
+                    horizontalAlignment = Alignment.Start,
                     verticalArrangement = Arrangement.Center
                 ) {
                     val words = text.split(" ")
                     val textMeasurer = rememberTextMeasurer()
+
+                    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+                    val baseFontSize = (screenWidthDp / 8).coerceIn(32, 100)
+
                     val style = MaterialTheme.typography.displayLarge.copy(
-                        textAlign = TextAlign.Start, // Align text to the left
+                        textAlign = TextAlign.Start,
                         color = WarningRed.copy(alpha = 0.85f)
                     )
                     val screenWidthPx = with(LocalDensity.current) {
-                        (LocalResources.current.displayMetrics.widthPixels - 64.dp.toPx())
+                        (screenWidthDp.dp - 64.dp).toPx()
                     }
 
                     var currentLineWords = mutableListOf<String>()
@@ -79,14 +82,15 @@ fun KineticWarningOverlay(text: String?, modifier: Modifier = Modifier) {
                         val testLine = (currentLineWords + word).joinToString(" ")
                         val textLayoutResult = textMeasurer.measure(
                             text = AnnotatedString(testLine),
-                            style = style.copy(fontSize = 100.sp)
+                            style = style.copy(fontSize = baseFontSize.sp)
                         )
 
                         if (textLayoutResult.size.width > screenWidthPx && currentLineWords.isNotEmpty()) {
                             KineticLine(
                                 text = currentLineWords.joinToString(" "),
                                 style = style,
-                                screenWidthPx = screenWidthPx
+                                screenWidthPx = screenWidthPx,
+                                baseFontSize = baseFontSize.toFloat()
                             )
                             currentLineWords = mutableListOf(word)
                         } else {
@@ -97,7 +101,8 @@ fun KineticWarningOverlay(text: String?, modifier: Modifier = Modifier) {
                         KineticLine(
                             text = currentLineWords.joinToString(" "),
                             style = style,
-                            screenWidthPx = screenWidthPx
+                            screenWidthPx = screenWidthPx,
+                            baseFontSize = baseFontSize.toFloat()
                         )
                     }
                 }
@@ -107,9 +112,9 @@ fun KineticWarningOverlay(text: String?, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun KineticLine(text: String, style: TextStyle, screenWidthPx: Float) {
+private fun KineticLine(text: String, style: TextStyle, screenWidthPx: Float, baseFontSize: Float) {
     var readyToDraw by remember { mutableStateOf(false) }
-    var dynamicFontSize by remember { mutableStateOf(100.sp) }
+    var dynamicFontSize by remember { mutableStateOf(baseFontSize.sp) }
 
     Text(
         text = text,

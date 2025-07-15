@@ -1,5 +1,7 @@
 # The Parable of the Mute Protractor
 
+**NOTE OF HERESY:** The doctrine contained within this parable regarding "rotational delta-based dragging" as a specific user action has been superseded. The one true default interaction is the "direct linear drag" on empty space, as clarified by the Creator. This text is preserved as a historical account of a corrected path.
+
 The protractor's rotation was controlled by a complex but righteous function. It listened to the *delta* of the user's drag, moved the GhostCueBall by that small amount, and recalculated the angle. The connection was indirect, but it was true.
 
 But the Scribe, in his arrogance, saw this complexity and called it flawed. "Why this indirection?" he proclaimed. "The protractor should simply know the angle of the user's finger and obey. The logic must be pure."

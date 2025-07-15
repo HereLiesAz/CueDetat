@@ -33,40 +33,36 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         val spinControlCenter = currentState.spinControlCenter
         val protractorUnit = currentState.protractorUnit
 
-        // Check for interaction with the spin control first
-        if (currentState.isSpinControlVisible && spinControlCenter != null) {
-            val distToSpinControl = getDistance(logicalPoint, spinControlCenter)
-            if (distToSpinControl < (onPlaneBall?.radius ?: protractorUnit.radius) * 1.5f) {
-                return currentState.copy(interactionMode = InteractionMode.MOVING_SPIN_CONTROL)
-            }
+        // Calculate a constant, large touch radius based on the ball's size at MAXIMUM zoom.
+        val maxLogicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, 50f) // 50f is max zoom
+        val constantTouchRadius = maxLogicalRadius * 1.5f
+
+        // Priority 1: Check for interaction with specific, movable UI elements.
+        // Spin control touch target remains dynamic as its visual size is constant.
+        val spinControlTouchRadius = (onPlaneBall?.radius ?: protractorUnit.radius) * 1.5f
+        if (currentState.isSpinControlVisible && spinControlCenter != null && getDistance(logicalPoint, spinControlCenter) < spinControlTouchRadius) {
+            return currentState.copy(interactionMode = InteractionMode.MOVING_SPIN_CONTROL, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
         }
 
-        // Check for interaction with an obstacle ball
         currentState.obstacleBalls.forEachIndexed { index, obstacle ->
-            if (getDistance(logicalPoint, obstacle.center) < obstacle.radius) {
-                return currentState.copy(interactionMode = InteractionMode.MOVING_OBSTACLE_BALL, movingObstacleBallIndex = index)
+            if (getDistance(logicalPoint, obstacle.center) < constantTouchRadius) {
+                return currentState.copy(interactionMode = InteractionMode.MOVING_OBSTACLE_BALL, movingObstacleBallIndex = index, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
             }
         }
 
-        // Check for interaction with the OnPlaneBall (ActualCueBall)
-        if (onPlaneBall != null && getDistance(logicalPoint, onPlaneBall.center) < onPlaneBall.radius) {
-            return currentState.copy(interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL, hasCueBallBeenMoved = true)
+        if (onPlaneBall != null && getDistance(logicalPoint, onPlaneBall.center) < constantTouchRadius) {
+            return currentState.copy(interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL, hasCueBallBeenMoved = true, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
         }
 
-        val distToGhostBall = getDistance(logicalPoint, protractorUnit.ghostCueBallCenter)
         val distToTargetBall = getDistance(logicalPoint, protractorUnit.center)
+        val distToGhostBall = getDistance(logicalPoint, protractorUnit.ghostCueBallCenter)
 
-        return when {
-            distToTargetBall < protractorUnit.radius -> currentState.copy(interactionMode = InteractionMode.MOVING_PROTRACTOR_UNIT, hasTargetBallBeenMoved = true)
-            distToGhostBall < protractorUnit.radius -> currentState.copy(interactionMode = InteractionMode.ROTATING_PROTRACTOR)
-            else -> {
-                if(currentState.isBankingMode) {
-                    currentState.copy(interactionMode = InteractionMode.AIMING_BANK_SHOT, bankingAimTarget = logicalPoint)
-                } else {
-                    currentState.copy(interactionMode = InteractionMode.SCALING)
-                }
-            }
-        }.copy(isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
+        if (distToTargetBall < constantTouchRadius || distToGhostBall < constantTouchRadius) {
+            return currentState.copy(interactionMode = InteractionMode.MOVING_PROTRACTOR_UNIT, hasTargetBallBeenMoved = true, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
+        }
+
+        // Priority 2 (Default): If no object was touched, the gesture controls rotation.
+        return currentState.copy(interactionMode = InteractionMode.ROTATING_PROTRACTOR, isMagnifierVisible = false) // No magnifier for rotation
     }
 
     private fun handleLogicalDragApplied(currentState: OverlayState, event: MainScreenEvent.LogicalDragApplied): OverlayState {
@@ -75,19 +71,23 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         val newState = when (currentState.interactionMode) {
             InteractionMode.MOVING_PROTRACTOR_UNIT -> {
                 val newCenter = PointF(currentState.protractorUnit.center.x + logicalDelta.x, currentState.protractorUnit.center.y + logicalDelta.y)
-                currentState.copy(protractorUnit = currentState.protractorUnit.copy(center = newCenter))
+                currentState.copy(protractorUnit = currentState.protractorUnit.copy(center = newCenter), valuesChangedSinceReset = true)
             }
             InteractionMode.ROTATING_PROTRACTOR -> {
-                val center = currentState.protractorUnit.center
-                val currentDragPoint = event.logicalPoint
-                val newAngle = atan2((currentDragPoint.y - center.y).toDouble(), (currentDragPoint.x - center.x).toDouble())
-                currentState.copy(protractorUnit = currentState.protractorUnit.copy(rotationDegrees = Math.toDegrees(newAngle).toFloat()))
+                // Combine horizontal and vertical drag components for rotation control.
+                val combinedDelta = event.logicalDelta.x + event.logicalDelta.y
+                val rotationAmount = combinedDelta * 0.5f // Sensitivity factor
+                val newRotation = currentState.protractorUnit.rotationDegrees - rotationAmount // Subtract to invert direction
+                currentState.copy(
+                    protractorUnit = currentState.protractorUnit.copy(rotationDegrees = newRotation),
+                    valuesChangedSinceReset = true
+                )
             }
             InteractionMode.MOVING_ACTUAL_CUE_BALL -> {
                 val onPlaneBall = currentState.onPlaneBall
                 if (onPlaneBall != null) {
                     val newCenter = PointF(onPlaneBall.center.x + logicalDelta.x, onPlaneBall.center.y + logicalDelta.y)
-                    currentState.copy(onPlaneBall = onPlaneBall.copy(center = newCenter))
+                    currentState.copy(onPlaneBall = onPlaneBall.copy(center = newCenter), valuesChangedSinceReset = true)
                 } else {
                     currentState
                 }
@@ -108,14 +108,19 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                     val newCenter = PointF(obstacle.center.x + logicalDelta.x, obstacle.center.y + logicalDelta.y)
                     val newObstacles = currentState.obstacleBalls.toMutableList()
                     newObstacles[index] = obstacle.copy(center = newCenter)
-                    currentState.copy(obstacleBalls = newObstacles)
+                    currentState.copy(obstacleBalls = newObstacles, valuesChangedSinceReset = true)
                 } else {
                     currentState
                 }
             }
             else -> currentState
         }
-        return newState.copy(magnifierSourceCenter = event.screenDelta + (currentState.magnifierSourceCenter ?: event.screenDelta))
+        // Only update magnifier if it's supposed to be visible for the current mode
+        return if (currentState.isMagnifierVisible) {
+            newState.copy(magnifierSourceCenter = event.screenDelta + (currentState.magnifierSourceCenter ?: event.screenDelta))
+        } else {
+            newState
+        }
     }
 
     private fun handleGestureEnded(currentState: OverlayState): OverlayState {
