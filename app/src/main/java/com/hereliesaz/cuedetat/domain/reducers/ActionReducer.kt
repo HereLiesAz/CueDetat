@@ -30,33 +30,43 @@ class ActionReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
         // Otherwise, this is the first press. Save the current positional state.
         val stateToSave = currentState.copy()
 
-        // Create the default positional state based on the logical origin (0,0)
+        // Create the default positional state based on a logical origin
         val initialSliderPos = 0f
         val initialLogicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, initialSliderPos)
 
-        val targetBallCenter = PointF(0f, 0f) // The sacred logical origin
-        val newProtractorUnit = ProtractorUnit(center = targetBallCenter, radius = initialLogicalRadius, rotationDegrees = 180f) // Corrected to point UP
+        val newProtractorUnit: ProtractorUnit
         val newOnPlaneBall: OnPlaneBall?
+        val newTableRotation: Float
 
         if (currentState.showTable) {
-            // If table is shown, calculate cue ball position based on head spot
-            newOnPlaneBall = OnPlaneBall(center = reducerUtils.getDefaultCueBallPosition(currentState), radius = initialLogicalRadius)
+            val targetBallCenter = PointF(0f, 0f) // Logical center
+            val scale = (initialLogicalRadius * 2) / 2.25f
+            val tablePlayingSurfaceHeight = currentState.tableSize.shortSideInches * scale
+            val headSpotY = tablePlayingSurfaceHeight / 4f
+            val actualCueBallCenter = PointF(0f, headSpotY)
+
+            newProtractorUnit = ProtractorUnit(center = targetBallCenter, radius = initialLogicalRadius, rotationDegrees = -90f)
+            newOnPlaneBall = OnPlaneBall(center = actualCueBallCenter, radius = initialLogicalRadius)
+            newTableRotation = 0f
         } else {
-            // If no table, place cue ball at a default logical offset, only if it currently exists
-            newOnPlaneBall = if (currentState.onPlaneBall != null) {
-                OnPlaneBall(center = PointF(0f, initialLogicalRadius * 4), radius = initialLogicalRadius)
-            } else {
-                null
-            }
+            // Screen-centric defaults when table is not visible
+            val viewCenterX = currentState.viewWidth / 2f
+            val viewCenterY = currentState.viewHeight / 2f
+            val targetBallCenter = PointF(viewCenterX, viewCenterY)
+            val actualCueBallCenter = PointF(viewCenterX, viewCenterY + (currentState.viewHeight / 4f))
+
+            newProtractorUnit = ProtractorUnit(center = targetBallCenter, radius = initialLogicalRadius, rotationDegrees = -90f)
+            newOnPlaneBall = if (currentState.onPlaneBall != null) OnPlaneBall(center = actualCueBallCenter, radius = initialLogicalRadius) else null
+            newTableRotation = 0f
         }
 
         // Reset only positional and rotational properties, preserving toggles
         return currentState.copy(
             protractorUnit = newProtractorUnit,
             onPlaneBall = newOnPlaneBall,
-            obstacleBalls = emptyList(),
+            obstacleBalls = emptyList(), // Clear obstacles on reset
             zoomSliderPosition = initialSliderPos,
-            tableRotationDegrees = 0f, // Always reset table rotation
+            tableRotationDegrees = newTableRotation,
             bankingAimTarget = null,
             valuesChangedSinceReset = false,
             preResetState = stateToSave,

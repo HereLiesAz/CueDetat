@@ -49,7 +49,7 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
         val initialSliderPos = 0f
         val initialLogicalRadius = reducerUtils.getCurrentLogicalRadius(viewWidth, viewHeight, initialSliderPos)
         val initialProtractorCenter = PointF(0f, 0f)
-        val initialTableRotation = 0f // Default to landscape orientation
+        val initialTableRotation = 90f // Default to portrait orientation
 
         // UI elements like the spin control remain screen-relative.
         val initialSpinControlCenter = PointF(viewWidth / 2f, viewHeight * 0.75f)
@@ -60,7 +60,7 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             protractorUnit = ProtractorUnit(
                 center = initialProtractorCenter,
                 radius = initialLogicalRadius,
-                rotationDegrees = 180f // Corrected to point UP
+                rotationDegrees = -90f // Default to a straight-down shot
             ),
             onPlaneBall = null,
             zoomSliderPosition = initialSliderPos,
