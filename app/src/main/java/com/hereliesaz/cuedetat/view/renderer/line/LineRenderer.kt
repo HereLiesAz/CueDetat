@@ -81,19 +81,16 @@ class LineRenderer {
         }
 
         // --- Pass 1: Wide Pathways ---
-        drawPath(canvas, listOf(shotLineAnchor, ghostCueCenter), obstructionPaint)
-        if (state.aimingLineBankPath.isNotEmpty()) {
-            drawPath(canvas, state.aimingLineBankPath, obstructionPaint)
-        } else {
-            drawPath(canvas, listOf(ghostCueCenter, state.aimingLineEndPoint ?: state.protractorUnit.center), obstructionPaint)
-        }
+        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, obstructionPaint)
+        drawPath(canvas, state.aimingLineBankPath, obstructionPaint)
+
 
         // --- Pass 2: Glows ---
-        drawPath(canvas, listOf(shotLineAnchor, ghostCueCenter), shotLineGlow)
+        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLineGlow)
         drawTangentLines(canvas, state, paints)
 
         // --- Pass 3: Core Lines ---
-        drawPath(canvas, listOf(shotLineAnchor, ghostCueCenter), shotLinePaint)
+        drawExtendedLine(canvas, shotLineAnchor, ghostCueCenter, shotLinePaint)
         drawAimingLines(canvas, state, paints)
         drawSpinPaths(canvas, state, paints)
 
@@ -106,7 +103,7 @@ class LineRenderer {
         val aimingLineConfig = AimingLine()
         val isPocketed = state.aimedPocketIndex != null
 
-        val baseAimingColor = if (isPocketed) RebelYellow else aimingLineConfig.strokeColor
+        val baseAimingColor = if(isPocketed) RebelYellow else aimingLineConfig.strokeColor
 
         val aimingLinePaint = Paint(paints.targetCirclePaint).apply {
             color = baseAimingColor.toArgb()
@@ -260,13 +257,12 @@ class LineRenderer {
 
         val halfW = tableWidth / 2f
         val halfH = tableHeight / 2f
-        val canvasCenterX = state.viewWidth / 2f
-        val canvasCenterY = state.viewHeight / 2f
 
-        val left = canvasCenterX - halfW
-        val top = canvasCenterY - halfH
-        val right = canvasCenterX + halfW
-        val bottom = canvasCenterY + halfH
+        // Rail positions are relative to logical origin (0,0)
+        val left = -halfW
+        val top = -halfH
+        val right = halfW
+        val bottom = halfH
 
         val tolerance = 5f
 
@@ -276,6 +272,15 @@ class LineRenderer {
             point.x > left - tolerance && point.x < left + tolerance -> LineTextRenderer.RailType.LEFT
             point.x > right - tolerance && point.x < right + tolerance -> LineTextRenderer.RailType.RIGHT
             else -> null
+        }
+    }
+
+    private fun drawExtendedLine(canvas: Canvas, start: PointF, end: PointF, paint: Paint) {
+        val dirX = end.x - start.x; val dirY = end.y - start.y
+        val mag = sqrt(dirX * dirX + dirY * dirY)
+        if (mag > 0.001f) {
+            val extendFactor = 5000f; val ndx = dirX / mag; val ndy = dirY / mag
+            canvas.drawLine(start.x, start.y, start.x + ndx * extendFactor, start.y + ndy * extendFactor, paint)
         }
     }
 

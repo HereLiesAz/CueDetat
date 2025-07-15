@@ -30,34 +30,28 @@ class ActionReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
         // Otherwise, this is the first press. Save the current positional state.
         val stateToSave = currentState.copy()
 
-        // Create the default positional state based on table visibility
+        // Create the default positional state based on a logical origin
         val initialSliderPos = 0f
         val initialLogicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, initialSliderPos)
-        val viewCenterX = currentState.viewWidth / 2f
-        val viewCenterY = currentState.viewHeight / 2f
 
         val newProtractorUnit: ProtractorUnit
         val newOnPlaneBall: OnPlaneBall?
         val newTableRotation: Float
 
         if (currentState.showTable) {
-            // Table is visible, use table-centric defaults.
-            val targetBallCenter = PointF(viewCenterX, viewCenterY)
-
-            val ballRealDiameter = 2.25f
-            val ballLogicalDiameter = initialLogicalRadius * 2
-            val scale = ballLogicalDiameter / ballRealDiameter
+            val targetBallCenter = PointF(0f, 0f) // Logical center
+            val scale = (initialLogicalRadius * 2) / 2.25f
             val tablePlayingSurfaceHeight = currentState.tableSize.shortSideInches * scale
+            val headSpotY = tablePlayingSurfaceHeight / 4f
+            val actualCueBallCenter = PointF(0f, headSpotY)
 
-            val actualCueBallCenter = PointF(viewCenterX, viewCenterY + tablePlayingSurfaceHeight / 4f)
-            val rotationDegrees = -90f
-
-            newProtractorUnit = ProtractorUnit(center = targetBallCenter, radius = initialLogicalRadius, rotationDegrees = rotationDegrees)
+            newProtractorUnit = ProtractorUnit(center = targetBallCenter, radius = initialLogicalRadius, rotationDegrees = -90f)
             newOnPlaneBall = OnPlaneBall(center = actualCueBallCenter, radius = initialLogicalRadius)
-            newTableRotation = if (currentState.viewWidth > currentState.viewHeight) 0f else 90f
-
+            newTableRotation = 0f
         } else {
-            // Table is not visible, use screen-centric defaults.
+            // Screen-centric defaults when table is not visible
+            val viewCenterX = currentState.viewWidth / 2f
+            val viewCenterY = currentState.viewHeight / 2f
             val targetBallCenter = PointF(viewCenterX, viewCenterY)
             val actualCueBallCenter = PointF(viewCenterX, viewCenterY + (currentState.viewHeight / 4f))
 
@@ -74,9 +68,9 @@ class ActionReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             zoomSliderPosition = initialSliderPos,
             tableRotationDegrees = newTableRotation,
             bankingAimTarget = null,
-            valuesChangedSinceReset = false, // Resetting restores the "unchanged" state
-            preResetState = stateToSave, // Save the original state for reverting
-            hasCueBallBeenMoved = false, // Reset interaction flags
+            valuesChangedSinceReset = false,
+            preResetState = stateToSave,
+            hasCueBallBeenMoved = false,
             hasTargetBallBeenMoved = false
         )
     }

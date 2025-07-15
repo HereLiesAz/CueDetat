@@ -9,17 +9,35 @@ import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 @Singleton
 class ReducerUtils @Inject constructor() {
+
+    fun getDefaultTargetBallPosition(): PointF = PointF(0f, 0f)
+
+    fun getDefaultCueBallPosition(state: OverlayState): PointF {
+        val logicalRadius = getCurrentLogicalRadius(state.viewWidth, state.viewHeight, 0f)
+        val scale = (logicalRadius * 2) / 2.25f
+        val tablePlayingSurfaceHeight = state.tableSize.shortSideInches * scale
+        val headSpotY = tablePlayingSurfaceHeight / 4f // Relative to table center
+        return PointF(0f, headSpotY)
+    }
+
     fun getCurrentLogicalRadius(stateWidth: Int, stateHeight: Int, zoomSliderPos: Float): Float {
         if (stateWidth == 0 || stateHeight == 0) return 1f
         val zoomFactor = ZoomMapping.sliderToZoom(zoomSliderPos)
         return (min(stateWidth, stateHeight) * 0.30f / 2f) * zoomFactor
     }
 
-    fun getTableBoundaries(state: OverlayState): Rect {
+    fun getLogicalTableCorners(state: OverlayState): List<PointF> {
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
+        if (referenceRadius <= 0f) return emptyList()
+
         val ballRealDiameter = 2.25f
         val ballLogicalDiameter = referenceRadius * 2
         val scale = ballLogicalDiameter / ballRealDiameter
@@ -27,85 +45,135 @@ class ReducerUtils @Inject constructor() {
         val logicalWidth = state.tableSize.longSideInches * scale
         val logicalHeight = state.tableSize.shortSideInches * scale
 
-        val canvasCenterX = state.viewWidth / 2f
-        val canvasCenterY = state.viewHeight / 2f
-        val left = canvasCenterX - logicalWidth / 2
-        val top = canvasCenterY - logicalHeight / 2
-        val right = canvasCenterX + logicalWidth / 2
-        val bottom = canvasCenterY + logicalHeight / 2
+        val halfW = logicalWidth / 2f
+        val halfH = logicalHeight / 2f
 
-        return Rect(left.toInt(), top.toInt(), right.toInt(), bottom.toInt())
-    }
-
-    private fun confinePoint(point: PointF, bounds: Rect): PointF {
-        return PointF(
-            point.x.coerceIn(bounds.left.toFloat(), bounds.right.toFloat()),
-            point.y.coerceIn(bounds.top.toFloat(), bounds.bottom.toFloat())
-        )
-    }
-
-    fun confineAllBallsToTable(state: OverlayState): OverlayState {
-        if (!state.showTable) {
-            return state
-        }
-        val bounds = getTableBoundaries(state)
-
-        val confinedCueBall = state.onPlaneBall?.let {
-            it.copy(center = confinePoint(it.center, bounds))
-        }
-
-        val confinedObstacles = state.obstacleBalls.map {
-            it.copy(center = confinePoint(it.center, bounds))
-        }
-
-        val confinedTargetBall = state.protractorUnit.copy(
-            center = confinePoint(state.protractorUnit.center, bounds)
+        val corners = listOf(
+            PointF(-halfW, -halfH), // Top-Left
+            PointF(halfW, -halfH),  // Top-Right
+            PointF(halfW, halfH),   // Bottom-Right
+            PointF(-halfW, halfH)   // Bottom-Left
         )
 
-        return state.copy(
-            onPlaneBall = confinedCueBall,
-            obstacleBalls = confinedObstacles,
-            protractorUnit = confinedTargetBall
-        )
+        val angleRad = Math.toRadians(state.tableRotationDegrees.toDouble())
+        val cosA = cos(angleRad).toFloat()
+        val sinA = sin(angleRad).toFloat()
+
+        return corners.map { p ->
+            PointF(
+                p.x * cosA - p.y * sinA,
+                p.x * sinA + p.y * cosA
+            )
+        }
     }
 
+    fun isPointInsidePolygon(point: PointF, polygon: List<PointF>): Boolean {
+        if (polygon.isEmpty()) return false
+        var isInside = false
+        var j = polygon.size - 1
+        for (i in polygon.indices) {
+            val pi = polygon[i]
+            val pj = polygon[j]
+            if ((pi.y > point.y) != (pj.y > point.y) &&
+                (point.x < (pj.x - pi.x) * (point.y - pi.y) / (pj.y - pi.y) + pi.x)
+            ) {
+                isInside = !isInside
+            }
+            j = i
+        }
+        return isInside
+    }
+
+    fun snapViolatingBalls(state: OverlayState): OverlayState {
+        if (!state.showTable) return state
+
+        val corners = getLogicalTableCorners(state)
+        if (corners.isEmpty()) return state
+
+        var updatedState = state
+
+        if (!isPointInsidePolygon(state.protractorUnit.center, corners)) {
+            updatedState = updatedState.copy(
+                protractorUnit = state.protractorUnit.copy(center = getDefaultTargetBallPosition())
+            )
+        }
+
+        updatedState.onPlaneBall?.let { ball ->
+            if (!isPointInsidePolygon(ball.center, corners)) {
+                updatedState = updatedState.copy(
+                    onPlaneBall = ball.copy(center = getDefaultCueBallPosition(updatedState))
+                )
+            }
+        }
+
+        val confinedObstacles = updatedState.obstacleBalls.filter {
+            isPointInsidePolygon(it.center, corners)
+        }
+        if (confinedObstacles.size != updatedState.obstacleBalls.size) {
+            updatedState = updatedState.copy(obstacleBalls = confinedObstacles)
+        }
+
+        return updatedState
+    }
 
     fun findRailIntersectionAndNormal(startPoint: PointF, endPoint: PointF, state: OverlayState): Pair<PointF, PointF>? {
-        val bounds = getTableBoundaries(state)
-        val left = bounds.left.toFloat()
-        val top = bounds.top.toFloat()
-        val right = bounds.right.toFloat()
-        val bottom = bounds.bottom.toFloat()
+        val corners = getLogicalTableCorners(state)
+        if (corners.size < 4) return null
 
-        val dirX = endPoint.x - startPoint.x
-        val dirY = endPoint.y - startPoint.y
+        val rails = listOf(
+            corners[0] to corners[1], // Top
+            corners[1] to corners[2], // Right
+            corners[2] to corners[3], // Bottom
+            corners[3] to corners[0]  // Left
+        )
 
-        var t = Float.MAX_VALUE
-        var normal: PointF? = null
+        val unrotatedNormals = listOf(
+            PointF(0f, -1f), // Top
+            PointF(1f, 0f),  // Right
+            PointF(0f, 1f),   // Bottom
+            PointF(-1f, 0f)  // Left
+        )
 
-        if (dirX != 0f) {
-            val tLeft = (left - startPoint.x) / dirX
-            if (tLeft > 0.001f && tLeft < t) {
-                t = tLeft; normal = PointF(1f, 0f)
-            }
-            val tRight = (right - startPoint.x) / dirX
-            if (tRight > 0.001f && tRight < t) {
-                t = tRight; normal = PointF(-1f, 0f)
-            }
-        }
-        if (dirY != 0f) {
-            val tTop = (top - startPoint.y) / dirY
-            if (tTop > 0.001f && tTop < t) {
-                t = tTop; normal = PointF(0f, 1f)
-            }
-            val tBottom = (bottom - startPoint.y) / dirY
-            if (tBottom > 0.001f && tBottom < t) {
-                t = tBottom; normal = PointF(0f, -1f)
-            }
+        val angleRad = Math.toRadians(state.tableRotationDegrees.toDouble())
+        val cosA = cos(angleRad).toFloat()
+        val sinA = sin(angleRad).toFloat()
+
+        val normals = unrotatedNormals.map { n ->
+            PointF(n.x * cosA - n.y * sinA, n.x * sinA + n.y * cosA)
         }
 
-        return if (t != Float.MAX_VALUE && normal != null) {
-            Pair(PointF(startPoint.x + t * dirX, startPoint.y + t * dirY), normal)
+        var closestIntersection: PointF? = null
+        var intersectionNormal: PointF? = null
+        var minDistanceSq = Float.MAX_VALUE
+
+        rails.forEachIndexed { index, rail ->
+            val intersection = getLineSegmentIntersection(startPoint, endPoint, rail.first, rail.second)
+            if (intersection != null) {
+                val distSq = (intersection.x - startPoint.x).pow(2) + (intersection.y - startPoint.y).pow(2)
+                if (distSq < minDistanceSq && distSq > 0.001f) {
+                    minDistanceSq = distSq
+                    closestIntersection = intersection
+                    intersectionNormal = normals[index]
+                }
+            }
+        }
+
+        return if (closestIntersection != null && intersectionNormal != null) {
+            Pair(closestIntersection!!, intersectionNormal!!)
+        } else {
+            null
+        }
+    }
+
+    private fun getLineSegmentIntersection(p1: PointF, p2: PointF, p3: PointF, p4: PointF): PointF? {
+        val d = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x)
+        if (d == 0f) return null
+
+        val t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / d
+        val u = -((p1.x - p2.x) * (p1.y - p3.y) - (p1.y - p2.y) * (p1.x - p3.x)) / d
+
+        return if (t > 0.001f && u >= 0f && u <= 1f) {
+            PointF(p1.x + t * (p2.x - p1.x), p1.y + t * (p2.y - p1.y))
         } else {
             null
         }

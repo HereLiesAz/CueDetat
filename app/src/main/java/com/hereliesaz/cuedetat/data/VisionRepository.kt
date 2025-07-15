@@ -3,242 +3,121 @@
 package com.hereliesaz.cuedetat.data
 
 import android.annotation.SuppressLint
-import android.content.Context
+import android.graphics.Matrix
 import android.graphics.PointF
-import android.graphics.Rect
-import android.util.Log
+import android.graphics.RectF
 import androidx.camera.core.ImageProxy
-import com.google.mlkit.common.model.LocalModel
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.objects.DetectedObject
-import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
-import com.google.mlkit.vision.objects.custom.CustomObjectDetectorOptions
 import com.hereliesaz.cuedetat.di.GenericDetector
 import com.hereliesaz.cuedetat.domain.ReducerUtils
-import com.hereliesaz.cuedetat.view.state.CvRefinementMethod
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.opencv.core.Core
+import org.opencv.core.CvType
 import org.opencv.core.Mat
-import org.opencv.core.MatOfPoint
-import org.opencv.core.MatOfPoint2f
-import org.opencv.core.Point
 import org.opencv.imgproc.Imgproc
-import java.io.IOException
-import java.nio.ByteBuffer
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class VisionRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
-    @GenericDetector private val genericDetector: ObjectDetector,
-    private val reducerUtils: ReducerUtils // Injected for centralized boundary logic
+    @GenericDetector private val genericObjectDetector: ObjectDetector,
+    private val reducerUtils: ReducerUtils
 ) {
 
     private val _visionDataFlow = MutableStateFlow(VisionData())
     val visionDataFlow = _visionDataFlow.asStateFlow()
-    private val customDetector: ObjectDetector?
 
-    init {
-        val modelFile = "model.tflite"
-        val assetExists = try {
-            context.assets.open(modelFile).close()
-            true
-        } catch (e: IOException) {
-            false
-        }
-
-        customDetector = if (assetExists) {
-            val localModel = LocalModel.Builder().setAssetFilePath(modelFile).build()
-            val customOptions = CustomObjectDetectorOptions.Builder(localModel)
-                .setDetectorMode(CustomObjectDetectorOptions.STREAM_MODE)
-                .enableMultipleObjects()
-                .enableClassification()
-                .setClassificationConfidenceThreshold(0.5f)
-                .setMaxPerObjectLabelCount(3)
-                .build()
-            ObjectDetection.getClient(customOptions)
-        } else {
-            null
-        }
-    }
-
+    private var lastFrameTime = 0L
 
     @SuppressLint("UnsafeOptInUsageError")
-    fun processImage(imageProxy: ImageProxy, uiState: OverlayState) {
-        val mediaImage = imageProxy.image ?: run { imageProxy.close(); return }
-        val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-
-        var genericResults: List<DetectedObject> = emptyList()
-        var customResults: List<DetectedObject> = emptyList()
-        var processedCount = 0
-
-        val detectorsToRun = listOfNotNull(genericDetector, if (uiState.useCustomModel) customDetector else null)
-        if (detectorsToRun.isEmpty()) {
+    fun processImage(imageProxy: ImageProxy, state: OverlayState) {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastFrameTime < 33) { // ~30 FPS cap
             imageProxy.close()
             return
         }
+        lastFrameTime = currentTime
 
-        val onComplete = {
-            processedCount++
-            if (processedCount == detectorsToRun.size) {
-                processWithOpenCV(imageProxy, genericResults, customResults, uiState)
-            }
-        }
+        val mediaImage = imageProxy.image
+        if (mediaImage != null) {
+            val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+            val matrix = getTransformationMatrix(
+                inputImage.width, inputImage.height,
+                state.viewWidth, state.viewHeight
+            )
 
-        genericDetector.process(inputImage)
-            .addOnSuccessListener { genericResults = it }
-            .addOnFailureListener { Log.e("VisionRepo", "Generic detector failed.", it) }
-            .addOnCompleteListener { onComplete() }
+            genericObjectDetector.process(inputImage)
+                .addOnSuccessListener { detectedObjects ->
+                    val hsv = if (state.lockedHsvColor != null) {
+                        state.lockedHsvColor
+                    } else {
+                        val mat = imageToMat(inputImage)
+                        val hsvMat = Mat()
+                        Imgproc.cvtColor(mat, hsvMat, Imgproc.COLOR_BGR2HSV)
+                        val centerColor = hsvMat[hsvMat.rows() / 2, hsvMat.cols() / 2]
+                        floatArrayOf(centerColor[0].toFloat(), centerColor[1].toFloat(), centerColor[2].toFloat())
+                    }
 
-        if (uiState.useCustomModel && customDetector != null) {
-            customDetector.process(inputImage)
-                .addOnSuccessListener { customResults = it }
-                .addOnFailureListener { Log.e("VisionRepo", "Custom detector failed.", it) }
-                .addOnCompleteListener { onComplete() }
-        }
-    }
+                    val detectedBalls = detectedObjects.map {
+                        val transformedRect = RectF(it.boundingBox)
+                        matrix.mapRect(transformedRect)
+                        PointF(transformedRect.centerX(), transformedRect.centerY())
+                    }
 
-    private fun yuvToRotatedRgba(imageProxy: ImageProxy): Mat {
-        val yBuffer: ByteBuffer = imageProxy.planes[0].buffer
-        val uBuffer: ByteBuffer = imageProxy.planes[1].buffer
-        val vBuffer: ByteBuffer = imageProxy.planes[2].buffer
-        val ySize: Int = yBuffer.remaining()
-        val uSize: Int = uBuffer.remaining()
-        val vSize: Int = vBuffer.remaining()
-        val nv21 = ByteArray(ySize + uSize + vSize)
-        yBuffer.get(nv21, 0, ySize)
-        vBuffer.get(nv21, ySize, vSize)
-        uBuffer.get(nv21, ySize + vSize, uSize)
+                    // The logic now correctly queries the rotated table corners for filtering
+                    val filteredBalls = if (state.showTable) {
+                        val tableCorners = reducerUtils.getLogicalTableCorners(state)
+                        detectedBalls.filter { reducerUtils.isPointInsidePolygon(it, tableCorners) }
+                    } else {
+                        detectedBalls
+                    }
 
-        val yuvMat = Mat(imageProxy.height + imageProxy.height / 2, imageProxy.width, org.opencv.core.CvType.CV_8UC1)
-        yuvMat.put(0, 0, nv21)
+                    _visionDataFlow.value = VisionData(
+                        genericBalls = filteredBalls,
+                        detectedHsvColor = hsv
+                    )
 
-        val rgbaMat = Mat()
-        Imgproc.cvtColor(yuvMat, rgbaMat, Imgproc.COLOR_YUV2RGBA_NV21, 4)
-
-        val rotatedRgbaMat = Mat()
-        Core.rotate(rgbaMat, rotatedRgbaMat, imageProxy.imageInfo.rotationDegrees.toCvRotateCode())
-
-        yuvMat.release()
-        rgbaMat.release()
-
-        return rotatedRgbaMat
-    }
-
-    @SuppressLint("UnsafeOptInUsageError")
-    private fun processWithOpenCV(imageProxy: ImageProxy, genericObjects: List<DetectedObject>, customObjects: List<DetectedObject>, uiState: OverlayState) {
-        val rotatedRgbaMat = yuvToRotatedRgba(imageProxy)
-        // Use the centralized boundary definition
-        val tableBoundaries = if (uiState.showTable) reducerUtils.getTableBoundaries(uiState) else null
-
-        val refinedGeneric = refineDetections(genericObjects, rotatedRgbaMat, uiState, tableBoundaries)
-        val refinedCustom = refineDetections(customObjects, rotatedRgbaMat, uiState, tableBoundaries)
-
-        val allDetectedObjects = genericObjects + customObjects
-        val boundingBoxes = allDetectedObjects.map { it.boundingBox }
-
-        _visionDataFlow.value = VisionData(
-            genericBalls = refinedGeneric,
-            customBalls = refinedCustom,
-            detectedBoundingBoxes = boundingBoxes
-        )
-
-        rotatedRgbaMat.release()
-        imageProxy.close()
-    }
-
-    private fun refineDetections(detectedObjects: List<DetectedObject>, imageMat: Mat, uiState: OverlayState, tableBounds: Rect?): List<PointF> {
-        val filteredObjects = if (tableBounds != null) {
-            detectedObjects.filter { tableBounds.contains(it.boundingBox) }
+                    imageProxy.close()
+                }
+                .addOnFailureListener {
+                    imageProxy.close()
+                }
         } else {
-            detectedObjects
-        }
-
-        return when (uiState.cvRefinementMethod) {
-            CvRefinementMethod.HOUGH -> refineWithHoughCircles(filteredObjects, imageMat, uiState)
-            CvRefinementMethod.CONTOUR -> refineWithContours(filteredObjects, imageMat)
+            imageProxy.close()
         }
     }
 
-    private fun refineWithHoughCircles(detectedObjects: List<DetectedObject>, imageMat: Mat, uiState: OverlayState): List<PointF> {
-        val refinedPoints = mutableListOf<PointF>()
-        val grayMat = Mat()
-        Imgproc.cvtColor(imageMat, grayMat, Imgproc.COLOR_RGBA2GRAY)
+    private fun imageToMat(image: InputImage): Mat {
+        val yBuffer = image.planes?.get(0)?.buffer
+        val uBuffer = image.planes?.get(1)?.buffer
+        val vBuffer = image.planes?.get(2)?.buffer
 
-        for (obj in detectedObjects) {
-            val roiRect = obj.boundingBox.toOpenCvRect()
-            if (roiRect.x >= 0 && roiRect.y >= 0 && roiRect.x + roiRect.width <= grayMat.cols() && roiRect.y + roiRect.height <= grayMat.rows() && roiRect.width > 0 && roiRect.height > 0) {
-                val roi = Mat(grayMat, roiRect)
-                val circles = Mat()
-                Imgproc.HoughCircles(
-                    roi, circles, Imgproc.HOUGH_GRADIENT, 1.0,
-                    roiRect.width.toDouble(),
-                    uiState.houghP1.toDouble(),
-                    uiState.houghP2.toDouble(),
-                    5,
-                    roiRect.width.coerceAtLeast(6)
-                )
-                if (!circles.empty()) {
-                    val circle = circles.get(0, 0)
-                    refinedPoints.add(PointF((circle[0] + roiRect.x).toFloat(), (circle[1] + roiRect.y).toFloat()))
-                }
-                roi.release()
-                circles.release()
-            }
-        }
-        grayMat.release()
-        return refinedPoints
+        val ySize = yBuffer?.remaining() ?: 0
+        val uSize = uBuffer?.remaining() ?: 0
+        val vSize = vBuffer?.remaining() ?: 0
+
+        val nv21 = ByteArray(ySize + uSize + vSize)
+        yBuffer?.get(nv21, 0, ySize)
+        vBuffer?.get(nv21, ySize, vSize)
+        uBuffer?.get(nv21, ySize + vSize, uSize)
+
+        val yuvImage = Mat(image.height + image.height / 2, image.width, CvType.CV_8UC1)
+        yuvImage.put(0, 0, nv21)
+        val mat = Mat()
+        Imgproc.cvtColor(yuvImage, mat, Imgproc.COLOR_YUV2BGR_NV21, 3)
+        return mat
     }
 
-    private fun refineWithContours(detectedObjects: List<DetectedObject>, imageMat: Mat): List<PointF> {
-        val refinedPoints = mutableListOf<PointF>()
-        val grayMat = Mat()
-        Imgproc.cvtColor(imageMat, grayMat, Imgproc.COLOR_RGBA2GRAY)
-
-        for (obj in detectedObjects) {
-            val roiRect = obj.boundingBox.toOpenCvRect()
-            if (roiRect.x >= 0 && roiRect.y >= 0 && roiRect.x + roiRect.width <= grayMat.cols() && roiRect.y + roiRect.height <= grayMat.rows() && roiRect.width > 0 && roiRect.height > 0) {
-                val roi = Mat(grayMat, roiRect)
-                val binaryRoi = Mat()
-
-                Imgproc.threshold(roi, binaryRoi, 100.0, 255.0, Imgproc.THRESH_BINARY)
-
-                val contours = mutableListOf<MatOfPoint>()
-                val hierarchy = Mat()
-
-                Imgproc.findContours(binaryRoi, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
-
-                contours.maxByOrNull { Imgproc.contourArea(it) }?.let { bestContour ->
-                    val contour2f = MatOfPoint2f(*bestContour.toArray())
-                    val center = Point()
-                    val radius = FloatArray(1)
-                    Imgproc.minEnclosingCircle(contour2f, center, radius)
-
-                    refinedPoints.add(PointF((center.x + roiRect.x).toFloat(), (center.y + roiRect.y).toFloat()))
-                }
-
-                roi.release()
-                binaryRoi.release()
-                hierarchy.release()
-            }
-        }
-        grayMat.release()
-        return refinedPoints
-    }
-
-    private fun Int.toCvRotateCode(): Int = when (this) {
-        90 -> Core.ROTATE_90_CLOCKWISE
-        180 -> Core.ROTATE_180
-        270 -> Core.ROTATE_90_COUNTERCLOCKWISE
-        else -> -1
-    }
-
-    private fun android.graphics.Rect.toOpenCvRect(): org.opencv.core.Rect {
-        return org.opencv.core.Rect(this.left, this.top, this.width(), this.height())
+    private fun getTransformationMatrix(
+        sourceWidth: Int, sourceHeight: Int,
+        destWidth: Int, destHeight: Int
+    ): Matrix {
+        val matrix = Matrix()
+        val sx = destWidth.toFloat() / sourceWidth.toFloat()
+        val sy = destHeight.toFloat() / sourceHeight.toFloat()
+        matrix.postScale(sx, sy)
+        return matrix
     }
 }

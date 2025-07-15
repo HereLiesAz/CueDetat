@@ -49,29 +49,36 @@ class ObstacleReducer @Inject constructor(private val reducerUtils: ReducerUtils
 
         // Fallback placement logic
         if (currentState.showTable) {
-            // If table is visible, place randomly within its bounds.
-            val bounds = reducerUtils.getTableBoundaries(currentState)
+            val corners = reducerUtils.getLogicalTableCorners(currentState)
+            if (corners.isEmpty()) return reducerUtils.getDefaultTargetBallPosition()
+
+            val minX = corners.minOf { it.x }
+            val maxX = corners.maxOf { it.x }
+            val minY = corners.minOf { it.y }
+            val maxY = corners.maxOf { it.y }
+
             val attempts = 10
             for (i in 0 until attempts) {
-                val randomX = Random.nextFloat() * (bounds.width() - currentState.protractorUnit.radius * 2) + bounds.left + currentState.protractorUnit.radius
-                val randomY = Random.nextFloat() * (bounds.height() - currentState.protractorUnit.radius * 2) + bounds.top + currentState.protractorUnit.radius
+                val randomX = Random.nextFloat() * (maxX - minX) + minX
+                val randomY = Random.nextFloat() * (maxY - minY) + minY
                 val candidatePoint = PointF(randomX, randomY)
 
-                // Ensure it doesn't overlap with existing balls
-                val isOverlapping = allLogicalBalls.any {
-                    hypot((it.x - candidatePoint.x).toDouble(), (it.y - candidatePoint.y).toDouble()) < (currentState.protractorUnit.radius * 2.5)
+                if (reducerUtils.isPointInsidePolygon(candidatePoint, corners)) {
+                    val isOverlapping = allLogicalBalls.any {
+                        hypot((it.x - candidatePoint.x).toDouble(), (it.y - candidatePoint.y).toDouble()) < (currentState.protractorUnit.radius * 2.5)
+                    }
+                    if (!isOverlapping) return candidatePoint
                 }
-                if (!isOverlapping) return candidatePoint
             }
-            // If all random attempts fail, fall back to center as a last resort
-            return PointF(currentState.viewWidth / 2f, currentState.viewHeight / 2f)
+            return reducerUtils.getDefaultTargetBallPosition()
         } else {
-            // Original screen-based placement if table is not visible
+            // Original logical-based placement if table is not visible
             val numObstacles = currentState.obstacleBalls.size
             val quadrantIndex = numObstacles % 4
-            val xFactor = if (quadrantIndex % 2 == 0) 0.3f else 0.7f
-            val yFactor = if (quadrantIndex < 2) 0.35f else 0.65f
-            return PointF(currentState.viewWidth * xFactor, currentState.viewHeight * yFactor)
+            val radius = currentState.protractorUnit.radius
+            val xOffset = if (quadrantIndex % 2 == 0) -radius * 3 else radius * 3
+            val yOffset = if (quadrantIndex < 2) -radius * 6 else radius * 6
+            return PointF(xOffset, yOffset)
         }
     }
 }

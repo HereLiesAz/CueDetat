@@ -22,9 +22,9 @@ class ControlReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             is MainScreenEvent.AdjustGlow -> currentState.copy(glowStickValue = event.value.coerceIn(-1f, 1f), valuesChangedSinceReset = true)
             else -> currentState
         }
-        // Confine balls after any control change that might affect their position or scale
+
         return if (event is MainScreenEvent.ZoomSliderChanged || event is MainScreenEvent.ZoomScaleChanged) {
-            reducerUtils.confineAllBallsToTable(updatedState)
+            reducerUtils.snapViolatingBalls(updatedState)
         } else {
             updatedState
         }

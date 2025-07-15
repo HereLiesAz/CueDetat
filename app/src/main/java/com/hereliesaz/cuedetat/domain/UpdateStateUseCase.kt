@@ -46,7 +46,7 @@ class UpdateStateUseCase @Inject constructor(
             camera = camera
         )
 
-        val logicalShotLineAnchor = getLogicalShotLineAnchor(updatedStateWithSnapping, baseInverseMatrix)
+        val logicalShotLineAnchor = getLogicalShotLineAnchor(updatedStateWithSnapping)
         val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= updatedStateWithSnapping.protractorUnit.ghostCueBallCenter.y
 
         val (isGeometricallyImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
@@ -142,10 +142,10 @@ class UpdateStateUseCase @Inject constructor(
         )
     }
 
-    private fun getLogicalShotLineAnchor(state: OverlayState, inverseMatrix: Matrix): PointF {
+    private fun getLogicalShotLineAnchor(state: OverlayState): PointF {
         state.onPlaneBall?.let { return it.center }
-        val screenAnchor = PointF(state.viewWidth / 2f, state.viewHeight.toFloat())
-        return Perspective.screenToLogical(screenAnchor, inverseMatrix)
+        // Default to a logical point far below the target ball if the cue ball isn't present
+        return PointF(state.protractorUnit.center.x, state.protractorUnit.center.y + 10000f)
     }
 
     private fun calculateShotPossibilityAndTangent(shotAnchor: PointF, ghostBall: PointF, targetBall: PointF): Pair<Boolean, Float> {

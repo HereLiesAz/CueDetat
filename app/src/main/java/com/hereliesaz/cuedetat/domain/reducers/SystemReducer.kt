@@ -4,14 +4,15 @@ package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
+import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.abs
 
 @Singleton
 class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) {
@@ -26,59 +27,32 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
     }
 
     private fun handleSizeChanged(currentState: OverlayState, event: MainScreenEvent.SizeChanged): OverlayState {
-        val newState = if (currentState.viewWidth == 0 && currentState.viewHeight == 0) {
-            createInitialState(event.width, event.height, currentState.appControlColorScheme)
-        } else {
-            val newLogicalRadius = reducerUtils.getCurrentLogicalRadius(event.width, event.height, currentState.zoomSliderPosition)
-            var updatedOnPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius)
-            var protractorNewCenter = currentState.protractorUnit.center
-
-            if (currentState.protractorUnit.center.x.roughlyEquals(currentState.viewWidth / 2f) &&
-                currentState.protractorUnit.center.y.roughlyEquals(currentState.viewHeight / 2f)) {
-                protractorNewCenter = PointF(event.width / 2f, event.height / 2f)
-            }
-            if (currentState.isBankingMode && updatedOnPlaneBall != null) {
-                if (updatedOnPlaneBall.center.x.roughlyEquals(currentState.viewWidth/2f) && updatedOnPlaneBall.center.y.roughlyEquals(currentState.viewHeight/2f)) {
-                    updatedOnPlaneBall = updatedOnPlaneBall.copy(center = PointF(
-                        event.width / 2f,
-                        event.height / 2f
-                    )
-                    )
-                }
-            }
-
-            var newSpinControlCenter = currentState.spinControlCenter
-            currentState.spinControlCenter?.let {
-                val oldDefaultY = currentState.viewHeight * 0.75f
-                if(it.x.roughlyEquals(currentState.viewWidth / 2f) && it.y.roughlyEquals(oldDefaultY)) {
-                    newSpinControlCenter = PointF(event.width / 2f, event.height * 0.75f)
-                }
-            }
-
-            currentState.copy(
-                viewWidth = event.width, viewHeight = event.height,
-                protractorUnit = currentState.protractorUnit.copy(
-                    radius = newLogicalRadius,
-                    center = protractorNewCenter
-                ),
-                onPlaneBall = updatedOnPlaneBall,
-                spinControlCenter = newSpinControlCenter
-            )
+        // Upon genesis, create the initial state.
+        if (currentState.viewWidth == 0 && currentState.viewHeight == 0) {
+            return createInitialState(event.width, event.height, currentState.appControlColorScheme)
         }
-        // Confinement is now handled by the calling function after all reducers have run.
-        return newState
+
+        // For all subsequent resizes, only update view dimensions and dependent logical radii.
+        // Logical coordinates of objects remain absolute and are not modified here.
+        val newLogicalRadius = reducerUtils.getCurrentLogicalRadius(event.width, event.height, currentState.zoomSliderPosition)
+
+        return currentState.copy(
+            viewWidth = event.width,
+            viewHeight = event.height,
+            protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
+            onPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius),
+            obstacleBalls = currentState.obstacleBalls.map { it.copy(radius = newLogicalRadius) }
+        )
     }
 
     private fun createInitialState(viewWidth: Int, viewHeight: Int, appColorScheme: ColorScheme): OverlayState {
         val initialSliderPos = 0f
         val initialLogicalRadius = reducerUtils.getCurrentLogicalRadius(viewWidth, viewHeight, initialSliderPos)
-        val initialProtractorCenter = PointF(viewWidth / 2f, viewHeight / 2f)
-        val initialTableRotation = 90f
+        val initialProtractorCenter = PointF(0f, 0f)
+        val initialTableRotation = 90f // Default to portrait orientation
 
-        val initialSpinControlCenter = PointF(
-            viewWidth / 2f,
-            viewHeight * 0.75f
-        )
+        // UI elements like the spin control remain screen-relative.
+        val initialSpinControlCenter = PointF(viewWidth / 2f, viewHeight * 0.75f)
 
         return OverlayState(
             viewWidth = viewWidth,
@@ -86,7 +60,7 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             protractorUnit = ProtractorUnit(
                 center = initialProtractorCenter,
                 radius = initialLogicalRadius,
-                rotationDegrees = 0f
+                rotationDegrees = -90f // Default to a straight-down shot
             ),
             onPlaneBall = null,
             zoomSliderPosition = initialSliderPos,
@@ -106,9 +80,5 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             interactionMode = InteractionMode.NONE,
             spinControlCenter = initialSpinControlCenter
         )
-    }
-
-    private fun Float.roughlyEquals(other: Float, tolerance: Float = 0.00001f): Boolean {
-        return abs(this - other) < tolerance
     }
 }
