@@ -1,9 +1,8 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/ReducerUtils.kt
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
-import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.ui.ZoomMapping
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.min

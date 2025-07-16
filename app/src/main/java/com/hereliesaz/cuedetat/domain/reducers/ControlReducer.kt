@@ -1,13 +1,13 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import javax.inject.Inject
 
 class ControlReducer @Inject constructor() {
-    fun reduce(state: OverlayState, event: MainScreenEvent): OverlayState {
+    fun reduce(event: MainScreenEvent, state: OverlayState): OverlayState {
         return when (event) {
-            is MainScreenEvent.TableRotationChanged -> state.copy(table = state.table.withRotation(event.degrees))
+            is MainScreenEvent.TableRotationChanged -> state.copy(table = state.table.copy(rotationDegrees = event.degrees))
             is MainScreenEvent.ZoomChanged -> state.copy(zoomSliderPosition = event.position)
             is MainScreenEvent.UpdateHoughP1 -> state.copy(houghP1 = event.value)
             is MainScreenEvent.UpdateHoughP2 -> state.copy(houghP2 = event.value)

@@ -2,10 +2,9 @@
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.Camera
-import com.hereliesaz.cuedetat.domain.reducers.GestureReducer
-import com.hereliesaz.cuedetat.domain.reducers.TutorialReducer
-import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.domain.reducers.*
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 
 class Reducer @Inject constructor(
@@ -30,6 +29,7 @@ class Reducer @Inject constructor(
 
             is MainScreenEvent.LoadUserSettings,
             is MainScreenEvent.Reset,
+            is MainScreenEvent.UpdateColorScheme,
             is MainScreenEvent.ToggleCamera,
             is MainScreenEvent.SwitchCamera,
             is MainScreenEvent.UpdateZoom,
@@ -56,8 +56,6 @@ class Reducer @Inject constructor(
             is MainScreenEvent.StartTutorial,
             is MainScreenEvent.NextTutorialStep,
             is MainScreenEvent.FinishTutorial -> tutorialReducer.reduce(event, state)
-
-            is MainScreenEvent.UpdateColorScheme -> state.copy(appControlColorScheme = event.colorScheme) // ADDED
 
             else -> state
         }

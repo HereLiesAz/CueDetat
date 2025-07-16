@@ -1,4 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreenEvent.kt
 package com.hereliesaz.cuedetat.ui
 
 import android.graphics.PointF
@@ -8,39 +7,47 @@ import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.UserPreferences
 import com.hereliesaz.cuedetat.data.VisionData
 import com.hereliesaz.cuedetat.view.model.TableSize
-import com.hereliesaz.cuedetat.view.state.ToastMessage
 
 sealed interface MainScreenEvent {
-    data class SizeChanged(val width: Int, val height: Int) : MainScreenEvent
-    data class OrientationChanged(val orientation: FullOrientation) : MainScreenEvent
     data class Drag(val position: PointF, val isLongPress: Boolean = false) : MainScreenEvent
     data class Release(val position: PointF) : MainScreenEvent
-    data class VisionDataUpdated(val visionData: VisionData) : MainScreenEvent
-    data class UpdateZoom(val zoom: Float) : MainScreenEvent
-    data class ShowToast(val message: ToastMessage) : MainScreenEvent
-    data class UpdateTableRotation(val rotation: Float) : MainScreenEvent
-    data class CycleTableSize(val forward: Boolean = true) : MainScreenEvent
+    data class TableRotationChanged(val degrees: Float) : MainScreenEvent
+    data class ZoomChanged(val position: Float) : MainScreenEvent
+    data class FullOrientationChanged(val orientation: FullOrientation) : MainScreenEvent
+    data class AimBankShot(val logicalTarget: PointF) : MainScreenEvent
+    data class CvDataUpdated(val visionData: VisionData) : MainScreenEvent
+    data class ShowToast(val message: String) : MainScreenEvent
+    data class SpinDrag(val offset: Offset) : MainScreenEvent
+    data class ThemeChanged(val scheme: ColorScheme) : MainScreenEvent
+    data class UpdateHoughP1(val value: Float) : MainScreenEvent
+    data class UpdateHoughP2(val value: Float) : MainScreenEvent
+    data class UpdateCannyT1(val value: Float) : MainScreenEvent
+    data class UpdateCannyT2(val value: Float) : MainScreenEvent
+    data class AdjustLuminance(val value: Float) : MainScreenEvent
+    data class AdjustGlow(val value: Float) : MainScreenEvent
+    data class SnapToDetectedBall(val ball: PointF) : MainScreenEvent
     data class SetTableSize(val size: TableSize) : MainScreenEvent
-    data class UpdateBankingAim(val position: PointF) : MainScreenEvent
-    data class UpdateColorScheme(val colorScheme: ColorScheme) : MainScreenEvent // ADDED
     data class LoadUserSettings(val prefs: UserPreferences) : MainScreenEvent
-    data object Reset : MainScreenEvent
-    data object ToggleTable : MainScreenEvent
-    data object ToggleOnPlaneBall : MainScreenEvent
-    data object ToggleCamera : MainScreenEvent
-    data object SwitchCamera : MainScreenEvent
-    data object ToggleBankingMode : MainScreenEvent
-    data object ToggleLuminanceDialog : MainScreenEvent
-    data object ToggleGlowStickDialog : MainScreenEvent
-    data object ToggleTableSizeDialog : MainScreenEvent
-    data object ToggleAdvancedOptionsDialog : MainScreenEvent
-    data object ToggleSpinControl : MainScreenEvent
-    data object ClearSpinState : MainScreenEvent
-    data object ToastShown : MainScreenEvent
-    data object AddObstacle : MainScreenEvent
-    data object FinishTutorial : MainScreenEvent
-    data object NextTutorialStep : MainScreenEvent
-    data object StartTutorial : MainScreenEvent
-    data object ToggleForceLightMode : MainScreenEvent
-    data object ToggleHelpers : MainScreenEvent
+    object Reset : MainScreenEvent
+    object ToggleCamera : MainScreenEvent
+    object ToggleTable : MainScreenEvent
+    object ToggleOnPlaneBall : MainScreenEvent
+    object ToggleBankingMode : MainScreenEvent
+    object ToggleHelp : MainScreenEvent
+    object ToggleCvParamMenu : MainScreenEvent
+    object ToggleForceTheme : MainScreenEvent
+    object ToggleDistanceUnit : MainScreenEvent
+    object CheckForUpdate : MainScreenEvent
+    object ViewArt : MainScreenEvent
+    object AddObstacle : MainScreenEvent
+    object ClearObstacles : MainScreenEvent
+    object ScreenGestureStarted : MainScreenEvent
+    object GestureEnded : MainScreenEvent
+    object SpinDragEnd : MainScreenEvent
+    object SingleEventConsumed : MainScreenEvent
+    object LockOrUnlockColor : MainScreenEvent
+    object ToggleAdvancedOptions : MainScreenEvent
+    object ToggleSnapping : MainScreenEvent
+    object ToggleCvModel : MainScreenEvent
+    object ToggleCvRefinementMethod : MainScreenEvent
 }

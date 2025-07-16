@@ -1,5 +1,5 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/TutorialReducer.kt
-package com.hereliesaz.cuedetat.domain
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/TutorialReducer.kt
+package com.hereliesaz.cuedetat.domain.reducers
 
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState

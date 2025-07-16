@@ -1,9 +1,8 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/GestureReducer.kt
-package com.hereliesaz.cuedetat.domain
+package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.Matrix
 import android.graphics.PointF
-import androidx.room.util.copy
+import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
@@ -17,6 +16,8 @@ class GestureReducer @Inject constructor(
         return when (event) {
             is MainScreenEvent.Drag -> handleDrag(event, state)
             is MainScreenEvent.Release -> handleRelease(event, state)
+            is MainScreenEvent.ScreenGestureStarted -> state.copy(isMagnifierVisible = true)
+            is MainScreenEvent.GestureEnded -> state.copy(isMagnifierVisible = false)
             else -> state
         }
     }

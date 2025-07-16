@@ -1,67 +1,24 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/GestureReducer.kt
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/OrientationReducer.kt
 package com.hereliesaz.cuedetat.domain.reducers
 
-import android.graphics.PointF
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
-import kotlin.math.atan2
-import kotlin.math.hypot
+import kotlin.math.abs
 
-class GestureReducer @Inject constructor(
-    private val reducerUtils: ReducerUtils
-) {
-    fun reduce(event: MainScreenEvent, state: OverlayState): OverlayState {
-        return when (event) {
-            is MainScreenEvent.Drag -> handleDrag(event, state)
-            is MainScreenEvent.Release -> handleRelease(event, state)
-            else -> state
-        }
-    }
+class OrientationReducer @Inject constructor() {
+    private val PITCH_THRESHOLD_DEGREES = 5
+    private val PITCH_MAX_DEGREES = 60
 
-    private fun handleDrag(event: MainScreenEvent.Drag, state: OverlayState): OverlayState {
-        val logicalPoint = state.inversePitchMatrix.mapPoint(event.position)
-        val isChanged = state.copy(valuesChangedSinceReset = true)
-
-        return if (state.isBankingMode) {
-            isChanged.copy(bankingAimTarget = logicalPoint)
+    fun reduce(event: MainScreenEvent.OrientationChanged, state: OverlayState): OverlayState {
+        val newPitch = event.orientation.pitch.coerceIn(-PITCH_MAX_DEGREES.toFloat(), PITCH_MAX_DEGREES.toFloat())
+        return if (abs(newPitch - state.pitchAngle) > 0.1) {
+            state.copy(
+                currentOrientation = event.orientation,
+                pitchAngle = if (abs(newPitch) > PITCH_THRESHOLD_DEGREES) newPitch else 0f
+            )
         } else {
-            val distToTarget = hypot((logicalPoint.x - state.protractorUnit.center.x).toDouble(), (logicalPoint.y - state.protractorUnit.center.y).toDouble()).toFloat()
-            val distToCue = state.onPlaneBall?.let { hypot((logicalPoint.x - it.center.x).toDouble(), (logicalPoint.y - it.center.y).toDouble()).toFloat() } ?: Float.MAX_VALUE
-
-            when {
-                event.isLongPress || distToTarget < state.protractorUnit.radius -> isChanged.copy(
-                    protractorUnit = state.protractorUnit.copy(center = logicalPoint)
-                ).let(reducerUtils::snapViolatingBalls)
-
-                distToCue < state.protractorUnit.radius -> isChanged.copy(
-                    onPlaneBall = state.onPlaneBall?.copy(center = logicalPoint)
-                ).let(reducerUtils::snapViolatingBalls)
-
-                else -> isChanged.copy(
-                    protractorUnit = state.protractorUnit.withRotation(
-                        Math.toDegrees(
-                            atan2(
-                                (logicalPoint.y - state.protractorUnit.center.y).toDouble(),
-                                (logicalPoint.x - state.protractorUnit.center.x).toDouble()
-                            )
-                        ).toFloat()
-                    )
-                )
-            }
+            state
         }
-    }
-
-    private fun handleRelease(event: MainScreenEvent.Release, state: OverlayState): OverlayState {
-        return state.copy(
-            isMagnifierVisible = false,
-            spinControlCenter = null
-        )
-    }
-
-    private fun Matrix.mapPoint(point: PointF): PointF {
-        val pts = floatArrayOf(point.x, point.y)
-        this.mapPoints(pts)
-        return PointF(pts[0], pts[1])
     }
 }

@@ -15,12 +15,13 @@ fun GlowStickDialog(
     onEvent: (MainScreenEvent) -> Unit,
     onDismiss: () -> Unit
 ) {
-    if (uiState.glowStickValue != 0f) {
+    if (uiState.isGlowStickDialogVisible) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Glow Stick") },
+            title = { Text("Glow Intensity") },
             text = {
                 Column {
+                    Text("Value: ${"%.2f".format(uiState.glowStickValue)}")
                     Slider(
                         value = uiState.glowStickValue,
                         onValueChange = { onEvent(MainScreenEvent.AdjustGlow(it)) },
@@ -29,9 +30,7 @@ fun GlowStickDialog(
                 }
             },
             confirmButton = {
-                TextButton(onClick = onDismiss) {
-                    Text("Done")
-                }
+                TextButton(onClick = onDismiss) { Text("OK") }
             }
         )
     }

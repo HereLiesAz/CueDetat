@@ -176,7 +176,7 @@ android {
         implementation(libs.androidx.animation.core)
 
         // OpenCV for Computer Vision
-
+implementation(libs.androidx.core.splashscreen)
     }
 }
 dependencies {

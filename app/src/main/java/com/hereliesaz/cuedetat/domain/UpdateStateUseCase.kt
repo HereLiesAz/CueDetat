@@ -1,7 +1,6 @@
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/UpdateStateUseCase.kt
 package com.hereliesaz.cuedetat.domain
 
-import android.R.attr.direction
 import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
@@ -11,7 +10,6 @@ import com.hereliesaz.cuedetat.view.model.BankShotResult
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import com.hereliesaz.cuedetat.domain.ReducerUtils
 import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -22,7 +20,8 @@ import kotlin.math.sqrt
 
 class UpdateStateUseCase @Inject constructor(
     private val calculateSpinPaths: CalculateSpinPaths,
-    private val calculateBankShot: CalculateBankShot
+    private val calculateBankShot: CalculateBankShot,
+    private val reducerUtils: ReducerUtils
 ) {
 
     private val railHeightToTableHeightRatio = 0.05f
@@ -237,7 +236,7 @@ class UpdateStateUseCase @Inject constructor(
         val intersectionResult = state.table.findRailIntersectionAndNormal(start, extendedEnd) ?: return listOf(start, extendedEnd)
         val intersectionPoint = intersectionResult.first
         val railNormal = intersectionResult.second
-        val reflectedDir = reducerUtils.reflect(direction, railNormal)
+        val reflectedDir = reducerUtils.reflect(PointF(dirX, dirY), railNormal)
         val finalEndPoint = PointF(intersectionPoint.x + reflectedDir.x * lineExtensionFactor, intersectionPoint.y + reflectedDir.y * lineExtensionFactor)
         return listOf(start, intersectionPoint, finalEndPoint)
     }

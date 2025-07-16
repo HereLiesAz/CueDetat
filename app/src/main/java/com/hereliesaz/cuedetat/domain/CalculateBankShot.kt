@@ -15,7 +15,7 @@ class CalculateBankShot @Inject constructor(
 
     operator fun invoke(state: OverlayState): BankShotResult {
         if (state.onPlaneBall == null || !state.table.geometry.isValid) {
-            return BankShotResult(emptyList(), null)
+            return BankShotResult()
         }
 
         val startPoint = state.onPlaneBall.center
@@ -43,7 +43,7 @@ class CalculateBankShot @Inject constructor(
             }
         }
 
-        return BankShotResult(path, null)
+        return BankShotResult(path)
     }
 
     private fun checkPocketAim(point: PointF, state: OverlayState): Pair<Int?, PointF?> {

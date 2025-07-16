@@ -1,4 +1,4 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/VisionReducer.kt
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/VisionReducer.kt
 package com.hereliesaz.cuedetat.domain.reducers
 
 import com.hereliesaz.cuedetat.domain.ReducerUtils

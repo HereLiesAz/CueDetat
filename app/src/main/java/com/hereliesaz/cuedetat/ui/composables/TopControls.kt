@@ -1,4 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/TopControls.kt
 package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.Image
@@ -64,7 +63,7 @@ fun TopControls(
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .clickable { onEvent(MainScreenEvent.CycleTableSize) },
+                    .clickable { onEvent(MainScreenEvent.CycleTableSize()) },
                 contentAlignment = Alignment.Center
             ) {
                 Text(text = uiState.table.size.feet, color = MaterialTheme.colorScheme.primary, fontSize = 24.sp)

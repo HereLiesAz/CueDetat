@@ -15,23 +15,22 @@ fun LuminanceAdjustmentDialog(
     onEvent: (MainScreenEvent) -> Unit,
     onDismiss: () -> Unit
 ) {
-    if (uiState.luminanceAdjustment != 0f) {
+    if (uiState.isLuminanceDialogVisible) {
         AlertDialog(
             onDismissRequest = onDismiss,
             title = { Text("Adjust Luminance") },
             text = {
                 Column {
+                    Text("Value: ${"%.2f".format(uiState.luminanceAdjustment)}")
                     Slider(
                         value = uiState.luminanceAdjustment,
                         onValueChange = { onEvent(MainScreenEvent.AdjustLuminance(it)) },
-                        valueRange = -0.4f..0.4f
+                        valueRange = -1f..1f
                     )
                 }
             },
             confirmButton = {
-                TextButton(onClick = onDismiss) {
-                    Text("Done")
-                }
+                TextButton(onClick = onDismiss) { Text("OK") }
             }
         )
     }

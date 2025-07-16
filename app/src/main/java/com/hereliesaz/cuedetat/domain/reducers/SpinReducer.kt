@@ -1,19 +1,19 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/SpinReducer.kt
 package com.hereliesaz.cuedetat.domain.reducers
 
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import javax.inject.Inject
 
 class SpinReducer @Inject constructor() {
-    fun reduce(state: OverlayState, event: MainScreenEvent): OverlayState {
+    fun reduce(event: MainScreenEvent, state: OverlayState): OverlayState {
         return when (event) {
-            is MainScreenEvent.SpinDrag -> state.copy(selectedSpinOffset = event.offset)
-            is MainScreenEvent.SpinDragEnd -> state.copy(
-                selectedSpinOffset = null,
+            is MainScreenEvent.SpinDrag -> state.copy(
+                selectedSpinOffset = event.offset,
                 lingeringSpinOffset = event.offset
             )
-            is MainScreenEvent.ClearSpinState -> state.copy(lingeringSpinOffset = null)
+            is MainScreenEvent.SpinDragEnd -> state.copy(
+                selectedSpinOffset = null
+            )
             else -> state
         }
     }

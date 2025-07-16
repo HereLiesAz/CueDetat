@@ -96,7 +96,7 @@ class VisionRepository @Inject constructor(
         val nv21 = ByteArray(ySize + uSize + vSize)
         yBuffer?.get(nv21, 0, ySize)
         vBuffer?.get(nv21, ySize, vSize)
-        uBuffer?.get(nv21, ySize + vSize, uSize)
+        uBuffer?.get(nv21, ySize + uSize, uSize)
 
         val yuvImage = Mat(image.height + image.height / 2, image.width, CvType.CV_8UC1)
         yuvImage.put(0, 0, nv21)

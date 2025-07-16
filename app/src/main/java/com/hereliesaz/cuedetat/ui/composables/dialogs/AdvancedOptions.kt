@@ -1,13 +1,7 @@
 package com.hereliesaz.cuedetat.ui.composables.dialogs
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,45 +15,39 @@ fun AdvancedOptionsDialog(
     onEvent: (MainScreenEvent) -> Unit,
     onDismiss: () -> Unit
 ) {
-    if (uiState.isCvParamMenuVisible) {
+    if (uiState.isAdvancedOptionsDialogVisible) {
         AlertDialog(
             onDismissRequest = onDismiss,
             title = { Text("Advanced Options") },
             text = {
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Auto-Snap Balls:", modifier = Modifier.weight(1f))
-                        TextButton(onClick = { onEvent(MainScreenEvent.ToggleSnapping) }) {
-                            Text(if (uiState.isSnappingEnabled) "On" else "Off")
-                        }
+                        Text("Enable Snapping")
+                        Spacer(Modifier.weight(1f))
+                        Switch(checked = uiState.isSnappingEnabled, onCheckedChange = { onEvent(MainScreenEvent.ToggleSnapping) })
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Active AI Model:", modifier = Modifier.weight(1f))
-                        TextButton(onClick = { onEvent(MainScreenEvent.ToggleCvModel) }) {
-                            Text(uiState.cvModel)
-                        }
+                        Text("CV Model: ${uiState.cvModel.name}")
+                        Spacer(Modifier.weight(1f))
+                        Button(onClick = { onEvent(MainScreenEvent.ToggleCvModel) }) { Text("Cycle") }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Refinement:", modifier = Modifier.weight(1f))
-                        TextButton(onClick = { onEvent(MainScreenEvent.ToggleCvRefinementMethod) }) {
-                            Text(uiState.cvRefinement)
-                        }
+                        Text("CV Refinement: ${uiState.cvRefinement.name}")
+                        Spacer(Modifier.weight(1f))
+                        Button(onClick = { onEvent(MainScreenEvent.ToggleCvRefinementMethod) }) { Text("Cycle") }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Hough P1 (Canny Edge): ${uiState.houghP1.toInt()}")
-                    Slider(value = uiState.houghP1, onValueChange = { onEvent(MainScreenEvent.UpdateHoughP1(it)) }, valueRange = 1f..300f)
-                    Text("Hough P2 (Accumulator): ${uiState.houghP2.toInt()}")
-                    Slider(value = uiState.houghP2, onValueChange = { onEvent(MainScreenEvent.UpdateHoughP2(it)) }, valueRange = 1f..100f)
-                    Text("Canny T1: ${uiState.cannyThreshold1.toInt()}")
+                    Text("Hough P1: ${uiState.houghP1}")
+                    Slider(value = uiState.houghP1, onValueChange = { onEvent(MainScreenEvent.UpdateHoughP1(it)) }, valueRange = 1f..200f)
+                    Text("Hough P2: ${uiState.houghP2}")
+                    Slider(value = uiState.houghP2, onValueChange = { onEvent(MainScreenEvent.UpdateHoughP2(it)) }, valueRange = 1f..200f)
+                    Text("Canny Thresh 1: ${uiState.cannyThreshold1}")
                     Slider(value = uiState.cannyThreshold1, onValueChange = { onEvent(MainScreenEvent.UpdateCannyT1(it)) }, valueRange = 1f..200f)
-                    Text("Canny T2: ${uiState.cannyThreshold2.toInt()}")
-                    Slider(value = uiState.cannyThreshold2, onValueChange = { onEvent(MainScreenEvent.UpdateCannyT2(it)) }, valueRange = 1f..400f)
+                    Text("Canny Thresh 2: ${uiState.cannyThreshold2}")
+                    Slider(value = uiState.cannyThreshold2, onValueChange = { onEvent(MainScreenEvent.UpdateCannyT2(it)) }, valueRange = 1f..200f)
                 }
             },
             confirmButton = {
-                TextButton(onClick = onDismiss) {
-                    Text("Done")
-                }
+                TextButton(onClick = onDismiss) { Text("Close") }
             }
         )
     }
