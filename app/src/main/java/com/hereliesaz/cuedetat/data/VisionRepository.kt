@@ -1,4 +1,5 @@
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/data/VisionRepository.kt
+
 package com.hereliesaz.cuedetat.data
 
 import android.annotation.SuppressLint
@@ -9,6 +10,7 @@ import androidx.camera.core.ImageProxy
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.hereliesaz.cuedetat.di.GenericDetector
+import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +23,7 @@ import javax.inject.Singleton
 @Singleton
 class VisionRepository @Inject constructor(
     @GenericDetector private val genericObjectDetector: ObjectDetector,
+    private val reducerUtils: ReducerUtils
 ) {
 
     private val _visionDataFlow = MutableStateFlow(VisionData())
@@ -63,8 +66,10 @@ class VisionRepository @Inject constructor(
                         PointF(transformedRect.centerX(), transformedRect.centerY())
                     }
 
-                    val filteredBalls = if (state.table.isVisible) {
-                        detectedBalls.filter { state.table.isPointInside(it) }
+                    // The logic now correctly queries the rotated table corners for filtering
+                    val filteredBalls = if (state.showTable) {
+                        val tableCorners = reducerUtils.getLogicalTableCorners(state)
+                        detectedBalls.filter { reducerUtils.isPointInsidePolygon(it, tableCorners) }
                     } else {
                         detectedBalls
                     }
@@ -96,7 +101,7 @@ class VisionRepository @Inject constructor(
         val nv21 = ByteArray(ySize + uSize + vSize)
         yBuffer?.get(nv21, 0, ySize)
         vBuffer?.get(nv21, ySize, vSize)
-        uBuffer?.get(nv21, ySize + uSize, uSize)
+        uBuffer?.get(nv21, ySize + vSize, uSize)
 
         val yuvImage = Mat(image.height + image.height / 2, image.width, CvType.CV_8UC1)
         yuvImage.put(0, 0, nv21)

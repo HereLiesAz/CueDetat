@@ -1,66 +1,63 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
+import android.graphics.PointF
+import com.hereliesaz.cuedetat.data.VisionData
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.view.state.SnapCandidate
 import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.math.hypot
 
+@Singleton
 class SnapReducer @Inject constructor() {
+    private val SNAP_THRESHOLD_MS = 1500L
+    private val SNAP_PROXIMITY_THRESHOLD_PX = 30f
 
-    private val snapConfirmTimeMs = 2000L
+    fun reduce(currentState: OverlayState, visionData: VisionData): OverlayState {
+        if (!currentState.isSnappingEnabled) {
+            return currentState.copy(snapCandidates = emptyList())
+        }
 
-    fun reduce(event: MainScreenEvent.SnapToDetectedBall, state: OverlayState): OverlayState {
         val currentTime = System.currentTimeMillis()
-        val logicalPoint = event.ball
-        val currentTarget = state.protractorUnit.center
-        val currentCue = state.onPlaneBall?.center
+        val detectedBalls = visionData.genericBalls + visionData.customBalls
+        val previousCandidates = currentState.snapCandidates.toMutableList()
+        val newCandidates = mutableListOf<SnapCandidate>()
 
-        val snapCandidates = state.snapCandidates.toMutableList()
-
-        val existingCandidate = snapCandidates.find {
-            val dx = it.detectedPoint.x - logicalPoint.x
-            val dy = it.detectedPoint.y - logicalPoint.y
-            (dx * dx + dy * dy) < (state.protractorUnit.radius * state.protractorUnit.radius)
-        }
-
-        if (existingCandidate != null) {
-            if (!existingCandidate.isConfirmed && currentTime - existingCandidate.firstSeenTimestamp > snapConfirmTimeMs) {
-                val confirmedCandidate = existingCandidate.copy(isConfirmed = true)
-                snapCandidates[snapCandidates.indexOf(existingCandidate)] = confirmedCandidate
-            }
-        } else {
-            // New candidate
-            // snapCandidates.add(SnapCandidate(detectedPoint = logicalPoint, firstSeenTimestamp = currentTime))
-        }
-
-        val confirmedSnaps = snapCandidates.filter { it.isConfirmed }
-
-        var newState = state
-        if (confirmedSnaps.isNotEmpty()) {
-            val hasTargetMoved = state.hasTargetBallBeenMoved
-            if (!hasTargetMoved) {
-                // Find closest confirmed snap to current target ball
-                val closestToTarget = confirmedSnaps.minByOrNull {
-                    val dx = it.detectedPoint.x - currentTarget.x
-                    val dy = it.detectedPoint.y - currentTarget.y
-                    dx * dx + dy * dy
-                }
-                if (closestToTarget != null) {
-                    newState = newState.copy(protractorUnit = newState.protractorUnit.copy(center = closestToTarget.detectedPoint))
-                }
+        // Update existing candidates and find new ones
+        for (detectedBall in detectedBalls) {
+            val closestExisting = previousCandidates.minByOrNull {
+                hypot((it.detectedPoint.x - detectedBall.x).toDouble(), (it.detectedPoint.y - detectedBall.y).toDouble())
             }
 
-            if (currentCue != null && !state.hasCueBallBeenMoved) {
-                val closestToCue = confirmedSnaps.minByOrNull {
-                    val dx = it.detectedPoint.x - currentCue.x
-                    val dy = it.detectedPoint.y - currentCue.y
-                    dx * dx + dy * dy
-                }
-                if (closestToCue != null) {
-                    newState = newState.copy(onPlaneBall = newState.onPlaneBall?.copy(center = closestToCue.detectedPoint))
-                }
+            if (closestExisting != null && hypot((closestExisting.detectedPoint.x - detectedBall.x).toDouble(), (closestExisting.detectedPoint.y - detectedBall.y).toDouble()) < SNAP_PROXIMITY_THRESHOLD_PX) {
+                // This is a returning candidate
+                previousCandidates.remove(closestExisting)
+                val isNowConfirmed = closestExisting.isConfirmed || (currentTime - closestExisting.firstSeenTimestamp > SNAP_THRESHOLD_MS)
+                newCandidates.add(closestExisting.copy(detectedPoint = detectedBall, isConfirmed = isNowConfirmed))
+            } else {
+                // This is a new candidate
+                newCandidates.add(SnapCandidate(detectedPoint = detectedBall, firstSeenTimestamp = currentTime))
             }
         }
 
-        return newState.copy(snapCandidates = snapCandidates)
+        // Snap balls to confirmed candidates
+        val confirmedCandidates = newCandidates.filter { it.isConfirmed }.toMutableList()
+        var newProtractorUnit = currentState.protractorUnit
+        var newOnPlaneBall = currentState.onPlaneBall
+
+        if (confirmedCandidates.isNotEmpty() && !currentState.hasTargetBallBeenMoved) {
+            newProtractorUnit = currentState.protractorUnit.copy(center = confirmedCandidates.first().detectedPoint)
+            confirmedCandidates.removeAt(0)
+        }
+
+        if (confirmedCandidates.isNotEmpty() && currentState.onPlaneBall != null && !currentState.hasCueBallBeenMoved) {
+            newOnPlaneBall = currentState.onPlaneBall.copy(center = confirmedCandidates.first().detectedPoint)
+        }
+
+        return currentState.copy(
+            snapCandidates = newCandidates,
+            protractorUnit = newProtractorUnit,
+            onPlaneBall = newOnPlaneBall
+        )
     }
 }

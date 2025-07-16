@@ -1,22 +1,27 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
-import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class CvReducer @Inject constructor() {
-    fun reduce(event: MainScreenEvent, state: OverlayState): OverlayState {
-        return when(event) {
+    fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
+        return when (event) {
             is MainScreenEvent.CvDataUpdated -> {
-                state.copy(
-                    visionData = event.visionData,
-                    lockedHsvColor = if(state.lockedHsvColor == null) event.visionData.detectedHsvColor else state.lockedHsvColor
-                )
+                currentState.copy(visionData = event.data)
             }
-            is MainScreenEvent.LockOrUnlockColor -> state.copy(
-                lockedHsvColor = if (state.lockedHsvColor == null) state.visionData.detectedHsvColor else null
-            )
-            else -> state
+            is MainScreenEvent.LockOrUnlockColor -> {
+                if (currentState.lockedHsvColor == null) {
+                    // Lock the current auto-detected color
+                    currentState.copy(lockedHsvColor = currentState.visionData.detectedHsvColor)
+                } else {
+                    // Unlock and revert to auto-detection
+                    currentState.copy(lockedHsvColor = null)
+                }
+            }
+            else -> currentState
         }
     }
 }

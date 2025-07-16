@@ -1,78 +1,327 @@
-package com.hereliesaz.cuedetat.data
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/UpdateStateUseCase.kt
 
-import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.*
-import androidx.datastore.preferences.preferencesDataStore
-import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.map
-import java.io.IOException
+package com.hereliesaz.cuedetat.domain
+
+import android.graphics.Camera
+import android.graphics.Matrix
+import android.graphics.PointF
+import androidx.compose.ui.graphics.Color
+import com.hereliesaz.cuedetat.data.FullOrientation
+import com.hereliesaz.cuedetat.view.model.OnPlaneBall
+import com.hereliesaz.cuedetat.view.model.Perspective
+import com.hereliesaz.cuedetat.view.model.ProtractorUnit
+import com.hereliesaz.cuedetat.view.renderer.table.TableRenderer
+import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
+import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
-import javax.inject.Singleton
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.pow
+import kotlin.math.sin
+import kotlin.math.sqrt
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
+class UpdateStateUseCase @Inject constructor(
+    private val calculateSpinPaths: CalculateSpinPaths,
+    private val reducerUtils: ReducerUtils
+) {
 
-data class UserPreferences(
-    val forceLightMode: Boolean?,
-    val tableSize: String,
-    val glowAmount: Float,
-    val luminance: Float
-)
+    private val railHeightToTableHeightRatio = 0.05f
+    private val distanceReferenceConstant = 6480f
+    private val lineExtensionFactor = 5000f
 
-@Singleton
-class UserPreferencesRepository @Inject constructor(@ApplicationContext context: Context) {
+    operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
+        if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
-    private object PreferencesKeys {
-        val FORCE_LIGHT_MODE = booleanPreferencesKey("force_light_mode")
-        val TABLE_SIZE = stringPreferencesKey("table_size")
-        val GLOW_AMOUNT = floatPreferencesKey("glow_amount")
-        val LUMINANCE = floatPreferencesKey("luminance")
-    }
+        val updatedProtractorUnit = state.protractorUnit
+        val updatedStateWithSnapping = state
 
-    private val dataStore = context.dataStore
+        val basePitchMatrix = Perspective.createPitchMatrix(
+            currentOrientation = state.currentOrientation,
+            viewWidth = state.viewWidth,
+            viewHeight = state.viewHeight,
+            camera = camera
+        )
+        val baseInverseMatrix = Matrix().apply { basePitchMatrix.invert(this) }
 
-    val userPreferences: Flow<UserPreferences> = dataStore.data
-        .catch { exception ->
-            if (exception is IOException) {
-                emit(emptyPreferences())
-            } else {
-                throw exception
+        val flatMatrix = Perspective.createPitchMatrix(
+            currentOrientation = FullOrientation(0f, 0f, 0f),
+            viewWidth = state.viewWidth,
+            viewHeight = state.viewHeight,
+            camera = camera
+        )
+
+        val logicalShotLineAnchor = getLogicalShotLineAnchor(updatedStateWithSnapping)
+        val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= updatedStateWithSnapping.protractorUnit.ghostCueBallCenter.y
+
+        val (isGeometricallyImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
+            shotAnchor = logicalShotLineAnchor,
+            ghostBall = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter,
+            targetBall = updatedStateWithSnapping.protractorUnit.center
+        )
+
+        val isObstructed = checkForObstructions(updatedStateWithSnapping)
+        val targetBallDistance = calculateDistance(updatedStateWithSnapping, flatMatrix)
+        val shotGuideImpactPoint = if (state.showTable && !state.isBankingMode) {
+            calculateShotGuideImpact(updatedStateWithSnapping, useShotGuideLine = true)
+        } else {
+            null
+        }
+
+        // --- Aiming Line & Tangent Line Logic ---
+        val tangentStart = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter
+        val ghostCueCenter = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter
+        val targetCenter = updatedStateWithSnapping.protractorUnit.center
+
+        val (finalAimingLineBankPath, aimedPocketIndex, aimingLineEndPoint) = if (state.showTable && !state.isBankingMode) {
+            val (path, pocketIndex, endPoint) = calculateAimAndBank(ghostCueCenter, targetCenter, updatedStateWithSnapping)
+            Triple(path, pocketIndex, endPoint)
+        } else {
+            val extendedPath = getExtendedLinePath(ghostCueCenter, targetCenter)
+            Triple(extendedPath, null, extendedPath.last())
+        }
+
+        val activeTangentTarget = PointF(
+            tangentStart.x - (targetCenter.y - tangentStart.y) * tangentDirection,
+            tangentStart.y + (targetCenter.x - tangentStart.x) * tangentDirection
+        )
+
+        val (finalTangentLineBankPath, tangentAimedPocketIndex, _) = if (state.showTable && !state.isBankingMode) {
+            calculateAimAndBank(tangentStart, activeTangentTarget, updatedStateWithSnapping)
+        } else {
+            Triple(getExtendedLinePath(tangentStart, activeTangentTarget), null, null)
+        }
+
+        val finalPitchMatrix = Matrix(basePitchMatrix)
+        val referenceRadius = updatedStateWithSnapping.onPlaneBall?.radius ?: updatedStateWithSnapping.protractorUnit.radius
+        val ballRealDiameter = 2.25f
+        val ballLogicalDiameter = referenceRadius * 2
+        val scale = ballLogicalDiameter / ballRealDiameter
+        val logicalTableShortSide = state.tableSize.shortSideInches * scale
+        val baseRailLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
+        val railLiftAmount = baseRailLiftAmount * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
+        val finalRailPitchMatrix = Perspective.createPitchMatrix(
+            currentOrientation = state.currentOrientation,
+            viewWidth = state.viewWidth,
+            viewHeight = state.viewHeight,
+            camera = camera,
+            lift = railLiftAmount
+        )
+        val finalInverseMatrix = Matrix()
+
+        if (state.showTable) {
+            val effectiveTableRotation = state.tableRotationDegrees % 360f
+            if (effectiveTableRotation != 0f) {
+                val centerX = state.viewWidth / 2f
+                val centerY = state.viewHeight / 2f
+                finalPitchMatrix.preRotate(effectiveTableRotation, centerX, centerY)
+                finalRailPitchMatrix.preRotate(effectiveTableRotation, centerX, centerY)
             }
-        }.map { preferences ->
-            val forceLightMode = preferences[PreferencesKeys.FORCE_LIGHT_MODE]
-            val tableSize = preferences[PreferencesKeys.TABLE_SIZE] ?: "EIGHT_FOOT"
-            val glowAmount = preferences[PreferencesKeys.GLOW_AMOUNT] ?: 0f
-            val luminance = preferences[PreferencesKeys.LUMINANCE] ?: 0f
-            UserPreferences(forceLightMode, tableSize, glowAmount, luminance)
+        }
+        val hasFinalInverse = finalPitchMatrix.invert(finalInverseMatrix)
+
+        val spinPaths: Map<Color, List<PointF>> = if (!state.isBankingMode) {
+            calculateSpinPaths(updatedStateWithSnapping)
+        } else {
+            emptyMap()
         }
 
-    suspend fun updateForceLightMode(forceLightMode: Boolean?) {
-        dataStore.edit { preferences ->
-            if (forceLightMode == null) {
-                preferences.remove(PreferencesKeys.FORCE_LIGHT_MODE)
-            } else {
-                preferences[PreferencesKeys.FORCE_LIGHT_MODE] = forceLightMode
+        return updatedStateWithSnapping.copy(
+            pitchMatrix = finalPitchMatrix,
+            railPitchMatrix = finalRailPitchMatrix,
+            inversePitchMatrix = finalInverseMatrix,
+            hasInverseMatrix = hasFinalInverse,
+            shotLineAnchor = logicalShotLineAnchor,
+            isGeometricallyImpossible = isGeometricallyImpossible,
+            isObstructed = isObstructed,
+            isTiltBeyondLimit = isTiltBeyondLimit,
+            tangentDirection = tangentDirection,
+            targetBallDistance = targetBallDistance,
+            aimedPocketIndex = aimedPocketIndex,
+            tangentAimedPocketIndex = tangentAimedPocketIndex,
+            aimingLineEndPoint = aimingLineEndPoint,
+            shotGuideImpactPoint = shotGuideImpactPoint,
+            aimingLineBankPath = finalAimingLineBankPath,
+            tangentLineBankPath = finalTangentLineBankPath,
+            spinPaths = spinPaths
+        )
+    }
+
+    private fun getLogicalShotLineAnchor(state: OverlayState): PointF {
+        state.onPlaneBall?.let { return it.center }
+        // Default to a logical point far below the target ball if the cue ball isn't present
+        return PointF(state.protractorUnit.center.x, state.protractorUnit.center.y + 10000f)
+    }
+
+    private fun calculateShotPossibilityAndTangent(shotAnchor: PointF, ghostBall: PointF, targetBall: PointF): Pair<Boolean, Float> {
+        val aimingAngle = atan2(targetBall.y - ghostBall.y, targetBall.x - ghostBall.x)
+        val distToGhostSq = (ghostBall.y - shotAnchor.y).pow(2) + (ghostBall.x - shotAnchor.x).pow(2)
+        val distToTargetSq = (targetBall.y - shotAnchor.y).pow(2) + (targetBall.x - shotAnchor.x).pow(2)
+        val isImpossible = distToGhostSq > distToTargetSq
+        val shotAngle = atan2(ghostBall.y - shotAnchor.y, ghostBall.x - shotAnchor.x)
+        var angleDifference = Math.toDegrees(aimingAngle.toDouble() - shotAngle.toDouble()).toFloat()
+        while (angleDifference <= -180) angleDifference += 360
+        while (angleDifference > 180) angleDifference -= 360
+        val tangentDirection = if (angleDifference < 0) 1.0f else -1.0f
+        return Pair(isImpossible, tangentDirection)
+    }
+
+    private fun calculateDistance(state: OverlayState, matrix: Matrix): Float {
+        val (logicalCenter, logicalRadius) = if (state.isBankingMode && state.onPlaneBall != null) {
+            state.onPlaneBall.center to state.onPlaneBall.radius
+        } else {
+            state.protractorUnit.center to state.protractorUnit.radius
+        }
+        val screenRadius = DrawingUtils.getPerspectiveRadiusAndLift(
+            logicalCenter, logicalRadius, state.copy(pitchMatrix = matrix, hasInverseMatrix = true)
+        ).radius
+        return if (screenRadius > 0) distanceReferenceConstant / screenRadius else 0f
+    }
+
+    private fun getExtendedLinePath(start: PointF, end: PointF): List<PointF> {
+        val dirX = end.x - start.x
+        val dirY = end.y - start.y
+        val mag = sqrt(dirX * dirX + dirY * dirY)
+        val extendedEnd = if (mag > 0.001f) {
+            val ndx = dirX / mag
+            val ndy = dirY / mag
+            PointF(start.x + ndx * lineExtensionFactor, start.y + ndy * lineExtensionFactor)
+        } else {
+            end
+        }
+        return listOf(start, extendedEnd)
+    }
+
+    private fun calculateAimAndBank(start: PointF, end: PointF, state: OverlayState): Triple<List<PointF>, Int?, PointF> {
+        val (directPocketIndex, directIntersection) = checkPocketAim(start, end, state)
+        if (directPocketIndex != null && directIntersection != null) {
+            return Triple(listOf(start, directIntersection), directPocketIndex, directIntersection)
+        }
+
+        val bankPath = calculateSingleBank(start, end, state)
+        if (bankPath.size > 2) {
+            val (bankedPocketIndex, bankedIntersection) = checkPocketAim(bankPath[1], bankPath[2], state)
+            if (bankedPocketIndex != null && bankedIntersection != null) {
+                return Triple(listOf(bankPath[0], bankPath[1], bankedIntersection), bankedPocketIndex, bankedIntersection)
             }
         }
+        return Triple(bankPath, null, bankPath.last())
     }
 
-    suspend fun updateTableSize(tableSize: String) {
-        dataStore.edit { preferences ->
-            preferences[PreferencesKeys.TABLE_SIZE] = tableSize
+    private fun checkPocketAim(start: PointF, end: PointF, state: OverlayState): Pair<Int?, PointF?> {
+        val dirX = end.x - start.x
+        val dirY = end.y - start.y
+        val mag = sqrt(dirX * dirX + dirY * dirY)
+        if (mag < 0.001f) return Pair(null, null)
+
+        val extendedEnd = PointF(start.x + dirX / mag * lineExtensionFactor, start.y + dirY / mag * lineExtensionFactor)
+
+        val pockets = TableRenderer.getLogicalPockets(state)
+        val pocketRadius = state.protractorUnit.radius * 1.8f
+
+        var closestIntersection: PointF? = null
+        var closestPocketIndex: Int? = null
+        var minDistanceSq = Float.MAX_VALUE
+
+        pockets.forEachIndexed { index, pocket ->
+            val intersection = getLineCircleIntersection(start, extendedEnd, pocket, pocketRadius)
+            if (intersection != null) {
+                val vecToPocketX = pocket.x - start.x
+                val vecToPocketY = pocket.y - start.y
+                val dotProduct = vecToPocketX * (dirX / mag) + vecToPocketY * (dirY / mag)
+                if (dotProduct > 0) {
+                    val distSq = (intersection.x - start.x).pow(2) + (intersection.y - start.y).pow(2)
+                    if (distSq < minDistanceSq) {
+                        minDistanceSq = distSq
+                        closestIntersection = intersection
+                        closestPocketIndex = index
+                    }
+                }
+            }
         }
+        return Pair(closestPocketIndex, closestIntersection)
     }
 
-    suspend fun updateGlowAmount(glowAmount: Float) {
-        dataStore.edit { preferences ->
-            preferences[PreferencesKeys.GLOW_AMOUNT] = glowAmount
-        }
+
+    private fun calculateShotGuideImpact(state: OverlayState, useShotGuideLine: Boolean = false): PointF? {
+        val p1 = if (useShotGuideLine) state.shotLineAnchor else state.protractorUnit.center
+        val p2 = state.protractorUnit.ghostCueBallCenter
+        val dirX = p2.x - p1.x
+        val dirY = p2.y - p1.y
+
+        return reducerUtils.findRailIntersectionAndNormal(p1, PointF(p1.x + dirX * 5000f, p1.y + dirY*5000f), state)?.first
     }
 
-    suspend fun updateLuminance(luminance: Float) {
-        dataStore.edit { preferences ->
-            preferences[PreferencesKeys.LUMINANCE] = luminance
+    private fun calculateSingleBank(start: PointF, end: PointF, state: OverlayState): List<PointF> {
+        val dirX = end.x - start.x
+        val dirY = end.y - start.y
+        val extendedEnd = PointF(start.x + dirX * lineExtensionFactor, start.y + dirY * lineExtensionFactor)
+
+        val intersectionResult = reducerUtils.findRailIntersectionAndNormal(start, extendedEnd, state) ?: return listOf(start, extendedEnd)
+        val (intersectionPoint, railNormal) = intersectionResult
+
+        val incidentVector = PointF(extendedEnd.x - start.x, extendedEnd.y - start.y)
+        val reflectedDir = reducerUtils.reflect(incidentVector, railNormal)
+
+        val finalEndPoint = PointF(
+            intersectionPoint.x + reflectedDir.x * lineExtensionFactor,
+            intersectionPoint.y + reflectedDir.y * lineExtensionFactor
+        )
+
+        return listOf(start, intersectionPoint, finalEndPoint)
+    }
+
+
+    private fun checkForObstructions(state: OverlayState): Boolean {
+        if (state.obstacleBalls.isEmpty()) return false
+
+        val ballRadius = state.protractorUnit.radius
+        val collisionDistance = ballRadius * 2
+
+        val shotLineStart = state.shotLineAnchor
+        val shotLineEnd = state.protractorUnit.ghostCueBallCenter
+        for (obstacle in state.obstacleBalls) {
+            if (isSegmentObstructed(shotLineStart, shotLineEnd, obstacle.center, collisionDistance)) {
+                return true
+            }
         }
+
+        val aimingLineStart = state.protractorUnit.ghostCueBallCenter
+        val aimingLineEnd = state.protractorUnit.center
+        for (obstacle in state.obstacleBalls) {
+            if (isSegmentObstructed(aimingLineStart, aimingLineEnd, obstacle.center, collisionDistance)) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private fun isSegmentObstructed(p1: PointF, p2: PointF, center: PointF, minDist: Float): Boolean {
+        val l2 = (p2.x - p1.x).pow(2) + (p2.y - p1.y).pow(2)
+        if (l2 == 0f) return false
+
+        var t = ((center.x - p1.x) * (p2.x - p1.x) + (center.y - p1.y) * (p2.y - p1.y)) / l2
+        t = t.coerceIn(0f, 1f)
+
+        val projection = PointF(p1.x + t * (p2.x - p1.x), p1.y + t * (p2.y - p1.y))
+        val dist = hypot((center.x - projection.x).toDouble(), (center.y - projection.y).toDouble()).toFloat()
+
+        return dist < minDist
+    }
+
+    private fun getLineCircleIntersection(p1: PointF, p2: PointF, circleCenter: PointF, radius: Float): PointF? {
+        val dx = p2.x - p1.x
+        val dy = p2.y - p1.y
+        val a = dx * dx + dy * dy
+        if (a < 0.0001f) return null
+        val b = 2 * (dx * (p1.x - circleCenter.x) + dy * (p1.y - circleCenter.y))
+        val c = (p1.x - circleCenter.x).pow(2) + (p1.y - circleCenter.y).pow(2) - radius * radius
+        val delta = b * b - 4 * a * c
+        if (delta < 0) return null
+        // Find the t for the first intersection point along the line's direction.
+        val t = (-b - sqrt(delta)) / (2 * a)
+        return PointF(p1.x + t * dx, p1.y + t * dy)
     }
 }

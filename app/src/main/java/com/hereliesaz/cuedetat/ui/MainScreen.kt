@@ -1,9 +1,6 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt
 package com.hereliesaz.cuedetat.ui
 
-import android.content.Intent
 import android.graphics.PointF
-import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -28,7 +25,6 @@ import com.hereliesaz.cuedetat.ui.composables.overlays.TutorialOverlay
 import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
-import com.hereliesaz.cuedetat.view.state.SingleEvent
 import com.hereliesaz.cuedetat.view.state.ToastMessage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -37,45 +33,31 @@ import kotlin.math.roundToInt
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    val toastMessage by viewModel.toastMessage.collectAsState()
     val context = LocalContext.current
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val isSystemDark = isSystemInDarkTheme()
 
     val useDarkTheme = when (uiState.isForceLightMode) {
         true -> false
         false -> true
-        null -> isSystemInDarkTheme()
+        null -> isSystemDark
     }
-
-    // This LaunchedEffect now correctly handles one-off events that are NOT state changes.
-    LaunchedEffect(viewModel) {
-        viewModel.singleEvent.collect { event ->
-            when (event) {
-                is SingleEvent.OpenUrl -> {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
-                    context.startActivity(intent)
-                }
-                null -> {}
-            }
-            viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
-        }
-    }
-
-    // This new LaunchedEffect observes the toast message property in the main UI state.
-    LaunchedEffect(uiState.toastMessage) {
-        uiState.toastMessage?.let { message ->
-            val messageText = when (message) {
-                is ToastMessage.StringResource -> context.getString(message.id, *message.formatArgs.toTypedArray())
-                is ToastMessage.PlainText -> message.text
-            }
-            Toast.makeText(context, messageText, Toast.LENGTH_SHORT).show()
-            viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
-        }
-    }
-
 
     CueDetatTheme(darkTheme = useDarkTheme) {
         val alphaAnimatable = remember { Animatable(1.0f) }
+
+        LaunchedEffect(toastMessage) {
+            toastMessage?.let {
+                val messageText = when (it) {
+                    is ToastMessage.StringResource -> context.getString(it.id, *it.formatArgs.toTypedArray())
+                    is ToastMessage.PlainText -> it.text
+                }
+                Toast.makeText(context, messageText, Toast.LENGTH_SHORT).show()
+                viewModel.onEvent(MainScreenEvent.ToastShown)
+            }
+        }
 
         LaunchedEffect(uiState.lingeringSpinOffset) {
             if (uiState.lingeringSpinOffset != null) {
@@ -91,11 +73,6 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
-        // Pass the updated color scheme to the ViewModel
-        LaunchedEffect(useDarkTheme) {
-            viewModel.onEvent(MainScreenEvent.ThemeChanged(if (useDarkTheme) darkColorScheme() else lightColorScheme()))
-        }
-
         ModalNavigationDrawer(
             drawerState = drawerState,
             gesturesEnabled = drawerState.isOpen,
@@ -107,7 +84,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 )
             }
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 if (uiState.isCameraVisible) {
                     CameraBackground(
                         modifier = Modifier.fillMaxSize().zIndex(0f),
@@ -117,8 +94,8 @@ fun MainScreen(viewModel: MainViewModel) {
 
                 ProtractorOverlay(
                     uiState = uiState.copy(spinPathsAlpha = alphaAnimatable.value),
+                    systemIsDark = useDarkTheme,
                     onEvent = viewModel::onEvent,
-                    renderer = viewModel.overlayRenderer,
                     modifier = Modifier.fillMaxSize().zIndex(1f)
                 )
 
@@ -143,7 +120,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                     (spinControlCenter.y - spinControlSizePx / 2).roundToInt()
                                 )
                             },
-                        centerPosition = PointF(spinControlSizePx/2, spinControlSizePx/2),
+                        centerPosition = PointF(0f, 0f),
                         selectedSpinOffset = uiState.selectedSpinOffset,
                         lingeringSpinOffset = uiState.lingeringSpinOffset,
                         spinPathAlpha = alphaAnimatable.value,
@@ -157,7 +134,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight(0.6f)
-                        .width(160.dp)
+                        .width(160.dp) // Increased width for a larger touch target
                         .zIndex(5f)
                 )
 
@@ -176,17 +153,31 @@ fun MainScreen(viewModel: MainViewModel) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        ActionFabs(uiState = uiState, onEvent = viewModel::onEvent)
+                        ToggleSpinControlFab(
+                            uiState = uiState,
+                            onEvent = viewModel::onEvent
+                        )
+                        AddObstacleBallFab(onEvent = viewModel::onEvent)
+                        if (!uiState.isBankingMode) {
+                            ToggleCueBallFab(
+                                uiState = uiState,
+                                onEvent = viewModel::onEvent
+                            )
+                            ToggleTableFab(
+                                uiState = uiState,
+                                onEvent = viewModel::onEvent
+                            )
+                        }
                     }
 
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(80.dp)
+                            .height(80.dp) // Increased height for a larger touch target
                             .padding(horizontal = 16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (uiState.table.isVisible) {
+                        if (uiState.showTable) {
                             TableRotationSlider(
                                 uiState = uiState,
                                 onEvent = viewModel::onEvent
@@ -195,7 +186,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
 
                     ResetFab(
-                        hasChanged = uiState.valuesChangedSinceReset,
+                        uiState = uiState,
                         onEvent = viewModel::onEvent,
                         modifier = Modifier.padding(end = 16.dp)
                     )

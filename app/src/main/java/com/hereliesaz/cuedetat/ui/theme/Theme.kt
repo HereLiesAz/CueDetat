@@ -1,4 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/theme/Theme.kt
 package com.hereliesaz.cuedetat.ui.theme
 
 import android.app.Activity

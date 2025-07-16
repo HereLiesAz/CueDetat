@@ -1,22 +1,21 @@
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/view/renderer/text/LineTextRenderer.kt
+
 package com.hereliesaz.cuedetat.view.renderer.text
 
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.Typeface
-import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.ui.ZoomMapping
-import com.hereliesaz.cuedetat.view.model.Table
+import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 
-class LineTextRenderer @Inject constructor() {
+class LineTextRenderer {
 
     private val minFontSize = 18f
     private val maxFontSize = 70f
@@ -46,25 +45,25 @@ class LineTextRenderer @Inject constructor() {
         canvas.restore()
     }
 
-    fun drawProtractorLabels(canvas: Canvas, state: OverlayState, typeface: Typeface?) {
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.typeface = typeface
-            textAlign = Paint.Align.CENTER
-            color = state.appControlColorScheme.onSurface.toArgb()
-            textSize = getDynamicFontSize(38f, state.zoomSliderPosition)
-        }
+    fun drawProtractorLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
+        val textPaint = paints.textPaint.apply { this.typeface = typeface }
+        textPaint.textSize = getDynamicFontSize(38f, state.zoomSliderPosition)
         val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM
 
+        // Aiming Line Label
         draw(canvas, "Aiming Line", state.protractorUnit.center, state.protractorUnit.rotationDegrees, state.protractorUnit.radius * 5.0f * zoomFactor, 0f, textPaint)
 
+        // Shot Guide Line Label - Anchored to Ghost Ball
         val shotLineAngle = Math.toDegrees(atan2((state.protractorUnit.ghostCueBallCenter.y - state.shotLineAnchor.y).toDouble(), (state.protractorUnit.ghostCueBallCenter.x - state.shotLineAnchor.x).toDouble()).toDouble()).toFloat()
         draw(canvas, "Shot Guide Line", state.protractorUnit.ghostCueBallCenter, shotLineAngle, state.protractorUnit.radius * 4.0f * zoomFactor, 0f, textPaint)
 
+        // Tangent Line Labels - Drawn on both sides
         val tangentBaseAngle = shotLineAngle + 90f
         val tangentDistance = state.protractorUnit.radius * 3.0f * zoomFactor
         draw(canvas, "Tangent Line", state.protractorUnit.ghostCueBallCenter, tangentBaseAngle + (90 * state.tangentDirection), tangentDistance, 0f, textPaint)
         draw(canvas, "Tangent Line", state.protractorUnit.ghostCueBallCenter, tangentBaseAngle - (90 * state.tangentDirection), tangentDistance, 0f, textPaint)
     }
+
 
     fun drawAngleLabel(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint, radius: Float) {
         val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)
@@ -79,7 +78,7 @@ class LineTextRenderer @Inject constructor() {
     }
 
     fun drawDiamondLabel(canvas: Canvas, point: PointF, railType: RailType, state: OverlayState, paint: Paint) {
-        val diamondNumberText = calculateDiamondNumber(point, railType, state.table) ?: return
+        val diamondNumberText = calculateDiamondNumber(point, railType, state) ?: return
 
         val ballRadiusOnRailPlane = DrawingUtils.getPerspectiveRadiusAndLift(
             logicalCenter = point,
@@ -105,7 +104,7 @@ class LineTextRenderer @Inject constructor() {
             RailType.RIGHT -> { textX -= padding; textRotation = -90f }
         }
 
-        val uprightCorrection = if (state.table.rotationDegrees > 90 && state.table.rotationDegrees < 270) 180f else 0f
+        val uprightCorrection = if (state.tableRotationDegrees > 0 && state.tableRotationDegrees < 180) 180f else 0f
 
         canvas.save()
         canvas.rotate(textRotation + uprightCorrection, textX, textY)
@@ -113,52 +112,34 @@ class LineTextRenderer @Inject constructor() {
         canvas.restore()
     }
 
-    fun getRailForPoint(point: PointF, state: OverlayState): RailType? {
-        val geometry = state.table.geometry
-        if (!geometry.isValid) return null
 
-        val angleRad = Math.toRadians(-state.table.rotationDegrees.toDouble())
-        val cosA = cos(angleRad).toFloat()
-        val sinA = sin(angleRad).toFloat()
+    private fun calculateDiamondNumber(point: PointF, railType: RailType, state: OverlayState): String? {
+        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
+        if (referenceRadius <= 0) return null
 
-        val unrotatedPoint = PointF(
-            point.x * cosA - point.y * sinA,
-            point.x * sinA + point.y * cosA
-        )
+        val ballRealDiameter = 2.25f
+        val ballLogicalDiameter = referenceRadius * 2
+        val scale = ballLogicalDiameter / ballRealDiameter
+        val tableWidth = state.tableSize.longSideInches * scale
+        val tableHeight = state.tableSize.shortSideInches * scale
 
-        val halfW = geometry.width / 2f
-        val halfH = geometry.height / 2f
-        val tolerance = 5f
+        val halfW = tableWidth / 2f
+        val halfH = tableHeight / 2f
 
-        return when {
-            abs(unrotatedPoint.y - (-halfH)) < tolerance -> RailType.TOP
-            abs(unrotatedPoint.y - halfH) < tolerance -> RailType.BOTTOM
-            abs(unrotatedPoint.x - (-halfW)) < tolerance -> RailType.LEFT
-            abs(unrotatedPoint.x - halfW) < tolerance -> RailType.RIGHT
-            else -> null
+        val logicalX = point.x - state.viewWidth / 2f
+        val logicalY = point.y - state.viewHeight / 2f
+
+        val diamondValue = when (railType) {
+            RailType.TOP -> ((logicalX + halfW) / tableWidth) * 8.0
+            RailType.RIGHT -> ((logicalY + halfH) / tableHeight) * 4.0
+            RailType.BOTTOM -> 8.0 - (((logicalX + halfW) / tableWidth) * 8.0)
+            RailType.LEFT -> 4.0 - (((logicalY + halfH) / tableHeight) * 4.0)
         }
+
+        return String.format("%.1f", diamondValue)
     }
 
-    private fun calculateDiamondNumber(point: PointF, railType: RailType, table: Table): String? {
-        val geometry = table.geometry
-        if (!geometry.isValid) return null
-        val halfW = geometry.width / 2f
-        val halfH = geometry.height / 2f
-
-        val angleRad = Math.toRadians(-table.rotationDegrees.toDouble())
-        val cosA = cos(angleRad).toFloat()
-        val sinA = sin(angleRad).toFloat()
-
-        val unrotatedX = point.x * cosA - point.y * sinA
-        val unrotatedY = point.x * sinA + point.y * cosA
-
-        val diamondNumber = when (railType) {
-            RailType.TOP -> 2.0 + (unrotatedX / halfW) * 2.0
-            RailType.BOTTOM -> 6.0 + (-unrotatedX / halfW) * 2.0
-            RailType.LEFT -> 4.0 + (-unrotatedY / halfH)
-            RailType.RIGHT -> 8.0 + (unrotatedY / halfH)
-        }
-
-        return String.format("%.1f", diamondNumber)
+    fun drawBankingLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?){
+        // This function is deprecated as its logic has been moved to LineRenderer, which has access to the necessary helper functions.
     }
 }

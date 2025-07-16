@@ -1,80 +1,122 @@
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/CalculateSpinPaths.kt
+
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import com.hereliesaz.cuedetat.ui.theme.spinPathColors
+import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
+import javax.inject.Singleton
+import kotlin.math.*
 
-class CalculateSpinPaths @Inject constructor(private val reducerUtils: ReducerUtils) {
-
-    private val lineExtensionFactor = 5000f
+@Singleton
+class CalculateSpinPaths @Inject constructor(
+    private val reducerUtils: ReducerUtils
+) {
+    private val maxPathLengthFactor = 20f
 
     operator fun invoke(state: OverlayState): Map<Color, List<PointF>> {
-        if (state.selectedSpinOffset != null) {
-            return getPathForSingleOffset(state.selectedSpinOffset, state)
+        val interactiveSpinOffset = state.lingeringSpinOffset ?: state.selectedSpinOffset ?: return emptyMap()
+
+        return calculateSinglePath(state, interactiveSpinOffset)
+    }
+
+    private fun calculateSinglePath(state: OverlayState, spinOffset: PointF): Map<Color, List<PointF>> {
+        val spinControlRadius = 60f * 2
+        val spinMagnitude = hypot((spinOffset.x - spinControlRadius).toDouble(), (spinOffset.y - spinControlRadius).toDouble()).toFloat() / spinControlRadius
+        val angleDegrees = Math.toDegrees(atan2(spinOffset.y - spinControlRadius, spinOffset.x - spinControlRadius).toDouble()).toFloat()
+
+        val path = calculatePathForSpin(state, angleDegrees, spinMagnitude)
+        val color = SpinColorUtils.getColorFromAngleAndDistance(angleDegrees, spinMagnitude)
+
+        val finalPath = if (state.showTable) {
+            bankCurve(path, state)
+        } else {
+            path
         }
-        return getDefaultSpinPaths(state)
+
+        return mapOf(color to finalPath)
     }
 
-    private fun getPathForSingleOffset(offset: Offset, state: OverlayState): Map<Color, List<PointF>> {
-        val angle = atan2(offset.y, offset.x)
-        val color = spinPathColors.getOrElse( ( (Math.toDegrees(angle.toDouble()) + 360) % 360 / (360.0/spinPathColors.size) ).toInt() ) { Color.White }
-        val path = calculateSpinPath(state, angle.toFloat())
-        return mapOf(color to path)
-    }
+    private fun calculatePathForSpin(state: OverlayState, angleDegrees: Float, magnitude: Float): List<PointF> {
+        val startPoint = state.protractorUnit.ghostCueBallCenter
+        val targetPoint = state.protractorUnit.center
+        val tangentDirection = state.tangentDirection
 
-    private fun getDefaultSpinPaths(state: OverlayState): Map<Color, List<PointF>> {
-        val paths = mutableMapOf<Color, List<PointF>>()
-        spinPathColors.forEachIndexed { i, color ->
-            val angle = (i.toFloat() / spinPathColors.size) * 2 * Math.PI
-            val path = calculateSpinPath(state, angle.toFloat())
-            paths[color] = path
-        }
-        return paths
-    }
+        val dxToTarget = targetPoint.x - startPoint.x
+        val dyToTarget = targetPoint.y - startPoint.y
+        val magToTarget = hypot(dxToTarget.toDouble(), dyToTarget.toDouble()).toFloat()
+        if (magToTarget < 0.001f) return emptyList()
 
-    private fun calculateSpinPath(state: OverlayState, spinAngleRad: Float): List<PointF> {
-        val ghostBall = state.protractorUnit.ghostCueBallCenter
-        val targetBall = state.protractorUnit.center
+        val tangentDx = (-dyToTarget / magToTarget) * tangentDirection
+        val tangentDy = (dxToTarget / magToTarget) * tangentDirection
 
-        val vectorToTarget = PointF(targetBall.x - ghostBall.x, targetBall.y - ghostBall.y)
-        val tangentVector = PointF(-vectorToTarget.y, vectorToTarget.x)
+        val spinAngle = Math.toRadians(angleDegrees.toDouble()).toFloat()
+        val maxCurveOffset = state.protractorUnit.radius * 2.5f
+        val curveAmount = magnitude * magnitude * maxCurveOffset
 
-        val combinedVector = PointF(
-            vectorToTarget.x * cos(spinAngleRad) - tangentVector.x * sin(spinAngleRad),
-            vectorToTarget.y * cos(spinAngleRad) + tangentVector.y * sin(spinAngleRad)
+        val controlPoint1 = PointF(
+            startPoint.x + tangentDx * (maxPathLengthFactor * state.protractorUnit.radius * 0.33f),
+            startPoint.y + tangentDy * (maxPathLengthFactor * state.protractorUnit.radius * 0.33f)
         )
 
-        val path = mutableListOf(ghostBall)
-        if (state.table.isVisible) {
-            val bankPath = calculateSingleBank(ghostBall, combinedVector, state)
-            path.addAll(bankPath.drop(1))
-        } else {
-            val extendedEnd = PointF(
-                ghostBall.x + combinedVector.x * lineExtensionFactor,
-                ghostBall.y + combinedVector.y * lineExtensionFactor
-            )
-            path.add(extendedEnd)
+        val endPoint = PointF(
+            startPoint.x + tangentDx * (maxPathLengthFactor * state.protractorUnit.radius) + (curveAmount * cos(spinAngle)),
+            startPoint.y + tangentDy * (maxPathLengthFactor * state.protractorUnit.radius) + (curveAmount * sin(spinAngle))
+        )
+
+        val controlPoint2 = PointF(
+            endPoint.x - tangentDx * (maxPathLengthFactor * state.protractorUnit.radius * 0.33f),
+            endPoint.y - tangentDy * (maxPathLengthFactor * state.protractorUnit.radius * 0.33f)
+        )
+
+        return generateBezierCurve(startPoint, controlPoint1, controlPoint2, endPoint)
+    }
+
+    private fun bankCurve(path: List<PointF>, state: OverlayState): List<PointF> {
+        if (path.size < 2) return path
+
+        for (i in 0 until path.size - 1) {
+            val p1 = path[i]
+            val p2 = path[i + 1]
+            val intersectionResult = reducerUtils.findRailIntersectionAndNormal(p1, p2, state)
+
+            if (intersectionResult != null) {
+                val (intersectionPoint, railNormal) = intersectionResult
+                val truncatedPath = path.subList(0, i + 1).toMutableList()
+                truncatedPath.add(intersectionPoint)
+
+                val incidentVector = PointF(p2.x - p1.x, p2.y - p1.y)
+                val reflectedVector = reducerUtils.reflect(incidentVector, railNormal)
+
+                val extendedEndPoint = PointF(
+                    intersectionPoint.x + reflectedVector.x * 5000f,
+                    intersectionPoint.y + reflectedVector.y * 5000f
+                )
+                truncatedPath.add(extendedEndPoint)
+
+                return truncatedPath
+            }
         }
         return path
     }
 
-    private fun calculateSingleBank(start: PointF, direction: PointF, state: OverlayState): List<PointF> {
-        val extendedEnd = PointF(start.x + direction.x * lineExtensionFactor, start.y + direction.y * lineExtensionFactor)
-        val intersectionResult = state.table.findRailIntersectionAndNormal(start, extendedEnd) ?: return listOf(start, extendedEnd)
-        val intersectionPoint = intersectionResult.first
-        val railNormal = intersectionResult.second
-        val reflectedDir = reducerUtils.reflect(direction, railNormal)
-        val finalEndPoint = PointF(
-            intersectionPoint.x + reflectedDir.x * lineExtensionFactor,
-            intersectionPoint.y + reflectedDir.y * lineExtensionFactor
-        )
-        return listOf(start, intersectionPoint, finalEndPoint)
+
+    private fun generateBezierCurve(p0: PointF, p1: PointF, p2: PointF, p3: PointF, numPoints: Int = 30): List<PointF> {
+        val curve = mutableListOf<PointF>()
+        for (i in 0..numPoints) {
+            val t = i.toFloat() / numPoints
+            val u = 1 - t
+            val tt = t * t
+            val uu = u * u
+            val uuu = uu * u
+            val ttt = tt * t
+
+            val x = uuu * p0.x + 3 * uu * t * p1.x + 3 * u * tt * p2.x + ttt * p3.x
+            val y = uuu * p0.y + 3 * uu * t * p1.y + 3 * u * tt * p2.y + ttt * p3.y
+            curve.add(PointF(x, y))
+        }
+        return curve
     }
 }

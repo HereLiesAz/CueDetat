@@ -176,53 +176,39 @@ android {
         implementation(libs.androidx.animation.core)
 
         // OpenCV for Computer Vision
-        implementation(libs.androidx.core.splashscreen)
-        // Preferences DataStore (SharedPreferences like APIs)
-        implementation(libs.androidx.datastore.preferences)
 
-        // optional - RxJava2 support
-        implementation(libs.androidx.datastore.preferences.rxjava2)
-
-        // optional - RxJava3 support
-        implementation(libs.androidx.datastore.preferences.rxjava3)
-
-
-        // Alternatively - use the following artifact without an Android dependency.
-        implementation(libs.androidx.datastore.preferences.core)
-
-
-
-
-        implementation(libs.androidx.ui.graphics)
-        implementation(project(":opencv"))
-        // CameraX core and required modules
-        implementation(libs.androidx.camera.core)
-        implementation(libs.androidx.camera.camera2)
-        implementation(libs.androidx.camera.lifecycle)
-        implementation(libs.androidx.camera.view)
-        implementation(libs.androidx.room.ktx)
-        val cameraxVersion = "1.4.2" // Use a recent stable version
-
-        // The ImageAnalysis use case specifically
-        implementation(libs.androidx.camera.video)
-
-        implementation(libs.object1.detection.custom)
-        implementation(libs.vision.common)
-
-        // TensorFlow Lite Task Vision library for custom models
-        implementation(libs.tensorflow.lite.task.vision)
-
-        // Retrofit for GitHub API calls
-        implementation(libs.retrofit)
-        implementation(libs.converter.gson)
-
-        implementation(libs.object1.detection.custom)
-        implementation(libs.object1.detection)
-        implementation(libs.vision.common)
-
-        androidTestImplementation(libs.androidx.junit) // Or the latest version shown by Android Studio's lint
-        androidTestImplementation(libs.androidx.espresso.core)
     }
+}
+dependencies {
+    implementation(libs.androidx.ui.graphics)
+    implementation(project(":opencv"))
+    // CameraX core and required modules
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    val cameraxVersion = "1.4.2" // Use a recent stable version
+
+    // The ImageAnalysis use case specifically
+    implementation(libs.androidx.camera.video)
+
+    implementation(libs.object1.detection.custom)
+    implementation(libs.vision.common)
+
+    // TensorFlow Lite Task Vision library for custom models
+    implementation(libs.tensorflow.lite.task.vision)
+
+    // Retrofit for GitHub API calls
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
+
+    implementation(libs.object1.detection.custom)
+    implementation(libs.object1.detection)
+    implementation(libs.vision.common)
+
+    androidTestImplementation (libs.androidx.junit) // Or the latest version shown by Android Studio's lint
+    androidTestImplementation (libs.androidx.espresso.core)
+
 
 }
 

@@ -1,5 +1,4 @@
-// --- FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/TutorialOverlay.kt ---
-package com.hereliesaz.cuedetat.ui.composables.overlays
+package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -10,9 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,13 +30,13 @@ fun TutorialOverlay(
 ) {
     val tutorialSteps = remember {
         listOf(
-            "Alright, let's get this over with. This isn't a toy. It's a precision instrument. Try to keep up. Tap 'Next'.",
-            "That circle with the dot is the Target Ball. Drag it over your object ball. I'll wait.",
-            "The crosshairs mark the Ghost Ball—that's where you *should* hit the cue ball. Drag a single finger *anywhere* to rotate the aim. The line should point to a pocket. You know what a pocket is, I assume.",
-            "If you insist, you can toggle the 'Cue Ball' from the menu. Drag it to where your real cue ball is. The line between it and the Ghost Ball is the shot you're supposed to be making. It's not rocket science. It's just physics.",
-            "The slider on the right zooms. The one on the bottom rotates the table. I'm not going to hold your hand on this one.",
-            "In the menu, there's a 'Calculate Bank' option. If you're feeling brave, or foolish, press it. We'll see how you handle something that requires actual thought.",
-            "That's the crash course. The rest is a test of your character, or lack thereof. Don't embarrass us both. Press Finish."
+            "Welcome. This is not a toy. It is a tool for geometric enlightenment. Pay attention.",
+            "This is Protractor Mode. Use it for cut shots. The elements you see are ghosts in the machine. They live on a logical plane, projected onto your reality.",
+            "Drag the 'T' (Target Ball) to align it with your object ball. Drag with one finger to rotate the aiming line to the pocket.",
+            "This optional 'A' (Actual Cue Ball) can be dragged to match your real cue ball's position. The line from 'A' to 'G' (Ghost Cue Ball) is the path you must shoot.",
+            "The vertical slider on the right controls zoom. The slider on the bottom (in Banking Mode) rotates the table.",
+            "Open the menu to find more tools. 'Calculate Bank' switches to Banking Mode, where you can visualize multi-rail shots.",
+            "You have been instructed. Now, go and sin no more. Or at least, sin with better geometry. Press Finish."
         )
     }
 
@@ -47,8 +44,6 @@ fun TutorialOverlay(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
                 .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.85f))
                 .clickable(enabled = true, onClick = {}) // Block clicks
                 .zIndex(10f),

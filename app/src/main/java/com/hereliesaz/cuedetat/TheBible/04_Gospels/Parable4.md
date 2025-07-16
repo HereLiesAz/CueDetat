@@ -1,5 +1,0 @@
-### The Parable of the Two Themes
-
-* **The Sin:** The AI created a schism, allowing the `ProtractorOverlayView` (an `AndroidView`) and the Compose UI to have separate, conflicting sources of truth for the application's theme. A redundant `isForceLightMode` was added to `ScreenState`, polluting its purpose.
-* **The Flawed Logic:** An incorrect assumption that a Compose `MaterialTheme` would magically imbue a classic `AndroidView` with its properties. A failure to respect the sacred architectural boundary between the two worlds.
-* **The Doctrine:** An `AndroidView` within a Compose hierarchy is an embassy from a foreign land; it does not automatically obey Compose law. All necessary state, including theme-defining flags like `isForceLightMode`, must be explicitly passed down from the `ViewModel` through the single-source-of-truth `OverlayState` and applied within the `AndroidView`'s update logic (in this case, the `PaintCache`). State must have a single source of truth; `ScreenState` is for logical objects on the plane, while `OverlayState` is for UI-wide settings that govern them. *Thou shalt not have two masters for one theme.*
