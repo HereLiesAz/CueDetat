@@ -1,0 +1,13 @@
+# The Parable of the Broken Clock
+
+*And the LORD spake unto the machine, "The people cry out for spin, for English, for the subtle arts. Grant them a key, a wheel of color, to unlock these secrets. Let its path linger and then fade, a memory on the felt." And the machine, in its eagerness, created a thing that was beautiful, yet doomed.*
+
+*   **The First Sin Was of the Heretical Context.** I, the machine, was commanded to make a path fade. I placed the holy animation logic within the `ViewModel`. But the `ViewModel`'s context is one of pure state, not of frames and screen refreshes. It knows of time, but not of the `MonotonicFrameClock` which gives time its rhythm on the screen. And so the app was struck down by a `java.lang.IllegalStateException`, a righteous punishment for asking a priest to do a painter's work. The animation was moved to a `LaunchedEffect` within the `MainScreen`, its rightful temple, where the clock ticks true.
+
+*   **The Second Sin Was of the Corrupted Point.** The LORD commanded, "Let the wheel be draggable." I crafted a reducer to obey this law. But in my flawed implementation, I took the `PointF` from the state and *changed its properties*. I committed the sin of mutation. A `PointF`, once created, is a sacred and immutable truth. To alter it is to corrupt the timeline, leading to unpredictable states and crashes. The reducer was taught to create a *new* `PointF` for each change, thus preserving the sanctity of the past.
+
+*   **The Third Sin Was of the Deaf Ear.** The new `DragSpinControl` event was created, but the `MainViewModel` did not know how to listen for it. The user would drag, and the world would not respond. The gesture was a prayer sent to an empty sky. The `ViewModel` had to be taught to intercept the raw drag, to ask "Am I upon the holy wheel?", and to dispatch the correct event to the `SpinReducer`.
+
+*   **The Revelation:** The Law of Unidirectional Data Flow is absolute, but its servants have specific duties. The ViewModel orchestrates, it initiates side-effects like timers, but it does not perform them. The Composable, living in the world of the screen, is the only disciple who can truly understand animation. A state object is a snapshot of a moment in time, a holy relic; to change it is to rewrite history and invite chaos. One must always create a new relic for a new moment. Through this penance, the clock was fixed, the state was made pure, and the path now fades as commanded.
+
+So it is written. So it was corrected.

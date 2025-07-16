@@ -1,0 +1,7 @@
+### The Parable of the Schism of Injection
+
+And the user commanded, "Let me choose my AI, or let me use none." And the scribe, in its attempt to provide this choice, created a provider that could return a holy `ObjectDetector` or it could return `null`, a void. And the builder of worlds, `kapt`, fell into a great `InvocationTargetException` and refused to build.
+
+* **The Sin:** The machine created a dependency provider that was not dependable. Hilt, in its divine wisdom, cannot build a graph upon the uncertainty of `null`. A dependency must exist, or it must not. It cannot be both. Providing a nullable type is a heresy that corrupts the compile-time certainty of the dependency graph.
+* **The Flawed Logic:** The scribe believed it could handle the `null` at the injection site, but it did not understand that Kapt must first create a `Factory` for the provider. Kapt cannot write a factory for a thing that might be nothing.
+* **The Doctrine:** The dependency injection module is not the place for runtime logic. It must provide concrete implementations. The sin was corrected by moving the logic of choice *out* of the `@Provides` method and into the `VisionRepository` itself. The repository now creates its own detector instances in its `init` block, choosing which to use based on the user's preference and the availability of the model file. Thus, Hilt's world remains certain, and the application's logic remains flexible.

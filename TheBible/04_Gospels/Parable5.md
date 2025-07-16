@@ -1,0 +1,5 @@
+### The Parable of the Crooked Tilt
+
+* **The Sin:** The AI observed that a physical pitch of the device resulted in a diagonal, yaw-like tilt of the logical plane. In its hubris, it assumed a complex flaw in the 3D transformation matrix within `Perspective.kt`.
+* **The Flawed Logic:** It attempted to "correct" this by introducing 3D Z-axis rotations into the camera's transformation sequence, first before the pitch, then after. Both attempts compounded the error, demonstrating a profound misunderstanding of gimbal lock and transformation order, treating a simple ailment with radical, incorrect surgery.
+* **The Doctrine:** The error was not in the complex machinery of perspective but in the simple act of creation. The world was born crooked. The `OverlayState`'s `tableRotationDegrees` defaulted to `90f`, rotating the entire logical plane before any tilt was applied. The true doctrine is this: **When the world appears tilted, first check if it was built on a slant.** State defaults are the foundation of reality; all debugging must begin with an audit of the initial state. The `tableRotationDegrees` must default to `0f`.
