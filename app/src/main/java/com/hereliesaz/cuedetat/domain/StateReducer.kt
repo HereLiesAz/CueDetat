@@ -17,6 +17,7 @@ class StateReducer @Inject constructor(
     private val controlReducer: ControlReducer,
     private val cvReducer: CvReducer,
     private val toastReducer: ToastReducer,
+    private val tutorialReducer: TutorialReducer,
     private val advancedOptionsReducer: AdvancedOptionsReducer,
     private val updateStateUseCase: UpdateStateUseCase
 ) {
@@ -26,15 +27,17 @@ class StateReducer @Inject constructor(
         val intermediateState = when (event) {
             is MainScreenEvent.Drag, is MainScreenEvent.Release, is MainScreenEvent.ScreenGestureStarted, is MainScreenEvent.GestureEnded -> gestureReducer.reduce(event, state)
             is MainScreenEvent.FullOrientationChanged, is MainScreenEvent.ThemeChanged -> systemReducer.reduce(event, state)
-            is MainScreenEvent.ToggleCamera, is MainScreenEvent.ToggleTable, is MainScreenEvent.ToggleOnPlaneBall, is MainScreenEvent.ToggleBankingMode, is MainScreenEvent.ToggleHelp, is MainScreenEvent.ToggleCvParamMenu, is MainScreenEvent.ToggleForceTheme, is MainScreenEvent.ToggleDistanceUnit -> toggleReducer.reduce(event, state)
+            is MainScreenEvent.ToggleCamera, is MainScreenEvent.ToggleTable, is MainScreenEvent.ToggleOnPlaneBall, is MainScreenEvent.ToggleBankingMode, is MainScreenEvent.ToggleHelp, is MainScreenEvent.ToggleCvParamMenu, is MainScreenEvent.ToggleForceTheme, is MainScreenEvent.ToggleDistanceUnit, is MainScreenEvent.ToggleSpinControl -> toggleReducer.reduce(event, state)
             is MainScreenEvent.Reset, is MainScreenEvent.ClearObstacles, is MainScreenEvent.AimBankShot -> actionReducer.reduce(event, state)
             is MainScreenEvent.AddObstacle -> obstacleReducer.reduce(event, state)
             is MainScreenEvent.SnapToDetectedBall -> snapReducer.reduce(event, state)
             is MainScreenEvent.SpinDrag, is MainScreenEvent.SpinDragEnd -> spinReducer.reduce(event, state)
-            is MainScreenEvent.TableRotationChanged, is MainScreenEvent.ZoomChanged, is MainScreenEvent.UpdateHoughP1, is MainScreenEvent.UpdateHoughP2, is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2, is MainScreenEvent.AdjustLuminance, is MainScreenEvent.AdjustGlow -> controlReducer.reduce(event, state)
+            is MainScreenEvent.TableRotationChanged, is MainScreenEvent.ZoomChanged, is MainScreenEvent.UpdateHoughP1, is MainScreenEvent.UpdateHoughP2, is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2, is MainScreenEvent.AdjustLuminance, is MainScreenEvent.AdjustGlow, is MainScreenEvent.CycleTableSize -> controlReducer.reduce(event, state)
             is MainScreenEvent.CvDataUpdated, is MainScreenEvent.LockOrUnlockColor -> cvReducer.reduce(event, state)
             is MainScreenEvent.ShowToast, is MainScreenEvent.SingleEventConsumed -> toastReducer.reduce(event, state)
+            is MainScreenEvent.StartTutorial, is MainScreenEvent.NextTutorialStep, is MainScreenEvent.FinishTutorial -> tutorialReducer.reduce(event, state)
             is MainScreenEvent.ToggleAdvancedOptions, is MainScreenEvent.ToggleSnapping, is MainScreenEvent.ToggleCvModel, is MainScreenEvent.ToggleCvRefinementMethod -> advancedOptionsReducer.reduce(event, state)
+            is MainScreenEvent.SetTableSize, is MainScreenEvent.LoadUserSettings -> settingsReducer.reduce(event, state)
             else -> state
         }
         return updateStateUseCase(intermediateState, camera)

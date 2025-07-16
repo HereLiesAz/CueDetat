@@ -1,5 +1,6 @@
 package com.hereliesaz.cuedetat.ui.composables
 
+import android.graphics.PointF
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.size
@@ -20,7 +21,7 @@ import kotlin.math.sqrt
 @Composable
 fun SpinControl(
     modifier: Modifier = Modifier,
-    centerPosition: Offset,
+    centerPosition: PointF,
     selectedSpinOffset: Offset?,
     lingeringSpinOffset: Offset?,
     spinPathAlpha: Float,
