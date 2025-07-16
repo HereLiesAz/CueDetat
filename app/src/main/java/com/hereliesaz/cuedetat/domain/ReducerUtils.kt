@@ -1,6 +1,7 @@
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
+import androidx.room.util.copy
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import javax.inject.Inject
