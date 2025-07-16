@@ -129,13 +129,16 @@ class BallRenderer {
         // Draw on-plane shadow
         canvas.save()
         canvas.concat(state.pitchMatrix)
-        canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, strokePaint)
+        // Adjust radius to place stroke on the outside of the logical boundary
+        canvas.drawCircle(ball.center.x, ball.center.y, ball.radius + strokePaint.strokeWidth / 2f, strokePaint)
         canvas.drawCircle(ball.center.x, ball.center.y, dotRadius, dotPaint)
         canvas.restore()
 
         // Draw the lifted ghost effect
-        canvas.drawCircle(screenPos.x, yPosLifted, radiusInfo.radius, glowPaint)
-        canvas.drawCircle(screenPos.x, yPosLifted, radiusInfo.radius, strokePaint)
+        // Adjust radius to place stroke on the outside of the logical boundary
+        val liftedRadius = radiusInfo.radius + strokePaint.strokeWidth / 2f
+        canvas.drawCircle(screenPos.x, yPosLifted, liftedRadius, glowPaint)
+        canvas.drawCircle(screenPos.x, yPosLifted, liftedRadius, strokePaint)
 
         // Draw center shape
         val centerPaint = Paint(paints.fillPaint).apply { color = config.centerColor.toArgb() }

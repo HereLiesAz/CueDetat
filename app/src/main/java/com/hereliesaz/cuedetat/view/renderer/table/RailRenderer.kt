@@ -13,6 +13,7 @@ import com.hereliesaz.cuedetat.view.config.table.Diamonds
 import com.hereliesaz.cuedetat.view.config.table.Rail
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import kotlin.math.abs
 
 class RailRenderer {
     private val railVisualOffsetFromEdgeFactor = 0.75f
@@ -40,7 +41,6 @@ class RailRenderer {
 
         val railOffsetAmount = LOGICAL_BALL_RADIUS * railVisualOffsetFromEdgeFactor
         val pocketRadius = LOGICAL_BALL_RADIUS * 1.8f
-        val railGapRadius = pocketRadius * 0.75f
 
         val corners = state.table.corners
         val normals = listOf(
@@ -78,18 +78,19 @@ class RailRenderer {
         // --- Draw Diamonds ---
         val diamondRadius = LOGICAL_BALL_RADIUS * diamondSizeFactor
 
-        // Long rails (top and bottom) - 4 diamonds each side of center
-        for(i in 1..4) {
-            val fraction = i / 5.0f
-            val top1 = interpolate(offsetCorners[0], offsetCorners[1], fraction)
-            val bottom1 = interpolate(offsetCorners[3], offsetCorners[2], fraction)
-            canvas.drawCircle(top1.x, top1.y, diamondRadius, diamondPaint)
-            canvas.drawCircle(bottom1.x, bottom1.y, diamondRadius, diamondPaint)
-        }
-
-        // Short rails (left and right) - 3 diamonds each
+        // End rails (short rails, top and bottom) - 3 diamonds each
         for(i in 1..3) {
             val fraction = i / 4.0f
+            val top = interpolate(offsetCorners[0], offsetCorners[1], fraction)
+            val bottom = interpolate(offsetCorners[3], offsetCorners[2], fraction)
+            canvas.drawCircle(top.x, top.y, diamondRadius, diamondPaint)
+            canvas.drawCircle(bottom.x, bottom.y, diamondRadius, diamondPaint)
+        }
+
+        // Side rails (long rails, left and right) - 6 diamonds total (3 per side of center)
+        for(i in 1..7) {
+            if(i == 4) continue // Skip the center point which corresponds to the side pocket
+            val fraction = i / 8.0f
             val left = interpolate(offsetCorners[0], offsetCorners[3], fraction)
             val right = interpolate(offsetCorners[1], offsetCorners[2], fraction)
             canvas.drawCircle(left.x, left.y, diamondRadius, diamondPaint)
@@ -106,16 +107,41 @@ class RailRenderer {
         // Diamond label for banked Aiming Line
         if (state.aimingLineBankPath.size > 1) {
             val bankPoint = state.aimingLineBankPath[1]
-            textRenderer.drawDiamondLabel(canvas, bankPoint, state, textPaint)
+            getRailForPoint(bankPoint, state)?.let { railType ->
+                textRenderer.drawDiamondLabel(canvas, bankPoint, railType, state, textPaint)
+            }
         }
         // Diamond label for banked Tangent Line
         if (state.tangentLineBankPath.size > 1) {
             val tangentBankPoint = state.tangentLineBankPath[1]
-            textRenderer.drawDiamondLabel(canvas, tangentBankPoint, state, textPaint)
+            getRailForPoint(tangentBankPoint, state)?.let { railType ->
+                textRenderer.drawDiamondLabel(canvas, tangentBankPoint, railType, state, textPaint)
+            }
         }
         // Diamond label for Shot Guide Line
         state.shotGuideImpactPoint?.let { impactPoint ->
-            textRenderer.drawDiamondLabel(canvas, impactPoint, state, textPaint)
+            getRailForPoint(impactPoint, state)?.let { railType ->
+                textRenderer.drawDiamondLabel(canvas, impactPoint, railType, state, textPaint)
+            }
+        }
+    }
+
+    private fun getRailForPoint(point: PointF, state: OverlayState): LineTextRenderer.RailType? {
+        val table = state.table
+        if (!table.isVisible) return null
+
+        // Since this is called on the railPitchMatrix canvas, the table is not rotated here.
+        // We can check against the un-rotated logical boundaries.
+        val halfW = table.logicalWidth / 2f
+        val halfH = table.logicalHeight / 2f
+        val tolerance = 5f // A small tolerance in logical units
+
+        return when {
+            abs(point.y - (-halfH)) < tolerance -> LineTextRenderer.RailType.TOP
+            abs(point.y - halfH) < tolerance -> LineTextRenderer.RailType.BOTTOM
+            abs(point.x - (-halfW)) < tolerance -> LineTextRenderer.RailType.LEFT
+            abs(point.x - halfW) < tolerance -> LineTextRenderer.RailType.RIGHT
+            else -> null
         }
     }
 

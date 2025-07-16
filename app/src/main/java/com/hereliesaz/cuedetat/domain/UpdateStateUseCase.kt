@@ -44,6 +44,8 @@ class UpdateStateUseCase @Inject constructor(
 
         val flatMatrix = createFullMatrix(state, 0f, 1f, applyPitch = false)
 
+        val consistentRadius = calculateConsistentVisualRadius(state, zoomFactor)
+
 
         val logicalShotLineAnchor = getLogicalShotLineAnchor(updatedStateWithSnapping)
         val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= updatedStateWithSnapping.protractorUnit.ghostCueBallCenter.y
@@ -54,6 +56,7 @@ class UpdateStateUseCase @Inject constructor(
             targetBall = updatedStateWithSnapping.protractorUnit.center
         )
 
+        val isStraightShot = isShotStraight(logicalShotLineAnchor, updatedStateWithSnapping.protractorUnit.ghostCueBallCenter, updatedStateWithSnapping.protractorUnit.center)
         val isObstructed = checkForObstructions(updatedStateWithSnapping)
         val targetBallDistance = calculateDistance(updatedStateWithSnapping, flatMatrix)
         val shotGuideImpactPoint = if (state.table.isVisible && !state.isBankingMode) {
@@ -80,10 +83,14 @@ class UpdateStateUseCase @Inject constructor(
             tangentStart.y + (targetCenter.x - tangentStart.x) * tangentDirection
         )
 
-        val (finalTangentLineBankPath, tangentAimedPocketIndex, _) = if (state.table.isVisible && !state.isBankingMode) {
+        var (finalTangentLineBankPath, tangentAimedPocketIndex, _) = if (state.table.isVisible && !state.isBankingMode) {
             calculateAimAndBank(tangentStart, activeTangentTarget, updatedStateWithSnapping)
         } else {
             Triple(getExtendedLinePath(tangentStart, activeTangentTarget), null, null)
+        }
+
+        if (isStraightShot) {
+            tangentAimedPocketIndex = null // A straight shot has no "active" tangent, regardless of pocket alignment.
         }
 
         val spinPaths: Map<Color, List<PointF>> = if (!state.isBankingMode) {
@@ -98,8 +105,10 @@ class UpdateStateUseCase @Inject constructor(
             inversePitchMatrix = state.inversePitchMatrix, // Use the one that was calculated and inverted
             hasInverseMatrix = hasFinalInverse,
             flatMatrix = flatMatrix,
+            visualBallRadius = consistentRadius,
             shotLineAnchor = logicalShotLineAnchor,
             isGeometricallyImpossible = isGeometricallyImpossible,
+            isStraightShot = isStraightShot,
             isObstructed = isObstructed,
             isTiltBeyondLimit = isTiltBeyondLimit,
             tangentDirection = tangentDirection,
@@ -145,11 +154,34 @@ class UpdateStateUseCase @Inject constructor(
         return finalMatrix
     }
 
+    private fun calculateConsistentVisualRadius(state: OverlayState, zoomFactor: Float): Float {
+        // Create a matrix with only tilt and zoom to calculate a radius independent of rotation or position.
+        val sizingMatrix = Matrix()
+        val tempCam = Camera()
+        tempCam.save()
+        tempCam.setLocation(0f, 0f, -32f)
+        tempCam.rotateX(state.pitchAngle)
+        tempCam.getMatrix(sizingMatrix)
+        tempCam.restore()
+        sizingMatrix.postScale(zoomFactor, zoomFactor)
+
+        val p1 = floatArrayOf(0f, 0f)
+        val p2 = floatArrayOf(LOGICAL_BALL_RADIUS, 0f)
+        sizingMatrix.mapPoints(p1)
+        sizingMatrix.mapPoints(p2)
+        return hypot((p1[0] - p2[0]).toDouble(), (p1[1] - p2[1]).toDouble()).toFloat()
+    }
+
 
     private fun getLogicalShotLineAnchor(state: OverlayState): PointF {
         state.onPlaneBall?.let { return it.center }
-        // Default to a logical point far below the target ball if the cue ball isn't present
-        return PointF(state.protractorUnit.center.x, state.protractorUnit.center.y + 10000f)
+        // When no cue ball, anchor to the bottom-center of the screen, transformed to logical space
+        if (!state.hasInverseMatrix) {
+            // Failsafe if matrix isn't ready
+            return PointF(state.protractorUnit.ghostCueBallCenter.x, state.protractorUnit.ghostCueBallCenter.y + 1000f)
+        }
+        val screenAnchor = PointF(state.viewWidth / 2f, state.viewHeight.toFloat())
+        return Perspective.screenToLogical(screenAnchor, state.inversePitchMatrix)
     }
 
     private fun calculateShotPossibilityAndTangent(shotAnchor: PointF, ghostBall: PointF, targetBall: PointF): Pair<Boolean, Float> {
@@ -163,6 +195,16 @@ class UpdateStateUseCase @Inject constructor(
         while (angleDifference > 180) angleDifference -= 360
         val tangentDirection = if (angleDifference < 0) 1.0f else -1.0f
         return Pair(isImpossible, tangentDirection)
+    }
+
+    private fun isShotStraight(shotAnchor: PointF, ghostBall: PointF, targetBall: PointF): Boolean {
+        val shotAngle = atan2(ghostBall.y - shotAnchor.y, ghostBall.x - shotAnchor.x)
+        val aimAngle = atan2(targetBall.y - ghostBall.y, targetBall.x - ghostBall.x)
+        var angleDiff = abs(shotAngle - aimAngle)
+        if (angleDiff > Math.PI) {
+            angleDiff = (2 * Math.PI - angleDiff).toFloat()
+        }
+        return angleDiff < 0.01 // Use a small tolerance in radians for collinearity
     }
 
     private fun calculateDistance(state: OverlayState, matrix: Matrix): Float {

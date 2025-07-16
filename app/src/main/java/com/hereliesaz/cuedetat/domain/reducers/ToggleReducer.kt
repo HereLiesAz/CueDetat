@@ -86,7 +86,7 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
 
         return currentState.copy(
             onPlaneBall = updatedOnPlaneBall,
-            protractorUnit = ProtractorUnit(center = targetBallCenter, radius = LOGICAL_BALL_RADIUS, rotationDegrees = -90f),
+            protractorUnit = ProtractorUnit(center = targetBallCenter, radius = LOGICAL_BALL_RADIUS, rotationDegrees = 0f),
             table = currentState.table.copy(rotationDegrees = 0f), // Portrait is default
             valuesChangedSinceReset = true,
             zoomSliderPosition = 0f,

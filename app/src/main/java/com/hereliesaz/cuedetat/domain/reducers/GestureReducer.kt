@@ -7,11 +7,13 @@ import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -61,17 +63,20 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
     }
 
     private fun handleLogicalDragApplied(currentState: OverlayState, event: MainScreenEvent.LogicalDragApplied): OverlayState {
-        val logicalDelta = event.logicalDelta
-
         val newState = when (currentState.interactionMode) {
             InteractionMode.MOVING_PROTRACTOR_UNIT -> {
-                val newCenter = PointF(currentState.protractorUnit.center.x + logicalDelta.x, currentState.protractorUnit.center.y + logicalDelta.y)
+                val dx = event.currentLogicalPoint.x - event.previousLogicalPoint.x
+                val dy = event.currentLogicalPoint.y - event.previousLogicalPoint.y
+                val newCenter = PointF(currentState.protractorUnit.center.x + dx, currentState.protractorUnit.center.y + dy)
                 currentState.copy(protractorUnit = currentState.protractorUnit.copy(center = newCenter), valuesChangedSinceReset = true)
             }
             InteractionMode.ROTATING_PROTRACTOR -> {
-                val combinedDelta = event.logicalDelta.x + event.logicalDelta.y
-                val rotationAmount = combinedDelta * 0.5f
-                val newRotation = currentState.protractorUnit.rotationDegrees - rotationAmount
+                val center = currentState.protractorUnit.center
+                val prevAngle = atan2(event.previousLogicalPoint.y - center.y, event.previousLogicalPoint.x - center.x)
+                val currAngle = atan2(event.currentLogicalPoint.y - center.y, event.currentLogicalPoint.x - center.x)
+                val angleDelta = Math.toDegrees(currAngle.toDouble() - prevAngle.toDouble()).toFloat()
+
+                val newRotation = currentState.protractorUnit.rotationDegrees + angleDelta
                 currentState.copy(
                     protractorUnit = currentState.protractorUnit.copy(rotationDegrees = newRotation),
                     valuesChangedSinceReset = true
@@ -79,7 +84,9 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             }
             InteractionMode.MOVING_ACTUAL_CUE_BALL -> {
                 currentState.onPlaneBall?.let {
-                    val newCenter = PointF(it.center.x + logicalDelta.x, it.center.y + logicalDelta.y)
+                    val dx = event.currentLogicalPoint.x - event.previousLogicalPoint.x
+                    val dy = event.currentLogicalPoint.y - event.previousLogicalPoint.y
+                    val newCenter = PointF(it.center.x + dx, it.center.y + dy)
                     currentState.copy(onPlaneBall = it.copy(center = newCenter), valuesChangedSinceReset = true)
                 } ?: currentState
             }
@@ -93,7 +100,9 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                 val index = currentState.movingObstacleBallIndex
                 if (index != null && index < currentState.obstacleBalls.size) {
                     val obstacle = currentState.obstacleBalls[index]
-                    val newCenter = PointF(obstacle.center.x + logicalDelta.x, obstacle.center.y + logicalDelta.y)
+                    val dx = event.currentLogicalPoint.x - event.previousLogicalPoint.x
+                    val dy = event.currentLogicalPoint.y - event.previousLogicalPoint.y
+                    val newCenter = PointF(obstacle.center.x + dx, obstacle.center.y + dy)
                     val newObstacles = currentState.obstacleBalls.toMutableList()
                     newObstacles[index] = obstacle.copy(center = newCenter)
                     currentState.copy(obstacleBalls = newObstacles, valuesChangedSinceReset = true)

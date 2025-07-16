@@ -33,14 +33,17 @@ class OverlayRenderer {
         canvas.save()
         canvas.concat(state.pitchMatrix)
         lineRenderer.drawLogicalLines(canvas, state, paints, typeface)
+        // Draw Rail Labels on the same flat plane as the lines and table surface.
+        if (state.table.isVisible) {
+            railRenderer.drawRailLabels(canvas, state, paints, typeface)
+        }
         canvas.restore()
 
-        // Pass 3: Draw Lifted Rails & Their Labels
+        // Pass 3: Draw Lifted Rails
         if (state.table.isVisible) {
             canvas.save()
             canvas.concat(state.railPitchMatrix)
             railRenderer.draw(canvas, state, paints)
-            railRenderer.drawRailLabels(canvas, state, paints, typeface) // Draw labels on the same plane as rails
             canvas.restore()
         }
 

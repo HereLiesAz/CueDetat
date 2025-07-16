@@ -41,7 +41,7 @@ class ActionReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
         val newProtractorUnit = ProtractorUnit(
             center = targetBallCenter,
             radius = LOGICAL_BALL_RADIUS,
-            rotationDegrees = -90f
+            rotationDegrees = 0f
         )
         val newOnPlaneBall = if (currentState.onPlaneBall != null) {
             OnPlaneBall(center = cueBallCenter, radius = LOGICAL_BALL_RADIUS)

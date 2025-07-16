@@ -135,6 +135,7 @@ data class OverlayState(
     val shotLineAnchor: PointF = PointF(0f, 0f),
     val tangentDirection: Float = 1.0f,
     val isGeometricallyImpossible: Boolean = false,
+    val isStraightShot: Boolean = false,
     val isObstructed: Boolean = false,
     val isTiltBeyondLimit: Boolean = false,
     val warningText: String? = null,
@@ -145,6 +146,7 @@ data class OverlayState(
     val aimedPocketIndex: Int? = null,
     val tangentAimedPocketIndex: Int? = null,
     val aimingLineEndPoint: PointF? = null,
+    val visualBallRadius: Float = LOGICAL_BALL_RADIUS, // The one true visual radius
 
     // Theming
     val appControlColorScheme: ColorScheme = darkColorScheme(),

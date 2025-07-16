@@ -1,6 +1,6 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/SystemReducer.kt
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/SystemReducer.kt
 
-package com.hereliesaz.cuedetat.domain.reducers
+package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
@@ -56,7 +56,7 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             protractorUnit = ProtractorUnit(
                 center = initialProtractorCenter,
                 radius = LOGICAL_BALL_RADIUS,
-                rotationDegrees = -90f // Default to a straight-down shot
+                rotationDegrees = 0f // Default to a straight-down shot
             ),
             table = Table(
                 size = TableSize.EIGHT_FT,

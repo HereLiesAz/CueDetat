@@ -28,7 +28,7 @@ sealed class MainScreenEvent {
 
     // Logical Events (dispatched by ViewModel)
     internal data class LogicalGestureStarted(val logicalPoint: PointF, val screenOffset: Offset) : MainScreenEvent()
-    internal data class LogicalDragApplied(val logicalDelta: PointF, val screenDelta: Offset, val logicalPoint: PointF) : MainScreenEvent()
+    internal data class LogicalDragApplied(val previousLogicalPoint: PointF, val currentLogicalPoint: PointF, val screenDelta: Offset) : MainScreenEvent()
     internal data class AimBankShot(val logicalTarget: PointF) : MainScreenEvent()
 
     // Direct State Change Events

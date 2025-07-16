@@ -129,14 +129,13 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.Drag -> {
                 if (!currentState.hasInverseMatrix) return
 
-                val logicalCurr = Perspective.screenToLogical(event.currentPosition, currentState.inversePitchMatrix)
+                val currentLogicalPoint = Perspective.screenToLogical(event.currentPosition, currentState.inversePitchMatrix)
                 if (currentState.interactionMode == InteractionMode.AIMING_BANK_SHOT) {
-                    MainScreenEvent.AimBankShot(logicalCurr)
+                    MainScreenEvent.AimBankShot(currentLogicalPoint)
                 } else {
-                    val logicalPrev = Perspective.screenToLogical(event.previousPosition, currentState.inversePitchMatrix)
+                    val previousLogicalPoint = Perspective.screenToLogical(event.previousPosition, currentState.inversePitchMatrix)
                     val screenDelta = Offset(event.currentPosition.x - event.previousPosition.x, event.currentPosition.y - event.previousPosition.y)
-                    val logicalDelta = PointF(logicalCurr.x - logicalPrev.x, logicalCurr.y - logicalPrev.y)
-                    MainScreenEvent.LogicalDragApplied(logicalDelta, screenDelta, logicalCurr)
+                    MainScreenEvent.LogicalDragApplied(previousLogicalPoint, currentLogicalPoint, screenDelta)
                 }
             }
             is MainScreenEvent.ScreenGestureStarted -> {
