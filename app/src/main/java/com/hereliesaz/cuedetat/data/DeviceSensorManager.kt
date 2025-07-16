@@ -14,12 +14,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.sqrt
 
-data class FullOrientation(
-    val azimuth: Float = 0f,
-    val pitch: Float = 0f,
-    val roll: Float = 0f
-)
-
 @Singleton
 class DeviceSensorManager @Inject constructor(@ApplicationContext context: Context) {
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager

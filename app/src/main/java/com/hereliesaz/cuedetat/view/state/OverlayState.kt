@@ -64,5 +64,17 @@ data class OverlayState(
     val spinPaths: Map<Color, List<PointF>> = emptyMap(),
     val lockedHsvColor: FloatArray? = null,
     val areHelpersVisible: Boolean = true,
-    val valuesChangedSinceReset: Boolean = false // RESTORED
+    val valuesChangedSinceReset: Boolean = false,
+    val toastMessage: ToastMessage? = null, // Restored for proper toast handling
+    val isSnappingEnabled: Boolean = true,
+    val cvModel: String = "Generic", // Example, adjust as needed
+    val cvRefinement: CvRefinementMethod = CvRefinementMethod.HOUGH,
+    val houghP1: Float = 100f,
+    val houghP2: Float = 30f,
+    val cannyThreshold1: Float = 50f,
+    val cannyThreshold2: Float = 100f,
+    val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
+    val hasTargetBallBeenMoved: Boolean = false,
+    val hasCueBallBeenMoved: Boolean = false,
+    val snapCandidates: List<SnapCandidate> = emptyList()
 )

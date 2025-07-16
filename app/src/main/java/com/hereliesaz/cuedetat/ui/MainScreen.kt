@@ -1,7 +1,9 @@
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt
 package com.hereliesaz.cuedetat.ui
 
+import android.content.Intent
 import android.graphics.PointF
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -26,6 +28,7 @@ import com.hereliesaz.cuedetat.ui.composables.overlays.TutorialOverlay
 import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
+import com.hereliesaz.cuedetat.view.state.SingleEvent
 import com.hereliesaz.cuedetat.view.state.ToastMessage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -34,7 +37,6 @@ import kotlin.math.roundToInt
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
-    val toastMessage by viewModel.toastMessage.collectAsState()
     val context = LocalContext.current
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -45,19 +47,35 @@ fun MainScreen(viewModel: MainViewModel) {
         null -> isSystemInDarkTheme()
     }
 
+    // This LaunchedEffect now correctly handles one-off events that are NOT state changes.
+    LaunchedEffect(viewModel) {
+        viewModel.singleEvent.collect { event ->
+            when (event) {
+                is SingleEvent.OpenUrl -> {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
+                    context.startActivity(intent)
+                }
+                null -> {}
+            }
+            viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
+        }
+    }
+
+    // This new LaunchedEffect observes the toast message property in the main UI state.
+    LaunchedEffect(uiState.toastMessage) {
+        uiState.toastMessage?.let { message ->
+            val messageText = when (message) {
+                is ToastMessage.StringResource -> context.getString(message.id, *message.formatArgs.toTypedArray())
+                is ToastMessage.PlainText -> message.text
+            }
+            Toast.makeText(context, messageText, Toast.LENGTH_SHORT).show()
+            viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
+        }
+    }
+
+
     CueDetatTheme(darkTheme = useDarkTheme) {
         val alphaAnimatable = remember { Animatable(1.0f) }
-
-        LaunchedEffect(toastMessage) {
-            toastMessage?.let {
-                val messageText = when (it) {
-                    is ToastMessage.StringResource -> context.getString(it.id, *it.formatArgs.toTypedArray())
-                    is ToastMessage.PlainText -> it.text
-                }
-                Toast.makeText(context, messageText, Toast.LENGTH_SHORT).show()
-                viewModel.onEvent(MainScreenEvent.ToastShown)
-            }
-        }
 
         LaunchedEffect(uiState.lingeringSpinOffset) {
             if (uiState.lingeringSpinOffset != null) {
@@ -75,7 +93,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
         // Pass the updated color scheme to the ViewModel
         LaunchedEffect(useDarkTheme) {
-            viewModel.onEvent(MainScreenEvent.UpdateColorScheme(if (useDarkTheme) darkColorScheme() else lightColorScheme()))
+            viewModel.onEvent(MainScreenEvent.ThemeChanged(if (useDarkTheme) darkColorScheme() else lightColorScheme()))
         }
 
         ModalNavigationDrawer(
@@ -89,7 +107,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 )
             }
         ) {
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxSize()) {
                 if (uiState.isCameraVisible) {
                     CameraBackground(
                         modifier = Modifier.fillMaxSize().zIndex(0f),

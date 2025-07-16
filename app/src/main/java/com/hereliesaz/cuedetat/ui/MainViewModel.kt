@@ -1,10 +1,10 @@
 package com.hereliesaz.cuedetat.ui
 
-import androidx.camera.core.CameraSelector
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.data.DeviceSensorManager
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
+import com.hereliesaz.cuedetat.data.VisionAnalyzer
 import com.hereliesaz.cuedetat.data.VisionRepository
 import com.hereliesaz.cuedetat.domain.StateReducer
 import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
@@ -20,15 +20,15 @@ class MainViewModel @Inject constructor(
     private val deviceSensorManager: DeviceSensorManager,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val visionRepository: VisionRepository,
-    private val reducer: StateReducer,
+    private val reducer: StateReducer, // Corrected to use StateReducer
     val overlayRenderer: OverlayRenderer
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(OverlayState())
     val uiState: StateFlow<OverlayState> = _uiState.asStateFlow()
 
-    private val _singleEvent = MutableStateFlow<SingleEvent<*>?>(null)
-    val singleEvent: StateFlow<SingleEvent<* >?> = _singleEvent.asStateFlow()
+    private val _singleEvent = MutableStateFlow<SingleEvent?>(null)
+    val singleEvent: StateFlow<SingleEvent?> = _singleEvent.asStateFlow()
 
     val visionAnalyzer = VisionAnalyzer(visionRepository)
 
@@ -55,8 +55,18 @@ class MainViewModel @Inject constructor(
         val newState = reducer.reduce(event, _uiState.value)
         _uiState.value = newState
 
-        if (event is MainScreenEvent.ShowToast) {
-            _singleEvent.value = SingleEvent.ShowToast(event.message)
+        // Handle true single events that don't belong in the main state
+        when (event) {
+            is MainScreenEvent.CheckForUpdate -> {
+                // Future logic to get URL and dispatch OpenUrl event
+            }
+            is MainScreenEvent.ViewArt -> {
+                // Future logic to get URL and dispatch OpenUrl event
+            }
+            is MainScreenEvent.SingleEventConsumed -> {
+                _singleEvent.value = null // Clear the single event
+            }
+            else -> {}
         }
     }
 
