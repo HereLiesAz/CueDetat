@@ -100,7 +100,7 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             val bankingZoomSliderPos = 0f
             val bankingBallCenter = PointF(0f, 0f)
             val newBankingBall = OnPlaneBall(center = bankingBallCenter, radius = LOGICAL_BALL_RADIUS)
-            val defaultTableRotation = 0f // Portrait is now the default
+            val defaultTableRotation = 90f // Corrected: Portrait is default
             val initialAimTarget = calculateInitialBankingAimTarget(newBankingBall, defaultTableRotation)
             currentState.copy(
                 isBankingMode = true, onPlaneBall = newBankingBall,

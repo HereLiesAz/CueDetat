@@ -12,4 +12,4 @@ The Table is a singular entity, a data class (`Table.kt`) that holds the truth o
 
 ## Decrees of Form
 
-*   **Diamond Layout:** The table rails must be adorned with diamonds. There shall be **three** diamonds on each of the short (end) rails, and **four** diamonds on each of the long (side) rails, excluding those at the corners and center pockets. This is implemented in `RailRenderer.kt`.
+* **Diamond Layout:** The table rails must be adorned with diamonds. There shall be **three** diamonds on each of the short (end) rails, and **six** diamonds on each of the long (side) rails, not counting the pockets. This is implemented in `RailRenderer.kt`.

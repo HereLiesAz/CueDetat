@@ -37,6 +37,16 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
 
         val constantTouchRadius = LOGICAL_BALL_RADIUS * 3.5f // Increased trigger area
 
+        // Banking Mode Logic
+        if (currentState.isBankingMode) {
+            return if (onPlaneBall != null && getDistance(logicalPoint, onPlaneBall.center) < constantTouchRadius) {
+                currentState.copy(interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL, hasCueBallBeenMoved = true, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
+            } else {
+                currentState.copy(interactionMode = InteractionMode.AIMING_BANK_SHOT)
+            }
+        }
+
+        // Protractor Mode Logic
         val spinControlTouchRadius = (onPlaneBall?.radius ?: protractorUnit.radius) * 1.5f
         if (currentState.isSpinControlVisible && spinControlCenter != null && getDistance(event.screenOffset, spinControlCenter) < spinControlTouchRadius) {
             return currentState.copy(interactionMode = InteractionMode.MOVING_SPIN_CONTROL, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)

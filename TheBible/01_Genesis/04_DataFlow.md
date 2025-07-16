@@ -24,12 +24,12 @@ This document describes the MVI (Model-View-Intent) architecture of the applicat
 To avoid rendering artifacts and maintain sanity, the following order of operations within the `UpdateStateUseCase` is mandatory. It is the architectural law for creating the final projection matrix.
 
 1.  **World Transformations (2D):** A `worldMatrix` is created. This matrix handles all transformations on the flat, logical plane.
-    *   It first applies the `zoom` factor as a 2D scale.
-    *   It then applies the `tableRotationDegrees` as a 2D rotation.
+    * It first applies the `zoom` factor as a 2D scale.
+    * It then applies the `tableRotationDegrees` as a 2D rotation around the logical origin (0,0).
 2.  **Camera Transformations (3D):** A separate `perspectiveMatrix` is created using the `android.graphics.Camera` class. This matrix is responsible *only* for applying the 3D perspective tilt based on the device's sensor pitch.
 3.  **Final Assembly:** The final `pitchMatrix` is constructed in a precise order:
     a. Start with the `worldMatrix` (which contains the zoomed and rotated logical plane).
     b. `postConcat` the `perspectiveMatrix` to apply the 3D tilt to the already-transformed world.
     c. `postTranslate` the entire result to center it on the screen.
 
-This strict order ensures that zoom and rotation are 2D operations on the logical plane, and tilt is a 3D operation on the camera's view of that plane, preventing visual corruption like the "wobble" or "barrel roll."
+This strict order ensures that zoom and rotation are 2D operations on the logical plane, and tilt is a 3D operation on the camera's view of that plane, preventing visual corruption like the "wobble" or "roll."

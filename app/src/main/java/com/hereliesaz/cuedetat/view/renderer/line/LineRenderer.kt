@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.Typeface
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.ui.theme.RebelYellow
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
@@ -175,35 +176,28 @@ class LineRenderer {
     private fun drawBankingLines(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         if (state.bankShotPath.size < 2) return
 
-        val bankLineConfigs = listOf(BankLine1(), BankLine2(), BankLine3(), BankLine4())
-        val lastSegmentIndex = state.bankShotPath.size - 2
+        val isPocketed = state.pocketedBankShotPocketIndex != null
 
-        for (i in 0..lastSegmentIndex) {
-            val start = state.bankShotPath[i]
-            val end = state.bankShotPath[i+1]
+        if (isPocketed) {
+            // If pocketed, draw all segments in white.
+            val whitePaint = Paint(paints.shotLinePaint).apply { color = Color.White.toArgb() }
+            val whiteGlowPaint = Paint(paints.lineGlowPaint).apply { color = Color.White.toArgb(); alpha = (paints.lineGlowPaint.alpha * 0.7f).toInt() }
+            drawPath(canvas, state.bankShotPath, whiteGlowPaint)
+            drawPath(canvas, state.bankShotPath, whitePaint)
+        } else {
+            // Otherwise, use progressive styling.
+            val bankLineConfigs = listOf(BankLine1(), BankLine2(), BankLine3(), BankLine4())
+            for (i in 0 until state.bankShotPath.size - 1) {
+                val start = state.bankShotPath[i]
+                val end = state.bankShotPath[i+1]
+                val config = bankLineConfigs.getOrElse(i) { bankLineConfigs.last() }
 
-            val isLastSegment = i == lastSegmentIndex
-            val isPocketed = state.pocketedBankShotPocketIndex != null
-
-            val config = bankLineConfigs.getOrElse(i) { bankLineConfigs.last() }
-
-            val linePaint = if (isLastSegment && isPocketed) {
-                Paint(paints.shotLinePaint).apply { color = RebelYellow.toArgb() }
-            } else {
-                Paint(paints.bankLine1Paint).apply { color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
-            }
-
-            val glowPaint = Paint(paints.lineGlowPaint).apply {
-                color = linePaint.color
-                alpha = (config.glowColor.alpha * 255).toInt()
-                strokeWidth = config.glowWidth
-            }
-
-            // If it's the last segment and not pocketed, draw it fading
-            if (isLastSegment && !isPocketed) {
-                val direction = normalize(PointF(end.x-start.x, end.y-start.y))
-                drawFadingLine(canvas, start, direction, linePaint, glowPaint, state)
-            } else {
+                val linePaint = Paint(paints.bankLine1Paint).apply { color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
+                val glowPaint = Paint(paints.lineGlowPaint).apply {
+                    color = linePaint.color
+                    alpha = (config.glowColor.alpha * 255).toInt()
+                    strokeWidth = config.glowWidth
+                }
                 canvas.drawLine(start.x, start.y, end.x, end.y, glowPaint)
                 canvas.drawLine(start.x, start.y, end.x, end.y, linePaint)
             }
