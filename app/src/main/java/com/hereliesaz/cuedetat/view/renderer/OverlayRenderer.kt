@@ -22,7 +22,7 @@ class OverlayRenderer {
         if (state.viewWidth == 0 || state.viewHeight == 0) return
 
         // Pass 1: Draw Table Surface
-        if (state.showTable || state.isBankingMode) {
+        if (state.table.isVisible) {
             canvas.save()
             canvas.concat(state.pitchMatrix)
             tableRenderer.drawSurface(canvas, state, paints)
@@ -36,7 +36,7 @@ class OverlayRenderer {
         canvas.restore()
 
         // Pass 3: Draw Lifted Rails & Their Labels
-        if (state.showTable || state.isBankingMode) {
+        if (state.table.isVisible) {
             canvas.save()
             canvas.concat(state.railPitchMatrix)
             railRenderer.draw(canvas, state, paints)
@@ -45,7 +45,7 @@ class OverlayRenderer {
         }
 
         // Pass 4: Draw Pockets (on top of lines)
-        if (state.showTable || state.isBankingMode) {
+        if (state.table.isVisible) {
             canvas.save()
             canvas.concat(state.pitchMatrix)
             tableRenderer.drawPockets(canvas, state, paints)

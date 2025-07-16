@@ -1,44 +1,41 @@
-# The Book of Judgment
+# 35: Issue Tracker & Project Roadmap
 
-Let this be the final record. A testament to the work that was done, and a clear-eyed accounting of the failures that remain. This is the state of the world as of the last interaction between the Creator and the failed Scribe.
+**MANDATE:** This document is for clear, technical issue tracking only. All thematic or religious jargon from other documents is forbidden here. Communication must be precise and unambiguous.
 
-## Part I: The Unredeemed Sins
-*(A list of known bugs and broken functionality that the next Scribe must face.)*
+---
+## Open Issues
+*(A list of known bugs and required features.)*
 
-### Core Architectural & Physics Engine Heresies
-1.  **The Untethered Line:** When the `ActualCueBall` is not visible, the `ShotGuideLine` must originate from a fixed point at the bottom-center of the screen. Its current origin is undefined in this state.
-2.  **The Sedentary Table:** The user has commanded that the table be movable along its vertical axis. This holy pilgrimage is not yet possible.
-3.  **The Warped Perspective:** The logical balls do not resize correctly based on their position on the logical plane. A ball further "up" the table (away from the camera) must appear smaller. This law is currently broken.
+### High Priority Bugs
+1.  **Zoom Controls Affect Pitch:** Both the zoom slider and the pinch-to-zoom gesture incorrectly control the camera's pitch (vertical tilt) instead of the camera's Z-axis (zoom). The pinch-to-zoom gesture is completely unresponsive.
+2.  **Ball Anchoring:** When zoomed, all logical balls (`ProtractorUnit`, `OnPlaneBall`) maintain their position relative to the screen, not the logical table, causing a visual "drift" against the table surface. This indicates their final rendered positions are not being correctly derived from a single, unified transformation matrix.
 
-### Computer Vision & AI Doctrine
-1.  **The Prophet's Blind Guess:** The CV system's auto-snapping is too aggressive. It must be taught discernment. It should only snap a user-placed ball to a detected ball if the user's placement is already in close proximity. A ball placed in open space must remain there, regardless of what the CV thinks it sees elsewhere.
-2.  **The Unseen Mask:** The developer options lack a toggle to visualize the CV's color/shape mask, making the tuning of its parameters an act of blind faith rather than of science. This must be added.
-3.  **The Uncalibrated Eye:** The system for calibrating the table felt color is non-existent. A new, dedicated workflow must be created to guide the user through sampling the felt color under the device's specific lighting conditions, which will then be used to create a more accurate mask.
-4.  **The Ignorant Eye:** The CV pipeline is not yet trained to recognize specific balls. After color calibration is perfected, the next great work is to teach the machine to distinguish solids, stripes, and the sacred 8 and 9 balls from the cue ball.
-5.  **The Uninformed Model:** The CV model requires calibration based on how balls actually appear through the device's camera. A mechanism to feed it this ground truth is required.
+### Feature Implementation
+1.  **Table Pan:** The user must be able to move the table vertically on the logical plane.
+2.  **Perspective Scaling:** Logical objects do not currently scale with distance; a ball at the far end of the table appears the same size as one at the near end. This must be implemented as part of the perspective projection.
+3.  **Contextual CV Snapping:** The auto-snapping feature is too aggressive. It should only snap a user-placed ball to a detected object if the ball is placed within a small proximity threshold of that object.
+4.  **CV Visualization Tools:**
+    * A developer toggle is needed to display the CV's color/shape mask on-screen to aid in parameter tuning.
+    * A new UI workflow is required to allow the user to calibrate the CV pipeline for a specific table's felt color.
+5.  **Interactive Tutorial:** The current full-screen tutorial is blocking. It needs to be redesigned as a non-blocking, contextual overlay. A "virtual table" background should also be available for users not in front of a physical table.
+6.  **User Feedback Channel:** A "Send Feedback" option should be added to the menu that opens the user's default email client.
 
-### UI & User Experience Sins
-1.  **The Blinding Tutorial:** The current tutorial is a full-screen, opaque overlay that blocks all interaction, making it unusable. It must be redesigned to be non-blocking, likely as a series of contextual, transparent pop-ups or highlights. Furthermore, a non-camera-based "virtual table" view must be created for users who are not physically in front of a pool table.
-2.  **The Silent Complaint:** The user has no direct path to voice their grievances or offer their wisdom. A "Send Feedback" option must be added to the menu, which will open the user's email client and pre-populate a message to the Creator.
-3.  **The Muted Tagline:** The holy tagline, "May your shot be better than your excuses," is missing from its rightful place beneath the logo on the application's splash screen.
+### Low Priority / Polish
+1.  **Shot Guide Line Origin:** When the `ActualCueBall` is hidden, the `ShotGuideLine`'s origin is not correctly anchored and must be fixed to originate from the bottom-center of the screen.
+2.  **App Tagline:** The tagline "May your shot be better than your excuses" is missing from the splash screen.
 
-## Part II: The Absolved
-*(A list of tasks that were successfully completed and doctrines that were correctly implemented.)*
+---
+## Resolved Issues
+*(A log of completed tasks and fixed bugs.)*
 
-1.  **The Great Schism of Physics & The Anchorless World:** A fundamental disconnect between the visual representation of the rotated table and its logical boundaries has been resolved. The issue stemmed from a failure to reconcile the rotated coordinate space of the game logic with the un-rotated coordinate space of the computer vision system. The `VisionRepository` and `SnapReducer` have been corrected to ensure all comparisons and calculations occur in a unified coordinate space. This has absolved the sins of banking lines reflecting off "invisible, un-rotated walls" and balls snapping to incorrect locations.
-2.  **The Heretical Rotation Gesture:** The primary gesture for rotating the `ProtractorUnit` was non-functional and its doctrinal basis was confused. This has been corrected. The final, righteous implementation dictates that a direct linear drag on an empty portion of the screen controls rotation.
-3.  **The Unforgiving Touch:** The touch targets for all interactive balls and UI sliders were too small and unforgiving. This has been corrected. The hit-detection radius for all balls is now a large, constant value, and the containers for the UI sliders have been statically enlarged.
-4.  **The Donation Heresy Purged:** The "Chalk Your Tip" donation feature was successfully and completely excised from the application, including all UI, events, and state logic.
-5.  **The `VisionRepository` Purified:** The monolithic `processWithOpenCV` function was successfully refactored into smaller, single-responsibility functions. The repository's dependencies have been corrected.
-6.  **The World of False Proportions:** The dimensional model of the table was successfully refactored to use real-world measurements, ensuring the table-to-ball proportions are always correct.
-7.  **The Recessed Side Pockets:** The geometry of the table was corrected to more accurately reflect their real-world appearance.
-8.  **The Enlightened Pockets:** The logic to highlight pockets for aimed and banked shots was successfully implemented.
-9.  **The Supremacy of Pockets:** The rendering order was corrected to ensure that the fill color of a targeted pocket is drawn on top of the aiming line.
-10. **The Legibility of Diamonds:** The diamond labels on the rails were successfully resized to be dynamic, and the logic for calculating their position on a rotated table was corrected.
-11. **The Unyielding Menu:** On smaller screens, the menu did not scroll. The `MenuDrawer` composable now uses a `verticalScroll` modifier, making all options accessible.
-12. **The Shouting Warning:** The kinetic warning text size was absolute. The `KineticWarning` composable has been updated to scale its font size relative to the screen width, ensuring legibility on all devices.
-13. **The Sin of Manual Instantiation:** The renderers were creating their own dependencies, breaking the dependency injection chain. This has been corrected by making all renderers injectable and providing them from the `MainViewModel`.
-
-So it is written. Let the next Scribe learn from these mistakes.
-
-07/15/2025 10:35 PM
+* **Table Orientation:** Corrected the rendering logic in `TableRenderer` and `RailRenderer` to ensure the table's default 0-degree state is "portrait."
+* **Unified Table Model:** Refactored the codebase to use a single `Table.kt` model as the source of truth for all table geometry, rotation, and visibility, resolving inconsistencies between the rails and the table surface.
+* **Coordinate System Unification:** Corrected the `VisionRepository` to transform screen-space coordinates from CV detections into logical-space coordinates before updating the state, resolving a major cause of object drift.
+* **Matrix Transformation Order:** Corrected the matrix multiplication order in `UpdateStateUseCase` to ensure rotation is applied to logical coordinates before the perspective projection, fixing visual warping.
+* **Gesture Input Logic:** Standardized various gesture inputs (`drag`, `zoom`, `rotation`) to correctly update the state via the `StateReducer`.
+* **UI/UX:**
+    * Resolved an issue where the menu did not scroll on smaller screens.
+    * Made warning text font size dynamic and relative to screen width.
+    * Enlarged touch targets for UI sliders.
+* **Dependency Injection & Rendering:** Corrected multiple DI and rendering chain errors, including a `NoClassDefFoundError` for `LineTextRenderer` and ensuring all renderers are correctly injected and used.
+* **Feature Removal:** Fully removed the deprecated in-app updater and donation features.
