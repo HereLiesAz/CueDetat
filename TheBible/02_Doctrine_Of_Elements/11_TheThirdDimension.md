@@ -2,34 +2,12 @@
 
 ## Perspective Transformation
 
-The process, handled by a `pitchMatrix`, of projecting the Logical Plane onto the Screen Plane to create the 3D illusion. The transformation order is critical:
-1.  Scale around the logical origin (0,0).
-2.  Rotate around the logical origin (0,0).
-3.  Translate based on device tilt.
-4.  Translate the entire logical plane to the center of the screen view.
+The transformation from the 2D logical plane to the 3D screen view is a sacred and precise process, governed by the `UpdateStateUseCase` and `Perspective.kt`.
 
-## Table Rotation Pivot
+### Mandates of Transformation
 
-The table must rotate around its actual center (0,0), which must be anchored to the logical plane's origin (0,0).
-
-## Global Zoom & Perspective Sizing
-
-A single zoom factor, controlled by the vertical zoom slider, determines the scale of the projection matrix. **Crucially, the apparent size of logical objects must also decrease as their logical Y-coordinate increases (as they move "further away" on the table), independent of the global zoom.** This is a fundamental law of perspective that is currently violated.
-
-## Mandate: Logical Positioning Stability
-
-The logical coordinates of any object are absolute and must be immutable during view transformations. A ball placed at logical position `(x,y)` must remain at logical position `(x,y)` regardless of any zoom or rotation transformations applied by the `pitchMatrix`. The transformations only affect the *projection* of the logical plane onto the screen, not the positions of objects within the logical plane itself. This ensures that zooming or rotating the view does not cause elements to drift from their positions on the table.
-***
-## Addendum: On Transformation Order and Sanity
-
-The rendering pipeline intentionally separates 3D and 2D transformations. The `pitchMatrix` is calculated first, applying the 3D perspective tilt. Any subsequent 2D rotations (like `tableRotation`) are applied as a `postRotate` operation on this already-pitched matrix. Conflating these into a single multi-axis `android.graphics.Camera` operation is forbidden, as it has proven to lead to madness and visual corruption. The source of unexpected rotation is almost always an incorrect default or calculated value in the `OverlayState`, not a flaw in the matrix pipeline itself.
-
-## Addendum: Mandates
-
-* **Roll is Heresy**: Device roll is a corrupting influence on the 2D-to-3D projection. The `createPitchMatrix` function in `Perspective.kt` must be modified to ignore the `roll` component of the device's orientation. Only `pitch` shall be used for vertical translation.
-
-* **The Overhead Anomaly**: The initial "lift" logic for 3D ghost effects created a visual disconnect when viewed from directly overhead (0° pitch), making the ghost and base appear as two separate, non-concentric circles. The lift calculation was corrected to be proportional to the sine of the pitch angle (`lift = radius * sin(pitch)`). This ensures the lift is 0 at 0° pitch (perfect alignment) and increases smoothly as the phone tilts, preserving the 3D illusion.
-
-* **3D "Ghost" Effect**: The "lifted" effect for the `TargetBall`, `GhostCueBall`, and `ActualCueBall` in Protractor Mode must be a pure screen-space effect. This effect is achieved by the `BallRenderer`'s `drawLiftedBall` method, which projects the ball's logical center to the screen, calculates a screen-space lift and radius based on perspective, and then draws the "lifted" circle directly on the screen canvas.
-
-* **The Overhead Rail Anomaly (Corrected)**: The same heresy that afflicted the ghost balls also afflicted the table rails, causing them to appear detached from the table surface when viewed from a 0° pitch. The `railLiftAmount` calculation in `UpdateStateUseCase` **must** also be made proportional to the sine of the pitch angle (`lift * abs(sin(pitch))`). This ensures all lifted elements in the 3D scene behave according to the same physical and visual laws.
+*   **Doctrine of Rightful Order:** The final projection matrix **must** be created by first applying all 2D logical transformations (zoom and rotation) and *then* applying the 3D camera transformations (pitch/tilt). To do otherwise is to invite the "wobble" heresy.
+*   **Doctrine of True Spin:** The rotation of the table **must** be a 2D rotation of the logical plane *before* any perspective is applied. This is handled in `UpdateStateUseCase.kt`. The `Perspective.kt` class itself must remain ignorant of table rotation and only handle the camera's tilt.
+*   **Doctrine of Decoupled Zoom:** Zoom is a 2D scaling of the logical plane. It is not a change in the camera's Z-axis position. This decoupling prevents zoom from affecting the perspective distortion (the "tilt" effect).
+*   **Doctrine of Unified Sizing:** The on-screen radius of a 3D "ghost" ball **must** be identical to its 2D "shadow" counterpart. This is achieved in `DrawingUtils.kt` by projecting two logical points (the ball's center and a point on its edge) using the final `pitchMatrix` and measuring their screen-space distance. Using a `flatMatrix` for this purpose is a corrected heresy, as it failed to account for zoom.
+*   **Doctrine of Rail Lift:** The `railLiftAmount` calculation in `UpdateStateUseCase` **must** be proportional to the sine of the pitch angle (`lift * abs(sin(pitch))`). This ensures the rails appear flush with the table at a 0° pitch and rise naturally with the tilt.

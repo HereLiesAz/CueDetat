@@ -1,44 +1,35 @@
-# Rendering Pipeline
+# The Architecture of the World
 
-1.  **Event (UI -> ViewModel):** A user interaction occurs in a Composable. An `MainScreenEvent` is sent to the `MainViewModel`.
+This document describes the MVI (Model-View-Intent) architecture of the application, which follows a strict unidirectional data flow. This is the law.
 
-2.  **Orchestration (ViewModel):**
-    *   For screen-space events (like dragging on the `ProtractorOverlay`), the ViewModel uses the `inversePitchMatrix` from the current state to convert screen coordinates to logical coordinates.
-    *   It then dispatches a new logical-space event (e.g., `LogicalDragApplied`, `AimBankShot`).
+## The Components
 
-3.  **Reduction (ViewModel -> StateReducer):** The `StateReducer` receives the event. It acts as a switchboard, delegating the event to the appropriate specialized reducer (`GestureReducer`, `ToggleReducer`, etc.). The specialized reducer takes the current state and the event, and returns a new, updated state without any side effects. Example: It updates the position of a ball model or toggles a boolean flag.
+* **View (`MainActivity`, `MainScreen`, Composables):** The UI layer. It is responsible only for displaying the state and forwarding user interactions (events) to the ViewModel. It contains no business logic. It is, and must remain, a beautiful idiot.
+* **ViewModel (`MainViewModel`):** The High Priest. It receives events from the View. It translates these events into logical actions and dispatches them to the `StateReducer`. It also subscribes to data flows (like sensors) and transforms them into events. It holds no state of its own, save for the `StateFlow` of the `OverlayState`.
+* **State Reducer (`StateReducer` and sub-reducers):** The Chancellery. This is the only component allowed to modify the state. It takes the current state and an event, and produces a new state. It is a pure function. Its logic is subdivided into smaller, specialized reducers (e.g., `GestureReducer`, `ControlReducer`) for clarity and sanity.
+* **Use Cases (e.g., `UpdateStateUseCase`, `CalculateBankShot`):** The Oracles. These classes contain complex business logic and calculations. They are invoked by the ViewModel after a state has been reduced to derive new properties of the state (e.g., calculating line intersections, obstruction). They do not modify state directly.
+* **State (`OverlayState`):** The One True Source of Truth. A single, immutable data class that represents the entire state of the application at any given moment. Every pixel on the screen is a direct function of this state.
 
-4.  **Derivation (ViewModel -> Use Cases):** The ViewModel takes the new state from the reducer and begins a two-stage derivation process:
-    *   **Stage 1 - Perspective:** The state is passed to `UpdateStateUseCase`. This use case calculates all perspective-derived data: the `pitchMatrix`, its inverse, the `shotLineAnchor`, `isImpossibleShot` flag, and the `targetBallDistance`. It returns a state updated with this new geometric truth.
-    *   **Stage 2 - Banking:** If the state indicates `isBankingMode` is true, the result from Stage 1 is then passed to `CalculateBankShot`. This use case calculates the multi-rail `bankShotPath` and determines if a pocket was made, returning the final calculated state.
+## The Flow
 
-5.  **State Update (ViewModel -> UI):** The ViewModel updates its `_uiState` Flow with the new, final state from the derivation pipeline.
+1.  A user **interacts** with the **View** (e.g., drags a finger).
+2.  The View creates an **Event** (e.g., `MainScreenEvent.Drag`) and sends it to the **ViewModel**.
+3.  The ViewModel receives the Event and dispatches it to the **StateReducer**.
+4.  The **StateReducer** takes the current `OverlayState` and the Event, and produces a new, immutable `OverlayState`.
+5.  The new `OverlayState` is emitted from the ViewModel's `StateFlow`.
+6.  The **View**, observing the `StateFlow`, receives the new state and re-renders itself accordingly.
 
-6.  **Render (UI):**
-    *   The `MainScreen` Composable recomposes based on the new state.
-    *   A `Canvas` Composable's `onDraw` block is triggered, and it calls the `OverlayRenderer` to draw the scene using the new state.
-    *   The heresy of `AndroidView` has been purged. The UI is pure Compose.
+## The Rendering Pipeline Gospel
 
-***
-## Addendum: The Rendering Pipeline Gospel
+To avoid rendering artifacts and maintain sanity, the following order of operations within the `UpdateStateUseCase` is mandatory. It is the architectural law for creating the final projection matrix.
 
-To avoid rendering artifacts and maintain sanity, the following order of operations within the `OverlayRenderer` is mandatory. It is not a suggestion. It is the law.
+1.  **World Transformations (2D):** A `worldMatrix` is created. This matrix handles all transformations on the flat, logical plane.
+    *   It first applies the `zoom` factor as a 2D scale.
+    *   It then applies the `tableRotationDegrees` as a 2D rotation.
+2.  **Camera Transformations (3D):** A separate `perspectiveMatrix` is created using the `android.graphics.Camera` class. This matrix is responsible *only* for applying the 3D perspective tilt based on the device's sensor pitch.
+3.  **Final Assembly:** The final `pitchMatrix` is constructed in a precise order:
+    a. Start with the `worldMatrix` (which contains the zoomed and rotated logical plane).
+    b. `postConcat` the `perspectiveMatrix` to apply the 3D tilt to the already-transformed world.
+    c. `postTranslate` the entire result to center it on the screen.
 
-1.  **ViewModel Responsibility**: The `ViewModel` is responsible for one thing: producing a correct and complete `OverlayState`. It calculates the single, centrally-pivoted `pitchMatrix` based on sensor input and computes the logical positions of all objects. This is all packaged and sent down to the renderer.
-
-2.  **Renderer Responsibility**: The `OverlayRenderer` receives the final `OverlayState` and does nothing but draw. It performs no calculations. Its `draw` method must adhere to this sequence:
-    *   **Pass 1: Pitched Table Surface & On-Plane Elements:**
-        *   `canvas.save()`
-        *   `canvas.concat(pitchMatrix)`: The 3D perspective is applied to the entire canvas *once*. All subsequent drawing operations until `canvas.restore()` will be in the transformed (pitched) space.
-        *   Draw all elements that exist *on* the 3D world plane (the `TableModel`, all lines and their labels, and the on-plane "shadows" of the ghosted balls) onto this single transformed canvas at their logical `(x, y)` coordinates.
-        *   `canvas.restore()`
-    *   **Pass 2: Lifted Rails (Banking Mode Only):**
-        *   `canvas.save()`
-        *   `canvas.concat(railPitchMatrix)`: A separate matrix with a vertical lift is used for the rails.
-        *   Draw the rails.
-        *   `canvas.restore()`
-    *   **Pass 3: Screen-Space "Ghost" Effects (Protractor Mode Only):**
-        *   These elements do not exist on the logical 3D plane. Their positions are calculated by projecting their logical counterparts' centers to the screen, and then applying a "lift" offset.
-        *   Draw the "ghost" versions of the `TargetBall`, `GhostCueBall`, and `ActualCueBall` directly on the screen canvas, without the `pitchMatrix`.
-    *   **Pass 4: Screen-Space Protractor Guides:**
-        *   The radiating protractor lines are drawn last in pure screen-space so they are not affected by perspective.
+This strict order ensures that zoom and rotation are 2D operations on the logical plane, and tilt is a 3D operation on the camera's view of that plane, preventing visual corruption like the "wobble" or "barrel roll."

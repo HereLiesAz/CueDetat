@@ -12,11 +12,9 @@
 * **Termination**: It terminates at the first point of contact, be it a pocket edge or a rail.
 * **Color**: If the line terminates at a pocket, it must turn `RebelYellow`.
 * **Banking Preview**:
-    * When the table is visible and the direct aiming line does **not** terminate in a pocket, a single bank reflection shall be calculated and drawn.
-    * The first segment (to the rail) uses the standard `AimingLine` style.
-    * The second, reflected segment uses the styles from `BankLine3.kt`. If this reflected path aims at a pocket, it must turn `RebelYellow` and terminate at the pocket's edge.
-    * A diamond number label must be rendered at the point of impact on the rail. This label is not considered "help text" and must always be visible.
-* **Label**: "Aiming Line".
+  * When the table is visible and the direct aiming line does **not** terminate in a pocket, a single bank reflection shall be calculated and drawn.
+  * The banked segment must inherit the color of the primary aiming line, but with a reduced alpha to distinguish it. If the path leads to a pocket, the banked segment turns `RebelYellow`.
+  * A diamond number label must be rendered at the point of impact on the rail. This label is not considered "help text" and must always be visible when its line is visible. It is rendered on the same 3D plane as the rails themselves.
 
 * **Shot Guide Line** (Protractor Mode)
 * **Path**: Drawn from the `shotLineAnchor` point through the `GhostCueBall` center.
@@ -26,7 +24,7 @@
 
 * **Tangent Lines** (Protractor Mode)
 * **Path**: Two rays originating from the `GhostCueBall` center, drawn perpendicular to the Aiming Line.
-* **Style**: The line indicating the cue ball's deflection path is solid; the other is dotted.
+* **Style**: The line indicating the cue ball's deflection path is solid; the other is dotted. Its banking preview behaves identically to the Aiming Line's.
 * **Label**: "Tangent Line".
 
 * **Fixed Angle Guides** (Protractor Mode)

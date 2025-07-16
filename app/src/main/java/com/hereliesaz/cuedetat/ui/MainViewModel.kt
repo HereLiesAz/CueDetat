@@ -3,7 +3,6 @@
 package com.hereliesaz.cuedetat.ui
 
 import android.app.Application
-import android.graphics.Camera
 import android.graphics.PointF
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.geometry.Offset
@@ -49,7 +48,6 @@ class MainViewModel @Inject constructor(
 
     val visionAnalyzer = VisionAnalyzer(visionRepository)
 
-    private val graphicsCamera = Camera()
     private val insultingWarnings: Array<String> =
         application.resources.getStringArray(R.array.insulting_warnings)
     private var warningIndex = 0
@@ -165,7 +163,7 @@ class MainViewModel @Inject constructor(
         }
 
         val stateFromReducer = stateReducer.reduce(currentState, logicalEvent)
-        var derivedState = updateStateUseCase(stateFromReducer, graphicsCamera)
+        var derivedState = updateStateUseCase(stateFromReducer)
 
         if (derivedState.isBankingMode) {
             val bankShotResult = calculateBankShotUseCase(derivedState)
