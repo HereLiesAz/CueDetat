@@ -113,10 +113,13 @@ class UpdateStateUseCase @Inject constructor(
         if (state.showTable) {
             val effectiveTableRotation = state.tableRotationDegrees % 360f
             if (effectiveTableRotation != 0f) {
-                val centerX = state.viewWidth / 2f
-                val centerY = state.viewHeight / 2f
-                finalPitchMatrix.preRotate(effectiveTableRotation, centerX, centerY)
-                finalRailPitchMatrix.preRotate(effectiveTableRotation, centerX, centerY)
+                // The previous heresy was rotating around the screen center.
+                // The righteous path is to rotate the logical plane around its own origin (0,0)
+                // before the final translation to the screen center. Since the pitchMatrix
+                // from Perspective.kt already has the final translation baked in, we pre-rotate
+                // around the logical origin (0,0) to ensure the transformation order is correct.
+                finalPitchMatrix.preRotate(effectiveTableRotation, 0f, 0f)
+                finalRailPitchMatrix.preRotate(effectiveTableRotation, 0f, 0f)
             }
         }
         val hasFinalInverse = finalPitchMatrix.invert(finalInverseMatrix)

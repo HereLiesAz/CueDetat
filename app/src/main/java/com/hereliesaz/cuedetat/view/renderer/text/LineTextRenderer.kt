@@ -14,6 +14,7 @@ import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 class LineTextRenderer {
 
@@ -78,7 +79,7 @@ class LineTextRenderer {
     }
 
     fun drawDiamondLabel(canvas: Canvas, point: PointF, railType: RailType, state: OverlayState, paint: Paint) {
-        val diamondNumberText = calculateDiamondNumber(point, railType, state) ?: return
+        val diamondNumberText = calculateDiamondNumber(point, state) ?: return
 
         val ballRadiusOnRailPlane = DrawingUtils.getPerspectiveRadiusAndLift(
             logicalCenter = point,
@@ -113,7 +114,7 @@ class LineTextRenderer {
     }
 
 
-    private fun calculateDiamondNumber(point: PointF, railType: RailType, state: OverlayState): String? {
+    private fun calculateDiamondNumber(point: PointF, state: OverlayState): String? {
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
         if (referenceRadius <= 0) return null
 
@@ -122,22 +123,32 @@ class LineTextRenderer {
         val scale = ballLogicalDiameter / ballRealDiameter
         val tableWidth = state.tableSize.longSideInches * scale
         val tableHeight = state.tableSize.shortSideInches * scale
-
         val halfW = tableWidth / 2f
         val halfH = tableHeight / 2f
 
-        val logicalX = point.x - state.viewWidth / 2f
-        val logicalY = point.y - state.viewHeight / 2f
+        // The 'point' is in the rotated logical space. We must apply an inverse rotation
+        // to get its position relative to the table's un-rotated coordinate system.
+        val angleRad = Math.toRadians(-state.tableRotationDegrees.toDouble()) // Negative angle for inverse
+        val cosA = cos(angleRad).toFloat()
+        val sinA = sin(angleRad).toFloat()
 
-        val diamondValue = when (railType) {
-            RailType.TOP -> ((logicalX + halfW) / tableWidth) * 8.0
-            RailType.RIGHT -> ((logicalY + halfH) / tableHeight) * 4.0
-            RailType.BOTTOM -> 8.0 - (((logicalX + halfW) / tableWidth) * 8.0)
-            RailType.LEFT -> 4.0 - (((logicalY + halfH) / tableHeight) * 4.0)
+        val unrotatedX = point.x * cosA - point.y * sinA
+        val unrotatedY = point.x * sinA + point.y * cosA
+
+        val tolerance = 5f // A small tolerance in logical units
+
+        // Use the un-rotated coordinates to determine the diamond number
+        val diamondNumber = when {
+            abs(unrotatedY - (-halfH)) < tolerance -> 2 + (unrotatedX / halfW) * 2
+            abs(unrotatedY - halfH) < tolerance -> 6 + (-unrotatedX / halfW) * 2
+            abs(unrotatedX - (-halfW)) < tolerance -> 4 + (-unrotatedY / halfH)
+            abs(unrotatedX - halfW) < tolerance -> 8 + (unrotatedY / halfH)
+            else -> return null // Should not happen if railType is correct
         }
 
-        return String.format("%.1f", diamondValue)
+        return String.format("%.1f", diamondNumber)
     }
+
 
     fun drawBankingLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?){
         // This function is deprecated as its logic has been moved to LineRenderer, which has access to the necessary helper functions.

@@ -23,3 +23,10 @@ To facilitate the training and tuning of a custom AI model, the system must be c
 * The user's custom-trained `.tflite` model.
 
 The results from each detector must be rendered on screen in a visually distinct style, allowing for a direct, real-time comparison of their performance. This is the path to enlightenment.
+
+## New Decrees of Vision
+
+* **Doctrine of Conditional Snapping:** The auto-snapping of logical balls to detected CV objects shall no longer be absolute. It is now decreed that a snap shall only occur if the user places a logical ball *in close proximity* to a detected object. A ball placed in open space must remain in open space, free from the pull of a distant, unrelated detection.
+* **Doctrine of the Revealed Mask:** A toggle shall be added to the Developer Options to render the CV's internal color mask directly on the screen. This will grant the user the sight necessary to properly tune the detection parameters.
+* **Doctrine of the Calibrated Eye:** A new, dedicated workflow shall be created for calibrating the system to the felt color of a specific table, improving the accuracy of the mask.
+* **Doctrine of Specificity (Future Work):** Once the eye is calibrated, it must be taught to see not just "balls", but *specific* balls, distinguishing solids from stripes, and all from the holy cue and the final 8-ball. This is the next great work.

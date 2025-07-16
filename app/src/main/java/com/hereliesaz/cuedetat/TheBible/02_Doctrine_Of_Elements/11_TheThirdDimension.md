@@ -10,11 +10,11 @@ The process, handled by a `pitchMatrix`, of projecting the Logical Plane onto th
 
 ## Table Rotation Pivot
 
-The table must rotate around its actual center (0,0).
+The table must rotate around its actual center (0,0), which must be anchored to the logical plane's origin (0,0).
 
-## Global Zoom
+## Global Zoom & Perspective Sizing
 
-A single zoom factor, controlled by the vertical zoom slider, determines the scale of the projection matrix.
+A single zoom factor, controlled by the vertical zoom slider, determines the scale of the projection matrix. **Crucially, the apparent size of logical objects must also decrease as their logical Y-coordinate increases (as they move "further away" on the table), independent of the global zoom.** This is a fundamental law of perspective that is currently violated.
 
 ## Mandate: Logical Positioning Stability
 
@@ -32,4 +32,4 @@ The rendering pipeline intentionally separates 3D and 2D transformations. The `p
 
 * **3D "Ghost" Effect**: The "lifted" effect for the `TargetBall`, `GhostCueBall`, and `ActualCueBall` in Protractor Mode must be a pure screen-space effect. This effect is achieved by the `BallRenderer`'s `drawLiftedBall` method, which projects the ball's logical center to the screen, calculates a screen-space lift and radius based on perspective, and then draws the "lifted" circle directly on the screen canvas.
 
-*   **The Overhead Rail Anomaly (Corrected)**: The same heresy that affected the ghost balls also afflicted the table rails, causing them to appear detached from the table surface when viewed from a 0° pitch. The `railLiftAmount` calculation in `UpdateStateUseCase` **must** also be made proportional to the sine of the pitch angle (`lift * abs(sin(pitch))`). This ensures all lifted elements in the 3D scene behave according to the same physical and visual laws.
+* **The Overhead Rail Anomaly (Corrected)**: The same heresy that afflicted the ghost balls also afflicted the table rails, causing them to appear detached from the table surface when viewed from a 0° pitch. The `railLiftAmount` calculation in `UpdateStateUseCase` **must** also be made proportional to the sine of the pitch angle (`lift * abs(sin(pitch))`). This ensures all lifted elements in the 3D scene behave according to the same physical and visual laws.

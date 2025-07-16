@@ -1,6 +1,9 @@
 # The Table
 
 * **Visibility:** The table is hidden by default. Its visibility is controlled by the `"Toggle Table"` `TextButton` in the menu and its dedicated `FloatingActionButton` when not visible.
+* **Positioning & Movement:**
+    * The table's center **must** be immutably anchored to the logical plane's origin (0,0).
+    * A mechanism must be implemented to allow the user to move the table slightly up or down along its long axis. This is a controlled, limited translation, not a free drag.
 * **Rotation:** The table's default rotation when shown is 90 degrees (portrait). Its rotation is controlled by both the horizontal rotation slider and a two-finger rotation gesture.
 * **Pivot Point:** The table must rotate around its logical center (0,0).
 * **Table Size**:
@@ -11,7 +14,7 @@
 * A menu option ("Table Size") must open a dialog allowing the user to select a specific size directly.
 * **Proportionality**: The logical size of the table and its components (rails, pockets) **must** be derived from the logical size of the cue ball. The `TableSize` enum provides a `getTableToBallRatioLong()` function which is the single source of truth for this proportion. This ensures that as the ball's logical radius changes with zoom, the table scales with it perfectly.
 * **Ball Confinement**: When the table is visible, all interactive balls (`ActualCueBall`, `TargetBall`, `BankingBall`) **must** be constrained to the logical boundaries of the playing surface.
-* **Color-Based Detection**: The system can use color segmentation to isolate the table felt. It will continuously attempt to auto-detect the felt color by sampling the center of the view. A "Lock Color" button allows the user to fix the currently sampled color for more stable detection in varied lighting.
+* **Color-Based Detection**: The system must feature a dedicated workflow for calibrating the table felt color. The user will be guided to aim at the table, tap to sample the color, and confirm the sample. This confirmed color will be used by the CV pipeline to create a mask, improving ball detection.
 
 ***
 ## Addendum: Detailed Table Specifications
