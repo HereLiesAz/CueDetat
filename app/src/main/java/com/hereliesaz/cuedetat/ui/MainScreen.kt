@@ -1,3 +1,4 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt
 package com.hereliesaz.cuedetat.ui
 
 import android.graphics.PointF
@@ -37,12 +38,11 @@ fun MainScreen(viewModel: MainViewModel) {
     val context = LocalContext.current
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    val isSystemDark = isSystemInDarkTheme()
 
     val useDarkTheme = when (uiState.isForceLightMode) {
         true -> false
         false -> true
-        null -> isSystemDark
+        null -> isSystemInDarkTheme()
     }
 
     CueDetatTheme(darkTheme = useDarkTheme) {
@@ -73,6 +73,11 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
+        // Pass the updated color scheme to the ViewModel
+        LaunchedEffect(useDarkTheme) {
+            viewModel.onEvent(MainScreenEvent.UpdateColorScheme(if (useDarkTheme) darkColorScheme() else lightColorScheme()))
+        }
+
         ModalNavigationDrawer(
             drawerState = drawerState,
             gesturesEnabled = drawerState.isOpen,
@@ -94,8 +99,8 @@ fun MainScreen(viewModel: MainViewModel) {
 
                 ProtractorOverlay(
                     uiState = uiState.copy(spinPathsAlpha = alphaAnimatable.value),
-                    systemIsDark = useDarkTheme,
                     onEvent = viewModel::onEvent,
+                    renderer = viewModel.overlayRenderer,
                     modifier = Modifier.fillMaxSize().zIndex(1f)
                 )
 
@@ -120,7 +125,7 @@ fun MainScreen(viewModel: MainViewModel) {
                                     (spinControlCenter.y - spinControlSizePx / 2).roundToInt()
                                 )
                             },
-                        centerPosition = PointF(0f, 0f),
+                        centerPosition = PointF(spinControlSizePx/2, spinControlSizePx/2),
                         selectedSpinOffset = uiState.selectedSpinOffset,
                         lingeringSpinOffset = uiState.lingeringSpinOffset,
                         spinPathAlpha = alphaAnimatable.value,
@@ -134,7 +139,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight(0.6f)
-                        .width(160.dp) // Increased width for a larger touch target
+                        .width(160.dp)
                         .zIndex(5f)
                 )
 
@@ -153,31 +158,17 @@ fun MainScreen(viewModel: MainViewModel) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        ToggleSpinControlFab(
-                            uiState = uiState,
-                            onEvent = viewModel::onEvent
-                        )
-                        AddObstacleBallFab(onEvent = viewModel::onEvent)
-                        if (!uiState.isBankingMode) {
-                            ToggleCueBallFab(
-                                uiState = uiState,
-                                onEvent = viewModel::onEvent
-                            )
-                            ToggleTableFab(
-                                uiState = uiState,
-                                onEvent = viewModel::onEvent
-                            )
-                        }
+                        ActionFabs(uiState = uiState, onEvent = viewModel::onEvent)
                     }
 
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(80.dp) // Increased height for a larger touch target
+                            .height(80.dp)
                             .padding(horizontal = 16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (uiState.showTable) {
+                        if (uiState.table.isVisible) {
                             TableRotationSlider(
                                 uiState = uiState,
                                 onEvent = viewModel::onEvent
@@ -186,7 +177,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
 
                     ResetFab(
-                        uiState = uiState,
+                        hasChanged = uiState.valuesChangedSinceReset,
                         onEvent = viewModel::onEvent,
                         modifier = Modifier.padding(end = 16.dp)
                     )

@@ -1,59 +1,53 @@
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/ActionFabs.kt
-
 package com.hereliesaz.cuedetat.ui.composables
 
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
-fun ToggleSpinControlFab(
+fun ActionFabs(
     uiState: OverlayState,
     onEvent: (MainScreenEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    FloatingActionButton(
-        onClick = { onEvent(MainScreenEvent.ToggleSpinControl) },
-        modifier = modifier
-            .navigationBarsPadding(),
-        containerColor = if (uiState.isSpinControlVisible) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer
-    ) {
-        Text(
-            text = "Spin",
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (uiState.isSpinControlVisible) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
+    Column(modifier = modifier) {
+        if (!uiState.isBankingMode) {
+            ToggleCueBallFab(
+                isVisible = uiState.onPlaneBall != null,
+                isTableVisible = uiState.table.isVisible,
+                onEvent = onEvent
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        ToggleSpinControlFab(
+            isVisible = uiState.isSpinControlVisible,
+            onEvent = onEvent
         )
     }
 }
 
+
 @Composable
 fun ResetFab(
-    uiState: OverlayState,
+    hasChanged: Boolean,
     onEvent: (MainScreenEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
     FloatingActionButton(
         onClick = { onEvent(MainScreenEvent.Reset) },
+        containerColor = if (hasChanged) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
         modifier = modifier
-            .padding(16.dp)
-            .navigationBarsPadding(),
-        containerColor = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer
     ) {
-        Text(
-            text = "Reset\nView",
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (uiState.valuesChangedSinceReset) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
-        )
+        Text("Reset\nView")
     }
 }
 
@@ -63,70 +57,56 @@ fun AddObstacleBallFab(
     modifier: Modifier = Modifier
 ) {
     FloatingActionButton(
-        onClick = { onEvent(MainScreenEvent.AddObstacleBall) },
-        modifier = modifier.navigationBarsPadding(),
-        containerColor = MaterialTheme.colorScheme.primaryContainer
+        onClick = { onEvent(MainScreenEvent.AddObstacle) },
+        modifier = modifier
     ) {
-        Text(
-            text = "Add\nBall",
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onPrimaryContainer
-        )
-    }
-}
-
-@Composable
-fun ToggleCueBallFab(
-    uiState: OverlayState,
-    onEvent: (MainScreenEvent) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val isEnabled = !uiState.showTable
-    val containerColor = when {
-        !isEnabled -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        uiState.onPlaneBall != null -> MaterialTheme.colorScheme.secondaryContainer
-        else -> MaterialTheme.colorScheme.primaryContainer
-    }
-    val textColor = when {
-        !isEnabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-        uiState.onPlaneBall != null -> MaterialTheme.colorScheme.onSecondaryContainer
-        else -> MaterialTheme.colorScheme.onPrimaryContainer
-    }
-
-    FloatingActionButton(
-        onClick = { if (isEnabled) onEvent(MainScreenEvent.ToggleOnPlaneBall) },
-        modifier = modifier.navigationBarsPadding(),
-        containerColor = containerColor
-    ) {
-        Text(
-            text = "Cue Ball\nToggle",
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.labelSmall,
-            color = textColor
-        )
+        Text("Add\nBall")
     }
 }
 
 @Composable
 fun ToggleTableFab(
-    uiState: OverlayState,
+    isVisible: Boolean,
     onEvent: (MainScreenEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val containerColor = if (uiState.showTable) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer
-    val textColor = if (uiState.showTable) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
-
     FloatingActionButton(
         onClick = { onEvent(MainScreenEvent.ToggleTable) },
-        modifier = modifier.navigationBarsPadding(),
-        containerColor = containerColor
+        containerColor = if (isVisible) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
+        modifier = modifier
     ) {
-        Text(
-            text = if (uiState.showTable) "Hide\nTable" else "Show\nTable",
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.labelSmall,
-            color = textColor
-        )
+        Text(if (isVisible) "Hide\nTable" else "Show\nTable")
+    }
+}
+
+
+@Composable
+fun ToggleCueBallFab(
+    isVisible: Boolean,
+    isTableVisible: Boolean,
+    onEvent: (MainScreenEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FloatingActionButton(
+        onClick = { if (!isTableVisible) onEvent(MainScreenEvent.ToggleOnPlaneBall) },
+        containerColor = if (isVisible) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
+        modifier = modifier
+    ) {
+        Text("Cue Ball\nToggle")
+    }
+}
+
+@Composable
+fun ToggleSpinControlFab(
+    isVisible: Boolean,
+    onEvent: (MainScreenEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FloatingActionButton(
+        onClick = { onEvent(MainScreenEvent.ToggleSpinControl) },
+        containerColor = if (isVisible) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
+        modifier = modifier
+    ) {
+        Text("Spin")
     }
 }

@@ -1,22 +1,20 @@
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/UpdateStateUseCase.kt
-
 package com.hereliesaz.cuedetat.domain
 
+import android.R.attr.direction
 import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.data.FullOrientation
-import com.hereliesaz.cuedetat.view.model.OnPlaneBall
+import com.hereliesaz.cuedetat.view.model.BankShotResult
 import com.hereliesaz.cuedetat.view.model.Perspective
-import com.hereliesaz.cuedetat.view.model.ProtractorUnit
-import com.hereliesaz.cuedetat.view.renderer.table.TableRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.domain.ReducerUtils
 import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.atan2
-import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.pow
 import kotlin.math.sin
@@ -24,7 +22,7 @@ import kotlin.math.sqrt
 
 class UpdateStateUseCase @Inject constructor(
     private val calculateSpinPaths: CalculateSpinPaths,
-    private val reducerUtils: ReducerUtils
+    private val calculateBankShot: CalculateBankShot
 ) {
 
     private val railHeightToTableHeightRatio = 0.05f
@@ -34,8 +32,9 @@ class UpdateStateUseCase @Inject constructor(
     operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
-        val updatedProtractorUnit = state.protractorUnit
-        val updatedStateWithSnapping = state
+        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
+        val updatedTable = state.table.recalculateGeometry(referenceRadius)
+        val tableGeometry = updatedTable.geometry
 
         val basePitchMatrix = Perspective.createPitchMatrix(
             currentOrientation = state.currentOrientation,
@@ -43,7 +42,6 @@ class UpdateStateUseCase @Inject constructor(
             viewHeight = state.viewHeight,
             camera = camera
         )
-        val baseInverseMatrix = Matrix().apply { basePitchMatrix.invert(this) }
 
         val flatMatrix = Perspective.createPitchMatrix(
             currentOrientation = FullOrientation(0f, 0f, 0f),
@@ -52,72 +50,56 @@ class UpdateStateUseCase @Inject constructor(
             camera = camera
         )
 
-        val logicalShotLineAnchor = getLogicalShotLineAnchor(updatedStateWithSnapping)
-        val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= updatedStateWithSnapping.protractorUnit.ghostCueBallCenter.y
+        val logicalShotLineAnchor = getLogicalShotLineAnchor(state)
+        val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= state.protractorUnit.ghostCueBallCenter.y
 
         val (isGeometricallyImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
             shotAnchor = logicalShotLineAnchor,
-            ghostBall = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter,
-            targetBall = updatedStateWithSnapping.protractorUnit.center
+            ghostBall = state.protractorUnit.ghostCueBallCenter,
+            targetBall = state.protractorUnit.center
         )
 
-        val isObstructed = checkForObstructions(updatedStateWithSnapping)
-        val targetBallDistance = calculateDistance(updatedStateWithSnapping, flatMatrix)
-        val shotGuideImpactPoint = if (state.showTable && !state.isBankingMode) {
-            calculateShotGuideImpact(updatedStateWithSnapping, useShotGuideLine = true)
+        val isObstructed = checkForObstructions(state)
+        val targetBallDistance = calculateDistance(state, flatMatrix)
+        val shotGuideImpactPoint = if (updatedTable.isVisible && !state.isBankingMode && tableGeometry.isValid) {
+            calculateShotGuideImpact(state)
         } else {
             null
         }
 
-        // --- Aiming Line & Tangent Line Logic ---
-        val tangentStart = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter
-        val ghostCueCenter = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter
-        val targetCenter = updatedStateWithSnapping.protractorUnit.center
+        val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
+        val targetCenter = state.protractorUnit.center
 
-        val (finalAimingLineBankPath, aimedPocketIndex, aimingLineEndPoint) = if (state.showTable && !state.isBankingMode) {
-            val (path, pocketIndex, endPoint) = calculateAimAndBank(ghostCueCenter, targetCenter, updatedStateWithSnapping)
-            Triple(path, pocketIndex, endPoint)
+        val (finalAimingLineBankPath, aimedPocketIndex, aimingLineEndPoint) = if (updatedTable.isVisible && !state.isBankingMode && tableGeometry.isValid) {
+            calculateAimAndBank(ghostCueCenter, targetCenter, state)
         } else {
             val extendedPath = getExtendedLinePath(ghostCueCenter, targetCenter)
             Triple(extendedPath, null, extendedPath.last())
         }
 
+        val tangentStart = state.protractorUnit.ghostCueBallCenter
         val activeTangentTarget = PointF(
             tangentStart.x - (targetCenter.y - tangentStart.y) * tangentDirection,
             tangentStart.y + (targetCenter.x - tangentStart.x) * tangentDirection
         )
 
-        val (finalTangentLineBankPath, tangentAimedPocketIndex, _) = if (state.showTable && !state.isBankingMode) {
-            calculateAimAndBank(tangentStart, activeTangentTarget, updatedStateWithSnapping)
+        val (finalTangentLineBankPath, tangentAimedPocketIndex, _) = if (updatedTable.isVisible && !state.isBankingMode && tableGeometry.isValid) {
+            calculateAimAndBank(tangentStart, activeTangentTarget, state)
         } else {
             Triple(getExtendedLinePath(tangentStart, activeTangentTarget), null, null)
         }
 
         val finalPitchMatrix = Matrix(basePitchMatrix)
-        val referenceRadius = updatedStateWithSnapping.onPlaneBall?.radius ?: updatedStateWithSnapping.protractorUnit.radius
-        val ballRealDiameter = 2.25f
-        val ballLogicalDiameter = referenceRadius * 2
-        val scale = ballLogicalDiameter / ballRealDiameter
-        val logicalTableShortSide = state.tableSize.shortSideInches * scale
-        val baseRailLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
+        val baseRailLiftAmount = tableGeometry.height * railHeightToTableHeightRatio
         val railLiftAmount = baseRailLiftAmount * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
         val finalRailPitchMatrix = Perspective.createPitchMatrix(
-            currentOrientation = state.currentOrientation,
-            viewWidth = state.viewWidth,
-            viewHeight = state.viewHeight,
-            camera = camera,
-            lift = railLiftAmount
+            currentOrientation = state.currentOrientation, viewWidth = state.viewWidth, viewHeight = state.viewHeight, camera = camera, lift = railLiftAmount
         )
         val finalInverseMatrix = Matrix()
 
-        if (state.showTable) {
-            val effectiveTableRotation = state.tableRotationDegrees % 360f
+        if (updatedTable.isVisible) {
+            val effectiveTableRotation = updatedTable.rotationDegrees % 360f
             if (effectiveTableRotation != 0f) {
-                // The previous heresy was rotating around the screen center.
-                // The righteous path is to rotate the logical plane around its own origin (0,0)
-                // before the final translation to the screen center. Since the pitchMatrix
-                // from Perspective.kt already has the final translation baked in, we pre-rotate
-                // around the logical origin (0,0) to ensure the transformation order is correct.
                 finalPitchMatrix.preRotate(effectiveTableRotation, 0f, 0f)
                 finalRailPitchMatrix.preRotate(effectiveTableRotation, 0f, 0f)
             }
@@ -125,12 +107,18 @@ class UpdateStateUseCase @Inject constructor(
         val hasFinalInverse = finalPitchMatrix.invert(finalInverseMatrix)
 
         val spinPaths: Map<Color, List<PointF>> = if (!state.isBankingMode) {
-            calculateSpinPaths(updatedStateWithSnapping)
+            calculateSpinPaths(state)
         } else {
             emptyMap()
         }
 
-        return updatedStateWithSnapping.copy(
+        val bankShotResult: BankShotResult = if (state.isBankingMode) {
+            calculateBankShot(state)
+        } else {
+            BankShotResult()
+        }
+
+        return state.copy(
             pitchMatrix = finalPitchMatrix,
             railPitchMatrix = finalRailPitchMatrix,
             inversePitchMatrix = finalInverseMatrix,
@@ -147,13 +135,15 @@ class UpdateStateUseCase @Inject constructor(
             shotGuideImpactPoint = shotGuideImpactPoint,
             aimingLineBankPath = finalAimingLineBankPath,
             tangentLineBankPath = finalTangentLineBankPath,
-            spinPaths = spinPaths
+            spinPaths = spinPaths,
+            table = updatedTable,
+            bankShotPath = bankShotResult.path,
+            pocketedBankShotPocketIndex = bankShotResult.pocketedIndex
         )
     }
 
     private fun getLogicalShotLineAnchor(state: OverlayState): PointF {
         state.onPlaneBall?.let { return it.center }
-        // Default to a logical point far below the target ball if the cue ball isn't present
         return PointF(state.protractorUnit.center.x, state.protractorUnit.center.y + 10000f)
     }
 
@@ -183,12 +173,10 @@ class UpdateStateUseCase @Inject constructor(
     }
 
     private fun getExtendedLinePath(start: PointF, end: PointF): List<PointF> {
-        val dirX = end.x - start.x
-        val dirY = end.y - start.y
+        val dirX = end.x - start.x; val dirY = end.y - start.y
         val mag = sqrt(dirX * dirX + dirY * dirY)
         val extendedEnd = if (mag > 0.001f) {
-            val ndx = dirX / mag
-            val ndy = dirY / mag
+            val ndx = dirX / mag; val ndy = dirY / mag
             PointF(start.x + ndx * lineExtensionFactor, start.y + ndy * lineExtensionFactor)
         } else {
             end
@@ -201,7 +189,6 @@ class UpdateStateUseCase @Inject constructor(
         if (directPocketIndex != null && directIntersection != null) {
             return Triple(listOf(start, directIntersection), directPocketIndex, directIntersection)
         }
-
         val bankPath = calculateSingleBank(start, end, state)
         if (bankPath.size > 2) {
             val (bankedPocketIndex, bankedIntersection) = checkPocketAim(bankPath[1], bankPath[2], state)
@@ -213,32 +200,22 @@ class UpdateStateUseCase @Inject constructor(
     }
 
     private fun checkPocketAim(start: PointF, end: PointF, state: OverlayState): Pair<Int?, PointF?> {
-        val dirX = end.x - start.x
-        val dirY = end.y - start.y
+        val dirX = end.x - start.x; val dirY = end.y - start.y
         val mag = sqrt(dirX * dirX + dirY * dirY)
         if (mag < 0.001f) return Pair(null, null)
-
         val extendedEnd = PointF(start.x + dirX / mag * lineExtensionFactor, start.y + dirY / mag * lineExtensionFactor)
-
-        val pockets = TableRenderer.getLogicalPockets(state)
+        val pockets = state.table.getLogicalPockets(state.protractorUnit.radius)
         val pocketRadius = state.protractorUnit.radius * 1.8f
-
-        var closestIntersection: PointF? = null
-        var closestPocketIndex: Int? = null
-        var minDistanceSq = Float.MAX_VALUE
-
+        var closestIntersection: PointF? = null; var closestPocketIndex: Int? = null; var minDistanceSq = Float.MAX_VALUE
         pockets.forEachIndexed { index, pocket ->
             val intersection = getLineCircleIntersection(start, extendedEnd, pocket, pocketRadius)
             if (intersection != null) {
-                val vecToPocketX = pocket.x - start.x
-                val vecToPocketY = pocket.y - start.y
+                val vecToPocketX = pocket.x - start.x; val vecToPocketY = pocket.y - start.y
                 val dotProduct = vecToPocketX * (dirX / mag) + vecToPocketY * (dirY / mag)
                 if (dotProduct > 0) {
                     val distSq = (intersection.x - start.x).pow(2) + (intersection.y - start.y).pow(2)
                     if (distSq < minDistanceSq) {
-                        minDistanceSq = distSq
-                        closestIntersection = intersection
-                        closestPocketIndex = index
+                        minDistanceSq = distSq; closestIntersection = intersection; closestPocketIndex = index
                     }
                 }
             }
@@ -246,84 +223,60 @@ class UpdateStateUseCase @Inject constructor(
         return Pair(closestPocketIndex, closestIntersection)
     }
 
-
     private fun calculateShotGuideImpact(state: OverlayState, useShotGuideLine: Boolean = false): PointF? {
         val p1 = if (useShotGuideLine) state.shotLineAnchor else state.protractorUnit.center
         val p2 = state.protractorUnit.ghostCueBallCenter
         val dirX = p2.x - p1.x
         val dirY = p2.y - p1.y
-
-        return reducerUtils.findRailIntersectionAndNormal(p1, PointF(p1.x + dirX * 5000f, p1.y + dirY*5000f), state)?.first
+        return state.table.findRailIntersectionAndNormal(p1, PointF(p1.x + dirX * 5000f, p1.y + dirY * 5000f))?.first
     }
 
     private fun calculateSingleBank(start: PointF, end: PointF, state: OverlayState): List<PointF> {
-        val dirX = end.x - start.x
-        val dirY = end.y - start.y
+        val dirX = end.x - start.x; val dirY = end.y - start.y
         val extendedEnd = PointF(start.x + dirX * lineExtensionFactor, start.y + dirY * lineExtensionFactor)
-
-        val intersectionResult = reducerUtils.findRailIntersectionAndNormal(start, extendedEnd, state) ?: return listOf(start, extendedEnd)
-        val (intersectionPoint, railNormal) = intersectionResult
-
-        val incidentVector = PointF(extendedEnd.x - start.x, extendedEnd.y - start.y)
-        val reflectedDir = reducerUtils.reflect(incidentVector, railNormal)
-
-        val finalEndPoint = PointF(
-            intersectionPoint.x + reflectedDir.x * lineExtensionFactor,
-            intersectionPoint.y + reflectedDir.y * lineExtensionFactor
-        )
-
+        val intersectionResult = state.table.findRailIntersectionAndNormal(start, extendedEnd) ?: return listOf(start, extendedEnd)
+        val intersectionPoint = intersectionResult.first
+        val railNormal = intersectionResult.second
+        val reflectedDir = reducerUtils.reflect(direction, railNormal)
+        val finalEndPoint = PointF(intersectionPoint.x + reflectedDir.x * lineExtensionFactor, intersectionPoint.y + reflectedDir.y * lineExtensionFactor)
         return listOf(start, intersectionPoint, finalEndPoint)
     }
 
-
     private fun checkForObstructions(state: OverlayState): Boolean {
-        if (state.obstacleBalls.isEmpty()) return false
-
+        if (state.obstacleBalls.isEmpty() || !state.table.geometry.isValid) return false
         val ballRadius = state.protractorUnit.radius
         val collisionDistance = ballRadius * 2
-
         val shotLineStart = state.shotLineAnchor
         val shotLineEnd = state.protractorUnit.ghostCueBallCenter
         for (obstacle in state.obstacleBalls) {
-            if (isSegmentObstructed(shotLineStart, shotLineEnd, obstacle.center, collisionDistance)) {
-                return true
-            }
+            if (isSegmentObstructed(shotLineStart, shotLineEnd, obstacle.center, collisionDistance)) return true
         }
-
         val aimingLineStart = state.protractorUnit.ghostCueBallCenter
         val aimingLineEnd = state.protractorUnit.center
         for (obstacle in state.obstacleBalls) {
-            if (isSegmentObstructed(aimingLineStart, aimingLineEnd, obstacle.center, collisionDistance)) {
-                return true
-            }
+            if (isSegmentObstructed(aimingLineStart, aimingLineEnd, obstacle.center, collisionDistance)) return true
         }
-
         return false
     }
 
     private fun isSegmentObstructed(p1: PointF, p2: PointF, center: PointF, minDist: Float): Boolean {
         val l2 = (p2.x - p1.x).pow(2) + (p2.y - p1.y).pow(2)
         if (l2 == 0f) return false
-
         var t = ((center.x - p1.x) * (p2.x - p1.x) + (center.y - p1.y) * (p2.y - p1.y)) / l2
         t = t.coerceIn(0f, 1f)
-
         val projection = PointF(p1.x + t * (p2.x - p1.x), p1.y + t * (p2.y - p1.y))
         val dist = hypot((center.x - projection.x).toDouble(), (center.y - projection.y).toDouble()).toFloat()
-
         return dist < minDist
     }
 
     private fun getLineCircleIntersection(p1: PointF, p2: PointF, circleCenter: PointF, radius: Float): PointF? {
-        val dx = p2.x - p1.x
-        val dy = p2.y - p1.y
+        val dx = p2.x - p1.x; val dy = p2.y - p1.y
         val a = dx * dx + dy * dy
         if (a < 0.0001f) return null
         val b = 2 * (dx * (p1.x - circleCenter.x) + dy * (p1.y - circleCenter.y))
         val c = (p1.x - circleCenter.x).pow(2) + (p1.y - circleCenter.y).pow(2) - radius * radius
         val delta = b * b - 4 * a * c
         if (delta < 0) return null
-        // Find the t for the first intersection point along the line's direction.
         val t = (-b - sqrt(delta)) / (2 * a)
         return PointF(p1.x + t * dx, p1.y + t * dy)
     }

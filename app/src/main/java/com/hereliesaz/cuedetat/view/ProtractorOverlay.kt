@@ -1,5 +1,4 @@
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/view/ProtractorOverlay.kt
-
 package com.hereliesaz.cuedetat.view
 
 import android.graphics.Typeface
@@ -8,7 +7,6 @@ import android.view.View
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -28,25 +26,15 @@ import com.hereliesaz.cuedetat.view.state.OverlayState
 @Composable
 fun ProtractorOverlay(
     uiState: OverlayState,
-    systemIsDark: Boolean,
     onEvent: (MainScreenEvent) -> Unit,
+    renderer: OverlayRenderer,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val paints = remember { PaintCache() }
-    val renderer = remember { OverlayRenderer() }
     val barbaroTypeface: Typeface? = remember {
         if (!View(context).isInEditMode) {
             ResourcesCompat.getFont(context, R.font.barbaro)
         } else null
-    }
-
-    LaunchedEffect(barbaroTypeface) {
-        paints.setTypeface(barbaroTypeface)
-    }
-
-    LaunchedEffect(uiState, systemIsDark) {
-        paints.updateColors(uiState, systemIsDark)
     }
 
     val magnifierModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && uiState.isMagnifierVisible) {
@@ -57,15 +45,12 @@ fun ProtractorOverlay(
             magnifierCenter = {
                 val source = uiState.magnifierSourceCenter
                 if (source != null && source != Offset.Unspecified) {
-                    // Position the magnifier widget above the touch point.
-                    // Convert dp to pixels if needed, or work directly in pixels.
-                    val yOffsetPx = with(this) { 100.dp.toPx() } // Example: 100.dp above
+                    val yOffsetPx = with(this) { 100.dp.toPx() }
                     source - Offset(0f, yOffsetPx)
                 } else {
-                    Offset.Unspecified // Hide magnifier if source is not specified
+                    Offset.Unspecified
                 }
             },
-
             zoom = 2f
         )
     } else {
@@ -78,12 +63,11 @@ fun ProtractorOverlay(
             .onSizeChanged { size ->
                 onEvent(MainScreenEvent.SizeChanged(size.width, size.height))
             }
-            // --- THE FIX: The gesture detector must come BEFORE the magnifier. ---
             .detectManualGestures(onEvent)
-           // .then(magnifierModifier)
+            .then(magnifierModifier)
     ) {
         drawIntoCanvas { canvas ->
-            renderer.draw(canvas.nativeCanvas, uiState, paints, barbaroTypeface)
+            renderer.draw(canvas.nativeCanvas, uiState, barbaroTypeface)
         }
     }
 }

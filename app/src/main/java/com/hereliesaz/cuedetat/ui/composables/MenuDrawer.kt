@@ -1,5 +1,4 @@
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/MenuDrawer.kt
-
 package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.clickable
@@ -20,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
-import com.hereliesaz.cuedetat.view.state.DistanceUnit
+import com.hereliesaz.cuedetat.view.model.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
@@ -45,7 +44,7 @@ fun MenuDrawerContent(
                     style = MaterialTheme.typography.displaySmall,
                     textAlign = TextAlign.Center
                 )
-                val versionInfo = "v${BuildConfig.VERSION_NAME}" + (uiState.latestVersionName?.let { " (latest: $it)" } ?: "")
+                val versionInfo = "v${BuildConfig.VERSION_NAME}" + (uiState.latestVersionName?.let { " (latest: $it)" } ?: "Checking...")
                 Text(
                     text = versionInfo,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -54,28 +53,23 @@ fun MenuDrawerContent(
             }
             MenuDivider()
 
-            // Section 1: Core Controls
-            val bankingModeToggleText = if (uiState.isBankingMode) "Ghost Ball Aiming" else "Calculate Bank"
             MenuItem(
-                text = bankingModeToggleText,
+                text = if (uiState.isBankingMode) "Ghost Ball Aiming" else "Calculate Bank",
                 onClick = { onEvent(MainScreenEvent.ToggleBankingMode); onCloseDrawer() }
             )
             if (!uiState.isBankingMode) {
-                val cueBallToggleText = if (uiState.onPlaneBall == null) "Toggle Cue Ball" else "Hide Cue Ball"
                 MenuItem(
-                    text = cueBallToggleText,
+                    text = if (uiState.onPlaneBall != null) "Hide Cue Ball" else "Toggle Cue Ball",
                     onClick = { onEvent(MainScreenEvent.ToggleOnPlaneBall); onCloseDrawer() }
                 )
             }
-            val cameraToggleText = if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On"
             MenuItem(
-                text = cameraToggleText,
+                text = if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On",
                 onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
             )
             MenuDivider()
 
-            // Section 2: Table & Unit Settings
-            if (!uiState.isBankingMode && !uiState.showTable) {
+            if (!uiState.isBankingMode && !uiState.table.isVisible) {
                 MenuItem(
                     text = "Show Table",
                     onClick = { onEvent(MainScreenEvent.ToggleTable); onCloseDrawer() }
@@ -85,15 +79,12 @@ fun MenuDrawerContent(
                 text = "Table Size",
                 onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog); onCloseDrawer() }
             )
-            val distanceUnitToggleText = if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units"
             MenuItem(
-                text = distanceUnitToggleText,
+                text = if (uiState.distanceUnit == DistanceUnit.IMPERIAL) "Use Metric Units" else "Use Imperial Units",
                 onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit); onCloseDrawer() }
             )
             MenuDivider()
 
-
-            // Section 3: Appearance
             val systemIsCurrentlyDark = isSystemInDarkTheme()
             val themeToggleText = when (uiState.isForceLightMode) {
                 true -> "Embrace the Darkness"
@@ -114,7 +105,6 @@ fun MenuDrawerContent(
             )
             MenuDivider()
 
-            // Section 4: Help & Info
             MenuItem(
                 text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
                 onClick = { onEvent(MainScreenEvent.ToggleHelp); onCloseDrawer() }
@@ -125,7 +115,6 @@ fun MenuDrawerContent(
             )
             MenuDivider()
 
-            // Section 5: Meta
             MenuItem(
                 text = "Check for Updates",
                 onClick = { onEvent(MainScreenEvent.CheckForUpdate); onCloseDrawer() })
@@ -134,14 +123,9 @@ fun MenuDrawerContent(
                 onClick = { onEvent(MainScreenEvent.ViewArt); onCloseDrawer() })
             MenuDivider()
 
-            // Section 6: Developer
             MenuItem(
                 text = "Too Advanced Options",
                 onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog); onCloseDrawer() }
-            )
-            MenuItem(
-                text = if (uiState.isSnappingEnabled) "Disable Snapping" else "Enable Snapping",
-                onClick = { onEvent(MainScreenEvent.ToggleSnapping); onCloseDrawer() }
             )
             Spacer(modifier = Modifier.height(12.dp))
         }

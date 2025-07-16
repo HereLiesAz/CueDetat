@@ -15,85 +15,19 @@ class StateReducer @Inject constructor(
     private val actionReducer: ActionReducer,
     private val tutorialReducer: TutorialReducer,
     private val spinReducer: SpinReducer,
-    private val obstacleReducer: ObstacleReducer,
     private val cvReducer: CvReducer,
-    private val advancedOptionsReducer: AdvancedOptionsReducer,
-    private val snapReducer: SnapReducer
+    private val advancedOptionsReducer: AdvancedOptionsReducer
 ) {
-    fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
-        return when (event) {
-            is MainScreenEvent.LogicalGestureStarted,
-            is MainScreenEvent.LogicalDragApplied,
-            is MainScreenEvent.GestureEnded,
-            is MainScreenEvent.AimBankShot ->
-                gestureReducer.reduce(currentState, event)
-
-            is MainScreenEvent.ToggleOnPlaneBall,
-            is MainScreenEvent.ToggleBankingMode,
-            is MainScreenEvent.ToggleTable,
-            is MainScreenEvent.CycleTableSize,
-            is MainScreenEvent.SetTableSize,
-            is MainScreenEvent.ToggleTableSizeDialog,
-            is MainScreenEvent.ToggleForceTheme,
-            is MainScreenEvent.ToggleCamera,
-            is MainScreenEvent.ToggleDistanceUnit,
-            is MainScreenEvent.ToggleLuminanceDialog,
-            is MainScreenEvent.ToggleGlowStickDialog,
-            is MainScreenEvent.ToggleHelp,
-            is MainScreenEvent.ToggleMoreHelp,
-            is MainScreenEvent.ToggleSpinControl,
-            is MainScreenEvent.ToggleSnapping, // Moved to ToggleReducer
-            is MainScreenEvent.ToggleCvModel ->
-                toggleReducer.reduce(currentState, event)
-
-            is MainScreenEvent.ZoomSliderChanged,
-            is MainScreenEvent.ZoomScaleChanged,
-            is MainScreenEvent.TableRotationApplied,
-            is MainScreenEvent.TableRotationChanged,
-            is MainScreenEvent.AdjustGlow,
-            is MainScreenEvent.AdjustLuminance ->
-                controlReducer.reduce(currentState, event)
-
-            is MainScreenEvent.SizeChanged,
-            is MainScreenEvent.FullOrientationChanged,
-            is MainScreenEvent.ThemeChanged ->
-                systemReducer.reduce(currentState, event)
-
-            is MainScreenEvent.Reset ->
-                actionReducer.reduce(currentState, event)
-
-            is MainScreenEvent.StartTutorial,
-            is MainScreenEvent.NextTutorialStep,
-            is MainScreenEvent.EndTutorial ->
-                tutorialReducer.reduce(currentState, event)
-
-            is MainScreenEvent.SpinApplied,
-            is MainScreenEvent.SpinSelectionEnded,
-            is MainScreenEvent.DragSpinControl,
-            is MainScreenEvent.ClearSpinState ->
-                spinReducer.reduce(currentState, event)
-
-            is MainScreenEvent.AddObstacleBall ->
-                obstacleReducer.reduce(currentState, event)
-
-            is MainScreenEvent.CvDataUpdated -> {
-                // First, process standard CV data changes (like color)
-                val stateAfterCv = cvReducer.reduce(currentState, event)
-                // Then, process snapping based on the new vision data
-                snapReducer.reduce(stateAfterCv, event.data)
-            }
-            is MainScreenEvent.LockOrUnlockColor ->
-                cvReducer.reduce(currentState, event)
-
-            is MainScreenEvent.ToggleAdvancedOptionsDialog,
-            is MainScreenEvent.ToggleCvRefinementMethod,
-            is MainScreenEvent.UpdateHoughP1,
-            is MainScreenEvent.UpdateHoughP2,
-            is MainScreenEvent.UpdateCannyT1,
-            is MainScreenEvent.UpdateCannyT2 ->
-                advancedOptionsReducer.reduce(currentState, event)
-
-            else -> currentState
-        }
+    fun reduce(state: OverlayState, event: MainScreenEvent): OverlayState {
+        return state
+            .let { gestureReducer.reduce(it, event) }
+            .let { toggleReducer.reduce(it, event) }
+            .let { controlReducer.reduce(it, event) }
+            .let { systemReducer.reduce(it, event) }
+            .let { actionReducer.reduce(it, event) }
+            .let { tutorialReducer.reduce(it, event) }
+            .let { spinReducer.reduce(it, event) }
+            .let { cvReducer.reduce(it, event) }
+            .let { advancedOptionsReducer.reduce(it, event) }
     }
 }

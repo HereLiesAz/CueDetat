@@ -1,58 +1,33 @@
 package com.hereliesaz.cuedetat.view.gestures
 
 import android.graphics.PointF
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculateCentroid
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateRotation
-import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 
-fun Modifier.detectManualGestures(onEvent: (MainScreenEvent) -> Unit) =
-    this.pointerInput(Unit) {
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false)
-            onEvent(MainScreenEvent.ScreenGestureStarted(PointF(down.position.x, down.position.y)))
-            down.consume()
-
-            var lastCentroid: Offset = down.position
-
-            do {
-                val event = awaitPointerEvent()
-                val canceled = event.changes.any { it.isConsumed }
-                if (!canceled) {
-                    val zoom = event.calculateZoom()
-                    val pan = event.calculatePan()
-                    val rotation = event.calculateRotation()
-                    val centroid = event.calculateCentroid()
-
-                    if (zoom != 1f) {
-                        onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
-                    }
-
-                    if (rotation != 0f) {
-                        onEvent(MainScreenEvent.TableRotationApplied(rotation))
-                    }
-
-                    if (pan != Offset.Zero) {
-                        val previousPosition = lastCentroid
-                        val currentPosition = centroid
-                        onEvent(
-                            MainScreenEvent.Drag(
-                                previousPosition = PointF(previousPosition.x, previousPosition.y),
-                                currentPosition = PointF(currentPosition.x, currentPosition.y)
-                            )
-                        )
-                        lastCentroid = centroid
-                    }
-                }
-                event.changes.forEach { if (it.pressed) it.consume() }
-            } while (!canceled && event.changes.any { it.pressed })
-
-            onEvent(MainScreenEvent.GestureEnded)
+fun Modifier.detectManualGestures(
+    onEvent: (MainScreenEvent) -> Unit
+): Modifier = this.pointerInput(Unit) {
+    detectTapGestures(
+        onPress = { offset ->
+            onEvent(MainScreenEvent.ScreenGestureStarted(PointF(offset.x, offset.y)))
+            tryAwaitRelease()
         }
-    }
+    )
+}.pointerInput(Unit) {
+    detectDragGestures(
+        onDrag = { change, dragAmount ->
+            change.consume()
+            val prevPos = change.position - dragAmount
+            onEvent(
+                MainScreenEvent.Drag(
+                    PointF(prevPos.x, prevPos.y),
+                    PointF(change.position.x, change.position.y)
+                )
+            )
+        },
+        onDragEnd = { onEvent(MainScreenEvent.GestureEnded) }
+    )
+}

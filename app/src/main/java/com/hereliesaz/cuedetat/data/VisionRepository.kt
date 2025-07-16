@@ -1,5 +1,4 @@
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/data/VisionRepository.kt
-
 package com.hereliesaz.cuedetat.data
 
 import android.annotation.SuppressLint
@@ -10,7 +9,6 @@ import androidx.camera.core.ImageProxy
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.hereliesaz.cuedetat.di.GenericDetector
-import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,7 +21,6 @@ import javax.inject.Singleton
 @Singleton
 class VisionRepository @Inject constructor(
     @GenericDetector private val genericObjectDetector: ObjectDetector,
-    private val reducerUtils: ReducerUtils
 ) {
 
     private val _visionDataFlow = MutableStateFlow(VisionData())
@@ -66,10 +63,8 @@ class VisionRepository @Inject constructor(
                         PointF(transformedRect.centerX(), transformedRect.centerY())
                     }
 
-                    // The logic now correctly queries the rotated table corners for filtering
-                    val filteredBalls = if (state.showTable) {
-                        val tableCorners = reducerUtils.getLogicalTableCorners(state)
-                        detectedBalls.filter { reducerUtils.isPointInsidePolygon(it, tableCorners) }
+                    val filteredBalls = if (state.table.isVisible) {
+                        detectedBalls.filter { state.table.isPointInside(it) }
                     } else {
                         detectedBalls
                     }

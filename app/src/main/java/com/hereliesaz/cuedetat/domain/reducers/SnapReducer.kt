@@ -1,9 +1,9 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/SnapReducer.kt
 package com.hereliesaz.cuedetat.domain.reducers
 
-import android.graphics.PointF
 import com.hereliesaz.cuedetat.data.VisionData
+import com.hereliesaz.cuedetat.view.model.SnapCandidate
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import com.hereliesaz.cuedetat.view.state.SnapCandidate
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.hypot
@@ -23,24 +23,20 @@ class SnapReducer @Inject constructor() {
         val previousCandidates = currentState.snapCandidates.toMutableList()
         val newCandidates = mutableListOf<SnapCandidate>()
 
-        // Update existing candidates and find new ones
         for (detectedBall in detectedBalls) {
             val closestExisting = previousCandidates.minByOrNull {
                 hypot((it.detectedPoint.x - detectedBall.x).toDouble(), (it.detectedPoint.y - detectedBall.y).toDouble())
             }
 
             if (closestExisting != null && hypot((closestExisting.detectedPoint.x - detectedBall.x).toDouble(), (closestExisting.detectedPoint.y - detectedBall.y).toDouble()) < SNAP_PROXIMITY_THRESHOLD_PX) {
-                // This is a returning candidate
                 previousCandidates.remove(closestExisting)
                 val isNowConfirmed = closestExisting.isConfirmed || (currentTime - closestExisting.firstSeenTimestamp > SNAP_THRESHOLD_MS)
                 newCandidates.add(closestExisting.copy(detectedPoint = detectedBall, isConfirmed = isNowConfirmed))
             } else {
-                // This is a new candidate
                 newCandidates.add(SnapCandidate(detectedPoint = detectedBall, firstSeenTimestamp = currentTime))
             }
         }
 
-        // Snap balls to confirmed candidates
         val confirmedCandidates = newCandidates.filter { it.isConfirmed }.toMutableList()
         var newProtractorUnit = currentState.protractorUnit
         var newOnPlaneBall = currentState.onPlaneBall

@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
             if (isGranted) {
                 setContent { AppContent(viewModel) }
             } else {
-                // Heresy is not tolerated. The user will comply or they will not use the app.
+                // Handle permission denial
             }
         }
 

@@ -53,6 +53,7 @@ ui = "1.9.0-beta02"
 animationCore = "1.8.3"
 uiGraphics = "1.8.3"
 visionCommon = "17.3.0"
+roomKtx = "2.7.2"
 
 [libraries]
 # AndroidX Core & UI
@@ -119,6 +120,7 @@ compose-material3 = { group = "androidx.wear.compose", name = "compose-material3
 androidx-animation-core = { group = "androidx.compose.animation", name = "animation-core", version.ref = "animationCore" }
 tensorflow-lite-task-vision = { module = "org.tensorflow:tensorflow-lite-task-vision", version = "0.4.4" }
 vision-common = { module = "com.google.mlkit:vision-common", version = "17.3.0" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "roomKtx" }
 
 
 

@@ -1,2 +1,0 @@
-ninja: error: manifest 'build.ninja' still dirty after 100 tries
-

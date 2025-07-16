@@ -1,101 +1,91 @@
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt
-
 package com.hereliesaz.cuedetat.view.renderer.table
 
-import android.graphics.Paint
 import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.PointF
-import androidx.compose.ui.graphics.toArgb
-import com.hereliesaz.cuedetat.view.PaintCache
+import android.graphics.Typeface
 import com.hereliesaz.cuedetat.view.config.table.Diamonds
 import com.hereliesaz.cuedetat.view.config.table.Rail
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import javax.inject.Inject
+import kotlin.math.cos
+import kotlin.math.sin
 
-class RailRenderer {
+class RailRenderer @Inject constructor() {
     private val railVisualOffsetFromEdgeFactor = 0.75f
     private val diamondSizeFactor = 0.25f
     private val railConfig = Rail()
     private val diamondConfig = Diamonds()
 
-    fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+    fun draw(canvas: Canvas, state: OverlayState, typeface: Typeface?) {
+        val geometry = state.table.geometry
+        if (!geometry.isValid) return
+
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
-        if (referenceRadius <= 0) return
+        val tablePlayingSurfaceWidth = geometry.width
+        val tablePlayingSurfaceHeight = geometry.height
 
-        val ballRealDiameter = 2.25f
-        val ballLogicalDiameter = referenceRadius * 2
-        val scale = ballLogicalDiameter / ballRealDiameter
-        val tablePlayingSurfaceWidth = state.tableSize.longSideInches * scale
-        val tablePlayingSurfaceHeight = state.tableSize.shortSideInches * scale
+        val railLinePaint = railConfig.getStrokePaint(state.luminanceAdjustment)
+        val railLineGlowPaint = railConfig.getGlowPaint(state.glowStickValue)
+        val diamondPaint = diamondConfig.getFillPaint(state.luminanceAdjustment)
 
-        // Corrected: Use logical origin (0,0) instead of screen center
-        val tableCenterX = 0f
-        val tableCenterY = 0f
-
-        val innerLeft = tableCenterX - tablePlayingSurfaceWidth / 2
-        val innerTop = tableCenterY - tablePlayingSurfaceHeight / 2
-        val innerRight = tableCenterX + tablePlayingSurfaceWidth / 2
-        val innerBottom = tableCenterY + tablePlayingSurfaceHeight / 2
-
-        val railLinePaint = Paint(paints.tableOutlinePaint).apply {
-            color = railConfig.strokeColor.toArgb()
-            strokeWidth = railConfig.strokeWidth
-        }
-        val railLineGlowPaint = Paint(paints.lineGlowPaint).apply {
-            strokeWidth = railConfig.glowWidth
-            color = railConfig.glowColor.toArgb()
-        }
-        val diamondPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-            color = diamondConfig.fillColor.toArgb()
-            alpha = (diamondConfig.opacity * 255).toInt()
-        }
+        val angleRad = Math.toRadians(-state.table.rotationDegrees.toDouble())
+        val cosA = cos(angleRad).toFloat()
+        val sinA = sin(angleRad).toFloat()
 
         val railOffsetAmount = referenceRadius * railVisualOffsetFromEdgeFactor
-        val railTopCenterY = innerTop - railOffsetAmount
-        val railBottomCenterY = innerBottom + railOffsetAmount
-        val railLeftCenterX = innerLeft - railOffsetAmount
-        val railRightCenterX = innerRight + railOffsetAmount
+        val diamondRadius = referenceRadius * diamondSizeFactor
 
-        val pocketRadius = referenceRadius * 1.8f
-        // Reduce the gap for the side pockets to make them appear shallower.
-        val railGapRadius = pocketRadius * 0.75f
-
-        // --- Draw Rail Segments ---
-        val railSegments = listOf(
-            // Top rail
-            PointF(innerLeft + pocketRadius, railTopCenterY) to PointF(tableCenterX - railGapRadius, railTopCenterY),
-            PointF(tableCenterX + railGapRadius, railTopCenterY) to PointF(innerRight - pocketRadius, railTopCenterY),
-            // Bottom rail
-            PointF(innerLeft + pocketRadius, railBottomCenterY) to PointF(tableCenterX - railGapRadius, railBottomCenterY),
-            PointF(tableCenterX + railGapRadius, railBottomCenterY) to PointF(innerRight - pocketRadius, railBottomCenterY),
-            // Side rails
-            PointF(railLeftCenterX, innerTop + pocketRadius) to PointF(railLeftCenterX, innerBottom - pocketRadius),
-            PointF(railRightCenterX, innerTop + pocketRadius) to PointF(railRightCenterX, innerBottom - pocketRadius)
+        val longSidePoints = listOf(
+            PointF(0f, -tablePlayingSurfaceHeight / 2 - railOffsetAmount)
         )
 
-        railSegments.forEach { (start, end) ->
-            canvas.drawLine(start.x, start.y, end.x, end.y, railLineGlowPaint)
-            canvas.drawLine(start.x, start.y, end.x, end.y, railLinePaint)
-        }
-
-        // Draw Diamonds on the rails
-        val diamondRadius = referenceRadius * diamondSizeFactor
-        val halfWidth = tablePlayingSurfaceWidth / 2f
-        val halfHeight = tablePlayingSurfaceHeight / 2f
-
-        // Long rails (3 diamonds between corner and side pockets)
         for (i in 1..3) {
-            val xOffset = halfWidth * (i / 4.0f)
-            canvas.drawCircle(tableCenterX - xOffset, railTopCenterY, diamondRadius, diamondPaint)
-            canvas.drawCircle(tableCenterX + xOffset, railTopCenterY, diamondRadius, diamondPaint)
-            canvas.drawCircle(tableCenterX - xOffset, railBottomCenterY, diamondRadius, diamondPaint)
-            canvas.drawCircle(tableCenterX + xOffset, railBottomCenterY, diamondRadius, diamondPaint)
+            val xOffset = tablePlayingSurfaceWidth / 4 * i - tablePlayingSurfaceWidth / 2
+            val topRailDiamond = PointF(xOffset, -tablePlayingSurfaceHeight / 2 - railOffsetAmount)
+            val bottomRailDiamond = PointF(xOffset, tablePlayingSurfaceHeight / 2 + railOffsetAmount)
+
+            val rotatedTop = PointF(topRailDiamond.x * cosA - topRailDiamond.y * sinA, topRailDiamond.x * sinA + topRailDiamond.y * cosA)
+            val rotatedBottom = PointF(bottomRailDiamond.x * cosA - bottomRailDiamond.y * sinA, bottomRailDiamond.x * sinA + bottomRailDiamond.y * cosA)
+
+            canvas.drawCircle(rotatedTop.x, rotatedTop.y, diamondRadius, diamondPaint)
+            canvas.drawCircle(rotatedBottom.x, rotatedBottom.y, diamondRadius, diamondPaint)
         }
-        // Short rails (3 diamonds per rail)
-        val shortRailYOffsets = listOf(-halfHeight / 2, 0f, halfHeight / 2)
-        for (yOffset in shortRailYOffsets) {
-            canvas.drawCircle(railLeftCenterX, tableCenterY + yOffset, diamondRadius, diamondPaint)
-            canvas.drawCircle(railRightCenterX, tableCenterY + yOffset, diamondRadius, diamondPaint)
+
+        val shortSidePoints = listOf(
+            PointF(-tablePlayingSurfaceWidth / 2 - railOffsetAmount, 0f),
+            PointF(tablePlayingSurfaceWidth / 2 + railOffsetAmount, 0f)
+        )
+        for (yOffsetFactor in listOf(-0.5f, 0.5f)) {
+            val yOffset = tablePlayingSurfaceHeight * yOffsetFactor
+            val leftRailDiamond = PointF(-tablePlayingSurfaceWidth / 2 - railOffsetAmount, yOffset)
+            val rightRailDiamond = PointF(tablePlayingSurfaceWidth / 2 + railOffsetAmount, yOffset)
+
+            val rotatedLeft = PointF(leftRailDiamond.x * cosA - leftRailDiamond.y * sinA, leftRailDiamond.x * sinA + leftRailDiamond.y * cosA)
+            val rotatedRight = PointF(rightRailDiamond.x * cosA - rightRailDiamond.y * sinA, rightRailDiamond.x * sinA + rightRailDiamond.y * cosA)
+
+            canvas.drawCircle(rotatedLeft.x, rotatedLeft.y, diamondRadius, diamondPaint)
+            canvas.drawCircle(rotatedRight.x, rotatedRight.y, diamondRadius, diamondPaint)
+        }
+
+        val innerCorners = geometry.unrotatedCorners
+        val outerCorners = innerCorners.map {
+            PointF(
+                it.x + railOffsetAmount * if (it.x < 0) -1 else 1,
+                it.y + railOffsetAmount * if (it.y < 0) -1 else 1
+            )
+        }
+
+        val rotatedOuterCorners = outerCorners.map {
+            PointF(it.x * cosA - it.y * sinA, it.x * sinA + it.y * cosA)
+        }
+
+        for (i in 0..3) {
+            val start = rotatedOuterCorners[i]
+            val end = rotatedOuterCorners[(i + 1) % 4]
+            railLineGlowPaint?.let { canvas.drawLine(start.x, start.y, end.x, end.y, it) }
+            canvas.drawLine(start.x, start.y, end.x, end.y, railLinePaint)
         }
     }
 }

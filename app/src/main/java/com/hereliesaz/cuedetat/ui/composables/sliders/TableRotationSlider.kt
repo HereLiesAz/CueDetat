@@ -1,13 +1,8 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/sliders/TableRotationSlider.kt
 package com.hereliesaz.cuedetat.ui.composables.sliders
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -18,28 +13,12 @@ fun TableRotationSlider(
     onEvent: (MainScreenEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (uiState.showTable) {
-        Column(
+    if (uiState.table.isVisible) {
+        Slider(
+            value = uiState.table.rotationDegrees,
+            onValueChange = { onEvent(MainScreenEvent.TableRotationChanged(it)) },
             modifier = modifier,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                "Table Rotation: ${uiState.tableRotationDegrees.toInt()}°",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Slider(
-                value = uiState.tableRotationDegrees,
-                onValueChange = { onEvent(MainScreenEvent.TableRotationChanged(it)) },
-                valueRange = -179f..180f, // Centered range
-                steps = 358,
-                modifier = Modifier.fillMaxWidth(),
-                colors = SliderDefaults.colors(
-                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                    inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
-                    thumbColor = MaterialTheme.colorScheme.primary
-                )
-            )
-        }
+            valueRange = 0f..360f
+        )
     }
 }

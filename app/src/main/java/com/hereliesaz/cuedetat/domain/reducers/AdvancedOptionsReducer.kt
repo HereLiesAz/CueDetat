@@ -3,19 +3,15 @@ package com.hereliesaz.cuedetat.domain.reducers
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
 class AdvancedOptionsReducer @Inject constructor() {
-    fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
+    fun reduce(state: OverlayState, event: MainScreenEvent): OverlayState {
         return when (event) {
-            is MainScreenEvent.ToggleAdvancedOptionsDialog -> currentState.copy(showAdvancedOptionsDialog = !currentState.showAdvancedOptionsDialog)
-            is MainScreenEvent.ToggleCvRefinementMethod -> currentState.copy(cvRefinementMethod = currentState.cvRefinementMethod.next())
-            is MainScreenEvent.UpdateHoughP1 -> currentState.copy(houghP1 = event.value)
-            is MainScreenEvent.UpdateHoughP2 -> currentState.copy(houghP2 = event.value)
-            is MainScreenEvent.UpdateCannyT1 -> currentState.copy(cannyThreshold1 = event.value)
-            is MainScreenEvent.UpdateCannyT2 -> currentState.copy(cannyThreshold2 = event.value)
-            else -> currentState
+            is MainScreenEvent.ToggleAdvancedOptionsDialog -> state.copy(isCvParamMenuVisible = !state.isCvParamMenuVisible)
+            is MainScreenEvent.ToggleCvRefinementMethod -> state.copy(cvRefinement = if(state.cvRefinement == "HOUGH") "CONTOUR" else "HOUGH")
+            is MainScreenEvent.ToggleCvModel -> state.copy(cvModel = if(state.cvModel == "Generic") "Custom" else "Generic")
+            is MainScreenEvent.ToggleSnapping -> state.copy(isSnappingEnabled = !state.isSnappingEnabled)
+            else -> state
         }
     }
 }

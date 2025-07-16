@@ -1,121 +1,73 @@
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt
-
 package com.hereliesaz.cuedetat.view.renderer.table
 
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.PointF
+import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
+import com.hereliesaz.cuedetat.ui.theme.RebelYellow
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
-import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.table.Holes
 import com.hereliesaz.cuedetat.view.config.table.Table
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import javax.inject.Inject
 
-class TableRenderer {
+class TableRenderer @Inject constructor() {
 
-    companion object {
-        fun getLogicalPockets(state: OverlayState): List<PointF> {
-            val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
-            if (referenceRadius <= 0) return emptyList()
+    private val tableConfig = Table()
+    private val holesConfig = Holes()
 
-            val ballRealDiameter = 2.25f
-            val ballLogicalDiameter = referenceRadius * 2
-            val scale = ballLogicalDiameter / ballRealDiameter
+    fun drawSurface(canvas: Canvas, state: OverlayState, typeface: Typeface?) {
+        val geometry = state.table.geometry
+        if (!geometry.isValid) return
 
-            val tablePlayingSurfaceWidth = state.tableSize.longSideInches * scale
-            val tablePlayingSurfaceHeight = state.tableSize.shortSideInches * scale
-
-            // Corrected: Use logical origin (0,0) instead of screen center
-            val tableCenterX = 0f
-            val tableCenterY = 0f
-            val left = tableCenterX - tablePlayingSurfaceWidth / 2
-            val top = tableCenterY - tablePlayingSurfaceHeight / 2
-            val right = tableCenterX + tablePlayingSurfaceWidth / 2
-            val bottom = tableCenterY + tablePlayingSurfaceHeight / 2
-
-            // Move side pockets outward by half a ball radius.
-            val sidePocketOffset = referenceRadius * 0.5f
-
-            return listOf(
-                PointF(left, top), PointF(right, top), // Top corners
-                PointF(left, bottom), PointF(right, bottom),   // Bottom corners
-                PointF(tableCenterX, top - sidePocketOffset), PointF(tableCenterX, bottom + sidePocketOffset) // Side pockets
-            )
+        val tableOutlinePaint = tableConfig.getStrokePaint(state.luminanceAdjustment)
+        val diamondGridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+            pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 15f), 0f)
+            color = tableConfig.strokeColor.toArgb()
+            alpha = 75
         }
-    }
 
-    fun drawSurface(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        if (!state.showTable && !state.isBankingMode) return
+        val corners = geometry.unrotatedCorners
+        val left = corners[0].x
+        val top = corners[0].y
+        val right = corners[2].x
+        val bottom = corners[2].y
 
-        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
-        if (referenceRadius <= 0) return
+        canvas.drawRect(left, top, right, bottom, tableOutlinePaint)
 
-        val tableConfig = Table()
-
-        val ballRealDiameter = 2.25f
-        val ballLogicalDiameter = referenceRadius * 2
-        val scale = ballLogicalDiameter / ballRealDiameter
-        val tablePlayingSurfaceWidth = state.tableSize.longSideInches * scale
-        val tablePlayingSurfaceHeight = state.tableSize.shortSideInches * scale
-
-        // Corrected: Use logical origin (0,0) instead of screen center
+        val halfWidth = geometry.width / 2
+        val halfHeight = geometry.height / 2
         val tableCenterX = 0f
         val tableCenterY = 0f
 
-        val left = tableCenterX - tablePlayingSurfaceWidth / 2
-        val top = tableCenterY - tablePlayingSurfaceHeight / 2
-        val right = tableCenterX + tablePlayingSurfaceWidth / 2
-        val bottom = tableCenterY + tablePlayingSurfaceHeight / 2
-
-        val tableOutlinePaint = Paint(paints.tableOutlinePaint).apply {
-            color = tableConfig.strokeColor.toArgb()
-            strokeWidth = tableConfig.strokeWidth
-        }
-
-        // Draw Outline Only, no fill.
-        canvas.drawRect(left, top, right, bottom, tableOutlinePaint)
-
-        // Draw Diamond Grid
-        val diamondGridPaint = paints.gridLinePaint
-        val halfWidth = tablePlayingSurfaceWidth / 2
-        val halfHeight = tablePlayingSurfaceHeight / 2
-
-        // Vertical lines (connecting long rail diamonds)
         for (i in 1..3) {
             val xOffset = halfWidth * (i / 4.0f)
             canvas.drawLine(tableCenterX - xOffset, top, tableCenterX - xOffset, bottom, diamondGridPaint)
             canvas.drawLine(tableCenterX + xOffset, top, tableCenterX + xOffset, bottom, diamondGridPaint)
         }
-        // Horizontal lines (connecting short rail diamonds)
         val shortRailYOffsets = listOf(-halfHeight / 2, 0f, halfHeight / 2)
         for (yOffset in shortRailYOffsets) {
             canvas.drawLine(left, tableCenterY + yOffset, right, tableCenterY + yOffset, diamondGridPaint)
         }
-        // Center lines
         canvas.drawLine(tableCenterX, top, tableCenterX, bottom, diamondGridPaint)
         canvas.drawLine(left, tableCenterY, right, tableCenterY, diamondGridPaint)
     }
 
-    fun drawPockets(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        if (!state.showTable && !state.isBankingMode) return
-        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
-        if (referenceRadius <= 0) return
+    fun drawPockets(canvas: Canvas, state: OverlayState) {
+        val geometry = state.table.geometry
+        if (!geometry.isValid) return
 
-        val holesConfig = Holes()
-        val pockets = getLogicalPockets(state)
+        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
+        val pockets = state.table.getLogicalPockets(referenceRadius)
         val pocketRadius = referenceRadius * 1.8f
 
-        val pocketedPaintWhite = Paint(paints.pocketFillPaint).apply { color = android.graphics.Color.WHITE }
-        val pocketedPaintRed = Paint(paints.pocketFillPaint).apply { color = WarningRed.toArgb() }
-        val pocketOutlinePaint = Paint(paints.tableOutlinePaint).apply {
-            color = holesConfig.strokeColor.toArgb()
-            strokeWidth = holesConfig.strokeWidth
-        }
-        val pocketFillPaint = Paint(paints.pocketFillPaint).apply {
-            color = holesConfig.fillColor.toArgb()
-        }
-
+        val pocketedPaintWhite = holesConfig.getFillPaint(state.luminanceAdjustment).apply { color = android.graphics.Color.WHITE }
+        val pocketedPaintRed = holesConfig.getFillPaint(state.luminanceAdjustment).apply { color = WarningRed.toArgb() }
+        val pocketOutlinePaint = holesConfig.getStrokePaint(state.luminanceAdjustment)
+        val pocketFillPaint = holesConfig.getFillPaint(state.luminanceAdjustment)
 
         pockets.forEachIndexed { index, pos ->
             val isAimedAtByAimingLine = state.aimedPocketIndex == index && !state.isBankingMode

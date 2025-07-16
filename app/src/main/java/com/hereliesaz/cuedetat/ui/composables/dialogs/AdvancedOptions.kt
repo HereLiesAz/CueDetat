@@ -1,14 +1,10 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/dialogs/AdvancedOptionsDialog.kt
-
 package com.hereliesaz.cuedetat.ui.composables.dialogs
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -25,77 +21,46 @@ fun AdvancedOptionsDialog(
     onEvent: (MainScreenEvent) -> Unit,
     onDismiss: () -> Unit
 ) {
-    if (uiState.showAdvancedOptionsDialog) {
+    if (uiState.isCvParamMenuVisible) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Too Advanced Options", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+            title = { Text("Advanced Options") },
             text = {
                 Column {
-                    // Snapping Toggle
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Auto-Snap Balls:", modifier = Modifier.weight(1f))
                         TextButton(onClick = { onEvent(MainScreenEvent.ToggleSnapping) }) {
                             Text(if (uiState.isSnappingEnabled) "On" else "Off")
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // CV Model Toggle
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Active AI Model:", modifier = Modifier.weight(1f))
                         TextButton(onClick = { onEvent(MainScreenEvent.ToggleCvModel) }) {
-                            Text(if (uiState.useCustomModel) "Custom" else "Generic")
+                            Text(uiState.cvModel)
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Refinement Method Toggle
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Refinement:", modifier = Modifier.weight(1f))
                         TextButton(onClick = { onEvent(MainScreenEvent.ToggleCvRefinementMethod) }) {
-                            Text(uiState.cvRefinementMethod.name)
+                            Text(uiState.cvRefinement)
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
-
-                    // HoughCircles Param 1
-                    Text("Hough P1 (Canny Edge): ${uiState.houghP1.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Slider(
-                        value = uiState.houghP1,
-                        onValueChange = { onEvent(MainScreenEvent.UpdateHoughP1(it)) },
-                        valueRange = 50f..250f
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // HoughCircles Param 2
-                    Text("Hough P2 (Accumulator): ${uiState.houghP2.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Slider(
-                        value = uiState.houghP2,
-                        onValueChange = { onEvent(MainScreenEvent.UpdateHoughP2(it)) },
-                        valueRange = 10f..100f
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Canny Threshold 1
-                    Text("Canny T1: ${uiState.cannyThreshold1.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Slider(
-                        value = uiState.cannyThreshold1,
-                        onValueChange = { onEvent(MainScreenEvent.UpdateCannyT1(it)) },
-                        valueRange = 10f..200f
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Canny Threshold 2
-                    Text("Canny T2: ${uiState.cannyThreshold2.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Slider(
-                        value = uiState.cannyThreshold2,
-                        onValueChange = { onEvent(MainScreenEvent.UpdateCannyT2(it)) },
-                        valueRange = 50f..300f
-                    )
+                    Text("Hough P1 (Canny Edge): ${uiState.houghP1.toInt()}")
+                    Slider(value = uiState.houghP1, onValueChange = { onEvent(MainScreenEvent.UpdateHoughP1(it)) }, valueRange = 1f..300f)
+                    Text("Hough P2 (Accumulator): ${uiState.houghP2.toInt()}")
+                    Slider(value = uiState.houghP2, onValueChange = { onEvent(MainScreenEvent.UpdateHoughP2(it)) }, valueRange = 1f..100f)
+                    Text("Canny T1: ${uiState.cannyThreshold1.toInt()}")
+                    Slider(value = uiState.cannyThreshold1, onValueChange = { onEvent(MainScreenEvent.UpdateCannyT1(it)) }, valueRange = 1f..200f)
+                    Text("Canny T2: ${uiState.cannyThreshold2.toInt()}")
+                    Slider(value = uiState.cannyThreshold2, onValueChange = { onEvent(MainScreenEvent.UpdateCannyT2(it)) }, valueRange = 1f..400f)
                 }
             },
-            confirmButton = { TextButton(onClick = onDismiss) { Text("Done", color = MaterialTheme.colorScheme.primary) } }
+            confirmButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("Done")
+                }
+            }
         )
     }
 }
