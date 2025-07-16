@@ -4,6 +4,7 @@ package com.hereliesaz.cuedetat.view.renderer.table
 
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PointF
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
@@ -16,89 +17,66 @@ class TableRenderer {
 
     companion object {
         fun getLogicalPockets(state: OverlayState): List<PointF> {
-            val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
-            if (referenceRadius <= 0) return emptyList()
-
-            val ballRealDiameter = 2.25f
-            val ballLogicalDiameter = referenceRadius * 2
-            val scale = ballLogicalDiameter / ballRealDiameter
-
-            val tablePlayingSurfaceWidth = state.tableSize.longSideInches * scale
-            val tablePlayingSurfaceHeight = state.tableSize.shortSideInches * scale
-
-            // Corrected: Use logical origin (0,0) instead of screen center
-            val tableCenterX = 0f
-            val tableCenterY = 0f
-            val left = tableCenterX - tablePlayingSurfaceWidth / 2
-            val top = tableCenterY - tablePlayingSurfaceHeight / 2
-            val right = tableCenterX + tablePlayingSurfaceWidth / 2
-            val bottom = tableCenterY + tablePlayingSurfaceHeight / 2
-
-            // Move side pockets outward by half a ball radius.
-            val sidePocketOffset = referenceRadius * 0.5f
-
-            return listOf(
-                PointF(left, top), PointF(right, top), // Top corners
-                PointF(left, bottom), PointF(right, bottom),   // Bottom corners
-                PointF(tableCenterX, top - sidePocketOffset), PointF(tableCenterX, bottom + sidePocketOffset) // Side pockets
-            )
+            return state.table.pockets
         }
     }
 
     fun drawSurface(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        if (!state.showTable && !state.isBankingMode) return
-
-        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
-        if (referenceRadius <= 0) return
+        if (!state.table.isVisible) return
 
         val tableConfig = Table()
-
-        val ballRealDiameter = 2.25f
-        val ballLogicalDiameter = referenceRadius * 2
-        val scale = ballLogicalDiameter / ballRealDiameter
-        val tablePlayingSurfaceWidth = state.tableSize.longSideInches * scale
-        val tablePlayingSurfaceHeight = state.tableSize.shortSideInches * scale
-
-        // Corrected: Use logical origin (0,0) instead of screen center
-        val tableCenterX = 0f
-        val tableCenterY = 0f
-
-        val left = tableCenterX - tablePlayingSurfaceWidth / 2
-        val top = tableCenterY - tablePlayingSurfaceHeight / 2
-        val right = tableCenterX + tablePlayingSurfaceWidth / 2
-        val bottom = tableCenterY + tablePlayingSurfaceHeight / 2
+        val corners = state.table.corners
+        if (corners.size < 4) return
 
         val tableOutlinePaint = Paint(paints.tableOutlinePaint).apply {
             color = tableConfig.strokeColor.toArgb()
             strokeWidth = tableConfig.strokeWidth
         }
 
-        // Draw Outline Only, no fill.
-        canvas.drawRect(left, top, right, bottom, tableOutlinePaint)
+        // Draw Rotated Outline
+        val path = Path()
+        path.moveTo(corners[0].x, corners[0].y)
+        path.lineTo(corners[1].x, corners[1].y)
+        path.lineTo(corners[2].x, corners[2].y)
+        path.lineTo(corners[3].x, corners[3].y)
+        path.close()
+        canvas.drawPath(path, tableOutlinePaint)
 
         // Draw Diamond Grid
         val diamondGridPaint = paints.gridLinePaint
-        val halfWidth = tablePlayingSurfaceWidth / 2
-        val halfHeight = tablePlayingSurfaceHeight / 2
+        val topMid = interpolate(corners[0], corners[1], 0.5f)
+        val bottomMid = interpolate(corners[3], corners[2], 0.5f)
+        canvas.drawLine(topMid.x, topMid.y, bottomMid.x, bottomMid.y, diamondGridPaint)
 
-        // Vertical lines (connecting long rail diamonds)
-        for (i in 1..3) {
-            val xOffset = halfWidth * (i / 4.0f)
-            canvas.drawLine(tableCenterX - xOffset, top, tableCenterX - xOffset, bottom, diamondGridPaint)
-            canvas.drawLine(tableCenterX + xOffset, top, tableCenterX + xOffset, bottom, diamondGridPaint)
-        }
-        // Horizontal lines (connecting short rail diamonds)
-        val shortRailYOffsets = listOf(-halfHeight / 2, 0f, halfHeight / 2)
-        for (yOffset in shortRailYOffsets) {
-            canvas.drawLine(left, tableCenterY + yOffset, right, tableCenterY + yOffset, diamondGridPaint)
-        }
-        // Center lines
-        canvas.drawLine(tableCenterX, top, tableCenterX, bottom, diamondGridPaint)
-        canvas.drawLine(left, tableCenterY, right, tableCenterY, diamondGridPaint)
+        val leftMid = interpolate(corners[0], corners[3], 0.5f)
+        val rightMid = interpolate(corners[1], corners[2], 0.5f)
+        canvas.drawLine(leftMid.x, leftMid.y, rightMid.x, rightMid.y, diamondGridPaint)
+
+        // Vertical lines
+        val top1_4 = interpolate(corners[0], corners[1], 0.25f)
+        val bottom1_4 = interpolate(corners[3], corners[2], 0.25f)
+        canvas.drawLine(top1_4.x, top1_4.y, bottom1_4.x, bottom1_4.y, diamondGridPaint)
+
+        val top3_4 = interpolate(corners[0], corners[1], 0.75f)
+        val bottom3_4 = interpolate(corners[3], corners[2], 0.75f)
+        canvas.drawLine(top3_4.x, top3_4.y, bottom3_4.x, bottom3_4.y, diamondGridPaint)
+
+        // Horizontal lines
+        val left1_4 = interpolate(corners[0], corners[3], 0.25f)
+        val right1_4 = interpolate(corners[1], corners[2], 0.25f)
+        canvas.drawLine(left1_4.x, left1_4.y, right1_4.x, right1_4.y, diamondGridPaint)
+
+        val left3_4 = interpolate(corners[0], corners[3], 0.75f)
+        val right3_4 = interpolate(corners[1], corners[2], 0.75f)
+        canvas.drawLine(left3_4.x, left3_4.y, right3_4.x, right3_4.y, diamondGridPaint)
+    }
+
+    private fun interpolate(p1: PointF, p2: PointF, fraction: Float): PointF {
+        return PointF(p1.x + (p2.x - p1.x) * fraction, p1.y + (p2.y - p1.y) * fraction)
     }
 
     fun drawPockets(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        if (!state.showTable && !state.isBankingMode) return
+        if (!state.table.isVisible) return
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
         if (referenceRadius <= 0) return
 

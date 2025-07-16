@@ -3,7 +3,6 @@
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
-import com.hereliesaz.cuedetat.view.renderer.table.TableRenderer
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import kotlin.math.abs
@@ -12,7 +11,7 @@ import kotlin.math.sqrt
 
 data class BankShotResult(val path: List<PointF>, val pocketedPocketIndex: Int?)
 
-class CalculateBankShot @Inject constructor(private val reducerUtils: ReducerUtils) {
+class CalculateBankShot @Inject constructor() {
 
     operator fun invoke(state: OverlayState): BankShotResult {
         if (!state.isBankingMode || state.onPlaneBall == null || state.bankingAimTarget == null) {
@@ -28,7 +27,7 @@ class CalculateBankShot @Inject constructor(private val reducerUtils: ReducerUti
         var pocketedIndex: Int? = null
 
         for (i in 0..10) { // Limit to 10 banks to prevent infinite loops
-            val intersectionResult = reducerUtils.findRailIntersectionAndNormal(currentPoint, state.bankingAimTarget, state)
+            val intersectionResult = state.table.findRailIntersectionAndNormal(currentPoint, state.bankingAimTarget)
             if (intersectionResult != null) {
                 val (intersection, normal) = intersectionResult
                 path.add(intersection)
@@ -40,7 +39,7 @@ class CalculateBankShot @Inject constructor(private val reducerUtils: ReducerUti
                     break
                 }
 
-                currentVector = reducerUtils.reflect(currentVector, normal)
+                currentVector = state.table.reflect(currentVector, normal)
                 currentPoint = intersection
             } else {
                 // No more intersections, path ends.
@@ -54,7 +53,7 @@ class CalculateBankShot @Inject constructor(private val reducerUtils: ReducerUti
     private fun checkPocketAim(start: PointF, end: PointF, state: OverlayState): Pair<Int?, PointF?> {
         val dirX = end.x - start.x
         val dirY = end.y - start.y
-        val pockets = TableRenderer.getLogicalPockets(state)
+        val pockets = state.table.pockets
         val pocketRadius = state.protractorUnit.radius * 1.8f
 
         for ((index, pocket) in pockets.withIndex()) {

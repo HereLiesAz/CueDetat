@@ -18,18 +18,18 @@ fun TableRotationSlider(
     onEvent: (MainScreenEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (uiState.showTable) {
+    if (uiState.table.isVisible) {
         Column(
             modifier = modifier,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                "Table Rotation: ${uiState.tableRotationDegrees.toInt()}°",
+                "Table Rotation: ${uiState.table.rotationDegrees.toInt()}°",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Slider(
-                value = uiState.tableRotationDegrees,
+                value = uiState.table.rotationDegrees,
                 onValueChange = { onEvent(MainScreenEvent.TableRotationChanged(it)) },
                 valueRange = -179f..180f, // Centered range
                 steps = 358,

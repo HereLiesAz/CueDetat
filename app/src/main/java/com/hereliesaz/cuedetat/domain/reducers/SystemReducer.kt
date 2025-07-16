@@ -5,12 +5,15 @@ package com.hereliesaz.cuedetat.domain.reducers
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
 import com.hereliesaz.cuedetat.data.FullOrientation
+import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
+import com.hereliesaz.cuedetat.view.model.Table
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.view.state.TableSize
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,24 +35,17 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             return createInitialState(event.width, event.height, currentState.appControlColorScheme)
         }
 
-        // For all subsequent resizes, only update view dimensions and dependent logical radii.
-        // Logical coordinates of objects remain absolute and are not modified here.
-        val newLogicalRadius = reducerUtils.getCurrentLogicalRadius(event.width, event.height, currentState.zoomSliderPosition)
-
+        // For all subsequent resizes, only update view dimensions.
+        // Logical sizes are now constant and do not depend on view size.
         return currentState.copy(
             viewWidth = event.width,
             viewHeight = event.height,
-            protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius),
-            onPlaneBall = currentState.onPlaneBall?.copy(radius = newLogicalRadius),
-            obstacleBalls = currentState.obstacleBalls.map { it.copy(radius = newLogicalRadius) }
         )
     }
 
     private fun createInitialState(viewWidth: Int, viewHeight: Int, appColorScheme: ColorScheme): OverlayState {
         val initialSliderPos = 0f
-        val initialLogicalRadius = reducerUtils.getCurrentLogicalRadius(viewWidth, viewHeight, initialSliderPos)
         val initialProtractorCenter = PointF(0f, 0f)
-        val initialTableRotation = 90f // Default to portrait orientation
 
         // UI elements like the spin control remain screen-relative.
         val initialSpinControlCenter = PointF(viewWidth / 2f, viewHeight * 0.75f)
@@ -59,14 +55,17 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             viewHeight = viewHeight,
             protractorUnit = ProtractorUnit(
                 center = initialProtractorCenter,
-                radius = initialLogicalRadius,
+                radius = LOGICAL_BALL_RADIUS,
                 rotationDegrees = -90f // Default to a straight-down shot
+            ),
+            table = Table(
+                size = TableSize.EIGHT_FT,
+                rotationDegrees = 0f, // Portrait is default
+                isVisible = false,
             ),
             onPlaneBall = null,
             zoomSliderPosition = initialSliderPos,
             isBankingMode = false,
-            showTable = false,
-            tableRotationDegrees = initialTableRotation,
             bankingAimTarget = null,
             valuesChangedSinceReset = false,
             areHelpersVisible = false,

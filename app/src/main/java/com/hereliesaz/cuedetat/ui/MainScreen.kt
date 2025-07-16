@@ -84,7 +84,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 )
             }
         ) {
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxSize()) {
                 if (uiState.isCameraVisible) {
                     CameraBackground(
                         modifier = Modifier.fillMaxSize().zIndex(0f),
@@ -177,7 +177,7 @@ fun MainScreen(viewModel: MainViewModel) {
                             .padding(horizontal = 16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (uiState.showTable) {
+                        if (uiState.table.isVisible) {
                             TableRotationSlider(
                                 uiState = uiState,
                                 onEvent = viewModel::onEvent

@@ -11,9 +11,7 @@ import javax.inject.Singleton
 import kotlin.math.*
 
 @Singleton
-class CalculateSpinPaths @Inject constructor(
-    private val reducerUtils: ReducerUtils
-) {
+class CalculateSpinPaths @Inject constructor() {
     private val maxPathLengthFactor = 20f
 
     operator fun invoke(state: OverlayState): Map<Color, List<PointF>> {
@@ -30,7 +28,7 @@ class CalculateSpinPaths @Inject constructor(
         val path = calculatePathForSpin(state, angleDegrees, spinMagnitude)
         val color = SpinColorUtils.getColorFromAngleAndDistance(angleDegrees, spinMagnitude)
 
-        val finalPath = if (state.showTable) {
+        val finalPath = if (state.table.isVisible) {
             bankCurve(path, state)
         } else {
             path
@@ -80,7 +78,7 @@ class CalculateSpinPaths @Inject constructor(
         for (i in 0 until path.size - 1) {
             val p1 = path[i]
             val p2 = path[i + 1]
-            val intersectionResult = reducerUtils.findRailIntersectionAndNormal(p1, p2, state)
+            val intersectionResult = state.table.findRailIntersectionAndNormal(p1, p2)
 
             if (intersectionResult != null) {
                 val (intersectionPoint, railNormal) = intersectionResult
@@ -88,7 +86,7 @@ class CalculateSpinPaths @Inject constructor(
                 truncatedPath.add(intersectionPoint)
 
                 val incidentVector = PointF(p2.x - p1.x, p2.y - p1.y)
-                val reflectedVector = reducerUtils.reflect(incidentVector, railNormal)
+                val reflectedVector = state.table.reflect(incidentVector, railNormal)
 
                 val extendedEndPoint = PointF(
                     intersectionPoint.x + reflectedVector.x * 5000f,

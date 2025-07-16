@@ -3,10 +3,12 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
+import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
+import com.hereliesaz.cuedetat.view.model.Table
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.TableSize
@@ -23,11 +25,11 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(currentState)
             is MainScreenEvent.ToggleTable -> handleToggleTable(currentState)
             is MainScreenEvent.CycleTableSize -> {
-                val newState = currentState.copy(tableSize = currentState.tableSize.next(), valuesChangedSinceReset = true)
+                val newState = currentState.copy(table = currentState.table.copy(size = currentState.table.size.next()), valuesChangedSinceReset = true)
                 reducerUtils.snapViolatingBalls(newState)
             }
             is MainScreenEvent.SetTableSize -> {
-                val newState = currentState.copy(tableSize = event.size, valuesChangedSinceReset = true)
+                val newState = currentState.copy(table = currentState.table.copy(size = event.size), valuesChangedSinceReset = true)
                 reducerUtils.snapViolatingBalls(newState)
             }
             is MainScreenEvent.ToggleTableSizeDialog -> currentState.copy(showTableSizeDialog = !currentState.showTableSizeDialog)
@@ -50,7 +52,10 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
     }
 
     private fun handleToggleTable(currentState: OverlayState): OverlayState {
-        val newState = currentState.copy(showTable = !currentState.showTable, valuesChangedSinceReset = true)
+        val newState = currentState.copy(
+            table = currentState.table.copy(isVisible = !currentState.table.isVisible),
+            valuesChangedSinceReset = true
+        )
         return resetForTable(newState)
     }
 
@@ -59,14 +64,10 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
         return if (currentState.onPlaneBall != null) {
             currentState.copy(onPlaneBall = null, valuesChangedSinceReset = true)
         } else {
-            val newRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, currentState.zoomSliderPosition)
-            val newCenter = if (currentState.showTable) {
-                reducerUtils.getDefaultCueBallPosition(currentState)
-            } else {
-                PointF(0f, currentState.protractorUnit.radius * 4)
-            }
+            // Always use the logical default position, regardless of table visibility.
+            val newCenter = reducerUtils.getDefaultCueBallPosition(currentState)
             currentState.copy(
-                onPlaneBall = OnPlaneBall(center = newCenter, radius = newRadius),
+                onPlaneBall = OnPlaneBall(center = newCenter, radius = LOGICAL_BALL_RADIUS),
                 valuesChangedSinceReset = true
             )
         }
@@ -74,20 +75,19 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
 
 
     private fun resetForTable(currentState: OverlayState): OverlayState {
-        val logicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, 0f)
         val targetBallCenter = reducerUtils.getDefaultTargetBallPosition()
         val actualCueBallCenter = reducerUtils.getDefaultCueBallPosition(currentState)
 
-        val updatedOnPlaneBall = if (currentState.onPlaneBall != null || currentState.showTable) {
-            OnPlaneBall(center = actualCueBallCenter, radius = logicalRadius)
+        val updatedOnPlaneBall = if (currentState.onPlaneBall != null || currentState.table.isVisible) {
+            OnPlaneBall(center = actualCueBallCenter, radius = LOGICAL_BALL_RADIUS)
         } else {
             null
         }
 
         return currentState.copy(
             onPlaneBall = updatedOnPlaneBall,
-            protractorUnit = ProtractorUnit(center = targetBallCenter, radius = logicalRadius, rotationDegrees = -90f),
-            tableRotationDegrees = 90f, // Corrected default to portrait
+            protractorUnit = ProtractorUnit(center = targetBallCenter, radius = LOGICAL_BALL_RADIUS, rotationDegrees = -90f),
+            table = currentState.table.copy(rotationDegrees = 0f), // Portrait is default
             valuesChangedSinceReset = true,
             zoomSliderPosition = 0f,
             obstacleBalls = emptyList()
@@ -98,32 +98,36 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
         val bankingEnabled = !currentState.isBankingMode
         val newState = if (bankingEnabled) {
             val bankingZoomSliderPos = 0f
-            val newLogicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, bankingZoomSliderPos)
             val bankingBallCenter = PointF(0f, 0f)
-            val newBankingBall = OnPlaneBall(center = bankingBallCenter, radius = newLogicalRadius)
-            val defaultTableRotation = 90f // Corrected default to portrait
-            val initialAimTarget = calculateInitialBankingAimTarget(newBankingBall, defaultTableRotation, newLogicalRadius)
+            val newBankingBall = OnPlaneBall(center = bankingBallCenter, radius = LOGICAL_BALL_RADIUS)
+            val defaultTableRotation = 0f // Portrait is now the default
+            val initialAimTarget = calculateInitialBankingAimTarget(newBankingBall, defaultTableRotation)
             currentState.copy(
                 isBankingMode = true, onPlaneBall = newBankingBall,
-                zoomSliderPosition = bankingZoomSliderPos, tableRotationDegrees = defaultTableRotation,
+                zoomSliderPosition = bankingZoomSliderPos,
+                table = currentState.table.copy(
+                    isVisible = true,
+                    rotationDegrees = defaultTableRotation
+                ),
                 bankingAimTarget = initialAimTarget,
-                protractorUnit = currentState.protractorUnit.copy(radius = newLogicalRadius, center = PointF(0f,0f)),
-                showTable = true,
+                protractorUnit = currentState.protractorUnit.copy(radius = LOGICAL_BALL_RADIUS, center = PointF(0f,0f)),
                 warningText = null
             )
         } else {
             val defaultSliderPos = 0f
-            val defaultLogicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, defaultSliderPos)
             currentState.copy(
                 isBankingMode = false, bankingAimTarget = null,
                 zoomSliderPosition = defaultSliderPos,
-                showTable = false,
-                onPlaneBall = OnPlaneBall(PointF(0f, defaultLogicalRadius * 4), defaultLogicalRadius),
+                table = currentState.table.copy(
+                    isVisible = false,
+                    rotationDegrees = 0f,
+                ),
+                onPlaneBall = OnPlaneBall(PointF(0f, LOGICAL_BALL_RADIUS * 4), LOGICAL_BALL_RADIUS),
                 protractorUnit = currentState.protractorUnit.copy(
-                    radius = defaultLogicalRadius,
+                    radius = LOGICAL_BALL_RADIUS,
                     center = PointF(0f, 0f)
                 ),
-                tableRotationDegrees = 0f, warningText = null
+                warningText = null
             )
         }
         return reducerUtils.snapViolatingBalls(newState.copy(
@@ -134,11 +138,10 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
 
     private fun calculateInitialBankingAimTarget(
         cueBall: OnPlaneBall,
-        tableRotationDegrees: Float,
-        cueBallRadius: Float
+        tableRotationDegrees: Float
     ): PointF {
         val defaultBankingAimDistanceFactor = 15f
-        val aimDistance = cueBallRadius * defaultBankingAimDistanceFactor
+        val aimDistance = LOGICAL_BALL_RADIUS * defaultBankingAimDistanceFactor
         val angleRad = Math.toRadians((tableRotationDegrees - 90.0))
         return PointF(
             cueBall.center.x + (aimDistance * kotlin.math.cos(angleRad)).toFloat(),

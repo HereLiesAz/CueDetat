@@ -5,6 +5,7 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.data.FullOrientation
+import com.hereliesaz.cuedetat.ui.ZoomMapping
 
 object Perspective {
 
@@ -13,12 +14,13 @@ object Perspective {
         viewWidth: Int,
         viewHeight: Int,
         camera: Camera,
-        lift: Float = 0f
+        lift: Float = 0f,
+        zoom: Float = 1.0f
     ): Matrix {
         val matrix = Matrix()
         camera.save()
-        // The camera is at the logical origin, looking down the Z-axis.
-        camera.setLocation(0f, 0f, -32f)
+        // Adjust camera Z position for zoom. Dividing by zoom brings camera closer.
+        camera.setLocation(0f, 0f, -32f / zoom)
 
         if (lift != 0f) {
             camera.translate(0f, lift, 0f)
@@ -33,7 +35,6 @@ object Perspective {
 
         val pivotX = viewWidth / 2f
         val pivotY = viewHeight / 2f
-        // The pre-translation was heresy. It has been removed.
         // Post-translation correctly moves the logical origin (0,0) to the screen's center.
         matrix.postTranslate(pivotX, pivotY)
 

@@ -7,12 +7,10 @@ import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.data.FullOrientation
-import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.Perspective
-import com.hereliesaz.cuedetat.view.model.ProtractorUnit
-import com.hereliesaz.cuedetat.view.renderer.table.TableRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.ui.ZoomMapping
 import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -34,23 +32,19 @@ class UpdateStateUseCase @Inject constructor(
     operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
-        val updatedProtractorUnit = state.protractorUnit
         val updatedStateWithSnapping = state
+        val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition)
 
-        val basePitchMatrix = Perspective.createPitchMatrix(
-            currentOrientation = state.currentOrientation,
-            viewWidth = state.viewWidth,
-            viewHeight = state.viewHeight,
-            camera = camera
-        )
-        val baseInverseMatrix = Matrix().apply { basePitchMatrix.invert(this) }
+        // --- Corrected Matrix Calculation ---
+        val finalPitchMatrix = createFullMatrix(state, camera, 0f, zoomFactor)
+        val hasFinalInverse = finalPitchMatrix.invert(state.inversePitchMatrix)
 
-        val flatMatrix = Perspective.createPitchMatrix(
-            currentOrientation = FullOrientation(0f, 0f, 0f),
-            viewWidth = state.viewWidth,
-            viewHeight = state.viewHeight,
-            camera = camera
-        )
+        val logicalTableShortSide = state.table.logicalHeight
+        val baseRailLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
+        val railLiftAmount = baseRailLiftAmount * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
+        val finalRailPitchMatrix = createFullMatrix(state, camera, railLiftAmount, zoomFactor)
+        // --- End Correction ---
+
 
         val logicalShotLineAnchor = getLogicalShotLineAnchor(updatedStateWithSnapping)
         val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= updatedStateWithSnapping.protractorUnit.ghostCueBallCenter.y
@@ -61,9 +55,10 @@ class UpdateStateUseCase @Inject constructor(
             targetBall = updatedStateWithSnapping.protractorUnit.center
         )
 
+        val flatMatrix = createFullMatrix(state, camera, 0f, 1f)
         val isObstructed = checkForObstructions(updatedStateWithSnapping)
         val targetBallDistance = calculateDistance(updatedStateWithSnapping, flatMatrix)
-        val shotGuideImpactPoint = if (state.showTable && !state.isBankingMode) {
+        val shotGuideImpactPoint = if (state.table.isVisible && !state.isBankingMode) {
             calculateShotGuideImpact(updatedStateWithSnapping, useShotGuideLine = true)
         } else {
             null
@@ -74,7 +69,7 @@ class UpdateStateUseCase @Inject constructor(
         val ghostCueCenter = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter
         val targetCenter = updatedStateWithSnapping.protractorUnit.center
 
-        val (finalAimingLineBankPath, aimedPocketIndex, aimingLineEndPoint) = if (state.showTable && !state.isBankingMode) {
+        val (finalAimingLineBankPath, aimedPocketIndex, aimingLineEndPoint) = if (state.table.isVisible && !state.isBankingMode) {
             val (path, pocketIndex, endPoint) = calculateAimAndBank(ghostCueCenter, targetCenter, updatedStateWithSnapping)
             Triple(path, pocketIndex, endPoint)
         } else {
@@ -87,39 +82,11 @@ class UpdateStateUseCase @Inject constructor(
             tangentStart.y + (targetCenter.x - tangentStart.x) * tangentDirection
         )
 
-        val (finalTangentLineBankPath, tangentAimedPocketIndex, _) = if (state.showTable && !state.isBankingMode) {
+        val (finalTangentLineBankPath, tangentAimedPocketIndex, _) = if (state.table.isVisible && !state.isBankingMode) {
             calculateAimAndBank(tangentStart, activeTangentTarget, updatedStateWithSnapping)
         } else {
             Triple(getExtendedLinePath(tangentStart, activeTangentTarget), null, null)
         }
-
-        val finalPitchMatrix = Matrix(basePitchMatrix)
-        val referenceRadius = updatedStateWithSnapping.onPlaneBall?.radius ?: updatedStateWithSnapping.protractorUnit.radius
-        val ballRealDiameter = 2.25f
-        val ballLogicalDiameter = referenceRadius * 2
-        val scale = ballLogicalDiameter / ballRealDiameter
-        val logicalTableShortSide = state.tableSize.shortSideInches * scale
-        val baseRailLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
-        val railLiftAmount = baseRailLiftAmount * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
-        val finalRailPitchMatrix = Perspective.createPitchMatrix(
-            currentOrientation = state.currentOrientation,
-            viewWidth = state.viewWidth,
-            viewHeight = state.viewHeight,
-            camera = camera,
-            lift = railLiftAmount
-        )
-        val finalInverseMatrix = Matrix()
-
-        if (state.showTable) {
-            val effectiveTableRotation = state.tableRotationDegrees % 360f
-            if (effectiveTableRotation != 0f) {
-                val centerX = state.viewWidth / 2f
-                val centerY = state.viewHeight / 2f
-                finalPitchMatrix.preRotate(effectiveTableRotation, centerX, centerY)
-                finalRailPitchMatrix.preRotate(effectiveTableRotation, centerX, centerY)
-            }
-        }
-        val hasFinalInverse = finalPitchMatrix.invert(finalInverseMatrix)
 
         val spinPaths: Map<Color, List<PointF>> = if (!state.isBankingMode) {
             calculateSpinPaths(updatedStateWithSnapping)
@@ -130,8 +97,9 @@ class UpdateStateUseCase @Inject constructor(
         return updatedStateWithSnapping.copy(
             pitchMatrix = finalPitchMatrix,
             railPitchMatrix = finalRailPitchMatrix,
-            inversePitchMatrix = finalInverseMatrix,
+            inversePitchMatrix = state.inversePitchMatrix, // Use the one that was calculated and inverted
             hasInverseMatrix = hasFinalInverse,
+            flatMatrix = flatMatrix,
             shotLineAnchor = logicalShotLineAnchor,
             isGeometricallyImpossible = isGeometricallyImpossible,
             isObstructed = isObstructed,
@@ -147,6 +115,35 @@ class UpdateStateUseCase @Inject constructor(
             spinPaths = spinPaths
         )
     }
+
+    private fun createFullMatrix(state: OverlayState, camera: Camera, lift: Float, zoom: Float): Matrix {
+        // 1. Rotation Matrix (around logical 0,0)
+        val rotationMatrix = Matrix().apply {
+            if (state.table.isVisible) {
+                setRotate(state.table.rotationDegrees, 0f, 0f)
+            }
+        }
+
+        // 2. Pitch & Zoom Matrix (3D perspective) from the util
+        val pitchAndZoomMatrix = Perspective.createPitchMatrix(
+            currentOrientation = state.currentOrientation,
+            camera = camera,
+            lift = lift,
+            zoom = zoom,
+            viewWidth = state.viewWidth, // Pass view dimensions
+            viewHeight = state.viewHeight
+        )
+
+
+        // The final matrix is T_screen * P_persp * R_logical
+        // The `pitchAndZoomMatrix` from the util already includes the final translation to screen center.
+        // To apply rotation first, we must pre-concatenate it to the perspective matrix.
+        val finalMatrix = Matrix(pitchAndZoomMatrix)
+        finalMatrix.preConcat(rotationMatrix)
+
+        return finalMatrix
+    }
+
 
     private fun getLogicalShotLineAnchor(state: OverlayState): PointF {
         state.onPlaneBall?.let { return it.center }
@@ -217,7 +214,7 @@ class UpdateStateUseCase @Inject constructor(
 
         val extendedEnd = PointF(start.x + dirX / mag * lineExtensionFactor, start.y + dirY / mag * lineExtensionFactor)
 
-        val pockets = TableRenderer.getLogicalPockets(state)
+        val pockets = state.table.pockets
         val pocketRadius = state.protractorUnit.radius * 1.8f
 
         var closestIntersection: PointF? = null
@@ -250,7 +247,7 @@ class UpdateStateUseCase @Inject constructor(
         val dirX = p2.x - p1.x
         val dirY = p2.y - p1.y
 
-        return reducerUtils.findRailIntersectionAndNormal(p1, PointF(p1.x + dirX * 5000f, p1.y + dirY*5000f), state)?.first
+        return state.table.findRailIntersectionAndNormal(p1, PointF(p1.x + dirX * 5000f, p1.y + dirY*5000f))?.first
     }
 
     private fun calculateSingleBank(start: PointF, end: PointF, state: OverlayState): List<PointF> {
@@ -258,11 +255,11 @@ class UpdateStateUseCase @Inject constructor(
         val dirY = end.y - start.y
         val extendedEnd = PointF(start.x + dirX * lineExtensionFactor, start.y + dirY * lineExtensionFactor)
 
-        val intersectionResult = reducerUtils.findRailIntersectionAndNormal(start, extendedEnd, state) ?: return listOf(start, extendedEnd)
+        val intersectionResult = state.table.findRailIntersectionAndNormal(start, extendedEnd) ?: return listOf(start, extendedEnd)
         val (intersectionPoint, railNormal) = intersectionResult
 
         val incidentVector = PointF(extendedEnd.x - start.x, extendedEnd.y - start.y)
-        val reflectedDir = reducerUtils.reflect(incidentVector, railNormal)
+        val reflectedDir = state.table.reflect(incidentVector, railNormal)
 
         val finalEndPoint = PointF(
             intersectionPoint.x + reflectedDir.x * lineExtensionFactor,

@@ -104,7 +104,8 @@ class LineTextRenderer {
             RailType.RIGHT -> { textX -= padding; textRotation = -90f }
         }
 
-        val uprightCorrection = if (state.tableRotationDegrees > 0 && state.tableRotationDegrees < 180) 180f else 0f
+        val uprightCorrection = if (state.table.rotationDegrees > 90 || state.table.rotationDegrees < -90) 180f else 0f
+
 
         canvas.save()
         canvas.rotate(textRotation + uprightCorrection, textX, textY)
@@ -114,26 +115,20 @@ class LineTextRenderer {
 
 
     private fun calculateDiamondNumber(point: PointF, railType: RailType, state: OverlayState): String? {
-        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
-        if (referenceRadius <= 0) return null
+        val table = state.table
+        if (!table.isVisible || table.logicalWidth <= 0 || table.logicalHeight <= 0) return null
 
-        val ballRealDiameter = 2.25f
-        val ballLogicalDiameter = referenceRadius * 2
-        val scale = ballLogicalDiameter / ballRealDiameter
-        val tableWidth = state.tableSize.longSideInches * scale
-        val tableHeight = state.tableSize.shortSideInches * scale
+        val halfW = table.logicalWidth / 2f
+        val halfH = table.logicalHeight / 2f
 
-        val halfW = tableWidth / 2f
-        val halfH = tableHeight / 2f
-
-        val logicalX = point.x - state.viewWidth / 2f
-        val logicalY = point.y - state.viewHeight / 2f
+        val logicalX = point.x
+        val logicalY = point.y
 
         val diamondValue = when (railType) {
-            RailType.TOP -> ((logicalX + halfW) / tableWidth) * 8.0
-            RailType.RIGHT -> ((logicalY + halfH) / tableHeight) * 4.0
-            RailType.BOTTOM -> 8.0 - (((logicalX + halfW) / tableWidth) * 8.0)
-            RailType.LEFT -> 4.0 - (((logicalY + halfH) / tableHeight) * 4.0)
+            RailType.TOP -> if (table.logicalWidth > 0) ((logicalX + halfW) / table.logicalWidth) * 8.0 else 0.0
+            RailType.RIGHT -> if (table.logicalHeight > 0) ((logicalY + halfH) / table.logicalHeight) * 4.0 else 0.0
+            RailType.BOTTOM -> if (table.logicalWidth > 0) 8.0 - (((logicalX + halfW) / table.logicalWidth) * 8.0) else 0.0
+            RailType.LEFT -> if (table.logicalHeight > 0) 4.0 - (((logicalY + halfH) / table.logicalHeight) * 4.0) else 0.0
         }
 
         return String.format("%.1f", diamondValue)

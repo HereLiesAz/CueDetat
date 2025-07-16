@@ -48,8 +48,8 @@ class ObstacleReducer @Inject constructor(private val reducerUtils: ReducerUtils
         }
 
         // Fallback placement logic
-        if (currentState.showTable) {
-            val corners = reducerUtils.getLogicalTableCorners(currentState)
+        if (currentState.table.isVisible) {
+            val corners = currentState.table.corners
             if (corners.isEmpty()) return reducerUtils.getDefaultTargetBallPosition()
 
             val minX = corners.minOf { it.x }
@@ -63,7 +63,7 @@ class ObstacleReducer @Inject constructor(private val reducerUtils: ReducerUtils
                 val randomY = Random.nextFloat() * (maxY - minY) + minY
                 val candidatePoint = PointF(randomX, randomY)
 
-                if (reducerUtils.isPointInsidePolygon(candidatePoint, corners)) {
+                if (currentState.table.isPointInside(candidatePoint)) {
                     val isOverlapping = allLogicalBalls.any {
                         hypot((it.x - candidatePoint.x).toDouble(), (it.y - candidatePoint.y).toDouble()) < (currentState.protractorUnit.radius * 2.5)
                     }

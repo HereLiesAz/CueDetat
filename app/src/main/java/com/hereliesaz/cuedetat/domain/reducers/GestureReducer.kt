@@ -4,6 +4,7 @@ package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
 import androidx.compose.ui.geometry.Offset
+import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.InteractionMode
@@ -32,8 +33,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         val spinControlCenter = currentState.spinControlCenter
         val protractorUnit = currentState.protractorUnit
 
-        val maxLogicalRadius = reducerUtils.getCurrentLogicalRadius(currentState.viewWidth, currentState.viewHeight, 50f)
-        val constantTouchRadius = maxLogicalRadius * 1.5f
+        val constantTouchRadius = LOGICAL_BALL_RADIUS * 1.5f
 
         val spinControlTouchRadius = (onPlaneBall?.radius ?: protractorUnit.radius) * 1.5f
         if (currentState.isSpinControlVisible && spinControlCenter != null && getDistance(event.screenOffset, spinControlCenter) < spinControlTouchRadius) {

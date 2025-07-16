@@ -19,6 +19,7 @@ import com.hereliesaz.cuedetat.domain.CalculateBankShot
 import com.hereliesaz.cuedetat.domain.StateReducer
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.view.model.Perspective
+import com.hereliesaz.cuedetat.view.model.Table
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -57,7 +58,11 @@ class MainViewModel @Inject constructor(
         OverlayState(
             appControlColorScheme = darkColorScheme(),
             distanceUnit = userPreferencesRepository.getDistanceUnit(),
-            tableSize = userPreferencesRepository.getTableSize(),
+            table = Table(
+                size = userPreferencesRepository.getTableSize(),
+                rotationDegrees = 0f,
+                isVisible = false
+            ),
             houghP1 = userPreferencesRepository.getCvHoughP1(),
             houghP2 = userPreferencesRepository.getCvHoughP2(),
             cannyThreshold1 = userPreferencesRepository.getCvCannyT1(),
@@ -100,7 +105,7 @@ class MainViewModel @Inject constructor(
                 userPreferencesRepository.setTableSize(event.size)
             }
             is MainScreenEvent.CycleTableSize -> {
-                val newSize = uiState.value.tableSize.next()
+                val newSize = uiState.value.table.size.next()
                 userPreferencesRepository.setTableSize(newSize)
             }
             is MainScreenEvent.UpdateHoughP1 -> userPreferencesRepository.setCvHoughP1(event.value)

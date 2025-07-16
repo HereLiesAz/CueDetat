@@ -4,15 +4,16 @@ package com.hereliesaz.cuedetat.view.state
 
 import android.graphics.Matrix
 import android.graphics.PointF
-import android.graphics.Rect
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.VisionData
+import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
+import com.hereliesaz.cuedetat.view.model.Table
 
 data class SnapCandidate(
     val detectedPoint: PointF,
@@ -63,9 +64,16 @@ data class OverlayState(
     val viewHeight: Int = 0,
 
     // Core logical model
-    val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), 1f, 0f),
+    val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), LOGICAL_BALL_RADIUS, 0f),
     val onPlaneBall: OnPlaneBall? = null,
     val obstacleBalls: List<OnPlaneBall> = emptyList(),
+
+    // Table State Object
+    val table: Table = Table(
+        size = TableSize.EIGHT_FT,
+        rotationDegrees = 0f,
+        isVisible = false
+    ),
 
     // UI control state
     val zoomSliderPosition: Float = 0f,
@@ -76,12 +84,9 @@ data class OverlayState(
 
     // Banking mode specific state
     val isBankingMode: Boolean = false,
-    val showTable: Boolean = false,
-    val tableRotationDegrees: Float = 0f,
     val bankingAimTarget: PointF? = null,
     val bankShotPath: List<PointF> = emptyList(),
     val pocketedBankShotPocketIndex: Int? = null,
-    val tableSize: TableSize = TableSize.EIGHT_FT,
     val showTableSizeDialog: Boolean = false,
 
     // Theme and Appearance

@@ -35,7 +35,7 @@ class LineRenderer {
     }
 
     fun drawRailLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
-        if (!state.showTable) return
+        if (!state.table.isVisible) return
 
         val textPaint = paints.textPaint.apply { this.typeface = typeface }
 
@@ -248,17 +248,8 @@ class LineRenderer {
     }
 
     private fun getRailForPoint(point: PointF, state: OverlayState): LineTextRenderer.RailType? {
-        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
-        if (referenceRadius <= 0) return null
-
-        val ballRealDiameter = 2.25f
-        val ballLogicalDiameter = referenceRadius * 2
-        val scale = ballLogicalDiameter / ballRealDiameter
-        val tableWidth = state.tableSize.longSideInches * scale
-        val tableHeight = state.tableSize.shortSideInches * scale
-
-        val halfW = tableWidth / 2f
-        val halfH = tableHeight / 2f
+        val halfW = state.table.logicalWidth / 2f
+        val halfH = state.table.logicalHeight / 2f
 
         // Corrected: Use logical coordinates relative to (0,0)
         val logicalX = point.x

@@ -75,7 +75,7 @@ fun MenuDrawerContent(
             MenuDivider()
 
             // Section 2: Table & Unit Settings
-            if (!uiState.isBankingMode && !uiState.showTable) {
+            if (!uiState.isBankingMode && !uiState.table.isVisible) {
                 MenuItem(
                     text = "Show Table",
                     onClick = { onEvent(MainScreenEvent.ToggleTable); onCloseDrawer() }

@@ -6,9 +6,9 @@ import kotlin.math.pow
 
 internal object ZoomMapping {
     // --- Master Zoom Controls ---
-    const val MIN_ZOOM = 0.084f
-    const val DEFAULT_ZOOM = 0.4f
-    const val MAX_ZOOM = 0.6f
+    const val MIN_ZOOM = 0.5f
+    const val DEFAULT_ZOOM = 1.0f
+    const val MAX_ZOOM = 4.0f
     // ----------------------------
 
     // Slider now operates on a -50 to +50 range.

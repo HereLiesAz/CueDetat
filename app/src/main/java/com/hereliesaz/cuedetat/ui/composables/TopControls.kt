@@ -65,7 +65,7 @@ fun TopControls(
             }
         }
 
-        if(uiState.showTable || uiState.isBankingMode) {
+        if(uiState.table.isVisible) {
             Column(
                 horizontalAlignment = Alignment.End,
                 modifier = Modifier.clickable { onEvent(MainScreenEvent.CycleTableSize) }
@@ -76,7 +76,7 @@ fun TopControls(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
                 Text(
-                    text = "${uiState.tableSize.feet}'",
+                    text = "${uiState.table.size.feet}'",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
                 )

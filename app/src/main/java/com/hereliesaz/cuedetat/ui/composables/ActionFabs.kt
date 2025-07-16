@@ -82,7 +82,7 @@ fun ToggleCueBallFab(
     onEvent: (MainScreenEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isEnabled = !uiState.showTable
+    val isEnabled = !uiState.table.isVisible
     val containerColor = when {
         !isEnabled -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         uiState.onPlaneBall != null -> MaterialTheme.colorScheme.secondaryContainer
@@ -114,8 +114,8 @@ fun ToggleTableFab(
     onEvent: (MainScreenEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val containerColor = if (uiState.showTable) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer
-    val textColor = if (uiState.showTable) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
+    val containerColor = if (uiState.table.isVisible) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer
+    val textColor = if (uiState.table.isVisible) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
 
     FloatingActionButton(
         onClick = { onEvent(MainScreenEvent.ToggleTable) },
@@ -123,7 +123,7 @@ fun ToggleTableFab(
         containerColor = containerColor
     ) {
         Text(
-            text = if (uiState.showTable) "Hide\nTable" else "Show\nTable",
+            text = if (uiState.table.isVisible) "Hide\nTable" else "Show\nTable",
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.labelSmall,
             color = textColor

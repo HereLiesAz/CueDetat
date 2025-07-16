@@ -10,7 +10,7 @@ import androidx.camera.core.ImageProxy
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.hereliesaz.cuedetat.di.GenericDetector
-import com.hereliesaz.cuedetat.domain.ReducerUtils
+import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,7 +23,6 @@ import javax.inject.Singleton
 @Singleton
 class VisionRepository @Inject constructor(
     @GenericDetector private val genericObjectDetector: ObjectDetector,
-    private val reducerUtils: ReducerUtils
 ) {
 
     private val _visionDataFlow = MutableStateFlow(VisionData())
@@ -60,18 +59,26 @@ class VisionRepository @Inject constructor(
                         floatArrayOf(centerColor[0].toFloat(), centerColor[1].toFloat(), centerColor[2].toFloat())
                     }
 
-                    val detectedBalls = detectedObjects.map {
+                    val detectedScreenPoints = detectedObjects.map {
                         val transformedRect = RectF(it.boundingBox)
                         matrix.mapRect(transformedRect)
                         PointF(transformedRect.centerX(), transformedRect.centerY())
                     }
 
-                    // The logic now correctly queries the rotated table corners for filtering
-                    val filteredBalls = if (state.showTable) {
-                        val tableCorners = reducerUtils.getLogicalTableCorners(state)
-                        detectedBalls.filter { reducerUtils.isPointInsidePolygon(it, tableCorners) }
+                    // Convert screen points to logical points before filtering
+                    val detectedLogicalPoints = if (state.hasInverseMatrix) {
+                        detectedScreenPoints.map { screenPoint ->
+                            Perspective.screenToLogical(screenPoint, state.inversePitchMatrix)
+                        }
                     } else {
-                        detectedBalls
+                        emptyList()
+                    }
+
+
+                    val filteredBalls = if (state.table.isVisible) {
+                        detectedLogicalPoints.filter { state.table.isPointInside(it) }
+                    } else {
+                        detectedLogicalPoints
                     }
 
                     _visionDataFlow.value = VisionData(
