@@ -26,30 +26,35 @@ fun Modifier.detectManualGestures(onEvent: (MainScreenEvent) -> Unit) =
                 val canceled = event.changes.any { it.isConsumed }
                 if (!canceled) {
                     val zoom = event.calculateZoom()
-                    val pan = event.calculatePan()
                     val rotation = event.calculateRotation()
+                    val pan = event.calculatePan()
                     val centroid = event.calculateCentroid()
 
-                    if (zoom != 1f) {
-                        onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
-                    }
-
-                    if (rotation != 0f) {
-                        onEvent(MainScreenEvent.TableRotationApplied(rotation))
-                    }
-
-                    if (pan != Offset.Zero) {
-                        val previousPosition = lastCentroid
-                        val currentPosition = centroid
-                        onEvent(
-                            MainScreenEvent.Drag(
-                                previousPosition = PointF(previousPosition.x, previousPosition.y),
-                                currentPosition = PointF(currentPosition.x, currentPosition.y)
+                    // Differentiate between one-finger drag and multi-finger transform
+                    if (event.changes.size > 1) {
+                        // Multi-finger gesture for zoom and rotation
+                        if (zoom != 1f) {
+                            onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
+                        }
+                        if (rotation != 0f) {
+                            onEvent(MainScreenEvent.TableRotationApplied(rotation))
+                        }
+                    } else if (event.changes.size == 1) {
+                        // Single-finger drag
+                        if (pan != Offset.Zero) {
+                            val previousPosition = lastCentroid
+                            val currentPosition = centroid
+                            onEvent(
+                                MainScreenEvent.Drag(
+                                    previousPosition = PointF(previousPosition.x, previousPosition.y),
+                                    currentPosition = PointF(currentPosition.x, currentPosition.y)
+                                )
                             )
-                        )
-                        lastCentroid = centroid
+                        }
                     }
+                    lastCentroid = centroid
                 }
+
                 event.changes.forEach { if (it.pressed) it.consume() }
             } while (!canceled && event.changes.any { it.pressed })
 

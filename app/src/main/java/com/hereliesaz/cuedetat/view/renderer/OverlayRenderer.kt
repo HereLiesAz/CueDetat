@@ -40,7 +40,7 @@ class OverlayRenderer {
             canvas.save()
             canvas.concat(state.railPitchMatrix)
             railRenderer.draw(canvas, state, paints)
-            lineRenderer.drawRailLabels(canvas, state, paints, typeface)
+            railRenderer.drawRailLabels(canvas, state, paints, typeface) // Draw labels on the same plane as rails
             canvas.restore()
         }
 

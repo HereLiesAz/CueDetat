@@ -6,7 +6,6 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.ui.graphics.Color
-import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -25,25 +24,25 @@ class UpdateStateUseCase @Inject constructor(
     private val reducerUtils: ReducerUtils
 ) {
 
-    private val railHeightToTableHeightRatio = 0.05f
+    private val railHeightToTableHeightRatio = 0.025f // Halved the lift amount
     private val distanceReferenceConstant = 6480f
     private val lineExtensionFactor = 5000f
 
-    operator fun invoke(state: OverlayState, camera: Camera): OverlayState {
+    operator fun invoke(state: OverlayState): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
         val updatedStateWithSnapping = state
         val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition)
 
-        // --- Corrected Matrix Calculation ---
-        val finalPitchMatrix = createFullMatrix(state, camera, 0f, zoomFactor)
+        val finalPitchMatrix = createFullMatrix(state, 0f, zoomFactor)
         val hasFinalInverse = finalPitchMatrix.invert(state.inversePitchMatrix)
 
         val logicalTableShortSide = state.table.logicalHeight
         val baseRailLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
         val railLiftAmount = baseRailLiftAmount * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
-        val finalRailPitchMatrix = createFullMatrix(state, camera, railLiftAmount, zoomFactor)
-        // --- End Correction ---
+        val finalRailPitchMatrix = createFullMatrix(state, railLiftAmount, zoomFactor)
+
+        val flatMatrix = createFullMatrix(state, 0f, 1f, applyPitch = false)
 
 
         val logicalShotLineAnchor = getLogicalShotLineAnchor(updatedStateWithSnapping)
@@ -55,7 +54,6 @@ class UpdateStateUseCase @Inject constructor(
             targetBall = updatedStateWithSnapping.protractorUnit.center
         )
 
-        val flatMatrix = createFullMatrix(state, camera, 0f, 1f)
         val isObstructed = checkForObstructions(updatedStateWithSnapping)
         val targetBallDistance = calculateDistance(updatedStateWithSnapping, flatMatrix)
         val shotGuideImpactPoint = if (state.table.isVisible && !state.isBankingMode) {
@@ -116,30 +114,33 @@ class UpdateStateUseCase @Inject constructor(
         )
     }
 
-    private fun createFullMatrix(state: OverlayState, camera: Camera, lift: Float, zoom: Float): Matrix {
-        // 1. Rotation Matrix (around logical 0,0)
-        val rotationMatrix = Matrix().apply {
-            if (state.table.isVisible) {
-                setRotate(state.table.rotationDegrees, 0f, 0f)
-            }
-        }
+    private fun createFullMatrix(state: OverlayState, lift: Float, zoom: Float, applyPitch: Boolean = true): Matrix {
+        val camera = Camera()
 
-        // 2. Pitch & Zoom Matrix (3D perspective) from the util
-        val pitchAndZoomMatrix = Perspective.createPitchMatrix(
+        // 1. Create the base perspective matrix (tilt only).
+        val perspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = state.currentOrientation,
             camera = camera,
             lift = lift,
-            zoom = zoom,
-            viewWidth = state.viewWidth, // Pass view dimensions
-            viewHeight = state.viewHeight
+            applyPitch = applyPitch
         )
 
+        // 2. Create the world transformation matrix (2D rotation and scale).
+        val worldMatrix = Matrix().apply {
+            postScale(zoom, zoom)
+            if (state.table.isVisible) {
+                postRotate(state.table.rotationDegrees, 0f, 0f)
+            }
+        }
 
-        // The final matrix is T_screen * P_persp * R_logical
-        // The `pitchAndZoomMatrix` from the util already includes the final translation to screen center.
-        // To apply rotation first, we must pre-concatenate it to the perspective matrix.
-        val finalMatrix = Matrix(pitchAndZoomMatrix)
-        finalMatrix.preConcat(rotationMatrix)
+        // 3. Assemble the final matrix with the correct transformation order.
+        val finalMatrix = Matrix()
+        // a. Apply the world's 2D rotation and scale transformations FIRST.
+        finalMatrix.set(worldMatrix)
+        // b. Apply the camera's 3D perspective tilt.
+        finalMatrix.postConcat(perspectiveMatrix)
+        // c. Center the entire transformed scene on the view.
+        finalMatrix.postTranslate(state.viewWidth / 2f, state.viewHeight / 2f)
 
         return finalMatrix
     }

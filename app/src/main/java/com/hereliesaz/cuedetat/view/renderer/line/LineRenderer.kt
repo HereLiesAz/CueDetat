@@ -13,7 +13,6 @@ import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.line.*
 import com.hereliesaz.cuedetat.view.config.ui.ProtractorGuides
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
-import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -31,33 +30,6 @@ class LineRenderer {
         } else {
             drawProtractorLines(canvas, state, paints, typeface)
             drawProtractorGuides(canvas, state, paints)
-        }
-    }
-
-    fun drawRailLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
-        if (!state.table.isVisible) return
-
-        val textPaint = paints.textPaint.apply { this.typeface = typeface }
-
-        // Diamond label for banked Aiming Line
-        if (state.aimingLineBankPath.size > 1) {
-            val bankPoint = state.aimingLineBankPath[1]
-            getRailForPoint(bankPoint, state)?.let { railType ->
-                textRenderer.drawDiamondLabel(canvas, bankPoint, railType, state, textPaint)
-            }
-        }
-        // Diamond label for banked Tangent Line
-        if (state.tangentLineBankPath.size > 1) {
-            val tangentBankPoint = state.tangentLineBankPath[1]
-            getRailForPoint(tangentBankPoint, state)?.let { railType ->
-                textRenderer.drawDiamondLabel(canvas, tangentBankPoint, railType, state, textPaint)
-            }
-        }
-        // Diamond label for Shot Guide Line
-        state.shotGuideImpactPoint?.let { impactPoint ->
-            getRailForPoint(impactPoint, state)?.let { railType ->
-                textRenderer.drawDiamondLabel(canvas, impactPoint, railType, state, textPaint)
-            }
         }
     }
 
@@ -117,15 +89,17 @@ class LineRenderer {
             alpha = (aimingLineConfig.glowColor.alpha * 255).toInt()
         }
 
-        drawPath(canvas, state.aimingLineBankPath, aimingLineGlow)
-        drawPath(canvas, state.aimingLineBankPath, aimingLinePaint)
+        drawBankablePath(canvas, state.aimingLineBankPath, aimingLinePaint, aimingLineGlow, isPocketed)
     }
 
 
     private fun drawTangentLines(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         val tangentLineConfig = TangentLine()
+        val isPocketed = state.tangentAimedPocketIndex != null
+        val baseTangentColor = if (isPocketed) RebelYellow else tangentLineConfig.strokeColor
+
         val tangentSolidPaint = Paint(paints.tangentLineSolidPaint).apply {
-            color = tangentLineConfig.strokeColor.toArgb()
+            color = baseTangentColor.toArgb()
             strokeWidth = tangentLineConfig.strokeWidth
         }
         val tangentDottedPaint = Paint(paints.tangentLineDottedPaint).apply {
@@ -138,8 +112,8 @@ class LineRenderer {
             color = tangentLineConfig.glowColor.toArgb()
         }
 
-        drawPath(canvas, state.tangentLineBankPath, tangentGlow)
-        drawPath(canvas, state.tangentLineBankPath, tangentSolidPaint)
+        drawBankablePath(canvas, state.tangentLineBankPath, tangentSolidPaint, tangentGlow, isPocketed)
+
 
         // Inactive tangent line
         val start = state.protractorUnit.ghostCueBallCenter
@@ -247,22 +221,40 @@ class LineRenderer {
         }
     }
 
-    private fun getRailForPoint(point: PointF, state: OverlayState): LineTextRenderer.RailType? {
-        val halfW = state.table.logicalWidth / 2f
-        val halfH = state.table.logicalHeight / 2f
+    private fun drawBankablePath(
+        canvas: Canvas,
+        path: List<PointF>,
+        primaryPaint: Paint,
+        glowPaint: Paint,
+        isPocketed: Boolean
+    ) {
+        if (path.size < 2) return
 
-        // Corrected: Use logical coordinates relative to (0,0)
-        val logicalX = point.x
-        val logicalY = point.y
+        // Draw glow first for the entire path
+        drawPath(canvas, path, glowPaint)
 
-        val tolerance = 5f // This tolerance is in logical space now
+        // Draw primary line for the first segment
+        canvas.drawLine(path[0].x, path[0].y, path[1].x, path[1].y, primaryPaint)
 
-        return when {
-            abs(logicalY - (-halfH)) < tolerance -> LineTextRenderer.RailType.TOP
-            abs(logicalY - halfH) < tolerance -> LineTextRenderer.RailType.BOTTOM
-            abs(logicalX - (-halfW)) < tolerance -> LineTextRenderer.RailType.LEFT
-            abs(logicalX - halfW) < tolerance -> LineTextRenderer.RailType.RIGHT
-            else -> null
+        // Draw subsequent banked segments
+        if (path.size > 2) {
+            // Create a paint for the banked segment that inherits color but is slightly faded.
+            val bankedPaint = Paint(primaryPaint).apply {
+                alpha = (primaryPaint.alpha * 0.7f).toInt()
+            }
+            val pocketedPaint = Paint(primaryPaint).apply {
+                color = RebelYellow.toArgb()
+            }
+
+            for (i in 1 until path.size - 1) {
+                // If this is the last segment and it's pocketed, use the bright yellow paint.
+                val paintToUse = if (isPocketed && i == path.size - 2) {
+                    pocketedPaint
+                } else {
+                    bankedPaint
+                }
+                canvas.drawLine(path[i].x, path[i].y, path[i+1].x, path[i+1].y, paintToUse)
+            }
         }
     }
 

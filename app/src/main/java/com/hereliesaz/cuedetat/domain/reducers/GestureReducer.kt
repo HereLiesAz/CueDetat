@@ -33,7 +33,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         val spinControlCenter = currentState.spinControlCenter
         val protractorUnit = currentState.protractorUnit
 
-        val constantTouchRadius = LOGICAL_BALL_RADIUS * 1.5f
+        val constantTouchRadius = LOGICAL_BALL_RADIUS * 3.5f // Increased trigger area
 
         val spinControlTouchRadius = (onPlaneBall?.radius ?: protractorUnit.radius) * 1.5f
         if (currentState.isSpinControlVisible && spinControlCenter != null && getDistance(event.screenOffset, spinControlCenter) < spinControlTouchRadius) {
