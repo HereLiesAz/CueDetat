@@ -1,0 +1,46 @@
+ninja: Entering directory `G:\My Drive\CueDetatLite\opencv\.cxx\Debug\4j3b1k15\x86'
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/Debug/4j3b1k15/x86
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/Debug/4j3b1k15/x86
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/Debug/4j3b1k15/x86
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/Debug/4j3b1k15/x86
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/Debug/4j3b1k15/x86
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/Debug/4j3b1k15/x86
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/Debug/4j3b1k15/x86
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/Debug/4j3b1k15/x86
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/Debug/4j3b1k15/x86
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/Debug/4j3b1k15/x86
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/Debug/4j3b1k15/x86
+ninja: no work to do.
