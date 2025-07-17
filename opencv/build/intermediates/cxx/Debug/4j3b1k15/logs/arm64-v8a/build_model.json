@@ -27,10 +27,7 @@
     "variantName": "debug",
     "isDebuggableEnabled": true,
     "validAbiList": [
-      "armeabi-v7a",
-      "arm64-v8a",
-      "x86",
-      "x86_64"
+      "arm64-v8a"
     ],
     "buildTargetSet": [
       "opencv_jni_shared"
@@ -159,6 +156,7 @@
         "rootBuildGradleFolder": "G:\\My Drive\\CueDetatLite",
         "sdkFolder": "C:\\Users\\azrie\\AppData\\Local\\Android\\Sdk",
         "isBuildOnlyTargetAbiEnabled": true,
+        "ideBuildTargetAbi": "arm64-v8a,armeabi-v7a,armeabi",
         "isCmakeBuildCohabitationEnabled": false,
         "isPrefabEnabled": false
       },

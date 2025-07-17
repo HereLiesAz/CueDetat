@@ -6,6 +6,7 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.ui.graphics.Color
+import androidx.core.view.isVisible
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -129,8 +130,7 @@ class UpdateStateUseCase @Inject constructor(
         // 1. Get the 3D transformation matrix (tilt and table rotation).
         val perspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = state.currentOrientation,
-            tableRotationDegrees = if (state.table.isVisible) state.table.rotationDegrees else 0f,
-            camera = camera,
+            tableRotationDegrees = state.table.takeIf { it.isVisible }?.rotationDegrees ?: 0f,            camera = camera,
             lift = lift,
             applyPitch = applyPitch
         )
