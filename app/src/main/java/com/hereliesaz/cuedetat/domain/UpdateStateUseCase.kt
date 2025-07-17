@@ -165,6 +165,7 @@ class UpdateStateUseCase @Inject constructor(
         tempCam.restore()
         sizingMatrix.postScale(zoomFactor, zoomFactor)
 
+        // Project two points (center and edge) and measure the screen distance.
         val p1 = floatArrayOf(0f, 0f)
         val p2 = floatArrayOf(LOGICAL_BALL_RADIUS, 0f)
         sizingMatrix.mapPoints(p1)

@@ -11,5 +11,5 @@ data class ProtractorGuides(
     override val glowColor: Color = Color.Transparent,
     override val strokeWidth: Float = 1.5f,
     override val strokeColor: Color = MutedGray,
-    override val additionalOffset: Float = 0f
+    override val additionalOffset: Float = .2f
 ) : LinesConfig

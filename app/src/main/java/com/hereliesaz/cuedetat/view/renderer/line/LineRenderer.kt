@@ -9,6 +9,10 @@ import android.graphics.PointF
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import com.hereliesaz.cuedetat.ui.theme.BankLine1Yellow
+import com.hereliesaz.cuedetat.ui.theme.BankLine2Yellow
+import com.hereliesaz.cuedetat.ui.theme.BankLine3Yellow
+import com.hereliesaz.cuedetat.ui.theme.BankLine4Yellow
 import com.hereliesaz.cuedetat.ui.theme.RebelYellow
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.PaintCache
@@ -24,6 +28,7 @@ import kotlin.math.sqrt
 class LineRenderer {
     private val textRenderer = LineTextRenderer()
     private val protractorAngles = floatArrayOf(5f, 10f, 15f, 20f, 25f, 30f, 35f, 40f, 45f)
+    private val lineExtensionFactor = 5000f
 
     fun drawLogicalLines(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         if (state.isBankingMode) {
@@ -127,17 +132,32 @@ class LineRenderer {
         val tangentDy = dxToTarget / magToTarget
 
         if (state.isStraightShot) {
-            // Both lines are inactive/dotted
             val direction1 = normalize(PointF(tangentDx, tangentDy))
+            val endPoint1 = PointF(start.x + direction1.x * (state.table.logicalHeight * 2.0f), start.y + direction1.y * (state.table.logicalHeight * 2.0f))
+            val path1 = Path().apply { moveTo(start.x, start.y); lineTo(endPoint1.x, endPoint1.y) }
+            canvas.drawPath(path1, tangentGlow)
+            canvas.drawPath(path1, tangentDottedPaint)
+
             val direction2 = normalize(PointF(-tangentDx, -tangentDy))
-            drawFadingLine(canvas, start, direction1, tangentDottedPaint, tangentGlow, state)
-            drawFadingLine(canvas, start, direction2, tangentDottedPaint, tangentGlow, state)
+            val endPoint2 = PointF(start.x + direction2.x * (state.table.logicalHeight * 2.0f), start.y + direction2.y * (state.table.logicalHeight * 2.0f))
+            val path2 = Path().apply { moveTo(start.x, start.y); lineTo(endPoint2.x, endPoint2.y) }
+            canvas.drawPath(path2, tangentGlow)
+            canvas.drawPath(path2, tangentDottedPaint)
         } else {
             // Active / Inactive logic
             drawBankablePath(canvas, state.tangentLineBankPath, tangentSolidPaint, tangentGlow, isPocketed, state)
 
+            // Draw inactive line manually as a non-fading dotted line
             val inactiveDirection = normalize(PointF(tangentDx * -state.tangentDirection, tangentDy * -state.tangentDirection))
-            drawFadingLine(canvas, start, inactiveDirection, tangentDottedPaint, tangentGlow, state)
+            val endPoint = PointF(start.x + inactiveDirection.x * (state.table.logicalHeight * 2.0f), start.y + inactiveDirection.y * (state.table.logicalHeight * 2.0f))
+            val path = Path()
+            path.moveTo(start.x, start.y)
+            path.lineTo(endPoint.x, endPoint.y)
+
+            // Draw glow first
+            canvas.drawPath(path, tangentGlow)
+            // Then draw dotted line
+            canvas.drawPath(path, tangentDottedPaint)
         }
     }
 

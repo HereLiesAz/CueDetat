@@ -10,7 +10,6 @@ import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -77,39 +76,34 @@ class LineTextRenderer {
         canvas.drawText(text, textX, textY, paint)
     }
 
-    fun drawDiamondLabel(canvas: Canvas, point: PointF, railType: RailType, state: OverlayState, paint: Paint) {
+    fun drawDiamondLabel(
+        canvas: Canvas,
+        point: PointF,
+        railType: RailType,
+        state: OverlayState,
+        paint: Paint,
+        padding: Float
+    ) {
         val diamondNumberText = calculateDiamondNumber(point, railType, state) ?: return
 
-        val ballRadiusOnRailPlane = DrawingUtils.getPerspectiveRadiusAndLift(
-            logicalCenter = point,
-            logicalRadius = state.protractorUnit.radius,
-            state = state,
-            matrix = state.railPitchMatrix
-        ).radius
-
-        paint.textSize = ballRadiusOnRailPlane * 2f
-
-        val padding = 15f
-
-        var textRotation = 0f
-        var textX = point.x
-        var textY = point.y
         val textHeight = paint.descent() - paint.ascent()
         val textOffset = textHeight / 2 - paint.descent()
 
+        var textX = point.x
+        var textY = point.y
+
         when (railType) {
-            RailType.TOP -> textY += padding + textHeight/2
+            RailType.TOP -> textY += padding
             RailType.BOTTOM -> textY -= padding
-            RailType.LEFT -> { textX += padding + textHeight/2; textRotation = 90f }
-            RailType.RIGHT -> { textX -= padding; textRotation = -90f }
+            RailType.LEFT -> textX += padding
+            RailType.RIGHT -> textX -= padding
         }
 
-        val uprightCorrection = if (state.table.rotationDegrees > 90 || state.table.rotationDegrees < -90) 180f else 0f
-
-
+        // Counter-rotate the text to keep it upright relative to the screen
         canvas.save()
-        canvas.rotate(textRotation + uprightCorrection, textX, textY)
-        canvas.drawText(diamondNumberText, textX, textY + textOffset, paint)
+        canvas.translate(textX, textY)
+        canvas.rotate(-state.table.rotationDegrees)
+        canvas.drawText(diamondNumberText, 0f, textOffset, paint)
         canvas.restore()
     }
 
@@ -118,17 +112,26 @@ class LineTextRenderer {
         val table = state.table
         if (!table.isVisible || table.logicalWidth <= 0 || table.logicalHeight <= 0) return null
 
+        // De-rotate the impact point to align with the un-rotated table for easier calculation
+        val deRotatedPoint = PointF()
+        val angleRad = Math.toRadians(-state.table.rotationDegrees.toDouble())
+        val cosA = cos(angleRad).toFloat()
+        val sinA = sin(angleRad).toFloat()
+        deRotatedPoint.x = point.x * cosA - point.y * sinA
+        deRotatedPoint.y = point.x * sinA + point.y * cosA
+
+
         val halfW = table.logicalWidth / 2f
         val halfH = table.logicalHeight / 2f
 
-        val logicalX = point.x
-        val logicalY = point.y
+        val logicalX = deRotatedPoint.x
+        val logicalY = deRotatedPoint.y
 
         val diamondValue = when (railType) {
-            RailType.TOP -> if (table.logicalWidth > 0) ((logicalX + halfW) / table.logicalWidth) * 8.0 else 0.0
-            RailType.RIGHT -> if (table.logicalHeight > 0) ((logicalY + halfH) / table.logicalHeight) * 4.0 else 0.0
-            RailType.BOTTOM -> if (table.logicalWidth > 0) 8.0 - (((logicalX + halfW) / table.logicalWidth) * 8.0) else 0.0
-            RailType.LEFT -> if (table.logicalHeight > 0) 4.0 - (((logicalY + halfH) / table.logicalHeight) * 4.0) else 0.0
+            RailType.TOP -> if (table.logicalWidth > 0) ((logicalX + halfW) / table.logicalWidth) * 4.0 else 0.0
+            RailType.BOTTOM -> if (table.logicalWidth > 0) 4.0 - (((logicalX + halfW) / table.logicalWidth) * 4.0) else 0.0
+            RailType.LEFT -> if (table.logicalHeight > 0) ((logicalY + halfH) / table.logicalHeight) * 8.0 else 0.0
+            RailType.RIGHT -> if (table.logicalHeight > 0) 8.0 - (((logicalY + halfH) / table.logicalHeight) * 8.0) else 0.0
         }
 
         return String.format("%.1f", diamondValue)
