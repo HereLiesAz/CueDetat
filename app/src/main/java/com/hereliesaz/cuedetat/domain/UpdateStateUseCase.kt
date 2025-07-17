@@ -126,27 +126,26 @@ class UpdateStateUseCase @Inject constructor(
     private fun createFullMatrix(state: OverlayState, lift: Float, zoom: Float, applyPitch: Boolean = true): Matrix {
         val camera = Camera()
 
-        // 1. Create the base perspective matrix (tilt only).
+        // 1. Get the 3D transformation matrix (tilt and table rotation).
         val perspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = state.currentOrientation,
+            tableRotationDegrees = if (state.table.isVisible) state.table.rotationDegrees else 0f,
             camera = camera,
             lift = lift,
             applyPitch = applyPitch
         )
 
-        // 2. Create the world transformation matrix (2D rotation and scale).
+        // 2. Create the world transformation matrix (2D scale only).
         val worldMatrix = Matrix().apply {
             postScale(zoom, zoom)
-            if (state.table.isVisible) {
-                postRotate(state.table.rotationDegrees, 0f, 0f)
-            }
+            // Rotation is now handled in 3D by the camera.
         }
 
         // 3. Assemble the final matrix with the correct transformation order.
         val finalMatrix = Matrix()
-        // a. Apply the world's 2D rotation and scale transformations FIRST.
+        // a. Apply the world's 2D scale transformation FIRST.
         finalMatrix.set(worldMatrix)
-        // b. Apply the camera's 3D perspective tilt.
+        // b. Apply the camera's 3D transformations.
         finalMatrix.postConcat(perspectiveMatrix)
         // c. Center the entire transformed scene on the view.
         finalMatrix.postTranslate(state.viewWidth / 2f, state.viewHeight / 2f)
@@ -155,14 +154,14 @@ class UpdateStateUseCase @Inject constructor(
     }
 
     private fun calculateConsistentVisualRadius(state: OverlayState, zoomFactor: Float): Float {
-        // Create a matrix with only tilt and zoom to calculate a radius independent of rotation or position.
-        val sizingMatrix = Matrix()
-        val tempCam = Camera()
-        tempCam.save()
-        tempCam.setLocation(0f, 0f, -32f)
-        tempCam.rotateX(state.pitchAngle)
-        tempCam.getMatrix(sizingMatrix)
-        tempCam.restore()
+        // Create a matrix with only tilt and zoom to calculate a radius independent of rotation.
+        val sizingMatrix = Perspective.createPerspectiveMatrix(
+            currentOrientation = state.currentOrientation,
+            tableRotationDegrees = 0f, // No rotation for this specific calculation
+            camera = Camera(),
+            applyPitch = true
+        )
+        // Apply the 2D zoom scale after the 3D projection is calculated.
         sizingMatrix.postScale(zoomFactor, zoomFactor)
 
         // Project two points (center and edge) and measure the screen distance.
@@ -258,7 +257,7 @@ class UpdateStateUseCase @Inject constructor(
 
         val extendedEnd = PointF(start.x + dirX / mag * lineExtensionFactor, start.y + dirY / mag * lineExtensionFactor)
 
-        val pockets = state.table.pockets
+        val pockets = state.table.unrotatedPockets.map { state.table.getRotatedPoint(it) }
         val pocketRadius = state.protractorUnit.radius * 1.8f
 
         var closestIntersection: PointF? = null
