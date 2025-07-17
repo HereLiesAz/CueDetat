@@ -10,22 +10,23 @@ import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.table.Holes
-import com.hereliesaz.cuedetat.view.config.table.Table
+import com.hereliesaz.cuedetat.view.config.table.Table as TableConfig
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class TableRenderer {
 
     companion object {
         fun getLogicalPockets(state: OverlayState): List<PointF> {
-            return state.table.pockets
+            // Return the unrotated pockets, as the canvas will handle rotation.
+            return state.table.unrotatedPockets
         }
     }
 
     fun drawSurface(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         if (!state.table.isVisible) return
 
-        val tableConfig = Table()
-        val corners = state.table.corners
+        val tableConfig = TableConfig()
+        val corners = state.table.unrotatedCorners
         if (corners.size < 4) return
 
         val tableOutlinePaint = Paint(paints.tableOutlinePaint).apply {
@@ -33,7 +34,7 @@ class TableRenderer {
             strokeWidth = tableConfig.strokeWidth
         }
 
-        // Draw Rotated Outline
+        // Draw Rotated Outline - The canvas is already rotated, so we draw the base shape.
         val path = Path()
         path.moveTo(corners[0].x, corners[0].y)
         path.lineTo(corners[1].x, corners[1].y)
