@@ -54,7 +54,7 @@ class LineRenderer {
         val aimingLinePaint = Paint(paints.targetCirclePaint).apply { color = aimingLineBaseColor; strokeWidth = aimingLineConfig.strokeWidth }
         val aimingLineGlow = Paint(paints.lineGlowPaint).apply { color = aimingLineBaseColor; strokeWidth = aimingLineConfig.glowWidth }
 
-        // Use the pre-cached paint for performance.
+        // Use the single, pre-cached paint object for performance.
         val pathPaint = paints.pathObstructionPaint.apply {
             strokeWidth = state.protractorUnit.radius * 2
         }
@@ -62,8 +62,16 @@ class LineRenderer {
         val shotGuideDirection = normalize(PointF(ghostCueCenter.x - shotLineAnchor.x, ghostCueCenter.y - shotLineAnchor.y))
 
         // --- Pass 1: Wide Pathways ---
+        // Righteously modify the color of the cached paint before use.
+        pathPaint.color = shotLineBaseColor
+        pathPaint.alpha = (255 * 0.1f).toInt()
         drawFadingLine(canvas, shotLineAnchor, shotGuideDirection, pathPaint, pathPaint, state)
+
+        // Do the same for the aiming line path.
+        pathPaint.color = aimingLineBaseColor
+        pathPaint.alpha = (255 * 0.1f).toInt()
         drawBankablePath(canvas, state.aimingLineBankPath, pathPaint, pathPaint, false, state)
+
 
         // --- Pass 2: Glows ---
         drawFadingLine(canvas, shotLineAnchor, shotGuideDirection, shotLineGlow, shotLineGlow, state)
