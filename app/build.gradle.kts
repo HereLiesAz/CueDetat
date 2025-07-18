@@ -187,6 +187,7 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
+    implementation(libs.androidx.compose.ui.graphics)
     val cameraxVersion = "1.4.2" // Use a recent stable version
 
     // The ImageAnalysis use case specifically

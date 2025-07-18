@@ -64,7 +64,8 @@ class LineRenderer {
 
         // --- Pass 1: Wide Pathways ---
         drawFadingLine(canvas, shotLineAnchor, shotGuideDirection, obstructionPaint, obstructionPaint, state)
-        drawPath(canvas, state.aimingLineBankPath, obstructionPaint)
+        // Corrected: Use drawBankablePath for the aiming line's wide path to ensure it fades.
+        drawBankablePath(canvas, state.aimingLineBankPath, obstructionPaint, obstructionPaint, isPocketed = false, state)
 
 
         // --- Pass 2: Glows ---
@@ -154,9 +155,7 @@ class LineRenderer {
             path.moveTo(start.x, start.y)
             path.lineTo(endPoint.x, endPoint.y)
 
-            // Draw glow first
             canvas.drawPath(path, tangentGlow)
-            // Then draw dotted line
             canvas.drawPath(path, tangentDottedPaint)
         }
     }
@@ -199,13 +198,11 @@ class LineRenderer {
         val isPocketed = state.pocketedBankShotPocketIndex != null
 
         if (isPocketed) {
-            // If pocketed, draw all segments in white.
             val whitePaint = Paint(paints.shotLinePaint).apply { color = Color.White.toArgb() }
             val whiteGlowPaint = Paint(paints.lineGlowPaint).apply { color = Color.White.toArgb(); alpha = (paints.lineGlowPaint.alpha * 0.7f).toInt() }
             drawPath(canvas, state.bankShotPath, whiteGlowPaint)
             drawPath(canvas, state.bankShotPath, whitePaint)
         } else {
-            // Otherwise, use progressive styling.
             val bankLineConfigs = listOf(BankLine1(), BankLine2(), BankLine3(), BankLine4())
             for (i in 0 until state.bankShotPath.size - 1) {
                 val start = state.bankShotPath[i]
@@ -322,25 +319,21 @@ class LineRenderer {
             val p1 = PointF(start.x + direction.x * segmentStartDist, start.y + direction.y * segmentStartDist)
             val p2 = PointF(start.x + direction.x * segmentEndDist, start.y + direction.y * segmentEndDist)
 
-            // Calculate alpha based on the midpoint of the segment
             val midPointDist = (segmentStartDist + segmentEndDist) / 2f
             val alphaMultiplier = if (midPointDist < fadeStartDistance) {
                 1.0f
             } else {
-                // Inverse linear interpolation from 1.0 down to 0.0
                 1.0f - ((midPointDist - fadeStartDistance) / (fadeEndDistance - fadeStartDistance))
             }.coerceIn(0f, 1f)
 
             paint.alpha = (initialAlpha * alphaMultiplier).toInt()
             glowPaint.alpha = (initialGlowAlpha * alphaMultiplier).toInt()
 
-            // Don't draw fully transparent segments
-            if (paint.alpha > 5) { // Use a small threshold
+            if (paint.alpha > 5) {
                 canvas.drawLine(p1.x, p1.y, p2.x, p2.y, glowPaint)
                 canvas.drawLine(p1.x, p1.y, p2.x, p2.y, paint)
             }
         }
-        // Restore original alpha
         paint.alpha = initialAlpha
         glowPaint.alpha = initialGlowAlpha
     }

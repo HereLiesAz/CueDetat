@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/SnapReducer.kt
+
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
@@ -40,24 +42,12 @@ class SnapReducer @Inject constructor() {
             }
         }
 
-        // Snap balls to confirmed candidates
-        val confirmedCandidates = newCandidates.filter { it.isConfirmed }.toMutableList()
-        var newProtractorUnit = currentState.protractorUnit
-        var newOnPlaneBall = currentState.onPlaneBall
-
-        if (confirmedCandidates.isNotEmpty() && !currentState.hasTargetBallBeenMoved) {
-            newProtractorUnit = currentState.protractorUnit.copy(center = confirmedCandidates.first().detectedPoint)
-            confirmedCandidates.removeAt(0)
-        }
-
-        if (confirmedCandidates.isNotEmpty() && currentState.onPlaneBall != null && !currentState.hasCueBallBeenMoved) {
-            newOnPlaneBall = currentState.onPlaneBall.copy(center = confirmedCandidates.first().detectedPoint)
-        }
+        // The heresy of passive auto-snapping has been purged.
+        // Snapping now only occurs in the GestureReducer upon user action.
+        // This reducer is now only responsible for maintaining the candidate list.
 
         return currentState.copy(
             snapCandidates = newCandidates,
-            protractorUnit = newProtractorUnit,
-            onPlaneBall = newOnPlaneBall
         )
     }
 }

@@ -49,9 +49,6 @@ class UpdateStateUseCase @Inject constructor(
 
         val flatMatrix = createFullMatrix(stateWithCoercedPan, 0f, 1f, applyPitch = false)
 
-        val consistentRadius = calculateConsistentVisualRadius(stateWithCoercedPan, zoomFactor)
-
-
         val logicalShotLineAnchor = getLogicalShotLineAnchor(stateWithCoercedPan)
         val isTiltBeyondLimit = !stateWithCoercedPan.isBankingMode && logicalShotLineAnchor.y <= stateWithCoercedPan.protractorUnit.ghostCueBallCenter.y
 
@@ -95,7 +92,7 @@ class UpdateStateUseCase @Inject constructor(
         }
 
         if (isStraightShot) {
-            tangentAimedPocketIndex = null // A straight shot has no "active" tangent, regardless of pocket alignment.
+            tangentAimedPocketIndex = null
         }
 
         val spinPaths: Map<Color, List<PointF>> = if (!state.isBankingMode) {
@@ -107,10 +104,9 @@ class UpdateStateUseCase @Inject constructor(
         return stateWithCoercedPan.copy(
             pitchMatrix = finalPitchMatrix,
             railPitchMatrix = finalRailPitchMatrix,
-            inversePitchMatrix = stateWithCoercedPan.inversePitchMatrix, // Use the one that was calculated and inverted
+            inversePitchMatrix = stateWithCoercedPan.inversePitchMatrix,
             hasInverseMatrix = hasFinalInverse,
             flatMatrix = flatMatrix,
-            visualBallRadius = consistentRadius,
             shotLineAnchor = logicalShotLineAnchor,
             isGeometricallyImpossible = isGeometricallyImpossible,
             isStraightShot = isStraightShot,
@@ -131,7 +127,6 @@ class UpdateStateUseCase @Inject constructor(
     private fun createFullMatrix(state: OverlayState, lift: Float, zoom: Float, applyPitch: Boolean = true): Matrix {
         val camera = Camera()
 
-        // 1. Create the base perspective matrix (tilt only).
         val perspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = state.currentOrientation,
             camera = camera,
@@ -139,7 +134,6 @@ class UpdateStateUseCase @Inject constructor(
             applyPitch = applyPitch
         )
 
-        // 2. Create the world transformation matrix (2D rotation and scale).
         val worldMatrix = Matrix().apply {
             postScale(zoom, zoom)
             if (state.table.isVisible) {
@@ -147,13 +141,9 @@ class UpdateStateUseCase @Inject constructor(
             }
         }
 
-        // 3. Assemble the final matrix with the correct transformation order.
         val finalMatrix = Matrix()
-        // a. Apply the world's 2D rotation and scale transformations FIRST.
         finalMatrix.set(worldMatrix)
-        // b. Apply the camera's 3D perspective tilt.
         finalMatrix.postConcat(perspectiveMatrix)
-        // c. Apply the view pan and center the entire transformed scene on the view.
         finalMatrix.postTranslate(
             (state.viewWidth / 2f) + state.viewOffset.x,
             (state.viewHeight / 2f) + state.viewOffset.y
@@ -162,23 +152,17 @@ class UpdateStateUseCase @Inject constructor(
         return finalMatrix
     }
 
-    private fun calculateConsistentVisualRadius(state: OverlayState, zoomFactor: Float): Float {
-        val sizingMatrix = Matrix()
-        val tempCam = Camera()
-        tempCam.save()
-        tempCam.setLocation(0f, 0f, -32f)
-        tempCam.rotateX(state.pitchAngle)
-        tempCam.getMatrix(sizingMatrix)
-        tempCam.restore()
-        sizingMatrix.postScale(zoomFactor, zoomFactor)
-
-        val p1 = floatArrayOf(0f, 0f)
-        val p2 = floatArrayOf(LOGICAL_BALL_RADIUS, 0f)
-        sizingMatrix.mapPoints(p1)
-        sizingMatrix.mapPoints(p2)
-        return hypot((p1[0] - p2[0]).toDouble(), (p1[1] - p2[1]).toDouble()).toFloat()
+    private fun calculateDistance(state: OverlayState, matrix: Matrix): Float {
+        val (logicalCenter, logicalRadius) = if (state.isBankingMode && state.onPlaneBall != null) {
+            state.onPlaneBall.center to state.onPlaneBall.radius
+        } else {
+            state.protractorUnit.center to state.protractorUnit.radius
+        }
+        val screenRadius = DrawingUtils.getPerspectiveRadiusAndLift(
+            logicalCenter, logicalRadius, state, matrix
+        ).radius
+        return if (screenRadius > 0) distanceReferenceConstant / screenRadius else 0f
     }
-
 
     private fun getLogicalShotLineAnchor(state: OverlayState): PointF {
         state.onPlaneBall?.let { return it.center }
@@ -210,18 +194,6 @@ class UpdateStateUseCase @Inject constructor(
             angleDiff = (2 * Math.PI - angleDiff).toFloat()
         }
         return angleDiff < 0.01 // Use a small tolerance in radians for collinearity
-    }
-
-    private fun calculateDistance(state: OverlayState, matrix: Matrix): Float {
-        val (logicalCenter, logicalRadius) = if (state.isBankingMode && state.onPlaneBall != null) {
-            state.onPlaneBall.center to state.onPlaneBall.radius
-        } else {
-            state.protractorUnit.center to state.protractorUnit.radius
-        }
-        val screenRadius = DrawingUtils.getPerspectiveRadiusAndLift(
-            logicalCenter, logicalRadius, state.copy(pitchMatrix = matrix, hasInverseMatrix = true)
-        ).radius
-        return if (screenRadius > 0) distanceReferenceConstant / screenRadius else 0f
     }
 
     private fun getExtendedLinePath(start: PointF, end: PointF): List<PointF> {
@@ -288,7 +260,6 @@ class UpdateStateUseCase @Inject constructor(
         return Pair(closestPocketIndex, closestIntersection)
     }
 
-
     private fun calculateShotGuideImpact(state: OverlayState, useShotGuideLine: Boolean = false): PointF? {
         val p1 = if (useShotGuideLine) state.shotLineAnchor else state.protractorUnit.center
         val p2 = state.protractorUnit.ghostCueBallCenter
@@ -316,7 +287,6 @@ class UpdateStateUseCase @Inject constructor(
 
         return listOf(start, intersectionPoint, finalEndPoint)
     }
-
 
     private fun checkForObstructions(state: OverlayState): Boolean {
         if (state.obstacleBalls.isEmpty()) return false
