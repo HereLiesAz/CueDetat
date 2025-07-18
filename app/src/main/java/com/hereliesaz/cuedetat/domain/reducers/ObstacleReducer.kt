@@ -49,7 +49,7 @@ class ObstacleReducer @Inject constructor(private val reducerUtils: ReducerUtils
 
         // Fallback placement logic
         if (currentState.table.isVisible) {
-            val corners = currentState.table.unrotatedCorners
+            val corners = currentState.table.corners
             if (corners.isEmpty()) return reducerUtils.getDefaultTargetBallPosition()
 
             val minX = corners.minOf { it.x }

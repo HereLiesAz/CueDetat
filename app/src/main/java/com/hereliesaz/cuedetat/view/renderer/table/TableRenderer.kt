@@ -17,8 +17,7 @@ class TableRenderer {
 
     companion object {
         fun getLogicalPockets(state: OverlayState): List<PointF> {
-            // Return the unrotated pockets, as the canvas will handle rotation.
-            return state.table.unrotatedPockets
+            return state.table.pockets
         }
     }
 
@@ -26,7 +25,7 @@ class TableRenderer {
         if (!state.table.isVisible) return
 
         val tableConfig = TableConfig()
-        val corners = state.table.unrotatedCorners
+        val corners = state.table.corners
         if (corners.size < 4) return
 
         val tableOutlinePaint = Paint(paints.tableOutlinePaint).apply {
@@ -34,7 +33,7 @@ class TableRenderer {
             strokeWidth = tableConfig.strokeWidth
         }
 
-        // Draw Rotated Outline - The canvas is already rotated, so we draw the base shape.
+        // Draw Rotated Outline
         val path = Path()
         path.moveTo(corners[0].x, corners[0].y)
         path.lineTo(corners[1].x, corners[1].y)

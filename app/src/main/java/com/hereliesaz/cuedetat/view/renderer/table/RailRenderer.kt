@@ -26,7 +26,7 @@ class RailRenderer {
     private val textRenderer = LineTextRenderer()
 
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
-        if (!state.table.isVisible || state.table.unrotatedCorners.size < 4) return
+        if (!state.table.isVisible || state.table.corners.size < 4) return
 
         val railLinePaint = Paint(paints.tableOutlinePaint).apply {
             color = railConfig.strokeColor.toArgb()
@@ -45,7 +45,7 @@ class RailRenderer {
         val railOffsetAmount = LOGICAL_BALL_RADIUS * railVisualOffsetFromEdgeFactor
         val pocketRadius = LOGICAL_BALL_RADIUS * 1.8f
 
-        val corners = state.table.unrotatedCorners
+        val corners = state.table.corners
 
         val offsetCorners = corners.mapIndexed { index, corner ->
             val normal1 = normalize(PointF(corners[(index + 3) % 4].y - corner.y, corner.x - corners[(index + 3) % 4].x))
@@ -139,14 +139,15 @@ class RailRenderer {
     private fun getRailForPoint(point: PointF, state: OverlayState): LineTextRenderer.RailType? {
         val table = state.table
         if (!table.isVisible) return null
-        val deRotatedPoint = table.getDeRotatedPoint(point)
-        val corners = table.unrotatedCorners
+
+        // Use the rotated corners for this check, as we are in screen space
+        val corners = table.corners
         val tolerance = 5f
 
-        if (pointToSegmentDistance(deRotatedPoint, corners[0], corners[1]) < tolerance) return LineTextRenderer.RailType.TOP
-        if (pointToSegmentDistance(deRotatedPoint, corners[1], corners[2]) < tolerance) return LineTextRenderer.RailType.RIGHT
-        if (pointToSegmentDistance(deRotatedPoint, corners[2], corners[3]) < tolerance) return LineTextRenderer.RailType.BOTTOM
-        if (pointToSegmentDistance(deRotatedPoint, corners[3], corners[0]) < tolerance) return LineTextRenderer.RailType.LEFT
+        if (pointToSegmentDistance(point, corners[0], corners[1]) < tolerance) return LineTextRenderer.RailType.TOP
+        if (pointToSegmentDistance(point, corners[1], corners[2]) < tolerance) return LineTextRenderer.RailType.RIGHT
+        if (pointToSegmentDistance(point, corners[2], corners[3]) < tolerance) return LineTextRenderer.RailType.BOTTOM
+        if (pointToSegmentDistance(point, corners[3], corners[0]) < tolerance) return LineTextRenderer.RailType.LEFT
 
         return null
     }

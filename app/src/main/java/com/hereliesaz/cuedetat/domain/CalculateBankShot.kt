@@ -6,9 +6,7 @@ import android.graphics.PointF
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.pow
-import kotlin.math.sin
 import kotlin.math.sqrt
 
 data class BankShotResult(val path: List<PointF>, val pocketedPocketIndex: Int?)
@@ -61,7 +59,7 @@ class CalculateBankShot @Inject constructor() {
 
         val extendedEnd = PointF(start.x + dirX / mag * 5000f, start.y + dirY / mag * 5000f)
 
-        val pockets = state.table.unrotatedPockets.map { state.table.getRotatedPoint(it) }
+        val pockets = state.table.pockets
         val pocketRadius = state.protractorUnit.radius * 1.8f
 
         var closestIntersection: PointF? = null
