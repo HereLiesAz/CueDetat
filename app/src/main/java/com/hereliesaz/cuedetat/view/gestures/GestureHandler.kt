@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/gestures/GestureHandler.kt
+
 package com.hereliesaz.cuedetat.view.gestures
 
 import android.graphics.PointF
@@ -11,6 +13,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import kotlin.math.abs
 
 fun Modifier.detectManualGestures(onEvent: (MainScreenEvent) -> Unit) =
     this.pointerInput(Unit) {
@@ -30,15 +33,19 @@ fun Modifier.detectManualGestures(onEvent: (MainScreenEvent) -> Unit) =
                     val pan = event.calculatePan()
                     val centroid = event.calculateCentroid()
 
-                    // Differentiate between one-finger drag and multi-finger transform
                     if (event.changes.size > 1) {
-                        // Multi-finger gesture for zoom and rotation
+                        // Multi-finger gestures: Process all transformations.
                         if (zoom != 1f) {
                             onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
                         }
                         if (rotation != 0f) {
                             onEvent(MainScreenEvent.TableRotationApplied(rotation))
                         }
+                        // As commanded, only vertical pan is enacted.
+                        if (abs(pan.y) > 0.1f) { // Use a small threshold to ignore noise
+                            onEvent(MainScreenEvent.PanView(PointF(0f, pan.y)))
+                        }
+
                     } else if (event.changes.size == 1) {
                         // Single-finger drag
                         if (pan != Offset.Zero) {

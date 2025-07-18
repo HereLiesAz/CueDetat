@@ -34,7 +34,8 @@ enum class InteractionMode {
     MOVING_ACTUAL_CUE_BALL,
     AIMING_BANK_SHOT,
     MOVING_SPIN_CONTROL,
-    MOVING_OBSTACLE_BALL
+    MOVING_OBSTACLE_BALL,
+    PANNING_VIEW
 }
 
 enum class DistanceUnit {
@@ -81,6 +82,7 @@ data class OverlayState(
     val isMoreHelpVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
     val isCameraVisible: Boolean = true,
+    val viewOffset: PointF = PointF(0f, 0f), // Pan state
 
     // Banking mode specific state
     val isBankingMode: Boolean = false,

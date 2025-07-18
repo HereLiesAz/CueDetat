@@ -2,7 +2,7 @@
 
 package com.hereliesaz.cuedetat.domain.reducers
 
-import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
+import android.graphics.PointF
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.ZoomMapping
@@ -21,13 +21,20 @@ class ControlReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             is MainScreenEvent.TableRotationChanged -> currentState.copy(table = currentState.table.copy(rotationDegrees = event.degrees), valuesChangedSinceReset = true)
             is MainScreenEvent.AdjustLuminance -> currentState.copy(luminanceAdjustment = event.adjustment.coerceIn(-0.4f, 0.4f), valuesChangedSinceReset = true)
             is MainScreenEvent.AdjustGlow -> currentState.copy(glowStickValue = event.value.coerceIn(-1f, 1f), valuesChangedSinceReset = true)
+            is MainScreenEvent.PanView -> handlePanView(currentState, event)
             else -> currentState
         }
     }
 
+    private fun handlePanView(currentState: OverlayState, event: MainScreenEvent.PanView): OverlayState {
+        val currentOffset = currentState.viewOffset
+        // The reducer simply applies the delta. The UseCase will enforce limits.
+        val newY = currentOffset.y + event.delta.y
+        return currentState.copy(viewOffset = PointF(currentOffset.x, newY))
+    }
+
     private fun handleZoomSliderChanged(currentState: OverlayState, event: MainScreenEvent.ZoomSliderChanged): OverlayState {
         val newSliderPos = event.position.coerceIn(-50f, 50f)
-        // Zoom only affects the slider position; the matrix calculation handles the rest.
         return currentState.copy(
             zoomSliderPosition = newSliderPos,
             valuesChangedSinceReset = true
@@ -39,7 +46,6 @@ class ControlReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         val currentZoomValue = ZoomMapping.sliderToZoom(oldZoomSliderPos)
         val newZoomValue = (currentZoomValue * event.scaleFactor).coerceIn(ZoomMapping.MIN_ZOOM, ZoomMapping.MAX_ZOOM)
         val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue)
-        // Zoom only affects the slider position; the matrix calculation handles the rest.
         return currentState.copy(
             zoomSliderPosition = newSliderPos,
             valuesChangedSinceReset = true

@@ -1,3 +1,5 @@
+--- FILE: TheBible/05_Apocrypha/Issues.md ---
+
 # 35: Issue Tracker & Project Roadmap
 
 **MANDATE:** This document is for clear, technical issue tracking only. All thematic or religious jargon from other documents is forbidden here. Communication must be precise and unambiguous.
@@ -7,8 +9,7 @@
 *(A list of known bugs and required features.)*
 
 ### High Priority Bugs
-1.  **Zoom Controls Affect Pitch:** Both the zoom slider and the pinch-to-zoom gesture incorrectly control the camera's pitch (vertical tilt) instead of the camera's Z-axis (zoom). The pinch-to-zoom gesture is completely unresponsive.
-2.  **Ball Anchoring:** When zoomed, all logical balls (`ProtractorUnit`, `OnPlaneBall`) maintain their position relative to the screen, not the logical table, causing a visual "drift" against the table surface. This indicates their final rendered positions are not being correctly derived from a single, unified transformation matrix.
+*No known high-priority bugs at this time.*
 
 ### Feature Implementation
 1.  **Table Pan:** The user must be able to move the table vertically on the logical plane.
@@ -28,14 +29,4 @@
 ## Resolved Issues
 *(A log of completed tasks and fixed bugs.)*
 
-* **Table Orientation:** Corrected the rendering logic in `TableRenderer` and `RailRenderer` to ensure the table's default 0-degree state is "portrait."
-* **Unified Table Model:** Refactored the codebase to use a single `Table.kt` model as the source of truth for all table geometry, rotation, and visibility, resolving inconsistencies between the rails and the table surface.
-* **Coordinate System Unification:** Corrected the `VisionRepository` to transform screen-space coordinates from CV detections into logical-space coordinates before updating the state, resolving a major cause of object drift.
-* **Matrix Transformation Order:** Corrected the matrix multiplication order in `UpdateStateUseCase` to ensure rotation is applied to logical coordinates before the perspective projection, fixing visual warping.
-* **Gesture Input Logic:** Standardized various gesture inputs (`drag`, `zoom`, `rotation`) to correctly update the state via the `StateReducer`.
-* **UI/UX:**
-    * Resolved an issue where the menu did not scroll on smaller screens.
-    * Made warning text font size dynamic and relative to screen width.
-    * Enlarged touch targets for UI sliders.
-* **Dependency Injection & Rendering:** Corrected multiple DI and rendering chain errors, including a `NoClassDefFoundError` for `LineTextRenderer` and ensuring all renderers are correctly injected and used.
-* **Feature Removal:** Fully removed the deprecated in-app updater and donation features.
+* **Table and Ball Rotation De-Sync:** Corrected a double-rotation issue where the `Table` data class was pre-calculating its own rotated coordinates while the `UpdateStateUseCase` was also applying a world rotation via the matrix. All rotational logic was removed from `Table.kt`, consolidating the responsibility for orientation solely within the transformation matrix.

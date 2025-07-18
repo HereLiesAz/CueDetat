@@ -18,6 +18,7 @@ sealed class MainScreenEvent {
     data class ZoomScaleChanged(val scaleFactor: Float) : MainScreenEvent()
     data class TableRotationApplied(val degrees: Float) : MainScreenEvent()
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
+    data class PanView(val delta: PointF) : MainScreenEvent()
 
     // Spin Control Events
     object ToggleSpinControl : MainScreenEvent()

@@ -6,9 +6,7 @@ import android.graphics.PointF
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.view.state.TableSize
 import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.pow
-import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
@@ -44,66 +42,49 @@ data class Table(
         val halfW = logicalWidth / 2f
         val halfH = logicalHeight / 2f
 
-        val baseCorners = listOf(
+        // Corners are now permanently stored in their un-rotated, logical orientation.
+        // The transformation matrix is solely responsible for rotation.
+        corners = listOf(
             PointF(-halfW, -halfH), // Top-Left
             PointF(halfW, -halfH),  // Top-Right
             PointF(halfW, halfH),   // Bottom-Right
             PointF(-halfW, halfH)   // Bottom-Left
         )
 
-        val angleRad = Math.toRadians(rotationDegrees.toDouble())
-        val cosA = cos(angleRad).toFloat()
-        val sinA = sin(angleRad).toFloat()
-
-        corners = baseCorners.map { p ->
-            PointF(
-                p.x * cosA - p.y * sinA,
-                p.x * sinA + p.y * cosA
-            )
-        }
-
         val sidePocketOffset = LOGICAL_BALL_RADIUS * 0.5f
-        val basePockets = listOf(
+
+        // Pockets are also now permanently stored in their un-rotated, logical orientation.
+        pockets = listOf(
             PointF(-halfW, -halfH), PointF(halfW, -halfH),
             PointF(-halfW, halfH), PointF(halfW, halfH),
             PointF(-halfW - sidePocketOffset, 0f), PointF(halfW + sidePocketOffset, 0f)
         )
 
-        pockets = basePockets.map { p ->
-            PointF(
-                p.x * cosA - p.y * sinA,
-                p.x * sinA + p.y * cosA
-            )
-        }
-
-
-        val unrotatedNormals = listOf(
+        // Normals are also now permanently stored in their un-rotated, logical orientation.
+        normals = listOf(
             PointF(0f, -1f), // Top
             PointF(1f, 0f),  // Right
             PointF(0f, 1f),   // Bottom
             PointF(-1f, 0f)  // Left
         )
-
-        normals = unrotatedNormals.map { n ->
-            PointF(n.x * cosA - n.y * sinA, n.x * sinA + n.y * cosA)
-        }
     }
 
     fun isPointInside(point: PointF): Boolean {
         if (corners.isEmpty()) return false
-        var isInside = false
-        var j = corners.size - 1
-        for (i in corners.indices) {
-            val pi = corners[i]
-            val pj = corners[j]
-            if ((pi.y > point.y) != (pj.y > point.y) &&
-                (point.x < (pj.x - pi.x) * (point.y - pi.y) / (pj.y - pi.y) + pi.x)
-            ) {
-                isInside = !isInside
-            }
-            j = i
-        }
-        return isInside
+
+        // De-rotate the point to check against the un-rotated table bounds
+        val deRotatedPoint = PointF()
+        val angleRad = Math.toRadians(-rotationDegrees.toDouble())
+        val cosA = kotlin.math.cos(angleRad).toFloat()
+        val sinA = kotlin.math.sin(angleRad).toFloat()
+        deRotatedPoint.x = point.x * cosA - point.y * sinA
+        deRotatedPoint.y = point.x * sinA + point.y * cosA
+
+        val halfW = logicalWidth / 2f
+        val halfH = logicalHeight / 2f
+
+        return deRotatedPoint.x >= -halfW && deRotatedPoint.x <= halfW &&
+                deRotatedPoint.y >= -halfH && deRotatedPoint.y <= halfH
     }
 
     fun findRailIntersectionAndNormal(startPoint: PointF, endPoint: PointF): Pair<PointF, PointF>? {

@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/StateReducer.kt
+
 package com.hereliesaz.cuedetat.domain
 
 import com.hereliesaz.cuedetat.domain.reducers.*
@@ -42,7 +44,7 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.ToggleHelp,
             is MainScreenEvent.ToggleMoreHelp,
             is MainScreenEvent.ToggleSpinControl,
-            is MainScreenEvent.ToggleSnapping, // Moved to ToggleReducer
+            is MainScreenEvent.ToggleSnapping,
             is MainScreenEvent.ToggleCvModel ->
                 toggleReducer.reduce(currentState, event)
 
@@ -51,6 +53,7 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.TableRotationApplied,
             is MainScreenEvent.TableRotationChanged,
             is MainScreenEvent.AdjustGlow,
+            is MainScreenEvent.PanView, // <-- The missing link is added here
             is MainScreenEvent.AdjustLuminance ->
                 controlReducer.reduce(currentState, event)
 

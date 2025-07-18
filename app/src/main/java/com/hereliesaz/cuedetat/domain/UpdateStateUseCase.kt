@@ -24,54 +24,59 @@ class UpdateStateUseCase @Inject constructor(
     private val reducerUtils: ReducerUtils
 ) {
 
-    private val railHeightToTableHeightRatio = 0.025f // Halved the lift amount
+    private val railHeightToTableHeightRatio = 0.025f
     private val distanceReferenceConstant = 6480f
     private val lineExtensionFactor = 5000f
 
     operator fun invoke(state: OverlayState): OverlayState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
-        val updatedStateWithSnapping = state
         val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition)
 
-        val finalPitchMatrix = createFullMatrix(state, 0f, zoomFactor)
-        val hasFinalInverse = finalPitchMatrix.invert(state.inversePitchMatrix)
+        // Enforce the pan limit here, where we have full context.
+        val screenSpaceLimit = (state.table.logicalHeight / 2f) * zoomFactor
+        val coercedOffsetY = state.viewOffset.y.coerceIn(-screenSpaceLimit, screenSpaceLimit)
+        val coercedViewOffset = PointF(state.viewOffset.x, coercedOffsetY)
+        val stateWithCoercedPan = state.copy(viewOffset = coercedViewOffset)
 
-        val logicalTableShortSide = state.table.logicalHeight
+        val finalPitchMatrix = createFullMatrix(stateWithCoercedPan, 0f, zoomFactor)
+        val hasFinalInverse = finalPitchMatrix.invert(stateWithCoercedPan.inversePitchMatrix)
+
+        val logicalTableShortSide = stateWithCoercedPan.table.logicalHeight
         val baseRailLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
-        val railLiftAmount = baseRailLiftAmount * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
-        val finalRailPitchMatrix = createFullMatrix(state, railLiftAmount, zoomFactor)
+        val railLiftAmount = baseRailLiftAmount * abs(sin(Math.toRadians(stateWithCoercedPan.pitchAngle.toDouble()))).toFloat()
+        val finalRailPitchMatrix = createFullMatrix(stateWithCoercedPan, railLiftAmount, zoomFactor)
 
-        val flatMatrix = createFullMatrix(state, 0f, 1f, applyPitch = false)
+        val flatMatrix = createFullMatrix(stateWithCoercedPan, 0f, 1f, applyPitch = false)
 
-        val consistentRadius = calculateConsistentVisualRadius(state, zoomFactor)
+        val consistentRadius = calculateConsistentVisualRadius(stateWithCoercedPan, zoomFactor)
 
 
-        val logicalShotLineAnchor = getLogicalShotLineAnchor(updatedStateWithSnapping)
-        val isTiltBeyondLimit = !state.isBankingMode && logicalShotLineAnchor.y <= updatedStateWithSnapping.protractorUnit.ghostCueBallCenter.y
+        val logicalShotLineAnchor = getLogicalShotLineAnchor(stateWithCoercedPan)
+        val isTiltBeyondLimit = !stateWithCoercedPan.isBankingMode && logicalShotLineAnchor.y <= stateWithCoercedPan.protractorUnit.ghostCueBallCenter.y
 
         val (isGeometricallyImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
             shotAnchor = logicalShotLineAnchor,
-            ghostBall = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter,
-            targetBall = updatedStateWithSnapping.protractorUnit.center
+            ghostBall = stateWithCoercedPan.protractorUnit.ghostCueBallCenter,
+            targetBall = stateWithCoercedPan.protractorUnit.center
         )
 
-        val isStraightShot = isShotStraight(logicalShotLineAnchor, updatedStateWithSnapping.protractorUnit.ghostCueBallCenter, updatedStateWithSnapping.protractorUnit.center)
-        val isObstructed = checkForObstructions(updatedStateWithSnapping)
-        val targetBallDistance = calculateDistance(updatedStateWithSnapping, flatMatrix)
+        val isStraightShot = isShotStraight(logicalShotLineAnchor, stateWithCoercedPan.protractorUnit.ghostCueBallCenter, stateWithCoercedPan.protractorUnit.center)
+        val isObstructed = checkForObstructions(stateWithCoercedPan)
+        val targetBallDistance = calculateDistance(stateWithCoercedPan, flatMatrix)
         val shotGuideImpactPoint = if (state.table.isVisible && !state.isBankingMode) {
-            calculateShotGuideImpact(updatedStateWithSnapping, useShotGuideLine = true)
+            calculateShotGuideImpact(stateWithCoercedPan, useShotGuideLine = true)
         } else {
             null
         }
 
         // --- Aiming Line & Tangent Line Logic ---
-        val tangentStart = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter
-        val ghostCueCenter = updatedStateWithSnapping.protractorUnit.ghostCueBallCenter
-        val targetCenter = updatedStateWithSnapping.protractorUnit.center
+        val tangentStart = stateWithCoercedPan.protractorUnit.ghostCueBallCenter
+        val ghostCueCenter = stateWithCoercedPan.protractorUnit.ghostCueBallCenter
+        val targetCenter = stateWithCoercedPan.protractorUnit.center
 
         val (finalAimingLineBankPath, aimedPocketIndex, aimingLineEndPoint) = if (state.table.isVisible && !state.isBankingMode) {
-            val (path, pocketIndex, endPoint) = calculateAimAndBank(ghostCueCenter, targetCenter, updatedStateWithSnapping)
+            val (path, pocketIndex, endPoint) = calculateAimAndBank(ghostCueCenter, targetCenter, stateWithCoercedPan)
             Triple(path, pocketIndex, endPoint)
         } else {
             val extendedPath = getExtendedLinePath(ghostCueCenter, targetCenter)
@@ -84,7 +89,7 @@ class UpdateStateUseCase @Inject constructor(
         )
 
         var (finalTangentLineBankPath, tangentAimedPocketIndex, _) = if (state.table.isVisible && !state.isBankingMode) {
-            calculateAimAndBank(tangentStart, activeTangentTarget, updatedStateWithSnapping)
+            calculateAimAndBank(tangentStart, activeTangentTarget, stateWithCoercedPan)
         } else {
             Triple(getExtendedLinePath(tangentStart, activeTangentTarget), null, null)
         }
@@ -94,15 +99,15 @@ class UpdateStateUseCase @Inject constructor(
         }
 
         val spinPaths: Map<Color, List<PointF>> = if (!state.isBankingMode) {
-            calculateSpinPaths(updatedStateWithSnapping)
+            calculateSpinPaths(stateWithCoercedPan)
         } else {
             emptyMap()
         }
 
-        return updatedStateWithSnapping.copy(
+        return stateWithCoercedPan.copy(
             pitchMatrix = finalPitchMatrix,
             railPitchMatrix = finalRailPitchMatrix,
-            inversePitchMatrix = state.inversePitchMatrix, // Use the one that was calculated and inverted
+            inversePitchMatrix = stateWithCoercedPan.inversePitchMatrix, // Use the one that was calculated and inverted
             hasInverseMatrix = hasFinalInverse,
             flatMatrix = flatMatrix,
             visualBallRadius = consistentRadius,
@@ -148,14 +153,16 @@ class UpdateStateUseCase @Inject constructor(
         finalMatrix.set(worldMatrix)
         // b. Apply the camera's 3D perspective tilt.
         finalMatrix.postConcat(perspectiveMatrix)
-        // c. Center the entire transformed scene on the view.
-        finalMatrix.postTranslate(state.viewWidth / 2f, state.viewHeight / 2f)
+        // c. Apply the view pan and center the entire transformed scene on the view.
+        finalMatrix.postTranslate(
+            (state.viewWidth / 2f) + state.viewOffset.x,
+            (state.viewHeight / 2f) + state.viewOffset.y
+        )
 
         return finalMatrix
     }
 
     private fun calculateConsistentVisualRadius(state: OverlayState, zoomFactor: Float): Float {
-        // Create a matrix with only tilt and zoom to calculate a radius independent of rotation or position.
         val sizingMatrix = Matrix()
         val tempCam = Camera()
         tempCam.save()
@@ -165,7 +172,6 @@ class UpdateStateUseCase @Inject constructor(
         tempCam.restore()
         sizingMatrix.postScale(zoomFactor, zoomFactor)
 
-        // Project two points (center and edge) and measure the screen distance.
         val p1 = floatArrayOf(0f, 0f)
         val p2 = floatArrayOf(LOGICAL_BALL_RADIUS, 0f)
         sizingMatrix.mapPoints(p1)
@@ -176,9 +182,7 @@ class UpdateStateUseCase @Inject constructor(
 
     private fun getLogicalShotLineAnchor(state: OverlayState): PointF {
         state.onPlaneBall?.let { return it.center }
-        // When no cue ball, anchor to the bottom-center of the screen, transformed to logical space
         if (!state.hasInverseMatrix) {
-            // Failsafe if matrix isn't ready
             return PointF(state.protractorUnit.ghostCueBallCenter.x, state.protractorUnit.ghostCueBallCenter.y + 1000f)
         }
         val screenAnchor = PointF(state.viewWidth / 2f, state.viewHeight.toFloat())
