@@ -39,11 +39,8 @@ class BallRenderer {
             drawGhostedBall(canvas, obstacle, ObstacleBall(), state, paints)
         }
 
-        // Draw the bounding boxes from CV
         drawBoundingBoxes(canvas, state, paints)
 
-
-        // --- Visual Distinction for Snapped Balls ---
         val detectedBalls = state.visionData.genericBalls + state.visionData.customBalls
         val snappedPaint = Paint(paints.targetCirclePaint).apply {
             color = RebelYellow.toArgb()
@@ -54,7 +51,7 @@ class BallRenderer {
         val allLogicalBalls = (listOfNotNull(state.onPlaneBall, state.protractorUnit) + state.obstacleBalls)
         allLogicalBalls.forEach { logicalBall ->
             val isSnapped = detectedBalls.any { detected ->
-                hypot((logicalBall.center.x - detected.x).toDouble(), (logicalBall.center.y - detected.y).toDouble()) < 5.0 // 5px tolerance
+                hypot((logicalBall.center.x - detected.x).toDouble(), (logicalBall.center.y - detected.y).toDouble()) < 5.0
             }
             if (isSnapped) {
                 canvas.save()
@@ -63,7 +60,6 @@ class BallRenderer {
                 canvas.restore()
             }
         }
-        // --- End Visual Distinction ---
 
         if (state.areHelpersVisible) {
             drawAllLabels(canvas, state, paints, typeface)
@@ -77,7 +73,7 @@ class BallRenderer {
             alpha = 150
         }
         canvas.save()
-        canvas.concat(state.pitchMatrix) // Ensure boxes are drawn in the same perspective space
+        canvas.concat(state.pitchMatrix)
         state.visionData.detectedBoundingBoxes.forEach { box ->
             canvas.drawRect(RectF(box), paint)
         }
@@ -88,23 +84,20 @@ class BallRenderer {
     private fun drawProtractorAndActual(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         val protractor = state.protractorUnit
 
-        // Target Ball
         drawGhostedBall(canvas, protractor, TargetBall(), state, paints)
 
-        // Ghost Cue Ball
         drawGhostedBall(canvas, object : LogicalCircular {
             override val center = protractor.ghostCueBallCenter
             override val radius = protractor.radius
         }, GhostCueBall(), state, paints)
 
-        // Actual Cue Ball
         state.onPlaneBall?.let {
             drawGhostedBall(canvas, it, ActualCueBall(), state, paints)
         }
     }
 
     private fun drawGhostedBall(canvas: Canvas, ball: LogicalCircular, config: BallsConfig, state: OverlayState, paints: PaintCache) {
-        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ball.center, ball.radius, state)
+        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ball.center, ball.radius, state, state.pitchMatrix)
         val screenPos = DrawingUtils.mapPoint(ball.center, state.pitchMatrix)
         val yPosLifted = screenPos.y - radiusInfo.lift
 
@@ -126,21 +119,16 @@ class BallRenderer {
         val dotPaint = Paint(paints.fillPaint).apply { color = android.graphics.Color.WHITE }
         val dotRadius = ball.radius * 0.1f
 
-        // Draw on-plane shadow
         canvas.save()
         canvas.concat(state.pitchMatrix)
-        // Adjust radius to place stroke on the outside of the logical boundary
         canvas.drawCircle(ball.center.x, ball.center.y, ball.radius + strokePaint.strokeWidth / 2f, strokePaint)
         canvas.drawCircle(ball.center.x, ball.center.y, dotRadius, dotPaint)
         canvas.restore()
 
-        // Draw the lifted ghost effect
-        // Adjust radius to place stroke on the outside of the logical boundary
         val liftedRadius = radiusInfo.radius + strokePaint.strokeWidth / 2f
         canvas.drawCircle(screenPos.x, yPosLifted, liftedRadius, glowPaint)
         canvas.drawCircle(screenPos.x, yPosLifted, liftedRadius, strokePaint)
 
-        // Draw center shape
         val centerPaint = Paint(paints.fillPaint).apply { color = config.centerColor.toArgb() }
         val crosshairPaint = Paint(strokePaint).apply { color = config.centerColor.toArgb(); strokeWidth = config.strokeWidth }
         val centerSize = radiusInfo.radius * config.centerSize

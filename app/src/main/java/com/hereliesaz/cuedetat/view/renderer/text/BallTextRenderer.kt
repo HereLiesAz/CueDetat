@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/renderer/text/BallTextRenderer.kt
+
 package com.hereliesaz.cuedetat.view.renderer.text
 
 import android.graphics.Canvas
@@ -25,7 +27,7 @@ class BallTextRenderer {
         val currentTextSize = (baseFontSize * zoomFactor).coerceIn(minFontSize, maxFontSize)
         paint.textSize = currentTextSize
 
-        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ball.center, ball.radius, state)
+        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ball.center, ball.radius, state, state.pitchMatrix)
         val screenPos = DrawingUtils.mapPoint(ball.center, state.pitchMatrix)
 
         val textMetrics = paint.fontMetrics

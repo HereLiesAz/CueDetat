@@ -13,6 +13,7 @@ import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.table.Diamonds
 import com.hereliesaz.cuedetat.view.config.table.Rail
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
+import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.atan2
 import kotlin.math.pow
@@ -58,11 +59,8 @@ class RailRenderer {
 
         // --- Draw Rail Segments ---
         val railSegments = listOf(
-            // Top rail segments
             getPointAlongLine(offsetCorners[0], offsetCorners[1], pocketRadius) to getPointAlongLine(offsetCorners[1], offsetCorners[0], pocketRadius),
-            // Bottom rail segments
             getPointAlongLine(offsetCorners[3], offsetCorners[2], pocketRadius) to getPointAlongLine(offsetCorners[2], offsetCorners[3], pocketRadius),
-            // Side rail segments - need to be split
             getPointAlongLine(offsetCorners[0], offsetCorners[3], pocketRadius * 1.5f) to getPointAlongLine(offsetCorners[0], offsetCorners[3], state.table.logicalHeight / 2f - pocketRadius),
             getPointAlongLine(offsetCorners[3], offsetCorners[0], pocketRadius * 1.5f) to getPointAlongLine(offsetCorners[3], offsetCorners[0], state.table.logicalHeight / 2f - pocketRadius),
             getPointAlongLine(offsetCorners[1], offsetCorners[2], pocketRadius * 1.5f) to getPointAlongLine(offsetCorners[1], offsetCorners[2], state.table.logicalHeight / 2f - pocketRadius),
@@ -77,7 +75,6 @@ class RailRenderer {
         // --- Draw Diamonds ---
         val diamondRadius = LOGICAL_BALL_RADIUS * diamondSizeFactor
 
-        // End rails (short rails, top and bottom) - 3 diamonds each
         for (i in 1..3) {
             val fraction = i / 4.0f
             val top = interpolate(offsetCorners[0], offsetCorners[1], fraction)
@@ -86,15 +83,12 @@ class RailRenderer {
             canvas.drawCircle(bottom.x, bottom.y, diamondRadius, diamondPaint)
         }
 
-        // Side rails (long rails, left and right) - 3 diamonds per side of the side pocket (6 total)
         for (i in 1..3) {
-            // Top half
             val leftTop = interpolate(offsetCorners[0], offsetCorners[3], i / 8.0f)
             val rightTop = interpolate(offsetCorners[1], offsetCorners[2], i / 8.0f)
             canvas.drawCircle(leftTop.x, leftTop.y, diamondRadius, diamondPaint)
             canvas.drawCircle(rightTop.x, rightTop.y, diamondRadius, diamondPaint)
 
-            // Bottom half
             val leftBottom = interpolate(offsetCorners[0], offsetCorners[3], (8 - i) / 8.0f)
             val rightBottom = interpolate(offsetCorners[1], offsetCorners[2], (8 - i) / 8.0f)
             canvas.drawCircle(leftBottom.x, leftBottom.y, diamondRadius, diamondPaint)
@@ -103,14 +97,18 @@ class RailRenderer {
     }
 
     fun drawRailLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
+        // Calculate a reference radius for font sizing, since the global one is gone.
+        val referenceRadius = DrawingUtils.getPerspectiveRadiusAndLift(
+            state.protractorUnit.center, state.protractorUnit.radius, state, state.pitchMatrix
+        ).radius
+
         val textPaint = paints.textPaint.apply {
             this.typeface = typeface
-            this.textSize = state.visualBallRadius * 4f
+            this.textSize = referenceRadius * 4f
             this.color = AcidPatina.toArgb()
         }
-        val textPadding = state.visualBallRadius * 5f
+        val textPadding = referenceRadius * 5f
 
-        // Diamond label for banked Aiming Line (Protractor Mode) or Bank Shot (Banking Mode)
         val pathToLabel = if (state.isBankingMode) state.bankShotPath else state.aimingLineBankPath
         if (pathToLabel.size > 1) {
             val bankPoint = pathToLabel[1]
@@ -119,14 +117,13 @@ class RailRenderer {
             }
         }
 
-        // Diamond label for banked Tangent Line (Protractor Mode only)
         if (!state.isBankingMode && state.tangentLineBankPath.size > 1) {
             val tangentBankPoint = state.tangentLineBankPath[1]
             getRailForPoint(tangentBankPoint, state)?.let { railType ->
                 textRenderer.drawDiamondLabel(canvas, tangentBankPoint, railType, state, textPaint, textPadding)
             }
         }
-        // Diamond label for Shot Guide Line (Protractor Mode only)
+
         if (!state.isBankingMode) {
             state.shotGuideImpactPoint?.let { impactPoint ->
                 getRailForPoint(impactPoint, state)?.let { railType ->
@@ -140,7 +137,6 @@ class RailRenderer {
         val table = state.table
         if (!table.isVisible) return null
 
-        // Use the rotated corners for this check, as we are in screen space
         val corners = table.corners
         val tolerance = 5f
 

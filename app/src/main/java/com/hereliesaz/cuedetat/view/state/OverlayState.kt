@@ -148,7 +148,6 @@ data class OverlayState(
     val aimedPocketIndex: Int? = null,
     val tangentAimedPocketIndex: Int? = null,
     val aimingLineEndPoint: PointF? = null,
-    val visualBallRadius: Float = LOGICAL_BALL_RADIUS, // The one true visual radius
 
     // Theming
     val appControlColorScheme: ColorScheme = darkColorScheme(),
