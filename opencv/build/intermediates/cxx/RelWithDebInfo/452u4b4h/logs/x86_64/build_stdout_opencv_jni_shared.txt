@@ -74,3 +74,29 @@ ninja: Entering directory `G:\My Drive\CueDetatLite\opencv\.cxx\RelWithDebInfo\4
 [0/1] Re-running CMake...
 -- Configuring done
 -- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/RelWithDebInfo/452u4b4h/x86_64
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/RelWithDebInfo/452u4b4h/x86_64
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/RelWithDebInfo/452u4b4h/x86_64
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/RelWithDebInfo/452u4b4h/x86_64
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/RelWithDebInfo/452u4b4h/x86_64
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/RelWithDebInfo/452u4b4h/x86_64
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetatLite/opencv/.cxx/RelWithDebInfo/452u4b4h/x86_64
+ninja: no work to do.
