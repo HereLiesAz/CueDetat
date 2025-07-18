@@ -17,12 +17,13 @@ hiltNavigationCompose = "1.2.0"
 junit = "4.13.2"
 junitTest = "1.2.1"
 junitExt = "1.8.3"
+kotzillaSdk = "1.2.0-Beta1"
 lifecycle = "2.9.1"
-lifecycleRuntimeCompose = "2.9.1"
+lifecycleRuntimeCompose = "2.9.2"
 material = "1.12.0"
 material3 = "1.3.2"
 material3Expressive = "1.0.0-alpha01"
-material3Version = "1.4.0-alpha17"
+material3Version = "1.4.0-alpha18"
 materialIconsExtended = "1.7.8"
 multidex = "2.0.1"
 objectDetection = "17.0.2"
@@ -61,25 +62,26 @@ foundationLayout = "1.8.3"
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 androidx-camera-analysis = { module = "androidx.camera:camera-analysis", version.ref = "cameraxVersion" }
-androidx-camera-video = { module = "androidx.camera:camera-video", version = "1.5.0-beta01" }
+androidx-camera-video = { module = "androidx.camera:camera-video", version = "1.5.0-beta02" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.16.0" }
 androidx-glance = { module = "androidx.glance:glance", version = "1.2.0-alpha01" }
 androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version = "1.2.0-alpha01" }
 androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycleRuntimeCompose" }
-androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version = "2.9.1" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version = "2.9.2" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version = "1.7.8" }
 androidx-material3 = { module = "androidx.compose.material3:material3", name = "material3" }
 androidx-multidex = { group = "androidx.multidex", name = "multidex", version = "2.0.1" }
 dagger-hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hiltCompiler" }
+kotzilla-sdk = { module = "io.kotzilla:kotzilla-sdk", version.ref = "kotzillaSdk" }
 material = { group = "com.google.android.material", name = "material", version = "1.14.0-alpha02" }
 
 
 # Jetpack Compose
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "ui" }
-androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics", version = "1.9.0-beta02" }
+androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics", version = "1.9.0-beta03" }
 androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling", version.ref = "ui" }
 androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview", version.ref = "ui" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
@@ -121,7 +123,6 @@ compose-material3 = { group = "androidx.wear.compose", name = "compose-material3
 androidx-animation-core = { group = "androidx.compose.animation", name = "animation-core", version.ref = "animationCore" }
 tensorflow-lite-task-vision = { module = "org.tensorflow:tensorflow-lite-task-vision", version = "0.4.4" }
 vision-common = { module = "com.google.mlkit:vision-common", version = "17.3.0" }
-androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics", version.ref = "uiGraphicsVersion" }
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
 
 

@@ -1,5 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/MenuDrawer.kt
-
 package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.clickable
@@ -20,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.ui.theme.AccentGold
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
@@ -30,8 +29,8 @@ fun MenuDrawerContent(
     onCloseDrawer: () -> Unit
 ) {
     ModalDrawerSheet(
-        modifier = Modifier.width(280.dp), // Constrain the width
-        drawerContainerColor = MaterialTheme.colorScheme.background // Set to darkest background color, fully opaque
+        modifier = Modifier.width(280.dp),
+        drawerContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
     ) {
         Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
             Column(
@@ -42,7 +41,7 @@ fun MenuDrawerContent(
             ) {
                 Text(
                     text = stringResource(id = R.string.app_name),
-                    color = MaterialTheme.colorScheme.primary,
+                    color = AccentGold,
                     style = MaterialTheme.typography.displaySmall,
                     textAlign = TextAlign.Center
                 )
@@ -72,6 +71,10 @@ fun MenuDrawerContent(
             MenuItem(
                 text = cameraToggleText,
                 onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
+            )
+            MenuItem(
+                text = if (uiState.isSnappingEnabled) "Disable Snapping" else "Enable Snapping",
+                onClick = { onEvent(MainScreenEvent.ToggleSnapping); onCloseDrawer() }
             )
             MenuDivider()
 
@@ -148,10 +151,6 @@ fun MenuDrawerContent(
                 text = "Too Advanced Options",
                 onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog); onCloseDrawer() }
             )
-            MenuItem(
-                text = if (uiState.isSnappingEnabled) "Disable Snapping" else "Enable Snapping",
-                onClick = { onEvent(MainScreenEvent.ToggleSnapping); onCloseDrawer() }
-            )
             Spacer(modifier = Modifier.height(12.dp))
         }
     }
@@ -168,8 +167,8 @@ private fun MenuItem(text: String, onClick: () -> Unit) {
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyMedium, // Reduced text size
-            color = MaterialTheme.colorScheme.primary
+            style = MaterialTheme.typography.bodyMedium,
+            color = AccentGold
         )
     }
 }

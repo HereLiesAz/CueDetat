@@ -8,7 +8,7 @@ import com.hereliesaz.cuedetat.ui.theme.OracleGlow
 import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
 
-class ObstacleBall : BallsConfig {
+internal class ObstacleBall : BallsConfig {
     override val label: String = ""
     override val strokeColor: Color = MutedMaroon
     override val strokeWidth: Float = 2f

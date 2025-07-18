@@ -1,0 +1,2 @@
+ninja: Entering directory `G:\My Drive\CueDetatLite\opencv\.cxx\Debug\4j3b1k15\armeabi-v7a'
+ninja: no work to do.

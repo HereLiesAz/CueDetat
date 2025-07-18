@@ -1,27 +1,36 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/data/VisionRepository.kt
-
 package com.hereliesaz.cuedetat.data
 
 import android.annotation.SuppressLint
 import android.graphics.Matrix
 import android.graphics.PointF
+import android.graphics.Rect
 import android.graphics.RectF
 import androidx.camera.core.ImageProxy
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.objects.DetectedObject
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.hereliesaz.cuedetat.di.GenericDetector
 import com.hereliesaz.cuedetat.view.model.Perspective
+import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
+import com.hereliesaz.cuedetat.view.state.CvRefinementMethod
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.opencv.android.Utils
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
-import org.opencv.core.Rect as OCVRect
+import org.opencv.core.MatOfDouble
+import org.opencv.core.MatOfPoint
+import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Scalar
 import org.opencv.imgproc.Imgproc
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.PI
+import kotlin.math.pow
+import org.opencv.core.Point as OCVPoint
+import org.opencv.core.Rect as OCVRect
 
 @Singleton
 class VisionRepository @Inject constructor(
@@ -42,85 +51,219 @@ class VisionRepository @Inject constructor(
         }
         lastFrameTime = currentTime
 
-        val mediaImage = imageProxy.image
-        if (mediaImage != null) {
-            val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-            val matrix = getTransformationMatrix(
-                inputImage.width, inputImage.height,
-                state.viewWidth, state.viewHeight
+        val mediaImage = imageProxy.image ?: run { imageProxy.close(); return }
+        val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+        val transformationMatrix = getTransformationMatrix(
+            inputImage.width, inputImage.height,
+            state.viewWidth, state.viewHeight
+        )
+
+        genericObjectDetector.process(inputImage)
+            .addOnSuccessListener { detectedObjects ->
+                val mat = imageToMat(inputImage)
+                val hsvMat = Mat()
+                Imgproc.cvtColor(mat, hsvMat, Imgproc.COLOR_BGR2HSV)
+
+                val (hsv, mask) = processColorAndMask(hsvMat, state)
+                val refinedBalls = refineDetections(detectedObjects, transformationMatrix, state, mat)
+
+                val logicalBalls = if (state.hasInverseMatrix) {
+                    refinedBalls.map { screenPoint ->
+                        Perspective.screenToLogical(screenPoint, state.inversePitchMatrix)
+                    }
+                } else {
+                    emptyList()
+                }
+
+                val finalBalls = if (state.table.isVisible) {
+                    logicalBalls.filter { state.table.isPointInside(it) }
+                } else {
+                    logicalBalls
+                }
+
+                _visionDataFlow.value = VisionData(
+                    genericBalls = finalBalls,
+                    detectedHsvColor = hsv,
+                    detectedBoundingBoxes = detectedObjects.map { it.boundingBox },
+                    cvMask = if (state.showCvMask) mask else null
+                )
+
+                mat.release()
+                hsvMat.release()
+                mask?.release()
+
+                imageProxy.close()
+            }
+            .addOnFailureListener {
+                imageProxy.close()
+            }
+    }
+
+    private fun processColorAndMask(hsvMat: Mat, state: OverlayState): Pair<FloatArray, Mat?> {
+        val hsv: FloatArray
+        val mask: Mat?
+
+        if (state.lockedHsvColor != null) {
+            hsv = state.lockedHsvColor
+        } else if (state.colorSamplePoint != null) {
+            val imageX = (state.colorSamplePoint.x * (hsvMat.cols() / state.viewWidth.toFloat())).toInt()
+            val imageY = (state.colorSamplePoint.y * (hsvMat.rows() / state.viewHeight.toFloat())).toInt()
+            val sampleRegion = OCVRect(
+                (imageX - 2).coerceIn(0, hsvMat.cols() - 5),
+                (imageY - 2).coerceIn(0, hsvMat.rows() - 5),
+                5, 5
             )
+            val patch = hsvMat.submat(sampleRegion)
+            val mean = MatOfDouble()
+            val stdDev = MatOfDouble()
+            Core.meanStdDev(patch, mean, stdDev)
 
-            genericObjectDetector.process(inputImage)
-                .addOnSuccessListener { detectedObjects ->
-                    val mat = imageToMat(inputImage)
-                    val hsvMat = Mat()
-                    Imgproc.cvtColor(mat, hsvMat, Imgproc.COLOR_BGR2HSV)
+            val meanValues = mean.toArray()
+            val stdDevValues = stdDev.toArray()
 
-                    val hsv = state.lockedHsvColor ?: state.colorSamplePoint?.let {
-                        val imageX = (it.x * (hsvMat.cols() / state.viewWidth.toFloat())).toInt()
-                        val imageY = (it.y * (hsvMat.rows() / state.viewHeight.toFloat())).toInt()
-                        val color = hsvMat[imageY.coerceIn(0, hsvMat.rows() - 1), imageX.coerceIn(0, hsvMat.cols() - 1)]
-                        floatArrayOf(color[0].toFloat(), color[1].toFloat(), color[2].toFloat())
-                    } ?: run {
-                        val roiWidth = 50
-                        val roiHeight = 50
-                        val roiX = (hsvMat.cols() - roiWidth) / 2
-                        val roiY = (hsvMat.rows() - roiHeight) / 2
-                        val centerRoi = hsvMat.submat(OCVRect(roiX, roiY, roiWidth, roiHeight))
-                        val meanColor = Core.mean(centerRoi)
-                        centerRoi.release()
-                        floatArrayOf(meanColor.`val`[0].toFloat(), meanColor.`val`[1].toFloat(), meanColor.`val`[2].toFloat())
-                    }
+            hsv = if (meanValues.size >= 3 && stdDevValues.size >= 3) {
+                floatArrayOf(
+                    meanValues[0].toFloat(), stdDevValues[0].toFloat(),
+                    meanValues[1].toFloat(), stdDevValues[1].toFloat(),
+                    meanValues[2].toFloat(), stdDevValues[2].toFloat()
+                )
+            } else {
+                floatArrayOf(0f, 0f, 0f, 0f, 0f, 0f)
+            }
 
-                    val cvMask = if (state.showCvMask) {
-                        val mask = Mat()
-                        val hueRange = 10.0
-                        val lowerBound = Scalar((hsv[0] - hueRange).coerceAtLeast(0.0), 100.0, 100.0)
-                        val upperBound = Scalar((hsv[0] + hueRange).coerceAtMost(180.0), 255.0, 255.0)
-                        Core.inRange(hsvMat, lowerBound, upperBound, mask)
-                        mask
-                    } else {
-                        null
-                    }
-
-                    val detectedScreenPoints = detectedObjects.map {
-                        val transformedRect = RectF(it.boundingBox)
-                        matrix.mapRect(transformedRect)
-                        PointF(transformedRect.centerX(), transformedRect.centerY())
-                    }
-
-                    val detectedLogicalPoints = if (state.hasInverseMatrix) {
-                        detectedScreenPoints.map { screenPoint ->
-                            Perspective.screenToLogical(screenPoint, state.inversePitchMatrix)
-                        }
-                    } else {
-                        emptyList()
-                    }
-
-                    val filteredBalls = if (state.table.isVisible) {
-                        detectedLogicalPoints.filter { state.table.isPointInside(it) }
-                    } else {
-                        detectedLogicalPoints
-                    }
-
-                    _visionDataFlow.value = VisionData(
-                        genericBalls = filteredBalls,
-                        detectedHsvColor = hsv,
-                        detectedBoundingBoxes = detectedObjects.map { it.boundingBox },
-                        cvMask = cvMask
-                    )
-
-                    mat.release()
-                    hsvMat.release()
-
-                    imageProxy.close()
-                }
-                .addOnFailureListener {
-                    imageProxy.close()
-                }
+            patch.release()
+            mean.release()
+            stdDev.release()
         } else {
-            imageProxy.close()
+            hsv = floatArrayOf(0f, 0f, 0f, 0f, 0f, 0f)
         }
+
+        mask = if (state.showCvMask && hsv.size >= 6) {
+            val m = Mat()
+            val multiplier = state.cvHsvRangeMultiplier
+            val lowerBound = Scalar(
+                (hsv[0] - hsv[1] * multiplier).toDouble().coerceAtLeast(0.0),
+                (hsv[2] - hsv[3] * multiplier).toDouble().coerceAtLeast(0.0),
+                (hsv[4] - hsv[5] * multiplier).toDouble().coerceAtLeast(0.0)
+            )
+            val upperBound = Scalar(
+                (hsv[0] + hsv[1] * multiplier).toDouble().coerceAtMost(180.0),
+                (hsv[2] + hsv[3] * multiplier).toDouble().coerceAtMost(255.0),
+                (hsv[4] + hsv[5] * multiplier).toDouble().coerceAtMost(255.0)
+            )
+            Core.inRange(hsvMat, lowerBound, upperBound, m)
+            m
+        } else {
+            null
+        }
+
+        return Pair(hsv, mask)
+    }
+
+    private fun refineDetections(
+        detectedObjects: List<DetectedObject>,
+        matrix: Matrix,
+        state: OverlayState,
+        fullImageMat: Mat
+    ): List<PointF> {
+        return detectedObjects.mapNotNull { obj ->
+            val screenRect = RectF(obj.boundingBox)
+            matrix.mapRect(screenRect)
+
+            val roi = OCVRect(
+                obj.boundingBox.left.coerceAtLeast(0),
+                obj.boundingBox.top.coerceAtLeast(0),
+                obj.boundingBox.width().coerceAtMost(fullImageMat.cols() - obj.boundingBox.left),
+                obj.boundingBox.height().coerceAtMost(fullImageMat.rows() - obj.boundingBox.top)
+            )
+            if (roi.width <= 0 || roi.height <= 0) return@mapNotNull null
+
+            val subMat = fullImageMat.submat(roi)
+            val graySubMat = Mat()
+            Imgproc.cvtColor(subMat, graySubMat, Imgproc.COLOR_BGR2GRAY)
+
+            val refinedCenter = when (state.cvRefinementMethod) {
+                CvRefinementMethod.HOUGH -> refineWithHoughCircles(graySubMat, screenRect, state)
+                CvRefinementMethod.CONTOUR -> refineWithContours(subMat, screenRect, state)
+            }
+
+            subMat.release()
+            graySubMat.release()
+            refinedCenter
+        }
+    }
+
+    private fun refineWithHoughCircles(roiGray: Mat, screenRect: RectF, state: OverlayState): PointF? {
+        val circles = Mat()
+        val expectedRadius = DrawingUtils.getExpectedRadiusAtScreenY(screenRect.centerY(), state)
+        val radiusMargin = expectedRadius * 0.5f
+
+        Imgproc.HoughCircles(
+            roiGray,
+            circles,
+            Imgproc.HOUGH_GRADIENT,
+            1.0,
+            (expectedRadius * 2).toDouble(),
+            state.houghP1.toDouble(),
+            state.houghP2.toDouble(),
+            (expectedRadius - radiusMargin).toInt().coerceAtLeast(1),
+            (expectedRadius + radiusMargin).toInt().coerceAtLeast(5)
+        )
+
+        return if (circles.cols() > 0) {
+            val circle = circles[0, 0]
+            val refinedScreenX = screenRect.left + circle[0].toFloat()
+            val refinedScreenY = screenRect.top + circle[1].toFloat()
+            circles.release()
+            PointF(refinedScreenX, refinedScreenY)
+        } else {
+            circles.release()
+            null
+        }
+    }
+
+    private fun refineWithContours(roi: Mat, screenRect: RectF, state: OverlayState): PointF? {
+        val thresh = Mat()
+        Imgproc.cvtColor(roi, thresh, Imgproc.COLOR_BGR2GRAY)
+        Imgproc.threshold(thresh, thresh, 128.0, 255.0, Imgproc.THRESH_BINARY)
+
+        val contours = mutableListOf<MatOfPoint>()
+        val hierarchy = Mat()
+        Imgproc.findContours(thresh, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+
+        val expectedRadius = DrawingUtils.getExpectedRadiusAtScreenY(screenRect.centerY(), state)
+        val radiusMargin = expectedRadius * 0.75f
+        val minRadius = expectedRadius - radiusMargin
+        val maxRadius = expectedRadius + radiusMargin
+
+        var bestCandidate: PointF? = null
+        var bestCircularity = 0.0
+
+        for (contour in contours) {
+            if (contour.total() > 5) { // Need at least 5 points to fit a circle
+                val center = OCVPoint()
+                val radiusArr = FloatArray(1)
+                Imgproc.minEnclosingCircle(MatOfPoint2f(*contour.toArray()), center, radiusArr)
+                val radius = radiusArr[0]
+
+                if (radius in minRadius..maxRadius) {
+                    val area = Imgproc.contourArea(contour)
+                    val perimeter = Imgproc.arcLength(MatOfPoint2f(*contour.toArray()), true)
+                    if (perimeter > 0) {
+                        val circularity = (4 * PI * area) / (perimeter * perimeter)
+                        if (circularity > 0.7 && circularity > bestCircularity) {
+                            bestCircularity = circularity
+                            bestCandidate = PointF(screenRect.left + center.x.toFloat(), screenRect.top + center.y.toFloat())
+                        }
+                    }
+                }
+            }
+            contour.release()
+        }
+
+        thresh.release()
+        hierarchy.release()
+        return bestCandidate
     }
 
     private fun imageToMat(image: InputImage): Mat {

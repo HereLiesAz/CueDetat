@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.ui.theme.AccentGold
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
@@ -35,9 +36,9 @@ fun TableRotationSlider(
                 steps = 358,
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
-                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = AccentGold,
                     inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
-                    thumbColor = MaterialTheme.colorScheme.primary
+                    thumbColor = AccentGold
                 )
             )
         }

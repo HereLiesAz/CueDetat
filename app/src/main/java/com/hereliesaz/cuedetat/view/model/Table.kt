@@ -51,13 +51,11 @@ data class Table(
             PointF(-halfW, halfH)   // Bottom-Left
         )
 
-        val sidePocketOffset = LOGICAL_BALL_RADIUS * 0.5f
-
         // Pockets are also now permanently stored in their un-rotated, logical orientation.
         pockets = listOf(
-            PointF(-halfW, -halfH), PointF(halfW, -halfH),
-            PointF(-halfW, halfH), PointF(halfW, halfH),
-            PointF(-halfW - sidePocketOffset, 0f), PointF(halfW + sidePocketOffset, 0f)
+            PointF(-halfW, -halfH), PointF(halfW, -halfH), // Top-Left, Top-Right
+            PointF(-halfW, halfH), PointF(halfW, halfH),   // Bottom-Left, Bottom-Right
+            PointF(-halfW, 0f), PointF(halfW, 0f)          // CORRECTED: Side pockets are on the rail.
         )
 
         // Normals are also now permanently stored in their un-rotated, logical orientation.

@@ -4,6 +4,7 @@ plugins {
     id("kotlin-kapt")
     id("com.google.dagger.hilt.android")
     alias(libs.plugins.kotlin.compose)
+    id("io.kotzilla.plugin")
 }
 
 android {
@@ -187,7 +188,6 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
-    implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.foundation.layout)
     val cameraxVersion = "1.4.2" // Use a recent stable version
 
@@ -211,6 +211,7 @@ dependencies {
     androidTestImplementation (libs.androidx.junit) // Or the latest version shown by Android Studio's lint
     androidTestImplementation (libs.androidx.espresso.core)
 
+    implementation(libs.kotzilla.sdk)
 
 }
 

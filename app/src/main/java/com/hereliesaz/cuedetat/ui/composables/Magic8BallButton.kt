@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.cuedetat.ui.theme.ButtonTextBlue
 import com.hereliesaz.cuedetat.ui.theme.OracleBlue
 import com.hereliesaz.cuedetat.ui.theme.OracleGlow
 
@@ -54,9 +55,9 @@ fun Magic8BallButton(
                     val paint = Paint().asFrameworkPaint()
                     // Set up the glow layer
                     paint.setShadowLayer(
-                        30f, 0f, 0f,
+                        20f, 0f, 0f, // CORRECTED: Increased radius from 30f for a larger glow
                         OracleGlow
-                            .copy(alpha = 0.7f)
+                            .copy(alpha = 0.9f) // CORRECTED: Increased alpha from 0.7f for more opacity
                             .toArgb()
                     )
                     // Draw the solid blue triangle onto the glow layer

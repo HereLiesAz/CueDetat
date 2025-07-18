@@ -1,112 +1,97 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt
-
 package com.hereliesaz.cuedetat.view.renderer.table
 
 import android.graphics.Canvas
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
 import androidx.compose.ui.graphics.toArgb
-import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
-import com.hereliesaz.cuedetat.ui.theme.AcidPatina
-import com.hereliesaz.cuedetat.view.PaintCache
+import com.hereliesaz.cuedetat.ui.theme.GunmetalFog
+import com.hereliesaz.cuedetat.ui.theme.SlateGray
+import com.hereliesaz.cuedetat.view.model.Table
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import kotlin.math.cos
-import kotlin.math.sin
 
-class TableRenderer {
-    private val pocketSizeFactor = 1.8f
-    private val cornerPocketAngle = 45.0
-    private val sidePocketAngle = 90.0
-
-    fun drawSurface(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        if (!state.table.isVisible || state.table.corners.size < 4) return
-
-        val tablePath = Path()
-        val corners = state.table.corners
-        tablePath.moveTo(corners[0].x, corners[0].y)
-        for (i in 1 until corners.size) {
-            tablePath.lineTo(corners[i].x, corners[i].y)
-        }
-        tablePath.close()
-
-        canvas.drawPath(tablePath, paints.tableFillPaint)
-        canvas.drawPath(tablePath, paints.tableOutlinePaint)
-
-        // Draw grid lines if helpers are visible
-        if (state.areHelpersVisible) {
-            val gridPaint = Paint(paints.tableOutlinePaint).apply {
-                alpha = 50
-                strokeWidth = 1f
-            }
-            val width = state.table.logicalWidth
-            val height = state.table.logicalHeight
-            val halfW = width / 2f
-            val halfH = height / 2f
-
-            // Center lines
-            canvas.drawLine(0f, -halfH, 0f, halfH, gridPaint)
-            canvas.drawLine(-halfW, 0f, halfW, 0f, gridPaint)
-
-            // Quarter lines
-            canvas.drawLine(-halfW / 2f, -halfH, -halfW / 2f, halfH, gridPaint)
-            canvas.drawLine(halfW / 2f, -halfH, halfW / 2f, halfH, gridPaint)
-            canvas.drawLine(-halfW, -halfH / 2f, halfW, -halfH / 2f, gridPaint)
-            canvas.drawLine(-halfW, halfH / 2f, halfW, halfH / 2f, gridPaint)
-        }
+object TableRenderer {
+    private val tablePaint = Paint().apply {
+        style = Paint.Style.FILL
+        color = GunmetalFog.toArgb()
+        isAntiAlias = true
     }
 
-    fun drawPockets(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+    private val railPaint = Paint().apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 2.5f
+        color = SlateGray.toArgb()
+        isAntiAlias = true
+    }
+
+    private val pocketPaint = Paint().apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 2.5f
+        color = SlateGray.toArgb()
+        isAntiAlias = true
+    }
+
+    private val pocketCutoutPaint = Paint().apply {
+        style = Paint.Style.FILL
+        color = android.graphics.Color.BLACK
+        isAntiAlias = true
+    }
+
+    private val diamondGridPaint = Paint().apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f
+        color = SlateGray.toArgb()
+        alpha = 100
+        pathEffect = DashPathEffect(floatArrayOf(5f, 10f), 0f)
+        isAntiAlias = true
+    }
+
+    fun drawTable(canvas: Canvas, state: OverlayState) {
         if (!state.table.isVisible) return
 
-        val pocketRadius = LOGICAL_BALL_RADIUS * pocketSizeFactor
-        val pocketGlowPaint = Paint(paints.ballGlowPaint)
+        canvas.save()
+        canvas.concat(state.pitchMatrix)
 
-        state.table.pockets.forEachIndexed { index, pocket ->
-            val angle = when (index) {
-                0 -> -cornerPocketAngle + 180
-                1 -> cornerPocketAngle + 180
-                2 -> cornerPocketAngle
-                3 -> -cornerPocketAngle
-                4 -> sidePocketAngle
-                5 -> -sidePocketAngle
-                else -> 0.0
-            }
-            drawPocket(canvas, pocket.x, pocket.y, pocketRadius, angle, paints.pocketPaint, pocketGlowPaint, paints)
-        }
+        val table = state.table
+        canvas.drawPath(table.surfacePath, tablePaint)
+        drawDiamondGrid(canvas, table, diamondGridPaint)
+        canvas.drawPath(table.railPath, railPaint)
+        drawPockets(canvas, table, pocketPaint, pocketCutoutPaint)
 
-        // Draw highlights on aimed pockets
-        state.aimedPocketIndex?.let {
-            val pocket = state.table.pockets[it]
-            val aimedPaint = Paint(paints.pocketPaint).apply { color = AcidPatina.toArgb() }
-            val aimedGlow = Paint(paints.ballGlowPaint).apply { color = AcidPatina.toArgb() }
-            drawPocket(canvas, pocket.x, pocket.y, pocketRadius, 0.0, aimedPaint, aimedGlow, paints, isFullCircle = true)
-        }
-        state.tangentAimedPocketIndex?.let {
-            val pocket = state.table.pockets[it]
-            val aimedPaint = Paint(paints.pocketPaint).apply { color = AcidPatina.copy(alpha = 0.5f).toArgb() }
-            val aimedGlow = Paint(paints.ballGlowPaint).apply { color = AcidPatina.copy(alpha = 0.5f).toArgb() }
-            drawPocket(canvas, pocket.x, pocket.y, pocketRadius, 0.0, aimedPaint, aimedGlow, paints, isFullCircle = true)
+        canvas.restore()
+    }
+
+    private fun drawPockets(canvas: Canvas, table: Table, rimPaint: Paint, cutoutPaint: Paint) {
+        table.pockets.forEach { pocket ->
+            canvas.drawCircle(pocket.x, pocket.y, table.pocketRadius, cutoutPaint)
+            canvas.drawCircle(pocket.x, pocket.y, table.pocketRadius, rimPaint)
         }
     }
 
-    private fun drawPocket(
-        canvas: Canvas,
-        cx: Float,
-        cy: Float,
-        radius: Float,
-        angleDegrees: Double,
-        fillPaint: Paint,
-        glowPaint: Paint,
-        paints: PaintCache,
-        isFullCircle: Boolean = false
-    ) {
-        canvas.drawCircle(cx, cy, radius, glowPaint)
-        canvas.drawCircle(cx, cy, radius, fillPaint)
-        if (!isFullCircle) {
-            val angleRad = Math.toRadians(angleDegrees)
-            val coverX = cx + (radius * 2 * cos(angleRad)).toFloat()
-            val coverY = cy + (radius * 2 * sin(angleRad)).toFloat()
-            canvas.drawCircle(coverX, coverY, radius, paints.tableFillPaint)
+    private fun drawDiamondGrid(canvas: Canvas, table: Table, paint: Paint) {
+        val path = Path()
+        val diamonds = table.diamonds
+
+        if (diamonds.size < 18) return
+
+        for (i in 0..2) {
+            val topStart = diamonds[i + 1]
+            val bottomEnd = diamonds[15 - i]
+            path.moveTo(topStart.x, topStart.y)
+            path.lineTo(bottomEnd.x, bottomEnd.y)
         }
+
+        path.moveTo(diamonds[0].x, diamonds[0].y)
+        path.lineTo(diamonds[9].x, diamonds[9].y)
+
+        path.moveTo(diamonds[4].x, diamonds[4].y)
+        path.lineTo(diamonds[13].x, diamonds[13].y)
+
+        val leftSidePocket = table.pockets[5]
+        val rightSidePocket = table.pockets[2]
+        path.moveTo(leftSidePocket.x, leftSidePocket.y)
+        path.lineTo(rightSidePocket.x, rightSidePocket.y)
+
+        canvas.drawPath(path, paint)
     }
 }

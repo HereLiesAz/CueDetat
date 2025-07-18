@@ -23,7 +23,9 @@ val BankLine4Yellow = RebelYellow.copy(alpha = 0.3f)
 val AcidPatina = Color(0xFF00FFC2)
 val OracleBlue = Color(0xFF380B80)
 val OracleGlow = Color(0xFF4E2E98) // Lighter, purple-ish blue glow
-val ObstructionPathBlue = Color(0x4DA0A0B0) // New: Smokey bluish white for path obstruction
+val ObstructionPathBlue = Color(0x4DA0A0B0)
+val ButtonTextBlue = Color(0xFFADD8E6)
+val AcidSpill = Color(0xFF59BF1A) // CORRECTED: This was the other green
 
 // Resurrected Palette from the Void
 val AccentGold = Color(0xFFFFC107)
@@ -41,3 +43,5 @@ val IcedOpal = Color(0xFFE0E0E0)
 val ScorchedUmber = Color(0xFF3A3A3A)
 val VioletResidue = Color(0xFF9C27B0)
 val MutedMaroon = Color(0xFF880E4F)
+
+val SlateGray = Color(0xFF708090)

@@ -8,12 +8,12 @@ import com.hereliesaz.cuedetat.ui.theme.OracleGlow
 import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
 
-class GhostCueBall : BallsConfig {
+internal class GhostCueBall : BallsConfig {
     override val label: String = "Ghost Ball"
-    override val strokeColor: Color = MutedGray
-    override val strokeWidth: Float = 2f
-    override val glowColor: Color = OracleGlow
-    override val glowWidth: Float = 8f
+    override val strokeColor: Color = Color.White
+    override val strokeWidth: Float = 1f
+    override val glowColor: Color = MutedGray
+    override val glowWidth: Float = 5f
     override val centerColor: Color = MutedGray
     override val centerSize: Float = 0.8f
     override val centerShape: CenterShape = CenterShape.CROSSHAIR

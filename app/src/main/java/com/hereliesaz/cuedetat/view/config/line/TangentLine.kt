@@ -9,7 +9,7 @@ import com.hereliesaz.cuedetat.view.config.base.LinesConfig
 class TangentLine: LinesConfig {
     override val strokeColor = MutedGray
     override val strokeWidth = 2f
-    override val glowColor = OracleGlow
+    override val glowColor = obstaclePathColor
     override val glowWidth = 8f
     override val opacity = 0.7f
     override val label = "Tangent Line"

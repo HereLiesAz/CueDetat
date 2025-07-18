@@ -1,5 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreenEvent.kt
-
 package com.hereliesaz.cuedetat.ui
 
 import android.graphics.PointF
@@ -67,6 +65,7 @@ sealed class MainScreenEvent {
     data class UpdateHoughP2(val value: Float) : MainScreenEvent()
     data class UpdateCannyT1(val value: Float) : MainScreenEvent()
     data class UpdateCannyT2(val value: Float) : MainScreenEvent()
+    data class UpdateHsvMultiplier(val value: Float) : MainScreenEvent()
     object ToggleCvModel : MainScreenEvent()
     object ToggleSnapping: MainScreenEvent()
     object ToggleCvMask : MainScreenEvent()

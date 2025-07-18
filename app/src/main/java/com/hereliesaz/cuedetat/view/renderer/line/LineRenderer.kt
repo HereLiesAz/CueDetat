@@ -3,9 +3,11 @@
 package com.hereliesaz.cuedetat.view.renderer.line
 
 import android.graphics.Canvas
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
+import android.graphics.Shader
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.ui.theme.RebelYellow
@@ -54,17 +56,23 @@ class LineRenderer {
         val aimingLinePaint = Paint(paints.targetCirclePaint).apply { color = aimingLineBaseColor; strokeWidth = aimingLineConfig.strokeWidth }
         val aimingLineGlow = Paint(paints.lineGlowPaint).apply { color = aimingLineBaseColor; strokeWidth = aimingLineConfig.glowWidth }
 
-        // Use the single, pre-cached paint object for performance.
-        val pathPaint = paints.pathObstructionPaint.apply {
-            strokeWidth = state.protractorUnit.radius * 2
-        }
 
         val shotGuideDirection = normalize(PointF(ghostCueCenter.x - shotLineAnchor.x, ghostCueCenter.y - shotLineAnchor.y))
 
         // --- Pass 1: Wide Pathways ---
-        // The path paint is now configured in the cache. No per-frame modification is needed.
-        drawFadingLine(canvas, shotLineAnchor, shotGuideDirection, pathPaint, pathPaint, state)
-        drawBankablePath(canvas, state.aimingLineBankPath, pathPaint, pathPaint, false, state)
+        val shotGuidePathPaint = Paint(paints.pathObstructionPaint).apply {
+            strokeWidth = state.protractorUnit.radius * 2
+            color = shotGuideLineConfig.obstaclePathColor.toArgb()
+            alpha = (shotGuideLineConfig.obstaclePathOpacity * 255).toInt()
+        }
+        val aimingLinePathPaint = Paint(paints.pathObstructionPaint).apply {
+            strokeWidth = state.protractorUnit.radius * 2
+            color = aimingLineConfig.obstaclePathColor.toArgb()
+            alpha = (aimingLineConfig.obstaclePathOpacity * 255).toInt()
+        }
+
+        drawFadingLine(canvas, shotLineAnchor, shotGuideDirection, shotGuidePathPaint, shotGuidePathPaint, state)
+        drawBankablePath(canvas, state.aimingLineBankPath, aimingLinePathPaint, aimingLinePathPaint, false, state)
 
 
         // --- Pass 2: Glows ---
@@ -224,27 +232,34 @@ class LineRenderer {
     }
 
     private fun drawFadingLine(canvas: Canvas, start: PointF, direction: PointF, paint: Paint, glowPaint: Paint, state: OverlayState) {
-        val tableLength = state.table.logicalHeight; val totalLength = tableLength * 2.0f
-        val fadeStartDistance = tableLength * 1.2f; val fadeEndDistance = totalLength
-        val segmentLength = 15f; val numSegments = (totalLength / segmentLength).toInt()
-        val initialAlpha = paint.alpha; val initialGlowAlpha = glowPaint.alpha
-        for (i in 0 until numSegments) {
-            val segmentStartDist = i * segmentLength; val segmentEndDist = (i + 1) * segmentLength
-            if (segmentStartDist > fadeEndDistance) break
-            val p1 = PointF(start.x + direction.x * segmentStartDist, start.y + direction.y * segmentStartDist)
-            val p2 = PointF(start.x + direction.x * segmentEndDist, start.y + direction.y * segmentEndDist)
-            val midPointDist = (segmentStartDist + segmentEndDist) / 2f
-            val alphaMultiplier = if (midPointDist < fadeStartDistance) 1.0f else {
-                1.0f - ((midPointDist - fadeStartDistance) / (fadeEndDistance - fadeStartDistance))
-            }.coerceIn(0f, 1f)
-            paint.alpha = (initialAlpha * alphaMultiplier).toInt()
-            glowPaint.alpha = (initialGlowAlpha * alphaMultiplier).toInt()
-            if (paint.alpha > 5) {
-                canvas.drawLine(p1.x, p1.y, p2.x, p2.y, glowPaint)
-                canvas.drawLine(p1.x, p1.y, p2.x, p2.y, paint)
-            }
-        }
-        paint.alpha = initialAlpha; glowPaint.alpha = initialGlowAlpha
+        val tableLength = state.table.logicalHeight
+        val totalLength = tableLength * 2.0f
+        if (totalLength <= 0f) return
+
+        val end = PointF(start.x + direction.x * totalLength, start.y + direction.y * totalLength)
+        val fadeStartFraction = 1.2f / 2.0f // Fade starts at 1.2 table lengths out of a total 2.0
+
+        val transparentColor = android.graphics.Color.TRANSPARENT
+
+        // Create and apply gradient to the primary paint
+        val primaryShader = LinearGradient(
+            start.x, start.y, end.x, end.y,
+            intArrayOf(paint.color, paint.color, transparentColor),
+            floatArrayOf(0f, fadeStartFraction, 1.0f),
+            Shader.TileMode.CLAMP
+        )
+        val gradientPaint = Paint(paint).apply { shader = primaryShader }
+        canvas.drawLine(start.x, start.y, end.x, end.y, gradientPaint)
+
+        // Create and apply gradient to the glow paint
+        val glowShader = LinearGradient(
+            start.x, start.y, end.x, end.y,
+            intArrayOf(glowPaint.color, glowPaint.color, transparentColor),
+            floatArrayOf(0f, fadeStartFraction, 1.0f),
+            Shader.TileMode.CLAMP
+        )
+        val gradientGlowPaint = Paint(glowPaint).apply { shader = glowShader }
+        canvas.drawLine(start.x, start.y, end.x, end.y, gradientGlowPaint)
     }
 
     private fun normalize(p: PointF): PointF {

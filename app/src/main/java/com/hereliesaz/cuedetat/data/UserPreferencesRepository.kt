@@ -22,6 +22,7 @@ class UserPreferencesRepository @Inject constructor(@ApplicationContext context:
         private const val KEY_CV_HOUGH_P2 = "cv_hough_p2"
         private const val KEY_CV_CANNY_T1 = "cv_canny_t1"
         private const val KEY_CV_CANNY_T2 = "cv_canny_t2"
+        private const val KEY_CV_HSV_MULTIPLIER = "cv_hsv_multiplier"
     }
 
     fun getDistanceUnit(): DistanceUnit {
@@ -77,4 +78,7 @@ class UserPreferencesRepository @Inject constructor(@ApplicationContext context:
 
     fun getCvCannyT2(): Float = prefs.getFloat(KEY_CV_CANNY_T2, 150f)
     fun setCvCannyT2(value: Float) = prefs.edit().putFloat(KEY_CV_CANNY_T2, value).apply()
+
+    fun getCvHsvMultiplier(): Float = prefs.getFloat(KEY_CV_HSV_MULTIPLIER, 1.5f)
+    fun setCvHsvMultiplier(value: Float) = prefs.edit().putFloat(KEY_CV_HSV_MULTIPLIER, value).apply()
 }

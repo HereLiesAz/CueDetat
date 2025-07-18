@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/theme/Type.kt
+
 package com.hereliesaz.cuedetat.ui.theme
 
 import androidx.compose.material3.Typography
@@ -91,8 +93,8 @@ val Typography = Typography(
     labelSmall = TextStyle(
         fontFamily = Barbaro,
         fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 22.sp,
+        fontSize = 10.sp, // CORRECTED: Reduced from 14sp
+        lineHeight = 16.sp,
         letterSpacing = 0.5.sp
     )
 )

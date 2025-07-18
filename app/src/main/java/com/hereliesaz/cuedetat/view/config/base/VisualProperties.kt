@@ -38,8 +38,9 @@ interface BallsConfig : VisualProperties {
  * An interface for visual configurations specific to line-like objects.
  */
 interface LinesConfig : VisualProperties {
-    // Currently no line-specific properties beyond the base VisualConfig.
-    // This interface exists for future expansion and type safety.
+    // New properties for the wide obstacle path, with default implementations.
+    val obstaclePathColor: Color get() = Color.Transparent
+    val obstaclePathOpacity: Float get() = 0f
 }
 
 /**

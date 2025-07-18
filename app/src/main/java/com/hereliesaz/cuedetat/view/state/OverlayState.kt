@@ -1,5 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/state/OverlayState.kt
-
 package com.hereliesaz.cuedetat.view.state
 
 import android.graphics.Matrix
@@ -113,7 +111,6 @@ data class OverlayState(
     // Sensor and perspective data
     val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f),
     val pitchMatrix: Matrix = Matrix(),
-    val railPitchMatrix: Matrix = Matrix(),
     val inversePitchMatrix: Matrix = Matrix(),
     val flatMatrix: Matrix = Matrix(),
     val hasInverseMatrix: Boolean = false,
@@ -132,10 +129,11 @@ data class OverlayState(
     val houghP2: Float = 20f,
     val cannyThreshold1: Float = 50f,
     val cannyThreshold2: Float = 150f,
+    val cvHsvRangeMultiplier: Float = 1.5f,
     val showCvMask: Boolean = false,
     val isTestingCvMask: Boolean = false,
-    val isCalibratingColor: Boolean = false,      // New state for calibration mode
-    val colorSamplePoint: Offset? = null,      // New state for the user's tap location
+    val isCalibratingColor: Boolean = false,
+    val colorSamplePoint: Offset? = null,
 
     // Derived state
     val shotLineAnchor: PointF = PointF(0f, 0f),

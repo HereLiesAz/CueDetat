@@ -1,32 +1,14 @@
---- FILE: TheBible/05_Apocrypha/Issues.md ---
+# Issues
 
-# 35: Issue Tracker & Project Roadmap
+## Open
+- **Interactive Tutorial:** The full, interactive, non-blocking tutorial overlay still needs to be implemented. *Progress: Foundational UI for CV Calibration, a key part of the tutorial, is complete.*
+- **Performance:** Investigate performance bottlenecks, particularly during complex CV processing.
 
-**MANDATE:** This document is for clear, technical issue tracking only. All thematic or religious jargon from other documents is forbidden here. Communication must be precise and unambiguous.
-
----
-## Open Issues
-*(A list of known bugs and required features.)*
-
-### High Priority Bugs
-*No known high-priority bugs at this time.*
-
-### Feature Implementation
-1.  **Table Pan:** The user must be able to move the table vertically on the logical plane.
-2.  **Perspective Scaling:** Logical objects do not currently scale with distance; a ball at the far end of the table appears the same size as one at the near end. This must be implemented as part of the perspective projection.
-3.  **Contextual CV Snapping:** The auto-snapping feature is too aggressive. It should only snap a user-placed ball to a detected object if the ball is placed within a small proximity threshold of that object.
-4.  **CV Visualization Tools:**
-    * A developer toggle is needed to display the CV's color/shape mask on-screen to aid in parameter tuning.
-    * A new UI workflow is required to allow the user to calibrate the CV pipeline for a specific table's felt color.
-5.  **Interactive Tutorial:** The current full-screen tutorial is blocking. It needs to be redesigned as a non-blocking, contextual overlay. A "virtual table" background should also be available for users not in front of a physical table.
-6.  **User Feedback Channel:** A "Send Feedback" option should be added to the menu that opens the user's default email client.
-
-### Low Priority / Polish
-1.  **Shot Guide Line Origin:** When the `ActualCueBall` is hidden, the `ShotGuideLine`'s origin is not correctly anchored and must be fixed to originate from the bottom-center of the screen.
-2.  **App Tagline:** The tagline "May your shot be better than your excuses" is missing from the splash screen.
-
----
-## Resolved Issues
-*(A log of completed tasks and fixed bugs.)*
-
-* **Table and Ball Rotation De-Sync:** Corrected a double-rotation issue where the `Table` data class was pre-calculating its own rotated coordinates while the `UpdateStateUseCase` was also applying a world rotation via the matrix. All rotational logic was removed from `Table.kt`, consolidating the responsibility for orientation solely within the transformation matrix.
+## Closed
+- **[CLOSED] Implement CV Refinement:** The initial implementation only used a generic ML Kit model. The full "Scout/Sniper" pipeline with OpenCV refinement is now complete.
+- **[CLOSED] Improve Ball Detection Accuracy:** The previous model struggled with perspective and lighting. The new dynamic radius calculation and statistical color sampling have dramatically improved accuracy and robustness.
+- **[CLOSED] Add CV Tuning UI:** The user had no way to see or correct what the CV system was seeing. The new calibration and mask testing UI resolves this.
+- **[CLOSED] Fix Table Rendering:** The table rails and pockets were misaligned. This has been corrected by unifying all rendering under a single perspective matrix. The missing diamond grid has also been restored.
+- **[CLOSED] Overhaul Menu UI:** The menu animation was standard and the colors were inconsistent. The animation is now a custom top-down reveal and the color scheme has been unified under `AccentGold`.
+- **[CLOSED] Update Splash Screen:** The splash screen was generic. It has been updated with a larger logo and a more prominent catchphrase.
+- **[CLOSED] Codebase Cleanup:** The codebase suffered from scattered constants and broken references after refactoring. This has been addressed by creating a central `Constants.kt` file and fixing all related compilation errors.

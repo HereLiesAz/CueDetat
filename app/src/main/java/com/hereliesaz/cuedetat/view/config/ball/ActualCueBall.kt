@@ -8,7 +8,8 @@ import com.hereliesaz.cuedetat.ui.theme.OracleGlow
 import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
 
-class ActualCueBall : BallsConfig {
+
+internal class ActualCueBall : BallsConfig {
     override val label: String = "Cue Ball"
     override val strokeColor: Color = OracleBlue
     override val strokeWidth: Float = 3f

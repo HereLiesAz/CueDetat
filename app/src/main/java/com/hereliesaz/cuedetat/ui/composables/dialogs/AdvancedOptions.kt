@@ -1,5 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/dialogs/AdvancedOptionsDialog.kt
-
 package com.hereliesaz.cuedetat.ui.composables.dialogs
 
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -32,7 +32,7 @@ fun AdvancedOptionsDialog(
             title = { Text("Too Advanced Options", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
             text = {
-                Column {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Auto-Snap Balls:", modifier = Modifier.weight(1f))
                         TextButton(onClick = { onEvent(MainScreenEvent.ToggleSnapping) }) {
@@ -64,6 +64,14 @@ fun AdvancedOptionsDialog(
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
+
+                    Text("HSV Range Multiplier: ${"%.2f".format(uiState.cvHsvRangeMultiplier)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Slider(
+                        value = uiState.cvHsvRangeMultiplier,
+                        onValueChange = { onEvent(MainScreenEvent.UpdateHsvMultiplier(it)) },
+                        valueRange = 0.5f..5.0f
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Text("Hough P1 (Canny Edge): ${uiState.houghP1.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Slider(
