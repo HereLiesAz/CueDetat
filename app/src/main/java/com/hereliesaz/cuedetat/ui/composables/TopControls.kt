@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -28,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
@@ -43,20 +46,19 @@ fun TopControls(
             .statusBarsPadding()
             .padding(start = 16.dp, end = 16.dp, top = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.Top
     ) {
         Box(
             modifier = Modifier
                 .pointerInput(Unit) {
                     detectDragGestures { change, dragAmount ->
-                        // If a significant downward drag is detected, open the menu and consume the event.
                         if (dragAmount.y > 2.0f) {
                             onMenuClick()
                             change.consume()
                         }
                     }
                 }
-                .clickable(onClick = onMenuClick), // Keep clickable for accessibility
+                .clickable(onClick = onMenuClick),
             contentAlignment = Alignment.CenterStart
         ) {
             if (uiState.areHelpersVisible) {
@@ -86,21 +88,46 @@ fun TopControls(
         }
 
         if(uiState.table.isVisible) {
-            Column(
-                horizontalAlignment = Alignment.End,
-                modifier = Modifier.clickable { onEvent(MainScreenEvent.CycleTableSize) }
-            ) {
-                Text(
-                    text = "Table Size",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-                Text(
-                    text = "${uiState.table.size.feet}'",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
-                    modifier = Modifier.padding(top = 4.dp)
-                )
+            Column(horizontalAlignment = Alignment.End) {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    modifier = Modifier.clickable { onEvent(MainScreenEvent.CycleTableSize) }
+                ) {
+                    Text(
+                        text = "Table Size",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = "${uiState.table.size.feet}'",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    modifier = Modifier.clickable { onEvent(MainScreenEvent.ToggleDistanceUnit) }
+                ) {
+                    Text(
+                        text = "Distance to Target",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    val distanceText = when (uiState.distanceUnit) {
+                        DistanceUnit.METRIC -> "%.2f m".format(uiState.targetBallDistance * 0.0254f)
+                        DistanceUnit.IMPERIAL -> "%.1f in".format(uiState.targetBallDistance)
+                    }
+                    Text(
+                        text = distanceText,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
             }
         }
     }

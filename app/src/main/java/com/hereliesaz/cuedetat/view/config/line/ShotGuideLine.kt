@@ -1,18 +1,16 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/config/line/ShotGuideLine.kt
+
 package com.hereliesaz.cuedetat.view.config.line
 
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Color.Companion.White
-import com.hereliesaz.cuedetat.ui.theme.MutedGray
-import com.hereliesaz.cuedetat.ui.theme.RustedEmber
-import com.hereliesaz.cuedetat.ui.theme.VioletResidue
+import com.hereliesaz.cuedetat.ui.theme.*
 import com.hereliesaz.cuedetat.view.config.base.LinesConfig
 
-data class ShotGuideLine(
-    override val label: String = "Shot Guide Line",
-    override val opacity: Float = 1.0f,
-    override val glowWidth: Float = 10f,
-    override val glowColor: Color = Color.White.copy(alpha = 0.4f),
-    override val strokeWidth: Float = 5f,
-    override val strokeColor: Color = VioletResidue,
+class ShotGuideLine : LinesConfig {
+    override val strokeColor = OracleBlue
+    override val strokeWidth = 2f
+    override val glowColor = OracleGlow
+    override val glowWidth = 6f
+    override val opacity = 1f
+    override val label: String = ""
     override val additionalOffset: Float = 0f
-) : LinesConfig
+}

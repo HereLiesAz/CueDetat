@@ -5,17 +5,20 @@ package com.hereliesaz.cuedetat.ui.composables
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -31,11 +34,10 @@ fun ZoomControls(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceEvenly
     ) {
-        val buttonTextStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
-        Magic8BallButton(
+        IconButton(
             onClick = { onEvent(MainScreenEvent.ZoomSliderChanged(uiState.zoomSliderPosition + 1)) }
         ) {
-            Text("+", style = buttonTextStyle, color = MaterialTheme.colorScheme.onPrimary)
+            Icon(Icons.Default.Add, contentDescription = "Zoom In")
         }
 
         Slider(
@@ -68,10 +70,10 @@ fun ZoomControls(
                 .weight(1f)
         )
 
-        Magic8BallButton(
+        IconButton(
             onClick = { onEvent(MainScreenEvent.ZoomSliderChanged(uiState.zoomSliderPosition - 1)) }
         ) {
-            Text("-", style = buttonTextStyle, color = MaterialTheme.colorScheme.onPrimary)
+            Icon(Icons.Default.Remove, contentDescription = "Zoom Out")
         }
     }
 }

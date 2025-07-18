@@ -1,16 +1,17 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/config/line/AimingLine.kt
+
 package com.hereliesaz.cuedetat.view.config.line
 
-import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.ui.theme.AccentGold
-import com.hereliesaz.cuedetat.ui.theme.RebelYellow
+import com.hereliesaz.cuedetat.ui.theme.OracleGlow
 import com.hereliesaz.cuedetat.view.config.base.LinesConfig
 
-data class AimingLine(
-    override val label: String = "Aiming Line",
-    override val opacity: Float = 1.0f,
-    override val glowWidth: Float = 10f,
-    override val glowColor: Color = Color.White.copy(alpha = 0.4f),
-    override val strokeWidth: Float = 5f,
-    override val strokeColor: Color = RebelYellow,
-    override val additionalOffset: Float = 0f
-) : LinesConfig
+class AimingLine: LinesConfig {
+    override val strokeColor = AccentGold
+    override val strokeWidth = 2f
+    override val glowColor = OracleGlow
+    override val glowWidth = 8f
+    override val opacity = 1f
+    override val label = "Aiming Line"
+    override val additionalOffset = 0f
+}

@@ -1,17 +1,17 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/config/line/TangentLine.kt
+
 package com.hereliesaz.cuedetat.view.config.line
 
-import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.ui.theme.MutedGray
-import com.hereliesaz.cuedetat.ui.theme.RustedEmber
-import com.hereliesaz.cuedetat.ui.theme.VioletResidue
+import com.hereliesaz.cuedetat.ui.theme.OracleGlow
 import com.hereliesaz.cuedetat.view.config.base.LinesConfig
 
-data class TangentLine(
-    override val label: String = "Tangent Line",
-    override val opacity: Float = 0.8f,
-    override val glowWidth: Float = 8f,
-    override val glowColor: Color = Color.White.copy(alpha = 0.3f),
-    override val strokeWidth: Float = 5f,
-    override val strokeColor: Color = MutedGray,
-    override val additionalOffset: Float = 0f
-) : LinesConfig
+class TangentLine: LinesConfig {
+    override val strokeColor = MutedGray
+    override val strokeWidth = 2f
+    override val glowColor = OracleGlow
+    override val glowWidth = 8f
+    override val opacity = 0.7f
+    override val label = "Tangent Line"
+    override val additionalOffset = 0f
+}

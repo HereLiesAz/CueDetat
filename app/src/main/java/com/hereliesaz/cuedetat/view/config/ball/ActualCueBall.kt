@@ -1,22 +1,24 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/config/ball/ActualCueBall.kt
+
 package com.hereliesaz.cuedetat.view.config.ball
 
 import androidx.compose.ui.graphics.Color
-import com.hereliesaz.cuedetat.ui.theme.RustedEmber
-import com.hereliesaz.cuedetat.ui.theme.VioletResidue
+import com.hereliesaz.cuedetat.ui.theme.OracleBlue
+import com.hereliesaz.cuedetat.ui.theme.OracleGlow
 import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
 
-data class ActualCueBall(
-    override val label: String = "Actual Cue Ball",
-    override val opacity: Float = 1.0f,
-    override val glowWidth: Float = 12f,
-    override val glowColor: Color = Color.White.copy(alpha = 0.5f),
-    override val strokeWidth: Float = 5f,
-    override val strokeColor: Color = VioletResidue,
-    override val additionalOffset: Float = 0f,
-    override val centerShape: CenterShape = CenterShape.DOT,
-    override val centerSize: Float = 0.2f, // as a factor of radius
-    override val centerColor: Color = Color.White,
-    override val fillColor: Color = Color.Transparent,
+class ActualCueBall : BallsConfig {
+    override val label: String = "Cue Ball"
+    override val strokeColor: Color = OracleBlue
+    override val strokeWidth: Float = 3f
+    override val glowColor: Color = OracleGlow
+    override val glowWidth: Float = 8f
+    override val centerColor: Color = Color.White.copy(alpha = 0.8f)
+    override val centerSize: Float = 0.2f
+    override val centerShape: CenterShape = CenterShape.DOT
+    override val opacity: Float = 1f
+    override val fillColor: Color = Color.Transparent
+    override val additionalOffset: Float = 0f
     override val additionalOffset3d: Float = 0f
-) : BallsConfig
+}

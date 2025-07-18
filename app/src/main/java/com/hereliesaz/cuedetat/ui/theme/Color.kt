@@ -21,7 +21,8 @@ val BankLine2Yellow = RebelYellow.copy(alpha = 0.7f)
 val BankLine3Yellow = RebelYellow.copy(alpha = 0.5f)
 val BankLine4Yellow = RebelYellow.copy(alpha = 0.3f)
 val AcidPatina = Color(0xFF00FFC2)
-val Magic8BallBlue = Color(0xFF00BFFF)
+val OracleBlue = Color(0xFF380B80)
+val OracleGlow = Color(0xFF4E2E98) // Lighter, purple-ish blue glow
 
 // Resurrected Palette from the Void
 val AccentGold = Color(0xFFFFC107)

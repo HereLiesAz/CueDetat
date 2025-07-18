@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -204,25 +205,25 @@ fun MainScreen(viewModel: MainViewModel) {
                         verticalAlignment = Alignment.Bottom,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        val buttonTextStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                        val buttonTextStyle = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                         Column(
                             modifier = Modifier.padding(start = 16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Magic8BallButton(onClick = { viewModel.onEvent(MainScreenEvent.ToggleSpinControl) }) {
-                                Text("SPIN", style = buttonTextStyle, color = MaterialTheme.colorScheme.onPrimary)
+                                Text("SPIN", style = buttonTextStyle, color = Color.White)
                             }
                             Magic8BallButton(onClick = { viewModel.onEvent(MainScreenEvent.AddObstacleBall) }) {
-                                Text("ADD", style = buttonTextStyle, color = MaterialTheme.colorScheme.onPrimary)
+                                Text("Add\nBall", style = buttonTextStyle, color = Color.White)
                             }
                             if (!uiState.isBankingMode) {
                                 Magic8BallButton(onClick = { viewModel.onEvent(MainScreenEvent.ToggleOnPlaneBall) }) {
-                                    val text = if (uiState.onPlaneBall == null) "CUE" else "HIDE"
-                                    Text(text, style = buttonTextStyle, color = MaterialTheme.colorScheme.onPrimary)
+                                    val text = if (uiState.onPlaneBall == null) "Show\nCue Ball" else "Hide\nCue Ball"
+                                    Text(text, style = buttonTextStyle, color = Color.White)
                                 }
                                 Magic8BallButton(onClick = { viewModel.onEvent(MainScreenEvent.ToggleTable) }) {
-                                    Text("GRID", style = buttonTextStyle, color = MaterialTheme.colorScheme.onPrimary)
+                                    Text("Show\nTable", style = buttonTextStyle, color = Color.White)
                                 }
                             }
                         }
@@ -243,7 +244,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         }
 
                         Magic8BallButton(onClick = { viewModel.onEvent(MainScreenEvent.Reset) }, modifier = Modifier.padding(end = 16.dp)) {
-                            Text("RESET", style = buttonTextStyle, color = MaterialTheme.colorScheme.onPrimary)
+                            Text("Reset\nView", style = buttonTextStyle, color = Color.White)
                         }
                     }
                 }
