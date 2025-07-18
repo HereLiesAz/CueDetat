@@ -30,7 +30,8 @@ fun MenuDrawerContent(
     onCloseDrawer: () -> Unit
 ) {
     ModalDrawerSheet(
-        drawerContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+        modifier = Modifier.width(280.dp), // Constrain the width
+        drawerContainerColor = MaterialTheme.colorScheme.background // Set to darkest background color, fully opaque
     ) {
         Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
             Column(
@@ -92,7 +93,6 @@ fun MenuDrawerContent(
             )
             MenuDivider()
 
-
             // Section 3: Appearance
             val systemIsCurrentlyDark = isSystemInDarkTheme()
             val themeToggleText = when (uiState.isForceLightMode) {
@@ -127,11 +127,20 @@ fun MenuDrawerContent(
 
             // Section 5: Meta
             MenuItem(
-                text = "Check for Updates",
-                onClick = { onEvent(MainScreenEvent.CheckForUpdate); onCloseDrawer() })
+                text = "About",
+                onClick = { onEvent(MainScreenEvent.ViewAboutPage); onCloseDrawer() }
+            )
             MenuItem(
-                text = "About Me",
+                text = "@HereLiesAz",
                 onClick = { onEvent(MainScreenEvent.ViewArt); onCloseDrawer() })
+            MenuItem(
+                text = "Send Feedback",
+                onClick = { onEvent(MainScreenEvent.SendFeedback); onCloseDrawer() }
+            )
+            MenuItem(
+                text = "Check for Updates",
+                onClick = { onEvent(MainScreenEvent.CheckForUpdate); onCloseDrawer() }
+            )
             MenuDivider()
 
             // Section 6: Developer
@@ -159,7 +168,7 @@ private fun MenuItem(text: String, onClick: () -> Unit) {
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium, // Reduced text size
             color = MaterialTheme.colorScheme.primary
         )
     }

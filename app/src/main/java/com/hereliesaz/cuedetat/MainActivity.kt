@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/MainActivity.kt
+
 package com.hereliesaz.cuedetat
 
 import android.Manifest
@@ -9,8 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.*
 import androidx.compose.material3.MaterialTheme
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -18,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import com.hereliesaz.cuedetat.ui.MainScreen
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.MainViewModel
+import com.hereliesaz.cuedetat.ui.composables.SplashScreen
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import com.hereliesaz.cuedetat.view.state.SingleEvent
 import dagger.hilt.android.AndroidEntryPoint
@@ -61,20 +63,36 @@ class MainActivity : ComponentActivity() {
                     startActivity(intent)
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
-                null -> { /* Do nothing */
+                is SingleEvent.SendFeedbackEmail -> {
+                    val intent = Intent(Intent.ACTION_SENDTO).apply {
+                        data = Uri.parse("mailto:") // Only email apps should handle this
+                        putExtra(Intent.EXTRA_EMAIL, arrayOf(event.email))
+                        putExtra(Intent.EXTRA_SUBJECT, event.subject)
+                    }
+                    if (intent.resolveActivity(packageManager) != null) {
+                        startActivity(intent)
+                    }
+                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
+                null -> { /* Do nothing */ }
             }
         }.launchIn(lifecycleScope)
     }
 
     @Composable
     private fun AppContent(viewModel: MainViewModel) {
+        var showSplashScreen by remember { mutableStateOf(true) }
+
         CueDetatTheme {
-            val currentAppControlColorScheme = MaterialTheme.colorScheme
-            LaunchedEffect(currentAppControlColorScheme) {
-                viewModel.onEvent(MainScreenEvent.ThemeChanged(currentAppControlColorScheme))
+            if (showSplashScreen) {
+                SplashScreen(onTimeout = { showSplashScreen = false })
+            } else {
+                val currentAppControlColorScheme = MaterialTheme.colorScheme
+                LaunchedEffect(currentAppControlColorScheme) {
+                    viewModel.onEvent(MainScreenEvent.ThemeChanged(currentAppControlColorScheme))
+                }
+                MainScreen(viewModel = viewModel)
             }
-            MainScreen(viewModel = viewModel)
         }
     }
 

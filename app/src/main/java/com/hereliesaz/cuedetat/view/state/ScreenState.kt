@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/state/ScreenState.kt
+
 package com.hereliesaz.cuedetat.view.state
 
 sealed class ToastMessage {
@@ -7,5 +9,5 @@ sealed class ToastMessage {
 
 sealed class SingleEvent {
     data class OpenUrl(val url: String) : SingleEvent()
-    // The ShowDonationDialog case is now fully removed.
+    data class SendFeedbackEmail(val email: String, val subject: String) : SingleEvent()
 }

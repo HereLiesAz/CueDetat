@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -103,11 +104,12 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
                 }
 
-
             Box(modifier = mainBoxModifier) {
                 if (uiState.isCameraVisible) {
                     CameraBackground(
-                        modifier = Modifier.fillMaxSize().zIndex(0f),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .zIndex(0f),
                         analyzer = viewModel.visionAnalyzer
                     )
                 }
@@ -117,12 +119,17 @@ fun MainScreen(viewModel: MainViewModel) {
                     systemIsDark = useDarkTheme,
                     isTestingCvMask = uiState.isTestingCvMask,
                     onEvent = viewModel::onEvent,
-                    modifier = Modifier.fillMaxSize().zIndex(1f)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(1f)
                 )
 
                 if (uiState.isCalibratingColor) {
                     Column(
-                        modifier = Modifier.fillMaxSize().padding(32.dp).zIndex(6f),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(32.dp)
+                            .zIndex(6f),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -197,25 +204,26 @@ fun MainScreen(viewModel: MainViewModel) {
                         verticalAlignment = Alignment.Bottom,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        val buttonTextStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
                         Column(
                             modifier = Modifier.padding(start = 16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            ToggleSpinControlFab(
-                                uiState = uiState,
-                                onEvent = viewModel::onEvent
-                            )
-                            AddObstacleBallFab(onEvent = viewModel::onEvent)
+                            Magic8BallButton(onClick = { viewModel.onEvent(MainScreenEvent.ToggleSpinControl) }) {
+                                Text("SPIN", style = buttonTextStyle, color = MaterialTheme.colorScheme.onPrimary)
+                            }
+                            Magic8BallButton(onClick = { viewModel.onEvent(MainScreenEvent.AddObstacleBall) }) {
+                                Text("ADD", style = buttonTextStyle, color = MaterialTheme.colorScheme.onPrimary)
+                            }
                             if (!uiState.isBankingMode) {
-                                ToggleCueBallFab(
-                                    uiState = uiState,
-                                    onEvent = viewModel::onEvent
-                                )
-                                ToggleTableFab(
-                                    uiState = uiState,
-                                    onEvent = viewModel::onEvent
-                                )
+                                Magic8BallButton(onClick = { viewModel.onEvent(MainScreenEvent.ToggleOnPlaneBall) }) {
+                                    val text = if (uiState.onPlaneBall == null) "CUE" else "HIDE"
+                                    Text(text, style = buttonTextStyle, color = MaterialTheme.colorScheme.onPrimary)
+                                }
+                                Magic8BallButton(onClick = { viewModel.onEvent(MainScreenEvent.ToggleTable) }) {
+                                    Text("GRID", style = buttonTextStyle, color = MaterialTheme.colorScheme.onPrimary)
+                                }
                             }
                         }
 
@@ -234,11 +242,9 @@ fun MainScreen(viewModel: MainViewModel) {
                             }
                         }
 
-                        ResetFab(
-                            uiState = uiState,
-                            onEvent = viewModel::onEvent,
-                            modifier = Modifier.padding(end = 16.dp)
-                        )
+                        Magic8BallButton(onClick = { viewModel.onEvent(MainScreenEvent.Reset) }, modifier = Modifier.padding(end = 16.dp)) {
+                            Text("RESET", style = buttonTextStyle, color = MaterialTheme.colorScheme.onPrimary)
+                        }
                     }
                 }
 

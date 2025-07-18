@@ -59,8 +59,8 @@ sealed class MainScreenEvent {
     // CV Events
     data class CvDataUpdated(val data: VisionData) : MainScreenEvent()
     object LockOrUnlockColor : MainScreenEvent()
-    data class LockColor(val hsv: FloatArray) : MainScreenEvent() // To lock a specific color
-    object ClearSamplePoint : MainScreenEvent() // To reset after sampling
+    data class LockColor(val hsv: FloatArray) : MainScreenEvent()
+    object ClearSamplePoint : MainScreenEvent()
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
     object ToggleCvRefinementMethod : MainScreenEvent()
     data class UpdateHoughP1(val value: Float) : MainScreenEvent()
@@ -75,7 +75,6 @@ sealed class MainScreenEvent {
     object EnterCalibrationMode : MainScreenEvent()
     data class SampleColorAt(val screenPosition: Offset) : MainScreenEvent()
 
-
     // Tutorial Events
     object StartTutorial : MainScreenEvent()
     object NextTutorialStep : MainScreenEvent()
@@ -84,6 +83,8 @@ sealed class MainScreenEvent {
     // Meta/Single Events
     object CheckForUpdate : MainScreenEvent()
     object ViewArt : MainScreenEvent()
+    object ViewAboutPage : MainScreenEvent()
+    object SendFeedback : MainScreenEvent()
     object SingleEventConsumed : MainScreenEvent()
     object ToastShown : MainScreenEvent()
 }

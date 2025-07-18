@@ -1,7 +1,10 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/TopControls.kt
+
 package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -43,17 +47,33 @@ fun TopControls(
     ) {
         Box(
             modifier = Modifier
-                .size(width = 200.dp, height = 64.dp)
-                .clickable(onClick = onMenuClick),
+                .pointerInput(Unit) {
+                    detectDragGestures { change, dragAmount ->
+                        // If a significant downward drag is detected, open the menu and consume the event.
+                        if (dragAmount.y > 2.0f) {
+                            onMenuClick()
+                            change.consume()
+                        }
+                    }
+                }
+                .clickable(onClick = onMenuClick), // Keep clickable for accessibility
             contentAlignment = Alignment.CenterStart
         ) {
             if (uiState.areHelpersVisible) {
-                Text(
-                    text = stringResource(id = R.string.app_name),
-                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 28.sp),
-                    color = MaterialTheme.colorScheme.primary,
-                    textAlign = TextAlign.Start
-                )
+                Column {
+                    Text(
+                        text = stringResource(id = R.string.app_name),
+                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 28.sp),
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Start
+                    )
+                    Text(
+                        text = stringResource(id = R.string.tagline),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Start
+                    )
+                }
             } else {
                 Image(
                     painter = painterResource(id = R.drawable.ic_launcher),
@@ -78,7 +98,8 @@ fun TopControls(
                 Text(
                     text = "${uiState.table.size.feet}'",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                    modifier = Modifier.padding(top = 4.dp)
                 )
             }
         }

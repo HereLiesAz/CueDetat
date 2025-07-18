@@ -8,6 +8,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.SensorRepository
@@ -100,10 +101,14 @@ class MainViewModel @Inject constructor(
     }
 
     fun onEvent(event: MainScreenEvent) {
-        // Handle persistence side-effects before updating the state
         when (event) {
             is MainScreenEvent.CheckForUpdate -> _singleEvent.value = SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat/releases")
             is MainScreenEvent.ViewArt -> _singleEvent.value = SingleEvent.OpenUrl("https://instagram.com/hereliesaz")
+            is MainScreenEvent.ViewAboutPage -> _singleEvent.value = SingleEvent.OpenUrl("https://hereliesaz.github.io/CueDetat/")
+            is MainScreenEvent.SendFeedback -> {
+                val subject = "Cue d'État Feedback v${BuildConfig.VERSION_NAME}"
+                _singleEvent.value = SingleEvent.SendFeedbackEmail("hereliesaz@gmail.com", subject)
+            }
             is MainScreenEvent.SingleEventConsumed -> _singleEvent.value = null
             is MainScreenEvent.ToastShown -> _toastMessage.value = null
             is MainScreenEvent.ToggleDistanceUnit -> {
