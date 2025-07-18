@@ -1,17 +1,24 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt
+
 package com.hereliesaz.cuedetat.ui
 
 import android.graphics.PointF
 import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -84,7 +91,20 @@ fun MainScreen(viewModel: MainViewModel) {
                 )
             }
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            val mainBoxModifier = Modifier
+                .fillMaxSize()
+                .pointerInput(uiState.isCalibratingColor, uiState.isTestingCvMask) {
+                    detectTapGestures { offset ->
+                        if (uiState.isCalibratingColor) {
+                            viewModel.onEvent(MainScreenEvent.SampleColorAt(offset))
+                        } else if (uiState.isTestingCvMask) {
+                            viewModel.onEvent(MainScreenEvent.ExitCvMaskTestMode)
+                        }
+                    }
+                }
+
+
+            Box(modifier = mainBoxModifier) {
                 if (uiState.isCameraVisible) {
                     CameraBackground(
                         modifier = Modifier.fillMaxSize().zIndex(0f),
@@ -95,101 +115,131 @@ fun MainScreen(viewModel: MainViewModel) {
                 ProtractorOverlay(
                     uiState = uiState.copy(spinPathsAlpha = alphaAnimatable.value),
                     systemIsDark = useDarkTheme,
+                    isTestingCvMask = uiState.isTestingCvMask,
                     onEvent = viewModel::onEvent,
                     modifier = Modifier.fillMaxSize().zIndex(1f)
                 )
 
-                TopControls(
-                    uiState = uiState,
-                    onEvent = viewModel::onEvent,
-                    onMenuClick = { scope.launch { drawerState.open() } },
-                    modifier = Modifier.zIndex(2f)
-                )
-
-                val spinControlCenter = uiState.spinControlCenter
-                if (uiState.isSpinControlVisible && spinControlCenter != null) {
-                    val spinControlSizeDp = 120.dp
-                    val spinControlSizePx = with(LocalDensity.current) { spinControlSizeDp.toPx() }
-
-                    SpinControl(
-                        modifier = Modifier
-                            .zIndex(5f)
-                            .offset {
-                                IntOffset(
-                                    (spinControlCenter.x - spinControlSizePx / 2).roundToInt(),
-                                    (spinControlCenter.y - spinControlSizePx / 2).roundToInt()
-                                )
-                            },
-                        centerPosition = PointF(0f, 0f),
-                        selectedSpinOffset = uiState.selectedSpinOffset,
-                        lingeringSpinOffset = uiState.lingeringSpinOffset,
-                        spinPathAlpha = alphaAnimatable.value,
-                        onEvent = viewModel::onEvent
-                    )
+                if (uiState.isCalibratingColor) {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(32.dp).zIndex(6f),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "Aim at the table felt",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Crosshair",
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            "Tap to sample color",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
 
-                ZoomControls(
-                    uiState = uiState,
-                    onEvent = viewModel::onEvent,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .fillMaxHeight(0.6f)
-                        .width(160.dp) // Increased width for a larger touch target
-                        .zIndex(5f)
-                )
-
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(bottom = 8.dp)
-                        .zIndex(2f),
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(
-                        modifier = Modifier.padding(start = 16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ToggleSpinControlFab(
-                            uiState = uiState,
-                            onEvent = viewModel::onEvent
-                        )
-                        AddObstacleBallFab(onEvent = viewModel::onEvent)
-                        if (!uiState.isBankingMode) {
-                            ToggleCueBallFab(
-                                uiState = uiState,
-                                onEvent = viewModel::onEvent
-                            )
-                            ToggleTableFab(
-                                uiState = uiState,
-                                onEvent = viewModel::onEvent
-                            )
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(80.dp) // Increased height for a larger touch target
-                            .padding(horizontal = 16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (uiState.table.isVisible) {
-                            TableRotationSlider(
-                                uiState = uiState,
-                                onEvent = viewModel::onEvent
-                            )
-                        }
-                    }
-
-                    ResetFab(
+                if (!uiState.isTestingCvMask && !uiState.isCalibratingColor) {
+                    TopControls(
                         uiState = uiState,
                         onEvent = viewModel::onEvent,
-                        modifier = Modifier.padding(end = 16.dp)
+                        onMenuClick = { scope.launch { drawerState.open() } },
+                        modifier = Modifier.zIndex(2f)
                     )
+
+                    val spinControlCenter = uiState.spinControlCenter
+                    if (uiState.isSpinControlVisible && spinControlCenter != null) {
+                        val spinControlSizeDp = 120.dp
+                        val spinControlSizePx = with(LocalDensity.current) { spinControlSizeDp.toPx() }
+
+                        SpinControl(
+                            modifier = Modifier
+                                .zIndex(5f)
+                                .offset {
+                                    IntOffset(
+                                        (spinControlCenter.x - spinControlSizePx / 2).roundToInt(),
+                                        (spinControlCenter.y - spinControlSizePx / 2).roundToInt()
+                                    )
+                                },
+                            centerPosition = PointF(0f, 0f),
+                            selectedSpinOffset = uiState.selectedSpinOffset,
+                            lingeringSpinOffset = uiState.lingeringSpinOffset,
+                            spinPathAlpha = alphaAnimatable.value,
+                            onEvent = viewModel::onEvent
+                        )
+                    }
+
+                    ZoomControls(
+                        uiState = uiState,
+                        onEvent = viewModel::onEvent,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .fillMaxHeight(0.6f)
+                            .width(160.dp)
+                            .zIndex(5f)
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(bottom = 8.dp)
+                            .zIndex(2f),
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(start = 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            ToggleSpinControlFab(
+                                uiState = uiState,
+                                onEvent = viewModel::onEvent
+                            )
+                            AddObstacleBallFab(onEvent = viewModel::onEvent)
+                            if (!uiState.isBankingMode) {
+                                ToggleCueBallFab(
+                                    uiState = uiState,
+                                    onEvent = viewModel::onEvent
+                                )
+                                ToggleTableFab(
+                                    uiState = uiState,
+                                    onEvent = viewModel::onEvent
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(80.dp)
+                                .padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (uiState.table.isVisible) {
+                                TableRotationSlider(
+                                    uiState = uiState,
+                                    onEvent = viewModel::onEvent
+                                )
+                            }
+                        }
+
+                        ResetFab(
+                            uiState = uiState,
+                            onEvent = viewModel::onEvent,
+                            modifier = Modifier.padding(end = 16.dp)
+                        )
+                    }
                 }
 
                 KineticWarningOverlay(text = uiState.warningText, modifier = Modifier.zIndex(3f))

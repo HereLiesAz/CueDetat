@@ -53,7 +53,7 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.TableRotationApplied,
             is MainScreenEvent.TableRotationChanged,
             is MainScreenEvent.AdjustGlow,
-            is MainScreenEvent.PanView, // <-- The missing link is added here
+            is MainScreenEvent.PanView,
             is MainScreenEvent.AdjustLuminance ->
                 controlReducer.reduce(currentState, event)
 
@@ -79,17 +79,20 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.AddObstacleBall ->
                 obstacleReducer.reduce(currentState, event)
 
-            is MainScreenEvent.CvDataUpdated -> {
-                // First, process standard CV data changes (like color)
-                val stateAfterCv = cvReducer.reduce(currentState, event)
-                // Then, process snapping based on the new vision data
-                snapReducer.reduce(stateAfterCv, event.data)
-            }
-            is MainScreenEvent.LockOrUnlockColor ->
+            is MainScreenEvent.CvDataUpdated,
+            is MainScreenEvent.LockOrUnlockColor,
+            is MainScreenEvent.LockColor,
+            is MainScreenEvent.ClearSamplePoint -> {
                 cvReducer.reduce(currentState, event)
+            }
 
             is MainScreenEvent.ToggleAdvancedOptionsDialog,
             is MainScreenEvent.ToggleCvRefinementMethod,
+            is MainScreenEvent.ToggleCvMask,
+            is MainScreenEvent.EnterCvMaskTestMode,
+            is MainScreenEvent.ExitCvMaskTestMode,
+            is MainScreenEvent.EnterCalibrationMode,
+            is MainScreenEvent.SampleColorAt,
             is MainScreenEvent.UpdateHoughP1,
             is MainScreenEvent.UpdateHoughP2,
             is MainScreenEvent.UpdateCannyT1,

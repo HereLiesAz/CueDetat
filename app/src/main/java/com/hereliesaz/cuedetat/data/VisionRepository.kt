@@ -14,8 +14,11 @@ import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
+import org.opencv.core.Rect as OCVRect
+import org.opencv.core.Scalar
 import org.opencv.imgproc.Imgproc
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -49,14 +52,35 @@ class VisionRepository @Inject constructor(
 
             genericObjectDetector.process(inputImage)
                 .addOnSuccessListener { detectedObjects ->
-                    val hsv = if (state.lockedHsvColor != null) {
-                        state.lockedHsvColor
+                    val mat = imageToMat(inputImage)
+                    val hsvMat = Mat()
+                    Imgproc.cvtColor(mat, hsvMat, Imgproc.COLOR_BGR2HSV)
+
+                    val hsv = state.lockedHsvColor ?: state.colorSamplePoint?.let {
+                        val imageX = (it.x * (hsvMat.cols() / state.viewWidth.toFloat())).toInt()
+                        val imageY = (it.y * (hsvMat.rows() / state.viewHeight.toFloat())).toInt()
+                        val color = hsvMat[imageY.coerceIn(0, hsvMat.rows() - 1), imageX.coerceIn(0, hsvMat.cols() - 1)]
+                        floatArrayOf(color[0].toFloat(), color[1].toFloat(), color[2].toFloat())
+                    } ?: run {
+                        val roiWidth = 50
+                        val roiHeight = 50
+                        val roiX = (hsvMat.cols() - roiWidth) / 2
+                        val roiY = (hsvMat.rows() - roiHeight) / 2
+                        val centerRoi = hsvMat.submat(OCVRect(roiX, roiY, roiWidth, roiHeight))
+                        val meanColor = Core.mean(centerRoi)
+                        centerRoi.release()
+                        floatArrayOf(meanColor.`val`[0].toFloat(), meanColor.`val`[1].toFloat(), meanColor.`val`[2].toFloat())
+                    }
+
+                    val cvMask = if (state.showCvMask) {
+                        val mask = Mat()
+                        val hueRange = 10.0
+                        val lowerBound = Scalar((hsv[0] - hueRange).coerceAtLeast(0.0), 100.0, 100.0)
+                        val upperBound = Scalar((hsv[0] + hueRange).coerceAtMost(180.0), 255.0, 255.0)
+                        Core.inRange(hsvMat, lowerBound, upperBound, mask)
+                        mask
                     } else {
-                        val mat = imageToMat(inputImage)
-                        val hsvMat = Mat()
-                        Imgproc.cvtColor(mat, hsvMat, Imgproc.COLOR_BGR2HSV)
-                        val centerColor = hsvMat[hsvMat.rows() / 2, hsvMat.cols() / 2]
-                        floatArrayOf(centerColor[0].toFloat(), centerColor[1].toFloat(), centerColor[2].toFloat())
+                        null
                     }
 
                     val detectedScreenPoints = detectedObjects.map {
@@ -65,7 +89,6 @@ class VisionRepository @Inject constructor(
                         PointF(transformedRect.centerX(), transformedRect.centerY())
                     }
 
-                    // Convert screen points to logical points before filtering
                     val detectedLogicalPoints = if (state.hasInverseMatrix) {
                         detectedScreenPoints.map { screenPoint ->
                             Perspective.screenToLogical(screenPoint, state.inversePitchMatrix)
@@ -73,7 +96,6 @@ class VisionRepository @Inject constructor(
                     } else {
                         emptyList()
                     }
-
 
                     val filteredBalls = if (state.table.isVisible) {
                         detectedLogicalPoints.filter { state.table.isPointInside(it) }
@@ -83,8 +105,13 @@ class VisionRepository @Inject constructor(
 
                     _visionDataFlow.value = VisionData(
                         genericBalls = filteredBalls,
-                        detectedHsvColor = hsv
+                        detectedHsvColor = hsv,
+                        detectedBoundingBoxes = detectedObjects.map { it.boundingBox },
+                        cvMask = cvMask
                     )
+
+                    mat.release()
+                    hsvMat.release()
 
                     imageProxy.close()
                 }
@@ -114,6 +141,7 @@ class VisionRepository @Inject constructor(
         yuvImage.put(0, 0, nv21)
         val mat = Mat()
         Imgproc.cvtColor(yuvImage, mat, Imgproc.COLOR_YUV2BGR_NV21, 3)
+        yuvImage.release()
         return mat
     }
 

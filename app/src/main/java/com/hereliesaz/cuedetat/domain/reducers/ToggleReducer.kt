@@ -47,6 +47,7 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             is MainScreenEvent.ToggleHelp -> currentState.copy(areHelpersVisible = !currentState.areHelpersVisible)
             is MainScreenEvent.ToggleMoreHelp -> currentState.copy(isMoreHelpVisible = !currentState.isMoreHelpVisible)
             is MainScreenEvent.ToggleSnapping -> currentState.copy(isSnappingEnabled = !currentState.isSnappingEnabled)
+            is MainScreenEvent.ToggleCvModel -> currentState.copy(useCustomModel = !currentState.useCustomModel) // <-- The command is now understood.
             else -> currentState
         }
     }
@@ -64,7 +65,6 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
         return if (currentState.onPlaneBall != null) {
             currentState.copy(onPlaneBall = null, valuesChangedSinceReset = true)
         } else {
-            // Always use the logical default position, regardless of table visibility.
             val newCenter = reducerUtils.getDefaultCueBallPosition(currentState)
             currentState.copy(
                 onPlaneBall = OnPlaneBall(center = newCenter, radius = LOGICAL_BALL_RADIUS),

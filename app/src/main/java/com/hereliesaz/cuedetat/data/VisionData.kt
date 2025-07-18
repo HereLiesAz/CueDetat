@@ -4,15 +4,17 @@ package com.hereliesaz.cuedetat.data
 
 import android.graphics.PointF
 import android.graphics.Rect
+import org.opencv.core.Mat
 
 /**
  * Data class to hold the results of computer vision processing.
  */
 data class VisionData(
-    val genericBalls: List<PointF> = emptyList(), // Results from the generic ML Kit model
-    val customBalls: List<PointF> = emptyList(),  // Results from your custom TFLite model
+    val genericBalls: List<PointF> = emptyList(),
+    val customBalls: List<PointF> = emptyList(),
     val detectedHsvColor: FloatArray? = null,
-    val detectedBoundingBoxes: List<Rect> = emptyList()
+    val detectedBoundingBoxes: List<Rect> = emptyList(),
+    val cvMask: Mat? = null // The binary mask for debugging
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -27,6 +29,7 @@ data class VisionData(
             if (!detectedHsvColor.contentEquals(other.detectedHsvColor)) return false
         } else if (other.detectedHsvColor != null) return false
         if (detectedBoundingBoxes != other.detectedBoundingBoxes) return false
+        if (cvMask != other.cvMask) return false
 
         return true
     }
@@ -36,6 +39,7 @@ data class VisionData(
         result = 31 * result + customBalls.hashCode()
         result = 31 * result + (detectedHsvColor?.contentHashCode() ?: 0)
         result = 31 * result + detectedBoundingBoxes.hashCode()
+        result = 31 * result + (cvMask?.hashCode() ?: 0)
         return result
     }
 }

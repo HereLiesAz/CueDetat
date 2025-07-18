@@ -17,9 +17,21 @@ class OverlayRenderer {
     private val lineRenderer = LineRenderer()
     private val tableRenderer = TableRenderer()
     private val railRenderer = RailRenderer()
+    private val cvDebugRenderer = CvDebugRenderer()
 
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         if (state.viewWidth == 0 || state.viewHeight == 0) return
+
+        // If the mask is to be shown (either in test or calibration), draw only it and nothing else.
+        if (state.showCvMask) {
+            cvDebugRenderer.draw(canvas, state)
+            return
+        }
+
+        // If we are calibrating but not yet showing the mask, draw nothing but the camera feed.
+        if (state.isCalibratingColor) {
+            return
+        }
 
         // Pass 1: Draw Table Surface
         if (state.table.isVisible) {
@@ -40,7 +52,7 @@ class OverlayRenderer {
             canvas.save()
             canvas.concat(state.railPitchMatrix)
             railRenderer.draw(canvas, state, paints, typeface)
-            railRenderer.drawRailLabels(canvas, state, paints, typeface) // Draw rail impact labels
+            railRenderer.drawRailLabels(canvas, state, paints, typeface)
             canvas.restore()
         }
 

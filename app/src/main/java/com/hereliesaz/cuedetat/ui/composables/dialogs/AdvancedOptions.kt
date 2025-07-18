@@ -2,6 +2,7 @@
 
 package com.hereliesaz.cuedetat.ui.composables.dialogs
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,7 +33,6 @@ fun AdvancedOptionsDialog(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
             text = {
                 Column {
-                    // Snapping Toggle
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Auto-Snap Balls:", modifier = Modifier.weight(1f))
                         TextButton(onClick = { onEvent(MainScreenEvent.ToggleSnapping) }) {
@@ -41,7 +41,14 @@ fun AdvancedOptionsDialog(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // CV Model Toggle
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Show CV Mask:", modifier = Modifier.weight(1f))
+                        TextButton(onClick = { onEvent(MainScreenEvent.ToggleCvMask) }) {
+                            Text(if (uiState.showCvMask) "On" else "Off")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Active AI Model:", modifier = Modifier.weight(1f))
                         TextButton(onClick = { onEvent(MainScreenEvent.ToggleCvModel) }) {
@@ -50,7 +57,6 @@ fun AdvancedOptionsDialog(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Refinement Method Toggle
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Refinement:", modifier = Modifier.weight(1f))
                         TextButton(onClick = { onEvent(MainScreenEvent.ToggleCvRefinementMethod) }) {
@@ -59,7 +65,6 @@ fun AdvancedOptionsDialog(
                     }
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // HoughCircles Param 1
                     Text("Hough P1 (Canny Edge): ${uiState.houghP1.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Slider(
                         value = uiState.houghP1,
@@ -68,7 +73,6 @@ fun AdvancedOptionsDialog(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // HoughCircles Param 2
                     Text("Hough P2 (Accumulator): ${uiState.houghP2.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Slider(
                         value = uiState.houghP2,
@@ -77,7 +81,6 @@ fun AdvancedOptionsDialog(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Canny Threshold 1
                     Text("Canny T1: ${uiState.cannyThreshold1.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Slider(
                         value = uiState.cannyThreshold1,
@@ -86,13 +89,22 @@ fun AdvancedOptionsDialog(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Canny Threshold 2
                     Text("Canny T2: ${uiState.cannyThreshold2.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Slider(
                         value = uiState.cannyThreshold2,
                         onValueChange = { onEvent(MainScreenEvent.UpdateCannyT2(it)) },
                         valueRange = 50f..300f
                     )
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { onEvent(MainScreenEvent.EnterCalibrationMode) }) {
+                        Text("Calibrate Felt", color = MaterialTheme.colorScheme.tertiary)
+                    }
+                    TextButton(onClick = { onEvent(MainScreenEvent.EnterCvMaskTestMode) }) {
+                        Text("Test Mask", color = MaterialTheme.colorScheme.secondary)
+                    }
                 }
             },
             confirmButton = { TextButton(onClick = onDismiss) { Text("Done", color = MaterialTheme.colorScheme.primary) } }

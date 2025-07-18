@@ -132,6 +132,10 @@ data class OverlayState(
     val houghP2: Float = 20f,
     val cannyThreshold1: Float = 50f,
     val cannyThreshold2: Float = 150f,
+    val showCvMask: Boolean = false,
+    val isTestingCvMask: Boolean = false,
+    val isCalibratingColor: Boolean = false,      // New state for calibration mode
+    val colorSamplePoint: Offset? = null,      // New state for the user's tap location
 
     // Derived state
     val shotLineAnchor: PointF = PointF(0f, 0f),

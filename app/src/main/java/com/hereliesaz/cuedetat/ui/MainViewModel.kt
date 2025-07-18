@@ -61,6 +61,8 @@ class MainViewModel @Inject constructor(
                 rotationDegrees = 0f,
                 isVisible = false
             ),
+            useCustomModel = userPreferencesRepository.getUseCustomModel(),
+            cvRefinementMethod = userPreferencesRepository.getCvRefinementMethod(),
             houghP1 = userPreferencesRepository.getCvHoughP1(),
             houghP2 = userPreferencesRepository.getCvHoughP2(),
             cannyThreshold1 = userPreferencesRepository.getCvCannyT1(),
@@ -81,8 +83,16 @@ class MainViewModel @Inject constructor(
             .launchIn(viewModelScope)
 
         visionRepository.visionDataFlow
-            .onEach { visionData -> onEvent(MainScreenEvent.CvDataUpdated(visionData)) }
+            .onEach { visionData ->
+                val currentState = _uiState.value
+                if (currentState.colorSamplePoint != null && visionData.detectedHsvColor != null) {
+                    onEvent(MainScreenEvent.LockColor(visionData.detectedHsvColor))
+                    onEvent(MainScreenEvent.ClearSamplePoint)
+                }
+                onEvent(MainScreenEvent.CvDataUpdated(visionData))
+            }
             .launchIn(viewModelScope)
+
 
         visionAnalyzer.updateUiState(_uiState.value)
 
@@ -90,6 +100,7 @@ class MainViewModel @Inject constructor(
     }
 
     fun onEvent(event: MainScreenEvent) {
+        // Handle persistence side-effects before updating the state
         when (event) {
             is MainScreenEvent.CheckForUpdate -> _singleEvent.value = SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat/releases")
             is MainScreenEvent.ViewArt -> _singleEvent.value = SingleEvent.OpenUrl("https://instagram.com/hereliesaz")
@@ -106,11 +117,13 @@ class MainViewModel @Inject constructor(
                 val newSize = uiState.value.table.size.next()
                 userPreferencesRepository.setTableSize(newSize)
             }
+            is MainScreenEvent.ToggleCvModel -> userPreferencesRepository.setUseCustomModel(!uiState.value.useCustomModel)
+            is MainScreenEvent.ToggleCvRefinementMethod -> userPreferencesRepository.setCvRefinementMethod(uiState.value.cvRefinementMethod.next())
             is MainScreenEvent.UpdateHoughP1 -> userPreferencesRepository.setCvHoughP1(event.value)
             is MainScreenEvent.UpdateHoughP2 -> userPreferencesRepository.setCvHoughP2(event.value)
             is MainScreenEvent.UpdateCannyT1 -> userPreferencesRepository.setCvCannyT1(event.value)
             is MainScreenEvent.UpdateCannyT2 -> userPreferencesRepository.setCvCannyT2(event.value)
-            else -> { /* Do nothing here, handled by updateState */ }
+            else -> { /* No side-effect needed, handled by updateState */ }
         }
         updateState(event)
     }

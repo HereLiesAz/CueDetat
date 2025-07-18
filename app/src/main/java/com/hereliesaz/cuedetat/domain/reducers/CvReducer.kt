@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/CvReducer.kt
+
 package com.hereliesaz.cuedetat.domain.reducers
 
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
@@ -14,12 +16,16 @@ class CvReducer @Inject constructor() {
             }
             is MainScreenEvent.LockOrUnlockColor -> {
                 if (currentState.lockedHsvColor == null) {
-                    // Lock the current auto-detected color
                     currentState.copy(lockedHsvColor = currentState.visionData.detectedHsvColor)
                 } else {
-                    // Unlock and revert to auto-detection
                     currentState.copy(lockedHsvColor = null)
                 }
+            }
+            is MainScreenEvent.LockColor -> {
+                currentState.copy(lockedHsvColor = event.hsv)
+            }
+            is MainScreenEvent.ClearSamplePoint -> {
+                currentState.copy(colorSamplePoint = null)
             }
             else -> currentState
         }
