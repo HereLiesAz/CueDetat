@@ -62,14 +62,8 @@ class LineRenderer {
         val shotGuideDirection = normalize(PointF(ghostCueCenter.x - shotLineAnchor.x, ghostCueCenter.y - shotLineAnchor.y))
 
         // --- Pass 1: Wide Pathways ---
-        // Righteously modify the color of the cached paint before use.
-        pathPaint.color = shotLineBaseColor
-        pathPaint.alpha = (255 * 0.1f).toInt()
+        // The path paint is now configured in the cache. No per-frame modification is needed.
         drawFadingLine(canvas, shotLineAnchor, shotGuideDirection, pathPaint, pathPaint, state)
-
-        // Do the same for the aiming line path.
-        pathPaint.color = aimingLineBaseColor
-        pathPaint.alpha = (255 * 0.1f).toInt()
         drawBankablePath(canvas, state.aimingLineBankPath, pathPaint, pathPaint, false, state)
 
 

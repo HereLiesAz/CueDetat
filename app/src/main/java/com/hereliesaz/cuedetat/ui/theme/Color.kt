@@ -23,6 +23,7 @@ val BankLine4Yellow = RebelYellow.copy(alpha = 0.3f)
 val AcidPatina = Color(0xFF00FFC2)
 val OracleBlue = Color(0xFF380B80)
 val OracleGlow = Color(0xFF4E2E98) // Lighter, purple-ish blue glow
+val ObstructionPathBlue = Color(0x4DA0A0B0) // New: Smokey bluish white for path obstruction
 
 // Resurrected Palette from the Void
 val AccentGold = Color(0xFFFFC107)
