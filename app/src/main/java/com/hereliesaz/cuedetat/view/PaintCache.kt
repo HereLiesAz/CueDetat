@@ -10,6 +10,7 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
+import com.hereliesaz.cuedetat.ui.theme.ObstructionPathBlue
 import com.hereliesaz.cuedetat.ui.theme.RebelYellow
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -85,7 +86,7 @@ class PaintCache {
 
     private fun createPathObstructionPaint() = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = WarningRed.copy(alpha = 0.1f).toArgb()
+        color = ObstructionPathBlue.toArgb() // Use the new color
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
         xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_OVER)
