@@ -1,13 +1,12 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/dialogs/AdvancedOptionsDialog.kt
+
 package com.hereliesaz.cuedetat.ui.composables.dialogs
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -32,7 +31,7 @@ fun AdvancedOptionsDialog(
             title = { Text("Too Advanced Options", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
             text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Column {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Auto-Snap Balls:", modifier = Modifier.weight(1f))
                         TextButton(onClick = { onEvent(MainScreenEvent.ToggleSnapping) }) {
@@ -65,19 +64,12 @@ fun AdvancedOptionsDialog(
                     }
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text("HSV Range Multiplier: ${"%.2f".format(uiState.cvHsvRangeMultiplier)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Slider(
-                        value = uiState.cvHsvRangeMultiplier,
-                        onValueChange = { onEvent(MainScreenEvent.UpdateHsvMultiplier(it)) },
-                        valueRange = 0.5f..5.0f
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
                     Text("Hough P1 (Canny Edge): ${uiState.houghP1.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Slider(
                         value = uiState.houghP1,
                         onValueChange = { onEvent(MainScreenEvent.UpdateHoughP1(it)) },
-                        valueRange = 50f..250f
+                        valueRange = 50f..250f,
+                        modifier = Modifier.height(32.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -85,7 +77,8 @@ fun AdvancedOptionsDialog(
                     Slider(
                         value = uiState.houghP2,
                         onValueChange = { onEvent(MainScreenEvent.UpdateHoughP2(it)) },
-                        valueRange = 10f..100f
+                        valueRange = 10f..100f,
+                        modifier = Modifier.height(32.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -93,7 +86,8 @@ fun AdvancedOptionsDialog(
                     Slider(
                         value = uiState.cannyThreshold1,
                         onValueChange = { onEvent(MainScreenEvent.UpdateCannyT1(it)) },
-                        valueRange = 10f..200f
+                        valueRange = 10f..200f,
+                        modifier = Modifier.height(32.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -101,7 +95,8 @@ fun AdvancedOptionsDialog(
                     Slider(
                         value = uiState.cannyThreshold2,
                         onValueChange = { onEvent(MainScreenEvent.UpdateCannyT2(it)) },
-                        valueRange = 50f..300f
+                        valueRange = 50f..300f,
+                        modifier = Modifier.height(32.dp)
                     )
                 }
             },

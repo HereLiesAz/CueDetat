@@ -5,32 +5,59 @@ package com.hereliesaz.cuedetat.ui
 import android.graphics.PointF
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import com.hereliesaz.cuedetat.ui.composables.*
+import com.hereliesaz.cuedetat.ui.composables.CameraBackground
+import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
+import com.hereliesaz.cuedetat.ui.composables.MenuDrawerContent
+import com.hereliesaz.cuedetat.ui.composables.SpinControl
+import com.hereliesaz.cuedetat.ui.composables.TopControls
+import com.hereliesaz.cuedetat.ui.composables.ZoomControls
 import com.hereliesaz.cuedetat.ui.composables.dialogs.AdvancedOptionsDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.GlowStickDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.LuminanceAdjustmentDialog
@@ -38,7 +65,6 @@ import com.hereliesaz.cuedetat.ui.composables.dialogs.TableSizeSelectionDialog
 import com.hereliesaz.cuedetat.ui.composables.overlays.KineticWarningOverlay
 import com.hereliesaz.cuedetat.ui.composables.overlays.TutorialOverlay
 import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
-import com.hereliesaz.cuedetat.ui.theme.ButtonTextBlue
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
 import com.hereliesaz.cuedetat.view.state.ToastMessage
@@ -51,21 +77,18 @@ fun MainScreen(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val context = LocalContext.current
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    var isDrawerOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    // REMOVE THE LINE BELOW
-    // var showSplashScreen by remember { mutableStateOf(true) }
+    val isSystemDark = isSystemInDarkTheme()
 
-    CueDetatTheme {
-        // REMOVE THE ENTIRE 'if (showSplashScreen)' BLOCK BELOW
-        /*
-        if (showSplashScreen) {
-            SplashScreen(onTimeout = { showSplashScreen = false })
-            return@CueDetatTheme
-        }
-        */
+    val useDarkTheme = when (uiState.isForceLightMode) {
+        true -> false
+        false -> true
+        null -> isSystemDark
+    }
 
-        val alphaAnimatable = remember { androidx.compose.animation.core.Animatable(1.0f) }
+    CueDetatTheme(darkTheme = useDarkTheme) {
+        val alphaAnimatable = remember { Animatable(1.0f) }
 
         LaunchedEffect(toastMessage) {
             toastMessage?.let {
@@ -92,8 +115,7 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
 
-        // Custom Top-Down Drawer Implementation
-        Box(Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize()) {
             val mainBoxModifier = Modifier
                 .fillMaxSize()
                 .pointerInput(uiState.isCalibratingColor, uiState.isTestingCvMask) {
@@ -118,7 +140,7 @@ fun MainScreen(viewModel: MainViewModel) {
 
                 ProtractorOverlay(
                     uiState = uiState.copy(spinPathsAlpha = alphaAnimatable.value),
-                    systemIsDark = true,
+                    systemIsDark = useDarkTheme,
                     isTestingCvMask = uiState.isTestingCvMask,
                     onEvent = viewModel::onEvent,
                     modifier = Modifier
@@ -160,7 +182,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     TopControls(
                         uiState = uiState,
                         onEvent = viewModel::onEvent,
-                        onMenuClick = { scope.launch { drawerState.open() } },
+                        onMenuClick = { scope.launch { isDrawerOpen = true } },
                         modifier = Modifier.zIndex(2f)
                     )
 
@@ -192,7 +214,7 @@ fun MainScreen(viewModel: MainViewModel) {
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight(0.6f)
-                            .width(160.dp)
+                            .width(60.dp)
                             .zIndex(5f)
                     )
 
@@ -206,26 +228,30 @@ fun MainScreen(viewModel: MainViewModel) {
                         verticalAlignment = Alignment.Bottom,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        val buttonTextStyle = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                         Column(
                             modifier = Modifier.padding(start = 16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Magic8BallButton(onClick = { viewModel.onEvent(MainScreenEvent.ToggleSpinControl) }) {
-                                Text("SPIN", style = buttonTextStyle, color = ButtonTextBlue)
-                            }
-                            Magic8BallButton(onClick = { viewModel.onEvent(MainScreenEvent.AddObstacleBall) }) {
-                                Text("Add\nBall", style = buttonTextStyle, color = ButtonTextBlue)
-                            }
+                            CuedetatButton(
+                                onClick = { viewModel.onEvent(MainScreenEvent.ToggleSpinControl) },
+                                text = "Spin"
+                            )
+                            CuedetatButton(
+                                onClick = { viewModel.onEvent(MainScreenEvent.AddObstacleBall) },
+                                text = "Add\nBall"
+                            )
                             if (!uiState.isBankingMode) {
-                                Magic8BallButton(onClick = { viewModel.onEvent(MainScreenEvent.ToggleOnPlaneBall) }) {
-                                    val text = if (uiState.onPlaneBall == null) "Show\nCue Ball" else "Hide\nCue Ball"
-                                    Text(text, style = buttonTextStyle, color = ButtonTextBlue)
+                                if (!uiState.table.isVisible) {
+                                    CuedetatButton(
+                                        onClick = { viewModel.onEvent(MainScreenEvent.ToggleOnPlaneBall) },
+                                        text = if (uiState.onPlaneBall == null) "Cue\nBall" else "Hide"
+                                    )
                                 }
-                                Magic8BallButton(onClick = { viewModel.onEvent(MainScreenEvent.ToggleTable) }) {
-                                    Text("Show\nTable", style = buttonTextStyle, color = ButtonTextBlue)
-                                }
+                                CuedetatButton(
+                                    onClick = { viewModel.onEvent(MainScreenEvent.ToggleTable) },
+                                    text = if (uiState.table.isVisible) "Hide\nTable" else "Show\nTable"
+                                )
                             }
                         }
 
@@ -244,9 +270,11 @@ fun MainScreen(viewModel: MainViewModel) {
                             }
                         }
 
-                        Magic8BallButton(onClick = { viewModel.onEvent(MainScreenEvent.Reset) }, modifier = Modifier.padding(end = 16.dp)) {
-                            Text("Reset\nView", style = buttonTextStyle, color = ButtonTextBlue)
-                        }
+                        CuedetatButton(
+                            onClick = { viewModel.onEvent(MainScreenEvent.Reset) },
+                            modifier = Modifier.padding(end = 16.dp),
+                            text = "Reset\nView"
+                        )
                     }
                 }
 
@@ -282,34 +310,40 @@ fun MainScreen(viewModel: MainViewModel) {
                 )
             }
 
-            // Scrim
-            if (drawerState.isOpen) {
+            // --- HERESY CORRECTED: Custom Menu Implementation ---
+            AnimatedVisibility(
+                visible = isDrawerOpen,
+                enter = fadeIn(animationSpec = tween(300)),
+                exit = fadeOut(animationSpec = tween(300))
+            ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.6f))
-                        .zIndex(20f)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = { scope.launch { drawerState.close() } }
-                        )
+                        .clickable { isDrawerOpen = false }
+                        .zIndex(20f) // Ensure scrim is on top of content
                 )
             }
 
-            // Animated Top-Down Drawer
             AnimatedVisibility(
-                visible = drawerState.isOpen,
-                enter = slideInVertically(initialOffsetY = { -it }, animationSpec = tween(durationMillis = 300)) + fadeIn(animationSpec = tween(durationMillis = 300)),
-                exit = slideOutVertically(targetOffsetY = { -it }, animationSpec = tween(durationMillis = 300)) + fadeOut(animationSpec = tween(durationMillis = 300)),
-                modifier = Modifier.zIndex(21f)
+                visible = isDrawerOpen,
+                modifier = Modifier.zIndex(21f), // Ensure drawer is on top of scrim
+                enter = expandVertically(
+                    animationSpec = tween(durationMillis = 400),
+                    expandFrom = Alignment.Top
+                ),
+                exit = slideOutHorizontally(
+                    animationSpec = tween(durationMillis = 300),
+                    targetOffsetX = { -it }
+                ) + shrinkVertically(animationSpec = tween(durationMillis = 300))
             ) {
                 MenuDrawerContent(
                     uiState = uiState,
                     onEvent = viewModel::onEvent,
-                    onCloseDrawer = { scope.launch { drawerState.close() } }
+                    onCloseDrawer = { isDrawerOpen = false }
                 )
             }
+            // --- END CORRECTION ---
         }
     }
 }

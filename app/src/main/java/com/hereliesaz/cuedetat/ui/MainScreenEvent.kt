@@ -1,3 +1,4 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreenEvent.kt
 package com.hereliesaz.cuedetat.ui
 
 import android.graphics.PointF
@@ -5,6 +6,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.VisionData
+import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.TableSize
 
 sealed class MainScreenEvent {
@@ -50,6 +52,11 @@ sealed class MainScreenEvent {
     object ToggleDistanceUnit : MainScreenEvent()
     object ToggleGlowStickDialog : MainScreenEvent()
     data class AdjustGlow(val value: Float) : MainScreenEvent()
+    data class SetWarning(val warning: String?) : MainScreenEvent()
+    object ToggleOrientationLock : MainScreenEvent()
+    data class OrientationChanged(val orientationLock: OverlayState.OrientationLock) :
+        MainScreenEvent()
+
 
     // Obstacle Events
     object AddObstacleBall : MainScreenEvent()
@@ -57,7 +64,7 @@ sealed class MainScreenEvent {
     // CV Events
     data class CvDataUpdated(val data: VisionData) : MainScreenEvent()
     object LockOrUnlockColor : MainScreenEvent()
-    data class LockColor(val hsv: FloatArray) : MainScreenEvent()
+    data class LockColor(val hsvMean: FloatArray, val hsvStdDev: FloatArray) : MainScreenEvent()
     object ClearSamplePoint : MainScreenEvent()
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
     object ToggleCvRefinementMethod : MainScreenEvent()
@@ -65,7 +72,6 @@ sealed class MainScreenEvent {
     data class UpdateHoughP2(val value: Float) : MainScreenEvent()
     data class UpdateCannyT1(val value: Float) : MainScreenEvent()
     data class UpdateCannyT2(val value: Float) : MainScreenEvent()
-    data class UpdateHsvMultiplier(val value: Float) : MainScreenEvent()
     object ToggleCvModel : MainScreenEvent()
     object ToggleSnapping: MainScreenEvent()
     object ToggleCvMask : MainScreenEvent()
@@ -86,4 +92,5 @@ sealed class MainScreenEvent {
     object SendFeedback : MainScreenEvent()
     object SingleEventConsumed : MainScreenEvent()
     object ToastShown : MainScreenEvent()
+    data class RestoreState(val state: OverlayState) : MainScreenEvent()
 }

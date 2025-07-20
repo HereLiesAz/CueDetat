@@ -4,27 +4,37 @@ package com.hereliesaz.cuedetat.ui.composables
 
 import android.graphics.PointF
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.*
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
-import kotlin.math.roundToInt
 import kotlin.math.sin
 
 @Composable
@@ -36,48 +46,53 @@ fun SpinControl(
     spinPathAlpha: Float,
     onEvent: (MainScreenEvent) -> Unit
 ) {
+    var isMoveModeActive by remember { mutableStateOf(false) }
+    val moveIconPainter = rememberVectorPainter(image = Icons.Default.OpenWith)
+
     Box(
         modifier = modifier
             .pointerInput(Unit) {
                 awaitEachGesture {
-                    // Detect the first tap, but don't consume it yet.
-                    val firstDown = awaitFirstDown(requireUnconsumed = false)
-
-                    // See if the first tap is followed by an up event.
+                    awaitFirstDown(requireUnconsumed = false)
                     val firstUp = waitForUpOrCancellation()
 
                     if (firstUp != null) {
-                        firstUp.consume() // Consume the up event of the first tap.
-
-                        // Now, wait for a potential second down within the double-tap timeout.
+                        firstUp.consume()
                         val secondDown = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
                             awaitFirstDown(requireUnconsumed = false)
                         }
 
                         if (secondDown != null) {
-                            // Double tap has been detected. Now we initiate a drag.
-                            secondDown.consume() // Consume the second tap to prevent other gestures.
+                            secondDown.consume()
+                            isMoveModeActive = true
                             var pointerId = secondDown.id
 
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val dragChange = event.changes.find { it.id == pointerId }
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val dragChange = event.changes.find { it.id == pointerId }
 
-                                if (dragChange == null || !dragChange.pressed) {
-                                    // Pointer was lifted or the event is for another pointer, so the drag ends.
-                                    break
+                                    if (dragChange == null || !dragChange.pressed) {
+                                        break
+                                    }
+                                    if (dragChange.isConsumed) {
+                                        continue
+                                    }
+                                    val pan = dragChange.positionChange()
+                                    if (pan != Offset.Zero) {
+                                        onEvent(
+                                            MainScreenEvent.DragSpinControl(
+                                                PointF(
+                                                    pan.x,
+                                                    pan.y
+                                                )
+                                            )
+                                        )
+                                        dragChange.consume()
+                                    }
                                 }
-
-                                if (dragChange.isConsumed) {
-                                    continue
-                                }
-
-                                val pan = dragChange.positionChange()
-                                if (pan != Offset.Zero) {
-                                    onEvent(MainScreenEvent.DragSpinControl(PointF(pan.x, pan.y)))
-                                    // Consume the change to prevent it from propagating further.
-                                    dragChange.consume()
-                                }
+                            } finally {
+                                isMoveModeActive = false
                             }
                         }
                     }
@@ -104,46 +119,78 @@ fun SpinControl(
         ) {
             val radius = size.minDimension / 2f
             val center = Offset(radius, radius)
+            val scaleFactor = if (isMoveModeActive) 1.1f else 1.0f
 
-            val numArcs = 72
-            val arcAngle = 360f / numArcs
-            for (i in 0 until numArcs) {
-                val startAngle = i * arcAngle
-                val colorSampleAngle = startAngle + (arcAngle / 2)
-                val color = SpinColorUtils.getColorFromAngleAndDistance(colorSampleAngle, 1.0f)
+            withTransform({
+                scale(scaleFactor, scaleFactor, center)
+            }) {
+                if (isMoveModeActive) {
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.2f),
+                        radius = radius,
+                        center = center
+                    )
+                }
 
-                drawArc(
-                    color = color,
-                    startAngle = startAngle - 90,
-                    sweepAngle = arcAngle,
-                    useCenter = true,
+                val numArcs = 72
+                val arcAngle = 360f / numArcs
+                for (i in 0 until numArcs) {
+                    val startAngle = i * arcAngle
+                    val colorSampleAngle = startAngle + (arcAngle / 2)
+                    val color = SpinColorUtils.getColorFromAngleAndDistance(colorSampleAngle, 1.0f)
+
+                    drawArc(
+                        color = color,
+                        startAngle = startAngle,
+                        sweepAngle = arcAngle,
+                        useCenter = true,
+                        alpha = spinPathAlpha
+                    )
+                }
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color.White, Color.Transparent),
+                        center = center,
+                        radius = radius
+                    ),
+                    radius = radius,
+                    center = center,
                     alpha = spinPathAlpha
                 )
-            }
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color.White, Color.Transparent),
+
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.5f * spinPathAlpha),
+                    radius = radius,
                     center = center,
-                    radius = radius
-                ),
-                radius = radius,
-                center = center,
-                alpha = spinPathAlpha
-            )
+                    style = Stroke(width = 2.dp.toPx())
+                )
 
-            drawCircle(
-                color = Color.White.copy(alpha = 0.5f * spinPathAlpha),
-                radius = radius,
-                center = center,
-                style = Stroke(width = 2.dp.toPx())
-            )
+                lingeringSpinOffset?.let {
+                    drawIndicator(
+                        it,
+                        center,
+                        radius,
+                        Color.White.copy(alpha = 0.6f * spinPathAlpha)
+                    )
+                }
 
-            lingeringSpinOffset?.let {
-                drawIndicator(it, center, radius, Color.White.copy(alpha = 0.6f * spinPathAlpha))
-            }
+                selectedSpinOffset?.let {
+                    drawIndicator(it, center, radius, Color.White)
+                }
 
-            selectedSpinOffset?.let {
-                drawIndicator(it, center, radius, Color.White)
+                if (isMoveModeActive) {
+                    with(moveIconPainter) {
+                        translate(
+                            left = center.x - intrinsicSize.width / 2,
+                            top = center.y - intrinsicSize.height / 2
+                        ) {
+                            draw(
+                                size = intrinsicSize,
+                                colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.8f))
+                            )
+                        }
+                    }
+                }
             }
         }
     }

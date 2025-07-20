@@ -1,11 +1,17 @@
+
 package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.Text
@@ -18,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
-import com.hereliesaz.cuedetat.ui.theme.AccentGold
+import com.hereliesaz.cuedetat.ui.theme.VoidBlack
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
@@ -30,7 +36,9 @@ fun MenuDrawerContent(
 ) {
     ModalDrawerSheet(
         modifier = Modifier.width(280.dp),
-        drawerContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+        // FIX: The 'colors' parameter doesn't exist in this version of Material3.
+        // Reverted to using 'drawerContainerColor', which is correct for this library version.
+        drawerContainerColor = VoidBlack
     ) {
         Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
             Column(
@@ -41,7 +49,7 @@ fun MenuDrawerContent(
             ) {
                 Text(
                     text = stringResource(id = R.string.app_name),
-                    color = AccentGold,
+                    color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.displaySmall,
                     textAlign = TextAlign.Center
                 )
@@ -60,7 +68,7 @@ fun MenuDrawerContent(
                 text = bankingModeToggleText,
                 onClick = { onEvent(MainScreenEvent.ToggleBankingMode); onCloseDrawer() }
             )
-            if (!uiState.isBankingMode) {
+            if (!uiState.isBankingMode && !uiState.table.isVisible) {
                 val cueBallToggleText = if (uiState.onPlaneBall == null) "Toggle Cue Ball" else "Hide Cue Ball"
                 MenuItem(
                     text = cueBallToggleText,
@@ -72,16 +80,12 @@ fun MenuDrawerContent(
                 text = cameraToggleText,
                 onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
             )
-            MenuItem(
-                text = if (uiState.isSnappingEnabled) "Disable Snapping" else "Enable Snapping",
-                onClick = { onEvent(MainScreenEvent.ToggleSnapping); onCloseDrawer() }
-            )
             MenuDivider()
 
             // Section 2: Table & Unit Settings
-            if (!uiState.isBankingMode && !uiState.table.isVisible) {
+            if (!uiState.isBankingMode) {
                 MenuItem(
-                    text = "Show Table",
+                    text = if (uiState.table.isVisible) "Hide Table" else "Show Table",
                     onClick = { onEvent(MainScreenEvent.ToggleTable); onCloseDrawer() }
                 )
             }
@@ -97,23 +101,18 @@ fun MenuDrawerContent(
             MenuDivider()
 
             // Section 3: Appearance
-            val systemIsCurrentlyDark = isSystemInDarkTheme()
-            val themeToggleText = when (uiState.isForceLightMode) {
-                true -> "Embrace the Darkness"
-                false -> "Use System Theme"
-                null -> if (systemIsCurrentlyDark) "Walk toward the Light" else "Embrace the Darkness"
+            val orientationToggleText = when (uiState.orientationLock) {
+                OverlayState.OrientationLock.AUTOMATIC -> "Orientation: Auto"
+                OverlayState.OrientationLock.PORTRAIT -> "Orientation: Portrait"
+                OverlayState.OrientationLock.LANDSCAPE -> "Orientation: Landscape"
             }
             MenuItem(
-                text = themeToggleText,
-                onClick = { onEvent(MainScreenEvent.ToggleForceTheme); onCloseDrawer() }
+                text = orientationToggleText,
+                onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) }
             )
             MenuItem(
                 text = "Luminance",
                 onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog); onCloseDrawer() }
-            )
-            MenuItem(
-                text = "Glow Stick",
-                onClick = { onEvent(MainScreenEvent.ToggleGlowStickDialog); onCloseDrawer() }
             )
             MenuDivider()
 
@@ -136,14 +135,6 @@ fun MenuDrawerContent(
             MenuItem(
                 text = "@HereLiesAz",
                 onClick = { onEvent(MainScreenEvent.ViewArt); onCloseDrawer() })
-            MenuItem(
-                text = "Send Feedback",
-                onClick = { onEvent(MainScreenEvent.SendFeedback); onCloseDrawer() }
-            )
-            MenuItem(
-                text = "Check for Updates",
-                onClick = { onEvent(MainScreenEvent.CheckForUpdate); onCloseDrawer() }
-            )
             MenuDivider()
 
             // Section 6: Developer
@@ -167,15 +158,15 @@ private fun MenuItem(text: String, onClick: () -> Unit) {
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = AccentGold
+            style = MaterialTheme.typography.bodyMedium, // Reduced text size
+            color = MaterialTheme.colorScheme.primary
         )
     }
 }
 
 @Composable
 private fun MenuDivider() {
-    HorizontalDivider(
+    Divider(
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
     )

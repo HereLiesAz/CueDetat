@@ -4,44 +4,44 @@ package com.hereliesaz.cuedetat.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // Base Palette
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
 val DarkCharcoal = Color(0xFF1A1A1A)
 
 // App-specific Palette
-val WarningRed = Color(0xFFF44336)
-val RebelYellow = Color(0xFFFFD700)
-val BankLine1Yellow = RebelYellow.copy(alpha = 0.9f)
-val BankLine2Yellow = RebelYellow.copy(alpha = 0.7f)
-val BankLine3Yellow = RebelYellow.copy(alpha = 0.5f)
-val BankLine4Yellow = RebelYellow.copy(alpha = 0.3f)
-val AcidPatina = Color(0xFF00FFC2)
-val OracleBlue = Color(0xFF380B80)
-val OracleGlow = Color(0xFF4E2E98) // Lighter, purple-ish blue glow
-val ObstructionPathBlue = Color(0x4DA0A0B0)
-val ButtonTextBlue = Color(0xFFADD8E6)
-val AcidSpill = Color(0xFF59BF1A) // CORRECTED: This was the other green
+val WarningRed = Color(0xFFAF403D)
+val RebelYellow = Color(0xFFDDAF0F)
+val SulfurDust = Color(0xFFDDAF0F)
 
-// Resurrected Palette from the Void
-val AccentGold = Color(0xFFFFC107)
-val DarkerAccentGold = Color(0xFFD4A106)
+val OracleBlue = Color(0xFF2862a4)
+val BalticSea = Color(0xFF1d1c23)
+val HippieGreen = Color(0xFF6a8e4a)
+val Pomegranate = WarningRed // #f44336
+val GunmetalBlue = Color(0xFF457379)
+val BruisedPlum = Color(0xFF664A64)
+val VoidBlack = Color(0xFF18171B)
+val EbonyClay = Color(0xFF262B34)
+val MonteCarlo = Color(0xFF87ca9d)
+val Mariner = Color(0xFF2862a4)
+
+
+// New Magic 8 Ball Colors
+val Eight_ball_darker_blue = Color(0xFF363A8F)
+val Eight_ball_blue = Color(0xFF2862a4)
+
+
+val IcedOpal = Color(0xFFE0E0E0)
 val MutedGray = Color(0xFF8E8E8E)
 val SteelAsh = Color(0xFF454545)
+val ScorchedUmber = Color(0xFF3A3A3A)
 val ColdAsh = Color(0xFF313131)
 val RogueUmber = Color(0xFF2A2A2A)
+val StaticClay = Color(0xFF242424)
 val GunmetalFog = Color(0xFF1F1F1F)
 val SmokeyGrunge = Color(0xFF121212)
-val RustedEmber = Color(0xFFD32F2F)
 val OilSlick = Color(0xFF0A0A0A)
-val StaticClay = Color(0xFF242424)
-val IcedOpal = Color(0xFFE0E0E0)
-val ScorchedUmber = Color(0xFF3A3A3A)
-val VioletResidue = Color(0xFF9C27B0)
-val MutedMaroon = Color(0xFF880E4F)
 
-val SlateGray = Color(0xFF708090)
+
+val BankLine1Yellow = SulfurDust.copy(alpha = 0.9f)
+val BankLine2Yellow = SulfurDust.copy(alpha = 0.7f)
+val BankLine3Yellow = SulfurDust.copy(alpha = 0.5f)
+val BankLine4Yellow = SulfurDust.copy(alpha = 0.3f)
