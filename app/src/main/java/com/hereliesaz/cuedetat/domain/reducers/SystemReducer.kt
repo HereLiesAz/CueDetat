@@ -1,14 +1,14 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/SystemReducer.kt
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/SystemReducer.kt
 
-package com.hereliesaz.cuedetat.domain
+package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
-import com.hereliesaz.cuedetat.data.FullOrientation
+import androidx.compose.material3.darkColorScheme
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
-import com.hereliesaz.cuedetat.view.model.OnPlaneBall
+import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.model.Table
 import com.hereliesaz.cuedetat.view.state.InteractionMode
@@ -25,6 +25,7 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             is MainScreenEvent.SizeChanged -> handleSizeChanged(currentState, event)
             is MainScreenEvent.FullOrientationChanged -> currentState.copy(currentOrientation = event.orientation)
             is MainScreenEvent.ThemeChanged -> currentState.copy(appControlColorScheme = event.scheme)
+            is MainScreenEvent.SetWarning -> currentState.copy(warningText = event.warning)
             else -> currentState
         }
     }
@@ -32,7 +33,11 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
     private fun handleSizeChanged(currentState: OverlayState, event: MainScreenEvent.SizeChanged): OverlayState {
         // Upon genesis, create the initial state.
         if (currentState.viewWidth == 0 && currentState.viewHeight == 0) {
-            return createInitialState(event.width, event.height, currentState.appControlColorScheme)
+            return createInitialState(
+                event.width,
+                event.height,
+                currentState.appControlColorScheme ?: darkColorScheme()
+            )
         }
 
         // For all subsequent resizes, only update view dimensions.
@@ -60,7 +65,6 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             ),
             table = Table(
                 size = TableSize.EIGHT_FT,
-                rotationDegrees = 0f, // Portrait is default
                 isVisible = false,
             ),
             onPlaneBall = null,
@@ -68,7 +72,7 @@ class SystemReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             isBankingMode = false,
             bankingAimTarget = null,
             valuesChangedSinceReset = false,
-            areHelpersVisible = false,
+            areHelpersVisible = LabelConfig.showLabelsByDefault,
             isMoreHelpVisible = false,
             isForceLightMode = null,
             luminanceAdjustment = 0f,

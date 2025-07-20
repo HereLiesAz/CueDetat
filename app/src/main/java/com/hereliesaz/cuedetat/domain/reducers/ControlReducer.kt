@@ -17,8 +17,15 @@ class ControlReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         return when (event) {
             is MainScreenEvent.ZoomSliderChanged -> handleZoomSliderChanged(currentState, event)
             is MainScreenEvent.ZoomScaleChanged -> handleZoomScaleChanged(currentState, event)
-            is MainScreenEvent.TableRotationApplied -> currentState.copy(table = currentState.table.copy(rotationDegrees = currentState.table.rotationDegrees + event.degrees), valuesChangedSinceReset = true)
-            is MainScreenEvent.TableRotationChanged -> currentState.copy(table = currentState.table.copy(rotationDegrees = event.degrees), valuesChangedSinceReset = true)
+            is MainScreenEvent.TableRotationApplied -> currentState.copy(
+                worldRotationDegrees = currentState.worldRotationDegrees + event.degrees,
+                valuesChangedSinceReset = true
+            )
+
+            is MainScreenEvent.TableRotationChanged -> currentState.copy(
+                worldRotationDegrees = event.degrees,
+                valuesChangedSinceReset = true
+            )
             is MainScreenEvent.AdjustLuminance -> currentState.copy(luminanceAdjustment = event.adjustment.coerceIn(-0.4f, 0.4f), valuesChangedSinceReset = true)
             is MainScreenEvent.AdjustGlow -> currentState.copy(glowStickValue = event.value.coerceIn(-1f, 1f), valuesChangedSinceReset = true)
             is MainScreenEvent.PanView -> handlePanView(currentState, event)
@@ -30,7 +37,8 @@ class ControlReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         val currentOffset = currentState.viewOffset
         // The reducer simply applies the delta. The UseCase will enforce limits.
         val newY = currentOffset.y + event.delta.y
-        return currentState.copy(viewOffset = PointF(currentOffset.x, newY))
+        val newX = currentOffset.x + event.delta.x
+        return currentState.copy(viewOffset = PointF(newX, newY))
     }
 
     private fun handleZoomSliderChanged(currentState: OverlayState, event: MainScreenEvent.ZoomSliderChanged): OverlayState {

@@ -31,7 +31,9 @@ class ObstacleReducer @Inject constructor(private val reducerUtils: ReducerUtils
     }
 
     private fun findNextAvailablePlacement(currentState: OverlayState): PointF {
-        val detectedBalls = currentState.visionData.genericBalls + currentState.visionData.customBalls
+        val visionData =
+            currentState.visionData ?: return reducerUtils.getDefaultTargetBallPosition()
+        val detectedBalls = visionData.genericBalls + visionData.customBalls
         val allLogicalBalls = (listOfNotNull(
             currentState.onPlaneBall,
             currentState.protractorUnit

@@ -3,7 +3,6 @@
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
-import com.hereliesaz.cuedetat.view.model.Table
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import kotlin.math.abs
@@ -34,7 +33,11 @@ class CalculateBankShot @Inject constructor() {
             if (intersectionResult != null) {
                 val (intersection, normal) = intersectionResult
 
-                val (pocketedOnSegment, pocketIntersectionPoint) = checkPocketAim(currentPoint, intersection, state.table, state.table.pockets)
+                val (pocketedOnSegment, pocketIntersectionPoint) = checkPocketAim(
+                    currentPoint,
+                    intersection,
+                    state
+                )
                 if (pocketedOnSegment != null && pocketIntersectionPoint != null) {
                     path.add(pocketIntersectionPoint) // Terminate the path AT the pocket
                     pocketedIndex = pocketedOnSegment
@@ -52,41 +55,11 @@ class CalculateBankShot @Inject constructor() {
         return BankShotResult(path, pocketedIndex)
     }
 
-    fun getBankPathForLine(startPoint: PointF, endPoint: PointF, table: Table, pockets: List<PointF>): Pair<List<PointF>, Int?> {
-        val extendedEnd = PointF(
-            startPoint.x + (endPoint.x - startPoint.x) * 5000,
-            startPoint.y + (endPoint.y - startPoint.y) * 5000
-        )
-
-        // First, check for a direct pocket.
-        val (directPocketIndex, directIntersection) = checkPocketAim(startPoint, extendedEnd, table, pockets)
-        if (directPocketIndex != null && directIntersection != null) {
-            return Pair(listOf(startPoint, directIntersection), directPocketIndex)
-        }
-
-        // If no direct pocket, check for a one-rail bank.
-        val intersectionResult = table.findRailIntersectionAndNormal(startPoint, extendedEnd)
-        if (intersectionResult != null) {
-            val (intersectionPoint, railNormal) = intersectionResult
-            val incidentVector = PointF(extendedEnd.x - startPoint.x, extendedEnd.y - startPoint.y)
-            val reflectedVector = table.reflect(incidentVector, railNormal)
-            val reflectedEndPoint = PointF(
-                intersectionPoint.x + reflectedVector.x * 5000,
-                intersectionPoint.y + reflectedVector.y * 5000
-            )
-
-            // Check if the banked path goes into a pocket
-            val (bankedPocketIndex, bankedIntersection) = checkPocketAim(intersectionPoint, reflectedEndPoint, table, pockets)
-            if (bankedPocketIndex != null && bankedIntersection != null) {
-                return Pair(listOf(startPoint, intersectionPoint, bankedIntersection), bankedPocketIndex)
-            }
-            return Pair(listOf(startPoint, intersectionPoint, reflectedEndPoint), null)
-        }
-
-        return Pair(listOf(startPoint, extendedEnd), null)
-    }
-
-    private fun checkPocketAim(start: PointF, end: PointF, table: Table, pockets: List<PointF>): Pair<Int?, PointF?> {
+    private fun checkPocketAim(
+        start: PointF,
+        end: PointF,
+        state: OverlayState
+    ): Pair<Int?, PointF?> {
         val dirX = end.x - start.x
         val dirY = end.y - start.y
         val mag = sqrt(dirX * dirX + dirY * dirY)
@@ -94,7 +67,8 @@ class CalculateBankShot @Inject constructor() {
 
         val extendedEnd = PointF(start.x + dirX / mag * 5000f, start.y + dirY / mag * 5000f)
 
-        val pocketRadius = LOGICAL_BALL_RADIUS * 1.8f
+        val pockets = state.table.pockets
+        val pocketRadius = state.protractorUnit.radius * 1.8f
 
         var closestIntersection: PointF? = null
         var closestPocketIndex: Int? = null
@@ -117,6 +91,13 @@ class CalculateBankShot @Inject constructor() {
             }
         }
         return Pair(closestPocketIndex, closestIntersection)
+    }
+
+
+    private fun linePointDistance(p1: PointF, p2: PointF, p: PointF): Float {
+        val num = abs((p2.x - p1.x) * (p1.y - p.y) - (p1.x - p.x) * (p2.y - p1.y))
+        val den = sqrt((p2.x - p1.x).pow(2) + (p2.y - p1.y).pow(2))
+        return if (den == 0f) 0f else num / den
     }
 
     private fun getLineCircleIntersection(p1: PointF, p2: PointF, circleCenter: PointF, radius: Float): PointF? {

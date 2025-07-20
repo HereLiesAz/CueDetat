@@ -48,9 +48,6 @@ class ActionReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
         } else {
             null
         }
-        val newTable = currentState.table.copy(
-            rotationDegrees = if (currentState.table.isVisible) 0f else 0f // Portrait is default
-        )
 
         // Reset only positional and rotational properties, preserving toggles
         return currentState.copy(
@@ -58,12 +55,13 @@ class ActionReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             onPlaneBall = newOnPlaneBall,
             obstacleBalls = emptyList(), // Clear obstacles on reset
             zoomSliderPosition = initialSliderPos,
-            table = newTable,
+            worldRotationDegrees = 0f,
             bankingAimTarget = null,
             valuesChangedSinceReset = false,
             preResetState = stateToSave,
             hasCueBallBeenMoved = false,
-            hasTargetBallBeenMoved = false
+            hasTargetBallBeenMoved = false,
+            viewOffset = PointF(0f, 0f) // Also reset pan
         )
     }
 }

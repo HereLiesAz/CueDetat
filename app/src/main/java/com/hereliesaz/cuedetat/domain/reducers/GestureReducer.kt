@@ -4,17 +4,15 @@ package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
 import androidx.compose.ui.geometry.Offset
-import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
-import com.hereliesaz.cuedetat.view.model.OnPlaneBall
+import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.atan2
-import kotlin.math.hypot
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -35,11 +33,22 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         val spinControlCenter = currentState.spinControlCenter
         val protractorUnit = currentState.protractorUnit
 
-        val constantTouchRadius = LOGICAL_BALL_RADIUS * 3.5f // Increased trigger area
+        // Define a constant touch radius in screen pixels (e.g., ~32dp)
+        val screenTouchRadiusPx = 96f
+        // Calculate the current zoom factor from the slider position
+        val zoomFactor = ZoomMapping.sliderToZoom(currentState.zoomSliderPosition)
+        // Convert the screen-space radius to a dynamic logical-space radius.
+        // As zoom increases, the logical radius needed to cover the same screen area decreases.
+        val dynamicLogicalTouchRadius = screenTouchRadiusPx / zoomFactor
+
 
         // Banking Mode Logic
         if (currentState.isBankingMode) {
-            return if (onPlaneBall != null && getDistance(logicalPoint, onPlaneBall.center) < constantTouchRadius) {
+            return if (onPlaneBall != null && getDistance(
+                    logicalPoint,
+                    onPlaneBall.center
+                ) < dynamicLogicalTouchRadius
+            ) {
                 currentState.copy(interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL, hasCueBallBeenMoved = true, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
             } else {
                 currentState.copy(interactionMode = InteractionMode.AIMING_BANK_SHOT)
@@ -53,19 +62,31 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         }
 
         currentState.obstacleBalls.forEachIndexed { index, obstacle ->
-            if (getDistance(logicalPoint, obstacle.center) < constantTouchRadius) {
+            if (getDistance(logicalPoint, obstacle.center) < dynamicLogicalTouchRadius) {
                 return currentState.copy(interactionMode = InteractionMode.MOVING_OBSTACLE_BALL, movingObstacleBallIndex = index, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
             }
         }
 
-        if (onPlaneBall != null && getDistance(logicalPoint, onPlaneBall.center) < constantTouchRadius) {
+        if (onPlaneBall != null && getDistance(
+                logicalPoint,
+                onPlaneBall.center
+            ) < dynamicLogicalTouchRadius
+        ) {
             return currentState.copy(interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL, hasCueBallBeenMoved = true, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
         }
 
         val distToTargetBall = getDistance(logicalPoint, protractorUnit.center)
-        val distToGhostBall = getDistance(logicalPoint, protractorUnit.ghostCueBallCenter)
+        if (distToTargetBall < dynamicLogicalTouchRadius) {
+            return currentState.copy(
+                interactionMode = InteractionMode.MOVING_PROTRACTOR_UNIT,
+                hasTargetBallBeenMoved = true,
+                isMagnifierVisible = true,
+                magnifierSourceCenter = event.screenOffset
+            )
+        }
 
-        if (distToTargetBall < constantTouchRadius || distToGhostBall < constantTouchRadius) {
+        val distToGhostBall = getDistance(logicalPoint, protractorUnit.ghostCueBallCenter)
+        if (distToGhostBall < dynamicLogicalTouchRadius) {
             return currentState.copy(interactionMode = InteractionMode.MOVING_PROTRACTOR_UNIT, hasTargetBallBeenMoved = true, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
         }
 
@@ -81,6 +102,8 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                 currentState.copy(protractorUnit = currentState.protractorUnit.copy(center = newCenter), valuesChangedSinceReset = true)
             }
             InteractionMode.ROTATING_PROTRACTOR -> {
+                // HERESY CORRECTED: Reverted to relative angle calculation.
+                // This provides a smooth rotation that "picks up where it left off."
                 val center = currentState.protractorUnit.center
                 val prevAngle = atan2(event.previousLogicalPoint.y - center.y, event.previousLogicalPoint.x - center.x)
                 val currAngle = atan2(event.currentLogicalPoint.y - center.y, event.currentLogicalPoint.x - center.x)
@@ -162,7 +185,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
 
         val snapRadius = (state.onPlaneBall?.radius ?: state.protractorUnit.radius) * 1.5f
 
-        return state.snapCandidates
+        return (state.snapCandidates ?: emptyList())
             .filter { getDistance(referencePoint, it.detectedPoint) < snapRadius }
             .minByOrNull { getDistance(referencePoint, it.detectedPoint) }
     }

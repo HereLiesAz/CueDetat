@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/AdvancedOptionsReducer.kt
+
 package com.hereliesaz.cuedetat.domain.reducers
 
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
@@ -49,7 +51,6 @@ class AdvancedOptionsReducer @Inject constructor() {
             is MainScreenEvent.UpdateHoughP2 -> currentState.copy(houghP2 = event.value)
             is MainScreenEvent.UpdateCannyT1 -> currentState.copy(cannyThreshold1 = event.value)
             is MainScreenEvent.UpdateCannyT2 -> currentState.copy(cannyThreshold2 = event.value)
-            is MainScreenEvent.UpdateHsvMultiplier -> currentState.copy(cvHsvRangeMultiplier = event.value)
             else -> currentState
         }
     }

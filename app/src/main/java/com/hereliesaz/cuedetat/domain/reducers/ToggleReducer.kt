@@ -8,10 +8,8 @@ import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
-import com.hereliesaz.cuedetat.view.model.Table
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import com.hereliesaz.cuedetat.view.state.TableSize
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -47,23 +45,45 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             is MainScreenEvent.ToggleHelp -> currentState.copy(areHelpersVisible = !currentState.areHelpersVisible)
             is MainScreenEvent.ToggleMoreHelp -> currentState.copy(isMoreHelpVisible = !currentState.isMoreHelpVisible)
             is MainScreenEvent.ToggleSnapping -> currentState.copy(isSnappingEnabled = !currentState.isSnappingEnabled)
-            is MainScreenEvent.ToggleCvModel -> currentState.copy(useCustomModel = !currentState.useCustomModel) // <-- The command is now understood.
+            is MainScreenEvent.ToggleCvModel -> currentState.copy(useCustomModel = !currentState.useCustomModel)
+            is MainScreenEvent.ToggleOrientationLock -> currentState.copy(orientationLock = currentState.orientationLock.next())
+            is MainScreenEvent.OrientationChanged -> currentState.copy(orientationLock = event.orientationLock)
             else -> currentState
         }
     }
 
     private fun handleToggleTable(currentState: OverlayState): OverlayState {
-        val newState = currentState.copy(
-            table = currentState.table.copy(isVisible = !currentState.table.isVisible),
-            valuesChangedSinceReset = true
-        )
-        return resetForTable(newState)
+        val isMakingVisible = !currentState.table.isVisible
+
+        // If making the table visible and the cue ball isn't, force the cue ball to appear.
+        return if (isMakingVisible && currentState.onPlaneBall == null) {
+            currentState.copy(
+                table = currentState.table.copy(isVisible = true),
+                onPlaneBall = OnPlaneBall(
+                    center = reducerUtils.getDefaultCueBallPosition(currentState),
+                    radius = LOGICAL_BALL_RADIUS
+                ),
+                valuesChangedSinceReset = true
+            )
+        } else {
+            // Otherwise, just toggle the table's visibility.
+            currentState.copy(
+                table = currentState.table.copy(isVisible = !currentState.table.isVisible),
+                valuesChangedSinceReset = true
+            )
+        }
     }
 
 
     private fun handleToggleOnPlaneBall(currentState: OverlayState): OverlayState {
         return if (currentState.onPlaneBall != null) {
-            currentState.copy(onPlaneBall = null, valuesChangedSinceReset = true)
+            // MANDATE: The ActualCueBall MUST be visible if the table is visible.
+            // Do not allow the ball to be hidden if the table is on screen.
+            if (currentState.table.isVisible) {
+                currentState // Return state unchanged, action is forbidden.
+            } else {
+                currentState.copy(onPlaneBall = null, valuesChangedSinceReset = true)
+            }
         } else {
             val newCenter = reducerUtils.getDefaultCueBallPosition(currentState)
             currentState.copy(
@@ -87,10 +107,11 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
         return currentState.copy(
             onPlaneBall = updatedOnPlaneBall,
             protractorUnit = ProtractorUnit(center = targetBallCenter, radius = LOGICAL_BALL_RADIUS, rotationDegrees = 0f),
-            table = currentState.table.copy(rotationDegrees = 0f), // Portrait is default
+            worldRotationDegrees = 0f,
             valuesChangedSinceReset = true,
             zoomSliderPosition = 0f,
-            obstacleBalls = emptyList()
+            obstacleBalls = emptyList(),
+            viewOffset = PointF(0f, 0f) // Also reset pan
         )
     }
 
@@ -100,15 +121,15 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             val bankingZoomSliderPos = 0f
             val bankingBallCenter = PointF(0f, 0f)
             val newBankingBall = OnPlaneBall(center = bankingBallCenter, radius = LOGICAL_BALL_RADIUS)
-            val defaultTableRotation = 90f // Corrected: Portrait is default
+            val defaultTableRotation = 0f // Let's keep it 0 for consistency
             val initialAimTarget = calculateInitialBankingAimTarget(newBankingBall, defaultTableRotation)
             currentState.copy(
                 isBankingMode = true, onPlaneBall = newBankingBall,
                 zoomSliderPosition = bankingZoomSliderPos,
                 table = currentState.table.copy(
-                    isVisible = true,
-                    rotationDegrees = defaultTableRotation
+                    isVisible = true
                 ),
+                worldRotationDegrees = defaultTableRotation,
                 bankingAimTarget = initialAimTarget,
                 protractorUnit = currentState.protractorUnit.copy(radius = LOGICAL_BALL_RADIUS, center = PointF(0f,0f)),
                 warningText = null
@@ -119,9 +140,9 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
                 isBankingMode = false, bankingAimTarget = null,
                 zoomSliderPosition = defaultSliderPos,
                 table = currentState.table.copy(
-                    isVisible = false,
-                    rotationDegrees = 0f,
+                    isVisible = false
                 ),
+                worldRotationDegrees = 0f,
                 onPlaneBall = OnPlaneBall(PointF(0f, LOGICAL_BALL_RADIUS * 4), LOGICAL_BALL_RADIUS),
                 protractorUnit = currentState.protractorUnit.copy(
                     radius = LOGICAL_BALL_RADIUS,
@@ -132,7 +153,8 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
         }
         return reducerUtils.snapViolatingBalls(newState.copy(
             valuesChangedSinceReset = true,
-            showLuminanceDialog = false, showTutorialOverlay = false
+            showLuminanceDialog = false, showTutorialOverlay = false,
+            viewOffset = PointF(0f, 0f) // Also reset pan
         ))
     }
 
@@ -144,8 +166,8 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
         val aimDistance = LOGICAL_BALL_RADIUS * defaultBankingAimDistanceFactor
         val angleRad = Math.toRadians((tableRotationDegrees - 90.0))
         return PointF(
-            cueBall.center.x + (aimDistance * kotlin.math.cos(angleRad)).toFloat(),
-            cueBall.center.y + (aimDistance * kotlin.math.sin(angleRad)).toFloat()
+            cueBall.center.x + (kotlin.math.cos(angleRad)).toFloat() * aimDistance,
+            cueBall.center.y + (kotlin.math.sin(angleRad)).toFloat() * aimDistance
         )
     }
 }

@@ -2,7 +2,6 @@
 
 package com.hereliesaz.cuedetat.domain.reducers
 
-import android.graphics.PointF
 import com.hereliesaz.cuedetat.data.VisionData
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
@@ -22,7 +21,7 @@ class SnapReducer @Inject constructor() {
 
         val currentTime = System.currentTimeMillis()
         val detectedBalls = visionData.genericBalls + visionData.customBalls
-        val previousCandidates = currentState.snapCandidates.toMutableList()
+        val previousCandidates = currentState.snapCandidates?.toMutableList() ?: mutableListOf()
         val newCandidates = mutableListOf<SnapCandidate>()
 
         // Update existing candidates and find new ones
