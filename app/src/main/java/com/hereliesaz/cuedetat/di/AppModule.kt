@@ -1,6 +1,7 @@
 package com.hereliesaz.cuedetat.di
 
 import android.content.Context
+import com.google.gson.Gson
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
@@ -31,8 +32,11 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideUserPreferencesRepository(@ApplicationContext context: Context): UserPreferencesRepository {
-        return UserPreferencesRepository(context)
+    fun provideUserPreferencesRepository(
+        @ApplicationContext context: Context,
+        gson: Gson
+    ): UserPreferencesRepository {
+        return UserPreferencesRepository(context, gson)
     }
 
     @Provides
@@ -45,5 +49,11 @@ object AppModule {
             .enableClassification()
             .build()
         return ObjectDetection.getClient(options)
+    }
+
+    @Provides
+    @Singleton
+    fun provideGson(): Gson {
+        return Gson()
     }
 }
