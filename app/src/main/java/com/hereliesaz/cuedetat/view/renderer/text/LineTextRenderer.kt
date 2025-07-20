@@ -6,9 +6,11 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.Typeface
+import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.PaintCache
-import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
+import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
+import com.hereliesaz.cuedetat.view.config.ui.LabelProperties
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -31,16 +33,30 @@ class LineTextRenderer {
         origin: PointF,
         angleDegrees: Float,
         distanceFromOrigin: Float,
-        rotationOffset: Float,
-        paint: Paint
+        config: LabelProperties,
+        paint: Paint,
+        state: OverlayState
     ) {
+        val matrix = state.pitchMatrix ?: return
         val textAngleRadians = Math.toRadians((angleDegrees - 90).toDouble())
-        val textX = origin.x + (distanceFromOrigin * cos(textAngleRadians)).toFloat()
-        val textY = origin.y + (distanceFromOrigin * sin(textAngleRadians)).toFloat()
+
+        // 1. Calculate base logical position
+        val logicalX = origin.x + (distanceFromOrigin * cos(textAngleRadians)).toFloat()
+        val logicalY = origin.y + (distanceFromOrigin * sin(textAngleRadians)).toFloat()
+
+        // 2. Transform base logical position to screen position
+        val screenCoords = floatArrayOf(logicalX, logicalY)
+        matrix.mapPoints(screenCoords)
+
+        // 3. Apply screen-space offset
+        val finalX = screenCoords[0] + config.xOffset
+        val finalY = screenCoords[1] + config.yOffset
 
         canvas.save()
-        canvas.rotate(angleDegrees + rotationOffset, textX, textY)
-        canvas.drawText(text, textX, textY, paint)
+        // 4. Rotate around the final screen position
+        canvas.rotate(angleDegrees + config.rotationDegrees, finalX, finalY)
+        paint.color = config.color.copy(alpha = config.opacity).toArgb()
+        canvas.drawText(text, finalX, finalY, paint)
         canvas.restore()
     }
 
@@ -50,21 +66,67 @@ class LineTextRenderer {
         val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM
 
         // Aiming Line Label
-        draw(canvas, "Aiming Line", state.protractorUnit.center, state.protractorUnit.rotationDegrees, state.protractorUnit.radius * 5.0f * zoomFactor, 0f, textPaint)
+        draw(
+            canvas,
+            "Aiming Line",
+            state.protractorUnit.center,
+            state.protractorUnit.rotationDegrees,
+            state.protractorUnit.radius * 5.0f * zoomFactor,
+            LabelConfig.aimingLine,
+            textPaint,
+            state
+        )
 
         // Shot Guide Line Label - Anchored to Ghost Ball
-        val shotLineAngle = Math.toDegrees(atan2((state.protractorUnit.ghostCueBallCenter.y - state.shotLineAnchor.y).toDouble(), (state.protractorUnit.ghostCueBallCenter.x - state.shotLineAnchor.x).toDouble()).toDouble()).toFloat()
-        draw(canvas, "Shot Guide Line", state.protractorUnit.ghostCueBallCenter, shotLineAngle, state.protractorUnit.radius * 4.0f * zoomFactor, 0f, textPaint)
+        state.shotLineAnchor?.let { anchor ->
+            val shotLineAngle = Math.toDegrees(
+                atan2(
+                    (state.protractorUnit.ghostCueBallCenter.y - anchor.y).toDouble(),
+                    (state.protractorUnit.ghostCueBallCenter.x - anchor.x).toDouble()
+                ).toDouble()
+            ).toFloat()
+            draw(
+                canvas,
+                "Shot Guide Line",
+                state.protractorUnit.ghostCueBallCenter,
+                shotLineAngle,
+                state.protractorUnit.radius * 4.0f * zoomFactor,
+                LabelConfig.shotGuideLine,
+                textPaint,
+                state
+            )
+        }
 
         // Tangent Line Labels - Drawn on both sides
-        val tangentBaseAngle = shotLineAngle + 90f
+        val tangentBaseAngle = state.protractorUnit.rotationDegrees + 90f
         val tangentDistance = state.protractorUnit.radius * 3.0f * zoomFactor
-        draw(canvas, "Tangent Line", state.protractorUnit.ghostCueBallCenter, tangentBaseAngle + (90 * state.tangentDirection), tangentDistance, 0f, textPaint)
-        draw(canvas, "Tangent Line", state.protractorUnit.ghostCueBallCenter, tangentBaseAngle - (90 * state.tangentDirection), tangentDistance, 0f, textPaint)
+        draw(
+            canvas,
+            "Tangent Line",
+            state.protractorUnit.ghostCueBallCenter,
+            tangentBaseAngle + (90 * state.tangentDirection),
+            tangentDistance,
+            LabelConfig.tangentLine,
+            textPaint,
+            state
+        )
+        draw(
+            canvas,
+            "Tangent Line",
+            state.protractorUnit.ghostCueBallCenter,
+            tangentBaseAngle - (90 * state.tangentDirection),
+            tangentDistance,
+            LabelConfig.tangentLine,
+            textPaint,
+            state
+        )
     }
 
 
     fun drawAngleLabel(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint, radius: Float) {
+        val config = LabelConfig.angleGuide
+        if (!config.isPersistentlyVisible) return // Assuming this is a helper label
+
         val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)
         val labelAngleRad = initialAngleRad + Math.toRadians(angleDegrees.toDouble())
         val labelDistance = radius * 16.5f
@@ -73,6 +135,7 @@ class LineTextRenderer {
         val textX = center.x + (labelDistance * cos(labelAngleRad)).toFloat()
         val textY = center.y + (labelDistance * sin(labelAngleRad)).toFloat()
 
+        paint.color = config.color.copy(alpha = config.opacity).toArgb()
         canvas.drawText(text, textX, textY, paint)
     }
 
@@ -84,7 +147,16 @@ class LineTextRenderer {
         paint: Paint,
         padding: Float
     ) {
+        val config = LabelConfig.diamondSystem
+        if (!state.areHelpersVisible && !config.isPersistentlyVisible) return
+
         val diamondNumberText = calculateDiamondNumber(point, railType, state) ?: return
+
+        // --- HERESY CORRECTED: Work in the logical coordinate space of the pre-transformed canvas. ---
+        // The canvas is already transformed by railPitchMatrix. We draw at the logical point.
+        // We must convert screen-space padding to logical-space padding.
+        val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition)
+        val logicalPadding = if (zoomFactor > 0) padding / zoomFactor else padding
 
         val textHeight = paint.descent() - paint.ascent()
         val textOffset = textHeight / 2 - paint.descent()
@@ -93,18 +165,24 @@ class LineTextRenderer {
         var textY = point.y
 
         when (railType) {
-            RailType.TOP -> textY += padding
-            RailType.BOTTOM -> textY -= padding
-            RailType.LEFT -> textX += padding
-            RailType.RIGHT -> textX -= padding
+            RailType.TOP -> textY += logicalPadding
+            RailType.BOTTOM -> textY -= logicalPadding
+            RailType.LEFT -> textX += logicalPadding
+            RailType.RIGHT -> textX -= logicalPadding
         }
 
-        // Counter-rotate the text to keep it upright relative to the screen
+        // Apply config offset, also scaled to logical space
+        textX += if (zoomFactor > 0) config.xOffset / zoomFactor else config.xOffset
+        textY += if (zoomFactor > 0) config.yOffset / zoomFactor else config.yOffset
+
+        // Counter-rotate the text relative to the world rotation to keep it screen-aligned
         canvas.save()
         canvas.translate(textX, textY)
-        canvas.rotate(-state.table.rotationDegrees)
+        canvas.rotate(-state.worldRotationDegrees)
+        paint.color = config.color.copy(alpha = config.opacity).toArgb()
         canvas.drawText(diamondNumberText, 0f, textOffset, paint)
         canvas.restore()
+        // --- END CORRECTION ---
     }
 
 
@@ -114,7 +192,7 @@ class LineTextRenderer {
 
         // De-rotate the impact point to align with the un-rotated table for easier calculation
         val deRotatedPoint = PointF()
-        val angleRad = Math.toRadians(-state.table.rotationDegrees.toDouble())
+        val angleRad = Math.toRadians(-state.worldRotationDegrees.toDouble())
         val cosA = cos(angleRad).toFloat()
         val sinA = sin(angleRad).toFloat()
         deRotatedPoint.x = point.x * cosA - point.y * sinA

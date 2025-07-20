@@ -1,97 +1,100 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt
+
 package com.hereliesaz.cuedetat.view.renderer.table
 
 import android.graphics.Canvas
-import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PointF
 import androidx.compose.ui.graphics.toArgb
-import com.hereliesaz.cuedetat.ui.theme.GunmetalFog
-import com.hereliesaz.cuedetat.ui.theme.SlateGray
-import com.hereliesaz.cuedetat.view.model.Table
+import com.hereliesaz.cuedetat.ui.theme.WarningRed
+import com.hereliesaz.cuedetat.view.PaintCache
+import com.hereliesaz.cuedetat.view.config.table.Holes
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
-object TableRenderer {
-    private val tablePaint = Paint().apply {
-        style = Paint.Style.FILL
-        color = GunmetalFog.toArgb()
-        isAntiAlias = true
+class TableRenderer {
+
+    companion object {
+        fun getLogicalPockets(state: OverlayState): List<PointF> {
+            return state.table.pockets
+        }
     }
 
-    private val railPaint = Paint().apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 2.5f
-        color = SlateGray.toArgb()
-        isAntiAlias = true
-    }
-
-    private val pocketPaint = Paint().apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 2.5f
-        color = SlateGray.toArgb()
-        isAntiAlias = true
-    }
-
-    private val pocketCutoutPaint = Paint().apply {
-        style = Paint.Style.FILL
-        color = android.graphics.Color.BLACK
-        isAntiAlias = true
-    }
-
-    private val diamondGridPaint = Paint().apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 1.0f
-        color = SlateGray.toArgb()
-        alpha = 100
-        pathEffect = DashPathEffect(floatArrayOf(5f, 10f), 0f)
-        isAntiAlias = true
-    }
-
-    fun drawTable(canvas: Canvas, state: OverlayState) {
+    fun drawSurface(canvas: Canvas, state: OverlayState, paints: PaintCache) {
         if (!state.table.isVisible) return
 
-        canvas.save()
-        canvas.concat(state.pitchMatrix)
+        val corners = state.table.corners
+        if (corners.size < 4) return
 
-        val table = state.table
-        canvas.drawPath(table.surfacePath, tablePaint)
-        drawDiamondGrid(canvas, table, diamondGridPaint)
-        canvas.drawPath(table.railPath, railPaint)
-        drawPockets(canvas, table, pocketPaint, pocketCutoutPaint)
+        val tableOutlinePaint = paints.tableOutlinePaint
+        val diamondGridPaint = paints.gridLinePaint
 
-        canvas.restore()
-    }
-
-    private fun drawPockets(canvas: Canvas, table: Table, rimPaint: Paint, cutoutPaint: Paint) {
-        table.pockets.forEach { pocket ->
-            canvas.drawCircle(pocket.x, pocket.y, table.pocketRadius, cutoutPaint)
-            canvas.drawCircle(pocket.x, pocket.y, table.pocketRadius, rimPaint)
-        }
-    }
-
-    private fun drawDiamondGrid(canvas: Canvas, table: Table, paint: Paint) {
+        // Draw Rotated Outline
         val path = Path()
-        val diamonds = table.diamonds
+        path.moveTo(corners[0].x, corners[0].y)
+        path.lineTo(corners[1].x, corners[1].y)
+        path.lineTo(corners[2].x, corners[2].y)
+        path.lineTo(corners[3].x, corners[3].y)
+        path.close()
+        canvas.drawPath(path, tableOutlinePaint)
 
-        if (diamonds.size < 18) return
-
-        for (i in 0..2) {
-            val topStart = diamonds[i + 1]
-            val bottomEnd = diamonds[15 - i]
-            path.moveTo(topStart.x, topStart.y)
-            path.lineTo(bottomEnd.x, bottomEnd.y)
+        // --- HERESY CORRECTED: Draw the proper 3x7 diamond system grid. ---
+        // Vertical lines (3 lines)
+        for (i in 1..3) {
+            val fraction = i / 4.0f
+            val top = interpolate(corners[0], corners[1], fraction)
+            val bottom = interpolate(corners[3], corners[2], fraction)
+            canvas.drawLine(top.x, top.y, bottom.x, bottom.y, diamondGridPaint)
         }
 
-        path.moveTo(diamonds[0].x, diamonds[0].y)
-        path.lineTo(diamonds[9].x, diamonds[9].y)
+        // Horizontal lines (7 lines)
+        for (i in 1..7) {
+            val fraction = i / 8.0f
+            val left = interpolate(corners[0], corners[3], fraction)
+            val right = interpolate(corners[1], corners[2], fraction)
+            canvas.drawLine(left.x, left.y, right.x, right.y, diamondGridPaint)
+        }
+        // --- END CORRECTION ---
+    }
 
-        path.moveTo(diamonds[4].x, diamonds[4].y)
-        path.lineTo(diamonds[13].x, diamonds[13].y)
+    private fun interpolate(p1: PointF, p2: PointF, fraction: Float): PointF {
+        return PointF(p1.x + (p2.x - p1.x) * fraction, p1.y + (p2.y - p1.y) * fraction)
+    }
 
-        val leftSidePocket = table.pockets[5]
-        val rightSidePocket = table.pockets[2]
-        path.moveTo(leftSidePocket.x, leftSidePocket.y)
-        path.lineTo(rightSidePocket.x, rightSidePocket.y)
+    fun drawPockets(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+        if (!state.table.isVisible) return
+        val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
+        if (referenceRadius <= 0) return
 
-        canvas.drawPath(path, paint)
+        val holesConfig = Holes()
+        val pockets = getLogicalPockets(state)
+        val pocketRadius = referenceRadius * 1.8f
+
+        val pocketedPaintWhite =
+            Paint(paints.pocketFillPaint).apply { color = android.graphics.Color.WHITE }
+        val pocketedPaintRed = Paint(paints.pocketFillPaint).apply { color = WarningRed.toArgb() }
+        val pocketOutlinePaint = Paint(paints.tableOutlinePaint).apply {
+            color = holesConfig.strokeColor.toArgb()
+            strokeWidth = holesConfig.strokeWidth
+        }
+        val pocketFillPaint = Paint(paints.pocketFillPaint).apply {
+            color = holesConfig.fillColor.toArgb()
+        }
+
+
+        pockets.forEachIndexed { index, pos ->
+            val isAimedAtByAimingLine = state.aimedPocketIndex == index && !state.isBankingMode
+            val isAimedAtByTangentLine =
+                state.tangentAimedPocketIndex == index && !state.isBankingMode
+            val isPocketedInBank = state.isBankingMode && index == state.pocketedBankShotPocketIndex
+
+            val fillPaint = when {
+                isAimedAtByAimingLine || isPocketedInBank -> pocketedPaintWhite
+                isAimedAtByTangentLine -> pocketedPaintRed
+                else -> pocketFillPaint
+            }
+            canvas.drawCircle(pos.x, pos.y, pocketRadius, fillPaint)
+            canvas.drawCircle(pos.x, pos.y, pocketRadius, pocketOutlinePaint)
+        }
     }
 }

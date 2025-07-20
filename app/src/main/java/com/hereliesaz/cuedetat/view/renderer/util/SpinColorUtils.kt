@@ -4,7 +4,6 @@ package com.hereliesaz.cuedetat.view.renderer.util
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
-import androidx.core.graphics.ColorUtils
 
 object SpinColorUtils {
 
@@ -16,8 +15,8 @@ object SpinColorUtils {
      * @return The calculated Color.
      */
     fun getColorFromAngleAndDistance(angleDegrees: Float, distance: Float): Color {
-        // A 90-degree clockwise rotation means subtracting 90 degrees from the input angle.
-        val adjustedAngle = (angleDegrees - 90f + 360f) % 360f
+        // Corrects the mathematical angle to align with the visual color wheel.
+        val adjustedAngle = (angleDegrees + 360f) % 360f
 
         val stops = listOf(
             0f to Color.Red,

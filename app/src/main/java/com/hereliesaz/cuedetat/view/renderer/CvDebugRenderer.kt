@@ -19,7 +19,7 @@ class CvDebugRenderer {
 
     fun draw(canvas: Canvas, state: OverlayState) {
         if (!state.showCvMask) return
-        val maskMat = state.visionData.cvMask ?: return
+        val maskMat = state.visionData?.cvMask ?: return
 
         try {
             // Ensure bitmap is the correct size, or create it

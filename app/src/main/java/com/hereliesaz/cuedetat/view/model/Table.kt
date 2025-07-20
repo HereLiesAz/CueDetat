@@ -5,9 +5,7 @@ package com.hereliesaz.cuedetat.view.model
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.view.state.TableSize
-import kotlin.math.abs
 import kotlin.math.pow
-import kotlin.math.sqrt
 
 /**
  * The single source of truth for the pool table's state and geometry.
@@ -17,19 +15,17 @@ import kotlin.math.sqrt
  * architecturally fixed to the logical plane's origin (0,0).
  *
  * @property size The physical dimensions of the table (e.g., EIGHT_FT).
- * @property rotationDegrees The visual rotation of the table on the logical plane.
  * @property isVisible Whether the table is currently rendered.
  */
 data class Table(
     val size: TableSize,
-    val rotationDegrees: Float,
     val isVisible: Boolean,
 ) {
     val logicalWidth: Float
     val logicalHeight: Float
     val corners: List<PointF>
     val pockets: List<PointF>
-    private val normals: List<PointF>
+    val normals: List<PointF>
 
     init {
         val ballRealDiameter = 2.25f
@@ -51,11 +47,13 @@ data class Table(
             PointF(-halfW, halfH)   // Bottom-Left
         )
 
+        val sidePocketOffset = LOGICAL_BALL_RADIUS * 0.5f
+
         // Pockets are also now permanently stored in their un-rotated, logical orientation.
         pockets = listOf(
-            PointF(-halfW, -halfH), PointF(halfW, -halfH), // Top-Left, Top-Right
-            PointF(-halfW, halfH), PointF(halfW, halfH),   // Bottom-Left, Bottom-Right
-            PointF(-halfW, 0f), PointF(halfW, 0f)          // CORRECTED: Side pockets are on the rail.
+            PointF(-halfW, -halfH), PointF(halfW, -halfH),
+            PointF(-halfW, halfH), PointF(halfW, halfH),
+            PointF(-halfW - sidePocketOffset, 0f), PointF(halfW + sidePocketOffset, 0f)
         )
 
         // Normals are also now permanently stored in their un-rotated, logical orientation.
@@ -70,19 +68,13 @@ data class Table(
     fun isPointInside(point: PointF): Boolean {
         if (corners.isEmpty()) return false
 
-        // De-rotate the point to check against the un-rotated table bounds
-        val deRotatedPoint = PointF()
-        val angleRad = Math.toRadians(-rotationDegrees.toDouble())
-        val cosA = kotlin.math.cos(angleRad).toFloat()
-        val sinA = kotlin.math.sin(angleRad).toFloat()
-        deRotatedPoint.x = point.x * cosA - point.y * sinA
-        deRotatedPoint.y = point.x * sinA + point.y * cosA
-
+        // HERESY PURGED: The table model is always un-rotated. The point passed in is
+        // in the logical, un-rotated coordinate space. No de-rotation is necessary here.
         val halfW = logicalWidth / 2f
         val halfH = logicalHeight / 2f
 
-        return deRotatedPoint.x >= -halfW && deRotatedPoint.x <= halfW &&
-                deRotatedPoint.y >= -halfH && deRotatedPoint.y <= halfH
+        return point.x >= -halfW && point.x <= halfW &&
+                point.y >= -halfH && point.y <= halfH
     }
 
     fun findRailIntersectionAndNormal(startPoint: PointF, endPoint: PointF): Pair<PointF, PointF>? {

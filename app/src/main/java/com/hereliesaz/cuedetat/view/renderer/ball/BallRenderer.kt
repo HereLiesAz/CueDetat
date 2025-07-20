@@ -4,10 +4,9 @@ package com.hereliesaz.cuedetat.view.renderer.ball
 
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
-import com.hereliesaz.cuedetat.ui.theme.RebelYellow
+import com.hereliesaz.cuedetat.ui.theme.SulfurDust
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.ball.ActualCueBall
 import com.hereliesaz.cuedetat.view.config.ball.BankingBall
@@ -16,6 +15,7 @@ import com.hereliesaz.cuedetat.view.config.ball.ObstacleBall
 import com.hereliesaz.cuedetat.view.config.ball.TargetBall
 import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
+import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.LogicalCircular
 import com.hereliesaz.cuedetat.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
@@ -41,9 +41,11 @@ class BallRenderer {
 
         drawBoundingBoxes(canvas, state, paints)
 
-        val detectedBalls = state.visionData.genericBalls + state.visionData.customBalls
+        val detectedBalls =
+            (state.visionData?.genericBalls ?: emptyList()) + (state.visionData?.customBalls
+                ?: emptyList())
         val snappedPaint = Paint(paints.targetCirclePaint).apply {
-            color = RebelYellow.toArgb()
+            color = SulfurDust.toArgb()
             style = Paint.Style.FILL
             alpha = 150
         }
@@ -54,30 +56,43 @@ class BallRenderer {
                 hypot((logicalBall.center.x - detected.x).toDouble(), (logicalBall.center.y - detected.y).toDouble()) < 5.0
             }
             if (isSnapped) {
-                canvas.save()
-                canvas.concat(state.pitchMatrix)
-                canvas.drawCircle(logicalBall.center.x, logicalBall.center.y, logicalBall.radius * 0.5f, snappedPaint)
-                canvas.restore()
+                state.pitchMatrix?.let { matrix ->
+                    canvas.save()
+                    canvas.concat(matrix)
+                    canvas.drawCircle(
+                        logicalBall.center.x,
+                        logicalBall.center.y,
+                        logicalBall.radius * 0.5f,
+                        snappedPaint
+                    )
+                    canvas.restore()
+                }
             }
         }
 
-        if (state.areHelpersVisible) {
-            drawAllLabels(canvas, state, paints, typeface)
-        }
+        drawAllLabels(canvas, state, paints, typeface)
     }
 
     private fun drawBoundingBoxes(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        val paint = Paint(paints.cvResultPaint).apply {
+        Paint(paints.cvResultPaint).apply {
             style = Paint.Style.STROKE
             strokeWidth = 3f
             alpha = 150
         }
-        canvas.save()
-        canvas.concat(state.pitchMatrix)
-        state.visionData.detectedBoundingBoxes.forEach { box ->
-            canvas.drawRect(RectF(box), paint)
-        }
-        canvas.restore()
+
+        // Bounding boxes are in image coordinates, not logical coordinates.
+        // We need to transform them to screen coordinates.
+        // The OverlayState's pitchMatrix transforms logical to screen.
+        // We can't use it directly.
+        // For now, this feature is disabled until a proper image-to-screen matrix is passed down.
+        // A direct draw would be misaligned.
+        // Example of what would be needed:
+        // canvas.save()
+        // canvas.concat(state.imageToScreenMatrix) // This matrix doesn't exist yet
+        // state.visionData.detectedBoundingBoxes.forEach { box ->
+        //     canvas.drawRect(RectF(box), paint)
+        // }
+        // canvas.restore()
     }
 
 
@@ -97,8 +112,12 @@ class BallRenderer {
     }
 
     private fun drawGhostedBall(canvas: Canvas, ball: LogicalCircular, config: BallsConfig, state: OverlayState, paints: PaintCache) {
-        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ball.center, ball.radius, state, state.pitchMatrix)
-        val screenPos = DrawingUtils.mapPoint(ball.center, state.pitchMatrix)
+        val positionMatrix = state.pitchMatrix ?: return
+        val sizeMatrix = state.sizeCalculationMatrix ?: positionMatrix // Fallback to positionMatrix
+
+        val radiusInfo =
+            DrawingUtils.getPerspectiveRadiusAndLift(ball.center, ball.radius, state, sizeMatrix)
+        val screenPos = DrawingUtils.mapPoint(ball.center, positionMatrix)
         val yPosLifted = screenPos.y - radiusInfo.lift
 
         val strokePaint = Paint(paints.targetCirclePaint).apply {
@@ -120,7 +139,7 @@ class BallRenderer {
         val dotRadius = ball.radius * 0.1f
 
         canvas.save()
-        canvas.concat(state.pitchMatrix)
+        canvas.concat(positionMatrix)
         canvas.drawCircle(ball.center.x, ball.center.y, ball.radius + strokePaint.strokeWidth / 2f, strokePaint)
         canvas.drawCircle(ball.center.x, ball.center.y, dotRadius, dotPaint)
         canvas.restore()
@@ -152,16 +171,40 @@ class BallRenderer {
         val textPaint = paints.textPaint.apply { this.typeface = typeface }
 
         state.onPlaneBall?.let {
-            val label = if (state.isBankingMode) BankingBall().label else ActualCueBall().label
-            textRenderer.draw(canvas, textPaint, state.zoomSliderPosition, it, label, state)
+            val (label, config) = if (state.isBankingMode) {
+                "Banking Ball" to LabelConfig.bankingBall
+            } else {
+                "Actual Cue Ball" to LabelConfig.actualCueBall
+            }
+            textRenderer.draw(canvas, textPaint, state.zoomSliderPosition, it, label, config, state)
         }
 
         if (!state.isBankingMode) {
-            textRenderer.draw(canvas, textPaint, state.zoomSliderPosition, state.protractorUnit, TargetBall().label, state)
+            textRenderer.draw(
+                canvas,
+                textPaint,
+                state.zoomSliderPosition,
+                state.protractorUnit,
+                "Target Ball",
+                LabelConfig.targetBall,
+                state
+            )
             textRenderer.draw(canvas, textPaint, state.zoomSliderPosition, object : LogicalCircular {
                 override val center = state.protractorUnit.ghostCueBallCenter
                 override val radius = state.protractorUnit.radius
-            }, GhostCueBall().label, state)
+            }, "Ghost Cue Ball", LabelConfig.ghostCueBall, state)
+        }
+
+        state.obstacleBalls.forEachIndexed { index, obstacle ->
+            textRenderer.draw(
+                canvas,
+                textPaint,
+                state.zoomSliderPosition,
+                obstacle,
+                "Obstacle ${index + 1}",
+                LabelConfig.obstacleBall,
+                state
+            )
         }
     }
 }

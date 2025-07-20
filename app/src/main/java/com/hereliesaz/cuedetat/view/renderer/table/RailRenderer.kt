@@ -4,24 +4,23 @@ package com.hereliesaz.cuedetat.view.renderer.table
 
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
-import com.hereliesaz.cuedetat.ui.theme.AcidPatina
+import com.hereliesaz.cuedetat.ui.theme.MonteCarlo
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.table.Diamonds
 import com.hereliesaz.cuedetat.view.config.table.Rail
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import kotlin.math.atan2
 import kotlin.math.pow
-import kotlin.math.sqrt
 
 class RailRenderer {
     private val railVisualOffsetFromEdgeFactor = 0.75f
-    private val diamondSizeFactor = 0.25f
+    private val diamondSizeFactor = 0.5f
     private val railConfig = Rail()
     private val diamondConfig = Diamonds()
     private val textRenderer = LineTextRenderer()
@@ -29,10 +28,7 @@ class RailRenderer {
     fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         if (!state.table.isVisible || state.table.corners.size < 4) return
 
-        val railLinePaint = Paint(paints.tableOutlinePaint).apply {
-            color = railConfig.strokeColor.toArgb()
-            strokeWidth = railConfig.strokeWidth
-        }
+        val railLinePaint = paints.tableOutlinePaint
         val railLineGlowPaint = Paint(paints.lineGlowPaint).apply {
             strokeWidth = railConfig.glowWidth
             color = railConfig.glowColor.toArgb()
@@ -49,8 +45,11 @@ class RailRenderer {
         val corners = state.table.corners
 
         val offsetCorners = corners.mapIndexed { index, corner ->
+            // Inward normal for segment from previous corner to current corner
             val normal1 = normalize(PointF(corners[(index + 3) % 4].y - corner.y, corner.x - corners[(index + 3) % 4].x))
-            val normal2 = normalize(PointF(corners[(index + 1) % 4].y - corner.y, corner.x - corners[(index + 1) % 4].x))
+            // Inward normal for segment from current corner to next corner
+            val nextCorner = corners[(index + 1) % 4]
+            val normal2 = normalize(PointF(corner.y - nextCorner.y, nextCorner.x - corner.x))
             PointF(
                 corner.x - (normal1.x + normal2.x) * railOffsetAmount,
                 corner.y - (normal1.y + normal2.y) * railOffsetAmount
@@ -74,55 +73,136 @@ class RailRenderer {
 
         // --- Draw Diamonds ---
         val diamondRadius = LOGICAL_BALL_RADIUS * diamondSizeFactor
+        val diamondOffset = 50f
+        val normals = state.table.normals
 
         for (i in 1..3) {
             val fraction = i / 4.0f
             val top = interpolate(offsetCorners[0], offsetCorners[1], fraction)
             val bottom = interpolate(offsetCorners[3], offsetCorners[2], fraction)
-            canvas.drawCircle(top.x, top.y, diamondRadius, diamondPaint)
-            canvas.drawCircle(bottom.x, bottom.y, diamondRadius, diamondPaint)
+
+            drawDiamond(
+                canvas,
+                PointF(top.x + normals[0].x * diamondOffset, top.y + normals[0].y * diamondOffset),
+                diamondRadius,
+                diamondPaint
+            )
+            drawDiamond(
+                canvas,
+                PointF(
+                    bottom.x + normals[2].x * diamondOffset,
+                    bottom.y + normals[2].y * diamondOffset
+                ),
+                diamondRadius,
+                diamondPaint
+            )
         }
 
         for (i in 1..3) {
+            // Upper half of side rails
             val leftTop = interpolate(offsetCorners[0], offsetCorners[3], i / 8.0f)
             val rightTop = interpolate(offsetCorners[1], offsetCorners[2], i / 8.0f)
-            canvas.drawCircle(leftTop.x, leftTop.y, diamondRadius, diamondPaint)
-            canvas.drawCircle(rightTop.x, rightTop.y, diamondRadius, diamondPaint)
+            drawDiamond(
+                canvas,
+                PointF(
+                    leftTop.x + normals[3].x * diamondOffset,
+                    leftTop.y + normals[3].y * diamondOffset
+                ),
+                diamondRadius,
+                diamondPaint
+            )
+            drawDiamond(
+                canvas,
+                PointF(
+                    rightTop.x + normals[1].x * diamondOffset,
+                    rightTop.y + normals[1].y * diamondOffset
+                ),
+                diamondRadius,
+                diamondPaint
+            )
 
+            // Lower half of side rails
             val leftBottom = interpolate(offsetCorners[0], offsetCorners[3], (8 - i) / 8.0f)
             val rightBottom = interpolate(offsetCorners[1], offsetCorners[2], (8 - i) / 8.0f)
-            canvas.drawCircle(leftBottom.x, leftBottom.y, diamondRadius, diamondPaint)
-            canvas.drawCircle(rightBottom.x, rightBottom.y, diamondRadius, diamondPaint)
+            drawDiamond(
+                canvas,
+                PointF(
+                    leftBottom.x + normals[3].x * diamondOffset,
+                    leftBottom.y + normals[3].y * diamondOffset
+                ),
+                diamondRadius,
+                diamondPaint
+            )
+            drawDiamond(
+                canvas,
+                PointF(
+                    rightBottom.x + normals[1].x * diamondOffset,
+                    rightBottom.y + normals[1].y * diamondOffset
+                ),
+                diamondRadius,
+                diamondPaint
+            )
         }
     }
 
+    private fun drawDiamond(canvas: Canvas, center: PointF, radius: Float, paint: Paint) {
+        val path = Path()
+        path.moveTo(center.x, center.y - radius) // Top
+        path.lineTo(center.x + radius, center.y) // Right
+        path.lineTo(center.x, center.y + radius) // Bottom
+        path.lineTo(center.x - radius, center.y) // Left
+        path.close()
+        canvas.drawPath(path, paint)
+    }
+
     fun drawRailLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
-        // Calculate a reference radius for font sizing, since the global one is gone.
+        val matrix = state.railPitchMatrix ?: return
         val referenceRadius = DrawingUtils.getPerspectiveRadiusAndLift(
-            state.protractorUnit.center, state.protractorUnit.radius, state, state.pitchMatrix
+            state.protractorUnit.center, state.protractorUnit.radius, state, matrix
         ).radius
 
         val textPaint = paints.textPaint.apply {
             this.typeface = typeface
             this.textSize = referenceRadius * 4f
-            this.color = AcidPatina.toArgb()
+            this.color = MonteCarlo.toArgb()
         }
         val textPadding = referenceRadius * 5f
 
         val pathToLabel = if (state.isBankingMode) state.bankShotPath else state.aimingLineBankPath
-        if (pathToLabel.size > 1) {
-            val bankPoint = pathToLabel[1]
-            getRailForPoint(bankPoint, state)?.let { railType ->
-                textRenderer.drawDiamondLabel(canvas, bankPoint, railType, state, textPaint, textPadding)
+        pathToLabel?.let { path ->
+            if (path.size > 1) {
+                val bankPoint = path[1]
+                getRailForPoint(bankPoint, state)?.let { railType ->
+                    textRenderer.drawDiamondLabel(
+                        canvas,
+                        bankPoint,
+                        railType,
+                        state,
+                        textPaint,
+                        textPadding
+                    )
+                }
             }
         }
 
-        if (!state.isBankingMode && state.tangentLineBankPath.size > 1) {
-            val tangentBankPoint = state.tangentLineBankPath[1]
-            getRailForPoint(tangentBankPoint, state)?.let { railType ->
-                textRenderer.drawDiamondLabel(canvas, tangentBankPoint, railType, state, textPaint, textPadding)
+        if (!state.isBankingMode) {
+            state.tangentLineBankPath?.let { path ->
+                if (path.size > 1) {
+                    val tangentBankPoint = path[1]
+                    getRailForPoint(tangentBankPoint, state)?.let { railType ->
+                        textRenderer.drawDiamondLabel(
+                            canvas,
+                            tangentBankPoint,
+                            railType,
+                            state,
+                            textPaint,
+                            textPadding
+                        )
+                    }
+                }
             }
         }
+
 
         if (!state.isBankingMode) {
             state.shotGuideImpactPoint?.let { impactPoint ->
@@ -160,7 +240,7 @@ class RailRenderer {
 
     private fun normalize(p: PointF): PointF {
         val mag = kotlin.math.hypot(p.x, p.y)
-        return if (mag > 0) PointF(p.x / mag, p.y / mag) else PointF(0f, 0f)
+        return if (mag > 0) PointF(p.x / mag.toFloat(), p.y / mag.toFloat()) else PointF(0f, 0f)
     }
 
     private fun getPointAlongLine(start: PointF, end: PointF, distance: Float): PointF {
