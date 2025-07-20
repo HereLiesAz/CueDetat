@@ -12,7 +12,7 @@ then processes only the included modules and root files, concatenating relevant 
 non-text assets. This version does NOT delete previous backups.
 .NOTES
 Author: Your Name/AI Assistant
-Version: 3.4
+Version: 3.7 (Optimized for Token Count)
 Place this script in the root of your Android project and run it from there.
 #>
 
@@ -28,7 +28,8 @@ $IgnoreModuleDirs = @(
 
 # Directories to exclude from processing inside selected modules (uses -like)
 $ExcludeSubDirsPatterns = @(
-    "*\build\*", "*\.cxx\*", "*\generated\*", "*\debug\*", "*\release\*"
+    "*\build\*", "*\.cxx\*", "*\generated\*", "*\debug\*", "*\release\*",
+    "*\.*" # Exclude any directory starting with a period (e.g., .git, .idea) and its contents.
 )
 
 # Specific files or patterns to always exclude (uses -like)
@@ -85,7 +86,9 @@ function Generate-ProjectTree {
     param([string]$Path = $ProjectRoot, [string]$Indent = "", [int]$Depth = 0, [int]$MaxDepth = 20, [hashtable]$FileStatusMap)
     if ($Depth -ge $MaxDepth) { return }
     try {
-        $items = Get-ChildItem -Path $Path -Force -ErrorAction SilentlyContinue | Sort-Object -Property @{Expression={$_.PSIsContainer}; Descending=$true}, Name
+        $items = Get-ChildItem -Path $Path -Force -ErrorAction SilentlyContinue | Where-Object {
+            -not ($_.PSIsContainer -and $_.Name.StartsWith('.'))
+        } | Sort-Object -Property @{ Expression = { $_.PSIsContainer }; Descending = $true }, Name
         if ($null -eq $items) { return }
     } catch { return }
     $lastItem = $items[-1]
@@ -96,7 +99,10 @@ function Generate-ProjectTree {
         $status = $FileStatusMap[$item.FullName]
         $statusMarker = if ($status) { " [$($status)]" } else { "" }
         $projectTreeOutput.Add("$Indent$marker $($item.Name)$statusMarker")
-        if ($item.PSIsContainer) {
+
+        # *** OPTIMIZATION: Only recurse into directories that are not marked for exclusion. ***
+        if ($item.PSIsContainer -and $status -ne "DIR EXCLUDED")
+        {
             Generate-ProjectTree -Path $item.FullName -Indent "$Indent$connection" -Depth ($Depth + 1) -MaxDepth $MaxDepth -FileStatusMap $FileStatusMap
         }
     }
@@ -172,12 +178,13 @@ foreach ($item in $allItems) {
         }
     }
 
-    # Skip directories immediately after setting their status
+    # Set DIR EXCLUDED status for directories matching exclusion patterns
     if ($item.PSIsContainer) {
-        if ($isInsideSelectedModule -and (Test-PathAgainstPatterns -Path $item.FullName -Patterns $ExcludeSubDirsPatterns)) {
+        if (Test-PathAgainstPatterns -Path $item.FullName -Patterns $ExcludeSubDirsPatterns)
+        {
             $fileStatusMap[$item.FullName] = "DIR EXCLUDED"
         }
-        continue
+        continue # Skip further processing for all directories in this initial categorization loop
     }
 
     # Process files within selected modules OR at the root level
@@ -202,7 +209,6 @@ foreach ($item in $allItems) {
         }
     }
 }
-
 
 Write-Host "Found $($filesToProcess.Count) text files to include."
 Write-Host "Found $($nonTextAssetsFound.Count) non-text assets to list."
