@@ -11,9 +11,9 @@
       "type": "SINGLE",
       "filters": [],
       "attributes": [],
-      "versionCode": 20,
-      "versionName": "0.8.3.1",
-      "outputFile": "CueDetat-0.8.3.1-release.apk"
+      "versionCode": 21,
+      "versionName": "0.8.9.4",
+      "outputFile": "com.hereliesaz.cuedetat-release-0.8.9.4-21.apk"
     }
   ],
   "elementType": "File",
@@ -22,14 +22,14 @@
       "minApi": 28,
       "maxApi": 30,
       "baselineProfiles": [
-        "baselineProfiles/1/CueDetat-0.8.3.1-release.dm"
+        "baselineProfiles/1/com.hereliesaz.cuedetat-release-0.8.9.4-21.dm"
       ]
     },
     {
       "minApi": 31,
       "maxApi": 2147483647,
       "baselineProfiles": [
-        "baselineProfiles/0/CueDetat-0.8.3.1-release.dm"
+        "baselineProfiles/0/com.hereliesaz.cuedetat-release-0.8.9.4-21.dm"
       ]
     }
   ],
