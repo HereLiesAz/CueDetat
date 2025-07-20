@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name"> Cue D\’état</string>
+    <string name="app_name">Cue D\’état</string>
     <string name="zoom_icon">Zoom Icon</string>
     <string name="reset_view">Reset View</string>
     <string name="show_helpers">WTF is all this?</string>

@@ -1,14 +1,15 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/state/OverlayState.kt
 package com.hereliesaz.cuedetat.view.state
 
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.VisionData
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
+import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.model.Table
@@ -70,23 +71,24 @@ data class OverlayState(
     // Table State Object
     val table: Table = Table(
         size = TableSize.EIGHT_FT,
-        rotationDegrees = 0f,
         isVisible = false
     ),
 
     // UI control state
     val zoomSliderPosition: Float = 0f,
-    val areHelpersVisible: Boolean = false,
+    val worldRotationDegrees: Float = 0f,
+    val areHelpersVisible: Boolean = LabelConfig.showLabelsByDefault,
     val isMoreHelpVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
     val isCameraVisible: Boolean = true,
     val viewOffset: PointF = PointF(0f, 0f), // Pan state
+    val orientationLock: OrientationLock = OrientationLock.AUTOMATIC,
 
     // Banking mode specific state
     val isBankingMode: Boolean = false,
     val bankingAimTarget: PointF? = null,
-    val bankShotPath: List<PointF> = emptyList(),
-    val pocketedBankShotPocketIndex: Int? = null,
+    @Transient val bankShotPath: List<PointF>? = null,
+    @Transient val pocketedBankShotPocketIndex: Int? = null,
     val showTableSizeDialog: Boolean = false,
 
     // Theme and Appearance
@@ -99,10 +101,10 @@ data class OverlayState(
     // Spin State
     val isSpinControlVisible: Boolean = false,
     val selectedSpinOffset: PointF? = null,
-    val spinPaths: Map<Color, List<PointF>> = emptyMap(),
+    @Transient val spinPaths: Map<Color, List<PointF>>? = null,
     val spinControlCenter: PointF? = null,
     val lingeringSpinOffset: PointF? = null,
-    val spinPathsAlpha: Float = 1.0f,
+    @Transient val spinPathsAlpha: Float = 1.0f,
 
     // Tutorial State
     val showTutorialOverlay: Boolean = false,
@@ -110,15 +112,18 @@ data class OverlayState(
 
     // Sensor and perspective data
     val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f),
-    val pitchMatrix: Matrix = Matrix(),
-    val inversePitchMatrix: Matrix = Matrix(),
-    val flatMatrix: Matrix = Matrix(),
-    val hasInverseMatrix: Boolean = false,
+    @Transient val pitchMatrix: Matrix? = null,
+    @Transient val railPitchMatrix: Matrix? = null,
+    @Transient val sizeCalculationMatrix: Matrix? = null,
+    @Transient val inversePitchMatrix: Matrix? = null,
+    @Transient val flatMatrix: Matrix? = null,
+    @Transient val hasInverseMatrix: Boolean = false,
 
     // CV Data
-    val visionData: VisionData = VisionData(),
-    val snapCandidates: List<SnapCandidate> = emptyList(),
+    @Transient val visionData: VisionData? = null,
+    @Transient val snapCandidates: List<SnapCandidate>? = null,
     val lockedHsvColor: FloatArray? = null,
+    val lockedHsvStdDev: FloatArray? = null,
     val showAdvancedOptionsDialog: Boolean = false,
     val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
     val useCustomModel: Boolean = false,
@@ -129,45 +134,54 @@ data class OverlayState(
     val houghP2: Float = 20f,
     val cannyThreshold1: Float = 50f,
     val cannyThreshold2: Float = 150f,
-    val cvHsvRangeMultiplier: Float = 1.5f,
     val showCvMask: Boolean = false,
     val isTestingCvMask: Boolean = false,
     val isCalibratingColor: Boolean = false,
     val colorSamplePoint: Offset? = null,
 
     // Derived state
-    val shotLineAnchor: PointF = PointF(0f, 0f),
-    val tangentDirection: Float = 1.0f,
-    val isGeometricallyImpossible: Boolean = false,
-    val isStraightShot: Boolean = false,
-    val isObstructed: Boolean = false,
-    val isTiltBeyondLimit: Boolean = false,
-    val warningText: String? = null,
-    val shotGuideImpactPoint: PointF? = null,
-    val aimingLineBankPath: List<PointF> = emptyList(),
-    val tangentLineBankPath: List<PointF> = emptyList(),
-    val inactiveTangentLineBankPath: List<PointF> = emptyList(),
-    val aimedPocketIndex: Int? = null,
-    val tangentAimedPocketIndex: Int? = null,
-    val aimingLineEndPoint: PointF? = null,
+    @Transient val shotLineAnchor: PointF? = null,
+    @Transient val tangentDirection: Float = 1.0f,
+    @Transient val isGeometricallyImpossible: Boolean = false,
+    @Transient val isStraightShot: Boolean = false,
+    @Transient val isObstructed: Boolean = false,
+    @Transient val isTiltBeyondLimit: Boolean = false,
+    @Transient val warningText: String? = null,
+    @Transient val shotGuideImpactPoint: PointF? = null,
+    @Transient val aimingLineBankPath: List<PointF>? = null,
+    @Transient val tangentLineBankPath: List<PointF>? = null,
+    @Transient val inactiveTangentLineBankPath: List<PointF>? = null,
+    @Transient val aimedPocketIndex: Int? = null,
+    @Transient val tangentAimedPocketIndex: Int? = null,
+    @Transient val aimingLineEndPoint: PointF? = null,
 
     // Theming
-    val appControlColorScheme: ColorScheme = darkColorScheme(),
+    @Transient val appControlColorScheme: ColorScheme? = null,
 
     // Gesture State
     val interactionMode: InteractionMode = InteractionMode.NONE,
     val movingObstacleBallIndex: Int? = null,
     val isMagnifierVisible: Boolean = false,
-    val magnifierSourceCenter: Offset? = null,
+    @Transient val magnifierSourceCenter: Offset? = null,
 
     // State for Reset/Revert functionality
-    val preResetState: OverlayState? = null,
+    @Transient val preResetState: OverlayState? = null,
 
     // Version Info
-    val latestVersionName: String? = null,
+    @Transient val latestVersionName: String? = null,
     val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
-    val targetBallDistance: Float = 0f
+    @Transient val targetBallDistance: Float = 0f
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
+
+    enum class OrientationLock {
+        AUTOMATIC, PORTRAIT, LANDSCAPE;
+
+        fun next(): OrientationLock = when (this) {
+            AUTOMATIC -> PORTRAIT
+            PORTRAIT -> LANDSCAPE
+            LANDSCAPE -> AUTOMATIC
+        }
+    }
 }

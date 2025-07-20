@@ -4,6 +4,7 @@ package com.hereliesaz.cuedetat
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
@@ -11,16 +12,23 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.runtime.*
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.hereliesaz.cuedetat.ui.MainScreen
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.MainViewModel
 import com.hereliesaz.cuedetat.ui.composables.SplashScreen
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
+import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SingleEvent
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.launchIn
@@ -81,7 +89,16 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun AppContent(viewModel: MainViewModel) {
-        var showSplashScreen by remember { mutableStateOf(true) }
+        var showSplashScreen by rememberSaveable { mutableStateOf(true) }
+        val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+        LaunchedEffect(uiState.orientationLock) {
+            requestedOrientation = when (uiState.orientationLock) {
+                OverlayState.OrientationLock.AUTOMATIC -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                OverlayState.OrientationLock.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                OverlayState.OrientationLock.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            }
+        }
 
         CueDetatTheme {
             if (showSplashScreen) {
