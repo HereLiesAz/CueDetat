@@ -1,0 +1,5 @@
+org.opencv.test.opencv-androidTest-0 G:\My Drive\CueDetatLite\opencv\build\generated\res\resValues\androidTest\debug
+org.opencv.test.opencv-mergeDebugAndroidTestResources-1 G:\My Drive\CueDetatLite\opencv\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\merged.dir
+org.opencv.test.opencv-mergeDebugAndroidTestResources-2 G:\My Drive\CueDetatLite\opencv\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\stripped.dir
+org.opencv.test.opencv-debugAndroidTest-3 G:\My Drive\CueDetatLite\opencv\build\intermediates\merged_res\debugAndroidTest\mergeDebugAndroidTestResources
+org.opencv.test.opencv-debug-4 G:\My Drive\CueDetatLite\opencv\build\intermediates\packaged_res\debug\packageDebugResources
