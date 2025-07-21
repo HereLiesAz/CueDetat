@@ -5,6 +5,7 @@ package com.hereliesaz.cuedetat.ui.composables
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -22,16 +23,17 @@ fun CuedetatButton(
     onClick: () -> Unit,
     text: String,
     modifier: Modifier = Modifier,
-    size: Dp = 72.dp
+    size: Dp = 72.dp,
+    color: Color = MaterialTheme.colorScheme.primary
 ) {
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.size(size),
-        shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)),
+        shape = CircleShape,
+        border = BorderStroke(2.dp, color.copy(alpha = 0.7f)),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = Color.Transparent,
-            contentColor = MaterialTheme.colorScheme.primary
+            contentColor = color
         ),
         contentPadding = PaddingValues(4.dp)
     ) {
@@ -39,8 +41,8 @@ fun CuedetatButton(
             text = text,
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 10.sp,
-                lineHeight = 12.sp
+                fontSize = 12.sp,
+                lineHeight = 14.sp
             ),
         )
     }

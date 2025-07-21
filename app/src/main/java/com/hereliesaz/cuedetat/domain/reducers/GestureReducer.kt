@@ -143,6 +143,12 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                     currentState
                 }
             }
+            InteractionMode.AIMING_BANK_SHOT -> {
+                currentState.copy(
+                    bankingAimTarget = event.currentLogicalPoint,
+                    valuesChangedSinceReset = true
+                )
+            }
             else -> currentState
         }
 

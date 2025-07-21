@@ -235,22 +235,26 @@ fun MainScreen(viewModel: MainViewModel) {
                         ) {
                             CuedetatButton(
                                 onClick = { viewModel.onEvent(MainScreenEvent.ToggleSpinControl) },
-                                text = "Spin"
+                                text = "Spin",
+                                color = MaterialTheme.colorScheme.tertiary
                             )
                             CuedetatButton(
                                 onClick = { viewModel.onEvent(MainScreenEvent.AddObstacleBall) },
-                                text = "Add\nBall"
+                                text = "Add\nBall",
+                                color = MaterialTheme.colorScheme.error
                             )
                             if (!uiState.isBankingMode) {
                                 if (!uiState.table.isVisible) {
                                     CuedetatButton(
                                         onClick = { viewModel.onEvent(MainScreenEvent.ToggleOnPlaneBall) },
-                                        text = if (uiState.onPlaneBall == null) "Cue\nBall" else "Hide"
+                                        text = if (uiState.onPlaneBall == null) "Cue\nBall" else "Hide",
+                                        color = MaterialTheme.colorScheme.secondary
                                     )
                                 }
                                 CuedetatButton(
                                     onClick = { viewModel.onEvent(MainScreenEvent.ToggleTable) },
-                                    text = if (uiState.table.isVisible) "Hide\nTable" else "Show\nTable"
+                                    text = if (uiState.table.isVisible) "Hide\nTable" else "Show\nTable",
+                                    color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
                                 )
                             }
                         }
@@ -273,7 +277,8 @@ fun MainScreen(viewModel: MainViewModel) {
                         CuedetatButton(
                             onClick = { viewModel.onEvent(MainScreenEvent.Reset) },
                             modifier = Modifier.padding(end = 16.dp),
-                            text = "Reset\nView"
+                            text = "Reset\nView",
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
                     }
                 }

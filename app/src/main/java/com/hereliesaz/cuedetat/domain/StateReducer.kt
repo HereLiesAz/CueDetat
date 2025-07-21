@@ -36,8 +36,7 @@ class StateReducer @Inject constructor(
         return when (event) {
             is MainScreenEvent.LogicalGestureStarted,
             is MainScreenEvent.LogicalDragApplied,
-            is MainScreenEvent.GestureEnded,
-            is MainScreenEvent.AimBankShot ->
+            is MainScreenEvent.GestureEnded ->
                 gestureReducer.reduce(currentState, event)
 
             is MainScreenEvent.ToggleOnPlaneBall,

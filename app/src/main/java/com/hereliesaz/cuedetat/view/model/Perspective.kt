@@ -38,27 +38,34 @@ object Perspective {
 
         if (applyPitch) {
             val physicalPitch = currentOrientation.pitch
-            val maxVisualPitch = 75f
-            val smoothingZoneStart = 60f // Start smoothing 15 degrees before the max.
+            val physicalMaxPitch = 75f
+            val virtualMaxPitch = 87f // Adjusted from 90f
+            val smoothingZoneStart = 60f
+
+            val overallScaleFactor = virtualMaxPitch / physicalMaxPitch
 
             val visualPitch = when {
                 physicalPitch < smoothingZoneStart -> {
-                    // Linear 1-to-1 mapping before the smoothing zone.
-                    physicalPitch
+                    // Linear mapping for the initial tilt range.
+                    physicalPitch * overallScaleFactor
                 }
 
-                physicalPitch in smoothingZoneStart..maxVisualPitch -> {
-                    // In the smoothing zone, apply an ease-out curve to smoothly
-                    // transition from the linear motion to the clamped limit.
-                    val range = maxVisualPitch - smoothingZoneStart
-                    val progress = (physicalPitch - smoothingZoneStart) / range
-                    val easedProgress = 1f - (1f - progress).pow(2) // Quadratic ease-out
-                    smoothingZoneStart + (easedProgress * range)
+                physicalPitch in smoothingZoneStart..physicalMaxPitch -> {
+                    // In the smoothing zone, apply an ease-out curve.
+                    val virtualSmoothingStart = smoothingZoneStart * overallScaleFactor
+                    val physicalRange = physicalMaxPitch - smoothingZoneStart
+                    val virtualRangeToEase = virtualMaxPitch - virtualSmoothingStart
+
+                    val progress = (physicalPitch - smoothingZoneStart) / physicalRange
+                    val easedProgress =
+                        1f - (1f - progress).pow(3) // Cubic ease-out for stronger effect
+
+                    virtualSmoothingStart + (easedProgress * virtualRangeToEase)
                 }
 
                 else -> {
                     // Past the max, lock it.
-                    maxVisualPitch
+                    virtualMaxPitch
                 }
             }
 

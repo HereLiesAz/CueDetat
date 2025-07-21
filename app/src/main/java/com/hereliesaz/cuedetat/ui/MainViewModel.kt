@@ -119,7 +119,6 @@ class MainViewModel @Inject constructor(
             val reducedState = when (event) {
                 // High-frequency gesture events that need a fast path
                 is MainScreenEvent.Drag -> handleDrag(currentState, event)
-                is MainScreenEvent.AimBankShot -> handleAimBankShot(currentState, event)
                 is MainScreenEvent.ScreenGestureStarted -> handleScreenGestureStarted(
                     currentState,
                     event
@@ -148,7 +147,6 @@ class MainViewModel @Inject constructor(
                 is MainScreenEvent.GestureEnded,
                 is MainScreenEvent.Reset,
                 is MainScreenEvent.AddObstacleBall,
-                is MainScreenEvent.AimBankShot,
                 is MainScreenEvent.ToggleBankingMode,
                 is MainScreenEvent.ToggleOnPlaneBall,
                 is MainScreenEvent.CvDataUpdated,
@@ -269,22 +267,6 @@ class MainViewModel @Inject constructor(
         return stateReducer.reduce(
             currentState,
             MainScreenEvent.LogicalDragApplied(prevLogical, currLogical, screenDelta)
-        )
-    }
-
-    private fun handleAimBankShot(
-        currentState: OverlayState,
-        event: MainScreenEvent.AimBankShot
-    ): OverlayState {
-        val newState = currentState.copy(bankingAimTarget = event.logicalTarget)
-        val bankResult = calculateBankShot(newState)
-        // This is a fast-path update, so we need to manually create a new state with the results
-        return updateStateUseCase(
-            newState.copy(
-                bankShotPath = bankResult.path,
-                pocketedBankShotPocketIndex = bankResult.pocketedPocketIndex
-            ),
-            UpdateType.AIMING // Trigger a full aiming update to ensure consistency
         )
     }
 }

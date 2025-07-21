@@ -14,7 +14,6 @@ import com.hereliesaz.cuedetat.ui.theme.BankLine1Yellow
 import com.hereliesaz.cuedetat.ui.theme.BankLine2Yellow
 import com.hereliesaz.cuedetat.ui.theme.BankLine3Yellow
 import com.hereliesaz.cuedetat.ui.theme.BankLine4Yellow
-import com.hereliesaz.cuedetat.ui.theme.SulfurDust
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.config.table.Table
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -114,7 +113,7 @@ class PaintCache {
 
         // --- HERESY CORRECTED: The cache now reads all properties from the component configs. ---
         val tableConfig = Table()
-        tableOutlinePaint.color = tableConfig.strokeColor.adjustLuminance(LUMINANCE_ADJUST).toArgb()
+        tableOutlinePaint.color = baseScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
         tableOutlinePaint.strokeWidth = tableConfig.strokeWidth
         // --- END CORRECTION ---
 
@@ -143,7 +142,7 @@ class PaintCache {
         angleGuidePaint.color =
             baseScheme.tertiary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.4f).toArgb()
         gridLinePaint.color =
-            SulfurDust.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.5f).toArgb()
+            baseScheme.primary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.5f).toArgb()
     }
 
     private fun Color.adjustLuminance(factor: Float): Color {

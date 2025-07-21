@@ -35,7 +35,8 @@ enum class UpdateType {
 
 class UpdateStateUseCase @Inject constructor(
     private val calculateSpinPaths: CalculateSpinPaths,
-    private val reducerUtils: ReducerUtils
+    private val reducerUtils: ReducerUtils,
+    private val calculateBankShot: CalculateBankShot
 ) {
 
     private val railHeightToTableHeightRatio = 0.025f
@@ -116,6 +117,14 @@ class UpdateStateUseCase @Inject constructor(
      * obstructions, line paths, banking, etc. Assumes matrices are up-to-date.
      */
     private fun updateAimingCalculations(state: OverlayState): OverlayState {
+        if (state.isBankingMode) {
+            val bankResult = calculateBankShot(state)
+            return state.copy(
+                bankShotPath = bankResult.path,
+                pocketedBankShotPocketIndex = bankResult.pocketedPocketIndex
+            )
+        }
+
         val logicalShotLineAnchor =
             getLogicalShotLineAnchor(state) ?: return state // Can't aim without an anchor
 

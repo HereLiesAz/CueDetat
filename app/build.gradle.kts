@@ -8,6 +8,8 @@ plugins {
     id("kotlin-kapt")
     id("com.google.dagger.hilt.android")
     alias(libs.plugins.kotlin.compose)
+    id("com.github.triplet.play")
+
 }
 
 kotlin {
@@ -53,14 +55,11 @@ android {
             )
         }
     }
+    // Play Publisher configuration block
 
-    splits {
-        abi {
-            reset() // Clear any existing ABI configurations
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
-        }
-    }
 
+    // Optional: Manage other aspects like metadata, images, etc.
+    // For full details, refer to the Gradle Play Publisher documentation.
     signingConfigs {
         create("release") {
             // Read signing information from local.properties
@@ -73,6 +72,8 @@ android {
             }
         }
     }
+
+
 
 
     buildTypes {
@@ -100,7 +101,19 @@ android {
 
     buildToolsVersion = "36.0.0"
     ndkVersion = "29.0.13599879 rc2"
+
+
 }
+
+//play {
+//    jsonFile =
+//        file("\"G:\\My Drive\\cue-detat-466601-50675aa2e046.json\"") // e.g., file("play-credentials.json")
+//    track = "internal" // Or "alpha", "beta", "production"
+//    publishNewApp.set(false) // Use with caution, typically set to false after first upload
+//    userFraction.set(1.0)
+//    releaseName.set("${appId}-${buildTypeName}-${abi}-${versionName}-${versionCode}")
+//    releaseStatus.set(com.github.triplet.gradle.play.api.ReleaseStatus.COMPLETED)
+//}
 
 dependencies {
     implementation(libs.androidx.core.ktx)
@@ -161,6 +174,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.datastore.preferences.rxjava2) // optional
     implementation(libs.androidx.datastore.preferences.rxjava3) // optional
+
 }
 
 kapt {
@@ -180,7 +194,7 @@ androidComponents {
             variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.APK)
         }
 
-        // Register a new Copy task for each variant
+        // Register a new Copy task for each vasriant
         tasks.register<Copy>("copyAndRename_${variant.name}") {
             group = "Distribution"
             description = "Copies and renames artifacts for the ${variant.name} variant."

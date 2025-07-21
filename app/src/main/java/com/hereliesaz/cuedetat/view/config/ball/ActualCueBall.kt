@@ -2,7 +2,6 @@ package com.hereliesaz.cuedetat.view.config.ball
 
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.ui.theme.Mariner
-import com.hereliesaz.cuedetat.ui.theme.OracleBlue
 import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
 
@@ -10,7 +9,7 @@ data class ActualCueBall(
     override val label: String = "Actual Cue Ball",
     override val opacity: Float = 1.0f,
     override val glowWidth: Float = 12f,
-    override val glowColor: Color = OracleBlue,
+    override val glowColor: Color = Mariner,
     override val strokeWidth: Float = 3f,
     override val strokeColor: Color = Mariner,
     override val additionalOffset: Float = 0f,

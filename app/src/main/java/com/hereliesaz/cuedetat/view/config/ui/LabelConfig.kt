@@ -3,11 +3,8 @@
 package com.hereliesaz.cuedetat.view.config.ui
 
 import androidx.compose.ui.graphics.Color
-import com.hereliesaz.cuedetat.ui.theme.Eight_ball_blue
 import com.hereliesaz.cuedetat.ui.theme.Mariner
 import com.hereliesaz.cuedetat.ui.theme.MutedGray
-import com.hereliesaz.cuedetat.ui.theme.OracleBlue
-import com.hereliesaz.cuedetat.ui.theme.RebelYellow
 import com.hereliesaz.cuedetat.ui.theme.SulfurDust
 
 /** Interface defining the common properties for all text labels. */
@@ -50,7 +47,7 @@ data class ActualCueBallLabelProperties(
 ) : LabelProperties
 
 data class BankingBallLabelProperties(
-    override val color: Color = RebelYellow,
+    override val color: Color = SulfurDust,
     override val xOffset: Float = 0f,
     override val yOffset: Float = 0f,
     override val opacity: Float = 1.0f,
@@ -77,7 +74,7 @@ data class AimingLineLabelProperties(
 ) : LabelProperties
 
 data class ShotGuideLineLabelProperties(
-    override val color: Color = Eight_ball_blue,
+    override val color: Color = Mariner,
     override val xOffset: Float = 5f,
     override val yOffset: Float = 0f,
     override val opacity: Float = 1.0f,
@@ -104,7 +101,7 @@ data class AngleGuideLabelProperties(
 ) : LabelProperties
 
 data class DiamondSystemLabelProperties(
-    override val color: Color = OracleBlue,
+    override val color: Color = Mariner,
     override val xOffset: Float = 0f,
     override val yOffset: Float = 0f,
     override val opacity: Float = 1.0f,
