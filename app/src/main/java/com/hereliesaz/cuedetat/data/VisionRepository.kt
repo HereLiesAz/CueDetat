@@ -142,6 +142,32 @@ class VisionRepository @Inject constructor(
                         null
                     }
 
+                    // --- FIX: Rotate the mask to match the display orientation ---
+                    val finalCvMask = if (cvMask != null) {
+                        val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+                        if (rotationDegrees == 0) {
+                            cvMask
+                        } else {
+                            val rotatedMask = Mat()
+                            val rotateCode = when (rotationDegrees) {
+                                90 -> Core.ROTATE_90_CLOCKWISE
+                                180 -> Core.ROTATE_180
+                                270 -> Core.ROTATE_90_COUNTERCLOCKWISE
+                                else -> -1 // Invalid, won't rotate
+                            }
+                            if (rotateCode != -1) {
+                                Core.rotate(cvMask, rotatedMask, rotateCode)
+                                cvMask.release() // Release the original un-rotated mask
+                                rotatedMask      // The rotated mask is now the final one
+                            } else {
+                                cvMask // Fallback to the original if rotation code is invalid
+                            }
+                        }
+                    } else {
+                        null
+                    }
+                    // --- END FIX ---
+
                     val refinedScreenPoints = detectedObjects.mapNotNull { detectedObject ->
                         refineBallCenter(detectedObject, mat, state, imageToScreenMatrix)
                     }.map { pointInImageCoords ->
@@ -170,7 +196,7 @@ class VisionRepository @Inject constructor(
                         genericBalls = filteredBalls,
                         detectedHsvColor = hsvTuple?.first ?: hsv,
                         detectedBoundingBoxes = detectedObjects.map { it.boundingBox },
-                        cvMask = cvMask
+                        cvMask = finalCvMask
                     )
 
                     _visionDataFlow.value = finalVisionData
