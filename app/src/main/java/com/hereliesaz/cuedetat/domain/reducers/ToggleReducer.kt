@@ -48,6 +48,7 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             is MainScreenEvent.ToggleCvModel -> currentState.copy(useCustomModel = !currentState.useCustomModel)
             is MainScreenEvent.ToggleOrientationLock -> currentState.copy(orientationLock = currentState.orientationLock.next())
             is MainScreenEvent.OrientationChanged -> currentState.copy(orientationLock = event.orientationLock)
+            is MainScreenEvent.ToggleCalibrationScreen -> currentState.copy(showCalibrationScreen = !currentState.showCalibrationScreen)
             else -> currentState
         }
     }

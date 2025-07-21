@@ -102,6 +102,9 @@ fun AdvancedOptionsDialog(
             },
             dismissButton = {
                 Row {
+                    TextButton(onClick = { onEvent(MainScreenEvent.ToggleCalibrationScreen); onDismiss() }) {
+                        Text("Calibrate Camera", color = MaterialTheme.colorScheme.tertiary)
+                    }
                     TextButton(onClick = { onEvent(MainScreenEvent.EnterCalibrationMode) }) {
                         Text("Calibrate Felt", color = MaterialTheme.colorScheme.tertiary)
                     }

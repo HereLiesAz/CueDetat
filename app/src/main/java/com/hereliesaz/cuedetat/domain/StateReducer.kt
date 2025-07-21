@@ -55,6 +55,7 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.ToggleSpinControl,
             is MainScreenEvent.ToggleSnapping,
             is MainScreenEvent.ToggleOrientationLock,
+            is MainScreenEvent.ToggleCalibrationScreen,
             is MainScreenEvent.ToggleCvModel ->
                 toggleReducer.reduce(currentState, event)
 

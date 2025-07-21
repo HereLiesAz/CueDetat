@@ -66,6 +66,7 @@ sealed class MainScreenEvent {
     data class LockColor(val hsvMean: FloatArray, val hsvStdDev: FloatArray) : MainScreenEvent()
     object ClearSamplePoint : MainScreenEvent()
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
+    object ToggleCalibrationScreen : MainScreenEvent()
     object ToggleCvRefinementMethod : MainScreenEvent()
     data class UpdateHoughP1(val value: Float) : MainScreenEvent()
     data class UpdateHoughP2(val value: Float) : MainScreenEvent()
