@@ -5,7 +5,8 @@ This document specifies the application's visual identity.
 ## Core Style
 
 * **Visuals:** Monochromatic, with a minimalistic aesthetic.
-* **Theme:** Dark mode is the default.
+* **Theme:** Dark mode is the default. The application uses a systematic, tiered color palette
+  defined in `Color.kt` and applied via `Theme.kt`.
 
 ## Theme Toggle
 
@@ -27,16 +28,16 @@ This document specifies the application's visual identity.
 * **Stroke Width**: The base stroke width for primary lines and ball outlines is `6f`. The glow
   stroke width is `12f`.
 * **Opacity**:
-    * Menu backgrounds: 80% (`0.8f`).
-    * Popup dialogs: 66% (`0.66f`).
+  * Menu backgrounds: 80% (`0.8f`).
+  * Popup dialogs: 66% (`0.66f`).
 
 ## Spin Control Color Wheel
 
 * **Description:** A circular UI element for selecting cue ball spin.
 * **Gradient:** The wheel must be a radial color gradient.
 * **Color Alignment**:
-    * **Top (270°):** Yellow (Topspin)
-    * **Right (0°):** Red (Right English)
-    * **Bottom (90°):** Blue (Draw/Backspin)
-    * **Left (180°):** Green (Left English)
+  * **Top (270°):** Yellow (Topspin)
+  * **Right (0°):** Red (Right English)
+  * **Bottom (90°):** Blue (Draw/Backspin)
+  * **Left (180°):** Green (Left English)
 * **Interaction:** A white circular indicator must show the precise point of selection.

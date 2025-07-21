@@ -67,6 +67,7 @@ sealed class MainScreenEvent {
     object ClearSamplePoint : MainScreenEvent()
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
     object ToggleCalibrationScreen : MainScreenEvent()
+    object ToggleQuickAlignScreen : MainScreenEvent()
     object ToggleCvRefinementMethod : MainScreenEvent()
     data class UpdateHoughP1(val value: Float) : MainScreenEvent()
     data class UpdateHoughP2(val value: Float) : MainScreenEvent()

@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
 import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
 import com.hereliesaz.cuedetat.ui.composables.MenuDrawerContent
@@ -59,12 +60,15 @@ import com.hereliesaz.cuedetat.ui.composables.SpinControl
 import com.hereliesaz.cuedetat.ui.composables.TopControls
 import com.hereliesaz.cuedetat.ui.composables.ZoomControls
 import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationScreen
+import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
 import com.hereliesaz.cuedetat.ui.composables.dialogs.AdvancedOptionsDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.GlowStickDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.LuminanceAdjustmentDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.TableSizeSelectionDialog
 import com.hereliesaz.cuedetat.ui.composables.overlays.KineticWarningOverlay
 import com.hereliesaz.cuedetat.ui.composables.overlays.TutorialOverlay
+import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignScreen
+import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
 import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
 import com.hereliesaz.cuedetat.ui.theme.BruisedPlum
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
@@ -77,9 +81,14 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
-    val uiState by viewModel.uiState.collectAsState()
-    val toastMessage by viewModel.toastMessage.collectAsState()
+fun MainScreen(
+    mainViewModel: MainViewModel,
+    calibrationViewModel: CalibrationViewModel,
+    quickAlignViewModel: QuickAlignViewModel,
+    calibrationAnalyzer: CalibrationAnalyzer
+) {
+    val uiState by mainViewModel.uiState.collectAsState()
+    val toastMessage by mainViewModel.toastMessage.collectAsState()
     val context = LocalContext.current
     var isDrawerOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -101,7 +110,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     is ToastMessage.PlainText -> it.text
                 }
                 Toast.makeText(context, messageText, Toast.LENGTH_SHORT).show()
-                viewModel.onEvent(MainScreenEvent.ToastShown)
+                mainViewModel.onEvent(MainScreenEvent.ToastShown)
             }
         }
 
@@ -113,260 +122,278 @@ fun MainScreen(viewModel: MainViewModel) {
                     targetValue = 0f,
                     animationSpec = tween(durationMillis = 5000)
                 )
-                viewModel.onEvent(MainScreenEvent.ClearSpinState)
+                mainViewModel.onEvent(MainScreenEvent.ClearSpinState)
             } else {
                 alphaAnimatable.snapTo(1.0f)
             }
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
-            if (uiState.showCalibrationScreen) {
-                CalibrationScreen(uiState = uiState, onEvent = viewModel::onEvent)
-            } else {
-                val mainBoxModifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(uiState.isCalibratingColor, uiState.isTestingCvMask) {
-                        detectTapGestures { offset ->
-                            if (uiState.isCalibratingColor) {
-                                viewModel.onEvent(MainScreenEvent.SampleColorAt(offset))
-                            } else if (uiState.isTestingCvMask) {
-                                viewModel.onEvent(MainScreenEvent.ExitCvMaskTestMode)
+            when {
+                uiState.showCalibrationScreen -> {
+                    CalibrationScreen(
+                        uiState = uiState,
+                        onEvent = mainViewModel::onEvent,
+                        viewModel = calibrationViewModel,
+                        analyzer = calibrationAnalyzer
+                    )
+                }
+
+                uiState.showQuickAlignScreen -> {
+                    QuickAlignScreen(
+                        uiState = uiState,
+                        analyzer = mainViewModel.visionAnalyzer,
+                        onEvent = mainViewModel::onEvent,
+                        viewModel = quickAlignViewModel
+                    )
+                }
+
+                else -> {
+                    val mainBoxModifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(uiState.isCalibratingColor, uiState.isTestingCvMask) {
+                            detectTapGestures { offset ->
+                                if (uiState.isCalibratingColor) {
+                                    mainViewModel.onEvent(MainScreenEvent.SampleColorAt(offset))
+                                } else if (uiState.isTestingCvMask) {
+                                    mainViewModel.onEvent(MainScreenEvent.ExitCvMaskTestMode)
+                                }
                             }
                         }
-                    }
 
-                Box(modifier = mainBoxModifier) {
-                    if (uiState.isCameraVisible) {
-                        CameraBackground(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .zIndex(0f),
-                            analyzer = viewModel.visionAnalyzer
-                        )
-                    }
-
-                    ProtractorOverlay(
-                        uiState = uiState.copy(spinPathsAlpha = alphaAnimatable.value),
-                        systemIsDark = useDarkTheme,
-                        isTestingCvMask = uiState.isTestingCvMask,
-                        onEvent = viewModel::onEvent,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .detectManualGestures(uiState, viewModel::onEvent)
-                            .zIndex(1f)
-                    )
-
-                    if (uiState.isCalibratingColor) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(32.dp)
-                                .zIndex(6f),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                "Aim at the table felt",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                textAlign = TextAlign.Center
-                            )
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = "Crosshair",
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                "Tap to sample color",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-
-                    if (!uiState.isTestingCvMask && !uiState.isCalibratingColor) {
-                        TopControls(
-                            uiState = uiState,
-                            onEvent = viewModel::onEvent,
-                            onMenuClick = { scope.launch { isDrawerOpen = true } },
-                            modifier = Modifier.zIndex(2f)
-                        )
-
-                        val spinControlCenter = uiState.spinControlCenter
-                        if (uiState.isSpinControlVisible && spinControlCenter != null) {
-                            val spinControlSizeDp = 120.dp
-                            val spinControlSizePx =
-                                with(LocalDensity.current) { spinControlSizeDp.toPx() }
-
-                            SpinControl(
+                    Box(modifier = mainBoxModifier) {
+                        if (uiState.isCameraVisible) {
+                            CameraBackground(
                                 modifier = Modifier
-                                    .zIndex(5f)
-                                    .offset {
-                                        IntOffset(
-                                            (spinControlCenter.x - spinControlSizePx / 2).roundToInt(),
-                                            (spinControlCenter.y - spinControlSizePx / 2).roundToInt()
-                                        )
-                                    },
-                                centerPosition = PointF(0f, 0f),
-                                selectedSpinOffset = uiState.selectedSpinOffset,
-                                lingeringSpinOffset = uiState.lingeringSpinOffset,
-                                spinPathAlpha = alphaAnimatable.value,
-                                onEvent = viewModel::onEvent
+                                    .fillMaxSize()
+                                    .zIndex(0f),
+                                analyzer = mainViewModel.visionAnalyzer
                             )
                         }
 
-                        ZoomControls(
-                            uiState = uiState,
-                            onEvent = viewModel::onEvent,
+                        ProtractorOverlay(
+                            uiState = uiState.copy(spinPathsAlpha = alphaAnimatable.value),
+                            systemIsDark = useDarkTheme,
+                            isTestingCvMask = uiState.isTestingCvMask,
+                            onEvent = mainViewModel::onEvent,
                             modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .fillMaxHeight(0.6f)
-                                .width(60.dp)
-                                .zIndex(5f)
+                                .fillMaxSize()
+                                .detectManualGestures(uiState, mainViewModel::onEvent)
+                                .zIndex(1f)
                         )
 
-                        Row(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .fillMaxWidth()
-                                .navigationBarsPadding()
-                                .padding(bottom = 8.dp)
-                                .zIndex(2f),
-                            verticalAlignment = Alignment.Bottom,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
+                        if (uiState.isCalibratingColor) {
                             Column(
-                                modifier = Modifier.padding(start = 16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(32.dp)
+                                    .zIndex(6f),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                CuedetatButton(
-                                    onClick = { viewModel.onEvent(MainScreenEvent.AddObstacleBall) },
-                                    text = "Add\nBall",
-                                    color = LightBlue400
+                                Text(
+                                    "Aim at the table felt",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textAlign = TextAlign.Center
                                 )
-                                if (!uiState.isBankingMode) {
-                                    if (!uiState.table.isVisible) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "Crosshair",
+                                    modifier = Modifier.size(48.dp),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    "Tap to sample color",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+
+                        if (!uiState.isTestingCvMask && !uiState.isCalibratingColor) {
+                            TopControls(
+                                uiState = uiState,
+                                onEvent = mainViewModel::onEvent,
+                                onMenuClick = { scope.launch { isDrawerOpen = true } },
+                                modifier = Modifier.zIndex(2f)
+                            )
+
+                            val spinControlCenter = uiState.spinControlCenter
+                            if (uiState.isSpinControlVisible && spinControlCenter != null) {
+                                val spinControlSizeDp = 120.dp
+                                val spinControlSizePx =
+                                    with(LocalDensity.current) { spinControlSizeDp.toPx() }
+
+                                SpinControl(
+                                    modifier = Modifier
+                                        .zIndex(5f)
+                                        .offset {
+                                            IntOffset(
+                                                (spinControlCenter.x - spinControlSizePx / 2).roundToInt(),
+                                                (spinControlCenter.y - spinControlSizePx / 2).roundToInt()
+                                            )
+                                        },
+                                    centerPosition = PointF(0f, 0f),
+                                    selectedSpinOffset = uiState.selectedSpinOffset,
+                                    lingeringSpinOffset = uiState.lingeringSpinOffset,
+                                    spinPathAlpha = alphaAnimatable.value,
+                                    onEvent = mainViewModel::onEvent
+                                )
+                            }
+
+                            ZoomControls(
+                                uiState = uiState,
+                                onEvent = mainViewModel::onEvent,
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .fillMaxHeight(0.6f)
+                                    .width(60.dp)
+                                    .zIndex(5f)
+                            )
+
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .navigationBarsPadding()
+                                    .padding(bottom = 8.dp)
+                                    .zIndex(2f),
+                                verticalAlignment = Alignment.Bottom,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(start = 16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    CuedetatButton(
+                                        onClick = { mainViewModel.onEvent(MainScreenEvent.AddObstacleBall) },
+                                        text = "Add\nBall",
+                                        color = LightBlue400
+                                    )
+                                    if (!uiState.isBankingMode) {
+                                        if (!uiState.table.isVisible) {
+                                            CuedetatButton(
+                                                onClick = { mainViewModel.onEvent(MainScreenEvent.ToggleOnPlaneBall) },
+                                                text = if (uiState.onPlaneBall == null) "Show\nCue Ball" else "Hide\nCue Ball",
+                                                color = BruisedPlum
+                                            )
+                                        }
                                         CuedetatButton(
-                                            onClick = { viewModel.onEvent(MainScreenEvent.ToggleOnPlaneBall) },
-                                            text = if (uiState.onPlaneBall == null) "Show\nCue Ball" else "Hide\nCue Ball",
-                                            color = BruisedPlum
+                                            onClick = { mainViewModel.onEvent(MainScreenEvent.ToggleTable) },
+                                            text = if (uiState.table.isVisible) "Hide\nTable" else "Show\nTable",
+                                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
                                         )
                                     }
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(80.dp)
+                                        .padding(horizontal = 16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (uiState.table.isVisible) {
+                                        TableRotationSlider(
+                                            uiState = uiState,
+                                            onEvent = mainViewModel::onEvent
+                                        )
+                                    }
+                                }
+
+                                Column(
+                                    modifier = Modifier.padding(end = 16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
                                     CuedetatButton(
-                                        onClick = { viewModel.onEvent(MainScreenEvent.ToggleTable) },
-                                        text = if (uiState.table.isVisible) "Hide\nTable" else "Show\nTable",
-                                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
+                                        onClick = { mainViewModel.onEvent(MainScreenEvent.ToggleSpinControl) },
+                                        text = "Spin",
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                    CuedetatButton(
+                                        onClick = { mainViewModel.onEvent(MainScreenEvent.Reset) },
+                                        text = "Reset\nView",
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                     )
                                 }
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(80.dp)
-                                    .padding(horizontal = 16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (uiState.table.isVisible) {
-                                    TableRotationSlider(
-                                        uiState = uiState,
-                                        onEvent = viewModel::onEvent
-                                    )
-                                }
-                            }
-
-                            Column(
-                                modifier = Modifier.padding(end = 16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                CuedetatButton(
-                                    onClick = { viewModel.onEvent(MainScreenEvent.ToggleSpinControl) },
-                                    text = "Spin",
-                                    color = MaterialTheme.colorScheme.tertiary
-                                )
-                                CuedetatButton(
-                                    onClick = { viewModel.onEvent(MainScreenEvent.Reset) },
-                                    text = "Reset\nView",
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                )
                             }
                         }
+
+                        KineticWarningOverlay(
+                            text = uiState.warningText,
+                            modifier = Modifier.zIndex(3f)
+                        )
+
+                        LuminanceAdjustmentDialog(
+                            uiState = uiState,
+                            onEvent = mainViewModel::onEvent,
+                            onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleLuminanceDialog) }
+                        )
+
+                        GlowStickDialog(
+                            uiState = uiState,
+                            onEvent = mainViewModel::onEvent,
+                            onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleGlowStickDialog) }
+                        )
+
+                        TableSizeSelectionDialog(
+                            uiState = uiState,
+                            onEvent = mainViewModel::onEvent,
+                            onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleTableSizeDialog) }
+                        )
+
+                        AdvancedOptionsDialog(
+                            uiState = uiState,
+                            onEvent = mainViewModel::onEvent,
+                            onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }
+                        )
+
+                        TutorialOverlay(
+                            uiState = uiState,
+                            onEvent = mainViewModel::onEvent
+                        )
                     }
-
-                    KineticWarningOverlay(
-                        text = uiState.warningText,
-                        modifier = Modifier.zIndex(3f)
-                    )
-
-                    LuminanceAdjustmentDialog(
-                        uiState = uiState,
-                        onEvent = viewModel::onEvent,
-                        onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleLuminanceDialog) }
-                    )
-
-                    GlowStickDialog(
-                        uiState = uiState,
-                        onEvent = viewModel::onEvent,
-                        onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleGlowStickDialog) }
-                    )
-
-                    TableSizeSelectionDialog(
-                        uiState = uiState,
-                        onEvent = viewModel::onEvent,
-                        onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleTableSizeDialog) }
-                    )
-
-                    AdvancedOptionsDialog(
-                        uiState = uiState,
-                        onEvent = viewModel::onEvent,
-                        onDismiss = { viewModel.onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }
-                    )
-
-                    TutorialOverlay(
-                        uiState = uiState,
-                        onEvent = viewModel::onEvent
-                    )
                 }
-
-                // --- HERESY CORRECTED: Custom Menu Implementation ---
-                AnimatedVisibility(
-                    visible = isDrawerOpen,
-                    enter = fadeIn(animationSpec = tween(300)),
-                    exit = fadeOut(animationSpec = tween(300))
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.6f))
-                            .clickable { isDrawerOpen = false }
-                            .zIndex(20f) // Ensure scrim is on top of content
-                    )
-                }
-
-                AnimatedVisibility(
-                    visible = isDrawerOpen,
-                    modifier = Modifier.zIndex(21f), // Ensure drawer is on top of scrim
-                    enter = expandVertically(
-                        animationSpec = tween(durationMillis = 400),
-                        expandFrom = Alignment.Top
-                    ),
-                    exit = slideOutHorizontally(
-                        animationSpec = tween(durationMillis = 300),
-                        targetOffsetX = { -it }
-                    ) + shrinkVertically(animationSpec = tween(durationMillis = 300))
-                ) {
-                    MenuDrawerContent(
-                        uiState = uiState,
-                        onEvent = viewModel::onEvent,
-                        onCloseDrawer = { isDrawerOpen = false }
-                    )
-                }
-                // --- END CORRECTION ---
             }
+
+            // --- HERESY CORRECTED: Custom Menu Implementation ---
+            AnimatedVisibility(
+                visible = isDrawerOpen,
+                enter = fadeIn(animationSpec = tween(300)),
+                exit = fadeOut(animationSpec = tween(300))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .clickable { isDrawerOpen = false }
+                        .zIndex(20f) // Ensure scrim is on top of content
+                )
+            }
+
+            AnimatedVisibility(
+                visible = isDrawerOpen,
+                modifier = Modifier.zIndex(21f), // Ensure drawer is on top of scrim
+                enter = expandVertically(
+                    animationSpec = tween(durationMillis = 400),
+                    expandFrom = Alignment.Top
+                ),
+                exit = slideOutHorizontally(
+                    animationSpec = tween(durationMillis = 300),
+                    targetOffsetX = { -it }
+                ) + shrinkVertically(animationSpec = tween(durationMillis = 300))
+            ) {
+                MenuDrawerContent(
+                    uiState = uiState,
+                    onEvent = mainViewModel::onEvent,
+                    onCloseDrawer = { isDrawerOpen = false }
+                )
+            }
+            // --- END CORRECTION ---
         }
     }
 }

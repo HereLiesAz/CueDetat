@@ -102,6 +102,9 @@ fun AdvancedOptionsDialog(
             },
             dismissButton = {
                 Row {
+                    TextButton(onClick = { onEvent(MainScreenEvent.ToggleQuickAlignScreen); onDismiss() }) {
+                        Text("Quick Align", color = MaterialTheme.colorScheme.tertiary)
+                    }
                     TextButton(onClick = { onEvent(MainScreenEvent.ToggleCalibrationScreen); onDismiss() }) {
                         Text("Calibrate Camera", color = MaterialTheme.colorScheme.tertiary)
                     }

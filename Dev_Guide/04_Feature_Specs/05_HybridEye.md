@@ -28,6 +28,13 @@ The application's vision system uses a hybrid, two-stage pipeline to achieve rob
   felt, not a single pixel. It calculates the **mean and standard deviation** of the HSV values to
   create an adaptive mask resilient to lighting changes.
 
+## Automatic World Lock
+
+* When a user successfully snaps a virtual ball to a CV-detected real ball, the `isWorldLocked`
+  flag is automatically set to `true`.
+* This lock is automatically disengaged if the user begins dragging a ball or presses the "Reset
+  View" button.
+
 ## Other CV Rules
 
 * **Conditional Snapping:** Auto-snapping of logical balls only occurs if the user places a logical

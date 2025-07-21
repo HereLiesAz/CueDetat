@@ -13,6 +13,7 @@ import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.model.Table
+import org.opencv.core.Mat
 
 data class SnapCandidate(
     val detectedPoint: PointF,
@@ -125,6 +126,7 @@ data class OverlayState(
     val lockedHsvStdDev: FloatArray? = null,
     val showAdvancedOptionsDialog: Boolean = false,
     val showCalibrationScreen: Boolean = false,
+    val showQuickAlignScreen: Boolean = false,
     val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
     val useCustomModel: Boolean = false,
     val isSnappingEnabled: Boolean = true,
@@ -138,6 +140,8 @@ data class OverlayState(
     val isTestingCvMask: Boolean = false,
     val isCalibratingColor: Boolean = false,
     val colorSamplePoint: Offset? = null,
+    @Transient val cameraMatrix: Mat? = null,
+    @Transient val distCoeffs: Mat? = null,
 
     // Derived state
     @Transient val shotLineAnchor: PointF? = null,

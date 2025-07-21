@@ -23,26 +23,45 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
+import com.hereliesaz.cuedetat.data.CalibrationRepository
 import com.hereliesaz.cuedetat.ui.MainScreen
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.MainViewModel
 import com.hereliesaz.cuedetat.ui.composables.SplashScreen
+import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
+import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SingleEvent
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: MainViewModel by viewModels()
+    private val mainViewModel: MainViewModel by viewModels()
+    private val calibrationViewModel: CalibrationViewModel by viewModels()
+    private val quickAlignViewModel: QuickAlignViewModel by viewModels()
+
+    @Inject
+    lateinit var calibrationRepository: CalibrationRepository
+
+    private lateinit var calibrationAnalyzer: CalibrationAnalyzer
 
     private val requestCameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             if (isGranted) {
-                setContent { AppContent(viewModel) }
+                setContent {
+                    AppContent(
+                        mainViewModel,
+                        calibrationViewModel,
+                        quickAlignViewModel,
+                        calibrationAnalyzer
+                    )
+                }
             } else {
                 // Heresy is not tolerated. The user will comply or they will not use the app.
             }
@@ -52,9 +71,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        calibrationAnalyzer = CalibrationAnalyzer(calibrationViewModel)
+
         when {
             hasCameraPermission() -> {
-                setContent { AppContent(viewModel) }
+                setContent {
+                    AppContent(
+                        mainViewModel,
+                        calibrationViewModel,
+                        quickAlignViewModel,
+                        calibrationAnalyzer
+                    )
+                }
             }
             else -> {
                 requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
@@ -64,12 +92,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun observeSingleEvents() {
-        viewModel.singleEvent.onEach { event ->
+        mainViewModel.singleEvent.onEach { event ->
             when (event) {
                 is SingleEvent.OpenUrl -> {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
                     startActivity(intent)
-                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
+                    mainViewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 is SingleEvent.SendFeedbackEmail -> {
                     val intent = Intent(Intent.ACTION_SENDTO).apply {
@@ -80,7 +108,7 @@ class MainActivity : ComponentActivity() {
                     if (intent.resolveActivity(packageManager) != null) {
                         startActivity(intent)
                     }
-                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
+                    mainViewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 null -> { /* Do nothing */ }
             }
@@ -88,9 +116,14 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun AppContent(viewModel: MainViewModel) {
+    private fun AppContent(
+        mainViewModel: MainViewModel,
+        calibrationViewModel: CalibrationViewModel,
+        quickAlignViewModel: QuickAlignViewModel,
+        calibrationAnalyzer: CalibrationAnalyzer
+    ) {
         var showSplashScreen by rememberSaveable { mutableStateOf(true) }
-        val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+        val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
 
         LaunchedEffect(uiState.orientationLock) {
             requestedOrientation = when (uiState.orientationLock) {
@@ -106,9 +139,14 @@ class MainActivity : ComponentActivity() {
             } else {
                 val currentAppControlColorScheme = MaterialTheme.colorScheme
                 LaunchedEffect(currentAppControlColorScheme) {
-                    viewModel.onEvent(MainScreenEvent.ThemeChanged(currentAppControlColorScheme))
+                    mainViewModel.onEvent(MainScreenEvent.ThemeChanged(currentAppControlColorScheme))
                 }
-                MainScreen(viewModel = viewModel)
+                MainScreen(
+                    mainViewModel = mainViewModel,
+                    calibrationViewModel = calibrationViewModel,
+                    quickAlignViewModel = quickAlignViewModel,
+                    calibrationAnalyzer = calibrationAnalyzer
+                )
             }
         }
     }

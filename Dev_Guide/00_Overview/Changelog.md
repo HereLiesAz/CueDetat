@@ -9,12 +9,50 @@ the state of the project, superseding all other records.
 
 A log of completed work.
 
+### [UNRELEASED] - 2025-07-21
+
+#### Added
+
+- **Feature: Quick Align:** Added a new "Quick Align" feature, allowing users to align the
+  virtual table by tapping four known points in a single photo. This replaces the complex and
+  unreliable full camera calibration feature.
+- **Feature: Automatic World Lock:** Implemented an automatic "World Lock" feature. The virtual
+  scene now automatically locks its position relative to the camera view when a user successfully
+  snaps a virtual ball to a real one. The world unlocks automatically when a ball is dragged or the
+  view is reset.
+
+#### Changed
+
+- **UI: Button Redesign:** The main action buttons are now circular, have a thicker 2dp outline,
+  larger text, and unique colors drawn from the new application theme.
+- **Theming: New Palette:** Replaced the entire application color palette with a new, systematic
+  one. All UI components, including themes, buttons, and canvas renderings, have been updated to use
+  the new color scheme. The primary yellow color was specifically muted as requested.
+- **Perspective System:** Refined the perspective tilt logic with a cubic ease-out curve to create
+  a more pronounced, non-linear slowing effect as the user approaches the physical tilt limit. The
+  maximum virtual tilt was also adjusted to 87 degrees.
+- **UI: Button Layout:** Removed the "Lock World" button and moved the "Spin" button to the
+  bottom-right column for a more balanced layout. The "Add Ball" button's color was changed to a
+  neutral blue to reserve red for warnings.
+
+#### Fixed
+
+- **Critical Bug: Banking Mode Aiming:** Resolved a major bug where aiming lines in Banking Mode
+  were static and did not update during a drag gesture. The issue was caused by a conflicting,
+  redundant gesture handler that has now been removed.
+- **CV: Mask Orientation:** Fixed a bug where the CV debug mask was being displayed with an
+  incorrect, squished orientation. The mask is now correctly rotated to match the device's display.
+- **CV: Bounding Box Display:** Re-enabled the drawing of CV bounding boxes. The renderer now
+  receives the necessary source image dimensions to correctly transform and display the boxes.
+- **Build: Compilation Errors:** Corrected a series of compilation errors related to outdated color
+  references in UI configuration files after the theme update.
+
 ### [UNRELEASED] - 2025-07-20 (Session 2)
 
 #### Added
 
-- [cite_start]**UI Component:** Created a new minimalist `CuedetatButton` component to replace the
-  dated `Magic8BallButton`. [cite: 1]
+- **UI Component:** Created a new minimalist `CuedetatButton` component to replace the
+  [cite_start]dated `Magic8BallButton`. [cite: 1]
 
 #### Changed
 
@@ -22,8 +60,8 @@ A log of completed work.
   requirements. [cite_start]The new system provides a non-linear mapping with an ease-out function,
   creating a smooth, intuitive transition as the user's physical tilt approaches its effective
   limit. [cite: 2, 3, 4]
-- [cite_start]**UI:** Redesigned the main menu with a `VoidBlack` background and removed the
-  non-functional theme-toggling option to streamline the user experience. [cite: 5]
+- **UI:** Redesigned the main menu with a `VoidBlack` background and removed the
+  [cite_start]non-functional theme-toggling option to streamline the user experience. [cite: 5]
 
 #### Fixed
 
@@ -34,9 +72,9 @@ A log of completed work.
 - **State Management:** Resolved a bug where the orientation lock menu option was
   unresponsive. [cite_start]The root cause was an event-routing failure in the main `StateReducer`,
   which was corrected to properly delegate the event. [cite: 7]
-- [cite_start]**Calculation:** Fixed a major error in the distance calculation by correcting the
+- **Calculation:** Fixed a major error in the distance calculation by correcting the
   `distanceReferenceConstant` in the `UpdateStateUseCase`, bringing the displayed distance in line
-  with physical reality. [cite: 8]
+  [cite_start]with physical reality. [cite: 8]
 
 ### [UNRELEASED] - 2025-07-20 (Session 1)
 
@@ -101,9 +139,9 @@ A log of completed work.
   based on the change in angle between drag events, providing a smoother, more intuitive feel that "
   [cite_start]picks up where it left off." [cite: 610, 611]
 - **UI Refinements:**
-    - Replaced `Magic8BallButton`s for zoom controls with standard `IconButton`s.
-    - Reduced the visual thickness of all `Slider` components.
-    - Moved the vertical zoom slider closer to the edge of the screen.
+  - Replaced `Magic8BallButton`s for zoom controls with standard `IconButton`s.
+  - Reduced the visual thickness of all `Slider` components.
+  - Moved the vertical zoom slider closer to the edge of the screen.
 - **State Persistence:** Replaced the unreliable `onPause` save trigger with a debounced, reactive
   [cite_start]mechanism that saves state automatically and robustly after changes. [cite: 1042]
 - **Gesture Handling:** The touch target for dragging logical balls is now a constant screen-space
@@ -114,7 +152,7 @@ A log of completed work.
   [cite_start]the user to cycle through options. [cite: 1493]
 - **Rendering:** Label rendering logic was refactored to apply configuration offsets in
   [cite_start]screen-space, preventing them from being distorted by perspective and
-  zoom. [cite: 1324]
+  zoom. [cite: 1505]
 
 #### Fixed
 
@@ -129,14 +167,16 @@ A log of completed work.
   [cite_start]the debug build configuration, making the project portable. [cite: 383]
 - **State Restoration:** Resolved a cascade of fatal `NullPointerException`s that occurred when
   restoring the app from a saved state. The issue was caused by Gson's handling of `@Transient`
-  properties; all affected state properties were made nullable and their consumers were updated to
+  properties;
+  all affected state properties were made nullable and their consumers were updated to
   [cite_start]handle them safely. [cite: 1501]
 - **Feature Regression: Orientation Lock:** Fixed a race condition between the state-saving
   mechanism and Activity recreation that was causing the orientation lock to fail. An immediate save
   [cite_start]is now triggered for this specific event. [cite: 1504]
 - **UI Regression: Obstruction Visualization:** Corrected a rendering bug where the shot guide line
   would obscure its translucent pathway. The issue stemmed from a flawed, secondary drawing function
-  that was being used in specific scenarios; the rendering logic has been unified and the line's
+  that was being used in specific scenarios;
+  the rendering logic has been unified and the line's
   [cite_start]stroke width has been corrected in its configuration. [cite: 1506, 1507]
 - **Gesture Logic:** Corrected the gesture detection logic in `GestureReducer` to ensure dragging
   [cite_start]the `GhostCueBall` correctly moves the entire protractor unit instead of causing
@@ -154,9 +194,11 @@ A list of known bugs and required features.
   [cite_start]performance degradation and lag, particularly during 3D perspective
   transformations. [cite: 1511]
 - **CV Robustness:** The current CV pipeline remains vulnerable to specular highlights and complex
-  [cite_start]ball patterns (stripes, numbers). [cite: 1512]
+  [cite_start]ball patterns (stripes, numbers). [cite: 1522]
 - **Interactive Tutorial:** The interactive placeholder needs to be expanded into a full, guided
-  [cite_start]experience. [cite: 1513]
+  [cite_start]experience. [cite: 1523]
+- **Feature Incomplete: Quick Align:** The "Quick Align" feature needs its final calculation and
+  state application logic implemented.
 
 ### Closed Issues
 

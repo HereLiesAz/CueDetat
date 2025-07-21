@@ -107,6 +107,16 @@ class MainViewModel @Inject constructor(
             }
         }
 
+        // Load calibration data
+        viewModelScope.launch {
+            userPreferencesRepository.calibrationDataFlow.collectLatest { (cameraMatrix, distCoeffs) ->
+                _uiState.value = _uiState.value.copy(
+                    cameraMatrix = cameraMatrix,
+                    distCoeffs = distCoeffs
+                )
+            }
+        }
+
         onEvent(MainScreenEvent.CheckForUpdate)
     }
 

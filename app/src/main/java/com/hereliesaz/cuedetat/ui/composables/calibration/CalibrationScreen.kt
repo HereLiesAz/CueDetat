@@ -2,6 +2,7 @@
 
 package com.hereliesaz.cuedetat.ui.composables.calibration
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,25 +19,79 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.ui.composables.CameraBackground
 import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
 fun CalibrationScreen(
     uiState: OverlayState,
-    onEvent: (MainScreenEvent) -> Unit
+    onEvent: (MainScreenEvent) -> Unit,
+    viewModel: CalibrationViewModel = hiltViewModel(),
+    analyzer: CalibrationAnalyzer
 ) {
+    val detectedPattern by viewModel.detectedPattern.collectAsState()
+    val capturedImageCount by viewModel.capturedImageCount.collectAsState()
+    val showSubmissionDialog by viewModel.showSubmissionDialog.collectAsState()
+
+    if (showSubmissionDialog) {
+        CalibrationSubmissionDialog(
+            onDismiss = { viewModel.onDismissSubmission(); onEvent(MainScreenEvent.ToggleCalibrationScreen) },
+            onSubmit = { viewModel.onSubmitData(); onEvent(MainScreenEvent.ToggleCalibrationScreen) }
+        )
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // In the future, the camera feed for calibration will go here.
+        CameraBackground(modifier = Modifier.fillMaxSize(), analyzer = analyzer)
+
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            detectedPattern?.let { points ->
+                if (points.isNotEmpty()) {
+                    val path = Path()
+                    points.forEachIndexed { index, point ->
+                        val offset = Offset(point.x.toFloat(), point.y.toFloat())
+                        if (index == 0) {
+                            path.moveTo(offset.x, offset.y)
+                        } else {
+                            path.lineTo(offset.x, offset.y)
+                        }
+                    }
+                    // Draw lines connecting all points for a spider-web effect
+                    drawPath(
+                        path,
+                        color = Color.Green,
+                        style = Stroke(width = 2.dp.toPx()),
+                        alpha = 0.7f
+                    )
+                    // Draw circles at each detected point
+                    points.forEach { point ->
+                        drawCircle(
+                            Color.Green,
+                            radius = 5.dp.toPx(),
+                            center = Offset(point.x.toFloat(), point.y.toFloat()),
+                            alpha = 0.8f
+                        )
+                    }
+                }
+            }
+        }
 
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -62,7 +117,7 @@ fun CalibrationScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "Show the camera a 9x6 chessboard pattern from various angles. " +
+                    "Show the camera a 4x11 circle grid pattern from various angles. " +
                             "Capture at least 10-15 images for an accurate calibration. " +
                             "A green overlay will indicate a successful pattern detection.",
                     textAlign = TextAlign.Center,
@@ -81,17 +136,21 @@ fun CalibrationScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Images: 0/15", // Placeholder
+                    text = "Images: $capturedImageCount/15",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
                 CuedetatButton(
-                    onClick = { /* TODO: Implement capture event */ },
-                    text = "Capture"
+                    onClick = { viewModel.capturePattern() },
+                    text = "Capture",
+                    // Enable button only when a pattern is detected
+                    color = if (detectedPattern != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(
+                        alpha = 0.5f
+                    )
                 )
 
-                TextButton(onClick = { onEvent(MainScreenEvent.ToggleCalibrationScreen) }) {
+                TextButton(onClick = { viewModel.onCalibrationFinished() }) {
                     Text("Finish")
                 }
             }
