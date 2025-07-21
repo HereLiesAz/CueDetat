@@ -51,7 +51,6 @@ enum class TableSize(
     EIGHT_FT(8, 88f, 44f),
     NINE_FT(9, 100f, 50f),
     TEN_FT(10, 112f, 56f);
-
     fun next(): TableSize {
         val nextOrdinal = (this.ordinal + 1) % entries.size
         return entries[nextOrdinal]
@@ -163,6 +162,7 @@ data class OverlayState(
     val movingObstacleBallIndex: Int? = null,
     val isMagnifierVisible: Boolean = false,
     @Transient val magnifierSourceCenter: Offset? = null,
+    val isWorldLocked: Boolean = false,
 
     // State for Reset/Revert functionality
     @Transient val preResetState: OverlayState? = null,
@@ -177,7 +177,6 @@ data class OverlayState(
 
     enum class OrientationLock {
         AUTOMATIC, PORTRAIT, LANDSCAPE;
-
         fun next(): OrientationLock = when (this) {
             AUTOMATIC -> PORTRAIT
             PORTRAIT -> LANDSCAPE

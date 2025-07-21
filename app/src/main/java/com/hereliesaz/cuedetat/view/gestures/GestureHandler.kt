@@ -9,13 +9,14 @@ import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.Modifier
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.abs
 
-fun Modifier.detectManualGestures(onEvent: (MainScreenEvent) -> Unit) =
+fun Modifier.detectManualGestures(uiState: OverlayState, onEvent: (MainScreenEvent) -> Unit) =
     this.pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
@@ -34,29 +35,40 @@ fun Modifier.detectManualGestures(onEvent: (MainScreenEvent) -> Unit) =
                     val centroid = event.calculateCentroid()
 
                     if (event.changes.size > 1) {
-                        // Multi-finger gestures: Process all transformations.
+                        // Multi-finger gestures always affect the entire world view.
                         if (zoom != 1f) {
                             onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
                         }
                         if (rotation != 0f) {
                             onEvent(MainScreenEvent.TableRotationApplied(rotation))
                         }
-                        // As commanded, only vertical pan is enacted.
-                        if (abs(pan.y) > 0.1f) { // Use a small threshold to ignore noise
+                        if (abs(pan.y) > 0.1f) {
                             onEvent(MainScreenEvent.PanView(PointF(0f, pan.y)))
                         }
 
                     } else if (event.changes.size == 1) {
-                        // Single-finger drag
+                        // Single-finger drag behavior depends on the world lock state.
                         if (pan != Offset.Zero) {
-                            val previousPosition = lastCentroid
-                            val currentPosition = centroid
-                            onEvent(
-                                MainScreenEvent.Drag(
-                                    previousPosition = PointF(previousPosition.x, previousPosition.y),
-                                    currentPosition = PointF(currentPosition.x, currentPosition.y)
+                            if (uiState.isWorldLocked) {
+                                // If locked, pan the entire world view.
+                                onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
+                            } else {
+                                // If unlocked, perform a logical drag on the plane.
+                                val previousPosition = lastCentroid
+                                val currentPosition = centroid
+                                onEvent(
+                                    MainScreenEvent.Drag(
+                                        previousPosition = PointF(
+                                            previousPosition.x,
+                                            previousPosition.y
+                                        ),
+                                        currentPosition = PointF(
+                                            currentPosition.x,
+                                            currentPosition.y
+                                        )
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                     lastCentroid = centroid

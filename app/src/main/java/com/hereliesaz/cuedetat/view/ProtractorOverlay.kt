@@ -3,7 +3,6 @@
 package com.hereliesaz.cuedetat.view
 
 import android.graphics.Typeface
-import android.os.Build
 import android.view.View
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,7 +17,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.res.ResourcesCompat
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
-import com.hereliesaz.cuedetat.view.gestures.detectManualGestures
 import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
@@ -51,9 +49,8 @@ fun ProtractorOverlay(
         // When testing or calibrating, the canvas should not detect gestures.
         modifier.fillMaxSize()
     } else {
-        modifier
-            .fillMaxSize()
-            .detectManualGestures(onEvent)
+        // The gesture handler is now applied in MainScreen.kt, not here.
+        modifier.fillMaxSize()
     }
 
     Canvas(

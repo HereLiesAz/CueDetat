@@ -79,7 +79,7 @@ val Gray700 = Color(0xFF111111)
 
 // --- Semantic Aliases for Compatibility ---
 val WarningRed = Red400
-val SulfurDust = Yellow200
+val SulfurDust = Yellow300
 val HippieGreen = Green400
 val Mariner = Blue500
 val MonteCarlo = Mint200
@@ -90,7 +90,7 @@ val MutedGray = Gray300
 val VoidBlack = Gray700
 
 // Bank lines can still be semantic
-val BankLine1Yellow = Yellow200.copy(alpha = 0.9f)
-val BankLine2Yellow = Yellow200.copy(alpha = 0.7f)
-val BankLine3Yellow = Yellow200.copy(alpha = 0.5f)
-val BankLine4Yellow = Yellow200.copy(alpha = 0.3f)
+val BankLine1Yellow = Yellow300.copy(alpha = 0.9f)
+val BankLine2Yellow = Yellow300.copy(alpha = 0.7f)
+val BankLine3Yellow = Yellow300.copy(alpha = 0.5f)
+val BankLine4Yellow = Yellow300.copy(alpha = 0.3f)

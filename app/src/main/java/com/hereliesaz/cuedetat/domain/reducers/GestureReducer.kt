@@ -49,7 +49,13 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                     onPlaneBall.center
                 ) < dynamicLogicalTouchRadius
             ) {
-                currentState.copy(interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL, hasCueBallBeenMoved = true, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
+                currentState.copy(
+                    interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL,
+                    hasCueBallBeenMoved = true,
+                    isMagnifierVisible = true,
+                    magnifierSourceCenter = event.screenOffset,
+                    isWorldLocked = false
+                )
             } else {
                 currentState.copy(interactionMode = InteractionMode.AIMING_BANK_SHOT)
             }
@@ -63,7 +69,13 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
 
         currentState.obstacleBalls.forEachIndexed { index, obstacle ->
             if (getDistance(logicalPoint, obstacle.center) < dynamicLogicalTouchRadius) {
-                return currentState.copy(interactionMode = InteractionMode.MOVING_OBSTACLE_BALL, movingObstacleBallIndex = index, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
+                return currentState.copy(
+                    interactionMode = InteractionMode.MOVING_OBSTACLE_BALL,
+                    movingObstacleBallIndex = index,
+                    isMagnifierVisible = true,
+                    magnifierSourceCenter = event.screenOffset,
+                    isWorldLocked = false
+                )
             }
         }
 
@@ -72,7 +84,13 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                 onPlaneBall.center
             ) < dynamicLogicalTouchRadius
         ) {
-            return currentState.copy(interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL, hasCueBallBeenMoved = true, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
+            return currentState.copy(
+                interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL,
+                hasCueBallBeenMoved = true,
+                isMagnifierVisible = true,
+                magnifierSourceCenter = event.screenOffset,
+                isWorldLocked = false
+            )
         }
 
         val distToTargetBall = getDistance(logicalPoint, protractorUnit.center)
@@ -81,13 +99,20 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                 interactionMode = InteractionMode.MOVING_PROTRACTOR_UNIT,
                 hasTargetBallBeenMoved = true,
                 isMagnifierVisible = true,
-                magnifierSourceCenter = event.screenOffset
+                magnifierSourceCenter = event.screenOffset,
+                isWorldLocked = false
             )
         }
 
         val distToGhostBall = getDistance(logicalPoint, protractorUnit.ghostCueBallCenter)
         if (distToGhostBall < dynamicLogicalTouchRadius) {
-            return currentState.copy(interactionMode = InteractionMode.MOVING_PROTRACTOR_UNIT, hasTargetBallBeenMoved = true, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
+            return currentState.copy(
+                interactionMode = InteractionMode.MOVING_PROTRACTOR_UNIT,
+                hasTargetBallBeenMoved = true,
+                isMagnifierVisible = true,
+                magnifierSourceCenter = event.screenOffset,
+                isWorldLocked = false
+            )
         }
 
         return currentState.copy(interactionMode = InteractionMode.ROTATING_PROTRACTOR, isMagnifierVisible = false)
@@ -176,6 +201,8 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                     }
                     else -> finalState
                 }
+                // A snap occurred, so automatically lock the world.
+                finalState = finalState.copy(isWorldLocked = true)
             }
         }
 

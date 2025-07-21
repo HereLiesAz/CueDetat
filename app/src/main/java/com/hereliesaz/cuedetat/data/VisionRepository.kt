@@ -196,7 +196,9 @@ class VisionRepository @Inject constructor(
                         genericBalls = filteredBalls,
                         detectedHsvColor = hsvTuple?.first ?: hsv,
                         detectedBoundingBoxes = detectedObjects.map { it.boundingBox },
-                        cvMask = finalCvMask
+                        cvMask = finalCvMask,
+                        sourceImageWidth = inputImage.width,
+                        sourceImageHeight = inputImage.height
                     )
 
                     _visionDataFlow.value = finalVisionData

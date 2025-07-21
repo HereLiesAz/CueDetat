@@ -25,7 +25,7 @@ class ActionReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
         // If a pre-reset state exists, revert to it.
         currentState.preResetState?.let {
             // Also clear any obstacles that may have been added after the save
-            return it.copy(preResetState = null, obstacleBalls = emptyList())
+            return it.copy(preResetState = null, obstacleBalls = emptyList(), isWorldLocked = false)
         }
 
         // Otherwise, this is the first press. Save the current positional state.
@@ -61,6 +61,7 @@ class ActionReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             preResetState = stateToSave,
             hasCueBallBeenMoved = false,
             hasTargetBallBeenMoved = false,
+            isWorldLocked = false, // Also unlock the world on reset
             viewOffset = PointF(0f, 0f) // Also reset pan
         )
     }

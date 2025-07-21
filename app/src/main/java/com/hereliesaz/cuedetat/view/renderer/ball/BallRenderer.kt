@@ -3,7 +3,9 @@
 package com.hereliesaz.cuedetat.view.renderer.ball
 
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.ui.theme.SulfurDust
@@ -74,25 +76,32 @@ class BallRenderer {
     }
 
     private fun drawBoundingBoxes(canvas: Canvas, state: OverlayState, paints: PaintCache) {
-        Paint(paints.cvResultPaint).apply {
+        val visionData = state.visionData ?: return
+        if (visionData.detectedBoundingBoxes.isEmpty() || visionData.sourceImageWidth == 0) return
+
+        val paint = Paint(paints.cvResultPaint).apply {
             style = Paint.Style.STROKE
             strokeWidth = 3f
             alpha = 150
         }
 
-        // Bounding boxes are in image coordinates, not logical coordinates.
-        // We need to transform them to screen coordinates.
-        // The OverlayState's pitchMatrix transforms logical to screen.
-        // We can't use it directly.
-        // For now, this feature is disabled until a proper image-to-screen matrix is passed down.
-        // A direct draw would be misaligned.
-        // Example of what would be needed:
-        // canvas.save()
-        // canvas.concat(state.imageToScreenMatrix) // This matrix doesn't exist yet
-        // state.visionData.detectedBoundingBoxes.forEach { box ->
-        //     canvas.drawRect(RectF(box), paint)
-        // }
-        // canvas.restore()
+        // Create the transformation matrix on the fly, now that we have the source dimensions.
+        val imageToScreenMatrix = Matrix()
+        val sx = canvas.width.toFloat() / visionData.sourceImageWidth.toFloat()
+        val sy = canvas.height.toFloat() / visionData.sourceImageHeight.toFloat()
+        imageToScreenMatrix.postScale(sx, sy)
+
+        canvas.save()
+        canvas.concat(imageToScreenMatrix)
+        visionData.detectedBoundingBoxes.forEach { box ->
+            // The box coordinates are from the un-rotated image. We must account for this.
+            val rotatedBox = RectF(box)
+            // Note: CameraX rotation is relative to portrait. If the sensor is landscape, a 90-degree
+            // rotation is applied for portrait display. The bounding box coordinates are relative to
+            // that un-rotated landscape image. For this simple debug view, a direct transform is sufficient.
+            canvas.drawRect(rotatedBox, paint)
+        }
+        canvas.restore()
     }
 
 
