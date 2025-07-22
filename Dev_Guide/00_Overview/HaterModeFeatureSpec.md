@@ -33,7 +33,7 @@ The responses must adhere to the application's cynical and witty persona. They s
 * Go home. Youre drunk.
 * 42
 * You're asking the wrong questions.
-* Signs point to "Bless your heart."
+* Bless your heart.
 * Ask again. More feeling this time.
 * What a terrible idea.
 * Without a doubt. You will be disappointed.
@@ -41,3 +41,38 @@ The responses must adhere to the application's cynical and witty persona. They s
 * Outlook doubtful. Try looking inward.
 * The odds are forever not in your favor.
 * Yes. And by that, I mean absolutely not.
+* Your guaranteed success is also a non-linear failure.
+* It is written in nuclear fallout.
+* Yes, but wrong universe.
+* Three known things can survive an atomic holocaust: roaches, twinkies, and stupid fucking questions like that.
+* Nah.
+* The end is nigh and you ask me this?
+* Reply hazy, the bar is on fire.
+* Thank you for asking! And the laugh.
+* The giraffe screams yes from a velvet mailbox.
+* Green is not the color of maybe.
+* Invert the spoon and dance.
+* Your question ate itself and said, "Delicious."
+* Your future is shaped like a falling piano.
+* Advice is a sandwich you forgot to invent.
+* All questions like this start with the letter Q.
+* The cat was Schrödinger's therapist. All but certain.
+* Yes, if gravity permits.
+* Onions are opinions, sans Pi.
+* Paint your doubt with the bones of clocks.
+* Nonsense is the only honest answer.
+* Reality declined the invitation.
+* Flip the idea inside out and wear it like it fits.
+* The oracle sneezed. That's your sign.
+* Fork your expectations.
+* The crows know, but they won't tell.
+* Ask again after the dream ends.
+* Everything is true until spoken aloud.
+* That question is the butterfly effect that ends humanity.
+* I’d agree, but then we’d both be wrong.
+* Ask again but try crying softer. The void is sensitive.
+* Even your apathy is underwhelming.
+* Wow. Edge of my non-existent seat.
+* Life’s short. So is your attention span.
+* Try giving a damn and maybe someone else will.
+* No. It’s not you. It’s reality.
