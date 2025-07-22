@@ -6,10 +6,10 @@ Hater Mode transforms the application into a "Magic 8-Ball" that delivers cynica
 
 ### II. User Interface & Visuals
 
-1.  **The 8-Ball:** The entire screen will render a photorealistic, high-gloss black sphere, simulating a Magic 8-Ball. Subtle, dynamic highlights should react to the device's gyroscope to enhance the 3D illusion.
-2.  **The Window:** A circular "window" will be rendered at the bottom of the sphere. Inside, a dark, murky, blue-black liquid will be simulated.
-3.  **The Die:** A 20-sided die (icosahedron) with triangular faces will be visible, partially submerged in the liquid. The text will appear on the upward-facing triangle.
-4.  **Menu Access:** The application's circular icon (`ic_launcher.webp`) will be rendered subtly at the top-center of the screen. Tapping this icon will open the main menu, allowing the user to switch to Expert or Beginner mode.
+1.  **The 8-Ball:** The entire screen will render a photorealistic, high-gloss black sphere up close, simulating a Magic 8-Ball. Subtle, dynamic highlights should react to the device's gyroscope to enhance the 3D illusion.
+2.  **The Window:** A circular "window" will be rendered at the center of the sphere, at the center of the screen. Inside, a dark, murky, blue-black liquid will be simulated.
+3.  **The Die:** The text will appear on the upward side of a murky blue triangle, resized to fit on the triangle. The triangle will appear in a random position with a random orientation. The text will appear under the uppermost side of the triangle so that it is always easily read.
+4.  **Menu Access:** The application's circular icon (`ic_launcher.webp`) will be at the top-left of the screen like it always is. Tapping this icon will open the main menu. The only options showing will be Expert/Beginner/Hater mode, About, and @HereLiesAz.
 
 ### III. Interaction Model
 
