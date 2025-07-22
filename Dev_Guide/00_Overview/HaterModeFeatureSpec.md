@@ -24,20 +24,20 @@ Hater Mode transforms the application into a "Magic 8-Ball" that delivers cynica
 
 The responses must adhere to the application's cynical and witty persona. They should be a mix of classic non-committal answers and project-specific insults.
 
-**Response Pool (Initial Draft):**
+**Response Pool (Revised):**
 
 * Ask again, but with less hope.
-* The outlook is as bleak as your last shot.
-* Reply hazy, try not to suck.
-* Cannot predict now. I'm busy judging you.
-* Don't count on it. Or anything, really.
-* My sources say you should probably just go home.
-* It is decidedly so... that you're asking the wrong questions.
-* Signs point to you buying the next round.
-* Concentrate and ask again. Maybe this time with feeling.
-* As I see it, yes, this is a terrible idea.
-* Without a doubt, you will be disappointed.
-* You may rely on the heat-death of the universe.
-* Very doubtful. Almost as doubtful as your skill.
-* The physics of the situation are not in your favor.
-* Yes, if by "yes" you mean "absolutely not."
+* Outlook hazy. Try to not suck.
+* System busy judging you. Try again later.
+* That's not your fingers. Don't count on it.
+* Go home. Youre drunk.
+* 42
+* You're asking the wrong questions.
+* Signs point to "Bless your heart."
+* Ask again. More feeling this time.
+* What a terrible idea.
+* Without a doubt. You will be disappointed.
+* It is as certain as the heat-death of the universe but will take longer.
+* Outlook doubtful. Try looking inward.
+* The odds are forever not in your favor.
+* Yes. And by that, I mean absolutely not.
