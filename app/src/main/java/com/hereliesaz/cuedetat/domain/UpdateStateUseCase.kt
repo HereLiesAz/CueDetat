@@ -121,7 +121,12 @@ class UpdateStateUseCase @Inject constructor(
             val bankResult = calculateBankShot(state)
             return state.copy(
                 bankShotPath = bankResult.path,
-                pocketedBankShotPocketIndex = bankResult.pocketedPocketIndex
+                pocketedBankShotPocketIndex = bankResult.pocketedPocketIndex,
+                // Reset protractor-mode-specific flags
+                isGeometricallyImpossible = false,
+                isObstructed = false,
+                isTiltBeyondLimit = false,
+                warningText = null
             )
         }
 

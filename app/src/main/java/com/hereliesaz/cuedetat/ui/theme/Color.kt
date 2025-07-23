@@ -88,6 +88,7 @@ val GunmetalBlue = LightBlue400
 val IcedOpal = Gray100
 val MutedGray = Gray300
 val VoidBlack = Gray700
+val Eight_ball_blue = Color(0xFF1923E7)
 
 // Bank lines can still be semantic
 val BankLine1Yellow = Yellow300.copy(alpha = 0.9f)

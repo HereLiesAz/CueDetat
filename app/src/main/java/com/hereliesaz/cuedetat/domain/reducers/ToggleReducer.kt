@@ -9,6 +9,7 @@ import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
+import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -46,25 +47,34 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             is MainScreenEvent.ToggleMoreHelp -> currentState.copy(isMoreHelpVisible = !currentState.isMoreHelpVisible)
             is MainScreenEvent.ToggleSnapping -> currentState.copy(isSnappingEnabled = !currentState.isSnappingEnabled)
             is MainScreenEvent.ToggleCvModel -> currentState.copy(useCustomModel = !currentState.useCustomModel)
-            is MainScreenEvent.ToggleOrientationLock -> currentState.copy(
-                orientationLock = currentState.orientationLock.next(),
-                isOrientationLockOnCooldown = true
-            )
+            is MainScreenEvent.ToggleOrientationLock -> {
+                val current = currentState.pendingOrientationLock ?: currentState.orientationLock
+                currentState.copy(pendingOrientationLock = current.next())
+            }
+
+            is MainScreenEvent.ApplyPendingOrientationLock -> {
+                if (currentState.pendingOrientationLock == null) return currentState
+                return currentState.copy(
+                    orientationLock = currentState.pendingOrientationLock,
+                    pendingOrientationLock = null
+                )
+            }
             is MainScreenEvent.OrientationChanged -> currentState.copy(orientationLock = event.orientationLock)
             is MainScreenEvent.ToggleCalibrationScreen -> currentState.copy(showCalibrationScreen = !currentState.showCalibrationScreen)
             is MainScreenEvent.ToggleQuickAlignScreen -> currentState.copy(showQuickAlignScreen = !currentState.showQuickAlignScreen)
-            is MainScreenEvent.ToggleExperienceMode -> currentState.copy(
-                experienceMode = currentState.experienceMode.next(),
-                isExperienceModeOnCooldown = true
-            )
+            is MainScreenEvent.ToggleExperienceMode -> {
+                val current = currentState.pendingExperienceMode ?: (currentState.experienceMode
+                    ?: ExperienceMode.EXPERT)
+                currentState.copy(pendingExperienceMode = current.next())
+            }
 
-            is MainScreenEvent.EndOrientationLockCooldown -> currentState.copy(
-                isOrientationLockOnCooldown = false
-            )
-
-            is MainScreenEvent.EndExperienceModeCooldown -> currentState.copy(
-                isExperienceModeOnCooldown = false
-            )
+            is MainScreenEvent.ApplyPendingExperienceMode -> {
+                if (currentState.pendingExperienceMode == null) return currentState
+                return currentState.copy(
+                    experienceMode = currentState.pendingExperienceMode,
+                    pendingExperienceMode = null
+                )
+            }
             else -> currentState
         }
     }

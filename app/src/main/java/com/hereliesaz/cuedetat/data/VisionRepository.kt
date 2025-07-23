@@ -138,6 +138,11 @@ class VisionRepository @Inject constructor(
                                 Scalar((hsv[0] + hueRange).coerceAtMost(180.0), 255.0, 255.0)
                             Core.inRange(hsvMat, lowerBound, upperBound, mask)
                         }
+                        // Morphological closing to fill holes from specular highlights
+                        val kernel =
+                            Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
+                        Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, kernel)
+                        kernel.release()
                         mask
                     } else {
                         null
@@ -361,30 +366,26 @@ class VisionRepository @Inject constructor(
         )
 
         var bestCenter: PointF? = null
-        var maxCircularity = 0.5 // Start with a reasonable threshold
 
-        for (contour in contours) {
-            val contour2f = MatOfPoint2f(*contour.toArray())
+        if (contours.isNotEmpty()) {
+            val allPoints = MatOfPoint()
+            Core.vconcat(contours as List<Mat>, allPoints)
+            val allPoints2f = MatOfPoint2f(*allPoints.toArray())
+
             val centerArray = org.opencv.core.Point()
             val radiusArray = FloatArray(1)
-            Imgproc.minEnclosingCircle(contour2f, centerArray, radiusArray)
+            Imgproc.minEnclosingCircle(allPoints2f, centerArray, radiusArray)
             val radius = radiusArray[0]
 
             if (radius > minRadius && radius < maxRadius) {
-                val area = Imgproc.contourArea(contour)
-                val perimeter = Imgproc.arcLength(contour2f, true)
-                if (perimeter > 0) {
-                    val circularity = 4 * Math.PI * area / (perimeter * perimeter)
-                    if (circularity > maxCircularity) {
-                        maxCircularity = circularity
-                        bestCenter = PointF(centerArray.x.toFloat(), centerArray.y.toFloat())
-                    }
-                }
+                bestCenter = PointF(centerArray.x.toFloat(), centerArray.y.toFloat())
             }
-            contour2f.release()
-            contour.release()
+
+            allPoints.release()
+            allPoints2f.release()
         }
 
+        contours.forEach { it.release() }
         gray.release()
         edges.release()
         hierarchy.release()

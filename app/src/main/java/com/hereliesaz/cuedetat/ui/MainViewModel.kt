@@ -64,11 +64,15 @@ class MainViewModel @Inject constructor(
     private var gestureJob: Job? = null
     private var isStateLoaded = false
 
+    private var orientationDebounceJob: Job? = null
+    private var experienceModeDebounceJob: Job? = null
+
     init {
         // Load persisted state first
         viewModelScope.launch {
             val savedState = userPreferencesRepository.stateFlow.first()
             if (savedState != null) {
+                // Clean the state to prevent crashes from old save files.
                 onEvent(MainScreenEvent.RestoreState(savedState))
             }
             isStateLoaded = true
@@ -166,7 +170,8 @@ class MainViewModel @Inject constructor(
                 is MainScreenEvent.ToggleTable,
                 is MainScreenEvent.ThemeChanged,
                 is MainScreenEvent.OrientationChanged,
-                is MainScreenEvent.ToggleOrientationLock,
+                is MainScreenEvent.ApplyPendingOrientationLock,
+                is MainScreenEvent.ApplyPendingExperienceMode,
                 is MainScreenEvent.ApplyQuickAlign,
                 is MainScreenEvent.RestoreState -> UpdateType.FULL
 
@@ -243,17 +248,29 @@ class MainViewModel @Inject constructor(
             }
 
             is MainScreenEvent.ToggleOrientationLock -> {
-                viewModelScope.launch {
-                    userPreferencesRepository.saveState(state)
+                orientationDebounceJob?.cancel()
+                orientationDebounceJob = viewModelScope.launch {
                     delay(1000L)
-                    onEvent(MainScreenEvent.EndOrientationLockCooldown)
+                    onEvent(MainScreenEvent.ApplyPendingOrientationLock)
                 }
             }
 
             is MainScreenEvent.ToggleExperienceMode -> {
-                viewModelScope.launch {
+                experienceModeDebounceJob?.cancel()
+                experienceModeDebounceJob = viewModelScope.launch {
                     delay(1000L)
-                    onEvent(MainScreenEvent.EndExperienceModeCooldown)
+                    onEvent(MainScreenEvent.ApplyPendingExperienceMode)
+                }
+            }
+
+            is MainScreenEvent.MenuClosed -> {
+                orientationDebounceJob?.cancel()
+                if (state.pendingOrientationLock != null) {
+                    onEvent(MainScreenEvent.ApplyPendingOrientationLock)
+                }
+                experienceModeDebounceJob?.cancel()
+                if (state.pendingExperienceMode != null) {
+                    onEvent(MainScreenEvent.ApplyPendingExperienceMode)
                 }
             }
 

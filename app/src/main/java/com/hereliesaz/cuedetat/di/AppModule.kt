@@ -5,6 +5,7 @@ import com.google.gson.Gson
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
+import com.hereliesaz.cuedetat.data.ShakeDetector
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.network.GithubApi
 import dagger.Module
@@ -49,6 +50,12 @@ object AppModule {
             .enableClassification()
             .build()
         return ObjectDetection.getClient(options)
+    }
+
+    @Provides
+    @Singleton
+    fun provideShakeDetector(@ApplicationContext context: Context): ShakeDetector {
+        return ShakeDetector(context)
     }
 
     @Provides

@@ -7,13 +7,11 @@
     <string name="permission_denied">Camera permission is required to use this app.</string>
     <string name="toggle_help_lines">Help</string>
 
-    <!-- Update Checker -->
     <string name="update_check_failed">Update check failed.</string>
     <string name="update_no_new_release">You are on the latest version.</string>
     <string name="update_available">Version %1$s is available!</string>
 
 
-    <!-- Insulting Warnings -->
     <string name="warning_message_area">Sarcastic Warning Message Area</string>
     <string name="tagline">May your shot be better than your excuses.</string>
 
@@ -50,5 +48,58 @@
         <item>I can\'t be more disappointed than your dad.</item>
         <item>Consult a physicist. Or a therapist.</item>
         <item>Maybe if you put your phone down once in a while....</item>
+    </string-array>
+
+    <string-array name="hater_mode_responses">
+        <item>Ask again, but with less hope.</item>
+        <item>Outlook hazy. Try to not suck.</item>
+        <item>System busy judging you. Try again later.</item>
+        <item>That\'s not your fingers. Don\'t count on it.</item>
+        <item>Go home. You\'re drunk.</item>
+        <item>42</item>
+        <item>You\'re asking the wrong questions.</item>
+        <item>Bless your heart.</item>
+        <item>Ask again. More feeling this time.</item>
+        <item>What a terrible idea.</item>
+        <item>Without a doubt. You will be disappointed.</item>
+        <item>It is as certain as the heat-death of the universe but will take longer.</item>
+        <item>Outlook doubtful. Try looking inward.</item>
+        <item>The odds are forever not in your favor.</item>
+        <item>Yes. And by that, I mean absolutely not.</item>
+        <item>Your guaranteed success is also a non-linear failure.</item>
+        <item>It is written in nuclear fallout.</item>
+        <item>Yes, but in the wrong universe.</item>
+        <item>Three known things can survive an atomic holocaust: roaches, twinkies, and stupid fucking questions like that.</item>
+        <item>Nah.</item>
+        <item>The end is nigh and you ask me this?</item>
+        <item>Reply hazy, the bar is on fire.</item>
+        <item>Thank you for asking! And the laugh.</item>
+        <item>The giraffe screams yes from a velvet mailbox.</item>
+        <item>Green is not the color of maybe.</item>
+        <item>Invert the spoon and dance.</item>
+        <item>Your question ate itself and said, \"Delicious.\"</item>
+        <item>Your future is shaped like a falling piano.</item>
+        <item>Advice is a sandwich you forgot to invent.</item>
+        <item>All questions like this start with the letter Q.</item>
+        <item>The cat was Schrödinger\'s therapist. All but certain.</item>
+        <item>Yes, if gravity permits.</item>
+        <item>Onions are opinions, sans Pi.</item>
+        <item>Paint your doubt with the bones of clocks.</item>
+        <item>Nonsense is the only honest answer.</item>
+        <item>Reality declined the invitation.</item>
+        <item>Flip the idea inside out and wear it like it fits.</item>
+        <item>The oracle sneezed. That\'s your sign.</item>
+        <item>Fork your expectations.</item>
+        <item>The crows know, but they won\'t tell.</item>
+        <item>Ask again after the dream ends.</item>
+        <item>Everything is true until spoken aloud.</item>
+        <item>That question is the butterfly effect that ends humanity.</item>
+        <item>I’d agree, but then we’d both be wrong.</item>
+        <item>Ask again but try crying softer. The void is sensitive.</item>
+        <item>Even your apathy is underwhelming.</item>
+        <item>Wow. Edge of my non-existent seat.</item>
+        <item>Life’s short. So is your attention span.</item>
+        <item>Try giving a damn and maybe someone else will.</item>
+        <item>No. It’s not you. It’s reality.</item>
     </string-array>
 </resources>

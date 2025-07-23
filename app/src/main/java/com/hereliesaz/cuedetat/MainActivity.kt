@@ -31,6 +31,7 @@ import com.hereliesaz.cuedetat.ui.MainViewModel
 import com.hereliesaz.cuedetat.ui.composables.SplashScreen
 import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
+import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SingleEvent
@@ -46,6 +47,7 @@ class MainActivity : ComponentActivity() {
     private val mainViewModel: MainViewModel by viewModels()
     private val calibrationViewModel: CalibrationViewModel by viewModels()
     private val quickAlignViewModel: QuickAlignViewModel by viewModels()
+    private val haterViewModel: HaterViewModel by viewModels()
 
     @Inject
     lateinit var calibrationRepository: CalibrationRepository
@@ -60,6 +62,7 @@ class MainActivity : ComponentActivity() {
                         mainViewModel,
                         calibrationViewModel,
                         quickAlignViewModel,
+                        haterViewModel,
                         calibrationAnalyzer
                     )
                 }
@@ -81,6 +84,7 @@ class MainActivity : ComponentActivity() {
                         mainViewModel,
                         calibrationViewModel,
                         quickAlignViewModel,
+                        haterViewModel,
                         calibrationAnalyzer
                     )
                 }
@@ -121,6 +125,7 @@ class MainActivity : ComponentActivity() {
         mainViewModel: MainViewModel,
         calibrationViewModel: CalibrationViewModel,
         quickAlignViewModel: QuickAlignViewModel,
+        haterViewModel: HaterViewModel,
         calibrationAnalyzer: CalibrationAnalyzer
     ) {
         var showSplashScreen by rememberSaveable { mutableStateOf(true) }
@@ -146,6 +151,7 @@ class MainActivity : ComponentActivity() {
                     mainViewModel = mainViewModel,
                     calibrationViewModel = calibrationViewModel,
                     quickAlignViewModel = quickAlignViewModel,
+                    haterViewModel = haterViewModel,
                     calibrationAnalyzer = calibrationAnalyzer
                 )
             }

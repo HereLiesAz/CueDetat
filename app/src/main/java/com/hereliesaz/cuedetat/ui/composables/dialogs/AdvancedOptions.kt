@@ -2,12 +2,14 @@
 
 package com.hereliesaz.cuedetat.ui.composables.dialogs
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -38,7 +40,6 @@ fun AdvancedOptionsDialog(
                             Text(if (uiState.isSnappingEnabled) "On" else "Off")
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
 
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Show CV Mask:", modifier = Modifier.weight(1f))
@@ -46,7 +47,16 @@ fun AdvancedOptionsDialog(
                             Text(if (uiState.showCvMask) "On" else "Off")
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { onEvent(MainScreenEvent.EnterCvMaskTestMode) }) {
+                            Text("Test Mask", color = MaterialTheme.colorScheme.secondary)
+                        }
+                    }
+
 
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Active AI Model:", modifier = Modifier.weight(1f))
@@ -54,7 +64,6 @@ fun AdvancedOptionsDialog(
                             Text(if (uiState.useCustomModel) "Custom" else "Generic")
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
 
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Refinement:", modifier = Modifier.weight(1f))
@@ -98,23 +107,31 @@ fun AdvancedOptionsDialog(
                         valueRange = 50f..300f,
                         modifier = Modifier.height(32.dp)
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Divider()
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Fix Lens Warp", style = MaterialTheme.typography.titleMedium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        TextButton(onClick = { onEvent(MainScreenEvent.ToggleQuickAlignScreen); onDismiss() }) {
+                            Text("Table Alignment", color = MaterialTheme.colorScheme.tertiary)
+                        }
+                        TextButton(onClick = { onEvent(MainScreenEvent.ToggleCalibrationScreen); onDismiss() }) {
+                            Text("Full Calibration", color = MaterialTheme.colorScheme.tertiary)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Divider()
+                    TextButton(onClick = { onEvent(MainScreenEvent.EnterCalibrationMode) }) {
+                        Text("Calibrate Felt Color", color = MaterialTheme.colorScheme.tertiary)
+                    }
                 }
             },
             dismissButton = {
-                Row {
-                    TextButton(onClick = { onEvent(MainScreenEvent.ToggleQuickAlignScreen); onDismiss() }) {
-                        Text("Quick Align", color = MaterialTheme.colorScheme.tertiary)
-                    }
-                    TextButton(onClick = { onEvent(MainScreenEvent.ToggleCalibrationScreen); onDismiss() }) {
-                        Text("Calibrate Camera", color = MaterialTheme.colorScheme.tertiary)
-                    }
-                    TextButton(onClick = { onEvent(MainScreenEvent.EnterCalibrationMode) }) {
-                        Text("Calibrate Felt", color = MaterialTheme.colorScheme.tertiary)
-                    }
-                    TextButton(onClick = { onEvent(MainScreenEvent.EnterCvMaskTestMode) }) {
-                        Text("Test Mask", color = MaterialTheme.colorScheme.secondary)
-                    }
-                }
+                // This is intentionally left blank to allow the confirm button to be the only one in the standard action row.
             },
             confirmButton = { TextButton(onClick = onDismiss) { Text("Done", color = MaterialTheme.colorScheme.primary) } }
         )
