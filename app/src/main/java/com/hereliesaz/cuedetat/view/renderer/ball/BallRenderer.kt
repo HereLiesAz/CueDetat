@@ -129,18 +129,17 @@ class BallRenderer {
         val screenPos = DrawingUtils.mapPoint(ball.center, positionMatrix)
         val yPosLifted = screenPos.y - radiusInfo.lift
 
+        val isWarning = (state.isGeometricallyImpossible || state.isObstructed) && config is GhostCueBall
+
         val strokePaint = Paint(paints.targetCirclePaint).apply {
-            color = config.strokeColor.toArgb()
+            color = if (isWarning) paints.warningPaint.color else config.strokeColor.toArgb()
             strokeWidth = config.strokeWidth
             alpha = (config.opacity * 255).toInt()
-        }
-        if ((state.isGeometricallyImpossible || state.isObstructed) && config is GhostCueBall) {
-            strokePaint.color = paints.warningPaint.color
         }
 
         val glowPaint = Paint(paints.ballGlowPaint).apply {
             strokeWidth = config.glowWidth
-            color = config.glowColor.toArgb()
+            color = if (isWarning) paints.warningPaint.color else config.glowColor.toArgb()
             alpha = (config.glowColor.alpha * 255).toInt()
         }
 
@@ -217,3 +216,4 @@ class BallRenderer {
         }
     }
 }
+
