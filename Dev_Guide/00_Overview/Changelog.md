@@ -18,6 +18,11 @@ A log of completed work.
     - **Beginner Mode:** A simplified experience with helper labels enabled by default. Feature set to be streamlined for approachability.
     - **Hater Mode:** A "Magic 8-Ball" mode that provides cynical, non-committal answers in response to a device shake. Specification is complete.
 
+#### Fixed
+
+- **Performance: Inefficient Glow:** Corrected a significant performance issue where fading lines were rendered via a CPU-intensive loop of discrete segments. The renderer now uses a single `LinearGradient` mask for a more performant, GPU-accelerated effect.
+- **Rendering Bug: Warning Glow Color:** Fixed a visual bug where the glow effect for the `GhostCueBall` and aiming lines would remain white during a warning state. The glow now correctly adopts the mandated `WarningRed` color.
+
 ### [UNRELEASED] - 2025-07-21
 
 #### Added
@@ -201,10 +206,6 @@ A list of known bugs and required features.
 
 - **Critical Bug: CV Crash:** Entering "Test Mask" mode when "Show CV Mask" is disabled causes a
   fatal crash.
-- **Performance: Inefficient Glow:** The glow effect is rendered with a series of circles instead of
-  a stroked path, causing visual artifacts and unnecessary performance overhead.
-- **Rendering Bug: Warning Glow Color:** The glow effect for warnings is incorrectly white instead
-  of the mandated `WarningRed`.
 - **UI/UX: Menu Redesign:**
     - The menu drawer width needs to be reduced.
     - Implement a fixed footer containing the "About" and "@hereliezaz" links, as well as a new
@@ -222,6 +223,10 @@ A list of known bugs and required features.
 
 ### Closed Issues
 
+- **[CLOSED] Performance: Inefficient Glow:** The glow effect was rendered with a series of circles instead of
+  a stroked path, causing visual artifacts and unnecessary performance overhead. This has been corrected.
+- **[CLOSED] Rendering Bug: Warning Glow Color:** The glow effect for warnings was incorrectly white instead
+  of the mandated `WarningRed`. This has been corrected.
 - **[CLOSED] Performance: 3D Lag:** The application suffered from significant lag during device
   tilt. The issue was traced to a flawed rendering cache that was being invalidated on every frame.
   The renderer has been refactored to cache only static, un-transformed geometry, resolving the
