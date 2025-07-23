@@ -3,9 +3,11 @@
 package com.hereliesaz.cuedetat.view.renderer.line
 
 import android.graphics.Canvas
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
+import android.graphics.Shader
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -57,7 +59,8 @@ class LineRenderer {
             strokeWidth = shotGuideLineConfig.strokeWidth
         }
         val shotLineGlow = Paint(paints.lineGlowPaint).apply {
-            color = shotLinePaint.color
+            // Explicitly set warning color, overriding the global glow stick color.
+            color = if (shotLineIsWarning) paints.warningPaint.color else shotLinePaint.color
             strokeWidth = shotGuideLineConfig.glowWidth
         }
         val obstructionPaint = Paint(paints.pathObstructionPaint).apply {
@@ -73,7 +76,8 @@ class LineRenderer {
             shotGuideDirection,
             obstructionPaint,
             null, // No glow for pathway
-            state
+            state,
+            paints
         )
 
         state.aimingLineBankPath?.let {
@@ -83,7 +87,8 @@ class LineRenderer {
                 obstructionPaint,
                 null, // No glow for pathway
                 isPocketed = false,
-                state
+                state,
+                paints
             )
         }
 
@@ -95,7 +100,8 @@ class LineRenderer {
             shotGuideDirection,
             shotLinePaint,
             shotLineGlow,
-            state
+            state,
+            paints
         )
         drawTangentLines(canvas, state, paints)
         drawAimingLines(canvas, state, paints)
@@ -129,7 +135,8 @@ class LineRenderer {
                 aimingLinePaint,
                 aimingLineGlow,
                 isPocketed,
-                state
+                state,
+                paints
             )
         }
     }
@@ -180,7 +187,7 @@ class LineRenderer {
         } else {
             // Active / Inactive logic
             state.tangentLineBankPath?.let {
-                drawBankablePath(canvas, it, tangentSolidPaint, tangentGlow, isPocketed, state)
+                drawBankablePath(canvas, it, tangentSolidPaint, tangentGlow, isPocketed, state, paints)
             }
 
             // Draw inactive line manually as a non-fading dotted line
@@ -278,8 +285,8 @@ class LineRenderer {
         }
 
         protractorAngles.forEach { angle ->
-            drawAngleGuide(canvas, ghostCueCenter, targetCenter, angle, guidePaint, state)
-            drawAngleGuide(canvas, ghostCueCenter, targetCenter, -angle, guidePaint, state)
+            drawAngleGuide(canvas, ghostCueCenter, targetCenter, angle, guidePaint, state, paints)
+            drawAngleGuide(canvas, ghostCueCenter, targetCenter, -angle, guidePaint, state, paints)
             if (state.areHelpersVisible || labelConfig.isPersistentlyVisible) {
                 textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, angle, textPaint, state.protractorUnit.radius)
                 textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, -angle, textPaint, state.protractorUnit.radius)
@@ -293,7 +300,8 @@ class LineRenderer {
         primaryPaint: Paint,
         glowPaint: Paint?,
         isPocketed: Boolean,
-        state: OverlayState
+        state: OverlayState,
+        paints: PaintCache
     ) {
         if (path.size < 2) return
 
@@ -306,7 +314,7 @@ class LineRenderer {
 
             if (isLastSegment) {
                 val direction = normalize(PointF(end.x - start.x, end.y - start.y))
-                drawFadingLine(canvas, start, direction, primaryPaint, glowPaint, state)
+                drawFadingLine(canvas, start, direction, primaryPaint, glowPaint, state, paints)
             } else { // For intermediate banked segments
                 glowPaint?.let { canvas.drawLine(start.x, start.y, end.x, end.y, it) }
                 canvas.drawLine(start.x, start.y, end.x, end.y, primaryPaint)
@@ -324,12 +332,12 @@ class LineRenderer {
     }
 
 
-    private fun drawAngleGuide(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint, state: OverlayState) {
+    private fun drawAngleGuide(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint, state: OverlayState, paints: PaintCache) {
         val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)
         val finalAngleRad = initialAngleRad + Math.toRadians(angleDegrees.toDouble())
 
         val direction = normalize(PointF(cos(finalAngleRad).toFloat(), sin(finalAngleRad).toFloat()))
-        drawFadingLine(canvas, center, direction, paint, null, state)
+        drawFadingLine(canvas, center, direction, paint, null, state, paints)
     }
 
     private fun drawFadingLine(
@@ -338,51 +346,36 @@ class LineRenderer {
         direction: PointF,
         paint: Paint,
         glowPaint: Paint?,
-        state: OverlayState
+        state: OverlayState,
+        paints: PaintCache
     ) {
         val tableLength = state.table.logicalHeight
         val totalLength = tableLength * 2.0f
         val fadeStartDistance = tableLength * 1.2f
         val fadeEndDistance = totalLength
 
-        val segmentLength = 15f // Draw in small segments for smooth fade
-        val numSegments = (totalLength / segmentLength).toInt()
+        val end = PointF(start.x + direction.x * totalLength, start.y + direction.y * totalLength)
+        val fadeStart = PointF(start.x + direction.x * fadeStartDistance, start.y + direction.y * fadeStartDistance)
 
-        val initialAlpha = paint.alpha
-        val initialGlowAlpha = glowPaint?.alpha ?: 0
+        val layer = canvas.saveLayer(null, null)
+        try {
+            // 1. Draw the full, opaque line(s)
+            glowPaint?.let { canvas.drawLine(start.x, start.y, end.x, end.y, it) }
+            canvas.drawLine(start.x, start.y, end.x, end.y, paint)
 
-        for (i in 0 until numSegments) {
-            val segmentStartDist = i * segmentLength
-            val segmentEndDist = (i + 1) * segmentLength
-
-            if (segmentStartDist > fadeEndDistance) break
-
-            val p1 = PointF(
-                start.x + direction.x * segmentStartDist,
-                start.y + direction.y * segmentStartDist
+            // 2. Create and apply the gradient mask
+            val gradient = LinearGradient(
+                fadeStart.x, fadeStart.y,
+                end.x, end.y,
+                intArrayOf(paint.color, Color.Transparent.toArgb()),
+                null,
+                Shader.TileMode.CLAMP
             )
-            val p2 = PointF(
-                start.x + direction.x * segmentEndDist,
-                start.y + direction.y * segmentEndDist
-            )
-
-            val midPointDist = (segmentStartDist + segmentEndDist) / 2f
-            val alphaMultiplier = if (midPointDist < fadeStartDistance) {
-                1.0f
-            } else {
-                1.0f - ((midPointDist - fadeStartDistance) / (fadeEndDistance - fadeStartDistance))
-            }.coerceIn(0f, 1f)
-
-            paint.alpha = (initialAlpha * alphaMultiplier).toInt()
-            glowPaint?.alpha = (initialGlowAlpha * alphaMultiplier).toInt()
-
-            if (paint.alpha > 5) {
-                glowPaint?.let { canvas.drawLine(p1.x, p1.y, p2.x, p2.y, it) }
-                canvas.drawLine(p1.x, p1.y, p2.x, p2.y, paint)
-            }
+            paints.gradientMaskPaint.shader = gradient
+            canvas.drawRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), paints.gradientMaskPaint)
+        } finally {
+            canvas.restoreToCount(layer)
         }
-        paint.alpha = initialAlpha
-        glowPaint?.alpha = initialGlowAlpha
     }
 
     private fun normalize(p: PointF): PointF {
@@ -390,3 +383,4 @@ class LineRenderer {
         return if (mag > 0.001f) PointF(p.x / mag, p.y / mag) else PointF(0f, 0f)
     }
 }
+
