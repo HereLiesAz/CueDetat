@@ -21,6 +21,9 @@ class CvDebugRenderer {
         if (!state.showCvMask) return
         val maskMat = state.visionData?.cvMask ?: return
 
+        // Prevent crash if the Mat is empty for a frame
+        if (maskMat.empty()) return
+
         try {
             // Ensure bitmap is the correct size, or create it
             if (bmp == null || bmp?.width != maskMat.cols() || bmp?.height != maskMat.rows()) {

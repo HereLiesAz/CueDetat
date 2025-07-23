@@ -57,6 +57,9 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.ToggleOrientationLock,
             is MainScreenEvent.ToggleCalibrationScreen,
             is MainScreenEvent.ToggleQuickAlignScreen,
+            is MainScreenEvent.ToggleExperienceMode,
+            is MainScreenEvent.EndOrientationLockCooldown,
+            is MainScreenEvent.EndExperienceModeCooldown,
             is MainScreenEvent.ToggleCvModel ->
                 toggleReducer.reduce(currentState, event)
 
@@ -111,6 +114,8 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.UpdateCannyT1,
             is MainScreenEvent.UpdateCannyT2 ->
                 advancedOptionsReducer.reduce(currentState, event)
+
+            is MainScreenEvent.SendFeedback -> currentState // No state change, only a side effect
 
             else -> currentState
         }

@@ -39,76 +39,70 @@ class OverlayRenderer {
             return
         }
 
-        // --- Performance Optimization: Bitmap Caching for Static Table ---
+        // --- Performance Optimization: Caching LOGICAL table geometry ---
         val currentTableStateHash = calculateTableStateHash(state)
+        val pitchMatrix = state.pitchMatrix ?: return // The primary matrix is required.
+
         if (tableBitmap == null || lastTableStateHash != currentTableStateHash || tableBitmap?.width != canvas.width || tableBitmap?.height != canvas.height) {
             lastTableStateHash = currentTableStateHash
-            // Invalidate and recreate the bitmap
+            // Invalidate and recreate the bitmap for the LOGICAL, UN-TRANSFORMED table.
             tableBitmap?.recycle()
             tableBitmap = Bitmap.createBitmap(canvas.width, canvas.height, Bitmap.Config.ARGB_8888)
             val tableCanvas = Canvas(tableBitmap!!)
-
-            // Clear the bitmap canvas
             tableCanvas.drawColor(0, PorterDuff.Mode.CLEAR)
+
+            // Center the canvas on the logical origin (0,0) to draw the static table.
+            tableCanvas.save()
+            tableCanvas.translate(tableCanvas.width / 2f, tableCanvas.height / 2f)
 
             // Pass 1: Draw Table Surface onto the bitmap
             if (state.table.isVisible) {
-                tableCanvas.save()
-                tableCanvas.concat(state.pitchMatrix)
                 tableRenderer.drawSurface(tableCanvas, state, paints)
-                tableCanvas.restore()
             }
-            // Pass 2: Draw Lifted Rails and their labels onto the bitmap
+            // Pass 2: Draw Rails and their labels onto the bitmap
             if (state.table.isVisible) {
-                tableCanvas.save()
-                tableCanvas.concat(state.railPitchMatrix)
                 railRenderer.draw(tableCanvas, state, paints, typeface)
                 railRenderer.drawRailLabels(tableCanvas, state, paints, typeface)
-                tableCanvas.restore()
             }
-            // Pass 3: Draw Pockets (on top of lines) onto the bitmap
-            if (state.table.isVisible) {
-                tableCanvas.save()
-                tableCanvas.concat(state.pitchMatrix)
-                tableRenderer.drawPockets(tableCanvas, state, paints)
-                tableCanvas.restore()
-            }
+            tableCanvas.restore()
         }
 
-        // Draw the cached table bitmap onto the main canvas
+        // Draw the cached, un-transformed bitmap, applying the dynamic pitch matrix.
+        // This is a single, hardware-accelerated operation.
         tableBitmap?.let {
-            canvas.drawBitmap(it, 0f, 0f, null)
+            canvas.drawBitmap(it, pitchMatrix, paints.bitmapPaint)
         }
         // --- End of Caching Logic ---
 
 
-        // Pass 4: Draw all dynamic logical lines on the main canvas
+        // Pass 3: Draw dynamic elements that live on the table plane (pockets, lines)
         canvas.save()
-        canvas.concat(state.pitchMatrix)
+        canvas.concat(pitchMatrix)
+        if (state.table.isVisible) {
+            tableRenderer.drawPockets(canvas, state, paints)
+        }
         lineRenderer.drawLogicalLines(canvas, state, paints, typeface)
         canvas.restore()
 
-        // Pass 5: Draw all dynamic balls on the main canvas
+        // Pass 4: Draw all balls, which handle their own "lift" effect.
         ballRenderer.draw(canvas, state, paints, typeface)
     }
 
+
     /**
      * Generates a hash code based on the state properties that affect the
-     * static table's appearance. If this hash changes, the table bitmap needs
-     * to be redrawn.
+     * static table's appearance. This hash must NOT include dynamic properties
+     * like the pitch matrix or aiming state.
      */
     private fun calculateTableStateHash(state: OverlayState): Int {
         var result = state.viewWidth
         result = 31 * result + state.viewHeight
-        result = 31 * result + (state.pitchMatrix?.hashCode() ?: 0)
-        result = 31 * result + (state.railPitchMatrix?.hashCode() ?: 0)
+        // HASH LOGICAL AND APPEARANCE PROPERTIES ONLY
         result = 31 * result + state.table.hashCode()
         result = 31 * result + state.areHelpersVisible.hashCode()
         result = 31 * result + state.luminanceAdjustment.hashCode()
         result = 31 * result + state.glowStickValue.hashCode()
-        result = 31 * result + (state.aimedPocketIndex ?: -1)
-        result = 31 * result + (state.tangentAimedPocketIndex ?: -1)
-        result = 31 * result + (state.pocketedBankShotPocketIndex ?: -1)
+        result = 31 * result + (state.appControlColorScheme?.hashCode() ?: 0)
         return result
     }
 }

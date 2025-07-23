@@ -55,6 +55,9 @@ sealed class MainScreenEvent {
     object ToggleOrientationLock : MainScreenEvent()
     data class OrientationChanged(val orientationLock: OverlayState.OrientationLock) :
         MainScreenEvent()
+    object ToggleExperienceMode : MainScreenEvent()
+    object EndOrientationLockCooldown : MainScreenEvent()
+    object EndExperienceModeCooldown : MainScreenEvent()
 
 
     // Obstacle Events
@@ -68,6 +71,8 @@ sealed class MainScreenEvent {
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
     object ToggleCalibrationScreen : MainScreenEvent()
     object ToggleQuickAlignScreen : MainScreenEvent()
+    data class ApplyQuickAlign(val translation: Offset, val rotation: Float, val scale: Float) :
+        MainScreenEvent()
     object ToggleCvRefinementMethod : MainScreenEvent()
     data class UpdateHoughP1(val value: Float) : MainScreenEvent()
     data class UpdateHoughP2(val value: Float) : MainScreenEvent()

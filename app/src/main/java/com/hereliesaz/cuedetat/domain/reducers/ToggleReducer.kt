@@ -46,10 +46,25 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             is MainScreenEvent.ToggleMoreHelp -> currentState.copy(isMoreHelpVisible = !currentState.isMoreHelpVisible)
             is MainScreenEvent.ToggleSnapping -> currentState.copy(isSnappingEnabled = !currentState.isSnappingEnabled)
             is MainScreenEvent.ToggleCvModel -> currentState.copy(useCustomModel = !currentState.useCustomModel)
-            is MainScreenEvent.ToggleOrientationLock -> currentState.copy(orientationLock = currentState.orientationLock.next())
+            is MainScreenEvent.ToggleOrientationLock -> currentState.copy(
+                orientationLock = currentState.orientationLock.next(),
+                isOrientationLockOnCooldown = true
+            )
             is MainScreenEvent.OrientationChanged -> currentState.copy(orientationLock = event.orientationLock)
             is MainScreenEvent.ToggleCalibrationScreen -> currentState.copy(showCalibrationScreen = !currentState.showCalibrationScreen)
             is MainScreenEvent.ToggleQuickAlignScreen -> currentState.copy(showQuickAlignScreen = !currentState.showQuickAlignScreen)
+            is MainScreenEvent.ToggleExperienceMode -> currentState.copy(
+                experienceMode = currentState.experienceMode.next(),
+                isExperienceModeOnCooldown = true
+            )
+
+            is MainScreenEvent.EndOrientationLockCooldown -> currentState.copy(
+                isOrientationLockOnCooldown = false
+            )
+
+            is MainScreenEvent.EndExperienceModeCooldown -> currentState.copy(
+                isExperienceModeOnCooldown = false
+            )
             else -> currentState
         }
     }

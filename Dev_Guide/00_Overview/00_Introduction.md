@@ -9,7 +9,7 @@ stability.
 To resolve any potential conflicts in the documentation, follow this order of precedence. Later
 documents in this list supersede earlier ones.
 
-1. **`04-7_Changelog_And_Issues.md`**: This is the definitive source for the current project status,
+1. **`04-8_Changelog_And_Issues.md`**: This is the definitive source for the current project status,
    including open tasks and a log of completed work.
 2. **Interaction Model Documents**: The final implementation for any gesture must satisfy the
    specifications in `03-1_Gesture_Interaction_Model.md`, `03-9_Slider_Specifications.md`, and
@@ -58,7 +58,9 @@ Dev_Guide/
 │ ├── 03_Feature_Spin_Paths.md
 │ ├── 04_Feature_Obstruction_Detection.md
 │ ├── 05_Feature_CV_Hybrid_Eye.md
-│ └── 06_Changelog_And_Issues.md
+│ ├── 06_Feature_Quick_Align.md
+│ ├── 07_Feature_Camera_Calibration.md
+│ └── 08_Changelog_And_Issues.md
 └── 05_Lessons_of_the_Changelog/
 │ ├── 01_State_And_Event_Management_Lessons.md
 │ ├── 02_Rendering_And_Perspective_Lessons.md

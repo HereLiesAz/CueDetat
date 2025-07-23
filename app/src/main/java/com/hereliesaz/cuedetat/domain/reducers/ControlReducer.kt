@@ -29,8 +29,24 @@ class ControlReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             is MainScreenEvent.AdjustLuminance -> currentState.copy(luminanceAdjustment = event.adjustment.coerceIn(-0.4f, 0.4f), valuesChangedSinceReset = true)
             is MainScreenEvent.AdjustGlow -> currentState.copy(glowStickValue = event.value.coerceIn(-1f, 1f), valuesChangedSinceReset = true)
             is MainScreenEvent.PanView -> handlePanView(currentState, event)
+            is MainScreenEvent.ApplyQuickAlign -> handleApplyQuickAlign(currentState, event)
             else -> currentState
         }
+    }
+
+    private fun handleApplyQuickAlign(
+        currentState: OverlayState,
+        event: MainScreenEvent.ApplyQuickAlign
+    ): OverlayState {
+        val newZoomSliderPos = ZoomMapping.zoomToSlider(event.scale)
+
+        return currentState.copy(
+            viewOffset = PointF(event.translation.x, event.translation.y),
+            worldRotationDegrees = event.rotation,
+            zoomSliderPosition = newZoomSliderPos,
+            isWorldLocked = true,
+            valuesChangedSinceReset = true
+        )
     }
 
     private fun handlePanView(currentState: OverlayState, event: MainScreenEvent.PanView): OverlayState {

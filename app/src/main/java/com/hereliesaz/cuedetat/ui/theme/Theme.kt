@@ -12,9 +12,11 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
@@ -53,13 +55,27 @@ private val LightColorScheme = lightColorScheme(
     outline = Gray300,
 )
 
+private fun Color.adjustLuminance(factor: Float): Color {
+    if (factor == 0f || this == Color.Transparent) return this
+    val hsl = FloatArray(3)
+    try {
+        ColorUtils.colorToHSL(this.toArgb(), hsl)
+        hsl[2] = (hsl[2] + factor).coerceIn(0f, 1f)
+        return Color(ColorUtils.HSLToColor(hsl))
+    } catch (e: IllegalArgumentException) {
+        return this
+    }
+}
+
+
 @Composable
 fun CueDetatTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
+    luminanceAdjustment: Float = 0f,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
+    val baseColorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -68,6 +84,19 @@ fun CueDetatTheme(
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
+
+    val colorScheme = if (luminanceAdjustment != 0f) {
+        baseColorScheme.copy(
+            background = baseColorScheme.background.adjustLuminance(luminanceAdjustment),
+            surface = baseColorScheme.surface.adjustLuminance(luminanceAdjustment),
+            onBackground = baseColorScheme.onBackground.adjustLuminance(luminanceAdjustment),
+            onSurface = baseColorScheme.onSurface.adjustLuminance(luminanceAdjustment),
+            outline = baseColorScheme.outline.adjustLuminance(luminanceAdjustment)
+        )
+    } else {
+        baseColorScheme
+    }
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {

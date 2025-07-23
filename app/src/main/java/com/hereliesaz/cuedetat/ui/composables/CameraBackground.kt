@@ -4,7 +4,6 @@ package com.hereliesaz.cuedetat.ui.composables
 import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageAnalysis.*
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -16,7 +15,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.hereliesaz.cuedetat.data.VisionAnalyzer
 import java.util.concurrent.Executors
 
 private const val TAG = "CameraBackground"
@@ -24,7 +22,7 @@ private const val TAG = "CameraBackground"
 @Composable
 fun CameraBackground(
     modifier: Modifier = Modifier,
-    analyzer: VisionAnalyzer
+    analyzer: ImageAnalysis.Analyzer
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -40,7 +38,7 @@ fun CameraBackground(
                 val cameraProvider = cameraProviderFuture.get()
 
                 val preview = Preview.Builder().build().also {
-                    it.setSurfaceProvider(previewView.surfaceProvider)
+                    it.surfaceProvider = previewView.surfaceProvider
                 }
 
                 val imageAnalysis = ImageAnalysis.Builder()

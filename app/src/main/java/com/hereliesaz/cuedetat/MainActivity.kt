@@ -42,6 +42,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+
     private val mainViewModel: MainViewModel by viewModels()
     private val calibrationViewModel: CalibrationViewModel by viewModels()
     private val quickAlignViewModel: QuickAlignViewModel by viewModels()
@@ -133,7 +134,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        CueDetatTheme {
+        CueDetatTheme(luminanceAdjustment = uiState.luminanceAdjustment) {
             if (showSplashScreen) {
                 SplashScreen(onTimeout = { showSplashScreen = false })
             } else {

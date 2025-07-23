@@ -100,6 +100,11 @@ fun MainScreen(
         null -> isSystemDark
     }
 
+    // Listen for results from the QuickAlignViewModel
+    LaunchedEffect(quickAlignViewModel) {
+        mainViewModel.listenToQuickAlign(quickAlignViewModel)
+    }
+
     CueDetatTheme(darkTheme = useDarkTheme) {
         val alphaAnimatable = remember { Animatable(1.0f) }
 
@@ -138,7 +143,6 @@ fun MainScreen(
                         analyzer = calibrationAnalyzer
                     )
                 }
-
                 uiState.showQuickAlignScreen -> {
                     QuickAlignScreen(
                         uiState = uiState,
@@ -147,7 +151,6 @@ fun MainScreen(
                         viewModel = quickAlignViewModel
                     )
                 }
-
                 else -> {
                     val mainBoxModifier = Modifier
                         .fillMaxSize()

@@ -18,6 +18,7 @@ import com.hereliesaz.cuedetat.domain.StateReducer
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.domain.UpdateType
 import com.hereliesaz.cuedetat.domain.WarningManager
+import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SingleEvent
@@ -26,6 +27,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -71,6 +73,20 @@ class MainViewModel @Inject constructor(
             }
             isStateLoaded = true
             startDataFlows() // Start collecting high-frequency data after initial state is loaded
+        }
+    }
+
+    fun listenToQuickAlign(quickAlignViewModel: QuickAlignViewModel) {
+        viewModelScope.launch {
+            quickAlignViewModel.alignResult.collectLatest { result ->
+                onEvent(
+                    MainScreenEvent.ApplyQuickAlign(
+                        translation = result.translation,
+                        rotation = result.rotation,
+                        scale = result.scale
+                    )
+                )
+            }
         }
     }
 
@@ -151,6 +167,7 @@ class MainViewModel @Inject constructor(
                 is MainScreenEvent.ThemeChanged,
                 is MainScreenEvent.OrientationChanged,
                 is MainScreenEvent.ToggleOrientationLock,
+                is MainScreenEvent.ApplyQuickAlign,
                 is MainScreenEvent.RestoreState -> UpdateType.FULL
 
                 is MainScreenEvent.LogicalDragApplied,
@@ -210,8 +227,8 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.SendFeedback -> viewModelScope.launch {
                 _singleEvent.send(
                     SingleEvent.SendFeedbackEmail(
-                        email = "az@herelies.az",
-                        subject = "Cue d'Etat Feedback"
+                        email = "hereliesaz@gmail.com",
+                        subject = "Cue d'Etat feedback"
                     )
                 )
             }
@@ -228,6 +245,15 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.ToggleOrientationLock -> {
                 viewModelScope.launch {
                     userPreferencesRepository.saveState(state)
+                    delay(1000L)
+                    onEvent(MainScreenEvent.EndOrientationLockCooldown)
+                }
+            }
+
+            is MainScreenEvent.ToggleExperienceMode -> {
+                viewModelScope.launch {
+                    delay(1000L)
+                    onEvent(MainScreenEvent.EndExperienceModeCooldown)
                 }
             }
 

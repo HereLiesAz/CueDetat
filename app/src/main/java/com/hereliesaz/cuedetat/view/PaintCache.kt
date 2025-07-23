@@ -16,6 +16,7 @@ import com.hereliesaz.cuedetat.ui.theme.BankLine1Yellow
 import com.hereliesaz.cuedetat.ui.theme.BankLine2Yellow
 import com.hereliesaz.cuedetat.ui.theme.BankLine3Yellow
 import com.hereliesaz.cuedetat.ui.theme.BankLine4Yellow
+import com.hereliesaz.cuedetat.ui.theme.MutedGray
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.config.table.Table
 import com.hereliesaz.cuedetat.view.state.OverlayState
@@ -135,7 +136,7 @@ class PaintCache {
         pathObstructionPaint.color =
             baseScheme.tertiary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.2f).toArgb()
         cvResultPaint.color =
-            Color.Blue.copy(alpha = 0.5f).adjustLuminance(LUMINANCE_ADJUST).toArgb()
+            MutedGray.copy(alpha = 0.5f).adjustLuminance(LUMINANCE_ADJUST).toArgb()
 
 
         bankLine1Paint.color = BankLine1Yellow.adjustLuminance(LUMINANCE_ADJUST).toArgb()
@@ -163,4 +164,3 @@ class PaintCache {
         }
     }
 }
-

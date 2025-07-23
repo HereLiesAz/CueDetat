@@ -29,6 +29,7 @@ import org.opencv.imgproc.Imgproc
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
+import kotlin.math.pow
 import org.opencv.core.Rect as OCVRect
 
 @Singleton
@@ -168,7 +169,18 @@ class VisionRepository @Inject constructor(
                     }
                     // --- END FIX ---
 
-                    val refinedScreenPoints = detectedObjects.mapNotNull { detectedObject ->
+                    val filteredDetectedObjects = detectedObjects.filter {
+                        val box = it.boundingBox
+                        val expectedRadius = getExpectedRadiusAtImageY(
+                            box.centerY().toFloat(),
+                            state,
+                            imageToScreenMatrix
+                        )
+                        val maxAllowedArea = 2 * Math.PI * expectedRadius.pow(2)
+                        (box.width() * box.height()) <= maxAllowedArea
+                    }
+
+                    val refinedScreenPoints = filteredDetectedObjects.mapNotNull { detectedObject ->
                         refineBallCenter(detectedObject, mat, state, imageToScreenMatrix)
                     }.map { pointInImageCoords ->
                         val screenPointArray =
@@ -195,7 +207,7 @@ class VisionRepository @Inject constructor(
                     val finalVisionData = VisionData(
                         genericBalls = filteredBalls,
                         detectedHsvColor = hsvTuple?.first ?: hsv,
-                        detectedBoundingBoxes = detectedObjects.map { it.boundingBox },
+                        detectedBoundingBoxes = filteredDetectedObjects.map { it.boundingBox },
                         cvMask = finalCvMask,
                         sourceImageWidth = inputImage.width,
                         sourceImageHeight = inputImage.height

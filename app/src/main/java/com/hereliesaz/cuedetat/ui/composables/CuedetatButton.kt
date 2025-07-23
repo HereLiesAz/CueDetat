@@ -30,7 +30,7 @@ fun CuedetatButton(
         onClick = onClick,
         modifier = modifier.size(size),
         shape = CircleShape,
-        border = BorderStroke(2.dp, color.copy(alpha = 0.7f)),
+        border = BorderStroke(3.dp, color.copy(alpha = 0.7f)),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = Color.Transparent,
             contentColor = color
@@ -41,8 +41,8 @@ fun CuedetatButton(
             text = text,
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 12.sp,
-                lineHeight = 14.sp
+                fontSize = 14.sp,
+                lineHeight = 16.sp
             ),
         )
     }

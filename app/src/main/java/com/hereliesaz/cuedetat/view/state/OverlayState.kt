@@ -23,6 +23,7 @@ data class SnapCandidate(
 
 enum class CvRefinementMethod {
     HOUGH, CONTOUR;
+
     fun next(): CvRefinementMethod = if (this == HOUGH) CONTOUR else HOUGH
 }
 
@@ -58,6 +59,15 @@ enum class TableSize(
     }
 }
 
+enum class ExperienceMode {
+    EXPERT, BEGINNER, HATER;
+
+    fun next(): ExperienceMode {
+        val nextOrdinal = (this.ordinal + 1) % entries.size
+        return entries[nextOrdinal]
+    }
+}
+
 data class OverlayState(
     // View dimensions
     val viewWidth: Int = 0,
@@ -83,6 +93,9 @@ data class OverlayState(
     val isCameraVisible: Boolean = true,
     val viewOffset: PointF = PointF(0f, 0f), // Pan state
     val orientationLock: OrientationLock = OrientationLock.AUTOMATIC,
+    val experienceMode: ExperienceMode = ExperienceMode.EXPERT,
+    @Transient val isOrientationLockOnCooldown: Boolean = false,
+    @Transient val isExperienceModeOnCooldown: Boolean = false,
 
     // Banking mode specific state
     val isBankingMode: Boolean = false,
@@ -182,6 +195,7 @@ data class OverlayState(
 
     enum class OrientationLock {
         AUTOMATIC, PORTRAIT, LANDSCAPE;
+
         fun next(): OrientationLock = when (this) {
             AUTOMATIC -> PORTRAIT
             PORTRAIT -> LANDSCAPE
