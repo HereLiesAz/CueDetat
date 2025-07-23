@@ -61,7 +61,6 @@ enum class TableSize(
 
 enum class ExperienceMode {
     EXPERT, BEGINNER, HATER;
-
     fun next(): ExperienceMode {
         val nextOrdinal = (this.ordinal + 1) % entries.size
         return entries[nextOrdinal]

@@ -1,6 +1,5 @@
 package com.hereliesaz.cuedetat.ui.composables.quickalign
 
-import android.graphics.Bitmap
 import android.graphics.PointF
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -61,7 +60,6 @@ fun QuickAlignScreen(
             QuickAlignStep.SELECT_SIZE -> {
                 SizeSelectionStep(viewModel = viewModel, onEvent = onEvent)
             }
-
             QuickAlignStep.ALIGN_TABLE -> {
                 photo?.let {
                     AlignmentStep(
@@ -118,7 +116,7 @@ private fun AlignmentStep(
     uiState: OverlayState,
     viewModel: QuickAlignViewModel,
     onEvent: (MainScreenEvent) -> Unit,
-    photo: Bitmap
+    photo: android.graphics.Bitmap
 ) {
     val alignState by viewModel.alignState.collectAsState()
     val selectedTableSize by viewModel.selectedTableSize.collectAsState()
@@ -133,6 +131,20 @@ private fun AlignmentStep(
         viewModel.onRotate(rotationChange)
     }
 
+    val density = LocalDensity.current
+    val alignUiState = remember(alignState, selectedTableSize, screenWidth, screenHeight, density) {
+        uiState.copy(
+            viewWidth = with(density) { screenWidth.toPx().toInt() },
+            viewHeight = with(density) { screenHeight.toPx().toInt() },
+            table = Table(size = selectedTableSize ?: TableSize.NINE_FT, isVisible = true),
+            zoomSliderPosition = ZoomMapping.zoomToSlider(alignState.zoom),
+            worldRotationDegrees = alignState.rotation,
+            viewOffset = PointF(alignState.pan.x, alignState.pan.y),
+            onPlaneBall = null, // No need for balls in alignment
+            currentOrientation = uiState.currentOrientation.copy(pitch = 0f) // Force flat view for alignment
+        )
+    }
+
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -142,19 +154,6 @@ private fun AlignmentStep(
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
-
-        val alignUiState = remember(alignState, selectedTableSize, screenWidth, screenHeight) {
-            uiState.copy(
-                viewWidth = with(LocalDensity.current) { screenWidth.toPx().toInt() },
-                viewHeight = with(LocalDensity.current) { screenHeight.toPx().toInt() },
-                table = Table(size = selectedTableSize ?: TableSize.NINE_FT, isVisible = true),
-                zoomSliderPosition = ZoomMapping.zoomToSlider(alignState.zoom),
-                worldRotationDegrees = alignState.rotation,
-                viewOffset = PointF(alignState.pan.x, alignState.pan.y),
-                onPlaneBall = null, // No need for balls in alignment
-                pitchAngle = 0f // Force flat view for alignment
-            )
-        }
 
         ProtractorOverlay(
             uiState = alignUiState,

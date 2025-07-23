@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -37,7 +38,18 @@ class UserPreferencesRepository @Inject constructor(
         .map { preferences ->
             preferences[PreferencesKeys.STATE_JSON]?.let { jsonString ->
                 try {
-                    gson.fromJson(jsonString, OverlayState::class.java)
+                    // Deserialization can result in nulls for newly added non-nullable fields
+                    // if the saved JSON is from an older version of the app.
+                    val deserializedState = gson.fromJson(jsonString, OverlayState::class.java)
+
+                    // Sanitize the state to handle data migration issues gracefully.
+                    deserializedState?.let {
+                        if (it.experienceMode == null) {
+                            it.copy(experienceMode = ExperienceMode.EXPERT)
+                        } else {
+                            it
+                        }
+                    }
                 } catch (e: Exception) {
                     // Handle potential deserialization errors, e.g., after a state class change
                     null

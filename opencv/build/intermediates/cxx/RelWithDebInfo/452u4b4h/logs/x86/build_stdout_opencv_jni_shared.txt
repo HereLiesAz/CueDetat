@@ -1,2 +1,0 @@
-ninja: Entering directory `G:\My Drive\CueDetatLite\opencv\.cxx\RelWithDebInfo\452u4b4h\x86'
-ninja: no work to do.
