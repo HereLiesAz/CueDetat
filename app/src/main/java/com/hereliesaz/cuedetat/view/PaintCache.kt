@@ -5,6 +5,8 @@ package com.hereliesaz.cuedetat.view
 import android.graphics.BlurMaskFilter
 import android.graphics.DashPathEffect
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.Typeface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Color
@@ -58,6 +60,10 @@ class PaintCache {
     } // Doubled
     val pathObstructionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     val cvResultPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    val gradientMaskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+    }
 
 
     // --- Bank Line Paints ---
@@ -72,7 +78,7 @@ class PaintCache {
 
     // --- Glow Paint Objects ---
     val lineGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL_AND_STROKE; strokeWidth = glowStrokeWidth
+        style = Paint.Style.STROKE; strokeWidth = glowStrokeWidth
     }
     val ballGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeWidth = glowStrokeWidth
@@ -157,3 +163,4 @@ class PaintCache {
         }
     }
 }
+
