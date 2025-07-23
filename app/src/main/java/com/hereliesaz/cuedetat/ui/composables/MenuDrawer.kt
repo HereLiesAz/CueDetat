@@ -25,6 +25,7 @@ import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.theme.VoidBlack
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
+import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
@@ -67,7 +68,18 @@ fun MenuDrawerContent(
                 }
                 MenuDivider()
 
-                // Section 1: Core Controls
+                // Section 1: Help & Info (Moved to top)
+                MenuItem(
+                    text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
+                    onClick = { onEvent(MainScreenEvent.ToggleHelp); onCloseDrawer() }
+                )
+                MenuItem(
+                    text = "Show Tutorial",
+                    onClick = { onEvent(MainScreenEvent.StartTutorial); onCloseDrawer() }
+                )
+                MenuDivider()
+
+                // Section 2: Core Controls
                 val cameraToggleText =
                     if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On"
                 MenuItem(
@@ -90,11 +102,15 @@ fun MenuDrawerContent(
                 }
                 MenuDivider()
 
-                // Section 2: Table & Unit Settings
+                // Section 3: Table & Unit Settings
                 if (!uiState.isBankingMode) {
                     MenuItem(
                         text = if (uiState.table.isVisible) "Hide Table" else "Show Table",
                         onClick = { onEvent(MainScreenEvent.ToggleTable); onCloseDrawer() }
+                    )
+                    MenuItem(
+                        text = "Table Alignment",
+                        onClick = { onEvent(MainScreenEvent.ToggleQuickAlignScreen); onCloseDrawer() }
                     )
                 }
                 MenuItem(
@@ -109,16 +125,16 @@ fun MenuDrawerContent(
                 )
                 MenuDivider()
 
-                // Section 3: Appearance
-                val orientationToggleText = when (uiState.orientationLock) {
+                // Section 4: Appearance (Order swapped)
+                val orientationToShow = uiState.pendingOrientationLock ?: uiState.orientationLock
+                val orientationToggleText = when (orientationToShow) {
                     OverlayState.OrientationLock.AUTOMATIC -> "Orientation: Auto"
                     OverlayState.OrientationLock.PORTRAIT -> "Orientation: Portrait"
                     OverlayState.OrientationLock.LANDSCAPE -> "Orientation: Landscape"
                 }
                 MenuItem(
                     text = orientationToggleText,
-                    onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) },
-                    enabled = !uiState.isOrientationLockOnCooldown
+                    onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) }
                 )
                 MenuItem(
                     text = "Luminance",
@@ -126,21 +142,25 @@ fun MenuDrawerContent(
                 )
                 MenuDivider()
 
-                // Section 4: Help & Info
+                // Section 5: Developer (Moved to bottom of scrollable list)
                 MenuItem(
-                    text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
-                    onClick = { onEvent(MainScreenEvent.ToggleHelp); onCloseDrawer() }
+                    text = "Too Advanced Options",
+                    onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog); onCloseDrawer() }
                 )
-                MenuItem(
-                    text = "Show Tutorial",
-                    onClick = { onEvent(MainScreenEvent.StartTutorial); onCloseDrawer() }
-                )
-                MenuDivider()
             }
 
             // --- Fixed Footer ---
             Column {
                 MenuDivider()
+                // Mode toggle is now at the top of the footer
+                val modeToShow = uiState.pendingExperienceMode ?: (uiState.experienceMode
+                    ?: ExperienceMode.EXPERT)
+                MenuItem(
+                    text = "Mode: ${
+                        modeToShow.name.lowercase().replaceFirstChar { it.titlecase() }
+                    }",
+                    onClick = { onEvent(MainScreenEvent.ToggleExperienceMode) }
+                )
                 MenuItem(
                     text = "About",
                     onClick = { onEvent(MainScreenEvent.ViewAboutPage); onCloseDrawer() }
@@ -152,18 +172,6 @@ fun MenuDrawerContent(
                 MenuItem(
                     text = "@HereLiesAz",
                     onClick = { onEvent(MainScreenEvent.ViewArt); onCloseDrawer() })
-                MenuItem(
-                    text = "Mode: ${
-                        uiState.experienceMode.name.lowercase().replaceFirstChar { it.titlecase() }
-                    }",
-                    onClick = { onEvent(MainScreenEvent.ToggleExperienceMode) },
-                    enabled = !uiState.isExperienceModeOnCooldown
-                )
-                MenuDivider()
-                MenuItem(
-                    text = "Too Advanced Options",
-                    onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog); onCloseDrawer() }
-                )
                 Spacer(modifier = Modifier.height(12.dp))
             }
         }

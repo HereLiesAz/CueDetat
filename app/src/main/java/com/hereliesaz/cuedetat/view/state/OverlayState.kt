@@ -67,6 +67,17 @@ enum class ExperienceMode {
     }
 }
 
+enum class TutorialHighlightElement {
+    NONE,
+    TARGET_BALL,
+    GHOST_BALL,
+    AIMING_AREA,
+    CUE_BALL,
+    ZOOM_SLIDER,
+    ROTATION_SLIDER,
+    BANK_BUTTON
+}
+
 data class OverlayState(
     // View dimensions
     val viewWidth: Int = 0,
@@ -92,9 +103,9 @@ data class OverlayState(
     val isCameraVisible: Boolean = true,
     val viewOffset: PointF = PointF(0f, 0f), // Pan state
     val orientationLock: OrientationLock = OrientationLock.AUTOMATIC,
-    val experienceMode: ExperienceMode = ExperienceMode.EXPERT,
-    @Transient val isOrientationLockOnCooldown: Boolean = false,
-    @Transient val isExperienceModeOnCooldown: Boolean = false,
+    val experienceMode: ExperienceMode? = ExperienceMode.EXPERT,
+    @Transient val pendingOrientationLock: OrientationLock? = null,
+    @Transient val pendingExperienceMode: ExperienceMode? = null,
 
     // Banking mode specific state
     val isBankingMode: Boolean = false,
@@ -121,6 +132,7 @@ data class OverlayState(
     // Tutorial State
     val showTutorialOverlay: Boolean = false,
     val currentTutorialStep: Int = 0,
+    @Transient val tutorialHighlight: TutorialHighlightElement? = TutorialHighlightElement.NONE,
 
     // Sensor and perspective data
     val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f),

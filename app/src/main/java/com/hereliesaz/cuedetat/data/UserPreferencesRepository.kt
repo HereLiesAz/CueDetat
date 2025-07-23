@@ -10,6 +10,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -43,12 +44,17 @@ class UserPreferencesRepository @Inject constructor(
                     val deserializedState = gson.fromJson(jsonString, OverlayState::class.java)
 
                     // Sanitize the state to handle data migration issues gracefully.
-                    deserializedState?.let {
-                        if (it.experienceMode == null) {
-                            it.copy(experienceMode = ExperienceMode.EXPERT)
-                        } else {
-                            it
+                    deserializedState?.let { state ->
+                        var sanitizedState = state
+                        if (state.experienceMode == null) {
+                            sanitizedState =
+                                sanitizedState.copy(experienceMode = ExperienceMode.EXPERT)
                         }
+                        if (state.tutorialHighlight == null) {
+                            sanitizedState =
+                                sanitizedState.copy(tutorialHighlight = TutorialHighlightElement.NONE)
+                        }
+                        sanitizedState
                     }
                 } catch (e: Exception) {
                     // Handle potential deserialization errors, e.g., after a state class change

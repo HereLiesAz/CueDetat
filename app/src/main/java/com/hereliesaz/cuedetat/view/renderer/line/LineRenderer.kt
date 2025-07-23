@@ -69,27 +69,30 @@ class LineRenderer {
 
         val shotGuideDirection = normalize(PointF(ghostCueCenter.x - shotLineAnchor.x, ghostCueCenter.y - shotLineAnchor.y))
 
-        // --- Pass 1: Wide Pathways ---
-        drawFadingLine(
-            canvas,
-            shotLineAnchor,
-            shotGuideDirection,
-            obstructionPaint,
-            null, // No glow for pathway
-            state,
-            paints
-        )
-
-        state.aimingLineBankPath?.let {
-            drawBankablePath(
+        // Only draw the wide pathways if there's something to obstruct
+        if (state.table.isVisible || state.obstacleBalls.isNotEmpty()) {
+            // --- Pass 1: Wide Pathways ---
+            drawFadingLine(
                 canvas,
-                it,
+                shotLineAnchor,
+                shotGuideDirection,
                 obstructionPaint,
                 null, // No glow for pathway
-                isPocketed = false,
                 state,
                 paints
             )
+
+            state.aimingLineBankPath?.let {
+                drawBankablePath(
+                    canvas,
+                    it,
+                    obstructionPaint,
+                    null, // No glow for pathway
+                    isPocketed = false,
+                    state,
+                    paints
+                )
+            }
         }
 
 
@@ -352,7 +355,7 @@ class LineRenderer {
         val tableLength = state.table.logicalHeight
         val totalLength = tableLength * 2.0f
         val fadeStartDistance = tableLength * 1.2f
-        val fadeEndDistance = totalLength
+        totalLength
 
         val end = PointF(start.x + direction.x * totalLength, start.y + direction.y * totalLength)
         val fadeStart = PointF(start.x + direction.x * fadeStartDistance, start.y + direction.y * fadeStartDistance)
@@ -374,6 +377,7 @@ class LineRenderer {
             paints.gradientMaskPaint.shader = gradient
             canvas.drawRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), paints.gradientMaskPaint)
         } finally {
+            paints.gradientMaskPaint.shader = null // Reset the shader
             canvas.restoreToCount(layer)
         }
     }
@@ -383,4 +387,3 @@ class LineRenderer {
         return if (mag > 0.001f) PointF(p.x / mag, p.y / mag) else PointF(0f, 0f)
     }
 }
-

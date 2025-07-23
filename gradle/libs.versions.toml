@@ -2,8 +2,8 @@
 # See https://docs.gradle.org/current/userguide/platforms.html for details.
 
 [versions]
-appVersionName = "0.8.9.6"
-appVersionCode = "22"
+appVersionName = "0.9.2.1"
+appVersionCode = "23"
 applicationId = "com.hereliesaz.cuedetat"
 appName = "Cue D’état"
 # Android & Jetpack

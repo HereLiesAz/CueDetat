@@ -1,6 +1,12 @@
 // --- FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/TutorialOverlay.kt ---
 package com.hereliesaz.cuedetat.ui.composables.overlays
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,14 +23,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 
 @Composable
 fun TutorialOverlay(
@@ -44,6 +57,95 @@ fun TutorialOverlay(
     }
 
     if (uiState.showTutorialOverlay) {
+        val infiniteTransition = rememberInfiniteTransition(label = "highlight-transition")
+        val highlightAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.3f,
+            targetValue = 0.9f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1000),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "highlight-alpha"
+        )
+        val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = highlightAlpha)
+
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(9f)
+        ) {
+            val matrix = uiState.pitchMatrix
+            if (matrix == null) return@Canvas
+
+            when (uiState.tutorialHighlight ?: TutorialHighlightElement.NONE) {
+                TutorialHighlightElement.TARGET_BALL -> {
+                    val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
+                        uiState.protractorUnit.center,
+                        uiState.protractorUnit.radius,
+                        uiState,
+                        matrix
+                    )
+                    val screenPos = DrawingUtils.mapPoint(uiState.protractorUnit.center, matrix)
+                    drawCircle(
+                        color = highlightColor,
+                        radius = radiusInfo.radius * 2.0f,
+                        center = Offset(screenPos.x, screenPos.y),
+                        style = Stroke(width = 4.dp.toPx())
+                    )
+                }
+
+                TutorialHighlightElement.GHOST_BALL -> {
+                    val ghostCenter = uiState.protractorUnit.ghostCueBallCenter
+                    val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
+                        ghostCenter,
+                        uiState.protractorUnit.radius,
+                        uiState,
+                        matrix
+                    )
+                    val screenPos = DrawingUtils.mapPoint(ghostCenter, matrix)
+                    drawCircle(
+                        color = highlightColor,
+                        radius = radiusInfo.radius * 2.0f,
+                        center = Offset(screenPos.x, screenPos.y),
+                        style = Stroke(width = 4.dp.toPx())
+                    )
+                }
+
+                TutorialHighlightElement.CUE_BALL -> {
+                    uiState.onPlaneBall?.let {
+                        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
+                            it.center,
+                            it.radius,
+                            uiState,
+                            matrix
+                        )
+                        val screenPos = DrawingUtils.mapPoint(it.center, matrix)
+                        drawCircle(
+                            color = highlightColor,
+                            radius = radiusInfo.radius * 2.0f,
+                            center = Offset(screenPos.x, screenPos.y),
+                            style = Stroke(width = 4.dp.toPx())
+                        )
+                    }
+                }
+
+                TutorialHighlightElement.ZOOM_SLIDER -> {
+                    drawRoundRect(
+                        color = highlightColor,
+                        topLeft = Offset(
+                            size.width - 64.dp.toPx(),
+                            center.y - (size.height * 0.3f)
+                        ),
+                        size = Size(60.dp.toPx(), size.height * 0.6f),
+                        cornerRadius = CornerRadius(16.dp.toPx()),
+                        style = Stroke(width = 4.dp.toPx())
+                    )
+                }
+                // Other cases can be added here
+                else -> {}
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()

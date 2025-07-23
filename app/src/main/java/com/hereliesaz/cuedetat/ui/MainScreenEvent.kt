@@ -53,11 +53,11 @@ sealed class MainScreenEvent {
     data class AdjustGlow(val value: Float) : MainScreenEvent()
     data class SetWarning(val warning: String?) : MainScreenEvent()
     object ToggleOrientationLock : MainScreenEvent()
+    object ApplyPendingOrientationLock : MainScreenEvent()
     data class OrientationChanged(val orientationLock: OverlayState.OrientationLock) :
         MainScreenEvent()
     object ToggleExperienceMode : MainScreenEvent()
-    object EndOrientationLockCooldown : MainScreenEvent()
-    object EndExperienceModeCooldown : MainScreenEvent()
+    object ApplyPendingExperienceMode : MainScreenEvent()
 
 
     // Obstacle Events
@@ -99,4 +99,5 @@ sealed class MainScreenEvent {
     object SingleEventConsumed : MainScreenEvent()
     object ToastShown : MainScreenEvent()
     data class RestoreState(val state: OverlayState) : MainScreenEvent()
+    object MenuClosed : MainScreenEvent()
 }
