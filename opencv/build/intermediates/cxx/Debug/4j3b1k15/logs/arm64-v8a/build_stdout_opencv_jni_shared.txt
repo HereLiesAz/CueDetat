@@ -1,2 +1,0 @@
-ninja: Entering directory `G:\My Drive\CueDetatLite\opencv\.cxx\Debug\4j3b1k15\arm64-v8a'
-ninja: no work to do.
