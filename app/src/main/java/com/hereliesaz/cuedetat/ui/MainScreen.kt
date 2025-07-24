@@ -104,7 +104,6 @@ fun MainScreen(
         null -> isSystemDark
     }
 
-    // Listen for results from the QuickAlignViewModel
     LaunchedEffect(quickAlignViewModel) {
         mainViewModel.listenToQuickAlign(quickAlignViewModel)
     }
@@ -140,266 +139,259 @@ fun MainScreen(
         Box(modifier = Modifier.fillMaxSize()) {
 
             // --- UI ROUTER ---
-            when (uiState.experienceMode) {
-                ExperienceMode.HATER -> {
-                    HaterScreen(
-                        viewModel = haterViewModel,
-                        onMenuClick = { scope.launch { isDrawerOpen = true } }
-                    )
-                }
+            if (uiState.experienceMode == ExperienceMode.HATER) {
+                HaterScreen(viewModel = haterViewModel)
+            } else { // EXPERT and BEGINNER modes share the main UI
+                when {
+                    uiState.showCalibrationScreen -> {
+                        CalibrationScreen(
+                            uiState = uiState,
+                            onEvent = mainViewModel::onEvent,
+                            viewModel = calibrationViewModel,
+                            analyzer = calibrationAnalyzer
+                        )
+                    }
 
-                else -> { // EXPERT and BEGINNER modes share the main UI
-                    when {
-                        uiState.showCalibrationScreen -> {
-                            CalibrationScreen(
-                                uiState = uiState,
-                                onEvent = mainViewModel::onEvent,
-                                viewModel = calibrationViewModel,
-                                analyzer = calibrationAnalyzer
-                            )
-                        }
+                    uiState.showQuickAlignScreen -> {
+                        QuickAlignScreen(
+                            uiState = uiState,
+                            analyzer = mainViewModel.visionAnalyzer,
+                            onEvent = mainViewModel::onEvent,
+                            viewModel = quickAlignViewModel
+                        )
+                    }
 
-                        uiState.showQuickAlignScreen -> {
-                            QuickAlignScreen(
-                                uiState = uiState,
-                                analyzer = mainViewModel.visionAnalyzer,
-                                onEvent = mainViewModel::onEvent,
-                                viewModel = quickAlignViewModel
-                            )
-                        }
-
-                        else -> {
-                            val mainBoxModifier = Modifier
-                                .fillMaxSize()
-                                .pointerInput(uiState.isCalibratingColor, uiState.isTestingCvMask) {
-                                    detectTapGestures { offset ->
-                                        if (uiState.isCalibratingColor) {
-                                            mainViewModel.onEvent(
-                                                MainScreenEvent.SampleColorAt(
-                                                    offset
-                                                )
+                    else -> {
+                        val mainBoxModifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(uiState.isCalibratingColor, uiState.isTestingCvMask) {
+                                detectTapGestures { offset ->
+                                    if (uiState.isCalibratingColor) {
+                                        mainViewModel.onEvent(
+                                            MainScreenEvent.SampleColorAt(
+                                                offset
                                             )
-                                        } else if (uiState.isTestingCvMask) {
-                                            mainViewModel.onEvent(MainScreenEvent.ExitCvMaskTestMode)
-                                        }
+                                        )
+                                    } else if (uiState.isTestingCvMask) {
+                                        mainViewModel.onEvent(MainScreenEvent.ExitCvMaskTestMode)
                                     }
                                 }
+                            }
 
-                            Box(modifier = mainBoxModifier) {
-                                if (uiState.isCameraVisible) {
-                                    CameraBackground(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .zIndex(0f),
-                                        analyzer = mainViewModel.visionAnalyzer
-                                    )
-                                }
-
-                                ProtractorOverlay(
-                                    uiState = uiState.copy(spinPathsAlpha = alphaAnimatable.value),
-                                    systemIsDark = useDarkTheme,
-                                    isTestingCvMask = uiState.isTestingCvMask,
-                                    onEvent = mainViewModel::onEvent,
+                        Box(modifier = mainBoxModifier) {
+                            if (uiState.isCameraVisible) {
+                                CameraBackground(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .detectManualGestures(uiState, mainViewModel::onEvent)
-                                        .zIndex(1f)
+                                        .zIndex(0f),
+                                    analyzer = mainViewModel.visionAnalyzer
                                 )
+                            }
 
-                                if (uiState.isCalibratingColor) {
-                                    Column(
+                            ProtractorOverlay(
+                                uiState = uiState.copy(spinPathsAlpha = alphaAnimatable.value),
+                                systemIsDark = useDarkTheme,
+                                isTestingCvMask = uiState.isTestingCvMask,
+                                onEvent = mainViewModel::onEvent,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .detectManualGestures(uiState, mainViewModel::onEvent)
+                                    .zIndex(1f)
+                            )
+
+                            if (uiState.isCalibratingColor) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(32.dp)
+                                        .zIndex(6f),
+                                    verticalArrangement = Arrangement.Center,
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        "Aim at the table felt",
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = "Crosshair",
+                                        modifier = Modifier.size(48.dp),
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        "Tap to sample color",
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+
+                            // The main UI controls are only visible if not in a special CV mode
+                            if (!uiState.isTestingCvMask && !uiState.isCalibratingColor) {
+                                val spinControlCenter = uiState.spinControlCenter
+                                if (uiState.isSpinControlVisible && spinControlCenter != null) {
+                                    val spinControlSizeDp = 120.dp
+                                    val spinControlSizePx =
+                                        with(LocalDensity.current) { spinControlSizeDp.toPx() }
+
+                                    SpinControl(
                                         modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(32.dp)
-                                            .zIndex(6f),
-                                        verticalArrangement = Arrangement.Center,
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Text(
-                                            "Aim at the table felt",
-                                            style = MaterialTheme.typography.headlineMedium,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            textAlign = TextAlign.Center
-                                        )
-                                        Icon(
-                                            Icons.Default.Add,
-                                            contentDescription = "Crosshair",
-                                            modifier = Modifier.size(48.dp),
-                                            tint = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            "Tap to sample color",
-                                            style = MaterialTheme.typography.headlineMedium,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
+                                            .zIndex(5f)
+                                            .offset {
+                                                IntOffset(
+                                                    (spinControlCenter.x - spinControlSizePx / 2).roundToInt(),
+                                                    (spinControlCenter.y - spinControlSizePx / 2).roundToInt()
+                                                )
+                                            },
+                                        centerPosition = PointF(0f, 0f),
+                                        selectedSpinOffset = uiState.selectedSpinOffset,
+                                        lingeringSpinOffset = uiState.lingeringSpinOffset,
+                                        spinPathAlpha = alphaAnimatable.value,
+                                        onEvent = mainViewModel::onEvent
+                                    )
                                 }
 
-                                if (!uiState.isTestingCvMask && !uiState.isCalibratingColor) {
-                                    TopControls(
-                                        uiState = uiState,
-                                        onEvent = mainViewModel::onEvent,
-                                        onMenuClick = { scope.launch { isDrawerOpen = true } },
-                                        modifier = Modifier.zIndex(2f)
-                                    )
+                                ZoomControls(
+                                    uiState = uiState,
+                                    onEvent = mainViewModel::onEvent,
+                                    modifier = Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .fillMaxHeight(0.6f)
+                                        .width(60.dp)
+                                        .zIndex(5f)
+                                )
 
-                                    val spinControlCenter = uiState.spinControlCenter
-                                    if (uiState.isSpinControlVisible && spinControlCenter != null) {
-                                        val spinControlSizeDp = 120.dp
-                                        val spinControlSizePx =
-                                            with(LocalDensity.current) { spinControlSizeDp.toPx() }
-
-                                        SpinControl(
-                                            modifier = Modifier
-                                                .zIndex(5f)
-                                                .offset {
-                                                    IntOffset(
-                                                        (spinControlCenter.x - spinControlSizePx / 2).roundToInt(),
-                                                        (spinControlCenter.y - spinControlSizePx / 2).roundToInt()
-                                                    )
-                                                },
-                                            centerPosition = PointF(0f, 0f),
-                                            selectedSpinOffset = uiState.selectedSpinOffset,
-                                            lingeringSpinOffset = uiState.lingeringSpinOffset,
-                                            spinPathAlpha = alphaAnimatable.value,
-                                            onEvent = mainViewModel::onEvent
-                                        )
-                                    }
-
-                                    ZoomControls(
-                                        uiState = uiState,
-                                        onEvent = mainViewModel::onEvent,
-                                        modifier = Modifier
-                                            .align(Alignment.CenterEnd)
-                                            .fillMaxHeight(0.6f)
-                                            .width(60.dp)
-                                            .zIndex(5f)
-                                    )
-
-                                    Row(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                            .fillMaxWidth()
-                                            .navigationBarsPadding()
-                                            .padding(bottom = 8.dp)
-                                            .zIndex(2f),
-                                        verticalAlignment = Alignment.Bottom,
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                Row(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .fillMaxWidth()
+                                        .navigationBarsPadding()
+                                        .padding(bottom = 8.dp)
+                                        .zIndex(2f),
+                                    verticalAlignment = Alignment.Bottom,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(start = 16.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Column(
-                                            modifier = Modifier.padding(start = 16.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            CuedetatButton(
-                                                onClick = { mainViewModel.onEvent(MainScreenEvent.AddObstacleBall) },
-                                                text = "Add\nBall",
-                                                color = LightBlue400
-                                            )
-                                            if (!uiState.isBankingMode) {
-                                                if (!uiState.table.isVisible) {
-                                                    CuedetatButton(
-                                                        onClick = {
-                                                            mainViewModel.onEvent(
-                                                                MainScreenEvent.ToggleOnPlaneBall
-                                                            )
-                                                        },
-                                                        text = if (uiState.onPlaneBall == null) "Show\nCue Ball" else "Hide\nCue Ball",
-                                                        color = BruisedPlum
-                                                    )
-                                                }
+                                        CuedetatButton(
+                                            onClick = { mainViewModel.onEvent(MainScreenEvent.AddObstacleBall) },
+                                            text = "Add\nBall",
+                                            color = LightBlue400
+                                        )
+                                        if (!uiState.isBankingMode) {
+                                            if (!uiState.table.isVisible) {
                                                 CuedetatButton(
                                                     onClick = {
                                                         mainViewModel.onEvent(
-                                                            MainScreenEvent.ToggleTable
+                                                            MainScreenEvent.ToggleOnPlaneBall
                                                         )
                                                     },
-                                                    text = if (uiState.table.isVisible) "Hide\nTable" else "Show\nTable",
-                                                    color = MaterialTheme.colorScheme.secondary.copy(
-                                                        alpha = 0.7f
+                                                    text = if (uiState.onPlaneBall == null) "Show\nCue Ball" else "Hide\nCue Ball",
+                                                    color = BruisedPlum
+                                                )
+                                            }
+                                            CuedetatButton(
+                                                onClick = {
+                                                    mainViewModel.onEvent(
+                                                        MainScreenEvent.ToggleTable
                                                     )
-                                                )
-                                            }
-                                        }
-
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(80.dp)
-                                                .padding(horizontal = 16.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            if (uiState.table.isVisible) {
-                                                TableRotationSlider(
-                                                    uiState = uiState,
-                                                    onEvent = mainViewModel::onEvent
-                                                )
-                                            }
-                                        }
-
-                                        Column(
-                                            modifier = Modifier.padding(end = 16.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            CuedetatButton(
-                                                onClick = { mainViewModel.onEvent(MainScreenEvent.ToggleSpinControl) },
-                                                text = "Spin",
-                                                color = MaterialTheme.colorScheme.tertiary
-                                            )
-                                            CuedetatButton(
-                                                onClick = { mainViewModel.onEvent(MainScreenEvent.Reset) },
-                                                text = "Reset\nView",
-                                                color = MaterialTheme.colorScheme.onSurface.copy(
+                                                },
+                                                text = if (uiState.table.isVisible) "Hide\nTable" else "Show\nTable",
+                                                color = MaterialTheme.colorScheme.secondary.copy(
                                                     alpha = 0.7f
                                                 )
                                             )
                                         }
                                     }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(80.dp)
+                                            .padding(horizontal = 16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (uiState.table.isVisible) {
+                                            TableRotationSlider(
+                                                uiState = uiState,
+                                                onEvent = mainViewModel::onEvent
+                                            )
+                                        }
+                                    }
+
+                                    Column(
+                                        modifier = Modifier.padding(end = 16.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        CuedetatButton(
+                                            onClick = { mainViewModel.onEvent(MainScreenEvent.ToggleSpinControl) },
+                                            text = "Spin",
+                                            color = MaterialTheme.colorScheme.tertiary
+                                        )
+                                        CuedetatButton(
+                                            onClick = { mainViewModel.onEvent(MainScreenEvent.Reset) },
+                                            text = "Reset\nView",
+                                            color = MaterialTheme.colorScheme.onSurface.copy(
+                                                alpha = 0.7f
+                                            )
+                                        )
+                                    }
                                 }
-
-                                KineticWarningOverlay(
-                                    text = uiState.warningText,
-                                    modifier = Modifier.zIndex(3f)
-                                )
-
-                                LuminanceAdjustmentDialog(
-                                    uiState = uiState,
-                                    onEvent = mainViewModel::onEvent,
-                                    onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleLuminanceDialog) }
-                                )
-
-                                GlowStickDialog(
-                                    uiState = uiState,
-                                    onEvent = mainViewModel::onEvent,
-                                    onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleGlowStickDialog) }
-                                )
-
-                                TableSizeSelectionDialog(
-                                    uiState = uiState,
-                                    onEvent = mainViewModel::onEvent,
-                                    onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleTableSizeDialog) }
-                                )
-
-                                AdvancedOptionsDialog(
-                                    uiState = uiState,
-                                    onEvent = mainViewModel::onEvent,
-                                    onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }
-                                )
-
-                                TutorialOverlay(
-                                    uiState = uiState,
-                                    onEvent = mainViewModel::onEvent
-                                )
                             }
+
+                            KineticWarningOverlay(
+                                text = uiState.warningText,
+                                modifier = Modifier.zIndex(3f)
+                            )
+
+                            LuminanceAdjustmentDialog(
+                                uiState = uiState,
+                                onEvent = mainViewModel::onEvent,
+                                onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleLuminanceDialog) }
+                            )
+
+                            GlowStickDialog(
+                                uiState = uiState,
+                                onEvent = mainViewModel::onEvent,
+                                onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleGlowStickDialog) }
+                            )
+
+                            TableSizeSelectionDialog(
+                                uiState = uiState,
+                                onEvent = mainViewModel::onEvent,
+                                onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleTableSizeDialog) }
+                            )
+
+                            AdvancedOptionsDialog(
+                                uiState = uiState,
+                                onEvent = mainViewModel::onEvent,
+                                onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }
+                            )
+
+                            TutorialOverlay(
+                                uiState = uiState,
+                                onEvent = mainViewModel::onEvent
+                            )
                         }
                     }
                 }
             }
 
+            // --- Global UI Elements (Visible in all modes) ---
+            TopControls(
+                uiState = uiState,
+                onEvent = mainViewModel::onEvent,
+                onMenuClick = { scope.launch { isDrawerOpen = true } },
+                modifier = Modifier.zIndex(10f)
+            )
 
-            // --- HERESY CORRECTED: Custom Menu Implementation ---
             AnimatedVisibility(
                 visible = isDrawerOpen,
                 enter = fadeIn(animationSpec = tween(300)),
@@ -410,13 +402,13 @@ fun MainScreen(
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.6f))
                         .clickable { isDrawerOpen = false }
-                        .zIndex(20f) // Ensure scrim is on top of content
+                        .zIndex(20f)
                 )
             }
 
             AnimatedVisibility(
                 visible = isDrawerOpen,
-                modifier = Modifier.zIndex(21f), // Ensure drawer is on top of scrim
+                modifier = Modifier.zIndex(21f),
                 enter = expandVertically(
                     animationSpec = tween(durationMillis = 400),
                     expandFrom = Alignment.Top
@@ -435,7 +427,6 @@ fun MainScreen(
                     }
                 )
             }
-            // --- END CORRECTION ---
         }
     }
 }
