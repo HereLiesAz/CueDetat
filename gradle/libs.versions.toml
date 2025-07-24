@@ -79,7 +79,6 @@ androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-com
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycleRuntimeCompose" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleKtx" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
-androidx-material3 = { module = "androidx.compose.material3:material3", name = "material3" }
 androidx-multidex = { group = "androidx.multidex", name = "multidex", version.ref = "multidex" }
 dagger-hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
@@ -110,7 +109,7 @@ hilt-android = { group = "com.google.dagger", name = "hilt-android", version = "
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version = "2.57" }
 
 # Retrofit
-material3 = { module = "androidx.compose.material3:material3", version = "1.4.0-alpha18" }
+material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
 object1-detection = { module = "com.google.mlkit:object-detection", version = "17.0.2" }
 object1-detection-custom = { module = "com.google.mlkit:object-detection-custom", version = "17.0.2" }
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version = "3.0.0" }
