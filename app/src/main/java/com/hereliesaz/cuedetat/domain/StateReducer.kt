@@ -58,6 +58,7 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.ApplyPendingOrientationLock,
             is MainScreenEvent.ToggleExperienceMode,
             is MainScreenEvent.ApplyPendingExperienceMode,
+            is MainScreenEvent.SetExperienceMode,
             is MainScreenEvent.ToggleCalibrationScreen,
             is MainScreenEvent.ToggleQuickAlignScreen,
             is MainScreenEvent.ToggleCvModel ->

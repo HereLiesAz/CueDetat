@@ -6,6 +6,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.VisionData
+import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.TableSize
 
@@ -58,6 +59,7 @@ sealed class MainScreenEvent {
         MainScreenEvent()
     object ToggleExperienceMode : MainScreenEvent()
     object ApplyPendingExperienceMode : MainScreenEvent()
+    data class SetExperienceMode(val mode: ExperienceMode) : MainScreenEvent()
 
 
     // Obstacle Events

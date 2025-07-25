@@ -14,12 +14,16 @@ import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.data.VisionAnalyzer
 import com.hereliesaz.cuedetat.data.VisionRepository
 import com.hereliesaz.cuedetat.domain.CalculateBankShot
+import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
+import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.domain.StateReducer
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.domain.UpdateType
 import com.hereliesaz.cuedetat.domain.WarningManager
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
+import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.Perspective
+import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SingleEvent
 import com.hereliesaz.cuedetat.view.state.ToastMessage
@@ -49,7 +53,8 @@ class MainViewModel @Inject constructor(
     private val warningManager: WarningManager,
     val visionAnalyzer: VisionAnalyzer,
     private val visionRepository: VisionRepository,
-    private val userPreferencesRepository: UserPreferencesRepository
+    private val userPreferencesRepository: UserPreferencesRepository,
+    private val reducerUtils: ReducerUtils
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(OverlayState())
@@ -70,13 +75,44 @@ class MainViewModel @Inject constructor(
     init {
         // Load persisted state first
         viewModelScope.launch {
-            val savedState = userPreferencesRepository.stateFlow.first()
+            var savedState = userPreferencesRepository.stateFlow.first()
             if (savedState != null) {
-                // Clean the state to prevent crashes from old save files.
+                savedState = enforceModeInvariants(savedState)
                 onEvent(MainScreenEvent.RestoreState(savedState))
             }
             isStateLoaded = true
             startDataFlows() // Start collecting high-frequency data after initial state is loaded
+        }
+    }
+
+    private fun enforceModeInvariants(state: OverlayState): OverlayState {
+        return when (state.experienceMode) {
+            ExperienceMode.EXPERT -> {
+                var expertState = state
+                if (!expertState.table.isVisible) {
+                    expertState = expertState.copy(table = expertState.table.copy(isVisible = true))
+                }
+                if (expertState.onPlaneBall == null) {
+                    val cueBallCenter = reducerUtils.getDefaultCueBallPosition(expertState)
+                    expertState = expertState.copy(
+                        onPlaneBall = OnPlaneBall(
+                            center = cueBallCenter,
+                            radius = LOGICAL_BALL_RADIUS
+                        )
+                    )
+                }
+                expertState
+            }
+
+            ExperienceMode.BEGINNER -> {
+                state.copy(
+                    table = state.table.copy(isVisible = false),
+                    onPlaneBall = null,
+                    isBankingMode = false
+                )
+            }
+
+            else -> state // Hater mode
         }
     }
 
@@ -167,7 +203,6 @@ class MainViewModel @Inject constructor(
                 is MainScreenEvent.PanView,
                 is MainScreenEvent.TableRotationChanged,
                 is MainScreenEvent.TableRotationApplied,
-                is MainScreenEvent.ToggleTable,
                 is MainScreenEvent.ThemeChanged,
                 is MainScreenEvent.OrientationChanged,
                 is MainScreenEvent.ApplyPendingOrientationLock,
@@ -180,10 +215,10 @@ class MainViewModel @Inject constructor(
                 is MainScreenEvent.Reset,
                 is MainScreenEvent.AddObstacleBall,
                 is MainScreenEvent.ToggleBankingMode,
-                is MainScreenEvent.ToggleOnPlaneBall,
                 is MainScreenEvent.CvDataUpdated,
                 is MainScreenEvent.SetTableSize,
-                is MainScreenEvent.CycleTableSize -> UpdateType.AIMING
+                is MainScreenEvent.CycleTableSize,
+                is MainScreenEvent.SetExperienceMode -> UpdateType.AIMING
 
                 is MainScreenEvent.SpinApplied,
                 is MainScreenEvent.SpinSelectionEnded,

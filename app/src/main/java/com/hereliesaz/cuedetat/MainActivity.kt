@@ -130,8 +130,8 @@ class MainActivity : ComponentActivity() {
         haterViewModel: HaterViewModel,
         calibrationAnalyzer: CalibrationAnalyzer
     ) {
-        var showSplashScreen by rememberSaveable { mutableStateOf(true) }
         val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
+        val showSplashScreen = uiState.experienceMode == null
         var haterModeLockedOrientation by rememberSaveable { mutableStateOf(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) }
 
         LaunchedEffect(uiState.experienceMode, uiState.orientationLock) {
@@ -157,7 +157,9 @@ class MainActivity : ComponentActivity() {
 
         CueDetatTheme(luminanceAdjustment = uiState.luminanceAdjustment) {
             if (showSplashScreen) {
-                SplashScreen(onTimeout = { showSplashScreen = false })
+                SplashScreen(onRoleSelected = { selectedMode ->
+                    mainViewModel.onEvent(MainScreenEvent.SetExperienceMode(selectedMode))
+                })
             } else {
                 val currentAppControlColorScheme = MaterialTheme.colorScheme
                 LaunchedEffect(currentAppControlColorScheme) {

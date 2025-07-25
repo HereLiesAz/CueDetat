@@ -8,7 +8,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -41,20 +40,15 @@ class UserPreferencesRepository @Inject constructor(
                 try {
                     // Deserialization can result in nulls for newly added non-nullable fields
                     // if the saved JSON is from an older version of the app.
-                    val deserializedState = gson.fromJson(jsonString, OverlayState::class.java)
+                    var deserializedState = gson.fromJson(jsonString, OverlayState::class.java)
 
                     // Sanitize the state to handle data migration issues gracefully.
                     deserializedState?.let { state ->
-                        var sanitizedState = state
-                        if (state.experienceMode == null) {
-                            sanitizedState =
-                                sanitizedState.copy(experienceMode = ExperienceMode.EXPERT)
-                        }
                         if (state.tutorialHighlight == null) {
-                            sanitizedState =
-                                sanitizedState.copy(tutorialHighlight = TutorialHighlightElement.NONE)
+                            deserializedState =
+                                deserializedState.copy(tutorialHighlight = TutorialHighlightElement.NONE)
                         }
-                        sanitizedState
+                        deserializedState
                     }
                 } catch (e: Exception) {
                     // Handle potential deserialization errors, e.g., after a state class change
@@ -90,7 +84,11 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun saveState(state: OverlayState) {
         dataStore.edit { preferences ->
-            val jsonString = gson.toJson(state)
+            // Create a copy of the state but explicitly nullify the experienceMode.
+            // This ensures that on every fresh app start, the user is prompted to select a mode.
+            // The mode selection itself is only ever held in the in-memory state.
+            val stateToSave = state.copy(experienceMode = null)
+            val jsonString = gson.toJson(stateToSave)
             preferences[PreferencesKeys.STATE_JSON] = jsonString
         }
     }

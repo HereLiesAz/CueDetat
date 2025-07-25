@@ -20,9 +20,7 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
     fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
         return when (event) {
             is MainScreenEvent.ToggleSpinControl -> currentState.copy(isSpinControlVisible = !currentState.isSpinControlVisible)
-            is MainScreenEvent.ToggleOnPlaneBall -> handleToggleOnPlaneBall(currentState)
             is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(currentState)
-            is MainScreenEvent.ToggleTable -> handleToggleTable(currentState)
             is MainScreenEvent.CycleTableSize -> {
                 val newState = currentState.copy(table = currentState.table.copy(size = currentState.table.size.next()), valuesChangedSinceReset = true)
                 reducerUtils.snapViolatingBalls(newState)
@@ -60,11 +58,9 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
                 )
             }
             is MainScreenEvent.OrientationChanged -> currentState.copy(orientationLock = event.orientationLock)
-            is MainScreenEvent.ToggleCalibrationScreen -> currentState.copy(showCalibrationScreen = !currentState.showCalibrationScreen)
-            is MainScreenEvent.ToggleQuickAlignScreen -> currentState.copy(showQuickAlignScreen = !currentState.showQuickAlignScreen)
             is MainScreenEvent.ToggleExperienceMode -> {
-                val current = currentState.pendingExperienceMode ?: (currentState.experienceMode
-                    ?: ExperienceMode.EXPERT)
+                val current = currentState.pendingExperienceMode ?: currentState.experienceMode
+                ?: ExperienceMode.EXPERT
                 currentState.copy(pendingExperienceMode = current.next())
             }
 
@@ -75,71 +71,66 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
                     pendingExperienceMode = null
                 )
             }
+
+            is MainScreenEvent.SetExperienceMode -> handleSetExperienceMode(
+                currentState,
+                event.mode
+            )
+
+            is MainScreenEvent.ToggleCalibrationScreen -> currentState.copy(showCalibrationScreen = !currentState.showCalibrationScreen)
+            is MainScreenEvent.ToggleQuickAlignScreen -> currentState.copy(showQuickAlignScreen = !currentState.showQuickAlignScreen)
             else -> currentState
         }
     }
 
-    private fun handleToggleTable(currentState: OverlayState): OverlayState {
-        val isMakingVisible = !currentState.table.isVisible
-
-        // If making the table visible and the cue ball isn't, force the cue ball to appear.
-        return if (isMakingVisible && currentState.onPlaneBall == null) {
-            currentState.copy(
-                table = currentState.table.copy(isVisible = true),
-                onPlaneBall = OnPlaneBall(
-                    center = reducerUtils.getDefaultCueBallPosition(currentState),
-                    radius = LOGICAL_BALL_RADIUS
-                ),
-                valuesChangedSinceReset = true
-            )
-        } else {
-            // Otherwise, just toggle the table's visibility.
-            currentState.copy(
-                table = currentState.table.copy(isVisible = !currentState.table.isVisible),
-                valuesChangedSinceReset = true
-            )
-        }
-    }
-
-
-    private fun handleToggleOnPlaneBall(currentState: OverlayState): OverlayState {
-        return if (currentState.onPlaneBall != null) {
-            // MANDATE: The ActualCueBall MUST be visible if the table is visible.
-            // Do not allow the ball to be hidden if the table is on screen.
-            if (currentState.table.isVisible) {
-                currentState // Return state unchanged, action is forbidden.
-            } else {
-                currentState.copy(onPlaneBall = null, valuesChangedSinceReset = true)
-            }
-        } else {
-            val newCenter = reducerUtils.getDefaultCueBallPosition(currentState)
-            currentState.copy(
-                onPlaneBall = OnPlaneBall(center = newCenter, radius = LOGICAL_BALL_RADIUS),
-                valuesChangedSinceReset = true
-            )
-        }
-    }
-
-
-    private fun resetForTable(currentState: OverlayState): OverlayState {
-        val targetBallCenter = reducerUtils.getDefaultTargetBallPosition()
-        val actualCueBallCenter = reducerUtils.getDefaultCueBallPosition(currentState)
-
-        val updatedOnPlaneBall = if (currentState.onPlaneBall != null || currentState.table.isVisible) {
-            OnPlaneBall(center = actualCueBallCenter, radius = LOGICAL_BALL_RADIUS)
-        } else {
-            null
-        }
-
-        return currentState.copy(
-            onPlaneBall = updatedOnPlaneBall,
-            protractorUnit = ProtractorUnit(center = targetBallCenter, radius = LOGICAL_BALL_RADIUS, rotationDegrees = 0f),
-            worldRotationDegrees = 0f,
-            valuesChangedSinceReset = true,
-            zoomSliderPosition = 0f,
+    private fun handleSetExperienceMode(
+        currentState: OverlayState,
+        mode: ExperienceMode
+    ): OverlayState {
+        // Start with the current state to preserve view dimensions and saved settings.
+        var newState = currentState.copy(
+            experienceMode = mode,
+            // Reset session-specific state to defaults for a clean slate in the new mode.
+            protractorUnit = ProtractorUnit(
+                reducerUtils.getDefaultTargetBallPosition(),
+                LOGICAL_BALL_RADIUS,
+                0f
+            ),
             obstacleBalls = emptyList(),
-            viewOffset = PointF(0f, 0f) // Also reset pan
+            zoomSliderPosition = 0f,
+            worldRotationDegrees = 0f,
+            bankingAimTarget = null,
+            valuesChangedSinceReset = false,
+            isWorldLocked = false,
+            viewOffset = PointF(0f, 0f)
         )
+
+        // Apply mode-specific configurations.
+        return when (mode) {
+            ExperienceMode.EXPERT -> {
+                newState.copy(
+                    table = newState.table.copy(isVisible = true),
+                    onPlaneBall = OnPlaneBall(
+                        center = reducerUtils.getDefaultCueBallPosition(newState),
+                        radius = LOGICAL_BALL_RADIUS
+                    ),
+                    areHelpersVisible = false
+                )
+            }
+
+            ExperienceMode.BEGINNER -> {
+                newState.copy(
+                    table = newState.table.copy(isVisible = false),
+                    onPlaneBall = null,
+                    isBankingMode = false,
+                    areHelpersVisible = true
+                )
+            }
+
+            ExperienceMode.HATER -> {
+                newState // Hater mode is self-contained.
+            }
+        }
     }
 
     private fun handleToggleBankingMode(currentState: OverlayState): OverlayState {
@@ -167,10 +158,14 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
                 isBankingMode = false, bankingAimTarget = null,
                 zoomSliderPosition = defaultSliderPos,
                 table = currentState.table.copy(
-                    isVisible = false
+                    // In expert mode, the table should remain visible when exiting banking.
+                    isVisible = currentState.experienceMode == ExperienceMode.EXPERT
                 ),
                 worldRotationDegrees = 0f,
-                onPlaneBall = OnPlaneBall(PointF(0f, LOGICAL_BALL_RADIUS * 4), LOGICAL_BALL_RADIUS),
+                onPlaneBall = OnPlaneBall(
+                    reducerUtils.getDefaultCueBallPosition(currentState),
+                    LOGICAL_BALL_RADIUS
+                ),
                 protractorUnit = currentState.protractorUnit.copy(
                     radius = LOGICAL_BALL_RADIUS,
                     center = PointF(0f, 0f)

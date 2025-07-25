@@ -72,7 +72,6 @@ import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
 import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
 import com.hereliesaz.cuedetat.ui.hatemode.HaterScreen
 import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
-import com.hereliesaz.cuedetat.ui.theme.BruisedPlum
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import com.hereliesaz.cuedetat.ui.theme.LightBlue400
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
@@ -279,33 +278,11 @@ fun MainScreen(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        CuedetatButton(
-                                            onClick = { mainViewModel.onEvent(MainScreenEvent.AddObstacleBall) },
-                                            text = "Add\nBall",
-                                            color = LightBlue400
-                                        )
-                                        if (!uiState.isBankingMode) {
-                                            if (!uiState.table.isVisible) {
-                                                CuedetatButton(
-                                                    onClick = {
-                                                        mainViewModel.onEvent(
-                                                            MainScreenEvent.ToggleOnPlaneBall
-                                                        )
-                                                    },
-                                                    text = if (uiState.onPlaneBall == null) "Show\nCue Ball" else "Hide\nCue Ball",
-                                                    color = BruisedPlum
-                                                )
-                                            }
+                                        if (uiState.experienceMode == ExperienceMode.EXPERT) {
                                             CuedetatButton(
-                                                onClick = {
-                                                    mainViewModel.onEvent(
-                                                        MainScreenEvent.ToggleTable
-                                                    )
-                                                },
-                                                text = if (uiState.table.isVisible) "Hide\nTable" else "Show\nTable",
-                                                color = MaterialTheme.colorScheme.secondary.copy(
-                                                    alpha = 0.7f
-                                                )
+                                                onClick = { mainViewModel.onEvent(MainScreenEvent.AddObstacleBall) },
+                                                text = "Add\nBall",
+                                                color = LightBlue400
                                             )
                                         }
                                     }
@@ -330,11 +307,13 @@ fun MainScreen(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        CuedetatButton(
-                                            onClick = { mainViewModel.onEvent(MainScreenEvent.ToggleSpinControl) },
-                                            text = "Spin",
-                                            color = MaterialTheme.colorScheme.tertiary
-                                        )
+                                        if (uiState.experienceMode == ExperienceMode.EXPERT) {
+                                            CuedetatButton(
+                                                onClick = { mainViewModel.onEvent(MainScreenEvent.ToggleSpinControl) },
+                                                text = "Spin",
+                                                color = MaterialTheme.colorScheme.tertiary
+                                            )
+                                        }
                                         CuedetatButton(
                                             onClick = { mainViewModel.onEvent(MainScreenEvent.Reset) },
                                             text = "Reset\nView",

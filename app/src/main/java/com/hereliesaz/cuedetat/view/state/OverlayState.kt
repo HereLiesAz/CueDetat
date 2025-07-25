@@ -103,7 +103,7 @@ data class OverlayState(
     val isCameraVisible: Boolean = true,
     val viewOffset: PointF = PointF(0f, 0f), // Pan state
     val orientationLock: OrientationLock = OrientationLock.AUTOMATIC,
-    val experienceMode: ExperienceMode? = ExperienceMode.EXPERT,
+    val experienceMode: ExperienceMode? = null,
     @Transient val pendingOrientationLock: OrientationLock? = null,
     @Transient val pendingExperienceMode: ExperienceMode? = null,
 

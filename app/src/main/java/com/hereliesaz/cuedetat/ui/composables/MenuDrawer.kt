@@ -86,28 +86,19 @@ fun MenuDrawerContent(
                     text = cameraToggleText,
                     onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
                 )
-                val bankingModeToggleText =
-                    if (uiState.isBankingMode) "Ghost Ball Aiming" else "Calculate Bank"
-                MenuItem(
-                    text = bankingModeToggleText,
-                    onClick = { onEvent(MainScreenEvent.ToggleBankingMode); onCloseDrawer() }
-                )
-                if (!uiState.isBankingMode && !uiState.table.isVisible) {
-                    val cueBallToggleText =
-                        if (uiState.onPlaneBall == null) "Toggle Cue Ball" else "Hide Cue Ball"
+                if (uiState.experienceMode != ExperienceMode.BEGINNER) {
+                    val bankingModeToggleText =
+                        if (uiState.isBankingMode) "Ghost Ball Aiming" else "Calculate Bank"
                     MenuItem(
-                        text = cueBallToggleText,
-                        onClick = { onEvent(MainScreenEvent.ToggleOnPlaneBall); onCloseDrawer() }
+                        text = bankingModeToggleText,
+                        onClick = { onEvent(MainScreenEvent.ToggleBankingMode); onCloseDrawer() }
                     )
                 }
+
                 MenuDivider()
 
                 // Section 3: Table & Unit Settings
-                if (!uiState.isBankingMode) {
-                    MenuItem(
-                        text = if (uiState.table.isVisible) "Hide Table" else "Show Table",
-                        onClick = { onEvent(MainScreenEvent.ToggleTable); onCloseDrawer() }
-                    )
+                if (uiState.experienceMode != ExperienceMode.BEGINNER) {
                     MenuItem(
                         text = "Table Alignment",
                         onClick = { onEvent(MainScreenEvent.ToggleQuickAlignScreen); onCloseDrawer() }
@@ -143,18 +134,20 @@ fun MenuDrawerContent(
                 MenuDivider()
 
                 // Section 5: Developer (Moved to bottom of scrollable list)
-                MenuItem(
-                    text = "Too Advanced Options",
-                    onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog); onCloseDrawer() }
-                )
+                if (uiState.experienceMode != ExperienceMode.BEGINNER) {
+                    MenuItem(
+                        text = "Too Advanced Options",
+                        onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog); onCloseDrawer() }
+                    )
+                }
             }
 
             // --- Fixed Footer ---
             Column {
                 MenuDivider()
                 // Mode toggle is now at the top of the footer
-                val modeToShow = uiState.pendingExperienceMode ?: (uiState.experienceMode
-                    ?: ExperienceMode.EXPERT)
+                val modeToShow =
+                    uiState.pendingExperienceMode ?: uiState.experienceMode ?: ExperienceMode.EXPERT
                 MenuItem(
                     text = "Mode: ${
                         modeToShow.name.lowercase().replaceFirstChar { it.titlecase() }
