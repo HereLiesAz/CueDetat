@@ -6,6 +6,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -33,6 +34,7 @@ import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
 import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
+import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SingleEvent
 import dagger.hilt.android.AndroidEntryPoint
@@ -130,12 +132,26 @@ class MainActivity : ComponentActivity() {
     ) {
         var showSplashScreen by rememberSaveable { mutableStateOf(true) }
         val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
+        var haterModeLockedOrientation by rememberSaveable { mutableStateOf(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) }
 
-        LaunchedEffect(uiState.orientationLock) {
-            requestedOrientation = when (uiState.orientationLock) {
-                OverlayState.OrientationLock.AUTOMATIC -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                OverlayState.OrientationLock.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                OverlayState.OrientationLock.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        LaunchedEffect(uiState.experienceMode, uiState.orientationLock) {
+            if (uiState.experienceMode == ExperienceMode.HATER) {
+                if (haterModeLockedOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
+                    // Lock to the current orientation upon entering Hater Mode
+                    haterModeLockedOrientation = when (resources.configuration.orientation) {
+                        Configuration.ORIENTATION_LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                        else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                    }
+                }
+                requestedOrientation = haterModeLockedOrientation
+            } else {
+                // Not in Hater Mode, so reset the lock and use the user's preference
+                haterModeLockedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                requestedOrientation = when (uiState.orientationLock) {
+                    OverlayState.OrientationLock.AUTOMATIC -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    OverlayState.OrientationLock.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                    OverlayState.OrientationLock.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                }
             }
         }
 

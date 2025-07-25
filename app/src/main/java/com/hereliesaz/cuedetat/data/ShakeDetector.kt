@@ -25,7 +25,7 @@ class ShakeDetector @Inject constructor(
     private var last_z: Float = 0.0f
 
     companion object {
-        private const val SHAKE_THRESHOLD = 800
+        private const val SHAKE_THRESHOLD = 2200
     }
 
     val shakeFlow: Flow<Unit> = callbackFlow {
