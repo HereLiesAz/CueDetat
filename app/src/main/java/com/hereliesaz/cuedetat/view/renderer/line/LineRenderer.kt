@@ -24,6 +24,7 @@ import com.hereliesaz.cuedetat.view.config.line.TangentLine
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.config.ui.ProtractorGuides
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
+import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -72,15 +73,20 @@ class LineRenderer {
         // Only draw the wide pathways if there's something to obstruct
         if (state.table.isVisible || state.obstacleBalls.isNotEmpty()) {
             // --- Pass 1: Wide Pathways ---
-            drawFadingLine(
-                canvas,
-                shotLineAnchor,
-                shotGuideDirection,
-                obstructionPaint,
-                null, // No glow for pathway
-                state,
-                paints
-            )
+            if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
+                // Do not draw shot guide line pathway in locked beginner mode
+            } else {
+                drawFadingLine(
+                    canvas,
+                    shotLineAnchor,
+                    shotGuideDirection,
+                    obstructionPaint,
+                    null, // No glow for pathway
+                    state,
+                    paints
+                )
+            }
+
 
             state.aimingLineBankPath?.let {
                 drawBankablePath(
@@ -97,15 +103,19 @@ class LineRenderer {
 
 
         // --- Pass 2 & 3: Glows and Core Lines (Combined) ---
-        drawFadingLine(
-            canvas,
-            shotLineAnchor,
-            shotGuideDirection,
-            shotLinePaint,
-            shotLineGlow,
-            state,
-            paints
-        )
+        if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
+            // Do not draw shot guide line in locked beginner mode
+        } else {
+            drawFadingLine(
+                canvas,
+                shotLineAnchor,
+                shotGuideDirection,
+                shotLinePaint,
+                shotLineGlow,
+                state,
+                paints
+            )
+        }
         drawTangentLines(canvas, state, paints)
         drawAimingLines(canvas, state, paints)
         drawSpinPaths(canvas, state, paints)

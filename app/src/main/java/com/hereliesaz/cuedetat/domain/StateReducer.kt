@@ -39,9 +39,7 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.GestureEnded ->
                 gestureReducer.reduce(currentState, event)
 
-            is MainScreenEvent.ToggleOnPlaneBall,
             is MainScreenEvent.ToggleBankingMode,
-            is MainScreenEvent.ToggleTable,
             is MainScreenEvent.CycleTableSize,
             is MainScreenEvent.SetTableSize,
             is MainScreenEvent.ToggleTableSizeDialog,
@@ -59,6 +57,7 @@ class StateReducer @Inject constructor(
             is MainScreenEvent.ToggleExperienceMode,
             is MainScreenEvent.ApplyPendingExperienceMode,
             is MainScreenEvent.SetExperienceMode,
+            is MainScreenEvent.UnlockBeginnerView,
             is MainScreenEvent.ToggleCalibrationScreen,
             is MainScreenEvent.ToggleQuickAlignScreen,
             is MainScreenEvent.ToggleCvModel ->

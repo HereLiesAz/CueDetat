@@ -39,9 +39,7 @@ sealed class MainScreenEvent {
     object Reset : MainScreenEvent()
     object ToggleHelp : MainScreenEvent()
     object ToggleMoreHelp : MainScreenEvent()
-    object ToggleOnPlaneBall : MainScreenEvent()
     object ToggleBankingMode : MainScreenEvent()
-    object ToggleTable: MainScreenEvent()
     object CycleTableSize: MainScreenEvent()
     data class SetTableSize(val size: TableSize) : MainScreenEvent()
     object ToggleTableSizeDialog : MainScreenEvent()
@@ -60,6 +58,7 @@ sealed class MainScreenEvent {
     object ToggleExperienceMode : MainScreenEvent()
     object ApplyPendingExperienceMode : MainScreenEvent()
     data class SetExperienceMode(val mode: ExperienceMode) : MainScreenEvent()
+    object UnlockBeginnerView : MainScreenEvent()
 
 
     // Obstacle Events

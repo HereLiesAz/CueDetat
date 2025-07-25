@@ -77,6 +77,7 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
                 event.mode
             )
 
+            is MainScreenEvent.UnlockBeginnerView -> currentState.copy(isBeginnerViewLocked = false)
             is MainScreenEvent.ToggleCalibrationScreen -> currentState.copy(showCalibrationScreen = !currentState.showCalibrationScreen)
             is MainScreenEvent.ToggleQuickAlignScreen -> currentState.copy(showQuickAlignScreen = !currentState.showQuickAlignScreen)
             else -> currentState
@@ -117,16 +118,16 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
                     areHelpersVisible = false
                 )
             }
-
             ExperienceMode.BEGINNER -> {
                 newState.copy(
                     table = newState.table.copy(isVisible = false),
                     onPlaneBall = null,
                     isBankingMode = false,
-                    areHelpersVisible = true
+                    areHelpersVisible = true,
+                    isBeginnerViewLocked = true,
+                    zoomSliderPosition = 50f // Default to max zoom
                 )
             }
-
             ExperienceMode.HATER -> {
                 newState // Hater mode is self-contained.
             }

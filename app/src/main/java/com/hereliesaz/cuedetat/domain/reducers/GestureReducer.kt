@@ -7,6 +7,7 @@ import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.ZoomMapping
+import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
@@ -28,6 +29,10 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
     }
 
     private fun handleLogicalGestureStarted(currentState: OverlayState, event: MainScreenEvent.LogicalGestureStarted): OverlayState {
+        if (currentState.experienceMode == ExperienceMode.BEGINNER && currentState.isBeginnerViewLocked) {
+            return currentState.copy(interactionMode = InteractionMode.ROTATING_PROTRACTOR)
+        }
+
         val logicalPoint = event.logicalPoint
         val onPlaneBall = currentState.onPlaneBall
         val spinControlCenter = currentState.spinControlCenter

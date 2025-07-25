@@ -106,6 +106,7 @@ data class OverlayState(
     val experienceMode: ExperienceMode? = null,
     @Transient val pendingOrientationLock: OrientationLock? = null,
     @Transient val pendingExperienceMode: ExperienceMode? = null,
+    val isBeginnerViewLocked: Boolean = false,
 
     // Banking mode specific state
     val isBankingMode: Boolean = false,
