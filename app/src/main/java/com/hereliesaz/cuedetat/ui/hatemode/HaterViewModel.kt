@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/hatemode/HaterViewModel.kt
+
 package com.hereliesaz.cuedetat.ui.hatemode
 
 import androidx.compose.ui.geometry.Offset
@@ -7,6 +9,7 @@ import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.ShakeDetector
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +18,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.hypot
 import kotlin.random.Random
 
 @HiltViewModel
@@ -28,6 +32,8 @@ class HaterViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(HaterState())
     val state: StateFlow<HaterState> = _state.asStateFlow()
+
+    private var physicsJob: Job? = null
 
     init {
         // Listen for shakes to trigger subsequent responses.
@@ -60,6 +66,7 @@ class HaterViewModel @Inject constructor(
                 _state.value = _state.value.copy(isCooldownActive = false)
             }
         }
+        startPhysicsLoop()
     }
 
     fun onEvent(event: HaterEvent) {
@@ -67,6 +74,61 @@ class HaterViewModel @Inject constructor(
         val newState = reducer.reduce(currentState, event)
         _state.value = newState
     }
+
+    private fun startPhysicsLoop() {
+        physicsJob?.cancel()
+        physicsJob = viewModelScope.launch {
+            var lastTime = System.currentTimeMillis()
+            while (true) {
+                val currentTime = System.currentTimeMillis()
+                val deltaTime = (currentTime - lastTime) / 1000f // Delta time in seconds
+                lastTime = currentTime
+
+                updatePhysics(deltaTime)
+
+                delay(16) // Aim for ~60 FPS
+            }
+        }
+    }
+
+    private fun updatePhysics(deltaTime: Float) {
+        _state.value = _state.value.let { s ->
+            var (ax, ay) = s.gravity
+
+            if (s.isUserDragging) {
+                // User's touch applies a direct force
+                ax += s.touchForce.x * 2f // Multiply force to make it feel responsive
+                ay += s.touchForce.y * 2f
+            }
+
+            var vx = s.velocity.x + ax
+            var vy = s.velocity.y + ay
+
+            // Apply viscous damping to simulate thick liquid
+            vx *= 0.85f
+            vy *= 0.85f
+
+            var newAngle = s.angle
+            var newAngularVelocity = s.angularVelocity
+
+            if (s.isUserDragging && hypot(s.touchForce.x, s.touchForce.y) > 0.1) {
+                // Pushing off-center creates torque
+                newAngularVelocity += s.touchForce.x * 0.1f
+            }
+
+            newAngularVelocity *= 0.90f // Angular damping
+            newAngle += newAngularVelocity
+
+            s.copy(
+                position = s.position + Offset(vx, vy),
+                velocity = Offset(vx, vy),
+                angle = newAngle,
+                angularVelocity = newAngularVelocity,
+                touchForce = Offset.Zero // Consume the force after applying it
+            )
+        }
+    }
+
 
     private fun triggerHaterSequence() {
         viewModelScope.launch {
@@ -116,10 +178,11 @@ class HaterViewModel @Inject constructor(
             currentAnswer = newAnswer,
             recentlyUsedAnswers = updatedRecentlyUsed,
             randomRotation = Random.nextFloat() * 90f - 45f, // Subtler rotation
-            randomOffset = Offset(
-                x = Random.nextFloat() * 0.4f - 0.2f,
-                y = Random.nextFloat() * 0.4f - 0.2f
-            ),
+            // Reset physics state for the new answer
+            position = Offset.Zero,
+            velocity = Offset.Zero,
+            angle = 0f,
+            angularVelocity = 0f,
             gradientStart = Offset(Random.nextFloat(), Random.nextFloat()),
             gradientEnd = Offset(Random.nextFloat(), Random.nextFloat())
         )

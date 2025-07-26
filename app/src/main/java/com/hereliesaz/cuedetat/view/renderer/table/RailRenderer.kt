@@ -15,6 +15,7 @@ import com.hereliesaz.cuedetat.view.config.table.Diamonds
 import com.hereliesaz.cuedetat.view.config.table.Rail
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
+import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.pow
 
@@ -29,10 +30,11 @@ class RailRenderer {
         if (!state.table.isVisible || state.table.corners.size < 4) return
 
         val railLinePaint = paints.tableOutlinePaint
-        val railLineGlowPaint = Paint(paints.lineGlowPaint).apply {
-            strokeWidth = railConfig.glowWidth
-            color = railConfig.glowColor.toArgb()
-        }
+        val railLineGlowPaint = createGlowPaint(
+            baseGlowColor = railConfig.glowColor,
+            baseGlowWidth = railConfig.glowWidth,
+            state = state
+        )
         val diamondPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
             color = diamondConfig.fillColor.toArgb()

@@ -16,10 +16,24 @@ When a touch gesture begins, its intent is determined by the following order of 
    the `BankingBall` is interpreted as `InteractionMode.AIMING_BANK_SHOT`.
 
 3. **Multi-Finger Gestures:** A gesture with more than one pointer manipulates the view itself:
-    * **Pinching** (`calculateZoom`) dispatches a `ZoomScaleChanged` event.
-    * **Twisting** (`calculateRotation`) dispatches a `TableRotationApplied` event.
+
+* **Pinching** (`calculateZoom`) dispatches a `ZoomScaleChanged` event.
+* **Twisting** (`calculateRotation`) dispatches a `TableRotationApplied` event.
 
 4. **Default Rotational Drag (Fallback Action):** In Protractor Mode, a single-finger drag on any
-   empty space defaults to controlling the protractor's rotation. The system calculates the absolute
-   angle of the user's finger relative to the `TargetBall`'s center and sets the protractor's
-   rotation directly to that angle.
+   empty space defaults to controlling the protractor's rotation. This **must** be implemented as a
+   **relative rotational drag**. The system calculates the **change in angle** of the user's finger
+   relative to the `TargetBall`'s center between pointer events. This angular delta is then applied
+   to the protractor's current rotation, providing a smooth, intuitive interaction where the aiming
+   apparatus "picks up" and follows the gesture.
+
+### Heresies of Interaction
+
+To prevent reintroduction of past bugs and flawed user experiences, the following interaction models
+are explicitly forbidden:
+
+* **Forbidden: Absolute Rotational Drag.** An implementation where the protractor's rotation snaps
+  directly to the absolute angle of the user's finger is unacceptable. This behavior is jarring and
+  disrupts the user's sense of control, violating the principle of a precision
+  instrument. [cite_start]This was the original, flawed implementation that has since been
+  corrected [cite: 377-378].

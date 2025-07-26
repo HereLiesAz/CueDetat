@@ -65,11 +65,10 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             }
 
             is MainScreenEvent.ApplyPendingExperienceMode -> {
-                if (currentState.pendingExperienceMode == null) return currentState
-                return currentState.copy(
-                    experienceMode = currentState.pendingExperienceMode,
-                    pendingExperienceMode = null
-                )
+                currentState.pendingExperienceMode?.let { newMode ->
+                    val modeAppliedState = handleSetExperienceMode(currentState, newMode)
+                    return modeAppliedState.copy(pendingExperienceMode = null)
+                } ?: currentState
             }
 
             is MainScreenEvent.SetExperienceMode -> handleSetExperienceMode(

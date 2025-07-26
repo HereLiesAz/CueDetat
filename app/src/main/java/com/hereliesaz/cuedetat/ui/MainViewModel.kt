@@ -21,6 +21,8 @@ import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.domain.UpdateType
 import com.hereliesaz.cuedetat.domain.WarningManager
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
+import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
+import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.ExperienceMode
@@ -54,7 +56,8 @@ class MainViewModel @Inject constructor(
     val visionAnalyzer: VisionAnalyzer,
     private val visionRepository: VisionRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
-    private val reducerUtils: ReducerUtils
+    private val reducerUtils: ReducerUtils,
+    private val haterViewModel: HaterViewModel,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(OverlayState())
@@ -236,6 +239,13 @@ class MainViewModel @Inject constructor(
             _uiState.value = finalState
             visionAnalyzer.updateUiState(finalState)
 
+            // Check for mode switch to Hater and trigger its reset/entry sequence
+            if ((event is MainScreenEvent.SetExperienceMode && event.mode == ExperienceMode.HATER) ||
+                (event is MainScreenEvent.ApplyPendingExperienceMode && finalState.experienceMode == ExperienceMode.HATER)
+            ) {
+                haterViewModel.onEvent(HaterEvent.EnterHaterMode)
+            }
+
             handleSideEffects(event, finalState)
         }
     }
@@ -253,7 +263,7 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.ViewArt -> viewModelScope.launch {
                 _singleEvent.send(
                     SingleEvent.OpenUrl(
-                        "https://herelies.az"
+                        "https://instagram.com/hereliesaz"
                     )
                 )
             }
