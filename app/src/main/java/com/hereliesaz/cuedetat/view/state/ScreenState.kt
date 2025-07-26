@@ -8,6 +8,7 @@ sealed class ToastMessage {
 }
 
 sealed class SingleEvent {
+    data object InitiateHaterMode : SingleEvent()
     data class OpenUrl(val url: String) : SingleEvent()
     data class SendFeedbackEmail(val email: String, val subject: String) : SingleEvent()
 }

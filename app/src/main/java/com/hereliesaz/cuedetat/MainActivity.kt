@@ -32,6 +32,7 @@ import com.hereliesaz.cuedetat.ui.MainViewModel
 import com.hereliesaz.cuedetat.ui.composables.SplashScreen
 import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
+import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
 import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import com.hereliesaz.cuedetat.view.state.ExperienceMode
@@ -115,6 +116,11 @@ class MainActivity : ComponentActivity() {
                     if (intent.resolveActivity(packageManager) != null) {
                         startActivity(intent)
                     }
+                    mainViewModel.onEvent(MainScreenEvent.SingleEventConsumed)
+                }
+
+                is SingleEvent.InitiateHaterMode -> {
+                    haterViewModel.onEvent(HaterEvent.EnterHaterMode)
                     mainViewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 null -> { /* Do nothing */ }
