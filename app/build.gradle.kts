@@ -38,8 +38,17 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-        ndk.abiFilters.addAll(listOf("arm64-v8a"))
+        //ndk.abiFilters.addAll(listOf("arm64-v8a"))
         multiDexEnabled = true
+    }
+
+    splits {
+        abi {
+            isEnable = true // Activates ABI splitting
+            reset() // Ensures only explicitly included ABIs are considered
+            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64") // These are the four common Android ABIs
+            isUniversalApk = false // Crucial: Set to false to prevent a fifth "universal" APK that contains all ABIs. If you want a universal APK in addition to the four, set this to true.
+        }
     }
 
     // FIX: Moved packaging rules to the stable, top-level packaging block.
@@ -101,6 +110,9 @@ android {
 
     buildToolsVersion = "36.0.0"
     ndkVersion = "29.0.13599879 rc2"
+    kotlinOptions {
+        freeCompilerArgs = listOf("-XXLanguage:+PropertyParamAnnotationDefaultTargetMode")
+    }
 
 
 }
@@ -184,50 +196,50 @@ kapt {
     correctErrorTypes = true
 }
 //
-//// --- Custom Artifact Renaming ---
-//// The new Android Gradle Plugin versions (8.x+) no longer allow direct renaming of output files.
-//// The official way to get custom-named files is to create a task that copies the final artifacts
-//// and renames them. This block does that, placing the final files in the `build/dist/` directory.
-//androidComponents {
-//    onVariants { variant ->
-//        // Determine the source of the artifacts based on the packaging type
-//        val artifacts = if (variant.buildType == "release") {
-//            variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.BUNDLE)
-//        } else {
-//            variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.APK)
-//        }
-//
-//        // Register a new Copy task for each vasriant
-//        tasks.register<Copy>("copyAndRename_${variant.name}") {
-//            group = "Distribution"
-//            description = "Copies and renames artifacts for the ${variant.name} variant."
-//
-//            from(artifacts)
-//            into(project.layout.buildDirectory.dir("dist"))
-//
-//            // This closure is called for each file as it's copied
-//            // ... inside tasks.register<Copy>("copyAndRename_${variant.name}")
-//            rename { fileName ->
-//                val appId = variant.applicationId.get()
-//
-//                // FIX: Access versionName and versionCode from the variant's output.
-//                val mainOutput = variant.outputs.first()
-//                val versionName = mainOutput.versionName.get() ?: "unknown"
-//                val versionCode = mainOutput.versionCode.get()
-//
-//                val buildTypeName = variant.buildType
-//
-//                if (fileName.endsWith(".aab")) {
-//                    // For App Bundles, the ABI is always "universal"
-//                    "${appId}-${buildTypeName}-universal-${versionName}-${versionCode}.aab"
-//                } else {
-//                    // For APKs, we parse the ABI from the default filename
-//                    val abiRegex = "-((armeabi-v7a)|(arm64-v8a)|(x86)|(x86_64))".toRegex()
-//                    val abi = abiRegex.find(fileName)?.groups?.get(1)?.value ?: "universal"
-//
-//                    "${appId}-${buildTypeName}-${abi}-${versionName}-${versionCode}.apk"
-//                }
-//            }
-//        }
-//    }
-//}
+// --- Custom Artifact Renaming ---
+// The new Android Gradle Plugin versions (8.x+) no longer allow direct renaming of output files.
+// The official way to get custom-named files is to create a task that copies the final artifacts
+// and renames them. This block does that, placing the final files in the `build/dist/` directory.
+androidComponents {
+    onVariants { variant ->
+        // Determine the source of the artifacts based on the packaging type
+        val artifacts = if (variant.buildType == "release") {
+            variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.BUNDLE)
+        } else {
+            variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.APK)
+        }
+
+        // Register a new Copy task for each vasriant
+        tasks.register<Copy>("copyAndRename_${variant.name}") {
+            group = "Distribution"
+            description = "Copies and renames artifacts for the ${variant.name} variant."
+
+            from(artifacts)
+            into(project.layout.buildDirectory.dir("dist"))
+
+            // This closure is called for each file as it's copied
+            // ... inside tasks.register<Copy>("copyAndRename_${variant.name}")
+            rename { fileName ->
+                val appId = variant.applicationId.get()
+
+                // FIX: Access versionName and versionCode from the variant's output.
+                val mainOutput = variant.outputs.first()
+                val versionName = mainOutput.versionName.get() ?: "unknown"
+                val versionCode = mainOutput.versionCode.get()
+
+                val buildTypeName = variant.buildType
+
+                if (fileName.endsWith(".aab")) {
+                    // For App Bundles, the ABI is always "universal"
+                    "${appId}-${buildTypeName}-universal-${versionName}-${versionCode}.aab"
+                } else {
+                    // For APKs, we parse the ABI from the default filename
+                    val abiRegex = "-((armeabi-v7a)|(arm64-v8a)|(x86)|(x86_64))".toRegex()
+                    val abi = abiRegex.find(fileName)?.groups?.get(1)?.value ?: "universal"
+
+                    "${appId}-${buildTypeName}-${abi}-${versionName}-${versionCode}.apk"
+                }
+            }
+        }
+    }
+}
