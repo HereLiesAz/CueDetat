@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.RectF
 import android.graphics.Typeface
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.ui.theme.SulfurDust
@@ -23,6 +24,7 @@ import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.LogicalCircular
 import com.hereliesaz.cuedetat.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
+import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
 import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.hypot
@@ -186,11 +188,7 @@ class BallRenderer {
                 strokeWidth = config.strokeWidth
                 alpha = (config.opacity * 255).toInt()
             }
-            val glowPaint = Paint(paints.ballGlowPaint).apply {
-                strokeWidth = config.glowWidth
-                color = config.glowColor.toArgb()
-                alpha = (config.glowColor.alpha * 255).toInt()
-            }
+            val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state)
             canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, bubbleRadius, glowPaint)
             canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, bubbleRadius, strokePaint)
 
@@ -216,11 +214,11 @@ class BallRenderer {
                 strokeWidth = config.strokeWidth
                 alpha = (config.opacity * 255).toInt()
             }
-            val glowPaint = Paint(paints.ballGlowPaint).apply {
-                strokeWidth = config.glowWidth
-                color = if (isWarning) paints.warningPaint.color else config.glowColor.toArgb()
-                alpha = (config.glowColor.alpha * 255).toInt()
-            }
+            val glowPaint = createGlowPaint(
+                baseGlowColor = if (isWarning) Color(paints.warningPaint.color) else config.glowColor,
+                baseGlowWidth = config.glowWidth,
+                state = state
+            )
 
             // Draw 2D logical ball
             canvas.save()

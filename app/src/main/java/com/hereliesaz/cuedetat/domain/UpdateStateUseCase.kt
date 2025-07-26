@@ -6,7 +6,6 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.ui.graphics.Color
-import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
@@ -93,13 +92,17 @@ class UpdateStateUseCase @Inject constructor(
         val coercedViewOffset = PointF(state.viewOffset.x, coercedOffsetY)
         val stateWithCoercedPan = state.copy(viewOffset = coercedViewOffset)
 
-        val finalPitchMatrix = createFullMatrix(
-            stateWithCoercedPan,
-            0f,
-            zoomFactor,
-            applyPitch = isPitchApplied,
-            orientation = state.currentOrientation
+        val camera = Camera()
+
+        val perspectiveMatrix = Perspective.createPerspectiveMatrix(
+            currentOrientation = stateWithCoercedPan.currentOrientation,
+            worldRotationDegrees = stateWithCoercedPan.worldRotationDegrees,
+            camera = camera,
+            lift = 0f,
+            applyPitch = isPitchApplied
         )
+
+        val finalPitchMatrix = createFullMatrix(stateWithCoercedPan, zoomFactor, perspectiveMatrix)
         val inverseMatrix = Matrix()
         val hasFinalInverse = finalPitchMatrix.invert(inverseMatrix)
 
@@ -107,39 +110,47 @@ class UpdateStateUseCase @Inject constructor(
         val baseRailLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
         val railLiftAmount =
             baseRailLiftAmount * abs(sin(Math.toRadians(stateWithCoercedPan.pitchAngle.toDouble()))).toFloat()
-        val finalRailPitchMatrix = createFullMatrix(
-            stateWithCoercedPan,
-            railLiftAmount,
-            zoomFactor,
-            applyPitch = isPitchApplied,
-            orientation = state.currentOrientation
-        )
 
-        val flatMatrix = createFullMatrix(
-            stateWithCoercedPan,
-            0f,
-            1f,
-            applyPitch = false,
-            orientation = state.currentOrientation
+        val railPerspectiveMatrix = Perspective.createPerspectiveMatrix(
+            currentOrientation = stateWithCoercedPan.currentOrientation,
+            worldRotationDegrees = stateWithCoercedPan.worldRotationDegrees,
+            camera = camera,
+            lift = railLiftAmount,
+            applyPitch = isPitchApplied
         )
-        val logicalPlaneMatrix = createFullMatrix(
-            stateWithCoercedPan,
-            0f,
-            zoomFactor,
-            applyPitch = false,
-            orientation = state.currentOrientation
+        val finalRailPitchMatrix =
+            createFullMatrix(stateWithCoercedPan, zoomFactor, railPerspectiveMatrix)
+
+        val flatPerspectiveMatrix = Perspective.createPerspectiveMatrix(
+            currentOrientation = stateWithCoercedPan.currentOrientation,
+            worldRotationDegrees = stateWithCoercedPan.worldRotationDegrees,
+            camera = camera,
+            applyPitch = false
         )
+        val flatMatrix = createFullMatrix(stateWithCoercedPan, 1f, flatPerspectiveMatrix)
+
+        val logicalPlanePerspectiveMatrix = Perspective.createPerspectiveMatrix(
+            currentOrientation = stateWithCoercedPan.currentOrientation,
+            worldRotationDegrees = stateWithCoercedPan.worldRotationDegrees,
+            camera = camera,
+            applyPitch = false
+        )
+        val logicalPlaneMatrix =
+            createFullMatrix(stateWithCoercedPan, zoomFactor, logicalPlanePerspectiveMatrix)
+
 
         // Create a separate matrix for size calculation that EXCLUDES world rotation
         // to prevent perspective distortion from affecting the apparent size of objects as they rotate.
-        val sizeCalculationMatrix =
-            createFullMatrix(
-                state.copy(worldRotationDegrees = 0f),
-                0f,
-                zoomFactor,
-                applyPitch = isPitchApplied,
-                orientation = state.currentOrientation
+        val sizeCalculationPerspectiveMatrix =
+            Perspective.createPerspectiveMatrix(
+                currentOrientation = state.currentOrientation,
+                worldRotationDegrees = 0f, // No rotation for sizing
+                camera = camera,
+                lift = 0f,
+                applyPitch = isPitchApplied
             )
+        val sizeCalculationMatrix =
+            createFullMatrix(state, zoomFactor, sizeCalculationPerspectiveMatrix)
 
 
         return stateWithCoercedPan.copy(
@@ -270,23 +281,11 @@ class UpdateStateUseCase @Inject constructor(
 
     private fun createFullMatrix(
         state: OverlayState,
-        lift: Float,
         zoom: Float,
-        applyPitch: Boolean = true,
-        orientation: FullOrientation,
+        perspectiveMatrix: Matrix,
     ): Matrix {
-        val camera = Camera()
-
-        val perspectiveMatrix = Perspective.createPerspectiveMatrix(
-            currentOrientation = orientation,
-            camera = camera,
-            lift = lift,
-            applyPitch = applyPitch
-        )
-
         val worldMatrix = Matrix().apply {
             postScale(zoom, zoom)
-            postRotate(state.worldRotationDegrees)
         }
 
         val finalMatrix = Matrix()

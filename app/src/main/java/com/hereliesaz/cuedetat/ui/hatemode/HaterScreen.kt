@@ -1,7 +1,8 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/hatemode/HaterScreen.kt
+
 package com.hereliesaz.cuedetat.ui.hatemode
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -22,7 +23,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -50,10 +50,6 @@ fun HaterScreen(viewModel: HaterViewModel) {
     val emergenceAlpha = remember { Animatable(0f) }
     val emergenceOffsetY = remember { Animatable(screenHeightPx / 10f) }
     val emergenceRotation = remember { Animatable(0f) }
-
-    // Unified animatable for the triangle's current position, combining all forces.
-    val currentOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
-    val currentRotation = remember { Animatable(0f) }
 
     LaunchedEffect(haterState.isHaterVisible) {
         if (haterState.isHaterVisible) {
@@ -84,39 +80,6 @@ fun HaterScreen(viewModel: HaterViewModel) {
         }
     }
 
-    // This is the core physics loop
-    LaunchedEffect(
-        haterState.isUserDragging,
-        haterState.gravityTargetOffset,
-        haterState.touchDrivenOffset
-    ) {
-        val gravityTarget = haterState.gravityTargetOffset + haterState.randomOffset.copy(
-            x = haterState.randomOffset.x * screenWidthPx,
-            y = haterState.randomOffset.y * screenHeightPx
-        )
-
-        if (haterState.isUserDragging) {
-            // While dragging, snap directly to the combined position
-            launch { currentOffset.snapTo(gravityTarget + haterState.touchDrivenOffset) }
-        } else {
-            // When not dragging, animate smoothly towards the gravity target
-            launch {
-                currentOffset.animateTo(
-                    gravityTarget,
-                    animationSpec = spring(dampingRatio = 0.6f, stiffness = 10f)
-                )
-            }
-        }
-
-        // Always animate rotation towards gravity target
-        val targetRotation = haterState.gravityTargetOffset.x * 0.2f
-        launch {
-            currentRotation.animateTo(
-                targetRotation,
-                animationSpec = spring(stiffness = 10f)
-            )
-        }
-    }
 
     Box(
         modifier = Modifier
@@ -142,9 +105,8 @@ fun HaterScreen(viewModel: HaterViewModel) {
             val xBounds = (screenWidthPx / 2f) - (imageWidthPx / 2f)
             val yBounds = (screenHeightPx / 2f) - (imageWidthPx / 2f) // Assuming roughly square
 
-            val clampedX = currentOffset.value.x.coerceIn(-xBounds, xBounds)
-            val clampedY = currentOffset.value.y.coerceIn(-yBounds, yBounds)
-            val finalOffset = Offset(clampedX, clampedY)
+            val clampedX = haterState.position.x.coerceIn(-xBounds, xBounds)
+            val clampedY = haterState.position.y.coerceIn(-yBounds, yBounds)
 
             Image(
                 painter = painterResource(id = haterState.currentAnswer!!),
@@ -154,12 +116,12 @@ fun HaterScreen(viewModel: HaterViewModel) {
                     .width(screenWidthDp / 2)
                     .offset {
                         IntOffset(
-                            finalOffset.x.roundToInt(),
-                            (emergenceOffsetY.value + finalOffset.y).roundToInt()
+                            clampedX.roundToInt(),
+                            (emergenceOffsetY.value + clampedY).roundToInt()
                         )
                     }
                     .scale(emergenceScale.value)
-                    .rotate(emergenceRotation.value + currentRotation.value)
+                    .rotate(emergenceRotation.value + haterState.angle)
                     .alpha(emergenceAlpha.value)
                     .drawBehind {
                         val glowRadius = size.minDimension
@@ -177,7 +139,8 @@ fun HaterScreen(viewModel: HaterViewModel) {
                     .pointerInput(Unit) {
                         detectDragGestures(
                             onDragStart = { viewModel.onEvent(HaterEvent.DragTriangleStart) },
-                            onDragEnd = { viewModel.onEvent(HaterEvent.DragTriangleEnd) }
+                            onDragEnd = { viewModel.onEvent(HaterEvent.DragTriangleEnd) },
+                            onDragCancel = { viewModel.onEvent(HaterEvent.DragTriangleEnd) }
                         ) { change, dragAmount ->
                             change.consume()
                             viewModel.onEvent(HaterEvent.DragTriangle(dragAmount))

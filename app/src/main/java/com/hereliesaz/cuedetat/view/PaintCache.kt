@@ -2,7 +2,6 @@
 
 package com.hereliesaz.cuedetat.view
 
-import android.graphics.BlurMaskFilter
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.PorterDuff
@@ -20,12 +19,9 @@ import com.hereliesaz.cuedetat.ui.theme.MutedGray
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.config.table.Table
 import com.hereliesaz.cuedetat.view.state.OverlayState
-import kotlin.math.abs
 
 class PaintCache {
     private val strokeWidth = 6f
-    private val glowStrokeWidth = 12f
-    private val glowRadius = 15f
 
     // --- Primary Paint Objects ---
     val tableOutlinePaint =
@@ -77,14 +73,6 @@ class PaintCache {
     val bankLine4Paint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
 
-    // --- Glow Paint Objects ---
-    val lineGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = glowStrokeWidth
-    }
-    val ballGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = glowStrokeWidth
-    }
-
 
     fun setTypeface(typeface: Typeface?) {
         textPaint.typeface = typeface
@@ -93,30 +81,6 @@ class PaintCache {
     fun updateColors(uiState: OverlayState, isDark: Boolean) {
         val LUMINANCE_ADJUST = uiState.luminanceAdjustment
         val baseScheme = uiState.appControlColorScheme ?: darkColorScheme()
-
-        // Handle Glow Stick
-        val glowValue = uiState.glowStickValue
-        val glowAlpha = (abs(glowValue) * 255).toInt()
-        val glowColor = if (glowValue > 0) Color.White.toArgb() else Color.Black.toArgb()
-
-        // --- HERESY CORRECTED: A default glow is now the law ---
-        val defaultBlurRadius = 8f
-        val blurRadius =
-            if (abs(glowValue) > 0.05f) glowRadius * abs(glowValue) else defaultBlurRadius
-        val blurFilter = BlurMaskFilter(blurRadius, BlurMaskFilter.Blur.NORMAL)
-        // --- END CORRECTION ---
-
-        lineGlowPaint.apply {
-            this.color = glowColor
-            this.alpha = glowAlpha
-            this.maskFilter = blurFilter
-        }
-        ballGlowPaint.apply {
-            this.color = glowColor
-            this.alpha = glowAlpha
-            this.maskFilter = blurFilter
-        }
-
 
         // --- HERESY CORRECTED: The cache now reads all properties from the component configs. ---
         val tableConfig = Table()

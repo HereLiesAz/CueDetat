@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/hatemode/HaterReducer.kt
+
 package com.hereliesaz.cuedetat.ui.hatemode
 
 import androidx.compose.ui.geometry.Offset
@@ -5,24 +7,30 @@ import androidx.compose.ui.geometry.Offset
 class HaterReducer {
     fun reduce(state: HaterState, event: HaterEvent): HaterState {
         return when (event) {
+            is HaterEvent.EnterHaterMode -> state.copy(
+                isFirstReveal = true,
+                recentlyUsedAnswers = emptyList(),
+                currentAnswer = null,
+                isHaterVisible = false
+            )
             is HaterEvent.ShowHater -> state.copy(isHaterVisible = true)
             is HaterEvent.HideHater -> state.copy(isHaterVisible = false)
             is HaterEvent.UpdateSensorOffset -> {
-                val offsetX = -event.roll * 4.0f
-                val offsetY = event.pitch * 4.0f
-                state.copy(gravityTargetOffset = Offset(offsetX, offsetY))
+                // The sensor roll translates to X-axis gravity, pitch to Y-axis
+                val gravityX = -event.roll * 0.1f
+                val gravityY = event.pitch * 0.1f
+                state.copy(gravity = Offset(gravityX, gravityY))
             }
 
             is HaterEvent.DragTriangleStart -> state.copy(isUserDragging = true)
-            is HaterEvent.DragTriangle -> {
-                // Apply a damping factor to simulate resistance/pushing
-                state.copy(touchDrivenOffset = state.touchDrivenOffset + (event.delta * 0.5f))
-            }
-
             is HaterEvent.DragTriangleEnd -> state.copy(
                 isUserDragging = false,
-                touchDrivenOffset = Offset.Zero // Reset touch offset on release
+                touchForce = Offset.Zero
             )
+            is HaterEvent.DragTriangle -> {
+                // When dragging, we apply the delta as a direct force
+                state.copy(touchForce = event.delta)
+            }
         }
     }
 }

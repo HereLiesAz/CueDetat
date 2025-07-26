@@ -24,6 +24,7 @@ import com.hereliesaz.cuedetat.view.config.line.TangentLine
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.config.ui.ProtractorGuides
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
+import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
 import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.atan2
@@ -34,7 +35,6 @@ import kotlin.math.sqrt
 class LineRenderer {
     private val textRenderer = LineTextRenderer()
     private val protractorAngles = floatArrayOf(10f, 20f, 30f, 40f, 50f, 60f, 70f, 80f)
-    private val lineExtensionFactor = 5000f
 
     fun drawLogicalLines(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         if (state.isBankingMode) {
@@ -59,11 +59,11 @@ class LineRenderer {
                 if (shotLineIsWarning) paints.warningPaint.color else shotGuideLineConfig.strokeColor.toArgb()
             strokeWidth = shotGuideLineConfig.strokeWidth
         }
-        val shotLineGlow = Paint(paints.lineGlowPaint).apply {
-            // Explicitly set warning color, overriding the global glow stick color.
-            color = if (shotLineIsWarning) paints.warningPaint.color else shotLinePaint.color
-            strokeWidth = shotGuideLineConfig.glowWidth
-        }
+        val shotLineGlow = createGlowPaint(
+            baseGlowColor = if (shotLineIsWarning) Color(paints.warningPaint.color) else shotGuideLineConfig.glowColor,
+            baseGlowWidth = shotGuideLineConfig.glowWidth,
+            state = state
+        )
         val obstructionPaint = Paint(paints.pathObstructionPaint).apply {
             strokeWidth = state.protractorUnit.radius * 2
         }
@@ -135,11 +135,11 @@ class LineRenderer {
             color = baseAimingColor.toArgb()
             strokeWidth = aimingLineConfig.strokeWidth
         }
-        val aimingLineGlow = Paint(paints.lineGlowPaint).apply {
-            color = aimingLineConfig.glowColor.toArgb()
-            strokeWidth = aimingLineConfig.glowWidth
-            alpha = (aimingLineConfig.glowColor.alpha * 255).toInt()
-        }
+        val aimingLineGlow = createGlowPaint(
+            baseGlowColor = aimingLineConfig.glowColor,
+            baseGlowWidth = aimingLineConfig.glowWidth,
+            state = state
+        )
 
         state.aimingLineBankPath?.let {
             drawBankablePath(
@@ -169,10 +169,11 @@ class LineRenderer {
             strokeWidth = tangentLineConfig.strokeWidth
             alpha = (tangentLineConfig.opacity * 255).toInt()
         }
-        val tangentGlow = Paint(paints.lineGlowPaint).apply {
-            strokeWidth = tangentLineConfig.glowWidth
-            color = tangentLineConfig.glowColor.toArgb()
-        }
+        val tangentGlow = createGlowPaint(
+            baseGlowColor = tangentLineConfig.glowColor,
+            baseGlowWidth = tangentLineConfig.glowWidth,
+            state = state
+        )
 
         val start = state.protractorUnit.ghostCueBallCenter
         val towards = state.protractorUnit.center
@@ -187,52 +188,52 @@ class LineRenderer {
 
         if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
             val direction1 = normalize(PointF(tangentDx, tangentDy))
-            val endPoint1 = PointF(
-                start.x + direction1.x * (state.table.logicalHeight * 2.0f),
-                start.y + direction1.y * (state.table.logicalHeight * 2.0f)
-            )
-            val path1 = Path().apply { moveTo(start.x, start.y); lineTo(endPoint1.x, endPoint1.y) }
-            canvas.drawPath(path1, tangentGlow)
-            canvas.drawPath(path1, tangentSolidPaint)
+            drawFadingLine(canvas, start, direction1, tangentSolidPaint, tangentGlow, state, paints)
 
             val direction2 = normalize(PointF(-tangentDx, -tangentDy))
-            val endPoint2 = PointF(
-                start.x + direction2.x * (state.table.logicalHeight * 2.0f),
-                start.y + direction2.y * (state.table.logicalHeight * 2.0f)
-            )
-            val path2 = Path().apply { moveTo(start.x, start.y); lineTo(endPoint2.x, endPoint2.y) }
-            canvas.drawPath(path2, tangentGlow)
-            canvas.drawPath(path2, tangentSolidPaint)
+            drawFadingLine(canvas, start, direction2, tangentSolidPaint, tangentGlow, state, paints)
             return
         }
 
         if (state.isStraightShot) {
             val direction1 = normalize(PointF(tangentDx, tangentDy))
-            val endPoint1 = PointF(start.x + direction1.x * (state.table.logicalHeight * 2.0f), start.y + direction1.y * (state.table.logicalHeight * 2.0f))
-            val path1 = Path().apply { moveTo(start.x, start.y); lineTo(endPoint1.x, endPoint1.y) }
-            canvas.drawPath(path1, tangentGlow)
-            canvas.drawPath(path1, tangentDottedPaint)
+            drawFadingLine(
+                canvas,
+                start,
+                direction1,
+                tangentDottedPaint,
+                tangentGlow,
+                state,
+                paints
+            )
 
             val direction2 = normalize(PointF(-tangentDx, -tangentDy))
-            val endPoint2 = PointF(start.x + direction2.x * (state.table.logicalHeight * 2.0f), start.y + direction2.y * (state.table.logicalHeight * 2.0f))
-            val path2 = Path().apply { moveTo(start.x, start.y); lineTo(endPoint2.x, endPoint2.y) }
-            canvas.drawPath(path2, tangentGlow)
-            canvas.drawPath(path2, tangentDottedPaint)
+            drawFadingLine(
+                canvas,
+                start,
+                direction2,
+                tangentDottedPaint,
+                tangentGlow,
+                state,
+                paints
+            )
         } else {
             // Active / Inactive logic
             state.tangentLineBankPath?.let {
                 drawBankablePath(canvas, it, tangentSolidPaint, tangentGlow, isPocketed, state, paints)
             }
 
-            // Draw inactive line manually as a non-fading dotted line
+            // Draw inactive line with fading logic
             val inactiveDirection = normalize(PointF(tangentDx * -state.tangentDirection, tangentDy * -state.tangentDirection))
-            val endPoint = PointF(start.x + inactiveDirection.x * (state.table.logicalHeight * 2.0f), start.y + inactiveDirection.y * (state.table.logicalHeight * 2.0f))
-            val path = Path()
-            path.moveTo(start.x, start.y)
-            path.lineTo(endPoint.x, endPoint.y)
-
-            canvas.drawPath(path, tangentGlow)
-            canvas.drawPath(path, tangentDottedPaint)
+            drawFadingLine(
+                canvas,
+                start,
+                inactiveDirection,
+                tangentDottedPaint,
+                tangentGlow,
+                state,
+                paints
+            )
         }
     }
 
@@ -246,7 +247,8 @@ class LineRenderer {
             strokeWidth = 4f
         }
 
-        val spinGlowPaint = Paint(paints.lineGlowPaint).apply {
+        val spinGlowPaint = Paint().apply {
+            style = Paint.Style.STROKE
             strokeWidth = 8f
         }
 
@@ -278,26 +280,47 @@ class LineRenderer {
 
         if (isPocketed) {
             val whitePaint = Paint(paints.shotLinePaint).apply { color = Color.White.toArgb() }
-            val whiteGlowPaint = Paint(paints.lineGlowPaint).apply {
-                color = Color.White.toArgb(); alpha = (paints.lineGlowPaint.alpha * 0.7f).toInt()
-            }
+            val whiteGlowPaint = createGlowPaint(Color.White, 12f, state)
             drawPath(canvas, path, whiteGlowPaint)
             drawPath(canvas, path, whitePaint)
         } else {
             val bankLineConfigs = listOf(BankLine1(), BankLine2(), BankLine3(), BankLine4())
-            for (i in 0 until path.size - 1) {
+            val finalSegmentIndex = path.size - 2
+
+            // Draw intermediate solid segments
+            for (i in 0 until finalSegmentIndex) {
                 val start = path[i]
                 val end = path[i + 1]
                 val config = bankLineConfigs.getOrElse(i) { bankLineConfigs.last() }
 
                 val linePaint = Paint(paints.bankLine1Paint).apply { color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
-                val glowPaint = Paint(paints.lineGlowPaint).apply {
-                    color = linePaint.color
-                    alpha = (config.glowColor.alpha * 255).toInt()
-                    strokeWidth = config.glowWidth
-                }
+                val glowPaint = createGlowPaint(
+                    baseGlowColor = config.glowColor,
+                    baseGlowWidth = config.glowWidth,
+                    state = state
+                )
                 canvas.drawLine(start.x, start.y, end.x, end.y, glowPaint)
                 canvas.drawLine(start.x, start.y, end.x, end.y, linePaint)
+            }
+
+            // Draw the final segment with fading
+            if (path.size > 1) {
+                val start = path[finalSegmentIndex]
+                val end = path.last()
+                val direction = normalize(PointF(end.x - start.x, end.y - start.y))
+                val config = bankLineConfigs.getOrElse(finalSegmentIndex) { bankLineConfigs.last() }
+
+                val linePaint = Paint(paints.bankLine1Paint).apply {
+                    color = config.strokeColor.toArgb()
+                    strokeWidth = config.strokeWidth
+                }
+                val glowPaint = createGlowPaint(
+                    baseGlowColor = config.glowColor,
+                    baseGlowWidth = config.glowWidth,
+                    state = state
+                )
+
+                drawFadingLine(canvas, start, direction, linePaint, glowPaint, state, paints)
             }
         }
     }
@@ -386,7 +409,6 @@ class LineRenderer {
         val tableLength = state.table.logicalHeight
         val totalLength = tableLength * 2.0f
         val fadeStartDistance = tableLength * 1.2f
-        totalLength
 
         val end = PointF(start.x + direction.x * totalLength, start.y + direction.y * totalLength)
         val fadeStart = PointF(start.x + direction.x * fadeStartDistance, start.y + direction.y * fadeStartDistance)

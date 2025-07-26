@@ -9,6 +9,38 @@ It is the final word on
 
 A log of completed work.
 
+### [0.9.0] - 2025-07-26
+
+#### Fixed
+
+- Corrected a severe architectural violation in the 3D perspective transformation logic, eliminating
+  the "Warped World" visual bug where the table would "roll" instead of spin.
+- Resolved a state management bug where the pool table and actual cue ball would incorrectly remain
+  visible when switching from Expert Mode to Beginner Mode.
+- Fixed a bug where dragging the `GhostCueBall` incorrectly initiated rotation; it now correctly
+  moves the entire `ProtractorUnit` as intended.
+- Addressed an issue where several types of aiming lines did not fade out over distance as required
+  by the specification. All extending lines now have a consistent, finite length and visual falloff.
+- Corrected various compilation errors related to the Hater Mode refactoring.
+
+#### Changed
+
+- **Overhauled Hater Mode:** The entire feature has been rebuilt. The simple animations have been
+  replaced with a full physics simulation. The response triangles now react to device tilt (gravity)
+  and can be "pushed" through a simulated viscous liquid, causing them to drift and spin with
+  inertia and resistance.
+- **Canonized Aiming Gesture:** The "relative rotational drag" is now the one true aiming mechanic.
+  All relevant documentation has been updated to enforce this standard and explicitly forbid other,
+  flawed implementations.
+- **Rendering Stability:** Refactored the creation of glow effects to be stateless, preventing
+  visual bugs where colors or effects could "stick" to unrelated UI elements.
+- Updated the "@HereLiesAz" menu link to direct to `https://instagram.com/hereliesaz`.
+
+#### Removed
+
+- Deleted the unused `HaterRenderer.kt` class. Its physics logic has been correctly integrated into
+  the `HaterViewModel` in accordance with the project's MVI architecture.
+
 ### [0.8.4.0] - 2025-07-26
 
 #### Added
@@ -130,15 +162,15 @@ A log of completed work.
 #### Added
 
 - **Feature: User Experience Modes:** Initial planning for three distinct user
-  [cite_start]experience modes (Expert, Beginner, Hater) to be selected on first
-  launch. [cite: 1649]
+  experience modes (Expert, Beginner, Hater) to be selected on first
+  [cite_start]launch. [cite: 1649]
 - [cite_start]**Expert Mode:** The current, full-featured application state. [cite: 1649]
   - **Beginner Mode:** A simplified experience with helper labels enabled by
     [cite_start]default. [cite: 1650] Feature set to be streamlined for
     [cite_start]approachability. [cite: 1650]
   - **Hater Mode:** A "Magic 8-Ball" mode that provides cynical, non-committal answers
-    [cite_start]in response to a device shake. [cite: 1651] [cite_start]Specification is
-    complete. [cite: 1651]
+    [cite_start]in response to a device shake. [cite: 1651] Specification is
+    [cite_start]complete. [cite: 1651]
 
 #### Fixed
 
@@ -281,14 +313,14 @@ A log of completed work.
   [cite_start]restored. [cite: 1759]
 - [cite_start]**[CLOSED] Overhaul Menu UI:** The menu animation was standard. [cite: 1759] It is now
   a custom top-down reveal
-  [cite_start]with a horizontal sweep dismissal, and the color scheme has been unified. [cite: 1760]
-- [cite_start]**[CLOSED] Update Splash Screen:** The splash screen was generic. [cite: 1761] It has
+  [cite_start]with a horizontal sweep dismissal, and the color scheme has been unified. [cite: 1670]
+- [cite_start]**[CLOSED] Update Splash Screen:** The splash screen was generic. [cite: 1671] It has
   been updated with a
-  [cite_start]larger logo and the app name has been removed. [cite: 1762]
+  [cite_start]larger logo and the app name has been removed. [cite: 1672]
 - **[CLOSED] Button Aesthetics:** The primary action buttons (`Magic8BallButton`) have been
   redesigned with a transparent background, an inverted triangle, a periwinkle glow, and smaller
-  [cite_start]text. [cite: 1763]
+  [cite_start]text. [cite: 1673]
 - **[CLOSED] Codebase Cleanup:** The codebase suffered from scattered constants and broken
-  [cite_start]references after refactoring. [cite: 1764] This has been addressed by creating a
+  [cite_start]references after refactoring. [cite: 1674] This has been addressed by creating a
   central `Constants.kt` file
-  [cite_start]and fixing all related compilation errors. [cite: 1765]
+  [cite_start]and fixing all related compilation errors. [cite: 1675]

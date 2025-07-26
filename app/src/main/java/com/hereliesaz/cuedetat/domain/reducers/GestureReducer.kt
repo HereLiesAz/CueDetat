@@ -38,6 +38,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         val spinControlCenter = currentState.spinControlCenter
         val protractorUnit = currentState.protractorUnit
 
+
         // Define a constant touch radius in screen pixels (e.g., ~32dp)
         val screenTouchRadiusPx = 96f
         // Calculate the current zoom factor from the slider position
