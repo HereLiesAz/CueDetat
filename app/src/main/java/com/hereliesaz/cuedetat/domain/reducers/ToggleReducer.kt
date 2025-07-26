@@ -78,6 +78,18 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             )
 
             is MainScreenEvent.UnlockBeginnerView -> currentState.copy(isBeginnerViewLocked = false)
+            is MainScreenEvent.LockBeginnerView -> {
+                currentState.copy(
+                    isBeginnerViewLocked = true,
+                    // Reset to the initial locked state for a consistent experience
+                    protractorUnit = ProtractorUnit(
+                        reducerUtils.getDefaultTargetBallPosition(),
+                        LOGICAL_BALL_RADIUS,
+                        0f
+                    ),
+                    zoomSliderPosition = 50f // Default to max zoom
+                )
+            }
             is MainScreenEvent.ToggleCalibrationScreen -> currentState.copy(showCalibrationScreen = !currentState.showCalibrationScreen)
             is MainScreenEvent.ToggleQuickAlignScreen -> currentState.copy(showQuickAlignScreen = !currentState.showQuickAlignScreen)
             else -> currentState
@@ -133,6 +145,7 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
             }
         }
     }
+
 
     private fun handleToggleBankingMode(currentState: OverlayState): OverlayState {
         val bankingEnabled = !currentState.isBankingMode

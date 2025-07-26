@@ -22,8 +22,16 @@ class LineTextRenderer {
     private val maxFontSize = 70f
     enum class RailType { TOP, BOTTOM, LEFT, RIGHT }
 
-    private fun getDynamicFontSize(baseSize: Float, zoomSliderPosition: Float): Float {
-        val zoomFactor = ZoomMapping.sliderToZoom(zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM
+    private fun getDynamicFontSize(baseSize: Float, state: OverlayState): Float {
+        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
+            state.experienceMode,
+            state.isBeginnerViewLocked
+        )
+        val zoomFactor = ZoomMapping.sliderToZoom(
+            state.zoomSliderPosition,
+            minZoom,
+            maxZoom
+        ) / ZoomMapping.DEFAULT_ZOOM
         return (baseSize * zoomFactor).coerceIn(minFontSize, maxFontSize)
     }
 
@@ -62,8 +70,16 @@ class LineTextRenderer {
 
     fun drawProtractorLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
         val textPaint = paints.textPaint.apply { this.typeface = typeface }
-        textPaint.textSize = getDynamicFontSize(38f, state.zoomSliderPosition)
-        val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM
+        textPaint.textSize = getDynamicFontSize(38f, state)
+        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
+            state.experienceMode,
+            state.isBeginnerViewLocked
+        )
+        val zoomFactor = ZoomMapping.sliderToZoom(
+            state.zoomSliderPosition,
+            minZoom,
+            maxZoom
+        ) / ZoomMapping.DEFAULT_ZOOM
 
         // Aiming Line Label
         draw(
@@ -155,7 +171,11 @@ class LineTextRenderer {
         // --- HERESY CORRECTED: Work in the logical coordinate space of the pre-transformed canvas. ---
         // The canvas is already transformed by railPitchMatrix. We draw at the logical point.
         // We must convert screen-space padding to logical-space padding.
-        val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition)
+        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
+            state.experienceMode,
+            state.isBeginnerViewLocked
+        )
+        val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom)
         val logicalPadding = if (zoomFactor > 0) padding / zoomFactor else padding
 
         val textHeight = paint.descent() - paint.ascent()

@@ -185,6 +185,27 @@ class LineRenderer {
         val tangentDx = -dyToTarget / magToTarget
         val tangentDy = dxToTarget / magToTarget
 
+        if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
+            val direction1 = normalize(PointF(tangentDx, tangentDy))
+            val endPoint1 = PointF(
+                start.x + direction1.x * (state.table.logicalHeight * 2.0f),
+                start.y + direction1.y * (state.table.logicalHeight * 2.0f)
+            )
+            val path1 = Path().apply { moveTo(start.x, start.y); lineTo(endPoint1.x, endPoint1.y) }
+            canvas.drawPath(path1, tangentGlow)
+            canvas.drawPath(path1, tangentSolidPaint)
+
+            val direction2 = normalize(PointF(-tangentDx, -tangentDy))
+            val endPoint2 = PointF(
+                start.x + direction2.x * (state.table.logicalHeight * 2.0f),
+                start.y + direction2.y * (state.table.logicalHeight * 2.0f)
+            )
+            val path2 = Path().apply { moveTo(start.x, start.y); lineTo(endPoint2.x, endPoint2.y) }
+            canvas.drawPath(path2, tangentGlow)
+            canvas.drawPath(path2, tangentSolidPaint)
+            return
+        }
+
         if (state.isStraightShot) {
             val direction1 = normalize(PointF(tangentDx, tangentDy))
             val endPoint1 = PointF(start.x + direction1.x * (state.table.logicalHeight * 2.0f), start.y + direction1.y * (state.table.logicalHeight * 2.0f))

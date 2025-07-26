@@ -30,7 +30,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
 
     private fun handleLogicalGestureStarted(currentState: OverlayState, event: MainScreenEvent.LogicalGestureStarted): OverlayState {
         if (currentState.experienceMode == ExperienceMode.BEGINNER && currentState.isBeginnerViewLocked) {
-            return currentState.copy(interactionMode = InteractionMode.ROTATING_PROTRACTOR)
+            return currentState // Do not allow any interaction in locked beginner mode
         }
 
         val logicalPoint = event.logicalPoint
@@ -41,7 +41,11 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         // Define a constant touch radius in screen pixels (e.g., ~32dp)
         val screenTouchRadiusPx = 96f
         // Calculate the current zoom factor from the slider position
-        val zoomFactor = ZoomMapping.sliderToZoom(currentState.zoomSliderPosition)
+        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
+            currentState.experienceMode,
+            currentState.isBeginnerViewLocked
+        )
+        val zoomFactor = ZoomMapping.sliderToZoom(currentState.zoomSliderPosition, minZoom, maxZoom)
         // Convert the screen-space radius to a dynamic logical-space radius.
         // As zoom increases, the logical radius needed to cover the same screen area decreases.
         val dynamicLogicalTouchRadius = screenTouchRadiusPx / zoomFactor

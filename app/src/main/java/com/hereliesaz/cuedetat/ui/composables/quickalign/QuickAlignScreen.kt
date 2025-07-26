@@ -38,6 +38,7 @@ import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
 import com.hereliesaz.cuedetat.view.model.Table
+import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.TableSize
 
@@ -133,11 +134,15 @@ private fun AlignmentStep(
 
     val density = LocalDensity.current
     val alignUiState = remember(alignState, selectedTableSize, screenWidth, screenHeight, density) {
+        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
+            ExperienceMode.EXPERT,
+            false
+        ) // Quick Align uses expert mode zoom
         uiState.copy(
             viewWidth = with(density) { screenWidth.toPx().toInt() },
             viewHeight = with(density) { screenHeight.toPx().toInt() },
             table = Table(size = selectedTableSize ?: TableSize.NINE_FT, isVisible = true),
-            zoomSliderPosition = ZoomMapping.zoomToSlider(alignState.zoom),
+            zoomSliderPosition = ZoomMapping.zoomToSlider(alignState.zoom, minZoom, maxZoom),
             worldRotationDegrees = alignState.rotation,
             viewOffset = PointF(alignState.pan.x, alignState.pan.y),
             onPlaneBall = null, // No need for balls in alignment

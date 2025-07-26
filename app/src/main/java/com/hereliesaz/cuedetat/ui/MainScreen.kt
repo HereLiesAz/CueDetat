@@ -314,13 +314,29 @@ fun MainScreen(
                                                 color = MaterialTheme.colorScheme.tertiary
                                             )
                                         }
-                                        CuedetatButton(
-                                            onClick = { mainViewModel.onEvent(MainScreenEvent.Reset) },
-                                            text = "Reset\nView",
-                                            color = MaterialTheme.colorScheme.onSurface.copy(
-                                                alpha = 0.7f
+                                        when {
+                                            uiState.experienceMode == ExperienceMode.EXPERT -> CuedetatButton(
+                                                onClick = { mainViewModel.onEvent(MainScreenEvent.Reset) },
+                                                text = "Reset\nView",
+                                                color = MaterialTheme.colorScheme.onSurface.copy(
+                                                    alpha = 0.7f
+                                                )
                                             )
-                                        )
+
+                                            uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> CuedetatButton(
+                                                onClick = { mainViewModel.onEvent(MainScreenEvent.UnlockBeginnerView) },
+                                                text = "Unlock\nView",
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+
+                                            uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked -> CuedetatButton(
+                                                onClick = { mainViewModel.onEvent(MainScreenEvent.LockBeginnerView) },
+                                                text = "Lock\nView",
+                                                color = MaterialTheme.colorScheme.onSurface.copy(
+                                                    alpha = 0.7f
+                                                )
+                                            )
+                                        }
                                     }
                                 }
                             }

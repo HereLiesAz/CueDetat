@@ -38,7 +38,8 @@ class ControlReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         currentState: OverlayState,
         event: MainScreenEvent.ApplyQuickAlign
     ): OverlayState {
-        val newZoomSliderPos = ZoomMapping.zoomToSlider(event.scale)
+        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(currentState.experienceMode)
+        val newZoomSliderPos = ZoomMapping.zoomToSlider(event.scale, minZoom, maxZoom)
 
         return currentState.copy(
             viewOffset = PointF(event.translation.x, event.translation.y),
@@ -66,10 +67,11 @@ class ControlReducer @Inject constructor(private val reducerUtils: ReducerUtils)
     }
 
     private fun handleZoomScaleChanged(currentState: OverlayState, event: MainScreenEvent.ZoomScaleChanged): OverlayState {
+        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(currentState.experienceMode)
         val oldZoomSliderPos = currentState.zoomSliderPosition
-        val currentZoomValue = ZoomMapping.sliderToZoom(oldZoomSliderPos)
-        val newZoomValue = (currentZoomValue * event.scaleFactor).coerceIn(ZoomMapping.MIN_ZOOM, ZoomMapping.MAX_ZOOM)
-        val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue)
+        val currentZoomValue = ZoomMapping.sliderToZoom(oldZoomSliderPos, minZoom, maxZoom)
+        val newZoomValue = (currentZoomValue * event.scaleFactor).coerceIn(minZoom, maxZoom)
+        val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue, minZoom, maxZoom)
         return currentState.copy(
             zoomSliderPosition = newSliderPos,
             valuesChangedSinceReset = true

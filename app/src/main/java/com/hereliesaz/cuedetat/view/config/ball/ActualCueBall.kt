@@ -10,12 +10,12 @@ data class ActualCueBall(
     override val opacity: Float = 1.0f,
     override val glowWidth: Float = 12f,
     override val glowColor: Color = Mariner,
-    override val strokeWidth: Float = 3f,
+    override val strokeWidth: Float = 6f,
     override val strokeColor: Color = Mariner,
     override val additionalOffset: Float = 0f,
     override val centerShape: CenterShape = CenterShape.DOT,
     override val centerSize: Float = 0.2f, // as a factor of radius
     override val centerColor: Color = Color.White,
     override val fillColor: Color = Color.Transparent,
-    override val additionalOffset3d: Float = 0f
+    override val additionalOffset3d: Float = 0f,
 ) : BallsConfig

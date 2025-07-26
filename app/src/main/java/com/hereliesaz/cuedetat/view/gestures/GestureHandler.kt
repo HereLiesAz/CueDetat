@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.abs
 
@@ -35,25 +36,27 @@ fun Modifier.detectManualGestures(uiState: OverlayState, onEvent: (MainScreenEve
                     val centroid = event.calculateCentroid()
 
                     if (event.changes.size > 1) {
-                        // Multi-finger gestures always affect the entire world view.
-                        if (zoom != 1f) {
-                            onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
-                        }
-                        if (rotation != 0f) {
-                            onEvent(MainScreenEvent.TableRotationApplied(rotation))
-                        }
-                        if (abs(pan.y) > 0.1f) {
-                            onEvent(MainScreenEvent.PanView(PointF(0f, pan.y)))
+                        // Multi-finger gestures are disabled in locked beginner mode
+                        if (uiState.experienceMode != ExperienceMode.BEGINNER || !uiState.isBeginnerViewLocked) {
+                            if (zoom != 1f) {
+                                onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
+                            }
+                            if (rotation != 0f) {
+                                onEvent(MainScreenEvent.TableRotationApplied(rotation))
+                            }
+                            if (abs(pan.y) > 0.1f) {
+                                onEvent(MainScreenEvent.PanView(PointF(0f, pan.y)))
+                            }
                         }
 
                     } else if (event.changes.size == 1) {
-                        // Single-finger drag behavior depends on the world lock state.
+                        // Single-finger drag behavior
                         if (pan != Offset.Zero) {
-                            if (uiState.isWorldLocked) {
-                                // If locked, pan the entire world view.
+                            // Pan is disabled in locked beginner mode
+                            if (uiState.isWorldLocked && (uiState.experienceMode != ExperienceMode.BEGINNER || !uiState.isBeginnerViewLocked)) {
                                 onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
                             } else {
-                                // If unlocked, perform a logical drag on the plane.
+                                // Perform a logical drag on the plane.
                                 val previousPosition = lastCentroid
                                 val currentPosition = centroid
                                 onEvent(
