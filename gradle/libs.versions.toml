@@ -62,6 +62,7 @@ cameraVideo = "1.5.0-beta02"
 glance = "1.2.0-alpha01"
 foundationLayout = "1.8.3"
 animationCoreVersion = "1.8.3"
+roomKtx = "2.7.2"
 
 [libraries]
 # AndroidX Core & UI
@@ -131,6 +132,7 @@ tensorflow-lite-task-vision = { module = "org.tensorflow:tensorflow-lite-task-vi
 vision-common = { module = "com.google.mlkit:vision-common", version = "17.3.0" }
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
 androidx-compose-animation-core = { group = "androidx.compose.animation", name = "animation-core", version.ref = "animationCoreVersion" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "roomKtx" }
 
 
 

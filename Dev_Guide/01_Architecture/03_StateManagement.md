@@ -20,9 +20,14 @@ This document provides an overview of its key properties.
 
 ### UI & Mode Controls
 
+- **`experienceMode`**: A transient, nullable `ExperienceMode` enum. It is **not persisted** to
+  disk, which forces the user to select a mode on every fresh application launch.
 - **`isBankingMode`**: `Boolean` flag to switch between Protractor and Banking modes.
 - **`isSpinControlVisible`**: `Boolean` for the visibility of the spin control UI.
 - **`isCameraVisible`**: `Boolean` for the visibility of the camera feed.
+- **`orientationLock`**: An `OrientationLock` enum. Its default value is **`PORTRAIT`**.
+- **`isBeginnerViewLocked`**: A `Boolean` specific to Beginner Mode, which locks the view to a
+  top-down perspective and disables certain interactions.
 - Various other `Boolean` flags for toggling dialogs (`show...Dialog`) and UI helpers (
   `areHelpersVisible`).
 

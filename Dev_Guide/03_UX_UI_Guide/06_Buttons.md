@@ -13,21 +13,20 @@ This document specifies the design and behavior of the primary action buttons (`
 
 ## Specific Buttons & Behavior
 
-* **1. Reset Button**
-    * **Placement**: Bottom-right column.
-    * **Action**: `MainScreenEvent.Reset`. Toggles between saving and reverting state. Also unlocks
-      the world view.
+* **1. Reset View / Unlock View Button**
+  * **Placement**: Bottom-right column.
+  * **Text (Conditional)**:
+    * Displays "Unlock View" when in Beginner Mode's locked state (`isBeginnerViewLocked == true`).
+    * Displays "Reset View" in all other modes and states.
+  * **Action (Conditional)**:
+    * Dispatches `UnlockBeginnerView` when in Beginner Mode's locked state.
+    * Dispatches `Reset` in all other modes and states. Toggles between saving and reverting state.
+      Also unlocks the world view.
 * **2. Toggle Spin Control Button**
-    * **Placement**: Bottom-right column.
-    * **Action**: `ToggleSpinControl`.
-* **3. Toggle Cue Ball Button**
-    * **Placement**: Bottom-left column.
-    * **Action**: `ToggleOnPlaneBall`.
-    * **Disabled State:** Must be disabled when the table is visible.
-* **4. Toggle Table Button**
-    * **Placement**: Bottom-left column.
-    * **Action**: `ToggleTable`.
-    * **Visibility**: Only visible when not in Banking Mode.
-* **5. Add Obstacle Ball Button**
-    * **Placement**: Bottom-left column.
-    * **Action**: `AddObstacleBall`.
+  * **Placement**: Bottom-right column.
+  * **Action**: `ToggleSpinControl`.
+  * **Visibility**: Hidden in Beginner Mode.
+* **3. Add Obstacle Ball Button**
+  * **Placement**: Bottom-left column.
+  * **Action**: `AddObstacleBall`.
+  * **Visibility**: Hidden in Beginner Mode.

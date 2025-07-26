@@ -1,41 +1,90 @@
-# 04: Core Operational Modes
+# 2.1. User Experience Modes
 
-The application operates in two distinct modes, toggled from the menu.
+The application operates in three distinct user experience modes, selected on launch.
 
-## Protractor Mode
-* This is the default aiming mode for standard cut shots.
-* **Visible Elements:** `ActualCueBall`, `TargetBall`, `GhostCueBall`.
-* **Functionality:** The user drags the `TargetBall` and `ActualCueBall` to match the real balls on the table. The `aimingAngle` can be adjusted with a rotational drag gesture, moving the `GhostCueBall` around the `TargetBall`. The rendered lines show the required shot path.
-* **Table Integration:** When the table is made visible in this mode, it provides a frame of reference and enables predictive banking calculations for the aiming line.
+## I. Expert Mode
 
-## Banking Mode
-* **Visible Elements:** `ActualCueBall` (as "Banking Ball") and the `Table Visuals`.
-* **Default Orientation:** The table defaults to a "portrait" orientation (`tableRotationDegrees = 90f`), matching the default for a visible table in Protractor Mode.
-* **Functionality:** Allows the user to calculate multi-rail kick and bank shots.
+Expert Mode provides the complete, unfiltered feature set of the application. It is designed for
+users who are comfortable with all the tools and want no restrictions.
 
-***
-## Addendum: Detailed Mode Specifications
+* **Core Mandates:**
+  * The **Table** is **always visible**.
+  * The **Actual Cue Ball** is **always visible**.
+* **Available Features:** All application features are enabled, including:
+  * Protractor and Banking Sub-Modes for aiming.
+  * Full Spin Control.
+  * Placement of Obstacle Balls.
+  * Access to "Too Advanced Options" for computer vision tuning and calibration.
+  * The bottom-right action button is always "Reset View".
 
-### Protractor Mode
+### Protractor Sub-Mode (Expert)
 
-* **Active Elements**:
-  * `TargetBall`: The logical and visual anchor of the protractor.
-  * `GhostCueBall`: Calculated position representing the required impact point on the `TargetBall`.
-  * `ActualCueBall` (Optional): A user-draggable reference point for shot visualization.
-  * All associated lines (Aiming, Shot, Tangent, Fixed Angle Guides).
+* **Functionality:** The standard aiming mode for cut shots. The user can drag the `TargetBall` and
+  `ActualCueBall` to match the real balls on the table. A rotational drag gesture aims the shot.
+
+### Banking Sub-Mode (Expert)
+
+* **Functionality:** Allows the user to calculate multi-rail kick and bank shots by dragging the
+  `ActualCueBall` and an aiming target.
+
+## II. Beginner Mode
+
+A simplified mode with two distinct sub-modes to guide new users.
+
+### 1. Protractor Sub-Mode (Locked State)
+
+This is the default state upon entering Beginner Mode.
+
+- **`isBeginnerViewLocked`**: `true`.
+- **View**: The view is rendered with a flat, top-down perspective. The 3D perspective tilt is
+  disabled.
+- **Bubble Level**: The 3D "ghost" component of the balls is repurposed as a bubble level. It moves
+  on-screen in the opposite direction of the device's **pitch** and **roll** to guide the user to a
+  perfectly flat orientation. This effect is constrained, preventing the 3D component's center from
+  moving beyond its own radius from the 2D component's center. The tilt effect is capped at +/- 20
+  degrees.
+- **Gestures**: All drag, pan, and multi-touch gestures are disabled. The protractor unit is
+  immobile.
+- **Visuals**: The `ShotGuideLine`, distance display, and all warning popups are hidden. The tangent
+  line is rendered as two solid lines.
+- **Zoom**: A special, expanded zoom range is active to make the protractor large and clear.
+- **Button**: The bottom-right action button displays "Unlock View".
+
+### 2. Free Aim Sub-Mode (Unlocked State)
+
+This mode is entered after the user taps "Unlock View".
+
+- **`isBeginnerViewLocked`**: `false`.
+- **View**: The standard 3D perspective tilt (based on pitch only) is enabled.
+- **Controls**: The `TargetBall` becomes draggable, and rotational aiming is enabled.
+- **Visuals**: The `ShotGuideLine` becomes visible. The tangent line reverts to its standard
+  half-solid, half-dotted appearance. Warnings and the distance display are active.
+- **Zoom**: The zoom range reverts to the standard range used in Expert Mode.
+- **Button**: The bottom-right action button displays "Lock View", which returns to the locked
+  state.
+
+### Disabled Features (All Beginner Sub-Modes)
+
+- Banking Mode
+- Spin Control
+- Obstacle Balls
+- Advanced Options
+- World Rotation
+- The following menu items are hidden: Camera Toggle, Table Size, and Distance Unit Toggle.
+
+## III. Hater Mode
+
+Hater Mode transforms the application into a "Magic 8-Ball" that delivers cynical and unhelpful "
+advice."
+
+* **Core Concept**: An interactive, darkly humorous oracle that responds to a device shake.
+* **User Interface**:
+  * The screen renders a large, murky blue triangle (the "die") that floats in a dark void.
+  * The triangle drifts and rotates based on the device's gyroscope. It can be "pushed" by the
+    user's touch.
+  * The main menu is accessible but limited to mode selection and informational links.
 * **Interaction**:
-  * **Aiming**: A rotational drag gesture around the `TargetBall` adjusts the `aimingAngle`, which moves the `GhostCueBall` in an orbit.
-  * **Positioning**: The `ActualCueBall` (if visible) and `TargetBall` are draggable on the logical plane.
-  * **Zoom**: The vertical slider controls the Global Zoom.
-
-### Banking Mode
-
-* **Active Elements**:
-  * `ActualCueBall` (as the "Banking Ball"): The primary interactive element, user-draggable on the table plane.
-  * `bankingAimTarget`: A user-defined logical point that sets the initial vector of the bank shot calculation.
-  * Table & Rails: The wireframe table becomes visible.
-  * Banking Shot Line.
-* **Interaction**:
-  * **Cue Position**: The Banking Ball is dragged to position it on the logical table.
-  * **Aiming**: A drag gesture anywhere else on the screen moves the `bankingAimTarget`, updating the calculated reflection path in real-time.
-  * **Table Rotation**: The horizontal slider rotates the entire table and banking shot apparatus around the view's center.
+  * A physical shake of the device triggers a new response.
+  * The die animates out, then a new one animates in with a new response.
+* **Content**: The responses are drawn from a predefined set of cynical, witty, and non-committal
+  phrases that are consistent with the application's established persona.

@@ -9,14 +9,82 @@ It is the final word on
 
 A log of completed work.
 
+### [0.8.4.0] - 2025-07-26
+
+#### Added
+
+* **Bubble Level Feature**: In the locked Beginner Mode, the 3D ball component now acts as a "bubble
+  level," moving inversely to the device's pitch and roll to guide the user to a flat orientation.
+  This replaces the 3D perspective effect in this mode only.
+* **"Lock View" State**: The "Unlock View" button in Beginner Mode now becomes a "Lock View" button,
+  allowing users to return to the locked protractor sub-mode.
+
+#### Changed
+
+* **Default Orientation**: The application's default orientation is now Portrait lock. Users can
+  still cycle to Landscape or Automatic modes through the menu.
+* **Scoped Beginner Zoom**: The expanded zoom range is now exclusive to the locked protractor
+  sub-mode. Unlocked Beginner Mode now uses the standard zoom range.
+* **Increased Stroke Width**: All ball stroke widths have been doubled for better visibility.
+* **Contextual Menu**: The menu is now contextual for Beginner Mode, hiding options for Camera,
+  Table Size, and Units that are not applicable in that mode.
+* **Ball Stroke Rendering**: The rendering logic for ball strokes has been adjusted to be centered
+  on the radius for proper visual anchoring.
+
+#### Fixed
+
+* Corrected a logical flaw where the `ShotGuideLine` would not appear in unlocked Beginner Mode.
+* The protractor unit is now correctly immobile in the locked beginner sub-mode, and drag gestures
+  are disabled as intended.
+* Warnings and the distance display are now correctly disabled in the locked beginner sub-mode.
+* Tangent lines now render correctly as two solid lines in the locked beginner sub-mode.
+* Resolved a series of cascading compiler errors related to a function signature change in
+  `ZoomMapping.kt`.
+
+### [UNRELEASED] - 2025-07-25
+
+#### Added
+
+- **Feature: Beginner Mode Overhaul:** Implemented a new two-stage experience for Beginner Mode.
+  - **Protractor Sub-Mode:** A new initial state for beginners that locks the view to a top-down
+    perspective, disables tilt and pan, locks the ball positions, and provides a unique, expanded
+    zoom range.
+  - **"Unlock View" Button:** A conditional button that allows beginner users to transition from the
+    locked Protractor sub-mode to a "Free Aim" sub-mode with more features enabled.
+
+#### Changed
+
+- **State Management:** The user's selected `experienceMode` is no longer persisted to disk. This
+  forces the mode selection screen to appear on every fresh application launch, fulfilling a core UX
+  requirement. State initialization logic was refactored to handle this new flow without losing
+  saved user settings.
+- **Zoom System:** The `ZoomMapping` utility was updated to provide a dynamic zoom range based on
+  the current `ExperienceMode`. Beginner Mode now has a maximum zoom level twice that of Expert
+  Mode.
+- **UI: Splash Screen:** The splash screen was updated with a new vertical layout and animations for
+  the mode selection options. The application's tagline now correctly fades out as the selection UI
+  fades in.
+- **Rendering: Ball Strokes:** The rendering logic for the 2D logical balls was updated. Their
+  stroke width is now scaled based on the current zoom factor to ensure it visually matches the
+  stroke width of their 3D counterparts at all times.
+
+#### Fixed
+
+- **Critical Crash: Mode Selection:** Resolved a critical crash that occurred when selecting "
+  Expert" or "Beginner" mode from the splash screen. The issue was caused by improper state
+  initialization that discarded essential view dimension information, leading to a fatal rendering
+  error.
+- **Compilation:** Corrected a series of compilation errors that arose from the `ZoomMapping`
+  refactoring by updating all call sites to provide the newly required zoom range parameters.
+
 ### [UNRELEASED] - 2025-07-23
 
 #### Added
 
 - **Feature: Hater Mode:** Implemented the full "Magic 8-Ball" feature, including a new UI,
   shake-to-activate logic, and a full set of cynical responses, as per the specification.
-- [cite_start]**UI: "Table Alignment" Shortcut:** Added a new "Table Alignment" option to the main
-  menu for more intuitive access to the Quick Align feature. [cite: 2262]
+- **UI: "Table Alignment" Shortcut:** Added a new "Table Alignment" option to the main
+  menu for more intuitive access to the Quick Align feature.
 
 #### Changed
 
@@ -61,25 +129,27 @@ A log of completed work.
 
 #### Added
 
-- [cite_start]**Feature: User Experience Modes:** Initial planning for three distinct user
-  experience modes (Expert, Beginner, Hater) to be selected on first launch. [cite: 1649]
+- **Feature: User Experience Modes:** Initial planning for three distinct user
+  [cite_start]experience modes (Expert, Beginner, Hater) to be selected on first
+  launch. [cite: 1649]
 - [cite_start]**Expert Mode:** The current, full-featured application state. [cite: 1649]
-  - [cite_start]**Beginner Mode:** A simplified experience with helper labels enabled by
-    default. [cite: 1650] [cite_start]Feature set to be streamlined for
-    approachability. [cite: 1650]
-  - [cite_start]**Hater Mode:** A "Magic 8-Ball" mode that provides cynical, non-committal answers
-    in response to a device shake. [cite: 1651] [cite_start]Specification is complete. [cite: 1651]
+  - **Beginner Mode:** A simplified experience with helper labels enabled by
+    [cite_start]default. [cite: 1650] Feature set to be streamlined for
+    [cite_start]approachability. [cite: 1650]
+  - **Hater Mode:** A "Magic 8-Ball" mode that provides cynical, non-committal answers
+    [cite_start]in response to a device shake. [cite: 1651] [cite_start]Specification is
+    complete. [cite: 1651]
 
 #### Fixed
 
-- [cite_start]**Performance: Inefficient Glow:** Corrected a significant performance issue where
+- **Performance: Inefficient Glow:** Corrected a significant performance issue where
   fading lines were rendered via a CPU-intensive loop of discrete
-  segments. [cite: 1652] [cite_start]The renderer now uses a single `LinearGradient` mask for a more
-  performant, GPU-accelerated effect. [cite: 1652]
-- [cite_start]**Rendering Bug: Warning Glow Color:** Fixed a visual bug where the glow effect for
+  [cite_start]segments. [cite: 1652] The renderer now uses a single `LinearGradient` mask for a more
+  [cite_start]performant, GPU-accelerated effect. [cite: 1652]
+- **Rendering Bug: Warning Glow Color:** Fixed a visual bug where the glow effect for
   the `GhostCueBall` and aiming lines would remain white during a warning
-  state. [cite: 1653] [cite_start]The glow now correctly adopts the mandated `WarningRed`
-  color. [cite: 1654]
+  [cite_start]state. [cite: 1653] The glow now correctly adopts the mandated `WarningRed`
+  [cite_start]color. [cite: 1654]
 
 ### [UNRELEASED] - 2025-07-21
 
@@ -89,8 +159,8 @@ A log of completed work.
   [cite_start]virtual table by tapping four known points in a single photo. [cite: 1655] This
   replaces the complex and
   [cite_start]unreliable full camera calibration feature. [cite: 1656]
-- [cite_start]**Feature: Automatic World Lock:** Implemented an automatic "World Lock"
-  feature. [cite: 1657] The virtual
+- **Feature: Automatic World Lock:** Implemented an automatic "World Lock"
+  [cite_start]feature. [cite: 1657] The virtual
   scene now automatically locks its position relative to the camera view when a user successfully
   [cite_start]snaps a virtual ball to a real one. [cite: 1658] The world unlocks automatically when
   a ball is dragged or the
@@ -103,11 +173,11 @@ A log of completed work.
 - **Theming: New Palette:** Replaced the entire application color palette with a new, systematic
   [cite_start]one. [cite: 1661] All UI components, including themes, buttons, and canvas renderings,
   have been updated to use
-  [cite_start]the new color scheme. [cite: 1661] [cite_start]The primary yellow color was
-  specifically muted as requested. [cite: 1662]
+  [cite_start]the new color scheme. [cite: 1661] The primary yellow color was
+  [cite_start]specifically muted as requested. [cite: 1662]
 - **Perspective System:** Refined the perspective tilt logic with a cubic ease-out curve to create
-  [cite_start]a more pronounced, non-linear slowing effect as the user approaches the physical tilt
-  limit. [cite: 1663] The
+  a more pronounced, non-linear slowing effect as the user approaches the physical tilt
+  [cite_start]limit. [cite: 1663] The
   [cite_start]maximum virtual tilt was also adjusted to 87 degrees. [cite: 1664]
 - **UI: Button Layout:** Removed the "Lock World" button and moved the "Spin" button to the
   [cite_start]bottom-right column for a more balanced layout. [cite: 1665] The "Add Ball" button's
@@ -121,12 +191,12 @@ A log of completed work.
   caused by a conflicting,
   [cite_start]redundant gesture handler that has now been removed. [cite: 1668]
 - **CV: Mask Orientation:** Fixed a bug where the CV debug mask was being displayed with an
-  [cite_start]incorrect, squished orientation. [cite: 1669] [cite_start]The mask is now correctly
-  rotated to match the device's display. [cite: 1670]
-- [cite_start]**CV: Bounding Box Display:** Re-enabled the drawing of CV bounding
-  boxes. [cite: 1671] The renderer now
-  [cite_start]receives the necessary source image dimensions to correctly transform and display the
-  boxes. [cite: 1672]
+  [cite_start]incorrect, squished orientation. [cite: 1669] The mask is now correctly
+  [cite_start]rotated to match the device's display. [cite: 1670]
+- **CV: Bounding Box Display:** Re-enabled the drawing of CV bounding
+  [cite_start]boxes. [cite: 1671] The renderer now
+  receives the necessary source image dimensions to correctly transform and display the
+  [cite_start]boxes. [cite: 1672]
 - **Build: Compilation Errors:** Corrected a series of compilation errors related to outdated color
   [cite_start]references in UI configuration files after the theme update. [cite: 1673]
 ---
@@ -139,13 +209,15 @@ A log of completed work.
 - **Interactive Tutorial:** The interactive placeholder needs to be expanded into a full, guided
   [cite_start]experience. [cite: 1735]
 - **UI/UX: Beginner Mode Menu:**
-  - [cite_start]The "Toggle Labels" option should be the first item, followed by "Show
-    Tutorial." [cite: 1731]
-  - [cite_start]The vertical spacing between all menu items needs to be increased for better
-    readability. [cite: 1732]
+  - The "Toggle Labels" option should be the first item, followed by "Show
+    [cite_start]Tutorial." [cite: 1731]
+  - The vertical spacing between all menu items needs to be increased for better
+    [cite_start]readability. [cite: 1732]
 
 ### Closed Issues
 
+- **[CLOSED] Critical Crash: Mode Selection:** Selecting "Expert" or "Beginner" mode caused the
+  application to effectively restart due to improper state initialization.
 - **[CLOSED] Critical Bug: CV Crash:** Entering "Test Mask" mode when "Show CV Mask" is disabled
   causes a
   [cite_start]fatal crash. [cite: 1727]
@@ -156,29 +228,30 @@ A log of completed work.
 - **[CLOSED] CV Robustness:** The CV pipeline is now more resilient to specular highlights and
   complex ball patterns.
 - **[CLOSED] Performance: Inefficient Glow:** The glow effect was rendered with a series of circles instead of
-  [cite_start]a stroked path, causing visual artifacts and unnecessary performance
-  overhead. [cite: 1736] [cite_start]This has been corrected. [cite: 1736]
+  a stroked path, causing visual artifacts and unnecessary performance
+  [cite_start]overhead. [cite: 1736] [cite_start]This has been corrected. [cite: 1736]
 - **[CLOSED] Rendering Bug: Warning Glow Color:** The glow effect for warnings was incorrectly white instead
-  [cite_start]of the mandated `WarningRed`. [cite: 1737] [cite_start]This has been
-  corrected. [cite: 1737]
+  [cite_start]of the mandated `WarningRed`. [cite: 1737] This has been
+  [cite_start]corrected. [cite: 1737]
 - **[CLOSED] Performance: 3D Lag:** The application suffered from significant lag during device
-  [cite_start]tilt. [cite: 1738] [cite_start]The issue was traced to a flawed rendering cache that
-  was being invalidated on every frame. [cite: 1739] The renderer has been refactored to cache only
+  [cite_start]tilt. [cite: 1738] The issue was traced to a flawed rendering cache that
+  [cite_start]was being invalidated on every frame. [cite: 1739] The renderer has been refactored to
+  cache only
   static, un-transformed geometry, resolving the
   [cite_start]bottleneck. [cite: 1740]
-- [cite_start]**[CLOSED] Feature Incomplete: Quick Align:** The "Quick Align" feature was a UI
-  placeholder. [cite: 1741] The
-  [cite_start]homography calculation and state application logic have been fully
-  implemented. [cite: 1742]
+- **[CLOSED] Feature Incomplete: Quick Align:** The "Quick Align" feature was a UI
+  [cite_start]placeholder. [cite: 1741] The
+  homography calculation and state application logic have been fully
+  [cite_start]implemented. [cite: 1742]
 - **[CLOSED] Rendering Bug: Missing Tilt:** A logical error in the perspective pipeline (`translate`
-  [cite_start]before `rotate`) was preventing the 3D tilt effect from being applied to the table
-  rails. [cite: 1743] The
+  before `rotate`) was preventing the 3D tilt effect from being applied to the table
+  [cite_start]rails. [cite: 1743] The
   [cite_start]transformation order has been corrected. [cite: 1743]
 - **[CLOSED] UI Regression: Rail Alignment / Ball Resizing:** A visual bug caused table rails to
   [cite_start]misalign and balls to resize during rotation. [cite: 1744] This was traced to an
   incorrect matrix
-  [cite_start]transformation order and was fixed by separating the rendering matrices for position
-  and size. [cite: 1745]
+  transformation order and was fixed by separating the rendering matrices for position
+  [cite_start]and size. [cite: 1745]
 - [cite_start]**[CLOSED] Interactive Tutorial:** The tutorial was a blocking overlay. [cite: 1746]
   It has been replaced with
   [cite_start]a non-blocking placeholder that allows user interaction. [cite: 1747]
@@ -198,8 +271,8 @@ A log of completed work.
   sampling have dramatically
   [cite_start]improved accuracy and robustness. [cite: 1755]
 - **[CLOSED] Add CV Tuning UI:** The user had no way to see or correct what the CV system was
-  [cite_start]seeing. [cite: 1756] [cite_start]The new calibration and mask testing UI resolves
-  this. [cite: 1756]
+  [cite_start]seeing. [cite: 1756] The new calibration and mask testing UI resolves
+  [cite_start]this. [cite: 1756]
 - **[CLOSED] Fix Table Rendering:** The table rails and pockets were misaligned due to an incorrect
   [cite_start]3D transformation order. [cite: 1757] This has been corrected by unifying all
   rendering under a single
