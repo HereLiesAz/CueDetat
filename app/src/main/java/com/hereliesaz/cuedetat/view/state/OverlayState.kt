@@ -102,7 +102,7 @@ data class OverlayState(
     val valuesChangedSinceReset: Boolean = false,
     val isCameraVisible: Boolean = true,
     val viewOffset: PointF = PointF(0f, 0f), // Pan state
-    val orientationLock: OrientationLock = OrientationLock.AUTOMATIC,
+    val orientationLock: OrientationLock = OrientationLock.PORTRAIT,
     val experienceMode: ExperienceMode? = null,
     @Transient val pendingOrientationLock: OrientationLock? = null,
     @Transient val pendingExperienceMode: ExperienceMode? = null,
@@ -142,6 +142,7 @@ data class OverlayState(
     @Transient val sizeCalculationMatrix: Matrix? = null,
     @Transient val inversePitchMatrix: Matrix? = null,
     @Transient val flatMatrix: Matrix? = null,
+    @Transient val logicalPlaneMatrix: Matrix? = null,
     @Transient val hasInverseMatrix: Boolean = false,
 
     // CV Data
@@ -200,7 +201,7 @@ data class OverlayState(
     // Version Info
     @Transient val latestVersionName: String? = null,
     val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
-    @Transient val targetBallDistance: Float = 0f
+    @Transient val targetBallDistance: Float = 0f,
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch

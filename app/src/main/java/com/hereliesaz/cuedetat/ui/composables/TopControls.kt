@@ -110,31 +110,33 @@ fun TopControls(
                     }
                 }
 
-                Column(horizontalAlignment = Alignment.End) {
-                    val distanceText = if (uiState.targetBallDistance > 0) {
-                        if (uiState.distanceUnit == DistanceUnit.IMPERIAL) {
-                            val feet = (uiState.targetBallDistance / 12).toInt()
-                            val inches = (uiState.targetBallDistance % 12).toInt()
-                            "$feet ft $inches in"
+                if (uiState.experienceMode != ExperienceMode.BEGINNER || !uiState.isBeginnerViewLocked) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        val distanceText = if (uiState.targetBallDistance > 0) {
+                            if (uiState.distanceUnit == DistanceUnit.IMPERIAL) {
+                                val feet = (uiState.targetBallDistance / 12).toInt()
+                                val inches = (uiState.targetBallDistance % 12).toInt()
+                                "$feet ft $inches in"
+                            } else {
+                                val cm = (uiState.targetBallDistance * 2.54).toInt()
+                                "$cm cm"
+                            }
                         } else {
-                            val cm = (uiState.targetBallDistance * 2.54).toInt()
-                            "$cm cm"
+                            "--"
                         }
-                    } else {
-                        "--"
-                    }
 
-                    Text(
-                        text = "Distance",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-                    Text(
-                        text = distanceText,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                        Text(
+                            text = "Distance",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                        Text(
+                            text = distanceText,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
                 }
             }
         }

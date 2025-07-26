@@ -80,12 +80,14 @@ fun MenuDrawerContent(
                 MenuDivider()
 
                 // Section 2: Core Controls
-                val cameraToggleText =
-                    if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On"
-                MenuItem(
-                    text = cameraToggleText,
-                    onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
-                )
+                if (uiState.experienceMode != ExperienceMode.BEGINNER) {
+                    val cameraToggleText =
+                        if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On"
+                    MenuItem(
+                        text = cameraToggleText,
+                        onClick = { onEvent(MainScreenEvent.ToggleCamera); onCloseDrawer() }
+                    )
+                }
                 if (uiState.experienceMode != ExperienceMode.BEGINNER) {
                     val bankingModeToggleText =
                         if (uiState.isBankingMode) "Ghost Ball Aiming" else "Calculate Bank"
@@ -103,17 +105,17 @@ fun MenuDrawerContent(
                         text = "Table Alignment",
                         onClick = { onEvent(MainScreenEvent.ToggleQuickAlignScreen); onCloseDrawer() }
                     )
+                    MenuItem(
+                        text = "Table Size",
+                        onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog); onCloseDrawer() }
+                    )
+                    val distanceUnitToggleText =
+                        if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units"
+                    MenuItem(
+                        text = distanceUnitToggleText,
+                        onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit); onCloseDrawer() }
+                    )
                 }
-                MenuItem(
-                    text = "Table Size",
-                    onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog); onCloseDrawer() }
-                )
-                val distanceUnitToggleText =
-                    if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units"
-                MenuItem(
-                    text = distanceUnitToggleText,
-                    onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit); onCloseDrawer() }
-                )
                 MenuDivider()
 
                 // Section 4: Appearance (Order swapped)

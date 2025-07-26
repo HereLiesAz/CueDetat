@@ -59,6 +59,7 @@ sealed class MainScreenEvent {
     object ApplyPendingExperienceMode : MainScreenEvent()
     data class SetExperienceMode(val mode: ExperienceMode) : MainScreenEvent()
     object UnlockBeginnerView : MainScreenEvent()
+    object LockBeginnerView : MainScreenEvent()
 
 
     // Obstacle Events

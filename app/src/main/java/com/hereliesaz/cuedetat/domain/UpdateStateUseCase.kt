@@ -6,9 +6,11 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.ui.graphics.Color
+import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
+import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import kotlin.math.abs
@@ -76,7 +78,14 @@ class UpdateStateUseCase @Inject constructor(
      * view dimensions, zoom, pan, pitch, or table rotation change.
      */
     private fun updateMatricesAndTransforms(state: OverlayState): OverlayState {
-        val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition)
+        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
+            state.experienceMode,
+            state.isBeginnerViewLocked
+        )
+        val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom)
+        val isPitchApplied =
+            state.experienceMode != ExperienceMode.BEGINNER || !state.isBeginnerViewLocked
+
 
         // Enforce the pan limit here, where we have full context.
         val screenSpaceLimit = (state.table.logicalHeight / 2f) * zoomFactor
@@ -84,7 +93,13 @@ class UpdateStateUseCase @Inject constructor(
         val coercedViewOffset = PointF(state.viewOffset.x, coercedOffsetY)
         val stateWithCoercedPan = state.copy(viewOffset = coercedViewOffset)
 
-        val finalPitchMatrix = createFullMatrix(stateWithCoercedPan, 0f, zoomFactor)
+        val finalPitchMatrix = createFullMatrix(
+            stateWithCoercedPan,
+            0f,
+            zoomFactor,
+            applyPitch = isPitchApplied,
+            orientation = state.currentOrientation
+        )
         val inverseMatrix = Matrix()
         val hasFinalInverse = finalPitchMatrix.invert(inverseMatrix)
 
@@ -92,14 +107,39 @@ class UpdateStateUseCase @Inject constructor(
         val baseRailLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
         val railLiftAmount =
             baseRailLiftAmount * abs(sin(Math.toRadians(stateWithCoercedPan.pitchAngle.toDouble()))).toFloat()
-        val finalRailPitchMatrix = createFullMatrix(stateWithCoercedPan, railLiftAmount, zoomFactor)
+        val finalRailPitchMatrix = createFullMatrix(
+            stateWithCoercedPan,
+            railLiftAmount,
+            zoomFactor,
+            applyPitch = isPitchApplied,
+            orientation = state.currentOrientation
+        )
 
-        val flatMatrix = createFullMatrix(stateWithCoercedPan, 0f, 1f, applyPitch = false)
+        val flatMatrix = createFullMatrix(
+            stateWithCoercedPan,
+            0f,
+            1f,
+            applyPitch = false,
+            orientation = state.currentOrientation
+        )
+        val logicalPlaneMatrix = createFullMatrix(
+            stateWithCoercedPan,
+            0f,
+            zoomFactor,
+            applyPitch = false,
+            orientation = state.currentOrientation
+        )
 
         // Create a separate matrix for size calculation that EXCLUDES world rotation
         // to prevent perspective distortion from affecting the apparent size of objects as they rotate.
         val sizeCalculationMatrix =
-            createFullMatrix(state.copy(worldRotationDegrees = 0f), 0f, zoomFactor)
+            createFullMatrix(
+                state.copy(worldRotationDegrees = 0f),
+                0f,
+                zoomFactor,
+                applyPitch = isPitchApplied,
+                orientation = state.currentOrientation
+            )
 
 
         return stateWithCoercedPan.copy(
@@ -108,7 +148,8 @@ class UpdateStateUseCase @Inject constructor(
             sizeCalculationMatrix = sizeCalculationMatrix,
             inversePitchMatrix = inverseMatrix,
             hasInverseMatrix = hasFinalInverse,
-            flatMatrix = flatMatrix
+            flatMatrix = flatMatrix,
+            logicalPlaneMatrix = logicalPlaneMatrix
         )
     }
 
@@ -127,6 +168,16 @@ class UpdateStateUseCase @Inject constructor(
                 isObstructed = false,
                 isTiltBeyondLimit = false,
                 warningText = null
+            )
+        }
+
+        if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
+            return state.copy(
+                isGeometricallyImpossible = false,
+                isObstructed = false,
+                isTiltBeyondLimit = false,
+                warningText = null,
+                isStraightShot = true // It is always straight in this mode
             )
         }
 
@@ -221,12 +272,13 @@ class UpdateStateUseCase @Inject constructor(
         state: OverlayState,
         lift: Float,
         zoom: Float,
-        applyPitch: Boolean = true
+        applyPitch: Boolean = true,
+        orientation: FullOrientation,
     ): Matrix {
         val camera = Camera()
 
         val perspectiveMatrix = Perspective.createPerspectiveMatrix(
-            currentOrientation = state.currentOrientation,
+            currentOrientation = orientation,
             camera = camera,
             lift = lift,
             applyPitch = applyPitch

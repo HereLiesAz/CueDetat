@@ -6,6 +6,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.ui.ZoomMapping
+import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.TableSize
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -53,9 +54,13 @@ class QuickAlignViewModel @Inject constructor() : ViewModel() {
     }
 
     fun onZoom(zoomFactor: Float) {
+        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
+            ExperienceMode.EXPERT,
+            false
+        ) // Quick Align uses expert mode zoom
         val newZoom = (_alignState.value.zoom * zoomFactor).coerceIn(
-            ZoomMapping.MIN_ZOOM / 2f,
-            ZoomMapping.MAX_ZOOM * 2f
+            minZoom / 2f,
+            maxZoom * 2f
         )
         _alignState.value = _alignState.value.copy(zoom = newZoom)
     }

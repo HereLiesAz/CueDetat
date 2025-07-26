@@ -1,18 +1,22 @@
 package com.hereliesaz.cuedetat.ui.composables
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -48,11 +52,9 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        // Logo and Tagline container
+        // Logo and Tagline container, always centered
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = if (showQuestion) 200.dp else 0.dp), // Pushes content up when questions appear
+            modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -62,16 +64,30 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
                 modifier = Modifier.size(256.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = stringResource(id = R.string.tagline),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
+
+            AnimatedVisibility(
+                visible = !showQuestion,
+                exit = fadeOut(animationSpec = tween(durationMillis = 500))
+            ) {
+                Text(
+                    text = stringResource(id = R.string.tagline),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
 
-        // Bottom question, appears without affecting the logo's position.
-        if (showQuestion) {
+        // Bottom question and buttons, appears from the bottom
+        AnimatedVisibility(
+            visible = showQuestion,
+            modifier = Modifier.fillMaxSize(),
+            enter = fadeIn(animationSpec = tween(durationMillis = 500, delayMillis = 200)) +
+                    slideInVertically(
+                        animationSpec = tween(durationMillis = 500, delayMillis = 200),
+                        initialOffsetY = { it / 2 }
+                    )
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -85,14 +101,14 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
                     color = Color.White,
                     modifier = Modifier.padding(16.dp)
                 )
-                Row(
-                    modifier = Modifier.padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                // Buttons are now in a Column for vertical layout
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(8.dp)
                 ) {
                     QuestionButton("Expert") { onRoleSelected(ExperienceMode.EXPERT) }
-                    Spacer(modifier = Modifier.width(16.dp))
                     QuestionButton("Beginner") { onRoleSelected(ExperienceMode.BEGINNER) }
-                    Spacer(modifier = Modifier.width(16.dp))
                     QuestionButton("Hater") { onRoleSelected(ExperienceMode.HATER) }
                 }
             }
@@ -104,6 +120,7 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
 private fun QuestionButton(label: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
+            .fillMaxWidth(0.6f) // Give the buttons a consistent width
             .clickable { onClick() }
             .background(Color.DarkGray, RoundedCornerShape(12.dp))
             .padding(horizontal = 24.dp, vertical = 12.dp),

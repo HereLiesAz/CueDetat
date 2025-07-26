@@ -20,7 +20,6 @@ class BallTextRenderer {
     fun draw(
         canvas: Canvas,
         paint: Paint,
-        zoomSliderPosition: Float,
         ball: LogicalCircular,
         text: String,
         config: LabelProperties,
@@ -29,7 +28,15 @@ class BallTextRenderer {
         if (!state.areHelpersVisible && !config.isPersistentlyVisible) return
         val matrix = state.pitchMatrix ?: return
 
-        val zoomFactor = ZoomMapping.sliderToZoom(zoomSliderPosition) / ZoomMapping.DEFAULT_ZOOM
+        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
+            state.experienceMode,
+            state.isBeginnerViewLocked
+        )
+        val zoomFactor = ZoomMapping.sliderToZoom(
+            state.zoomSliderPosition,
+            minZoom,
+            maxZoom
+        ) / ZoomMapping.DEFAULT_ZOOM
         val currentTextSize = (baseFontSize * zoomFactor).coerceIn(minFontSize, maxFontSize)
         paint.textSize = currentTextSize
         paint.color = config.color.copy(alpha = config.opacity).toArgb()
