@@ -149,12 +149,12 @@ fun MenuDrawerContent(
                 MenuDivider()
                 // Mode toggle is now at the top of the footer
                 val modeToShow =
-                    uiState.pendingExperienceMode ?: uiState.experienceMode ?: ExperienceMode.EXPERT
+                    uiState.experienceMode ?: ExperienceMode.EXPERT
                 MenuItem(
                     text = "Mode: ${
                         modeToShow.name.lowercase().replaceFirstChar { it.titlecase() }
                     }",
-                    onClick = { onEvent(MainScreenEvent.ToggleExperienceMode) }
+                    onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection); onCloseDrawer() }
                 )
                 MenuItem(
                     text = "About",

@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -122,14 +121,13 @@ private fun QuestionButton(label: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth(0.6f) // Give the buttons a consistent width
             .clickable { onClick() }
-            .background(Color.DarkGray, RoundedCornerShape(12.dp))
             .padding(horizontal = 24.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
             color = Color.White,
-            fontSize = 16.sp
+            fontSize = 24.sp
         )
     }
 }

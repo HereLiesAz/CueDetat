@@ -36,7 +36,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -70,7 +69,6 @@ class MainViewModel @Inject constructor(
     private var isStateLoaded = false
 
     private var orientationDebounceJob: Job? = null
-    private var experienceModeDebounceJob: Job? = null
 
     init {
         // Load persisted state first
@@ -179,6 +177,11 @@ class MainViewModel @Inject constructor(
     fun onEvent(event: MainScreenEvent) {
         if (!isStateLoaded && event !is MainScreenEvent.RestoreState) return // Don't process events until initial state is loaded
 
+        // Side effect: clear warning on any new touch
+        if (event is MainScreenEvent.ScreenGestureStarted && _uiState.value.warningText != null) {
+            onEvent(MainScreenEvent.SetWarning(null))
+        }
+
         viewModelScope.launch {
             val currentState = _uiState.value
 
@@ -206,7 +209,6 @@ class MainViewModel @Inject constructor(
                 is MainScreenEvent.ThemeChanged,
                 is MainScreenEvent.OrientationChanged,
                 is MainScreenEvent.ApplyPendingOrientationLock,
-                is MainScreenEvent.ApplyPendingExperienceMode,
                 is MainScreenEvent.ApplyQuickAlign,
                 is MainScreenEvent.RestoreState -> UpdateType.FULL
 
@@ -237,9 +239,7 @@ class MainViewModel @Inject constructor(
             visionAnalyzer.updateUiState(finalState)
 
             // Check for mode switch to Hater and trigger its reset/entry sequence
-            if ((event is MainScreenEvent.SetExperienceMode && event.mode == ExperienceMode.HATER) ||
-                (event is MainScreenEvent.ApplyPendingExperienceMode && finalState.experienceMode == ExperienceMode.HATER)
-            ) {
+            if (event is MainScreenEvent.SetExperienceMode && event.mode == ExperienceMode.HATER) {
                 _singleEvent.send(SingleEvent.InitiateHaterMode)
             }
 
@@ -297,22 +297,10 @@ class MainViewModel @Inject constructor(
                 }
             }
 
-            is MainScreenEvent.ToggleExperienceMode -> {
-                experienceModeDebounceJob?.cancel()
-                experienceModeDebounceJob = viewModelScope.launch {
-                    delay(1000L)
-                    onEvent(MainScreenEvent.ApplyPendingExperienceMode)
-                }
-            }
-
             is MainScreenEvent.MenuClosed -> {
                 orientationDebounceJob?.cancel()
                 if (state.pendingOrientationLock != null) {
                     onEvent(MainScreenEvent.ApplyPendingOrientationLock)
-                }
-                experienceModeDebounceJob?.cancel()
-                if (state.pendingExperienceMode != null) {
-                    onEvent(MainScreenEvent.ApplyPendingExperienceMode)
                 }
             }
 

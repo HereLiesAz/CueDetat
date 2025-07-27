@@ -8,6 +8,12 @@ import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.ShakeDetector
+import com.kphysics.Body
+import com.kphysics.BodyDef
+import com.kphysics.BodyType
+import com.kphysics.CircleShape
+import com.kphysics.FixtureDef
+import com.kphysics.World
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -34,9 +40,12 @@ class HaterViewModel @Inject constructor(
     val state: StateFlow<HaterState> = _state.asStateFlow()
 
     private var physicsJob: Job? = null
+    private var physicsWorld: World? = null
+    private var triangleBody: Body? = null
 
     init {
-        // Listen for shakes to trigger subsequent responses.
+        initializePhysicsWorld()
+
         shakeDetector.shakeFlow
             .onEach {
                 if (!_state.value.isCooldownActive) {
@@ -45,22 +54,19 @@ class HaterViewModel @Inject constructor(
             }
             .launchIn(viewModelScope)
 
-        // Listen for sensor changes for the floating effect.
         sensorRepository.fullOrientationFlow
             .onEach { orientation ->
-                onEvent(HaterEvent.UpdateSensorOffset(orientation.roll, orientation.pitch))
+                // Directly update the physics world's gravity
+                val gravityX = -orientation.roll * 0.1f
+                val gravityY = orientation.pitch * 0.1f
+                physicsWorld?.setGravity(Offset(gravityX, gravityY))
             }
             .launchIn(viewModelScope)
 
-        // Automatically trigger the first reveal animation on ViewModel creation.
         viewModelScope.launch {
             if (_state.value.isFirstReveal) {
-                // Prime the state with the initial answer.
                 selectAnswer()
-                // Make the UI visible to start the animation.
                 onEvent(HaterEvent.ShowHater)
-
-                // Start a cooldown to prevent an immediate shake from interrupting.
                 _state.value = _state.value.copy(isCooldownActive = true)
                 delay(2500)
                 _state.value = _state.value.copy(isCooldownActive = false)
@@ -69,66 +75,50 @@ class HaterViewModel @Inject constructor(
         startPhysicsLoop()
     }
 
+    private fun initializePhysicsWorld() {
+        physicsWorld = World(gravity = Offset.Zero).apply {
+            // Define world boundaries if the library supports them,
+            // otherwise, we rely on damping.
+        }
+    }
+
     fun onEvent(event: HaterEvent) {
         val currentState = _state.value
         val newState = reducer.reduce(currentState, event)
         _state.value = newState
+
+        if (event is HaterEvent.DragTriangle) {
+            // Apply drag force directly in the ViewModel
+            val forceMagnitude = 5000f // A value to make the drag feel responsive
+            val force = event.delta * forceMagnitude
+            triangleBody?.applyForceToCenter(force)
+        }
     }
 
     private fun startPhysicsLoop() {
         physicsJob?.cancel()
         physicsJob = viewModelScope.launch {
-            var lastTime = System.currentTimeMillis()
+            var lastTime = System.nanoTime()
             while (true) {
-                val currentTime = System.currentTimeMillis()
-                val deltaTime = (currentTime - lastTime) / 1000f // Delta time in seconds
+                val currentTime = System.nanoTime()
+                val deltaTime = (currentTime - lastTime) / 1_000_000_000.0f
                 lastTime = currentTime
 
-                updatePhysics(deltaTime)
+                // Step the physics world
+                physicsWorld?.step(deltaTime, 8, 3)
+
+                // Update UI state from physics body
+                triangleBody?.let { body ->
+                    _state.value = _state.value.copy(
+                        position = body.position,
+                        angle = Math.toDegrees(body.angle.toDouble()).toFloat()
+                    )
+                }
 
                 delay(16) // Aim for ~60 FPS
             }
         }
     }
-
-    private fun updatePhysics(deltaTime: Float) {
-        _state.value = _state.value.let { s ->
-            var (ax, ay) = s.gravity
-
-            if (s.isUserDragging) {
-                // User's touch applies a direct force
-                ax += s.touchForce.x * 2f // Multiply force to make it feel responsive
-                ay += s.touchForce.y * 2f
-            }
-
-            var vx = s.velocity.x + ax
-            var vy = s.velocity.y + ay
-
-            // Apply viscous damping to simulate thick liquid
-            vx *= 0.85f
-            vy *= 0.85f
-
-            var newAngle = s.angle
-            var newAngularVelocity = s.angularVelocity
-
-            if (s.isUserDragging && hypot(s.touchForce.x, s.touchForce.y) > 0.1) {
-                // Pushing off-center creates torque
-                newAngularVelocity += s.touchForce.x * 0.1f
-            }
-
-            newAngularVelocity *= 0.90f // Angular damping
-            newAngle += newAngularVelocity
-
-            s.copy(
-                position = s.position + Offset(vx, vy),
-                velocity = Offset(vx, vy),
-                angle = newAngle,
-                angularVelocity = newAngularVelocity,
-                touchForce = Offset.Zero // Consume the force after applying it
-            )
-        }
-    }
-
 
     private fun triggerHaterSequence() {
         viewModelScope.launch {
@@ -136,7 +126,7 @@ class HaterViewModel @Inject constructor(
 
             if (_state.value.currentAnswer != null) {
                 onEvent(HaterEvent.HideHater)
-                delay(1000) // Wait for submerge animation
+                delay(1000)
             }
 
             selectAnswer()
@@ -144,13 +134,14 @@ class HaterViewModel @Inject constructor(
             onEvent(HaterEvent.ShowHater)
 
             launch {
-                delay(2500) // Cooldown just longer than the full animation
+                delay(2500)
                 _state.value = _state.value.copy(isCooldownActive = false)
             }
         }
     }
 
     private fun selectAnswer() {
+        // ... (existing answer selection logic remains the same)
         val newAnswer: Int
         if (_state.value.isFirstReveal) {
             newAnswer = R.drawable.group0
@@ -171,20 +162,45 @@ class HaterViewModel @Inject constructor(
                     ?: R.drawable.group0
             }
         }
-
         val updatedRecentlyUsed = (_state.value.recentlyUsedAnswers + newAnswer).takeLast(15)
 
         _state.value = _state.value.copy(
             currentAnswer = newAnswer,
             recentlyUsedAnswers = updatedRecentlyUsed,
-            randomRotation = Random.nextFloat() * 90f - 45f, // Subtler rotation
-            // Reset physics state for the new answer
-            position = Offset.Zero,
-            velocity = Offset.Zero,
-            angle = 0f,
-            angularVelocity = 0f,
+            randomRotation = Random.nextFloat() * 90f - 45f,
             gradientStart = Offset(Random.nextFloat(), Random.nextFloat()),
             gradientEnd = Offset(Random.nextFloat(), Random.nextFloat())
         )
+
+        // Create a new physics body for the new answer
+        createTriangleBody()
+    }
+
+    private fun createTriangleBody() {
+        physicsWorld?.let { world ->
+            // Destroy the old body if it exists
+            triangleBody?.let { world.destroyBody(it) }
+
+            // Define the new body
+            val bodyDef = BodyDef(
+                type = BodyType.Dynamic,
+                position = Offset.Zero,
+                angle = 0f,
+                linearDamping = 5.0f,  // High damping for a floaty feel
+                angularDamping = 5.0f
+            )
+            val body = world.createBody(bodyDef)
+
+            // Define its shape and physical properties
+            val shape = CircleShape(radius = 150f) // Using a circle for simpler physics
+            val fixtureDef = FixtureDef(
+                shape = shape,
+                density = 0.5f,
+                friction = 0.3f,
+                restitution = 0.5f // Bounciness
+            )
+            body.createFixture(fixtureDef)
+            triangleBody = body
+        }
     }
 }

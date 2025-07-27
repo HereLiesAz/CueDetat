@@ -31,9 +31,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -346,6 +348,11 @@ fun MainScreen(
                                 modifier = Modifier.zIndex(3f)
                             )
 
+                            ExperienceModeSelectionDialog(
+                                uiState = uiState,
+                                onEvent = mainViewModel::onEvent
+                            )
+
                             LuminanceAdjustmentDialog(
                                 uiState = uiState,
                                 onEvent = mainViewModel::onEvent,
@@ -423,5 +430,44 @@ fun MainScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+fun ExperienceModeSelectionDialog(
+    uiState: OverlayState,
+    onEvent: (MainScreenEvent) -> Unit
+) {
+    if (uiState.showExperienceModeSelection) {
+        AlertDialog(
+            onDismissRequest = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) },
+            title = { Text("Select Experience Mode", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ExperienceMode.entries.forEach { mode ->
+                        TextButton(
+                            onClick = {
+                                onEvent(MainScreenEvent.SetExperienceMode(mode))
+                                onEvent(MainScreenEvent.ToggleExperienceModeSelection)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = mode.name.lowercase().replaceFirstChar { it.titlecase() },
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) }) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        )
     }
 }

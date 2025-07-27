@@ -12,15 +12,13 @@ data class HaterState(
     val isFirstReveal: Boolean = true,
     val isCooldownActive: Boolean = false,
 
-    // Physics Properties
+    // Physics Properties - The engine is the source of truth. These are for rendering.
     val position: Offset = Offset.Zero,
-    val velocity: Offset = Offset.Zero,
     val angle: Float = 0f,
-    val angularVelocity: Float = 0f,
-    val gravity: Offset = Offset.Zero,
-    val touchForce: Offset = Offset.Zero,
-    val isUserDragging: Boolean = false,
 
+    // User Interaction
+    val isUserDragging: Boolean = false,
+    val dragDelta: Offset = Offset.Zero, // Temporary storage for the drag gesture
 
     // Appearance Properties
     val randomRotation: Float = 0f,

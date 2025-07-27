@@ -43,6 +43,7 @@ hilt = "2.57" # Matches plugin version
 # Networking
 retrofit = "3.0.0"
 converterGson = "3.0.0"
+kphysics = "1.0.0"
 
 
 # Plugins
@@ -127,12 +128,12 @@ androidx-benchmark-common = { group = "androidx.benchmark", name = "benchmark-co
 
 androidx-palette = { group = "androidx.palette", name = "palette-ktx", version = "1.0.0" }
 compose-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "composeMaterial3" }
-androidx-animation-core = { group = "androidx.compose.animation", name = "animation-core", version = "1.9.0-beta03" }
 tensorflow-lite-task-vision = { module = "org.tensorflow:tensorflow-lite-task-vision", version = "0.4.4" }
 vision-common = { module = "com.google.mlkit:vision-common", version = "17.3.0" }
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
 androidx-compose-animation-core = { group = "androidx.compose.animation", name = "animation-core", version.ref = "animationCoreVersion" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "roomKtx" }
+kphysics = { group = "com.github.kphysics", name = "kphysics", version.ref = "kphysics" }
 
 
 

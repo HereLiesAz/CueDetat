@@ -173,7 +173,13 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
 
     // Animation
-    implementation(libs.androidx.animation.core)
+    implementation(libs.androidx.compose.animation.core)
+    implementation(libs.kphysics)
+
+    // DataStore for persisting user preferences
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.datastore.preferences.rxjava2) // optional
+    implementation(libs.androidx.datastore.preferences.rxjava3) // optional
 
     // OpenCV for Computer Vision
     implementation(project(":opencv"))
@@ -184,6 +190,9 @@ dependencies {
     implementation(libs.tensorflow.lite.task.vision)
     implementation(libs.object1.detection)
 
+
+
+    implementation(libs.kphysics)
 
     // DataStore for persisting user preferences
     implementation(libs.androidx.datastore.preferences)

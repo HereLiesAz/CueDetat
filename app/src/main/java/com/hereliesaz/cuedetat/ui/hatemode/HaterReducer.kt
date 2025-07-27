@@ -16,20 +16,15 @@ class HaterReducer {
             is HaterEvent.ShowHater -> state.copy(isHaterVisible = true)
             is HaterEvent.HideHater -> state.copy(isHaterVisible = false)
             is HaterEvent.UpdateSensorOffset -> {
-                // The sensor roll translates to X-axis gravity, pitch to Y-axis
-                val gravityX = -event.roll * 0.1f
-                val gravityY = event.pitch * 0.1f
-                state.copy(gravity = Offset(gravityX, gravityY))
+                // This event is now handled directly by the ViewModel to update the physics world's gravity.
+                // No state change is needed here.
+                state
             }
-
             is HaterEvent.DragTriangleStart -> state.copy(isUserDragging = true)
-            is HaterEvent.DragTriangleEnd -> state.copy(
-                isUserDragging = false,
-                touchForce = Offset.Zero
-            )
+            is HaterEvent.DragTriangleEnd -> state.copy(isUserDragging = false, dragDelta = Offset.Zero)
             is HaterEvent.DragTriangle -> {
-                // When dragging, we apply the delta as a direct force
-                state.copy(touchForce = event.delta)
+                // Simply record the delta for the ViewModel to process.
+                state.copy(dragDelta = event.delta)
             }
         }
     }

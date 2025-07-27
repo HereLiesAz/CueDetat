@@ -58,17 +58,8 @@ class ToggleReducer @Inject constructor(private val reducerUtils: ReducerUtils) 
                 )
             }
             is MainScreenEvent.OrientationChanged -> currentState.copy(orientationLock = event.orientationLock)
-            is MainScreenEvent.ToggleExperienceMode -> {
-                val current = currentState.pendingExperienceMode ?: currentState.experienceMode
-                ?: ExperienceMode.EXPERT
-                currentState.copy(pendingExperienceMode = current.next())
-            }
-
-            is MainScreenEvent.ApplyPendingExperienceMode -> {
-                currentState.pendingExperienceMode?.let { newMode ->
-                    val modeAppliedState = handleSetExperienceMode(currentState, newMode)
-                    return modeAppliedState.copy(pendingExperienceMode = null)
-                } ?: currentState
+            is MainScreenEvent.ToggleExperienceModeSelection -> {
+                currentState.copy(showExperienceModeSelection = !currentState.showExperienceModeSelection)
             }
 
             is MainScreenEvent.SetExperienceMode -> handleSetExperienceMode(

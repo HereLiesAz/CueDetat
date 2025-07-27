@@ -55,8 +55,7 @@ sealed class MainScreenEvent {
     object ApplyPendingOrientationLock : MainScreenEvent()
     data class OrientationChanged(val orientationLock: OverlayState.OrientationLock) :
         MainScreenEvent()
-    object ToggleExperienceMode : MainScreenEvent()
-    object ApplyPendingExperienceMode : MainScreenEvent()
+    object ToggleExperienceModeSelection : MainScreenEvent()
     data class SetExperienceMode(val mode: ExperienceMode) : MainScreenEvent()
     object UnlockBeginnerView : MainScreenEvent()
     object LockBeginnerView : MainScreenEvent()
