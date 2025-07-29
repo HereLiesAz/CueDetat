@@ -1,206 +1,144 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/hatemode/HaterViewModel.kt
-
 package com.hereliesaz.cuedetat.ui.hatemode
 
-import androidx.compose.ui.geometry.Offset
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.hereliesaz.cuedetat.R
-import com.hereliesaz.cuedetat.data.SensorRepository
-import com.hereliesaz.cuedetat.data.ShakeDetector
-import com.kphysics.Body
-import com.kphysics.BodyDef
-import com.kphysics.BodyType
-import com.kphysics.CircleShape
-import com.kphysics.FixtureDef
-import com.kphysics.World
-import dagger.hilt.android.lifecycle.HiltViewModel
+import com.github.minigdx.kphysics.Body
+import com.github.minigdx.kphysics.World
+import com.github.minigdx.kphysics.body.BodyDefinition
+import com.github.minigdx.kphysics.body.BodyType
+import com.github.minigdx.kphysics.fixture.FixtureDefinition
+import com.github.minigdx.kphysics.shape.CircleShape
+import com.hereliesaz.cuedetat.domain.CueDetatAction
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import javax.inject.Inject
-import kotlin.math.hypot
-import kotlin.random.Random
+import org.jbox2d.common.Vec2
+import java.util.UUID
 
-@HiltViewModel
-class HaterViewModel @Inject constructor(
-    private val shakeDetector: ShakeDetector,
-    private val sensorRepository: SensorRepository
-) : ViewModel() {
+class HateModeViewModel(
+    private val viewModelScope: CoroutineScope,
+    private val globalDispatch: (CueDetatAction) -> Unit
+) {
 
-    private val reducer = HaterReducer()
-    private val responses = HaterResponses
+    // --- State & Actions ---
+    data class BodyState(
+        val id: String,
+        val x: Float,
+        val y: Float,
+        val angle: Float
+    )
+
+    data class HaterState(
+        val haterText: String = "I hate...",
+        val bodies: List<BodyState> = emptyList()
+    )
+
+    sealed class Action {
+        data class UpdatePhysics(val bodies: List<Body>) : Action()
+        data class SetHaterText(val text: String) : Action()
+    }
 
     private val _state = MutableStateFlow(HaterState())
-    val state: StateFlow<HaterState> = _state.asStateFlow()
+    val state = _state.asStateFlow()
 
+    // --- Physics Engine ---
+    private val world: World
+    private val bodies = mutableMapOf<String, Body>()
     private var physicsJob: Job? = null
-    private var physicsWorld: World? = null
-    private var triangleBody: Body? = null
 
     init {
-        initializePhysicsWorld()
-
-        shakeDetector.shakeFlow
-            .onEach {
-                if (!_state.value.isCooldownActive) {
-                    triggerHaterSequence()
-                }
-            }
-            .launchIn(viewModelScope)
-
-        sensorRepository.fullOrientationFlow
-            .onEach { orientation ->
-                // Directly update the physics world's gravity
-                val gravityX = -orientation.roll * 0.1f
-                val gravityY = orientation.pitch * 0.1f
-                physicsWorld?.setGravity(Offset(gravityX, gravityY))
-            }
-            .launchIn(viewModelScope)
-
-        viewModelScope.launch {
-            if (_state.value.isFirstReveal) {
-                selectAnswer()
-                onEvent(HaterEvent.ShowHater)
-                _state.value = _state.value.copy(isCooldownActive = true)
-                delay(2500)
-                _state.value = _state.value.copy(isCooldownActive = false)
-            }
-        }
-        startPhysicsLoop()
+        // Create a world with no gravity
+        world = World(gravity = Vec2(0f, 0f))
+        startPhysics()
     }
 
-    private fun initializePhysicsWorld() {
-        physicsWorld = World(gravity = Offset.Zero).apply {
-            // Define world boundaries if the library supports them,
-            // otherwise, we rely on damping.
-        }
-    }
-
-    fun onEvent(event: HaterEvent) {
-        val currentState = _state.value
-        val newState = reducer.reduce(currentState, event)
+    fun dispatch(action: Action) {
+        val newState = haterStateReducer(_state.value, action)
         _state.value = newState
-
-        if (event is HaterEvent.DragTriangle) {
-            // Apply drag force directly in the ViewModel
-            val forceMagnitude = 5000f // A value to make the drag feel responsive
-            val force = event.delta * forceMagnitude
-            triangleBody?.applyForceToCenter(force)
-        }
     }
 
-    private fun startPhysicsLoop() {
+    private fun startPhysics() {
         physicsJob?.cancel()
         physicsJob = viewModelScope.launch {
-            var lastTime = System.nanoTime()
             while (true) {
-                val currentTime = System.nanoTime()
-                val deltaTime = (currentTime - lastTime) / 1_000_000_000.0f
-                lastTime = currentTime
-
-                // Step the physics world
-                physicsWorld?.step(deltaTime, 8, 3)
-
-                // Update UI state from physics body
-                triangleBody?.let { body ->
-                    _state.value = _state.value.copy(
-                        position = body.position,
-                        angle = Math.toDegrees(body.angle.toDouble()).toFloat()
-                    )
-                }
-
-                delay(16) // Aim for ~60 FPS
+                world.step(1 / 60f, 8, 3)
+                // Dispatch an update to the global state container
+                val physicsUpdateAction = Action.UpdatePhysics(bodies.values.toList())
+                dispatch(physicsUpdateAction)
+                delay(16) // Roughly 60 FPS
             }
         }
     }
 
-    private fun triggerHaterSequence() {
-        viewModelScope.launch {
-            _state.value = _state.value.copy(isCooldownActive = true)
+    fun addHaterObject(x: Float, y: Float) {
+        val id = UUID.randomUUID().toString()
+        val body = createBody(id, x, y)
+        bodies[id] = body
 
-            if (_state.value.currentAnswer != null) {
-                onEvent(HaterEvent.HideHater)
-                delay(1000)
-            }
-
-            selectAnswer()
-
-            onEvent(HaterEvent.ShowHater)
-
-            launch {
-                delay(2500)
-                _state.value = _state.value.copy(isCooldownActive = false)
-            }
-        }
-    }
-
-    private fun selectAnswer() {
-        // ... (existing answer selection logic remains the same)
-        val newAnswer: Int
-        if (_state.value.isFirstReveal) {
-            newAnswer = R.drawable.group0
-            _state.value = _state.value.copy(
-                isFirstReveal = false,
-                recentlyUsedAnswers = listOf(R.drawable.group0)
-            )
-        } else {
-            val recentlyUsed = _state.value.recentlyUsedAnswers
-            val availableResponses = responses.allResponses.filter { it !in recentlyUsed }
-
-            newAnswer = if (availableResponses.isNotEmpty()) {
-                availableResponses.random()
-            } else {
-                val lastAnswer = recentlyUsed.lastOrNull()
-                _state.value = _state.value.copy(recentlyUsedAnswers = listOfNotNull(lastAnswer))
-                responses.allResponses.filter { it != lastAnswer }.randomOrNull()
-                    ?: R.drawable.group0
-            }
-        }
-        val updatedRecentlyUsed = (_state.value.recentlyUsedAnswers + newAnswer).takeLast(15)
-
-        _state.value = _state.value.copy(
-            currentAnswer = newAnswer,
-            recentlyUsedAnswers = updatedRecentlyUsed,
-            randomRotation = Random.nextFloat() * 90f - 45f,
-            gradientStart = Offset(Random.nextFloat(), Random.nextFloat()),
-            gradientEnd = Offset(Random.nextFloat(), Random.nextFloat())
+        // Apply a random impulse to make it interesting
+        val force = Vec2(
+            (Math.random().toFloat() - 0.5f) * 1000,
+            (Math.random().toFloat() - 0.5f) * 1000
         )
-
-        // Create a new physics body for the new answer
-        createTriangleBody()
+        body.applyForceToCenter(force)
     }
 
-    private fun createTriangleBody() {
-        physicsWorld?.let { world ->
-            // Destroy the old body if it exists
-            triangleBody?.let { world.destroyBody(it) }
-
-            // Define the new body
-            val bodyDef = BodyDef(
-                type = BodyType.Dynamic,
-                position = Offset.Zero,
-                angle = 0f,
-                linearDamping = 5.0f,  // High damping for a floaty feel
-                angularDamping = 5.0f
-            )
-            val body = world.createBody(bodyDef)
-
-            // Define its shape and physical properties
-            val shape = CircleShape(radius = 150f) // Using a circle for simpler physics
-            val fixtureDef = FixtureDef(
-                shape = shape,
-                density = 0.5f,
-                friction = 0.3f,
-                restitution = 0.5f // Bounciness
-            )
-            body.createFixture(fixtureDef)
-            triangleBody = body
+    fun clearAll() {
+        viewModelScope.launch {
+            bodies.values.forEach { body ->
+                world.destroyBody(body)
+            }
+            bodies.clear()
+            dispatch(Action.UpdatePhysics(emptyList()))
         }
+    }
+
+    private fun createBody(id: String, x: Float, y: Float): Body {
+        val bodyDef = BodyDefinition(
+            type = BodyType.DYNAMIC,
+            position = Vec2(x, y)
+        )
+        val body = world.createBody(bodyDef).apply {
+            userData = id
+        }
+
+        val circle = CircleShape(radius = 10f) // Example radius
+        val fixtureDef = FixtureDefinition(
+            shape = circle,
+            density = 0.5f,
+            friction = 0.3f,
+            restitution = 0.5f // Bounciness
+        )
+        body.createFixture(fixtureDef)
+        circle.dispose()
+        return body
+    }
+
+    private fun haterStateReducer(currentState: HaterState, action: Action): HaterState {
+        return when (action) {
+            is Action.UpdatePhysics -> {
+                currentState.copy(
+                    bodies = action.bodies.mapNotNull { body ->
+                        val bodyId = body.userData as? String ?: return@mapNotNull null
+                        BodyState(
+                            id = bodyId,
+                            x = body.position.x,
+                            y = body.position.y,
+                            angle = body.angle
+                        )
+                    }
+                )
+            }
+
+            is Action.SetHaterText -> {
+                currentState.copy(haterText = action.text)
+            }
+        }
+    }
+
+    fun onCleared() {
+        physicsJob?.cancel()
+        world.dispose()
     }
 }

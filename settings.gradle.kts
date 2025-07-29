@@ -29,9 +29,11 @@ dependencyResolutionManagement {
     google()
     mavenCentral()
     mavenLocal()
+    maven(url = "https://jitpack.io") // <--- ADD THIS LINE
   }
 }
 
 rootProject.name = "CueDetat"
 include(":app")
 include(":opencv")
+include(":Dev_Guide")
