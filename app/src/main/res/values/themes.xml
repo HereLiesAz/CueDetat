@@ -1,0 +1,37 @@
+<resources>
+
+    <style name="Theme.CueDetat" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/sulfur_dust</item>
+        <item name="colorOnPrimary">@color/void_black</item>
+        <item name="colorPrimaryContainer">@color/Yellow500</item>
+        <item name="onPrimaryContainer">@color/Yellow100</item>
+        <item name="colorSecondary">@color/monte_carlo</item>
+        <item name="colorOnSecondary">@color/void_black</item>
+        <item name="colorSecondaryContainer">@color/Mint600</item>
+        <item name="onSecondaryContainer">@color/Mint100</item>
+        <item name="colorTertiary">@color/Blue400</item>
+        <item name="colorOnTertiary">@color/void_black</item>
+        <item name="colorTertiaryContainer">@color/Blue600</item>
+        <item name="onTertiaryContainer">@color/Blue100</item>
+        <item name="colorError">@color/warning_red</item>
+        <item name="onError">@color/iced_opal</item>
+        <item name="colorErrorContainer">@color/Red600</item>
+        <item name="onErrorContainer">@color/Red100</item>
+        <item name="android:colorBackground">@color/void_black</item>
+        <item name="colorOnBackground">@color/iced_opal</item>
+        <item name="colorSurface">@color/Gray600</item>
+        <item name="colorOnSurface">@color/iced_opal</item>
+        <item name="colorSurfaceVariant">@color/Gray600</item>
+        <item name="colorOnSurfaceVariant">@color/Gray200</item>
+        <item name="colorOutline">@color/Gray500</item>
+        <item name="colorOutlineVariant">@color/Gray400</item>
+        <item name="colorSurfaceInverse">@color/iced_opal</item>
+        <item name="colorOnSurfaceInverse">@color/void_black</item>
+        <item name="colorPrimaryInverse">@color/Yellow400</item>
+        <item name="colorSurfaceTint">@color/sulfur_dust</item>
+
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>
