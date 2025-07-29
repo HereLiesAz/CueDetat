@@ -116,15 +116,8 @@ android {
 
     buildToolsVersion = "36.0.0"
     ndkVersion = "29.0.13599879 rc2"
-    kotlinOptions {
-        freeCompilerArgs = listOf("-XXLanguage:+PropertyParamAnnotationDefaultTargetMode")
-        jvmTarget = "17"
-        compileOptions {
-            sourceCompatibility = JavaVersion.VERSION_17
-            targetCompatibility = JavaVersion.VERSION_17
-        }
 
-    }
+
 }
 
 //play {
@@ -138,7 +131,6 @@ android {
 //}
 
 dependencies {
-    // Core Android dependencies
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -146,32 +138,71 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.material3) // Consolidating material3 dependencies
+    implementation(libs.material)
+    implementation(libs.androidx.material.icons.extended)
 
+    // Hilt for Dependency Injection
     implementation(libs.hilt.android)
+    implementation(libs.androidx.compose.foundation.layout)
+    implementation(libs.androidx.compose.animation.core)
+    implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.compose.material3)
-    kapt(libs.dagger.hilt.compiler)
+    kapt(libs.hilt.compiler)
+    implementation(libs.androidx.hilt.navigation.compose)
 
-    // KPhysics - The missing physics engine
-    implementation(libs.kphysics)
+    // CameraX
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.androidx.camera.video)
 
-    // Kotlin Coroutines for Flow operators like distinctUntilChanged
-    implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.android)
+    // Retrofit for network calls
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
 
-    // Lifecycle components for ViewModel
-    implementation(libs.androidx.lifecycle.viewmodel.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation("com.google.android.material:material:1.12.0")
+    // Palette API for dynamic colors
+    implementation(libs.androidx.palette)
 
+    // Lifecycle-aware composition
+    implementation(libs.androidx.lifecycle.runtime.compose)
 
-    // Test dependencies
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+    // Animation
+    implementation(libs.androidx.compose.animation.core)
+    implementation(libs.kphysics)
+
+    // DataStore for persisting user preferences
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.datastore.preferences.rxjava2) // optional
+    implementation(libs.androidx.datastore.preferences.rxjava3) // optional
+
+    // OpenCV for Computer Vision
+    implementation(project(":opencv"))
+
+    // ML Kit & TensorFlow
+    implementation(libs.object1.detection.custom)
+    implementation(libs.vision.common)
+    implementation(libs.tensorflow.lite.task.vision)
+    implementation(libs.object1.detection)
+
+
+
+    implementation(libs.kphysics)
+
+    // DataStore for persisting user preferences
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.datastore.preferences.rxjava2) // optional
+    implementation(libs.androidx.datastore.preferences.rxjava3) // optional
+
 }
 
 kapt {

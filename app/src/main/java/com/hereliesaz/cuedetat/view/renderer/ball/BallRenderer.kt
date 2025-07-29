@@ -10,6 +10,8 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.ui.theme.SulfurDust
 import com.hereliesaz.cuedetat.view.PaintCache
@@ -25,15 +27,13 @@ import com.hereliesaz.cuedetat.view.model.LogicalCircular
 import com.hereliesaz.cuedetat.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
-import com.hereliesaz.cuedetat.view.state.ExperienceMode
-import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.hypot
 
 class BallRenderer {
 
     private val textRenderer = BallTextRenderer()
 
-    fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
+    fun draw(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?) {
         if (state.isBankingMode) {
             state.onPlaneBall?.let { bankingBall ->
                 drawGhostedBall(canvas, bankingBall, BankingBall(), state, paints)
@@ -80,7 +80,7 @@ class BallRenderer {
         drawAllLabels(canvas, state, paints, typeface)
     }
 
-    private fun drawBoundingBoxes(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+    private fun drawBoundingBoxes(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
         val visionData = state.visionData ?: return
         if (visionData.detectedBoundingBoxes.isEmpty() || visionData.sourceImageWidth == 0) return
 
@@ -110,7 +110,7 @@ class BallRenderer {
     }
 
 
-    private fun drawProtractorAndActual(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+    private fun drawProtractorAndActual(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
         val protractor = state.protractorUnit
 
         drawGhostedBall(canvas, protractor, TargetBall(), state, paints)
@@ -125,7 +125,13 @@ class BallRenderer {
         }
     }
 
-    private fun drawGhostedBall(canvas: Canvas, ball: LogicalCircular, config: BallsConfig, state: OverlayState, paints: PaintCache) {
+    private fun drawGhostedBall(
+        canvas: Canvas,
+        ball: LogicalCircular,
+        config: BallsConfig,
+        state: CueDetatState,
+        paints: PaintCache
+    ) {
         // Shared paint setup
         val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
             state.experienceMode,
@@ -288,7 +294,12 @@ class BallRenderer {
         }
     }
 
-    private fun drawAllLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
+    private fun drawAllLabels(
+        canvas: Canvas,
+        state: CueDetatState,
+        paints: PaintCache,
+        typeface: Typeface?
+    ) {
         val textPaint = paints.textPaint.apply { this.typeface = typeface }
 
         state.onPlaneBall?.let {

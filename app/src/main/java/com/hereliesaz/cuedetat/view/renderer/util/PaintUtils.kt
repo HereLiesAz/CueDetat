@@ -6,7 +6,7 @@ import android.graphics.BlurMaskFilter
 import android.graphics.Paint
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import kotlin.math.abs
 
 /**
@@ -20,14 +20,14 @@ import kotlin.math.abs
  * @param baseGlowColor The default color of the glow when the Glow Stick
  *    is not active.
  * @param baseGlowWidth The stroke width for the glow.
- * @param state The current OverlayState, used to check for the Glow Stick
+ * @param state The current CueDetatState, used to check for the Glow Stick
  *    value.
  * @return A configured Paint object ready for drawing a glow.
  */
 fun createGlowPaint(
     baseGlowColor: Color,
     baseGlowWidth: Float,
-    state: OverlayState,
+    state: CueDetatState,
 ): Paint {
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE

@@ -62,7 +62,21 @@ class VisionRepository @Inject constructor(
 
             genericObjectDetector.process(inputImage)
                 .addOnSuccessListener { detectedObjects ->
-                    val mat = imageProxyToMat(imageProxy)
+                    val unrotatedMat = imageProxyToMat(imageProxy)
+                    // --- FIX: Rotate the Mat to match the InputImage orientation BEFORE processing ---
+                    val mat = Mat()
+                    val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+                    when (rotationDegrees) {
+                        90 -> Core.rotate(unrotatedMat, mat, Core.ROTATE_90_CLOCKWISE)
+                        180 -> Core.rotate(unrotatedMat, mat, Core.ROTATE_180)
+                        270 -> Core.rotate(unrotatedMat, mat, Core.ROTATE_90_COUNTERCLOCKWISE)
+                        else -> mat = unrotatedMat // No rotation needed
+                    }
+                    if (mat != unrotatedMat) {
+                        unrotatedMat.release() // Release the original if we created a new one
+                    }
+                    // --- END FIX ---
+
                     val hsvMat = Mat()
                     Imgproc.cvtColor(mat, hsvMat, Imgproc.COLOR_BGR2HSV)
 
@@ -148,32 +162,6 @@ class VisionRepository @Inject constructor(
                         null
                     }
 
-                    // --- FIX: Rotate the mask to match the display orientation ---
-                    val finalCvMask = if (cvMask != null) {
-                        val rotationDegrees = imageProxy.imageInfo.rotationDegrees
-                        if (rotationDegrees == 0) {
-                            cvMask
-                        } else {
-                            val rotatedMask = Mat()
-                            val rotateCode = when (rotationDegrees) {
-                                90 -> Core.ROTATE_90_CLOCKWISE
-                                180 -> Core.ROTATE_180
-                                270 -> Core.ROTATE_90_COUNTERCLOCKWISE
-                                else -> -1 // Invalid, won't rotate
-                            }
-                            if (rotateCode != -1) {
-                                Core.rotate(cvMask, rotatedMask, rotateCode)
-                                cvMask.release() // Release the original un-rotated mask
-                                rotatedMask      // The rotated mask is now the final one
-                            } else {
-                                cvMask // Fallback to the original if rotation code is invalid
-                            }
-                        }
-                    } else {
-                        null
-                    }
-                    // --- END FIX ---
-
                     val filteredDetectedObjects = detectedObjects.filter {
                         val box = it.boundingBox
                         val expectedRadius = getExpectedRadiusAtImageY(
@@ -213,7 +201,7 @@ class VisionRepository @Inject constructor(
                         genericBalls = filteredBalls,
                         detectedHsvColor = hsvTuple?.first ?: hsv,
                         detectedBoundingBoxes = filteredDetectedObjects.map { it.boundingBox },
-                        cvMask = finalCvMask,
+                        cvMask = cvMask, // The mask is now correctly oriented
                         sourceImageWidth = inputImage.width,
                         sourceImageHeight = inputImage.height
                     )
@@ -224,7 +212,6 @@ class VisionRepository @Inject constructor(
                             detectedHsvColor = hsvTuple.first,
                         )
                     }
-
 
                     mat.release()
                     hsvMat.release()
@@ -282,7 +269,6 @@ class VisionRepository @Inject constructor(
             )
         }
 
-
         roiMat.release()
 
         return refinedCenterInRoi?.let {
@@ -296,20 +282,17 @@ class VisionRepository @Inject constructor(
         imageToScreenMatrix: Matrix
     ): Float {
         val pitchMatrix = state.pitchMatrix
-        if (!state.hasInverseMatrix || pitchMatrix == null) return LOGICAL_BALL_RADIUS // A fallback
+        if (!state.hasInverseMatrix || pitchMatrix == null) return LOGICAL_BALL_RADIUS
 
-        // 1. Convert image Y to screen Y
         val point = floatArrayOf(0f, imageY)
         imageToScreenMatrix.mapPoints(point)
         val screenY = point[1]
 
-        // 2. Define logical points for interpolation range
         val logicalTopY = if (state.table.isVisible) -state.table.logicalHeight / 2f else -200f
         val logicalBottomY = if (state.table.isVisible) state.table.logicalHeight / 2f else 200f
         val logicalTop = PointF(0f, logicalTopY)
         val logicalBottom = PointF(0f, logicalBottomY)
 
-        // 3. Get screen space info for these points
         val screenTopInfo = DrawingUtils.getPerspectiveRadiusAndLift(
             logicalTop,
             LOGICAL_BALL_RADIUS,
@@ -325,7 +308,6 @@ class VisionRepository @Inject constructor(
         val screenTopY = DrawingUtils.mapPoint(logicalTop, pitchMatrix).y
         val screenBottomY = DrawingUtils.mapPoint(logicalBottom, pitchMatrix).y
 
-        // 4. Interpolate to find expected screen radius at the given screen Y
         val rangeY = screenBottomY - screenTopY
         if (abs(rangeY) < 1f) return screenBottomInfo.radius
 
@@ -333,7 +315,6 @@ class VisionRepository @Inject constructor(
         val interpolatedRadius =
             screenTopInfo.radius + fraction * (screenBottomInfo.radius - screenTopInfo.radius)
 
-        // 5. Convert expected screen radius back to image coordinate space radius
         val values = FloatArray(9)
         imageToScreenMatrix.getValues(values)
         val scaleY = values[Matrix.MSCALE_Y]
@@ -402,17 +383,17 @@ class VisionRepository @Inject constructor(
     ): PointF? {
         val gray = Mat()
         Imgproc.cvtColor(roiMat, gray, Imgproc.COLOR_BGR2GRAY)
-        Imgproc.medianBlur(gray, gray, 5) // Hough is sensitive to noise
+        Imgproc.medianBlur(gray, gray, 5)
 
         val circles = Mat()
         Imgproc.HoughCircles(
             gray,
             circles,
             Imgproc.HOUGH_GRADIENT,
-            1.0, // dp: inverse ratio of accumulator resolution
-            roiMat.rows().toDouble() / 8, // minDist
-            houghP1, // param1: Canny higher threshold
-            houghP2, // param2: accumulator threshold
+            1.0,
+            roiMat.rows().toDouble() / 8,
+            houghP1,
+            houghP2,
             minRadius.toInt(),
             maxRadius.toInt()
         )
@@ -430,16 +411,6 @@ class VisionRepository @Inject constructor(
         return center
     }
 
-    /**
-     * Converts a YUV_420_888 ImageProxy to a BGR Mat.
-     *
-     * This function is optimized to avoid intermediate byte array copies for
-     * the common NV21 format by creating Mat headers that point directly to
-     * the image plane buffers.
-     *
-     * @param imageProxy The ImageProxy from CameraX.
-     * @return A BGR Mat.
-     */
     @SuppressLint("UnsafeOptInUsageError")
     private fun imageProxyToMat(imageProxy: ImageProxy): Mat {
         val image = imageProxy.image ?: return Mat()
@@ -449,17 +420,13 @@ class VisionRepository @Inject constructor(
 
         val bgrMat = Mat()
 
-        // Y plane
         val yPlane = planes[0]
         val yBuffer = yPlane.buffer
         val yMat = Mat(height, width, CvType.CV_8UC1, yBuffer, yPlane.rowStride.toLong())
 
-        // U and V planes. In YUV_420_888, the U/V planes might be interleaved (NV21) or planar (I420).
         val uPlane = planes[1]
         val vPlane = planes[2]
 
-        // Check for NV21 format (interleaved UV plane). This is the most common format from CameraX.
-        // In NV21, the V plane's buffer is the one that contains the interleaved VU data.
         if (vPlane.pixelStride == 2) {
             val uvBuffer = vPlane.buffer
             val uvMat =
@@ -467,13 +434,11 @@ class VisionRepository @Inject constructor(
             Imgproc.cvtColorTwoPlane(yMat, uvMat, bgrMat, Imgproc.COLOR_YUV2BGR_NV21)
             uvMat.release()
         } else {
-            // Fallback for planar formats like I420. This path is less efficient as it requires a copy.
             val ySize = yPlane.buffer.remaining()
             val uSize = uPlane.buffer.remaining()
             val vSize = vPlane.buffer.remaining()
             val data = ByteArray(ySize + uSize + vSize)
 
-            // Order for I420 is Y, then U, then V.
             yPlane.buffer.get(data, 0, ySize)
             uPlane.buffer.get(data, ySize, uSize)
             vPlane.buffer.get(data, ySize + uSize, vSize)

@@ -7,11 +7,11 @@ import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.config.ui.LabelProperties
-import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -22,7 +22,7 @@ class LineTextRenderer {
     private val maxFontSize = 70f
     enum class RailType { TOP, BOTTOM, LEFT, RIGHT }
 
-    private fun getDynamicFontSize(baseSize: Float, state: OverlayState): Float {
+    private fun getDynamicFontSize(baseSize: Float, state: CueDetatState): Float {
         val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
             state.experienceMode,
             state.isBeginnerViewLocked
@@ -43,7 +43,7 @@ class LineTextRenderer {
         distanceFromOrigin: Float,
         config: LabelProperties,
         paint: Paint,
-        state: OverlayState
+        state: CueDetatState
     ) {
         val matrix = state.pitchMatrix ?: return
         val textAngleRadians = Math.toRadians((angleDegrees - 90).toDouble())
@@ -68,7 +68,12 @@ class LineTextRenderer {
         canvas.restore()
     }
 
-    fun drawProtractorLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
+    fun drawProtractorLabels(
+        canvas: Canvas,
+        state: CueDetatState,
+        paints: PaintCache,
+        typeface: Typeface?
+    ) {
         val textPaint = paints.textPaint.apply { this.typeface = typeface }
         textPaint.textSize = getDynamicFontSize(38f, state)
         val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
@@ -159,7 +164,7 @@ class LineTextRenderer {
         canvas: Canvas,
         point: PointF,
         railType: RailType,
-        state: OverlayState,
+        state: CueDetatState,
         paint: Paint,
         padding: Float
     ) {
@@ -206,7 +211,11 @@ class LineTextRenderer {
     }
 
 
-    private fun calculateDiamondNumber(point: PointF, railType: RailType, state: OverlayState): String? {
+    private fun calculateDiamondNumber(
+        point: PointF,
+        railType: RailType,
+        state: CueDetatState
+    ): String? {
         val table = state.table
         if (!table.isVisible || table.logicalWidth <= 0 || table.logicalHeight <= 0) return null
 
@@ -235,7 +244,12 @@ class LineTextRenderer {
         return String.format("%.1f", diamondValue)
     }
 
-    fun drawBankingLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?){
+    fun drawBankingLabels(
+        canvas: Canvas,
+        state: CueDetatState,
+        paints: PaintCache,
+        typeface: Typeface?
+    ) {
         // This function is deprecated as its logic has been moved to LineRenderer, which has access to the necessary helper functions.
     }
 }

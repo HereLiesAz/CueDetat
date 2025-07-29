@@ -33,20 +33,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.hereliesaz.cuedetat.data.VisionAnalyzer
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.CueDetatAction
+import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
 import com.hereliesaz.cuedetat.view.model.Table
-import com.hereliesaz.cuedetat.view.state.ExperienceMode
-import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.TableSize
 
 @Composable
 fun QuickAlignScreen(
-    uiState: OverlayState,
+    uiState: CueDetatState,
     analyzer: VisionAnalyzer,
-    onEvent: (MainScreenEvent) -> Unit,
+    onEvent: (CueDetatAction) -> Unit,
     viewModel: QuickAlignViewModel = hiltViewModel()
 ) {
     val currentStep by viewModel.currentStep.collectAsState()
@@ -81,7 +81,7 @@ fun QuickAlignScreen(
 @Composable
 private fun SizeSelectionStep(
     viewModel: QuickAlignViewModel,
-    onEvent: (MainScreenEvent) -> Unit
+    onEvent: (CueDetatAction) -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -106,7 +106,7 @@ private fun SizeSelectionStep(
             }
         }
         Spacer(modifier = Modifier.height(32.dp))
-        TextButton(onClick = { onEvent(MainScreenEvent.ToggleQuickAlignScreen) }) {
+        TextButton(onClick = { onEvent(CueDetatAction.ToggleQuickAlignScreen) }) {
             Text("Cancel")
         }
     }
@@ -114,9 +114,9 @@ private fun SizeSelectionStep(
 
 @Composable
 private fun AlignmentStep(
-    uiState: OverlayState,
+    uiState: CueDetatState,
     viewModel: QuickAlignViewModel,
-    onEvent: (MainScreenEvent) -> Unit,
+    onEvent: (CueDetatAction) -> Unit,
     photo: android.graphics.Bitmap
 ) {
     val alignState by viewModel.alignState.collectAsState()
@@ -190,13 +190,13 @@ private fun AlignmentStep(
                 }
                 TextButton(onClick = {
                     viewModel.onFinishAlign(alignUiState.viewWidth, alignUiState.viewHeight)
-                    onEvent(MainScreenEvent.ToggleQuickAlignScreen)
+                    onEvent(CueDetatAction.ToggleQuickAlignScreen)
                 }) {
                     Text("Finish")
                 }
                 TextButton(onClick = {
                     viewModel.onCancel()
-                    onEvent(MainScreenEvent.ToggleQuickAlignScreen)
+                    onEvent(CueDetatAction.ToggleQuickAlignScreen)
                 }) {
                     Text("Cancel")
                 }

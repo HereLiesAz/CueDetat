@@ -1,0 +1,18 @@
+ninja: Entering directory `G:\My Drive\CueDetat\opencv\.cxx\Debug\5v552x38\x86'
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetat/opencv/.cxx/Debug/5v552x38/x86
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetat/opencv/.cxx/Debug/5v552x38/x86
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetat/opencv/.cxx/Debug/5v552x38/x86
+[0/1] Re-running CMake...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: G:/My Drive/CueDetat/opencv/.cxx/Debug/5v552x38/x86
+ninja: no work to do.

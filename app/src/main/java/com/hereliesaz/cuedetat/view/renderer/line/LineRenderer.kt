@@ -11,6 +11,8 @@ import android.graphics.Shader
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.ui.theme.SulfurDust
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.PaintCache
@@ -25,8 +27,6 @@ import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.config.ui.ProtractorGuides
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
-import com.hereliesaz.cuedetat.view.state.ExperienceMode
-import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -36,7 +36,12 @@ class LineRenderer {
     private val textRenderer = LineTextRenderer()
     private val protractorAngles = floatArrayOf(10f, 20f, 30f, 40f, 50f, 60f, 70f, 80f)
 
-    fun drawLogicalLines(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
+    fun drawLogicalLines(
+        canvas: Canvas,
+        state: CueDetatState,
+        paints: PaintCache,
+        typeface: Typeface?
+    ) {
         if (state.isBankingMode) {
             drawBankingLines(canvas, state, paints)
         } else {
@@ -46,7 +51,7 @@ class LineRenderer {
     }
 
     private fun drawProtractorLines(
-        canvas: Canvas, state: OverlayState,
+        canvas: Canvas, state: CueDetatState,
         paints: PaintCache, typeface: Typeface?
     ) {
         val shotLineAnchor = state.shotLineAnchor ?: return
@@ -70,9 +75,7 @@ class LineRenderer {
 
         val shotGuideDirection = normalize(PointF(ghostCueCenter.x - shotLineAnchor.x, ghostCueCenter.y - shotLineAnchor.y))
 
-        // Only draw the wide pathways if there's something to obstruct
         if (state.table.isVisible || state.obstacleBalls.isNotEmpty()) {
-            // --- Pass 1: Wide Pathways ---
             if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
                 // Do not draw shot guide line pathway in locked beginner mode
             } else {
@@ -87,7 +90,6 @@ class LineRenderer {
                 )
             }
 
-
             state.aimingLineBankPath?.let {
                 drawBankablePath(
                     canvas,
@@ -101,8 +103,6 @@ class LineRenderer {
             }
         }
 
-
-        // --- Pass 2 & 3: Glows and Core Lines (Combined) ---
         if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
             // Do not draw shot guide line in locked beginner mode
         } else {
@@ -125,7 +125,7 @@ class LineRenderer {
         }
     }
 
-    private fun drawAimingLines(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+    private fun drawAimingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
         val aimingLineConfig = AimingLine()
         val isPocketed = state.aimedPocketIndex != null
 
@@ -155,7 +155,7 @@ class LineRenderer {
     }
 
 
-    private fun drawTangentLines(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+    private fun drawTangentLines(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
         val tangentLineConfig = TangentLine()
         val isPocketed = state.tangentAimedPocketIndex != null
         val baseTangentColor = if (isPocketed) WarningRed else tangentLineConfig.strokeColor
@@ -238,7 +238,7 @@ class LineRenderer {
     }
 
 
-    private fun drawSpinPaths(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+    private fun drawSpinPaths(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
         val paths = state.spinPaths ?: return
         if (paths.isEmpty()) return
 
@@ -272,7 +272,7 @@ class LineRenderer {
         }
     }
 
-    private fun drawBankingLines(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+    private fun drawBankingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
         val path = state.bankShotPath ?: return
         if (path.size < 2) return
 
@@ -325,7 +325,7 @@ class LineRenderer {
         }
     }
 
-    private fun drawProtractorGuides(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+    private fun drawProtractorGuides(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
         val targetCenter = state.protractorUnit.center
         val config = ProtractorGuides()
@@ -357,7 +357,7 @@ class LineRenderer {
         primaryPaint: Paint,
         glowPaint: Paint?,
         isPocketed: Boolean,
-        state: OverlayState,
+        state: CueDetatState,
         paints: PaintCache
     ) {
         if (path.size < 2) return
@@ -389,7 +389,15 @@ class LineRenderer {
     }
 
 
-    private fun drawAngleGuide(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint, state: OverlayState, paints: PaintCache) {
+    private fun drawAngleGuide(
+        canvas: Canvas,
+        center: PointF,
+        referencePoint: PointF,
+        angleDegrees: Float,
+        paint: Paint,
+        state: CueDetatState,
+        paints: PaintCache
+    ) {
         val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)
         val finalAngleRad = initialAngleRad + Math.toRadians(angleDegrees.toDouble())
 
@@ -403,7 +411,7 @@ class LineRenderer {
         direction: PointF,
         paint: Paint,
         glowPaint: Paint?,
-        state: OverlayState,
+        state: CueDetatState,
         paints: PaintCache
     ) {
         val tableLength = state.table.logicalHeight

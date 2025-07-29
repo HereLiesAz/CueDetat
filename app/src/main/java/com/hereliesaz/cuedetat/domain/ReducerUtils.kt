@@ -3,23 +3,20 @@
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
-import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import javax.inject.Singleton
-
-const val LOGICAL_BALL_RADIUS = 25f
 
 @Singleton
 class ReducerUtils @Inject constructor() {
 
     fun getDefaultTargetBallPosition(): PointF = PointF(0f, 0f)
 
-    fun getDefaultCueBallPosition(state: OverlayState): PointF {
+    fun getDefaultCueBallPosition(state: CueDetatState): PointF {
         val headSpotY = state.table.logicalHeight / 4f // Relative to table center
         return PointF(0f, headSpotY)
     }
 
-    fun snapViolatingBalls(state: OverlayState): OverlayState {
+    fun snapViolatingBalls(state: CueDetatState): CueDetatState {
         if (!state.table.isVisible) return state
 
         var updatedState = state

@@ -1,80 +1,67 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ControlReducer.kt
-
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
-import com.hereliesaz.cuedetat.domain.ReducerUtils
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.CueDetatAction
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.ui.ZoomMapping
-import com.hereliesaz.cuedetat.view.state.OverlayState
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class ControlReducer @Inject constructor(private val reducerUtils: ReducerUtils) {
-
-    fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
-        return when (event) {
-            is MainScreenEvent.ZoomSliderChanged -> handleZoomSliderChanged(currentState, event)
-            is MainScreenEvent.ZoomScaleChanged -> handleZoomScaleChanged(currentState, event)
-            is MainScreenEvent.TableRotationApplied -> currentState.copy(
-                worldRotationDegrees = currentState.worldRotationDegrees + event.degrees,
-                valuesChangedSinceReset = true
-            )
-
-            is MainScreenEvent.TableRotationChanged -> currentState.copy(
-                worldRotationDegrees = event.degrees,
-                valuesChangedSinceReset = true
-            )
-            is MainScreenEvent.AdjustLuminance -> currentState.copy(luminanceAdjustment = event.adjustment.coerceIn(-0.4f, 0.4f), valuesChangedSinceReset = true)
-            is MainScreenEvent.AdjustGlow -> currentState.copy(glowStickValue = event.value.coerceIn(-1f, 1f), valuesChangedSinceReset = true)
-            is MainScreenEvent.PanView -> handlePanView(currentState, event)
-            is MainScreenEvent.ApplyQuickAlign -> handleApplyQuickAlign(currentState, event)
-            else -> currentState
+internal fun reduceControlAction(state: CueDetatState, action: CueDetatAction): CueDetatState {
+    return when (action) {
+        is CueDetatAction.ZoomSliderChanged -> {
+            val newSliderPos = action.position.coerceIn(-50f, 50f)
+            state.copy(zoomSliderPosition = newSliderPos, valuesChangedSinceReset = true)
         }
-    }
 
-    private fun handleApplyQuickAlign(
-        currentState: OverlayState,
-        event: MainScreenEvent.ApplyQuickAlign
-    ): OverlayState {
-        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(currentState.experienceMode)
-        val newZoomSliderPos = ZoomMapping.zoomToSlider(event.scale, minZoom, maxZoom)
+        is CueDetatAction.ZoomScaleChanged -> {
+            val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode)
+            val oldZoomSliderPos = state.zoomSliderPosition
+            val currentZoomValue = ZoomMapping.sliderToZoom(oldZoomSliderPos, minZoom, maxZoom)
+            val newZoomValue = (currentZoomValue * action.scaleFactor).coerceIn(minZoom, maxZoom)
+            val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue, minZoom, maxZoom)
+            state.copy(zoomSliderPosition = newSliderPos, valuesChangedSinceReset = true)
+        }
 
-        return currentState.copy(
-            viewOffset = PointF(event.translation.x, event.translation.y),
-            worldRotationDegrees = event.rotation,
-            zoomSliderPosition = newZoomSliderPos,
-            isWorldLocked = true,
+        is CueDetatAction.TableRotationApplied -> state.copy(
+            worldRotationDegrees = state.worldRotationDegrees + action.degrees,
             valuesChangedSinceReset = true
         )
-    }
 
-    private fun handlePanView(currentState: OverlayState, event: MainScreenEvent.PanView): OverlayState {
-        val currentOffset = currentState.viewOffset
-        // The reducer simply applies the delta. The UseCase will enforce limits.
-        val newY = currentOffset.y + event.delta.y
-        val newX = currentOffset.x + event.delta.x
-        return currentState.copy(viewOffset = PointF(newX, newY))
-    }
-
-    private fun handleZoomSliderChanged(currentState: OverlayState, event: MainScreenEvent.ZoomSliderChanged): OverlayState {
-        val newSliderPos = event.position.coerceIn(-50f, 50f)
-        return currentState.copy(
-            zoomSliderPosition = newSliderPos,
+        is CueDetatAction.TableRotationChanged -> state.copy(
+            worldRotationDegrees = action.degrees,
             valuesChangedSinceReset = true
         )
-    }
 
-    private fun handleZoomScaleChanged(currentState: OverlayState, event: MainScreenEvent.ZoomScaleChanged): OverlayState {
-        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(currentState.experienceMode)
-        val oldZoomSliderPos = currentState.zoomSliderPosition
-        val currentZoomValue = ZoomMapping.sliderToZoom(oldZoomSliderPos, minZoom, maxZoom)
-        val newZoomValue = (currentZoomValue * event.scaleFactor).coerceIn(minZoom, maxZoom)
-        val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue, minZoom, maxZoom)
-        return currentState.copy(
-            zoomSliderPosition = newSliderPos,
+        is CueDetatAction.AdjustLuminance -> state.copy(
+            luminanceAdjustment = action.adjustment.coerceIn(
+                -0.4f,
+                0.4f
+            ), valuesChangedSinceReset = true
+        )
+
+        is CueDetatAction.AdjustGlow -> state.copy(
+            glowStickValue = action.value.coerceIn(-1f, 1f),
             valuesChangedSinceReset = true
         )
+
+        is CueDetatAction.PanView -> {
+            val currentOffset = state.viewOffset
+            val newY = currentOffset.y + action.delta.y
+            val newX = currentOffset.x + action.delta.x
+            state.copy(viewOffset = PointF(newX, newY))
+        }
+
+        is CueDetatAction.ApplyQuickAlign -> {
+            val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode)
+            val newZoomSliderPos = ZoomMapping.zoomToSlider(action.scale, minZoom, maxZoom)
+            state.copy(
+                viewOffset = PointF(action.translation.x, action.translation.y),
+                worldRotationDegrees = action.rotation,
+                zoomSliderPosition = newZoomSliderPos,
+                isWorldLocked = true,
+                valuesChangedSinceReset = true
+            )
+        }
+
+        else -> state
     }
 }

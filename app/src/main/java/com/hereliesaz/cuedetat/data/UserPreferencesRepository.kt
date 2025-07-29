@@ -8,7 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -34,15 +34,12 @@ class UserPreferencesRepository @Inject constructor(
         val DIST_COEFFS_JSON = stringPreferencesKey("dist_coeffs_json")
     }
 
-    val stateFlow: Flow<OverlayState?> = dataStore.data
+    val stateFlow: Flow<CueDetatState?> = dataStore.data
         .map { preferences ->
             preferences[PreferencesKeys.STATE_JSON]?.let { jsonString ->
                 try {
-                    // Deserialization can result in nulls for newly added non-nullable fields
-                    // if the saved JSON is from an older version of the app.
-                    var deserializedState = gson.fromJson(jsonString, OverlayState::class.java)
+                    var deserializedState = gson.fromJson(jsonString, CueDetatState::class.java)
 
-                    // Sanitize the state to handle data migration issues gracefully.
                     deserializedState?.let { state ->
                         if (state.tutorialHighlight == null) {
                             deserializedState =
@@ -51,7 +48,6 @@ class UserPreferencesRepository @Inject constructor(
                         deserializedState
                     }
                 } catch (e: Exception) {
-                    // Handle potential deserialization errors, e.g., after a state class change
                     null
                 }
             }
@@ -82,11 +78,8 @@ class UserPreferencesRepository @Inject constructor(
         }
 
 
-    suspend fun saveState(state: OverlayState) {
+    suspend fun saveState(state: CueDetatState) {
         dataStore.edit { preferences ->
-            // Create a copy of the state but explicitly nullify the experienceMode.
-            // This ensures that on every fresh app start, the user is prompted to select a mode.
-            // The mode selection itself is only ever held in the in-memory state.
             val stateToSave = state.copy(experienceMode = null)
             val jsonString = gson.toJson(stateToSave)
             preferences[PreferencesKeys.STATE_JSON] = jsonString

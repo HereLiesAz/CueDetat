@@ -8,6 +8,7 @@ import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.ui.theme.MonteCarlo
 import com.hereliesaz.cuedetat.view.PaintCache
@@ -16,7 +17,6 @@ import com.hereliesaz.cuedetat.view.config.table.Rail
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
-import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlin.math.pow
 
 class RailRenderer {
@@ -26,7 +26,7 @@ class RailRenderer {
     private val diamondConfig = Diamonds()
     private val textRenderer = LineTextRenderer()
 
-    fun draw(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
+    fun draw(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?) {
         if (!state.table.isVisible || state.table.corners.size < 4) return
 
         val railLinePaint = paints.tableOutlinePaint
@@ -157,7 +157,12 @@ class RailRenderer {
         canvas.drawPath(path, paint)
     }
 
-    fun drawRailLabels(canvas: Canvas, state: OverlayState, paints: PaintCache, typeface: Typeface?) {
+    fun drawRailLabels(
+        canvas: Canvas,
+        state: CueDetatState,
+        paints: PaintCache,
+        typeface: Typeface?
+    ) {
         val matrix = state.railPitchMatrix ?: return
         val referenceRadius = DrawingUtils.getPerspectiveRadiusAndLift(
             state.protractorUnit.center, state.protractorUnit.radius, state, matrix
@@ -215,7 +220,7 @@ class RailRenderer {
         }
     }
 
-    private fun getRailForPoint(point: PointF, state: OverlayState): LineTextRenderer.RailType? {
+    private fun getRailForPoint(point: PointF, state: CueDetatState): LineTextRenderer.RailType? {
         val table = state.table
         if (!table.isVisible) return null
 

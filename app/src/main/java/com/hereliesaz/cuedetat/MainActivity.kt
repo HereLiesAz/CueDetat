@@ -26,17 +26,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
 import com.hereliesaz.cuedetat.data.CalibrationRepository
-import com.hereliesaz.cuedetat.ui.MainScreen
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.CueDetatAction
+import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.ui.MainViewModel
+import com.hereliesaz.cuedetat.ui.ProtractorScreen
 import com.hereliesaz.cuedetat.ui.composables.SplashScreen
 import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
 import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
+import com.hereliesaz.cuedetat.ui.hatemode.HaterScreen
 import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
-import com.hereliesaz.cuedetat.view.state.ExperienceMode
-import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SingleEvent
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.launchIn
@@ -46,8 +47,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-
-    private val mainViewModel: MainViewModel by viewModels()
+    private val viewModel: MainViewModel by viewModels()
     private val calibrationViewModel: CalibrationViewModel by viewModels()
     private val quickAlignViewModel: QuickAlignViewModel by viewModels()
     private val haterViewModel: HaterViewModel by viewModels()
@@ -60,15 +60,7 @@ class MainActivity : ComponentActivity() {
     private val requestCameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             if (isGranted) {
-                setContent {
-                    AppContent(
-                        mainViewModel,
-                        calibrationViewModel,
-                        quickAlignViewModel,
-                        haterViewModel,
-                        calibrationAnalyzer
-                    )
-                }
+                recreate() // Recreate the activity to initialize content
             } else {
                 // Heresy is not tolerated. The user will comply or they will not use the app.
             }
@@ -83,13 +75,7 @@ class MainActivity : ComponentActivity() {
         when {
             hasCameraPermission() -> {
                 setContent {
-                    AppContent(
-                        mainViewModel,
-                        calibrationViewModel,
-                        quickAlignViewModel,
-                        haterViewModel,
-                        calibrationAnalyzer
-                    )
+                    AppContent()
                 }
             }
             else -> {
@@ -100,28 +86,27 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun observeSingleEvents() {
-        mainViewModel.singleEvent.onEach { event ->
+        viewModel.singleEvent.onEach { event ->
             when (event) {
                 is SingleEvent.OpenUrl -> {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
                     startActivity(intent)
-                    mainViewModel.onEvent(MainScreenEvent.SingleEventConsumed)
+                    viewModel.onEvent(CueDetatAction.SingleEventConsumed)
                 }
                 is SingleEvent.SendFeedbackEmail -> {
                     val intent = Intent(Intent.ACTION_SENDTO).apply {
-                        data = Uri.parse("mailto:") // Only email apps should handle this
+                        data = Uri.parse("mailto:")
                         putExtra(Intent.EXTRA_EMAIL, arrayOf(event.email))
                         putExtra(Intent.EXTRA_SUBJECT, event.subject)
                     }
                     if (intent.resolveActivity(packageManager) != null) {
                         startActivity(intent)
                     }
-                    mainViewModel.onEvent(MainScreenEvent.SingleEventConsumed)
+                    viewModel.onEvent(CueDetatAction.SingleEventConsumed)
                 }
-
                 is SingleEvent.InitiateHaterMode -> {
                     haterViewModel.onEvent(HaterEvent.EnterHaterMode)
-                    mainViewModel.onEvent(MainScreenEvent.SingleEventConsumed)
+                    viewModel.onEvent(CueDetatAction.SingleEventConsumed)
                 }
                 null -> { /* Do nothing */ }
             }
@@ -129,21 +114,14 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun AppContent(
-        mainViewModel: MainViewModel,
-        calibrationViewModel: CalibrationViewModel,
-        quickAlignViewModel: QuickAlignViewModel,
-        haterViewModel: HaterViewModel,
-        calibrationAnalyzer: CalibrationAnalyzer
-    ) {
-        val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
+    private fun AppContent() {
+        val uiState by viewModel.uiState.collectAsStateWithLifecycle()
         val showSplashScreen = uiState.experienceMode == null
         var haterModeLockedOrientation by rememberSaveable { mutableStateOf(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) }
 
         LaunchedEffect(uiState.experienceMode, uiState.orientationLock) {
             if (uiState.experienceMode == ExperienceMode.HATER) {
                 if (haterModeLockedOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
-                    // Lock to the current orientation upon entering Hater Mode
                     haterModeLockedOrientation = when (resources.configuration.orientation) {
                         Configuration.ORIENTATION_LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                         else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -151,12 +129,11 @@ class MainActivity : ComponentActivity() {
                 }
                 requestedOrientation = haterModeLockedOrientation
             } else {
-                // Not in Hater Mode, so reset the lock and use the user's preference
                 haterModeLockedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                 requestedOrientation = when (uiState.orientationLock) {
-                    OverlayState.OrientationLock.AUTOMATIC -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                    OverlayState.OrientationLock.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                    OverlayState.OrientationLock.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                    CueDetatState.OrientationLock.AUTOMATIC -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    CueDetatState.OrientationLock.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                    CueDetatState.OrientationLock.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                 }
             }
         }
@@ -164,20 +141,33 @@ class MainActivity : ComponentActivity() {
         CueDetatTheme(luminanceAdjustment = uiState.luminanceAdjustment) {
             if (showSplashScreen) {
                 SplashScreen(onRoleSelected = { selectedMode ->
-                    mainViewModel.onEvent(MainScreenEvent.SetExperienceMode(selectedMode))
+                    // Explicitly cast or ensure selectedMode is of the correct type before dispatching
+                    val action = when (selectedMode) {
+                        is ExperienceMode -> CueDetatAction.SetExperienceMode(
+                            selectedMode
+                        )
+
+                        else -> TODO("Handle or throw error for unexpected type")
+                    }
+                    viewModel.onEvent(action)
                 })
             } else {
                 val currentAppControlColorScheme = MaterialTheme.colorScheme
                 LaunchedEffect(currentAppControlColorScheme) {
-                    mainViewModel.onEvent(MainScreenEvent.ThemeChanged(currentAppControlColorScheme))
+                    viewModel.onEvent(CueDetatAction.ThemeChanged(currentAppControlColorScheme))
                 }
-                MainScreen(
-                    mainViewModel = mainViewModel,
-                    calibrationViewModel = calibrationViewModel,
-                    quickAlignViewModel = quickAlignViewModel,
-                    haterViewModel = haterViewModel,
-                    calibrationAnalyzer = calibrationAnalyzer
-                )
+
+                when (uiState.experienceMode) {
+                    ExperienceMode.HATER -> HaterScreen(haterViewModel)
+                    else -> { // EXPERT and BEGINNER modes share the main screen
+                        ProtractorScreen(
+                            mainViewModel = viewModel,
+                            calibrationViewModel = calibrationViewModel,
+                            quickAlignViewModel = quickAlignViewModel,
+                            calibrationAnalyzer = calibrationAnalyzer
+                        )
+                    }
+                }
             }
         }
     }

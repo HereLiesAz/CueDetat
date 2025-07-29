@@ -1,68 +1,60 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ActionReducer.kt
-
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
+import com.hereliesaz.cuedetat.domain.CueDetatAction
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.ReducerUtils
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
-import com.hereliesaz.cuedetat.view.state.OverlayState
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class ActionReducer @Inject constructor(private val reducerUtils: ReducerUtils) {
-    fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
-        return when (event) {
-            is MainScreenEvent.Reset -> handleReset(currentState)
-            else -> currentState
+internal fun reduceAction(
+    state: CueDetatState,
+    action: CueDetatAction,
+    reducerUtils: ReducerUtils
+): CueDetatState {
+    return when (action) {
+        is CueDetatAction.Reset -> {
+            state.preResetState?.let {
+                return it.copy(
+                    preResetState = null,
+                    obstacleBalls = emptyList(),
+                    isWorldLocked = false
+                )
+            }
+
+            val stateToSave = state.copy()
+            val initialSliderPos = 0f
+            val targetBallCenter = reducerUtils.getDefaultTargetBallPosition()
+            val cueBallCenter = reducerUtils.getDefaultCueBallPosition(state)
+
+            val newProtractorUnit = ProtractorUnit(
+                center = targetBallCenter,
+                radius = LOGICAL_BALL_RADIUS,
+                rotationDegrees = 0f
+            )
+            val newOnPlaneBall = if (state.onPlaneBall != null) {
+                OnPlaneBall(center = cueBallCenter, radius = LOGICAL_BALL_RADIUS)
+            } else {
+                null
+            }
+
+            state.copy(
+                protractorUnit = newProtractorUnit,
+                onPlaneBall = newOnPlaneBall,
+                obstacleBalls = emptyList(),
+                zoomSliderPosition = initialSliderPos,
+                worldRotationDegrees = 0f,
+                bankingAimTarget = null,
+                valuesChangedSinceReset = false,
+                preResetState = stateToSave,
+                hasCueBallBeenMoved = false,
+                hasTargetBallBeenMoved = false,
+                isWorldLocked = false,
+                viewOffset = PointF(0f, 0f)
+            )
         }
-    }
 
-    private fun handleReset(currentState: OverlayState): OverlayState {
-        // If a pre-reset state exists, revert to it.
-        currentState.preResetState?.let {
-            // Also clear any obstacles that may have been added after the save
-            return it.copy(preResetState = null, obstacleBalls = emptyList(), isWorldLocked = false)
-        }
-
-        // Otherwise, this is the first press. Save the current positional state.
-        val stateToSave = currentState.copy()
-
-        // Create the default positional state based on the logical origin.
-        val initialSliderPos = 0f
-
-        // The default positions are always relative to the logical table, even if not visible.
-        val targetBallCenter = reducerUtils.getDefaultTargetBallPosition()
-        val cueBallCenter = reducerUtils.getDefaultCueBallPosition(currentState)
-
-        val newProtractorUnit = ProtractorUnit(
-            center = targetBallCenter,
-            radius = LOGICAL_BALL_RADIUS,
-            rotationDegrees = 0f
-        )
-        val newOnPlaneBall = if (currentState.onPlaneBall != null) {
-            OnPlaneBall(center = cueBallCenter, radius = LOGICAL_BALL_RADIUS)
-        } else {
-            null
-        }
-
-        // Reset only positional and rotational properties, preserving toggles
-        return currentState.copy(
-            protractorUnit = newProtractorUnit,
-            onPlaneBall = newOnPlaneBall,
-            obstacleBalls = emptyList(), // Clear obstacles on reset
-            zoomSliderPosition = initialSliderPos,
-            worldRotationDegrees = 0f,
-            bankingAimTarget = null,
-            valuesChangedSinceReset = false,
-            preResetState = stateToSave,
-            hasCueBallBeenMoved = false,
-            hasTargetBallBeenMoved = false,
-            isWorldLocked = false, // Also unlock the world on reset
-            viewOffset = PointF(0f, 0f) // Also reset pan
-        )
+        else -> state
     }
 }

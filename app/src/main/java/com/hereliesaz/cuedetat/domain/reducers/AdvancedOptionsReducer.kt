@@ -1,57 +1,58 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/AdvancedOptionsReducer.kt
-
 package com.hereliesaz.cuedetat.domain.reducers
 
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
-import com.hereliesaz.cuedetat.view.state.OverlayState
-import javax.inject.Inject
-import javax.inject.Singleton
+import com.hereliesaz.cuedetat.domain.CueDetatAction
+import com.hereliesaz.cuedetat.domain.CueDetatState
 
-@Singleton
-class AdvancedOptionsReducer @Inject constructor() {
-    fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
-        return when (event) {
-            is MainScreenEvent.ToggleAdvancedOptionsDialog -> {
-                val isOpening = !currentState.showAdvancedOptionsDialog
-                if (!isOpening) {
-                    currentState.copy(
-                        showAdvancedOptionsDialog = false,
-                        showCvMask = false,
-                        isTestingCvMask = false,
-                        isCalibratingColor = false
-                    )
-                } else {
-                    currentState.copy(showAdvancedOptionsDialog = true)
-                }
+internal fun reduceAdvancedOptionsAction(
+    state: CueDetatState,
+    action: CueDetatAction
+): CueDetatState {
+    return when (action) {
+        is CueDetatAction.ToggleAdvancedOptionsDialog -> {
+            val isOpening = !state.showAdvancedOptionsDialog
+            if (!isOpening) {
+                state.copy(
+                    showAdvancedOptionsDialog = false,
+                    showCvMask = false,
+                    isTestingCvMask = false,
+                    isCalibratingColor = false
+                )
+            } else {
+                state.copy(showAdvancedOptionsDialog = true)
             }
-            is MainScreenEvent.ToggleCvMask -> currentState.copy(showCvMask = !currentState.showCvMask)
-            is MainScreenEvent.EnterCvMaskTestMode -> currentState.copy(
-                isTestingCvMask = true,
-                showCvMask = true,
-                showAdvancedOptionsDialog = false
-            )
-            is MainScreenEvent.ExitCvMaskTestMode -> currentState.copy(
-                isTestingCvMask = false,
-                showCvMask = true, // Keep mask on, but return to dialog
-                showAdvancedOptionsDialog = true
-            )
-            is MainScreenEvent.EnterCalibrationMode -> currentState.copy(
-                isCalibratingColor = true,
-                showAdvancedOptionsDialog = false,
-                showCvMask = false
-            )
-            is MainScreenEvent.SampleColorAt -> currentState.copy(
-                colorSamplePoint = event.screenPosition,
-                isCalibratingColor = false,
-                isTestingCvMask = true, // Immediately go into test mode after sampling
-                showCvMask = true
-            )
-            is MainScreenEvent.ToggleCvRefinementMethod -> currentState.copy(cvRefinementMethod = currentState.cvRefinementMethod.next())
-            is MainScreenEvent.UpdateHoughP1 -> currentState.copy(houghP1 = event.value)
-            is MainScreenEvent.UpdateHoughP2 -> currentState.copy(houghP2 = event.value)
-            is MainScreenEvent.UpdateCannyT1 -> currentState.copy(cannyThreshold1 = event.value)
-            is MainScreenEvent.UpdateCannyT2 -> currentState.copy(cannyThreshold2 = event.value)
-            else -> currentState
         }
+
+        is CueDetatAction.ToggleCvMask -> state.copy(showCvMask = !state.showCvMask)
+        is CueDetatAction.EnterCvMaskTestMode -> state.copy(
+            isTestingCvMask = true,
+            showCvMask = true,
+            showAdvancedOptionsDialog = false
+        )
+
+        is CueDetatAction.ExitCvMaskTestMode -> state.copy(
+            isTestingCvMask = false,
+            showCvMask = true,
+            showAdvancedOptionsDialog = true
+        )
+
+        is CueDetatAction.EnterCalibrationMode -> state.copy(
+            isCalibratingColor = true,
+            showAdvancedOptionsDialog = false,
+            showCvMask = false
+        )
+
+        is CueDetatAction.SampleColorAt -> state.copy(
+            colorSamplePoint = action.screenPosition,
+            isCalibratingColor = false,
+            isTestingCvMask = true,
+            showCvMask = true
+        )
+
+        is CueDetatAction.ToggleCvRefinementMethod -> state.copy(cvRefinementMethod = state.cvRefinementMethod.next())
+        is CueDetatAction.UpdateHoughP1 -> state.copy(houghP1 = action.value)
+        is CueDetatAction.UpdateHoughP2 -> state.copy(houghP2 = action.value)
+        is CueDetatAction.UpdateCannyT1 -> state.copy(cannyThreshold1 = action.value)
+        is CueDetatAction.UpdateCannyT2 -> state.copy(cannyThreshold2 = action.value)
+        else -> state
     }
 }

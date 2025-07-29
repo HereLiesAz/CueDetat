@@ -1,7 +1,7 @@
 // app/src/main/java/com/hereliesaz/cuedetat/ui/ZoomMapping.kt
 package com.hereliesaz.cuedetat.ui
 
-import com.hereliesaz.cuedetat.view.state.ExperienceMode
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import kotlin.math.ln
 import kotlin.math.pow
 

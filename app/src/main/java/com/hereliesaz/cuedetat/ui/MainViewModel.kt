@@ -1,71 +1,194 @@
 package com.hereliesaz.cuedetat.ui
 
+import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hereliesaz.cuedetat.data.GithubRepository
+import com.hereliesaz.cuedetat.data.SensorRepository
+import com.hereliesaz.cuedetat.data.ShakeDetector
+import com.hereliesaz.cuedetat.data.UserPreferencesRepository
+import com.hereliesaz.cuedetat.data.VisionAnalyzer
+import com.hereliesaz.cuedetat.data.VisionRepository
 import com.hereliesaz.cuedetat.domain.CueDetatAction
-import com.hereliesaz.cuedetat.domain.ExperienceMode
-import com.hereliesaz.cuedetat.domain.OverlayState
+import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ReducerUtils
+import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
+import com.hereliesaz.cuedetat.domain.UpdateType
 import com.hereliesaz.cuedetat.domain.stateReducer
-import com.hereliesaz.cuedetat.ui.hatemode.HateModeViewModel
-import kotlinx.coroutines.channels.Channel
+import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
+import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
+import com.hereliesaz.cuedetat.view.model.Perspective
+import com.hereliesaz.cuedetat.view.state.SingleEvent
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.consumeAsFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-// The overall state of the application UI
-data class CueDetatState(
-    val experienceMode: ExperienceMode = ExperienceMode.NORMAL,
-    val overlay: OverlayState = OverlayState.None,
-    val haterState: HateModeViewModel.HaterState = HateModeViewModel.HaterState()
-)
+@HiltViewModel
+class MainViewModel @Inject constructor(
+    private val reducerUtils: ReducerUtils,
+    private val updateStateUseCase: UpdateStateUseCase,
+    private val sensorRepository: SensorRepository,
+    private val githubRepository: GithubRepository,
+    private val userPreferencesRepository: UserPreferencesRepository,
+    private val shakeDetector: ShakeDetector,
+    visionRepository: VisionRepository
+) : ViewModel() {
 
-class MainViewModel : ViewModel() {
+    private val _uiState = MutableStateFlow(CueDetatState())
+    val uiState = _uiState.asStateFlow()
 
-    // A channel for receiving actions from the UI.
-    // Using a channel ensures that all actions are processed sequentially.
-    private val actionChannel = Channel<CueDetatAction>(Channel.UNLIMITED)
+    private val _singleEvent = MutableSharedFlow<SingleEvent?>()
+    val singleEvent = _singleEvent.asSharedFlow()
 
-    // The single source of truth for the UI state.
-    private val _state = MutableStateFlow(CueDetatState())
-    val state = _state.asStateFlow()
-
-    // Sub-ViewModel for Hater Mode logic
-    private val haterViewModel = HateModeViewModel(viewModelScope, ::dispatch)
+    val visionAnalyzer: VisionAnalyzer = VisionAnalyzer(visionRepository)
+    private val haterViewModel = HaterViewModel()
 
     init {
-        // Launch a coroutine to process actions from the channel.
+        // Restore previous state or initialize
         viewModelScope.launch {
-            actionChannel.consumeAsFlow().collect { action ->
-                val newState = stateReducer(_state.value, action)
-                _state.value = newState
+            val savedState = userPreferencesRepository.stateFlow.first()
+            val initialState = savedState ?: CueDetatState()
+            processAndEmitState(initialState, UpdateType.FULL)
+        }
+
+        // Collect sensor data
+        viewModelScope.launch {
+            sensorRepository.fullOrientationFlow.collect { orientation ->
+                onEvent(CueDetatAction.FullOrientationChanged(orientation))
             }
         }
 
-        // Observe changes in Hater Mode state and dispatch updates
+        // Collect shake events for Hater Mode
         viewModelScope.launch {
-            haterViewModel.state.distinctUntilChanged().collect { haterState ->
-                // This check prevents an infinite loop of state updates.
-                // We only update the main state if the hater sub-state has actually changed.
-                if (_state.value.haterState != haterState) {
-                    _state.value = _state.value.copy(haterState = haterState)
+            shakeDetector.shakeFlow.collect {
+                if (_uiState.value.experienceMode == com.hereliesaz.cuedetat.domain.ExperienceMode.HATER) {
+                    haterViewModel.onEvent(HaterEvent.ShowHater)
                 }
+            }
+        }
+
+        // Forward vision data to the reducer
+        viewModelScope.launch {
+            visionRepository.visionDataFlow.collect { visionData ->
+                onEvent(CueDetatAction.CvDataUpdated(visionData))
             }
         }
     }
 
-    /**
-     * Dispatches an action to be processed. This is the only way to trigger a
-     * state change from the UI.
-     */
-    fun dispatch(action: CueDetatAction) {
+    fun onEvent(event: CueDetatAction) {
         viewModelScope.launch {
-            // Special handling for HaterMode actions to delegate to the sub-viewmodel
-            if (action is CueDetatAction.HaterAction) {
-                haterViewModel.dispatch(action.action)
-            } else {
-                actionChannel.send(action)
+            val currentState = _uiState.value
+
+            // Convert screen gestures to logical gestures before reducing
+            val logicalEvent = when (event) {
+                is CueDetatAction.ScreenGestureStarted -> {
+                    val logicalPoint = Perspective.screenToLogical(
+                        event.position,
+                        currentState.inversePitchMatrix ?: return@launch
+                    )
+                    CueDetatAction.LogicalGestureStarted(
+                        logicalPoint,
+                        Offset(event.position.x, event.position.y)
+                    )
+                }
+
+                is CueDetatAction.Drag -> {
+                    val prevLogical = Perspective.screenToLogical(
+                        event.previousPosition,
+                        currentState.inversePitchMatrix ?: return@launch
+                    )
+                    val currLogical = Perspective.screenToLogical(
+                        event.currentPosition,
+                        currentState.inversePitchMatrix ?: return@launch
+                    )
+                    val screenDelta = Offset(
+                        event.currentPosition.x - event.previousPosition.x,
+                        event.currentPosition.y - event.previousPosition.y
+                    )
+                    CueDetatAction.LogicalDragApplied(prevLogical, currLogical, screenDelta)
+                }
+
+                else -> event
+            }
+
+            // Reduce the state
+            val reducedState = stateReducer(currentState, logicalEvent, reducerUtils)
+
+            // Determine the required update type
+            val updateType = determineUpdateType(currentState, reducedState, logicalEvent)
+
+            // Run use case for derived state and emit
+            processAndEmitState(reducedState, updateType)
+
+            // Handle single events that don't change state
+            handleSingleEvents(logicalEvent)
+        }
+    }
+
+    private fun processAndEmitState(state: CueDetatState, type: UpdateType) {
+        val derivedState = updateStateUseCase(state, type)
+        _uiState.value = derivedState
+        visionAnalyzer.updateUiState(derivedState)
+
+        // Save state to disk if it has changed meaningfully
+        if (type != UpdateType.SPIN_ONLY) { // Don't save for every little spin change
+            viewModelScope.launch {
+                userPreferencesRepository.saveState(derivedState)
+            }
+        }
+    }
+
+    private fun determineUpdateType(
+        oldState: CueDetatState,
+        newState: CueDetatState,
+        event: CueDetatAction
+    ): UpdateType {
+        return when (event) {
+            is CueDetatAction.SizeChanged, is CueDetatAction.ZoomScaleChanged, is CueDetatAction.ZoomSliderChanged,
+            is CueDetatAction.PanView, is CueDetatAction.FullOrientationChanged, is CueDetatAction.TableRotationChanged,
+            is CueDetatAction.TableRotationApplied, is CueDetatAction.SetExperienceMode, is CueDetatAction.ToggleBankingMode,
+            is CueDetatAction.SetTableSize, is CueDetatAction.RestoreState -> UpdateType.FULL
+
+            is CueDetatAction.Reset, is CueDetatAction.LogicalGestureStarted, is CueDetatAction.LogicalDragApplied,
+            is CueDetatAction.GestureEnded, is CueDetatAction.AddObstacleBall -> UpdateType.AIMING
+
+            is CueDetatAction.SpinApplied -> UpdateType.SPIN_ONLY
+
+            else -> UpdateType.AIMING // Default to aiming for most other toggles
+        }
+    }
+
+    private fun handleSingleEvents(event: CueDetatAction) {
+        viewModelScope.launch {
+            when (event) {
+                is CueDetatAction.CheckForUpdate -> {
+                    githubRepository.getLatestVersionName()
+                    // This logic would be expanded to show a dialog
+                }
+
+                is CueDetatAction.ViewArt -> _singleEvent.emit(SingleEvent.OpenUrl("https://herelies.az"))
+                is CueDetatAction.ViewAboutPage -> _singleEvent.emit(SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat"))
+                is CueDetatAction.SendFeedback -> _singleEvent.emit(
+                    SingleEvent.SendFeedbackEmail(
+                        "dev@herelies.az",
+                        "Cue d'Etat Feedback"
+                    )
+                )
+
+                is CueDetatAction.SingleEventConsumed -> _singleEvent.emit(null)
+                is CueDetatAction.SetExperienceMode -> {
+                    if (event.mode == com.hereliesaz.cuedetat.domain.ExperienceMode.HATER) {
+                        _singleEvent.emit(SingleEvent.InitiateHaterMode)
+                    }
+                }
+
+                else -> { /* Do nothing for state-changing events */
+                }
             }
         }
     }

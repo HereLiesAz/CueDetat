@@ -9,8 +9,6 @@ import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
-import com.hereliesaz.cuedetat.view.state.ExperienceMode
-import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -44,16 +42,7 @@ class UpdateStateUseCase @Inject constructor(
     private val distanceReferenceConstant = 1200f
     private val lineExtensionFactor = 5000f
 
-    /**
-     * The main entry point for updating the derived state.
-     *
-     * @param state The current state after being processed by a reducer.
-     * @param type The type of update to perform, determining which
-     *    calculations are necessary.
-     * @return A new state object with all derived properties recalculated as
-     *    needed.
-     */
-    operator fun invoke(state: OverlayState, type: UpdateType): OverlayState {
+    operator fun invoke(state: CueDetatState, type: UpdateType): CueDetatState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
         val stateAfterMatrices = if (type == UpdateType.FULL) {
@@ -71,12 +60,7 @@ class UpdateStateUseCase @Inject constructor(
         return updateSpinCalculations(stateAfterAiming)
     }
 
-    /**
-     * Recalculates all perspective and projection matrices. This is the
-     * most expensive part of the update and should only be run when
-     * view dimensions, zoom, pan, pitch, or table rotation change.
-     */
-    private fun updateMatricesAndTransforms(state: OverlayState): OverlayState {
+    private fun updateMatricesAndTransforms(state: CueDetatState): CueDetatState {
         val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
             state.experienceMode,
             state.isBeginnerViewLocked
@@ -85,8 +69,6 @@ class UpdateStateUseCase @Inject constructor(
         val isPitchApplied =
             state.experienceMode != ExperienceMode.BEGINNER || !state.isBeginnerViewLocked
 
-
-        // Enforce the pan limit here, where we have full context.
         val screenSpaceLimit = (state.table.logicalHeight / 2f) * zoomFactor
         val coercedOffsetY = state.viewOffset.y.coerceIn(-screenSpaceLimit, screenSpaceLimit)
         val coercedViewOffset = PointF(state.viewOffset.x, coercedOffsetY)
@@ -139,8 +121,6 @@ class UpdateStateUseCase @Inject constructor(
             createFullMatrix(stateWithCoercedPan, zoomFactor, logicalPlanePerspectiveMatrix)
 
 
-        // Create a separate matrix for size calculation that EXCLUDES world rotation
-        // to prevent perspective distortion from affecting the apparent size of objects as they rotate.
         val sizeCalculationPerspectiveMatrix =
             Perspective.createPerspectiveMatrix(
                 currentOrientation = state.currentOrientation,
@@ -164,17 +144,12 @@ class UpdateStateUseCase @Inject constructor(
         )
     }
 
-    /**
-     * Recalculates all aiming-related properties: shot possibility,
-     * obstructions, line paths, banking, etc. Assumes matrices are up-to-date.
-     */
-    private fun updateAimingCalculations(state: OverlayState): OverlayState {
+    private fun updateAimingCalculations(state: CueDetatState): CueDetatState {
         if (state.isBankingMode) {
             val bankResult = calculateBankShot(state)
             return state.copy(
                 bankShotPath = bankResult.path,
                 pocketedBankShotPocketIndex = bankResult.pocketedPocketIndex,
-                // Reset protractor-mode-specific flags
                 isGeometricallyImpossible = false,
                 isObstructed = false,
                 isTiltBeyondLimit = false,
@@ -188,12 +163,11 @@ class UpdateStateUseCase @Inject constructor(
                 isObstructed = false,
                 isTiltBeyondLimit = false,
                 warningText = null,
-                isStraightShot = true // It is always straight in this mode
+                isStraightShot = true
             )
         }
 
-        val logicalShotLineAnchor =
-            getLogicalShotLineAnchor(state) ?: return state // Can't aim without an anchor
+        val logicalShotLineAnchor = getLogicalShotLineAnchor(state) ?: return state
 
         val isTiltBeyondLimit =
             !state.isBankingMode && logicalShotLineAnchor.y <= state.protractorUnit.ghostCueBallCenter.y
@@ -210,7 +184,6 @@ class UpdateStateUseCase @Inject constructor(
             state.protractorUnit.center
         )
         val isObstructed = checkForObstructions(state)
-        // HERESY CORRECTED: Use the final pitchMatrix for distance calculation.
         val targetBallDistance = calculateDistance(state, state.pitchMatrix ?: Matrix())
         val shotGuideImpactPoint = if (state.table.isVisible && !state.isBankingMode) {
             calculateShotGuideImpact(state, useShotGuideLine = true)
@@ -266,11 +239,7 @@ class UpdateStateUseCase @Inject constructor(
         )
     }
 
-    /**
-     * Recalculates only the spin path visualization. This is the least
-     * expensive update.
-     */
-    private fun updateSpinCalculations(state: OverlayState): OverlayState {
+    private fun updateSpinCalculations(state: CueDetatState): CueDetatState {
         val spinPaths: Map<Color, List<PointF>> = if (!state.isBankingMode) {
             calculateSpinPaths(state)
         } else {
@@ -280,14 +249,11 @@ class UpdateStateUseCase @Inject constructor(
     }
 
     private fun createFullMatrix(
-        state: OverlayState,
+        state: CueDetatState,
         zoom: Float,
-        perspectiveMatrix: Matrix,
+        perspectiveMatrix: Matrix
     ): Matrix {
-        val worldMatrix = Matrix().apply {
-            postScale(zoom, zoom)
-        }
-
+        val worldMatrix = Matrix().apply { postScale(zoom, zoom) }
         val finalMatrix = Matrix()
         finalMatrix.set(worldMatrix)
         finalMatrix.postConcat(perspectiveMatrix)
@@ -295,23 +261,25 @@ class UpdateStateUseCase @Inject constructor(
             (state.viewWidth / 2f) + state.viewOffset.x,
             (state.viewHeight / 2f) + state.viewOffset.y
         )
-
         return finalMatrix
     }
 
-    private fun calculateDistance(state: OverlayState, matrix: Matrix): Float {
+    private fun calculateDistance(state: CueDetatState, matrix: Matrix): Float {
         val (logicalCenter, logicalRadius) = if (state.isBankingMode && state.onPlaneBall != null) {
             state.onPlaneBall.center to state.onPlaneBall.radius
         } else {
             state.protractorUnit.center to state.protractorUnit.radius
         }
         val screenRadius = DrawingUtils.getPerspectiveRadiusAndLift(
-            logicalCenter, logicalRadius, state, matrix
+            logicalCenter,
+            logicalRadius,
+            state,
+            matrix
         ).radius
         return if (screenRadius > 0) distanceReferenceConstant / screenRadius else 0f
     }
 
-    private fun getLogicalShotLineAnchor(state: OverlayState): PointF? {
+    private fun getLogicalShotLineAnchor(state: CueDetatState): PointF? {
         state.onPlaneBall?.let { return it.center }
         val inverseMatrix = state.inversePitchMatrix ?: return null
         val screenAnchor = PointF(state.viewWidth / 2f, state.viewHeight.toFloat())
@@ -345,7 +313,7 @@ class UpdateStateUseCase @Inject constructor(
         if (angleDiff > Math.PI) {
             angleDiff = (2 * Math.PI - angleDiff).toFloat()
         }
-        return angleDiff < 0.01 // Use a small tolerance in radians for collinearity
+        return angleDiff < 0.01
     }
 
     private fun getExtendedLinePath(start: PointF, end: PointF): List<PointF> {
@@ -365,13 +333,12 @@ class UpdateStateUseCase @Inject constructor(
     private fun calculateAimAndBank(
         start: PointF,
         end: PointF,
-        state: OverlayState
+        state: CueDetatState
     ): Triple<List<PointF>, Int?, PointF> {
         val (directPocketIndex, directIntersection) = checkPocketAim(start, end, state)
         if (directPocketIndex != null && directIntersection != null) {
             return Triple(listOf(start, directIntersection), directPocketIndex, directIntersection)
         }
-
         val bankPath = calculateSingleBank(start, end, state)
         if (bankPath.size > 2) {
             val (bankedPocketIndex, bankedIntersection) = checkPocketAim(
@@ -393,25 +360,21 @@ class UpdateStateUseCase @Inject constructor(
     private fun checkPocketAim(
         start: PointF,
         end: PointF,
-        state: OverlayState
+        state: CueDetatState
     ): Pair<Int?, PointF?> {
         val dirX = end.x - start.x
         val dirY = end.y - start.y
         val mag = sqrt(dirX * dirX + dirY * dirY)
         if (mag < 0.001f) return Pair(null, null)
-
         val extendedEnd = PointF(
             start.x + dirX / mag * lineExtensionFactor,
             start.y + dirY / mag * lineExtensionFactor
         )
-
         val pockets = state.table.pockets
         val pocketRadius = state.protractorUnit.radius * 1.8f
-
         var closestIntersection: PointF? = null
         var closestPocketIndex: Int? = null
         var minDistanceSq = Float.MAX_VALUE
-
         pockets.forEachIndexed { index, pocket ->
             val intersection = getLineCircleIntersection(start, extendedEnd, pocket, pocketRadius)
             if (intersection != null) {
@@ -433,7 +396,7 @@ class UpdateStateUseCase @Inject constructor(
     }
 
     private fun calculateShotGuideImpact(
-        state: OverlayState,
+        state: CueDetatState,
         useShotGuideLine: Boolean = false
     ): PointF? {
         val p1 = if (useShotGuideLine) state.shotLineAnchor
@@ -441,43 +404,40 @@ class UpdateStateUseCase @Inject constructor(
         val p2 = state.protractorUnit.ghostCueBallCenter
         val dirX = p2.x - p1.x
         val dirY = p2.y - p1.y
-
         return state.table.findRailIntersectionAndNormal(
             p1,
             PointF(p1.x + dirX * 5000f, p1.y + dirY * 5000f)
         )?.first
     }
 
-    private fun calculateSingleBank(start: PointF, end: PointF, state: OverlayState): List<PointF> {
+    private fun calculateSingleBank(
+        start: PointF,
+        end: PointF,
+        state: CueDetatState
+    ): List<PointF> {
         val dirX = end.x - start.x
         val dirY = end.y - start.y
         val extendedEnd =
             PointF(start.x + dirX * lineExtensionFactor, start.y + dirY * lineExtensionFactor)
-
         val intersectionResult =
             state.table.findRailIntersectionAndNormal(start, extendedEnd) ?: return listOf(
                 start,
                 extendedEnd
             )
         val (intersectionPoint, railNormal) = intersectionResult
-
         val incidentVector = PointF(extendedEnd.x - start.x, extendedEnd.y - start.y)
         val reflectedDir = state.table.reflect(incidentVector, railNormal)
-
         val finalEndPoint = PointF(
             intersectionPoint.x + reflectedDir.x * lineExtensionFactor,
             intersectionPoint.y + reflectedDir.y * lineExtensionFactor
         )
-
         return listOf(start, intersectionPoint, finalEndPoint)
     }
 
-    private fun checkForObstructions(state: OverlayState): Boolean {
+    private fun checkForObstructions(state: CueDetatState): Boolean {
         if (state.obstacleBalls.isEmpty()) return false
-
         val ballRadius = state.protractorUnit.radius
         val collisionDistance = ballRadius * 2
-
         val shotLineStart = state.shotLineAnchor ?: return false
         val shotLineEnd = state.protractorUnit.ghostCueBallCenter
         for (obstacle in state.obstacleBalls) {
@@ -491,7 +451,6 @@ class UpdateStateUseCase @Inject constructor(
                 return true
             }
         }
-
         val aimingLineStart = state.protractorUnit.ghostCueBallCenter
         val aimingLineEnd = state.protractorUnit.center
         for (obstacle in state.obstacleBalls) {
@@ -505,7 +464,6 @@ class UpdateStateUseCase @Inject constructor(
                 return true
             }
         }
-
         return false
     }
 
@@ -517,16 +475,13 @@ class UpdateStateUseCase @Inject constructor(
     ): Boolean {
         val l2 = (p2.x - p1.x).pow(2) + (p2.y - p1.y).pow(2)
         if (l2 == 0f) return false
-
         var t = ((center.x - p1.x) * (p2.x - p1.x) + (center.y - p1.y) * (p2.y - p1.y)) / l2
         t = t.coerceIn(0f, 1f)
-
         val projection = PointF(p1.x + t * (p2.x - p1.x), p1.y + t * (p2.y - p1.y))
         val dist = hypot(
             (center.x - projection.x).toDouble(),
             (center.y - projection.y).toDouble()
         ).toFloat()
-
         return dist < minDist
     }
 
@@ -544,7 +499,6 @@ class UpdateStateUseCase @Inject constructor(
         val c = (p1.x - circleCenter.x).pow(2) + (p1.y - circleCenter.y).pow(2) - radius * radius
         val delta = b * b - 4 * a * c
         if (delta < 0) return null
-        // Find the t for the first intersection point along the line's direction.
         val t = (-b - sqrt(delta)) / (2 * a)
         return PointF(p1.x + t * dx, p1.y + t * dy)
     }

@@ -13,7 +13,6 @@ import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.model.Table
-import org.opencv.core.Mat
 
 data class SnapCandidate(
     val detectedPoint: PointF,

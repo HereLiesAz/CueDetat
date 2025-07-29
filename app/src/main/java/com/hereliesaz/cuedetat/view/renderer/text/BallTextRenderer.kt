@@ -5,11 +5,11 @@ package com.hereliesaz.cuedetat.view.renderer.text
 import android.graphics.Canvas
 import android.graphics.Paint
 import androidx.compose.ui.graphics.toArgb
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.config.ui.LabelProperties
 import com.hereliesaz.cuedetat.view.model.LogicalCircular
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
-import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class BallTextRenderer {
 
@@ -23,7 +23,7 @@ class BallTextRenderer {
         ball: LogicalCircular,
         text: String,
         config: LabelProperties,
-        state: OverlayState
+        state: CueDetatState
     ) {
         if (!state.areHelpersVisible && !config.isPersistentlyVisible) return
         val matrix = state.pitchMatrix ?: return

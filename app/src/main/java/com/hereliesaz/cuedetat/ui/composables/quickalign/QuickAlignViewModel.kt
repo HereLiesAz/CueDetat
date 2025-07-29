@@ -5,8 +5,8 @@ package com.hereliesaz.cuedetat.ui.composables.quickalign
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.ui.ZoomMapping
-import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.TableSize
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -78,12 +78,7 @@ class QuickAlignViewModel @Inject constructor() : ViewModel() {
         val finalAlignState = _alignState.value
         val finalZoom = ZoomMapping.DEFAULT_ZOOM / finalAlignState.zoom
 
-        // The pan offset is from the center, so we need to account for that.
-        val finalTranslation = Offset(
-            finalAlignState.pan.x - screenWidth / 2f,
-            finalAlignState.pan.y - screenHeight / 2f
-        )
-
+        val finalTranslation = finalAlignState.pan
 
         viewModelScope.launch {
             _alignResult.emit(
@@ -94,7 +89,6 @@ class QuickAlignViewModel @Inject constructor() : ViewModel() {
                 )
             )
         }
-        // Reset state for next use
         onResetPoints()
     }
 
