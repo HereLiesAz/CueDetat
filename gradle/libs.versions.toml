@@ -77,7 +77,6 @@ androidx-activity-compose = { group = "androidx.activity", name = "activity-comp
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 androidx-camera-analysis = { module = "androidx.camera:camera-analysis", version.ref = "cameraxVersion" }
 androidx-camera-video = { module = "androidx.camera:camera-video", version.ref = "cameraVideo" }
-androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCore" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
