@@ -70,6 +70,7 @@ foundationLayout = "1.8.3"
 animationCoreVersion = "1.8.3"
 roomKtx = "2.7.2"
 glanceVersion = "1.1.1"
+material3Version = "1.3.2"
 
 [libraries]
 # AndroidX Core & UI
@@ -146,6 +147,7 @@ androidx-compose-animation-core = { group = "androidx.compose.animation", name =
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "roomKtx" }
 kphysics = { group = "com.github.kphysics", name = "kphysics", version.ref = "kphysics" }
 glance = { group = "androidx.glance", name = "glance", version.ref = "glanceVersion" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3Version" }
 
 
 [plugins]

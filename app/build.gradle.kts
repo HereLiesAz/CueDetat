@@ -46,8 +46,14 @@ android {
         abi {
             isEnable = true // Activates ABI splitting
             reset() // Ensures only explicitly included ABIs are considered
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64") // These are the four common Android ABIs
-            isUniversalApk = false // Crucial: Set to false to prevent a fifth "universal" APK that contains all ABIs. If you want a universal APK in addition to the four, set this to true.
+            include(
+                "armeabi-v7a",
+                "arm64-v8a",
+                "x86",
+                "x86_64"
+            ) // These are the four common Android ABIs
+            isUniversalApk =
+                false // Crucial: Set to false to prevent a fifth "universal" APK that contains all ABIs. If you want a universal APK in addition to the four, set this to true.
         }
     }
 
@@ -112,9 +118,13 @@ android {
     ndkVersion = "29.0.13599879 rc2"
     kotlinOptions {
         freeCompilerArgs = listOf("-XXLanguage:+PropertyParamAnnotationDefaultTargetMode")
+        jvmTarget = "17"
+        compileOptions {
+            sourceCompatibility = JavaVersion.VERSION_17
+            targetCompatibility = JavaVersion.VERSION_17
+        }
+
     }
-
-
 }
 
 //play {
@@ -138,6 +148,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
 
     implementation(libs.hilt.android)
+    implementation(libs.androidx.compose.material3)
     kapt(libs.dagger.hilt.compiler)
 
     // KPhysics - The missing physics engine
@@ -150,6 +161,8 @@ dependencies {
     // Lifecycle components for ViewModel
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation("com.google.android.material:material:1.12.0")
+
 
     // Test dependencies
     testImplementation(libs.junit)

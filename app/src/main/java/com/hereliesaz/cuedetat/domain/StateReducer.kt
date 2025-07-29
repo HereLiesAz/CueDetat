@@ -1,7 +1,7 @@
 package com.hereliesaz.cuedetat.domain
 
 import com.hereliesaz.cuedetat.ui.CueDetatState
-import com.hereliesaz.cuedetat.ui.hatemode.HateModeViewModel
+import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
 
 /**
  * A pure function that takes the current state and an action, and returns
@@ -44,14 +44,14 @@ fun stateReducer(currentState: CueDetatState, action: CueDetatAction): CueDetatS
  * Reducer specifically for the Hater mode's state.
  */
 private fun haterStateReducer(
-    currentState: HateModeViewModel.HaterState,
-    action: HateModeViewModel.Action
-): HateModeViewModel.HaterState {
+    currentState: HaterViewModel.HaterState,
+    action: HaterViewModel.Action
+): HaterViewModel.HaterState {
     return when (action) {
-        is HateModeViewModel.Action.UpdatePhysics -> {
+        is HaterViewModel.Action.UpdatePhysics -> {
             currentState.copy(
                 bodies = action.bodies.map { body ->
-                    HateModeViewModel.BodyState(
+                    HaterViewModel.BodyState(
                         id = body.userData as? String ?: "",
                         x = body.position.x,
                         y = body.position.y,
@@ -61,7 +61,7 @@ private fun haterStateReducer(
             )
         }
 
-        is HateModeViewModel.Action.SetHaterText -> {
+        is HaterViewModel.Action.SetHaterText -> {
             currentState.copy(haterText = action.text)
         }
     }

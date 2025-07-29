@@ -1,22 +1,22 @@
 package com.hereliesaz.cuedetat.ui.hatemode
 
-import com.github.minigdx.kphysics.Body
-import com.github.minigdx.kphysics.World
 import com.github.minigdx.kphysics.body.BodyDefinition
 import com.github.minigdx.kphysics.body.BodyType
 import com.github.minigdx.kphysics.fixture.FixtureDefinition
 import com.github.minigdx.kphysics.shape.CircleShape
 import com.hereliesaz.cuedetat.domain.CueDetatAction
+import de.chaffic.dynamics.Body
+import de.chaffic.dynamics.World
+import de.chaffic.math.Vec2
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.jbox2d.common.Vec2
 import java.util.UUID
 
-class HateModeViewModel(
+class HaterViewModel(
     private val viewModelScope: CoroutineScope,
     private val globalDispatch: (CueDetatAction) -> Unit
 ) {
@@ -49,7 +49,7 @@ class HateModeViewModel(
 
     init {
         // Create a world with no gravity
-        world = World(gravity = Vec2(0f, 0f))
+        world = World(gravity = Vec2(0.0, 0.0))
         startPhysics()
     }
 
@@ -78,8 +78,8 @@ class HateModeViewModel(
 
         // Apply a random impulse to make it interesting
         val force = Vec2(
-            (Math.random().toFloat() - 0.5f) * 1000,
-            (Math.random().toFloat() - 0.5f) * 1000
+            ((Math.random().toFloat() - 0.5f) * 1000).toDouble(),
+            ((Math.random().toFloat() - 0.5f) * 1000).toDouble()
         )
         body.applyForceToCenter(force)
     }
@@ -130,7 +130,6 @@ class HateModeViewModel(
                     }
                 )
             }
-
             is Action.SetHaterText -> {
                 currentState.copy(haterText = action.text)
             }

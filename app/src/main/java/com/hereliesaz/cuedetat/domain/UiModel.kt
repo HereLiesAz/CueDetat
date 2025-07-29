@@ -1,6 +1,5 @@
 package com.hereliesaz.cuedetat.domain
 
-import androidx.glance.action.Action
 import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
 
 // Represents the different modes the application can be in.

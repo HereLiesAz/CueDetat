@@ -16,7 +16,7 @@ pluginManagement {
 
   }
   plugins {
-      id("com.android.application") version "8.13.0-alpha03"
+    id("com.android.application") version "8.11.0"
       id("com.android.library") version "8.13.0-alpha03"
     id("org.jetbrains.kotlin.android") version "2.2.0"
     id("com.github.triplet.play") version "3.12.1" // Add this line
