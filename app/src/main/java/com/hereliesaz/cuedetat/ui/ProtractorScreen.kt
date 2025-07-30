@@ -27,7 +27,8 @@ fun ProtractorScreen(
 ) {
     val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
     val systemIsDark = isSystemInDarkTheme()
-    val quickAlignAnalyzer = remember { QuickAlignAnalyzer(quickAlignViewModel) }
+    val quickAlignAnalyzer =
+        remember(quickAlignViewModel) { QuickAlignAnalyzer(quickAlignViewModel) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (uiState.isCameraVisible) {

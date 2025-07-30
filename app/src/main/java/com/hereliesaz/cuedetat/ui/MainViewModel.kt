@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.SensorRepository
-import com.hereliesaz.cuedetat.data.ShakeDetector
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.data.VisionAnalyzer
 import com.hereliesaz.cuedetat.data.VisionRepository
@@ -19,8 +18,6 @@ import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.domain.UpdateType
 import com.hereliesaz.cuedetat.domain.reducers.GestureReducer
 import com.hereliesaz.cuedetat.domain.stateReducer
-import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
-import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.SingleEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -40,9 +37,7 @@ class MainViewModel @Inject constructor(
     private val sensorRepository: SensorRepository,
     private val githubRepository: GithubRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
-    private val shakeDetector: ShakeDetector,
     visionRepository: VisionRepository,
-    private val haterViewModel: HaterViewModel
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CueDetatState())
@@ -63,22 +58,6 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             sensorRepository.fullOrientationFlow.collect { orientation ->
                 onEvent(MainScreenEvent.FullOrientationChanged(orientation))
-                if (_uiState.value.experienceMode == ExperienceMode.HATER) {
-                    haterViewModel.onEvent(
-                        HaterEvent.SensorChanged(
-                            orientation.roll,
-                            orientation.pitch
-                        )
-                    )
-                }
-            }
-        }
-
-        viewModelScope.launch {
-            shakeDetector.shakeFlow.collect {
-                if (_uiState.value.experienceMode == ExperienceMode.HATER) {
-                    haterViewModel.onEvent(HaterEvent.ShakeDetected)
-                }
             }
         }
 

@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hereliesaz.cuedetat.data.SensorRepository
+import com.hereliesaz.cuedetat.data.ShakeDetector
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.chaffic.dynamics.Body
 import de.chaffic.dynamics.World
@@ -23,12 +25,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.math.PI
-import kotlin.math.max
 import kotlin.random.Random
 
 @HiltViewModel
-class HaterViewModel @Inject constructor() : ViewModel() {
+class HaterViewModel @Inject constructor(
+    private val sensorRepository: SensorRepository,
+    private val shakeDetector: ShakeDetector
+) : ViewModel() {
 
     private val _haterState = MutableStateFlow(HaterState())
     val haterState = _haterState.asStateFlow()
@@ -99,6 +102,19 @@ class HaterViewModel @Inject constructor() : ViewModel() {
     )
     private var remainingAnswers = mutableListOf<String>()
 
+    init {
+        viewModelScope.launch {
+            sensorRepository.fullOrientationFlow.collect { orientation ->
+                onEvent(HaterEvent.SensorChanged(orientation.roll, orientation.pitch))
+            }
+        }
+        viewModelScope.launch {
+            shakeDetector.shakeFlow.collect {
+                onEvent(HaterEvent.ShakeDetected)
+            }
+        }
+    }
+
     fun onEvent(event: HaterEvent) {
         when (event) {
             is HaterEvent.EnterHaterMode -> enterHaterMode()
@@ -128,8 +144,8 @@ class HaterViewModel @Inject constructor() : ViewModel() {
                 world.step(1.0 / 60.0)
                 dieBody?.let { body ->
                     _haterState.value = _haterState.value.copy(
-                        diePosition = Offset(body.position.x.toFloat(), body.position.y.toFloat()),
-                        dieAngle = body.orientation.toFloat() * (180f / PI.toFloat())
+                        diePosition = Offset(body.position.x.toFloat(), body.position.y.toFloat())
+                        // The angle is no longer updated from the physics engine, preventing visual spin.
                     )
                 }
                 delay(16L) // ~60 FPS
@@ -140,62 +156,62 @@ class HaterViewModel @Inject constructor() : ViewModel() {
     fun setupBoundaries(width: Float, height: Float) {
         if (wallBodies.isNotEmpty()) return
 
-        val thickness = 200.0
+        val thickness = 2.0 // A thin, invisible wall
         val halfW = width / 2.0
         val halfH = height / 2.0
 
         // Top Wall
         val topWall = Body(Polygon(width.toDouble(), thickness), 0.5, 0.5)
-        topWall.position.set(0.0, -halfH - thickness / 2)
+        topWall.position.set(0.0, -halfH)
         topWall.setStatic()
         world.addBody(topWall)
         wallBodies.add(topWall)
 
         // Bottom Wall
         val bottomWall = Body(Polygon(width.toDouble(), thickness), 0.5, 0.5)
-        bottomWall.position.set(0.0, halfH + thickness / 2)
+        bottomWall.position.set(0.0, halfH)
         bottomWall.setStatic()
         world.addBody(bottomWall)
         wallBodies.add(bottomWall)
 
         // Left Wall
         val leftWall = Body(Polygon(thickness, height.toDouble()), 0.5, 0.5)
-        leftWall.position.set(-halfW - thickness / 2, 0.0)
+        leftWall.position.set(-halfW, 0.0)
         leftWall.setStatic()
         world.addBody(leftWall)
         wallBodies.add(leftWall)
 
         // Right Wall
         val rightWall = Body(Polygon(thickness, height.toDouble()), 0.5, 0.5)
-        rightWall.position.set(halfW + thickness / 2, 0.0)
+        rightWall.position.set(halfW, 0.0)
         rightWall.setStatic()
         world.addBody(rightWall)
         wallBodies.add(rightWall)
     }
 
     fun updateDieAndText(text: String, density: Float = 2.5f) {
-        textPaint.textSize = 16.sp.value * density
+        textPaint.textSize = 22.sp.value * density
         val layoutWidth = 200.dp.value * density
         staticLayout =
             StaticLayout.Builder.obtain(text, 0, text.length, textPaint, layoutWidth.toInt())
                 .setAlignment(Layout.Alignment.ALIGN_CENTER)
                 .build()
 
-        val textWidth = staticLayout!!.width.toFloat()
         val textHeight = staticLayout!!.height.toFloat()
 
         val padding = 30.dp.value * density
         val triangleHeight = textHeight + padding
         val sideLength = (triangleHeight / (kotlin.math.sqrt(3.0) / 2.0)).toFloat()
-        val triangleWidth = max(textWidth + padding, sideLength)
+        val triangleWidth = sideLength
 
-        val halfHeight = triangleHeight / 2.0
+        val topY = -(2.0 / 3.0) * triangleHeight
+        val bottomY = (1.0 / 3.0) * triangleHeight
         val halfWidth = triangleWidth / 2.0
 
         val newVertices = arrayOf(
-            Vec2(0.0, -halfHeight),
-            Vec2(-halfWidth, halfHeight),
-            Vec2(halfWidth, halfHeight)
+            Vec2(0.0, topY),
+            Vec2(-halfWidth, bottomY),
+            Vec2(halfWidth, bottomY)
         )
 
         dieBody?.let { world.removeBody(it) }
@@ -203,10 +219,10 @@ class HaterViewModel @Inject constructor() : ViewModel() {
         val shape = Polygon(newVertices)
         val body = Body(shape, 0.6, 0.6)
         body.position.set(Random.nextDouble() * 50 - 25, Random.nextDouble() * 50 - 25)
-        body.orientation = Random.nextDouble() * 2 * PI
+        body.orientation = 0.0
         body.density = 1.0
-        body.linearDampening = 5.0
-        body.angularDampening = 7.0
+        body.linearDampening = 10.0
+        body.angularDampening = 12.0
 
         dieBody = body
         world.addBody(dieBody!!)
@@ -241,7 +257,7 @@ class HaterViewModel @Inject constructor() : ViewModel() {
     }
 
     private fun applyGravity(roll: Float, pitch: Float) {
-        val gravityMultiplier = 0.1f
+        val gravityMultiplier = 0.05f
         world.gravity.set(
             (roll * gravityMultiplier).toDouble(),
             (pitch * gravityMultiplier).toDouble()

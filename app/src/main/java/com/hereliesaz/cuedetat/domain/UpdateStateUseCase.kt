@@ -158,12 +158,17 @@ class UpdateStateUseCase @Inject constructor(
         }
 
         if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
+            val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
+            val targetCenter = state.protractorUnit.center
+            val extendedPath = getExtendedLinePath(ghostCueCenter, targetCenter)
             return state.copy(
                 isGeometricallyImpossible = false,
                 isObstructed = false,
                 isTiltBeyondLimit = false,
                 warningText = null,
-                isStraightShot = true
+                isStraightShot = true,
+                aimingLineBankPath = extendedPath,
+                aimingLineEndPoint = extendedPath.last()
             )
         }
 

@@ -7,54 +7,45 @@ import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.Typeface
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.core.graphics.ColorUtils
 import com.hereliesaz.cuedetat.domain.CueDetatState
-import com.hereliesaz.cuedetat.ui.theme.BankLine1Yellow
-import com.hereliesaz.cuedetat.ui.theme.BankLine2Yellow
-import com.hereliesaz.cuedetat.ui.theme.BankLine3Yellow
-import com.hereliesaz.cuedetat.ui.theme.BankLine4Yellow
-import com.hereliesaz.cuedetat.ui.theme.MutedGray
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
-import com.hereliesaz.cuedetat.view.config.table.Table
+import com.hereliesaz.cuedetat.view.config.ball.ActualCueBall
+import com.hereliesaz.cuedetat.view.config.ball.GhostCueBall
+import com.hereliesaz.cuedetat.view.config.ball.TargetBall
+import com.hereliesaz.cuedetat.view.config.line.AimingLine
+import com.hereliesaz.cuedetat.view.config.line.BankLine1
+import com.hereliesaz.cuedetat.view.config.line.BankLine2
+import com.hereliesaz.cuedetat.view.config.line.BankLine3
+import com.hereliesaz.cuedetat.view.config.line.BankLine4
+import com.hereliesaz.cuedetat.view.config.line.ShotGuideLine
+import com.hereliesaz.cuedetat.view.config.line.TangentLine
+import com.hereliesaz.cuedetat.view.config.table.Holes
+import com.hereliesaz.cuedetat.view.config.table.Rail
 
 class PaintCache {
-    private val strokeWidth = 6f
 
     // --- Primary Paint Objects ---
-    val tableOutlinePaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-    val targetCirclePaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
-    val cueCirclePaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
-    val actualCueBallPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
+    val tableOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    val targetCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    val cueCirclePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    val actualCueBallPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    val shotLinePaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
-    val tangentLineSolidPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = strokeWidth * 0.8f
-    }
+    val shotLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    val tangentLineSolidPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     val tangentLineDottedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = strokeWidth * 0.8f; pathEffect =
-        DashPathEffect(floatArrayOf(15f, 10f), 0f)
+        style = Paint.Style.STROKE; pathEffect = DashPathEffect(floatArrayOf(15f, 10f), 0f)
     }
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
-    val warningPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
-    val angleGuidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = 3f
-    } // Doubled
-    val pocketFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL; color = Color.Black.toArgb()
-    }
+    val warningPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    val angleGuidePaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 3f }
+    val pocketFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     val gridLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeWidth = 5f; pathEffect =
         DashPathEffect(floatArrayOf(15f, 15f), 0f)
-    } // Doubled
+    }
     val pathObstructionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     val cvResultPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
@@ -62,69 +53,69 @@ class PaintCache {
         xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
     }
 
-
     // --- Bank Line Paints ---
-    val bankLine1Paint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
-    val bankLine2Paint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
-    val bankLine3Paint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
-    val bankLine4Paint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = strokeWidth }
-
+    val bankLine1Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    val bankLine2Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    val bankLine3Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    val bankLine4Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
 
     fun setTypeface(typeface: Typeface?) {
         textPaint.typeface = typeface
     }
 
     fun updateColors(uiState: CueDetatState, isDark: Boolean) {
-        val LUMINANCE_ADJUST = uiState.luminanceAdjustment
-        val baseScheme = uiState.appControlColorScheme ?: darkColorScheme()
+        // Load configs
+        val railConfig = Rail()
+        val targetBallConfig = TargetBall()
+        val ghostCueBallConfig = GhostCueBall()
+        val actualCueBallConfig = ActualCueBall()
+        val shotGuideLineConfig = ShotGuideLine()
+        AimingLine()
+        val tangentLineConfig = TangentLine()
+        val bankLine1Config = BankLine1()
+        val bankLine2Config = BankLine2()
+        val bankLine3Config = BankLine3()
+        val bankLine4Config = BankLine4()
+        val holesConfig = Holes()
 
-        // --- HERESY CORRECTED: The cache now reads all properties from the component configs. ---
-        val tableConfig = Table()
-        tableOutlinePaint.color = baseScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
-        tableOutlinePaint.strokeWidth = tableConfig.strokeWidth
-        // --- END CORRECTION ---
+        // Apply configs to paints
+        tableOutlinePaint.color = railConfig.strokeColor.toArgb()
+        tableOutlinePaint.strokeWidth = railConfig.strokeWidth
 
-        targetCirclePaint.color = baseScheme.primary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
-        cueCirclePaint.color = baseScheme.tertiary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
-        actualCueBallPaint.color = baseScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
-        fillPaint.color = baseScheme.onSurface.adjustLuminance(LUMINANCE_ADJUST).toArgb()
-        shotLinePaint.color = baseScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
-        tangentLineSolidPaint.color =
-            baseScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).toArgb()
-        tangentLineDottedPaint.color =
-            baseScheme.secondary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.6f).toArgb()
-        pathObstructionPaint.color =
-            baseScheme.tertiary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.2f).toArgb()
-        cvResultPaint.color =
-            MutedGray.copy(alpha = 0.5f).adjustLuminance(LUMINANCE_ADJUST).toArgb()
+        targetCirclePaint.color = targetBallConfig.strokeColor.toArgb()
+        targetCirclePaint.strokeWidth = targetBallConfig.strokeWidth
 
+        cueCirclePaint.color = ghostCueBallConfig.strokeColor.toArgb()
+        cueCirclePaint.strokeWidth = ghostCueBallConfig.strokeWidth
 
-        bankLine1Paint.color = BankLine1Yellow.adjustLuminance(LUMINANCE_ADJUST).toArgb()
-        bankLine2Paint.color = BankLine2Yellow.adjustLuminance(LUMINANCE_ADJUST).toArgb()
-        bankLine3Paint.color = BankLine3Yellow.adjustLuminance(LUMINANCE_ADJUST).toArgb()
-        bankLine4Paint.color = BankLine4Yellow.adjustLuminance(LUMINANCE_ADJUST).toArgb()
+        actualCueBallPaint.color = actualCueBallConfig.strokeColor.toArgb()
+        actualCueBallPaint.strokeWidth = actualCueBallConfig.strokeWidth
 
-        textPaint.color = baseScheme.onSurface.adjustLuminance(LUMINANCE_ADJUST).toArgb()
-        warningPaint.color = WarningRed.adjustLuminance(LUMINANCE_ADJUST).toArgb()
-        angleGuidePaint.color =
-            baseScheme.tertiary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.4f).toArgb()
-        gridLinePaint.color =
-            baseScheme.primary.adjustLuminance(LUMINANCE_ADJUST).copy(alpha = 0.5f).toArgb()
-    }
+        shotLinePaint.color = shotGuideLineConfig.strokeColor.toArgb()
+        shotLinePaint.strokeWidth = shotGuideLineConfig.strokeWidth
 
-    private fun Color.adjustLuminance(factor: Float): Color {
-        if (factor == 0f || this == Color.Transparent) return this
-        val hsl = FloatArray(3)
-        try {
-            ColorUtils.colorToHSL(this.toArgb(), hsl)
-            hsl[2] = (hsl[2] + factor).coerceIn(0f, 1f)
-            return Color(ColorUtils.HSLToColor(hsl))
-        } catch (e: IllegalArgumentException) {
-            return this
-        }
+        tangentLineSolidPaint.color = tangentLineConfig.strokeColor.toArgb()
+        tangentLineSolidPaint.strokeWidth = tangentLineConfig.strokeWidth
+
+        tangentLineDottedPaint.color = tangentLineConfig.strokeColor.toArgb()
+        tangentLineDottedPaint.strokeWidth = tangentLineConfig.strokeWidth
+        tangentLineDottedPaint.alpha = (tangentLineConfig.opacity * 255).toInt()
+
+        bankLine1Paint.color = bankLine1Config.strokeColor.toArgb()
+        bankLine1Paint.strokeWidth = bankLine1Config.strokeWidth
+        bankLine2Paint.color = bankLine2Config.strokeColor.toArgb()
+        bankLine2Paint.strokeWidth = bankLine2Config.strokeWidth
+        bankLine3Paint.color = bankLine3Config.strokeColor.toArgb()
+        bankLine3Paint.strokeWidth = bankLine3Config.strokeWidth
+        bankLine4Paint.color = bankLine4Config.strokeColor.toArgb()
+        bankLine4Paint.strokeWidth = bankLine4Config.strokeWidth
+
+        pocketFillPaint.color = holesConfig.fillColor.toArgb()
+
+        // Universal paints
+        warningPaint.color = WarningRed.toArgb()
+        warningPaint.strokeWidth = 6f // Keep warning stroke consistent
+        textPaint.color = Color.White.toArgb() // Debug text is always white
+        fillPaint.color = Color.White.toArgb()
     }
 }

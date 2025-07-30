@@ -154,12 +154,6 @@ class BallRenderer {
             // --- BUBBLE LEVEL LOGIC ---
             val logicalBallMatrix = state.logicalPlaneMatrix ?: return // This matrix is now flat
             val logicalScreenPos = DrawingUtils.mapPoint(ball.center, logicalBallMatrix)
-            val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
-                ball.center,
-                ball.radius,
-                state,
-                logicalBallMatrix
-            )
 
             // Draw 2D component (immobile on the flat plane)
             canvas.withMatrix(logicalBallMatrix) {
@@ -171,8 +165,7 @@ class BallRenderer {
             val sensitivity = 2.5f // Pixels of offset per degree of tilt
             val screenOffsetX = state.currentOrientation.roll * sensitivity
             val screenOffsetY = -state.currentOrientation.pitch * sensitivity
-            val bubbleRadius = radiusInfo.radius
-
+            val bubbleRadius = ball.radius * zoomFactor // Radius on screen for clamping
 
             // Clamp the offset to the radius of the ball
             val offsetDistance = hypot(screenOffsetX, screenOffsetY)

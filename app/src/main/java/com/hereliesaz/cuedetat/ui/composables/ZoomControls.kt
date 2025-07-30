@@ -4,6 +4,7 @@ package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
@@ -35,7 +36,7 @@ fun ZoomControls(
     Column(
         modifier = modifier.fillMaxHeight(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceEvenly
+        verticalArrangement = Arrangement.Center
     ) {
         IconButton(onClick = { onEvent(MainScreenEvent.ZoomSliderChanged(uiState.zoomSliderPosition + 1)) }) {
             Icon(
@@ -44,7 +45,7 @@ fun ZoomControls(
                 tint = MaterialTheme.colorScheme.onSurface
             )
         }
-
+        Spacer(modifier = Modifier.height(16.dp))
         Slider(
             value = uiState.zoomSliderPosition,
             onValueChange = { onEvent(MainScreenEvent.ZoomSliderChanged(it)) },
@@ -72,10 +73,10 @@ fun ZoomControls(
                         placeable.place(-placeable.width, 0)
                     }
                 }
-                .weight(1f)
+                .fillMaxHeight(0.7f)
                 .height(32.dp)
         )
-
+        Spacer(modifier = Modifier.height(16.dp))
         IconButton(onClick = { onEvent(MainScreenEvent.ZoomSliderChanged(uiState.zoomSliderPosition - 1)) }) {
             Icon(
                 Icons.Default.Remove,

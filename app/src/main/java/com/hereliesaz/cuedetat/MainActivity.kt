@@ -156,7 +156,11 @@ class MainActivity : ComponentActivity() {
                 }
 
                 when (uiState.experienceMode) {
-                    ExperienceMode.HATER -> HaterScreen(haterViewModel)
+                    ExperienceMode.HATER -> HaterScreen(
+                        haterViewModel = haterViewModel,
+                        uiState = uiState,
+                        onEvent = viewModel::onEvent
+                    )
                     else -> { // EXPERT and BEGINNER modes share the main screen
                         ProtractorScreen(
                             mainViewModel = viewModel,

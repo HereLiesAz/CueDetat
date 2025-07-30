@@ -177,6 +177,8 @@ class VisionRepository @Inject constructor(
                         kernel.release()
                         mask
                     } else {
+                        reusableMask?.release()
+                        reusableMask = null
                         null
                     }
 

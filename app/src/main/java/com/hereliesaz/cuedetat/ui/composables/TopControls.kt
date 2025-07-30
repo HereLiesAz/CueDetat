@@ -3,8 +3,7 @@
 package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,16 +47,9 @@ fun TopControls(
         verticalAlignment = Alignment.Top
     ) {
         Box(
-            modifier = Modifier
-                .pointerInput(Unit) {
-                    detectDragGestures { change, dragAmount ->
-                        if (dragAmount.y > 2.0f) {
-                            onMenuClick()
-                            change.consume()
-                        }
-                    }
-                }
-                .clickable(onClick = onMenuClick),
+            modifier = Modifier.pointerInput(Unit) {
+                detectTapGestures { onMenuClick() }
+            },
             contentAlignment = Alignment.CenterStart
         ) {
             if (uiState.areHelpersVisible && uiState.experienceMode != ExperienceMode.HATER) {
@@ -94,7 +86,9 @@ fun TopControls(
                 if (uiState.table.isVisible) {
                     Column(
                         horizontalAlignment = Alignment.End,
-                        modifier = Modifier.clickable { onEvent(MainScreenEvent.CycleTableSize) }
+                        modifier = Modifier.pointerInput(Unit) {
+                            detectTapGestures { onEvent(MainScreenEvent.CycleTableSize) }
+                        }
                     ) {
                         Text(
                             text = "Table Size",

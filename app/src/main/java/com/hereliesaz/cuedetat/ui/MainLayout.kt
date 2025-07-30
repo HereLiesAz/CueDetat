@@ -102,10 +102,12 @@ fun MainLayout(
 
                 val buttonText = when {
                     uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> "Unlock View"
+                    uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked -> "Lock View"
                     else -> "Reset View"
                 }
                 val buttonEvent = when {
                     uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> MainScreenEvent.UnlockBeginnerView
+                    uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked -> MainScreenEvent.LockBeginnerView
                     else -> MainScreenEvent.Reset
                 }
                 CuedetatButton(onClick = { onEvent(buttonEvent) }, text = buttonText)
@@ -118,7 +120,7 @@ fun MainLayout(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight(0.6f)
-                .padding(end = 8.dp)
+                .padding(end = 12.dp)
                 .width(48.dp)
         )
 
