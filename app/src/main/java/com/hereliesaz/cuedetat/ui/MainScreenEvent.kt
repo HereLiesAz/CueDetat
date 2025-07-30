@@ -6,7 +6,6 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.VisionData
-import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.TableSize
 
@@ -56,7 +55,8 @@ sealed class MainScreenEvent {
     data class OrientationChanged(val orientationLock: OverlayState.OrientationLock) :
         MainScreenEvent()
     object ToggleExperienceModeSelection : MainScreenEvent()
-    data class SetExperienceMode(val mode: ExperienceMode) : MainScreenEvent()
+    data class SetExperienceMode(val mode: com.hereliesaz.cuedetat.domain.ExperienceMode) :
+        MainScreenEvent()
     object UnlockBeginnerView : MainScreenEvent()
     object LockBeginnerView : MainScreenEvent()
 

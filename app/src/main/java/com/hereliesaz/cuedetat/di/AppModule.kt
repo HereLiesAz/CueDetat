@@ -44,12 +44,16 @@ object AppModule {
     @Singleton
     @GenericDetector
     fun provideGenericObjectDetector(): ObjectDetector {
-        val options = ObjectDetectorOptions.Builder()
-            .setDetectorMode(ObjectDetectorOptions.STREAM_MODE)
-            .enableMultipleObjects()
-            .enableClassification()
-            .build()
-        return ObjectDetection.getClient(options)
+        return try {
+            val options = ObjectDetectorOptions.Builder()
+                .setDetectorMode(ObjectDetectorOptions.STREAM_MODE)
+                .enableMultipleObjects()
+                .enableClassification()
+                .build()
+            ObjectDetection.getClient(options)
+        } catch (e: Exception) {
+            throw IllegalStateException("Failed to initialize ML Kit Object Detector.", e)
+        }
     }
 
     @Provides

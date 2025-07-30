@@ -187,7 +187,6 @@ dependencies {
 
     // OpenCV for Computer Vision
     implementation(libs.opencv)
-    implementation("org.opencv:opencv:4.12.0")
 
     // ML Kit & TensorFlow
     implementation(libs.object1.detection.custom)
@@ -195,7 +194,6 @@ dependencies {
     implementation(libs.tensorflow.lite.task.vision)
     implementation(libs.object1.detection)
 
-    implementation("com.github.Chafficui:KPhysics:master-SNAPSHOT")
 
 
     implementation(libs.kphysics)

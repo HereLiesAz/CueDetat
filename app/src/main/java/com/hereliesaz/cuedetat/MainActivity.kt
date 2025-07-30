@@ -26,9 +26,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
 import com.hereliesaz.cuedetat.data.CalibrationRepository
-import com.hereliesaz.cuedetat.domain.CueDetatAction
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
+import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.MainViewModel
 import com.hereliesaz.cuedetat.ui.ProtractorScreen
 import com.hereliesaz.cuedetat.ui.composables.SplashScreen
@@ -91,7 +91,7 @@ class MainActivity : ComponentActivity() {
                 is SingleEvent.OpenUrl -> {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
                     startActivity(intent)
-                    viewModel.onEvent(CueDetatAction.SingleEventConsumed)
+                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 is SingleEvent.SendFeedbackEmail -> {
                     val intent = Intent(Intent.ACTION_SENDTO).apply {
@@ -102,11 +102,11 @@ class MainActivity : ComponentActivity() {
                     if (intent.resolveActivity(packageManager) != null) {
                         startActivity(intent)
                     }
-                    viewModel.onEvent(CueDetatAction.SingleEventConsumed)
+                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 is SingleEvent.InitiateHaterMode -> {
                     haterViewModel.onEvent(HaterEvent.EnterHaterMode)
-                    viewModel.onEvent(CueDetatAction.SingleEventConsumed)
+                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 null -> { /* Do nothing */ }
             }
@@ -141,20 +141,12 @@ class MainActivity : ComponentActivity() {
         CueDetatTheme(luminanceAdjustment = uiState.luminanceAdjustment) {
             if (showSplashScreen) {
                 SplashScreen(onRoleSelected = { selectedMode ->
-                    // Explicitly cast or ensure selectedMode is of the correct type before dispatching
-                    val action = when (selectedMode) {
-                        is ExperienceMode -> CueDetatAction.SetExperienceMode(
-                            selectedMode
-                        )
-
-                        else -> TODO("Handle or throw error for unexpected type")
-                    }
-                    viewModel.onEvent(action)
+                    viewModel.onEvent(MainScreenEvent.SetExperienceMode(selectedMode))
                 })
             } else {
                 val currentAppControlColorScheme = MaterialTheme.colorScheme
                 LaunchedEffect(currentAppControlColorScheme) {
-                    viewModel.onEvent(CueDetatAction.ThemeChanged(currentAppControlColorScheme))
+                    viewModel.onEvent(MainScreenEvent.ThemeChanged(currentAppControlColorScheme))
                 }
 
                 when (uiState.experienceMode) {

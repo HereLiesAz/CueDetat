@@ -41,6 +41,7 @@ class VisionRepository @Inject constructor(
     val visionDataFlow = _visionDataFlow.asStateFlow()
 
     private var lastFrameTime = 0L
+    private var reusableMask: Mat? = null
 
     @SuppressLint("UnsafeOptInUsageError")
     fun processImage(imageProxy: ImageProxy, state: CueDetatState) {
@@ -128,7 +129,10 @@ class VisionRepository @Inject constructor(
                     }
 
                     val cvMask = if (state.showCvMask) {
-                        val mask = Mat()
+                        if (reusableMask == null) {
+                            reusableMask = Mat()
+                        }
+                        val mask = reusableMask!!
                         if (state.lockedHsvColor != null && state.lockedHsvStdDev != null) {
                             val mean = state.lockedHsvColor
                             val stdDev = state.lockedHsvStdDev

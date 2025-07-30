@@ -11,9 +11,11 @@ import com.hereliesaz.cuedetat.data.VisionAnalyzer
 import com.hereliesaz.cuedetat.data.VisionRepository
 import com.hereliesaz.cuedetat.domain.CueDetatAction
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.domain.UpdateType
+import com.hereliesaz.cuedetat.domain.reducers.GestureReducer
 import com.hereliesaz.cuedetat.domain.stateReducer
 import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
 import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
@@ -31,12 +33,14 @@ import javax.inject.Inject
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val reducerUtils: ReducerUtils,
+    private val gestureReducer: GestureReducer,
     private val updateStateUseCase: UpdateStateUseCase,
     private val sensorRepository: SensorRepository,
     private val githubRepository: GithubRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val shakeDetector: ShakeDetector,
-    visionRepository: VisionRepository
+    visionRepository: VisionRepository,
+    private val haterViewModel: HaterViewModel
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CueDetatState())
@@ -46,7 +50,6 @@ class MainViewModel @Inject constructor(
     val singleEvent = _singleEvent.asSharedFlow()
 
     val visionAnalyzer: VisionAnalyzer = VisionAnalyzer(visionRepository)
-    private val haterViewModel = HaterViewModel()
 
     init {
         // Restore previous state or initialize
@@ -60,14 +63,22 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             sensorRepository.fullOrientationFlow.collect { orientation ->
                 onEvent(CueDetatAction.FullOrientationChanged(orientation))
+                if (_uiState.value.experienceMode == ExperienceMode.HATER) {
+                    haterViewModel.onEvent(
+                        HaterEvent.SensorChanged(
+                            orientation.roll,
+                            orientation.pitch
+                        )
+                    )
+                }
             }
         }
 
         // Collect shake events for Hater Mode
         viewModelScope.launch {
             shakeDetector.shakeFlow.collect {
-                if (_uiState.value.experienceMode == com.hereliesaz.cuedetat.domain.ExperienceMode.HATER) {
-                    haterViewModel.onEvent(HaterEvent.ShowHater)
+                if (_uiState.value.experienceMode == ExperienceMode.HATER) {
+                    haterViewModel.onEvent(HaterEvent.ScreenTapped)
                 }
             }
         }
@@ -80,7 +91,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun onEvent(event: CueDetatAction) {
+    fun onEvent(event: MainScreenEvent) {
         viewModelScope.launch {
             val currentState = _uiState.value
 
@@ -91,7 +102,7 @@ class MainViewModel @Inject constructor(
                         event.position,
                         currentState.inversePitchMatrix ?: return@launch
                     )
-                    CueDetatAction.LogicalGestureStarted(
+                    MainScreenEvent.LogicalGestureStarted(
                         logicalPoint,
                         Offset(event.position.x, event.position.y)
                     )
@@ -110,14 +121,15 @@ class MainViewModel @Inject constructor(
                         event.currentPosition.x - event.previousPosition.x,
                         event.currentPosition.y - event.previousPosition.y
                     )
-                    CueDetatAction.LogicalDragApplied(prevLogical, currLogical, screenDelta)
+                    MainScreenEvent.LogicalDragApplied(prevLogical, currLogical, screenDelta)
                 }
 
                 else -> event
             }
 
             // Reduce the state
-            val reducedState = stateReducer(currentState, logicalEvent, reducerUtils)
+            val reducedState =
+                stateReducer(currentState, logicalEvent, reducerUtils, gestureReducer)
 
             // Determine the required update type
             val updateType = determineUpdateType(currentState, reducedState, logicalEvent)
@@ -146,7 +158,7 @@ class MainViewModel @Inject constructor(
     private fun determineUpdateType(
         oldState: CueDetatState,
         newState: CueDetatState,
-        event: CueDetatAction
+        event: MainScreenEvent
     ): UpdateType {
         return when (event) {
             is CueDetatAction.SizeChanged, is CueDetatAction.ZoomScaleChanged, is CueDetatAction.ZoomSliderChanged,
@@ -154,8 +166,8 @@ class MainViewModel @Inject constructor(
             is CueDetatAction.TableRotationApplied, is CueDetatAction.SetExperienceMode, is CueDetatAction.ToggleBankingMode,
             is CueDetatAction.SetTableSize, is CueDetatAction.RestoreState -> UpdateType.FULL
 
-            is CueDetatAction.Reset, is CueDetatAction.LogicalGestureStarted, is CueDetatAction.LogicalDragApplied,
-            is CueDetatAction.GestureEnded, is CueDetatAction.AddObstacleBall -> UpdateType.AIMING
+            is CueDetatAction.Reset, is MainScreenEvent.LogicalGestureStarted, is MainScreenEvent.LogicalDragApplied,
+            is MainScreenEvent.GestureEnded, is CueDetatAction.AddObstacleBall -> UpdateType.AIMING
 
             is CueDetatAction.SpinApplied -> UpdateType.SPIN_ONLY
 
@@ -163,31 +175,33 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun handleSingleEvents(event: CueDetatAction) {
-        viewModelScope.launch {
-            when (event) {
-                is CueDetatAction.CheckForUpdate -> {
-                    githubRepository.getLatestVersionName()
-                    // This logic would be expanded to show a dialog
-                }
-
-                is CueDetatAction.ViewArt -> _singleEvent.emit(SingleEvent.OpenUrl("https://herelies.az"))
-                is CueDetatAction.ViewAboutPage -> _singleEvent.emit(SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat"))
-                is CueDetatAction.SendFeedback -> _singleEvent.emit(
-                    SingleEvent.SendFeedbackEmail(
-                        "dev@herelies.az",
-                        "Cue d'Etat Feedback"
-                    )
-                )
-
-                is CueDetatAction.SingleEventConsumed -> _singleEvent.emit(null)
-                is CueDetatAction.SetExperienceMode -> {
-                    if (event.mode == com.hereliesaz.cuedetat.domain.ExperienceMode.HATER) {
-                        _singleEvent.emit(SingleEvent.InitiateHaterMode)
+    private fun handleSingleEvents(event: MainScreenEvent) {
+        if (event is CueDetatAction) {
+            viewModelScope.launch {
+                when (event) {
+                    is CueDetatAction.CheckForUpdate -> {
+                        githubRepository.getLatestVersionName()
+                        // This logic would be expanded to show a dialog
                     }
-                }
 
-                else -> { /* Do nothing for state-changing events */
+                    is CueDetatAction.ViewArt -> _singleEvent.emit(SingleEvent.OpenUrl("https://herelies.az"))
+                    is CueDetatAction.ViewAboutPage -> _singleEvent.emit(SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat"))
+                    is CueDetatAction.SendFeedback -> _singleEvent.emit(
+                        SingleEvent.SendFeedbackEmail(
+                            "dev@herelies.az",
+                            "Cue d'Etat Feedback"
+                        )
+                    )
+
+                    is CueDetatAction.SingleEventConsumed -> _singleEvent.emit(null)
+                    is CueDetatAction.SetExperienceMode -> {
+                        if (event.mode == ExperienceMode.HATER) {
+                            _singleEvent.emit(SingleEvent.InitiateHaterMode)
+                        }
+                    }
+
+                    else -> { /* Do nothing for state-changing events */
+                    }
                 }
             }
         }

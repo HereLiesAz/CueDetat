@@ -5,12 +5,11 @@ package com.hereliesaz.cuedetat.domain.reducers
 import android.graphics.PointF
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.ZoomMapping
-import com.hereliesaz.cuedetat.view.state.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.InteractionMode
-import com.hereliesaz.cuedetat.view.state.OverlayState
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -20,16 +19,19 @@ import kotlin.math.sqrt
 
 @Singleton
 class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils) {
-    fun reduce(currentState: OverlayState, event: MainScreenEvent): OverlayState {
+    fun reduce(currentState: CueDetatState, event: MainScreenEvent): CueDetatState {
         return when(event) {
             is MainScreenEvent.LogicalGestureStarted -> handleLogicalGestureStarted(currentState, event)
             is MainScreenEvent.LogicalDragApplied -> handleLogicalDragApplied(currentState, event)
             is MainScreenEvent.GestureEnded -> handleGestureEnded(currentState)
             else -> currentState
-        } as OverlayState
+        }
     }
 
-    private fun handleLogicalGestureStarted(currentState: OverlayState, event: MainScreenEvent.LogicalGestureStarted): OverlayState {
+    private fun handleLogicalGestureStarted(
+        currentState: CueDetatState,
+        event: MainScreenEvent.LogicalGestureStarted
+    ): CueDetatState {
         if (currentState.experienceMode == ExperienceMode.BEGINNER && currentState.isBeginnerViewLocked) {
             return currentState // Do not allow any interaction in locked beginner mode
         }
@@ -44,7 +46,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         val screenTouchRadiusPx = 96f
         // Calculate the current zoom factor from the slider position
         val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
-            currentState.experienceMode as com.hereliesaz.cuedetat.domain.ExperienceMode?,
+            currentState.experienceMode,
             currentState.isBeginnerViewLocked
         )
         val zoomFactor = ZoomMapping.sliderToZoom(currentState.zoomSliderPosition, minZoom, maxZoom)
@@ -129,7 +131,10 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         return currentState.copy(interactionMode = InteractionMode.ROTATING_PROTRACTOR, isMagnifierVisible = false)
     }
 
-    private fun handleLogicalDragApplied(currentState: OverlayState, event: MainScreenEvent.LogicalDragApplied): OverlayState {
+    private fun handleLogicalDragApplied(
+        currentState: CueDetatState,
+        event: MainScreenEvent.LogicalDragApplied
+    ): CueDetatState {
         val newState = when (currentState.interactionMode) {
             InteractionMode.MOVING_PROTRACTOR_UNIT -> {
                 val dx = event.currentLogicalPoint.x - event.previousLogicalPoint.x
@@ -195,7 +200,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         }
     }
 
-    private fun handleGestureEnded(currentState: OverlayState): CueDetatState {
+    private fun handleGestureEnded(currentState: CueDetatState): CueDetatState {
         var finalState = currentState.copy(interactionMode = InteractionMode.NONE, movingObstacleBallIndex = null, isMagnifierVisible = false)
 
         if (finalState.isSnappingEnabled) {
@@ -220,7 +225,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         return reducerUtils.snapViolatingBalls(finalState)
     }
 
-    private fun findClosestSnapCandidate(state: OverlayState): SnapCandidate? {
+    private fun findClosestSnapCandidate(state: CueDetatState): SnapCandidate? {
         val referencePoint = when (state.interactionMode) {
             InteractionMode.MOVING_PROTRACTOR_UNIT -> state.protractorUnit.center
             InteractionMode.MOVING_ACTUAL_CUE_BALL -> state.onPlaneBall?.center

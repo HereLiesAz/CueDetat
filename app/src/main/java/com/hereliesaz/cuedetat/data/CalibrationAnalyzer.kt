@@ -4,9 +4,6 @@ import android.annotation.SuppressLint
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.imgproc.Imgproc
@@ -18,11 +15,7 @@ class CalibrationAnalyzer(
     @SuppressLint("UnsafeOptInUsageError")
     override fun analyze(imageProxy: ImageProxy) {
         val mat = imageProxyToMat(imageProxy)
-
-        CoroutineScope(Dispatchers.Default).launch {
-            viewModel.processFrame(mat)
-        }
-
+        viewModel.processFrame(mat)
         imageProxy.close()
     }
 

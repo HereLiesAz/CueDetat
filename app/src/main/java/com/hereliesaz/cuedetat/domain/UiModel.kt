@@ -248,7 +248,7 @@ sealed class CueDetatAction {
     object AddObstacleBall : CueDetatAction()
 
     // CV Events
-    data class CvDataUpdated(val data: VisionData) : CueDetatAction()
+    data class CvDataUpdated(val visionData: VisionData) : CueDetatAction()
     object LockOrUnlockColor : CueDetatAction()
     data class LockColor(val hsvMean: FloatArray, val hsvStdDev: FloatArray) : CueDetatAction()
     object ClearSamplePoint : CueDetatAction()

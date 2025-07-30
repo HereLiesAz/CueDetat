@@ -39,11 +39,25 @@ fun ProtractorScreen(
             systemIsDark = systemIsDark,
             isTestingCvMask = uiState.isTestingCvMask,
             onEvent = mainViewModel::onEvent,
-            modifier = Modifier.detectManualGestures(uiState, mainViewModel::onEvent)
+            modifier = Modifier.detectManualGestures(uiState) { gestureEvent ->
+                // The 'when' expression must cover all possible cases. By adding an 'else'
+                // branch, we make it exhaustive and satisfy the compiler.
+                val event: MainScreenEvent? = when (gestureEvent) {
+                    is GestureEvent.Down -> MainScreenEvent.ScreenGestureStarted(gestureEvent.position)
+                    is GestureEvent.Drag -> MainScreenEvent.Drag(
+                        gestureEvent.previousPosition,
+                        gestureEvent.currentPosition
+                    )
+
+                    is GestureEvent.Up -> MainScreenEvent.GestureEnded
+                    // Add this else branch to handle any other types of GestureEvent
+                    else -> null
+                }
+                // Only call the onEvent function if a valid event was created.
+                event?.let { mainViewModel.onEvent(it) }
+            }
         )
 
-        // Other UI components would go here, like buttons, sliders, etc.
-        // This is a simplified version for the refactoring.
     }
 
     if (uiState.showCalibrationScreen) {

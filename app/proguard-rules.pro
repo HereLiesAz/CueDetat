@@ -60,7 +60,6 @@
 #-------------------------------------------------------------------------------
 # These rules are necessary for Jetpack Compose to function correctly after
 # code shrinking and obfuscation.
-
 -keepclassmembers class * {
     @androidx.compose.runtime.Composable <methods>;
 }
@@ -84,7 +83,8 @@
 # Keeps critical classes for Kotlin Coroutines.
 
 -keepnames class kotlinx.coroutines.internal.** { *; }
--keep class kotlinx.coroutines.android.** { *; }
+-keep class kotlinx.coroutines.android.** { *;
+}
 -keepclassmembers class ** {
     kotlinx.coroutines.flow.Flow flow(...);
 }
@@ -93,18 +93,20 @@
 # Networking: Retrofit, OkHttp, Okio, Gson
 #-------------------------------------------------------------------------------
 # You wouldn't want the network to forget how to speak.
-
 -keep class retrofit2.** { *; }
 -keep interface retrofit2.** { *; }
 -keep class com.google.gson.** { *; }
--keep class okhttp3.** { *; }
+-keep class okhttp3.** { *;
+}
 -keep interface okhttp3.** { *; }
 -keep class okio.** { *; }
--keep interface okio.** { *; }
+-keep interface okio.** { *;
+}
 
 # Keep the Github API and its data classes.
 -keep interface com.hereliesaz.cuedetat.network.GithubApi { *; }
--keep class com.hereliesaz.cuedetat.network.GithubRelease { *; }
+-keep class com.hereliesaz.cuedetat.network.GithubRelease { *;
+}
 -keepclassmembers class com.hereliesaz.cuedetat.network.GithubRelease {
     <fields>;
     <init>(...);
@@ -114,11 +116,11 @@
 # Dependency Injection: Hilt
 #-------------------------------------------------------------------------------
 # Hilt requires its generated classes to be preserved.
-
 -keep class * extends androidx.lifecycle.ViewModel
 -keep class **_HiltModules* { *; }
 -keep class dagger.hilt.internal.aggregatedroot.AggregatedRoot { *; }
--keep class **_Factory { *; }
+-keep class **_Factory { *;
+}
 -keep class **_MembersInjector { *; }
 
 #-------------------------------------------------------------------------------
@@ -127,7 +129,8 @@
 # Keep all OpenCV classes. The native libraries are large enough without R8
 # getting creative and breaking the JNI bindings.
 
--keep class org.opencv.** { *; }
+-keep class org.opencv.** { *;
+}
 
 #-------------------------------------------------------------------------------
 # Google ML Kit & TensorFlow Lite
@@ -136,7 +139,8 @@
 # models and their interpreters. A model with missing operations is a silent oracle.
 
 -keep class com.google.mlkit.** { *; }
--keep class org.tensorflow.** { *; }
+-keep class org.tensorflow.** { *;
+}
 
 # Ensure all native JNI methods for TensorFlow Lite and ML Kit are kept.
 -keepclasseswithmembernames,includedescriptorclasses class * {
@@ -147,12 +151,14 @@
 -keep class com.google.android.gms.internal.mlkit_vision_common.** { *; }
 -keep class com.google.android.gms.internal.mlkit_vision_object_detection.** { *; }
 -keep class com.google.mlkit.vision.objects.** { *; }
--keep class com.google.mlkit.vision.common.** { *; }
+-keep class com.google.mlkit.vision.common.** { *;
+}
 
 # Keep TensorFlow Lite delegates and support classes.
 -keep class org.tensorflow.lite.gpu.GpuDelegate
 -keep class org.tensorflow.lite.nnapi.NnApiDelegate
--keep class org.tensorflow.lite.support.** { *; }
+-keep class org.tensorflow.lite.support.** { *;
+}
 
 # Prevent obfuscation of model asset file paths if they are dynamically located.
 # Since we load from assets, this is a prudent safeguard.
@@ -165,14 +171,15 @@
 # Application-Specific Rules for com.hereliesaz.cuedetat
 #-------------------------------------------------------------------------------
 # Final safeguards for the application's core components.
-
 # Keep all data, model, and state classes.
 -keep class com.hereliesaz.cuedetat.data.** { *; }
--keep class com.hereliesaz.cuedetat.view.model.** { *; }
+-keep class com.hereliesaz.cuedetat.view.model.** { *;
+}
 -keep class com.hereliesaz.cuedetat.view.state.** { *; }
 -keep class com.hereliesaz.cuedetat.view.config.** { *; }
 
 
 # Keep your main activity and application class.
 -keep public class com.hereliesaz.cuedetat.MainActivity { *; }
--keep public class com.hereliesaz.cuedetat.MyApplication { *; }
+-keep public class com.hereliesaz.cuedetat.MyApplication { *;
+}

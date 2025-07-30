@@ -1,9 +1,15 @@
+
 Memory
+
 ALWAYS give me the full code for any file created or modified, no snippets. And don't you DARE do anything I don't explicitly tell you to do. Don't add, don't take away, don't think things like, "While I'm at it...." If you're not sure, ask. If you want to do something, suggest. Otherwise, it's not your job.
 
+
+
 First-Prompts
+
 As a world-class developer, become an expert on this project. Start by carefully reading through and memorizing the entire Dev Guide. Then examine the source code line by line until you know what everything is and most importantly, WHY it's there.
 
+Comb through the code and analyze for problems and errors.
 
 
 
