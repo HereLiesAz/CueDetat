@@ -1,5 +1,4 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/MainActivity.kt
-
+// app/src/main/java/com/hereliesaz/cuedetat/MainActivity.kt
 package com.hereliesaz.cuedetat
 
 import android.Manifest
@@ -9,6 +8,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -63,6 +63,12 @@ class MainActivity : ComponentActivity() {
                 recreate() // Recreate the activity to initialize content
             } else {
                 // Heresy is not tolerated. The user will comply or they will not use the app.
+                Toast.makeText(
+                    this,
+                    "Camera permission is required. The app will now close.",
+                    Toast.LENGTH_LONG
+                ).show()
+                finish()
             }
         }
 

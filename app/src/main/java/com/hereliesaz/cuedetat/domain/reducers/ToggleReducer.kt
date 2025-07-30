@@ -1,3 +1,4 @@
+// app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ToggleReducer.kt
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
@@ -16,6 +17,12 @@ internal fun reduceToggleAction(
     reducerUtils: ReducerUtils
 ): CueDetatState {
     return when (action) {
+        is MainScreenEvent.ToggleMenu -> {
+            // When toggling the main menu rail, always ensure the expanded menu is closed.
+            state.copy(isMenuVisible = !state.isMenuVisible, isExpandedMenuVisible = false)
+        }
+
+        is MainScreenEvent.ToggleExpandedMenu -> state.copy(isExpandedMenuVisible = !state.isExpandedMenuVisible)
         is MainScreenEvent.ToggleSpinControl -> state.copy(isSpinControlVisible = !state.isSpinControlVisible)
         is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(state, reducerUtils)
         is MainScreenEvent.CycleTableSize -> {

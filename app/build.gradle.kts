@@ -148,6 +148,7 @@ dependencies {
     implementation(libs.androidx.compose.animation.core)
     implementation(libs.androidx.room.ktx)
     implementation(libs.glance)
+    implementation(libs.sceneform.base)
     kapt(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 

@@ -1,3 +1,4 @@
+// app/src/main/java/com/hereliesaz/cuedetat/data/VisionRepository.kt
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/data/VisionRepository.kt
 
 package com.hereliesaz.cuedetat.data
@@ -15,7 +16,6 @@ import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.utils.toMat
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
-import com.hereliesaz.cuedetat.view.state.CvRefinementMethod
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.opencv.core.Core
@@ -64,21 +64,39 @@ class VisionRepository @Inject constructor(
 
             genericObjectDetector.process(inputImage)
                 .addOnSuccessListener { detectedObjects ->
-                    val unrotatedMat = imageProxy.toMat()
-                    var mat = Mat()
+                    // --- FIX: Correct Mat handling to prevent memory leaks/crashes ---
+                    val originalMat = imageProxy.toMat()
+                    var processedMat = Mat()
+                    var matToUse: Mat
+
                     when (rotationDegrees) {
-                        90 -> Core.rotate(unrotatedMat, mat, Core.ROTATE_90_CLOCKWISE)
-                        180 -> Core.rotate(unrotatedMat, mat, Core.ROTATE_180)
-                        270 -> Core.rotate(unrotatedMat, mat, Core.ROTATE_90_COUNTERCLOCKWISE)
-                        else -> mat = unrotatedMat // No rotation needed
+                        90 -> {
+                            Core.rotate(originalMat, processedMat, Core.ROTATE_90_CLOCKWISE)
+                            matToUse = processedMat
+                        }
+
+                        180 -> {
+                            Core.rotate(originalMat, processedMat, Core.ROTATE_180)
+                            matToUse = processedMat
+                        }
+
+                        270 -> {
+                            Core.rotate(originalMat, processedMat, Core.ROTATE_90_COUNTERCLOCKWISE)
+                            matToUse = processedMat
+                        }
+
+                        else -> {
+                            matToUse = originalMat // No rotation, use original directly
+                        }
                     }
-                    if (mat != unrotatedMat) {
-                        unrotatedMat.release() // Release the original if we created a new one
+
+                    if (matToUse !== originalMat) {
+                        originalMat.release() // Release the original if a new rotated one was created
                     }
                     // --- END FIX ---
 
                     val hsvMat = Mat()
-                    Imgproc.cvtColor(mat, hsvMat, Imgproc.COLOR_BGR2HSV)
+                    Imgproc.cvtColor(matToUse, hsvMat, Imgproc.COLOR_BGR2HSV)
 
                     val hsvTuple = state.colorSamplePoint?.let {
                         val imageX = (it.x * (hsvMat.cols() / state.viewWidth.toFloat())).toInt()
@@ -177,7 +195,7 @@ class VisionRepository @Inject constructor(
                     }
 
                     val refinedScreenPoints = filteredDetectedObjects.mapNotNull { detectedObject ->
-                        refineBallCenter(detectedObject, mat, state, imageToScreenMatrix)
+                        refineBallCenter(detectedObject, matToUse, state, imageToScreenMatrix)
                     }.map { pointInImageCoords ->
                         val screenPointArray =
                             floatArrayOf(pointInImageCoords.x, pointInImageCoords.y)
@@ -217,7 +235,7 @@ class VisionRepository @Inject constructor(
                         )
                     }
 
-                    mat.release()
+                    matToUse.release()
                     hsvMat.release()
 
                     imageProxy.close()

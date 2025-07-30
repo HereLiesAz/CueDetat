@@ -1,5 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/ProtractorOverlay.kt
-
 package com.hereliesaz.cuedetat.view
 
 import android.graphics.Typeface
@@ -18,6 +16,7 @@ import androidx.core.content.res.ResourcesCompat
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
+import com.hereliesaz.cuedetat.view.gestures.detectManualGestures
 import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
 
 @Composable
@@ -25,8 +24,7 @@ fun ProtractorOverlay(
     uiState: CueDetatState,
     systemIsDark: Boolean,
     isTestingCvMask: Boolean,
-    onEvent: (MainScreenEvent) -> Unit,
-    modifier: Modifier = Modifier
+    onEvent: (MainScreenEvent) -> Unit
 ) {
     val context = LocalContext.current
     val paints = remember { PaintCache() }
@@ -45,19 +43,13 @@ fun ProtractorOverlay(
         paints.updateColors(uiState, systemIsDark)
     }
 
-    val canvasModifier = if (uiState.isTestingCvMask || uiState.isCalibratingColor) {
-        // When testing or calibrating, the canvas should not detect gestures.
-        modifier.fillMaxSize()
-    } else {
-        // The gesture handler is now applied in MainScreen.kt, not here.
-        modifier.fillMaxSize()
-    }
-
     Canvas(
-        modifier = canvasModifier
+        modifier = Modifier
+            .fillMaxSize()
             .onSizeChanged { size ->
                 onEvent(MainScreenEvent.SizeChanged(size.width, size.height))
             }
+            .detectManualGestures(uiState, onEvent)
     ) {
         drawIntoCanvas { canvas ->
             renderer.draw(canvas.nativeCanvas, uiState, paints, barbaroTypeface)

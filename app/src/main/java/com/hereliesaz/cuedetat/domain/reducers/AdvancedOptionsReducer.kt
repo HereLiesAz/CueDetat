@@ -54,7 +54,7 @@ internal fun reduceAdvancedOptionsAction(
 
         is MainScreenEvent.UpdateHoughP1 -> state.copy(houghP1 = action.value)
         is MainScreenEvent.UpdateHoughP2 -> state.copy(houghP2 = action.value)
-        is MainScreenEvent.UpdateHoughThreshold -> state.copy(houghThreshold = action.value)
+        is MainScreenEvent.UpdateHoughThreshold -> state.copy(houghThreshold = action.value.toInt())
         is MainScreenEvent.UpdateCannyT1 -> state.copy(cannyThreshold1 = action.value)
         is MainScreenEvent.UpdateCannyT2 -> state.copy(cannyThreshold2 = action.value)
         else -> state

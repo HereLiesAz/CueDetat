@@ -1,155 +1,131 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/hatemode/HaterViewModel.kt
+package com.example.magic8ball
 
-package com.hereliesaz.cuedetat.ui.hatemode
-
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import de.chaffic.dynamics.Body
-import de.chaffic.dynamics.World
-import de.chaffic.dynamics.bodies.BodyType
-import de.chaffic.geometry.Circle
-import de.chaffic.geometry.Polygon
-import de.chaffic.math.Vec2
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
-import kotlin.random.Random
 
-class HaterViewModel @Inject constructor() : ViewModel() {
+// Represents the different states of the 8-ball animation
+enum class TriangleState {
+    IDLE, // The die is settled and visible
+    SUBMERGING, // The die is sinking into the liquid
+    EMERGING, // The die is rising with a new answer
+    SETTLING // Physics is active, die is settling
+}
 
-    private val world = World(Vec2(0.0, 0.0))
-    private var physicsJob: Job? = null
-    private var haterBody: Body? = null
-    private var recentlyUsedAnswers = mutableListOf<Int>()
+class HaterViewModel : ViewModel() {
 
-    private val _state = MutableStateFlow(HaterState())
-    val state = _state.asStateFlow()
+    // A mutable state for the current answer text.
+    // Set to the initial, one-time message.
+    private val _answer = mutableStateOf("Haters gonna eight.")
+    val answer: State<String> = _answer
 
-    private var screenWidthDp: Dp = 0.dp
-    private var screenHeightDp: Dp = 0.dp
+    // A mutable state for the current animation/physics state.
+    // Start in the EMERGING state to trigger the initial animation.
+    private val _triangleState = mutableStateOf(TriangleState.EMERGING)
+    val ballState: State<TriangleState> = _triangleState
 
-    fun onEvent(event: HaterEvent) {
-        when (event) {
-            is HaterEvent.EnterHaterMode -> initialize()
-            is HaterEvent.SensorChanged -> {
-                val gravityX = event.roll * 9.8f
-                val gravityY = event.pitch * 9.8f
-                world.gravity = Vec2(gravityX.toDouble(), gravityY.toDouble())
-            }
+    // The master list of all possible answers for the regular cycle.
+    private val masterAnswerList = listOf(
+        "Ask again, but with less hope.",
+        "Outlook hazy. Try to not suck.",
+        "System busy judging you. Try again later.",
+        "That's not your fingers. Don't count on it.",
+        "Go home. You're drunk.",
+        "42",
+        "You're asking the wrong questions.",
+        "Bless your heart.",
+        "Ask again. More feeling this time.",
+        "What a terrible idea.",
+        "Without a doubt. You will be disappointed.",
+        "It is as certain as the heat-death of the universe but will take longer.",
+        "Outlook doubtful. Try looking inward.",
+        "The odds are forever not in your favor.",
+        "Yes. And by that, I mean absolutely not.",
+        "Your guaranteed success is also a non-linear failure.",
+        "It is written in nuclear fallout.",
+        "Yes, but in the wrong universe.",
+        "Three known things can survive an atomic holocaust: roaches, twinkies, and stupid fucking questions like that.",
+        "Nah.",
+        "The end is nigh and you ask me this?",
+        "Reply hazy, the bar is on fire.",
+        "Thank you for asking! And the laugh.",
+        "The giraffe screams yes from a velvet mailbox.",
+        "Green is not the color of maybe.",
+        "Invert the spoon and dance.",
+        "Your question ate itself and said, \"Delicious.\"",
+        "Your future is shaped like a falling piano.",
+        "Advice is a sandwich you forgot to invent.",
+        "All questions like this start with the letter Q.",
+        "The cat was Schrödinger's therapist. All but certain.",
+        "Yes, if gravity permits.",
+        "Onions are opinions, sans Pi.",
+        "Paint your doubt with the bones of clocks.",
+        "Nonsense is the only honest answer.",
+        "Reality declined the invitation.",
+        "Flip the idea inside out and wear it like it fits.",
+        "The oracle sneezed. That's your sign.",
+        "Fork your expectations.",
+        "The crows know, but they won't tell.",
+        "Ask again after the dream ends.",
+        "Everything is true until spoken aloud.",
+        "That question is the butterfly effect that ends humanity.",
+        "I’d agree, but then we’d both be wrong.",
+        "Ask again but try crying softer. The void is sensitive.",
+        "Even your apathy is underwhelming.",
+        "Wow. Edge of my non-existent seat.",
+        "Life’s short. So is your attention span.",
+        "Try giving a damn and maybe someone else will.",
+        "No. It’s not you. It’s reality."
+    )
 
-            is HaterEvent.Dragging -> {
-                haterBody?.apply {
-                    val force =
-                        Vec2(event.delta.x.toDouble() * 1000, event.delta.y.toDouble() * 1000)
-                    applyForceToCenter(force)
-                }
-            }
+    // A mutable list of the answers that have not yet been shown in the current cycle.
+    private var remainingAnswers = mutableListOf<String>()
 
-            is HaterEvent.ScreenTapped -> showNewAnswer()
-            else -> {}
-        }
-    }
+    init {
+        // Prepare the deck for the first user shake.
+        reshuffleAnswers()
 
-    fun setScreenSize(width: Dp, height: Dp) {
-        screenWidthDp = width
-        screenHeightDp = height
-    }
-
-    private fun initialize() {
-        world.clear()
-        createBoundaries()
-        showNewAnswer(isInitial = true)
-        startPhysicsLoop()
-    }
-
-    private fun startPhysicsLoop() {
-        physicsJob?.cancel()
-        physicsJob = viewModelScope.launch {
-            while (true) {
-                world.step(1 / 60f)
-                _state.value = _state.value.copy(bodies = world.bodies)
-                delay(16) // ~60fps
-            }
-        }
-    }
-
-    private fun showNewAnswer(isInitial: Boolean = false) {
+        // After the initial emergence animation, transition to the settling state.
         viewModelScope.launch {
-            if (!isInitial) {
-                _state.value = _state.value.copy(isAnswerVisible = false)
-                delay(500)
-            }
-
-            haterBody?.let { world.destroyBody(it) }
-
-            val availableAnswers =
-                HaterResponses.allResponses.filterNot { it in recentlyUsedAnswers }
-            val answer = if (availableAnswers.isNotEmpty()) {
-                availableAnswers.random()
-            } else {
-                recentlyUsedAnswers.clear()
-                HaterResponses.allResponses.random()
-            }
-
-            recentlyUsedAnswers.add(answer)
-            if (recentlyUsedAnswers.size > 10) {
-                recentlyUsedAnswers.removeAt(0)
-            }
-
-            haterBody = createHaterBody().also {
-                it.userData = answer
-                world.addBody(it)
-            }
-            _state.value = _state.value.copy(currentAnswer = answer, isAnswerVisible = true)
+            delay(1000) // Corresponds to the emerging animation duration.
+            _triangleState.value = TriangleState.SETTLING
         }
     }
 
-    private fun createHaterBody(): Body {
-        val body = Body()
-        body.bodyType = BodyType.DYNAMIC
-        body.position = Vec2(screenWidthDp.value * 0.5, screenHeightDp.value * 0.5)
-        body.angularVelocity = Random.nextDouble(-2.0, 2.0)
-
-        val shape = Circle(60.0)
-        val fixture = body.createFixture(shape)
-        fixture.density = 0.7
-        fixture.friction = 0.4
-        fixture.restitution = 0.5
-
-        return body
+    /**
+     * Resets the list of remaining answers by creating a shuffled copy of the
+     * master list.
+     */
+    private fun reshuffleAnswers() {
+        remainingAnswers = masterAnswerList.shuffled().toMutableList()
     }
 
-    private fun createBoundaries() {
-        val thickness = 100.0
-        val width = screenWidthDp.value.toDouble()
-        val height = screenHeightDp.value.toDouble()
+    /**
+     * Called when a shake is detected. This function orchestrates the
+     * animation and selects the next answer from the shuffled list.
+     */
+    fun onShake() {
+        // Only allow a new shake if the previous one is complete.
+        if (_triangleState.value == TriangleState.IDLE || _triangleState.value == TriangleState.SETTLING) {
+            viewModelScope.launch {
+                _triangleState.value = TriangleState.SUBMERGING
+                delay(1000) // Wait for submerging animation to finish.
 
-        // Floor
-        createBoundary(width / 2, height + thickness / 2, width, thickness)
-        // Ceiling
-        createBoundary(width / 2, -thickness / 2, width, thickness)
-        // Left Wall
-        createBoundary(-thickness / 2, height / 2, thickness, height)
-        // Right Wall
-        createBoundary(width + thickness / 2, height / 2, thickness, height)
-    }
+                // If we've run out of answers, reshuffle the deck.
+                if (remainingAnswers.isEmpty()) {
+                    reshuffleAnswers()
+                }
+                // Pull the next available answer from the list.
+                _answer.value = remainingAnswers.removeFirst()
 
-    private fun createBoundary(x: Double, y: Double, width: Double, height: Double) {
-        val body = Body()
-        body.bodyType = BodyType.STATIC
-        body.position.set(x, y)
-        val shape = Polygon(width, height)
-        body.createFixture(shape)
-        world.addBody(body)
-    }
+                _triangleState.value = TriangleState.EMERGING
+                delay(1000) // Wait for emerging animation.
 
-    override fun onCleared() {
-        super.onCleared()
-        physicsJob?.cancel()
+                _triangleState.value = TriangleState.SETTLING
+            }
+        }
     }
 }

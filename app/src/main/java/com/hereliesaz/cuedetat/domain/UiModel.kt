@@ -1,3 +1,4 @@
+// app/src/main/java/com/hereliesaz/cuedetat/domain/UiModel.kt
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.Matrix
@@ -35,6 +36,8 @@ data class CueDetatState(
     // High-level state
     val experienceMode: ExperienceMode? = null,
     val haterState: HaterState = HaterState(),
+    val isMenuVisible: Boolean = false,
+    val isExpandedMenuVisible: Boolean = false,
 
     // View dimensions
     val viewWidth: Int = 0,
@@ -182,6 +185,8 @@ sealed class MainScreenEvent {
     data class HaterAction(val action: HaterEvent) : MainScreenEvent()
 
     // UI-Originated Events
+    object ToggleMenu : MainScreenEvent()
+    object ToggleExpandedMenu : MainScreenEvent()
     data class ScreenGestureStarted(val position: PointF) : MainScreenEvent()
     data class Drag(val previousPosition: PointF, val currentPosition: PointF) : MainScreenEvent()
     object GestureEnded : MainScreenEvent()
@@ -276,5 +281,4 @@ sealed class MainScreenEvent {
     object SingleEventConsumed : MainScreenEvent()
     object ToastShown : MainScreenEvent()
     data class RestoreState(val state: CueDetatState) : MainScreenEvent()
-    object MenuClosed : MainScreenEvent()
 }
