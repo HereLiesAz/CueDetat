@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainViewModel.kt
+
 package com.hereliesaz.cuedetat.ui
 
 import androidx.compose.ui.geometry.Offset
@@ -52,14 +54,12 @@ class MainViewModel @Inject constructor(
     val visionAnalyzer: VisionAnalyzer = VisionAnalyzer(visionRepository)
 
     init {
-        // Restore previous state or initialize
         viewModelScope.launch {
             val savedState = userPreferencesRepository.stateFlow.first()
             val initialState = savedState ?: CueDetatState()
             processAndEmitState(initialState, UpdateType.FULL)
         }
 
-        // Collect sensor data
         viewModelScope.launch {
             sensorRepository.fullOrientationFlow.collect { orientation ->
                 onEvent(MainScreenEvent.FullOrientationChanged(orientation))
@@ -74,16 +74,14 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        // Collect shake events for Hater Mode
         viewModelScope.launch {
             shakeDetector.shakeFlow.collect {
                 if (_uiState.value.experienceMode == ExperienceMode.HATER) {
-                    haterViewModel.onEvent(HaterEvent.ScreenTapped)
+                    haterViewModel.onEvent(HaterEvent.ShakeDetected)
                 }
             }
         }
 
-        // Forward vision data to the reducer
         viewModelScope.launch {
             visionRepository.visionDataFlow.collect { visionData ->
                 onEvent(MainScreenEvent.CvDataUpdated(visionData))
@@ -95,7 +93,6 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             val currentState = _uiState.value
 
-            // Convert screen gestures to logical gestures before reducing
             val logicalEvent = when (event) {
                 is MainScreenEvent.ScreenGestureStarted -> {
                     val logicalPoint = Perspective.screenToLogical(
@@ -127,17 +124,13 @@ class MainViewModel @Inject constructor(
                 else -> event
             }
 
-            // Reduce the state
             val reducedState =
                 stateReducer(currentState, logicalEvent, reducerUtils, gestureReducer)
 
-            // Determine the required update type
             val updateType = determineUpdateType(currentState, reducedState, logicalEvent)
 
-            // Run use case for derived state and emit
             processAndEmitState(reducedState, updateType)
 
-            // Handle single events that don't change state
             handleSingleEvents(logicalEvent)
         }
     }
@@ -147,8 +140,7 @@ class MainViewModel @Inject constructor(
         _uiState.value = derivedState
         visionAnalyzer.updateUiState(derivedState)
 
-        // Save state to disk if it has changed meaningfully
-        if (type != UpdateType.SPIN_ONLY) { // Don't save for every little spin change
+        if (type != UpdateType.SPIN_ONLY) {
             viewModelScope.launch {
                 userPreferencesRepository.saveState(derivedState)
             }
@@ -171,7 +163,7 @@ class MainViewModel @Inject constructor(
 
             is MainScreenEvent.SpinApplied -> UpdateType.SPIN_ONLY
 
-            else -> UpdateType.AIMING // Default to aiming for most other toggles
+            else -> UpdateType.AIMING
         }
     }
 
@@ -181,7 +173,6 @@ class MainViewModel @Inject constructor(
                 when (event) {
                     is MainScreenEvent.CheckForUpdate -> {
                         githubRepository.getLatestVersionName()
-                        // This logic would be expanded to show a dialog
                     }
 
                     is MainScreenEvent.ViewArt -> _singleEvent.emit(SingleEvent.OpenUrl("https://herelies.az"))

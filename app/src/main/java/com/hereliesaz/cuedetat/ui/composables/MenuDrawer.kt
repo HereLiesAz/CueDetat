@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/MenuDrawer.kt
+
 package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.clickable
@@ -22,15 +24,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.R
+import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.theme.VoidBlack
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
-import com.hereliesaz.cuedetat.view.state.ExperienceMode
-import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
 fun MenuDrawerContent(
-    uiState: OverlayState,
+    uiState: CueDetatState,
     onEvent: (MainScreenEvent) -> Unit,
     onCloseDrawer: () -> Unit
 ) {
@@ -68,7 +70,6 @@ fun MenuDrawerContent(
                 }
                 MenuDivider()
 
-                // Section 1: Help & Info (Moved to top)
                 MenuItem(
                     text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
                     onClick = { onEvent(MainScreenEvent.ToggleHelp); onCloseDrawer() }
@@ -79,7 +80,6 @@ fun MenuDrawerContent(
                 )
                 MenuDivider()
 
-                // Section 2: Core Controls
                 if (uiState.experienceMode != ExperienceMode.BEGINNER) {
                     val cameraToggleText =
                         if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On"
@@ -99,7 +99,6 @@ fun MenuDrawerContent(
 
                 MenuDivider()
 
-                // Section 3: Table & Unit Settings
                 if (uiState.experienceMode != ExperienceMode.BEGINNER) {
                     MenuItem(
                         text = "Table Alignment",
@@ -118,12 +117,11 @@ fun MenuDrawerContent(
                 }
                 MenuDivider()
 
-                // Section 4: Appearance (Order swapped)
                 val orientationToShow = uiState.pendingOrientationLock ?: uiState.orientationLock
                 val orientationToggleText = when (orientationToShow) {
-                    OverlayState.OrientationLock.AUTOMATIC -> "Orientation: Auto"
-                    OverlayState.OrientationLock.PORTRAIT -> "Orientation: Portrait"
-                    OverlayState.OrientationLock.LANDSCAPE -> "Orientation: Landscape"
+                    CueDetatState.OrientationLock.AUTOMATIC -> "Orientation: Auto"
+                    CueDetatState.OrientationLock.PORTRAIT -> "Orientation: Portrait"
+                    CueDetatState.OrientationLock.LANDSCAPE -> "Orientation: Landscape"
                 }
                 MenuItem(
                     text = orientationToggleText,
@@ -135,7 +133,6 @@ fun MenuDrawerContent(
                 )
                 MenuDivider()
 
-                // Section 5: Developer (Moved to bottom of scrollable list)
                 if (uiState.experienceMode != ExperienceMode.BEGINNER) {
                     MenuItem(
                         text = "Too Advanced Options",
@@ -147,7 +144,6 @@ fun MenuDrawerContent(
             // --- Fixed Footer ---
             Column {
                 MenuDivider()
-                // Mode toggle is now at the top of the footer
                 val modeToShow =
                     uiState.experienceMode ?: ExperienceMode.EXPERT
                 MenuItem(

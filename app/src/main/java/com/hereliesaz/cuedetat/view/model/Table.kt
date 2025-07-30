@@ -7,16 +7,6 @@ import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.view.state.TableSize
 import kotlin.math.pow
 
-/**
- * The single source of truth for the pool table's state and geometry.
- *
- * This data class encapsulates all properties of the table and is the sole authority
- * for calculations related to its boundaries, pockets, and rails. Its center is
- * architecturally fixed to the logical plane's origin (0,0).
- *
- * @property size The physical dimensions of the table (e.g., EIGHT_FT).
- * @property isVisible Whether the table is currently rendered.
- */
 data class Table(
     val size: TableSize,
     val isVisible: Boolean,
@@ -31,15 +21,12 @@ data class Table(
         val ballRealDiameter = 2.25f
         val ballLogicalDiameter = LOGICAL_BALL_RADIUS * 2
         val scale = ballLogicalDiameter / ballRealDiameter
-        // Defines the table in a default portrait orientation
         logicalWidth = size.shortSideInches * scale
         logicalHeight = size.longSideInches * scale
 
         val halfW = logicalWidth / 2f
         val halfH = logicalHeight / 2f
 
-        // Corners are now permanently stored in their un-rotated, logical orientation.
-        // The transformation matrix is solely responsible for rotation.
         corners = listOf(
             PointF(-halfW, -halfH), // Top-Left
             PointF(halfW, -halfH),  // Top-Right
@@ -49,14 +36,12 @@ data class Table(
 
         val sidePocketOffset = LOGICAL_BALL_RADIUS * 0.5f
 
-        // Pockets are also now permanently stored in their un-rotated, logical orientation.
         pockets = listOf(
             PointF(-halfW, -halfH), PointF(halfW, -halfH),
             PointF(-halfW, halfH), PointF(halfW, halfH),
             PointF(-halfW - sidePocketOffset, 0f), PointF(halfW + sidePocketOffset, 0f)
         )
 
-        // Normals are also now permanently stored in their un-rotated, logical orientation.
         normals = listOf(
             PointF(0f, -1f), // Top
             PointF(1f, 0f),  // Right
@@ -68,8 +53,6 @@ data class Table(
     fun isPointInside(point: PointF): Boolean {
         if (corners.isEmpty()) return false
 
-        // HERESY PURGED: The table model is always un-rotated. The point passed in is
-        // in the logical, un-rotated coordinate space. No de-rotation is necessary here.
         val halfW = logicalWidth / 2f
         val halfH = logicalHeight / 2f
 

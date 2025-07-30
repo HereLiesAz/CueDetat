@@ -27,14 +27,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.cuedetat.R
+import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
-import com.hereliesaz.cuedetat.view.state.ExperienceMode
-import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
 fun TopControls(
-    uiState: OverlayState,
+    uiState: CueDetatState,
     onEvent: (MainScreenEvent) -> Unit,
     onMenuClick: () -> Unit,
     modifier: Modifier = Modifier

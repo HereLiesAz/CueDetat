@@ -1,4 +1,4 @@
-package com.example.magic8ball
+package com.hereliesaz.cuedetat.ui.hatemode
 
 import android.hardware.Sensor
 import android.hardware.SensorEvent

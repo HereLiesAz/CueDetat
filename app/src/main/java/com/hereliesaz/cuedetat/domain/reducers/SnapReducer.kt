@@ -3,7 +3,7 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
 import com.hereliesaz.cuedetat.data.VisionData
-import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -14,7 +14,7 @@ class SnapReducer @Inject constructor() {
     private val SNAP_THRESHOLD_MS = 1500L
     private val SNAP_PROXIMITY_THRESHOLD_PX = 30f
 
-    fun reduce(currentState: OverlayState, visionData: VisionData): OverlayState {
+    fun reduce(currentState: CueDetatState, visionData: VisionData): CueDetatState {
         if (!currentState.isSnappingEnabled) {
             return currentState.copy(snapCandidates = emptyList())
         }

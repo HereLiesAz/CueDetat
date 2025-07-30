@@ -34,7 +34,6 @@ import com.hereliesaz.cuedetat.ui.composables.SpinControl
 import com.hereliesaz.cuedetat.ui.composables.TopControls
 import com.hereliesaz.cuedetat.ui.composables.ZoomControls
 import com.hereliesaz.cuedetat.ui.composables.dialogs.AdvancedOptionsDialog
-import com.hereliesaz.cuedetat.ui.composables.dialogs.GlowStickDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.LuminanceAdjustmentDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.TableSizeSelectionDialog
 import com.hereliesaz.cuedetat.ui.composables.overlays.KineticWarningOverlay
@@ -136,11 +135,7 @@ fun MainLayout(
             onEvent = onEvent,
             onDismiss = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
         )
-        GlowStickDialog(
-            uiState = uiState,
-            onEvent = onEvent,
-            onDismiss = { onEvent(MainScreenEvent.ToggleGlowStickDialog) }
-        )
+
         TableSizeSelectionDialog(
             uiState = uiState,
             onEvent = onEvent,

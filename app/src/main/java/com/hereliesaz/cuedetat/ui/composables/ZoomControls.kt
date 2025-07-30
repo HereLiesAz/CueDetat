@@ -22,12 +22,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
-import com.hereliesaz.cuedetat.view.state.OverlayState
+
 
 @Composable
 fun ZoomControls(
-    uiState: OverlayState,
+    uiState: CueDetatState,
     onEvent: (MainScreenEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {

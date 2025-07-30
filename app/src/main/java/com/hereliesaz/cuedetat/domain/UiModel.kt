@@ -1,4 +1,5 @@
-// app/src/main/java/com/hereliesaz/cuedetat/domain/UiModel.kt
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/UiModel.kt
+
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.Matrix
@@ -22,7 +23,7 @@ import com.hereliesaz.cuedetat.view.state.TableSize
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 import org.opencv.core.Mat
 
-// Represents the different modes the application can be in.
+
 enum class ExperienceMode {
     EXPERT, BEGINNER, HATER;
     fun next(): ExperienceMode {
@@ -31,69 +32,49 @@ enum class ExperienceMode {
     }
 }
 
-// The single source of truth for the application's entire state.
 data class CueDetatState(
-    // High-level state
     val experienceMode: ExperienceMode? = null,
     val haterState: HaterState = HaterState(),
     val isMenuVisible: Boolean = false,
     val isExpandedMenuVisible: Boolean = false,
-
-    // View dimensions
     val viewWidth: Int = 0,
     val viewHeight: Int = 0,
-
-    // Core logical model
     val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), LOGICAL_BALL_RADIUS, 0f),
     val onPlaneBall: OnPlaneBall? = null,
     val obstacleBalls: List<OnPlaneBall> = emptyList(),
-
-    // Table State Object
     val table: Table = Table(
         size = TableSize.EIGHT_FT,
         isVisible = false
     ),
-
-    // UI control state
     val zoomSliderPosition: Float = 0f,
     val worldRotationDegrees: Float = 0f,
     val areHelpersVisible: Boolean = LabelConfig.showLabelsByDefault,
     val isMoreHelpVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
     val isCameraVisible: Boolean = true,
-    val viewOffset: PointF = PointF(0f, 0f), // Pan state
+    val viewOffset: PointF = PointF(0f, 0f),
     val orientationLock: OrientationLock = OrientationLock.PORTRAIT,
     @Transient val pendingOrientationLock: OrientationLock? = null,
     val isBeginnerViewLocked: Boolean = false,
-
-    // Banking mode specific state
     val isBankingMode: Boolean = false,
     val bankingAimTarget: PointF? = null,
     @Transient val bankShotPath: List<PointF>? = null,
     @Transient val pocketedBankShotPocketIndex: Int? = null,
     val showTableSizeDialog: Boolean = false,
-
-    // Theme and Appearance
     val isForceLightMode: Boolean? = null,
     val luminanceAdjustment: Float = 0f,
     val showLuminanceDialog: Boolean = false,
     val glowStickValue: Float = 0f,
     val showGlowStickDialog: Boolean = false,
-
-    // Spin State
     val isSpinControlVisible: Boolean = false,
     val selectedSpinOffset: PointF? = null,
     @Transient val spinPaths: Map<Color, List<PointF>>? = null,
     val spinControlCenter: PointF? = null,
     val lingeringSpinOffset: PointF? = null,
     @Transient val spinPathsAlpha: Float = 1.0f,
-
-    // Tutorial State
     val showTutorialOverlay: Boolean = false,
     val currentTutorialStep: Int = 0,
     @Transient val tutorialHighlight: TutorialHighlightElement? = TutorialHighlightElement.NONE,
-
-    // Sensor and perspective data
     val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f),
     @Transient val pitchMatrix: Matrix? = null,
     @Transient val railPitchMatrix: Matrix? = null,
@@ -102,8 +83,6 @@ data class CueDetatState(
     @Transient val flatMatrix: Matrix? = null,
     @Transient val logicalPlaneMatrix: Matrix? = null,
     @Transient val hasInverseMatrix: Boolean = false,
-
-    // CV Data
     @Transient val visionData: VisionData? = null,
     @Transient val snapCandidates: List<SnapCandidate>? = null,
     val lockedHsvColor: FloatArray? = null,
@@ -127,8 +106,6 @@ data class CueDetatState(
     val colorSamplePoint: Offset? = null,
     @Transient val cameraMatrix: Mat? = null,
     @Transient val distCoeffs: Mat? = null,
-
-    // Derived state
     @Transient val shotLineAnchor: PointF? = null,
     @Transient val tangentDirection: Float = 1.0f,
     @Transient val isGeometricallyImpossible: Boolean = false,
@@ -143,21 +120,13 @@ data class CueDetatState(
     @Transient val aimedPocketIndex: Int? = null,
     @Transient val tangentAimedPocketIndex: Int? = null,
     @Transient val aimingLineEndPoint: PointF? = null,
-
-    // Theming
     @Transient val appControlColorScheme: ColorScheme? = null,
-
-    // Gesture State
     val interactionMode: InteractionMode = InteractionMode.NONE,
     val movingObstacleBallIndex: Int? = null,
     val isMagnifierVisible: Boolean = false,
     @Transient val magnifierSourceCenter: Offset? = null,
     val isWorldLocked: Boolean = false,
-
-    // State for Reset/Revert functionality
     @Transient val preResetState: CueDetatState? = null,
-
-    // Version Info
     @Transient val latestVersionName: String? = null,
     val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
     @Transient val targetBallDistance: Float = 0f,
@@ -177,14 +146,10 @@ data class CueDetatState(
 
 const val LOGICAL_BALL_RADIUS = 25f
 
-// A sealed class for all possible actions/events that can be dispatched to the reducer.
 sealed class MainScreenEvent {
-    // High-level Actions
     object ToggleExperienceModeSelection : MainScreenEvent()
     data class SetExperienceMode(val mode: ExperienceMode) : MainScreenEvent()
     data class HaterAction(val action: HaterEvent) : MainScreenEvent()
-
-    // UI-Originated Events
     object ToggleMenu : MainScreenEvent()
     object ToggleExpandedMenu : MainScreenEvent()
     data class ScreenGestureStarted(val position: PointF) : MainScreenEvent()
@@ -195,15 +160,11 @@ sealed class MainScreenEvent {
     data class TableRotationApplied(val degrees: Float) : MainScreenEvent()
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
     data class PanView(val delta: PointF) : MainScreenEvent()
-
-    // Spin Control Events
     object ToggleSpinControl : MainScreenEvent()
     data class SpinApplied(val offset: PointF) : MainScreenEvent()
     object SpinSelectionEnded : MainScreenEvent()
     data class DragSpinControl(val delta: PointF) : MainScreenEvent()
     object ClearSpinState : MainScreenEvent()
-
-    // Logical Events (dispatched by ViewModel)
     internal data class LogicalGestureStarted(val logicalPoint: PointF, val screenOffset: Offset) :
         MainScreenEvent()
 
@@ -212,8 +173,6 @@ sealed class MainScreenEvent {
         val currentLogicalPoint: PointF,
         val screenDelta: Offset
     ) : MainScreenEvent()
-
-    // Direct State Change Events
     data class TableRotationChanged(val degrees: Float) : MainScreenEvent()
     data class FullOrientationChanged(val orientation: FullOrientation) : MainScreenEvent()
     data class ThemeChanged(val scheme: ColorScheme) : MainScreenEvent()
@@ -239,11 +198,7 @@ sealed class MainScreenEvent {
 
     object UnlockBeginnerView : MainScreenEvent()
     object LockBeginnerView : MainScreenEvent()
-
-    // Obstacle Events
     object AddObstacleBall : MainScreenEvent()
-
-    // CV Events
     data class CvDataUpdated(val visionData: VisionData) : MainScreenEvent()
     object LockOrUnlockColor : MainScreenEvent()
     data class LockColor(val hsvMean: FloatArray, val hsvStdDev: FloatArray) : MainScreenEvent()
@@ -267,13 +222,9 @@ sealed class MainScreenEvent {
     object ExitCvMaskTestMode : MainScreenEvent()
     object EnterCalibrationMode : MainScreenEvent()
     data class SampleColorAt(val screenPosition: Offset) : MainScreenEvent()
-
-    // Tutorial Events
     object StartTutorial : MainScreenEvent()
     object NextTutorialStep : MainScreenEvent()
     object EndTutorial : MainScreenEvent()
-
-    // Meta/Single Events
     object CheckForUpdate : MainScreenEvent()
     object ViewArt : MainScreenEvent()
     object ViewAboutPage : MainScreenEvent()

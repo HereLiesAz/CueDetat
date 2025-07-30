@@ -6,12 +6,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
 import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationScreen
 import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
+import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignAnalyzer
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignScreen
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
@@ -25,12 +27,18 @@ fun ProtractorScreen(
 ) {
     val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
     val systemIsDark = isSystemInDarkTheme()
+    val quickAlignAnalyzer = remember { QuickAlignAnalyzer(quickAlignViewModel) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (uiState.isCameraVisible) {
+            val activeAnalyzer = when {
+                uiState.showCalibrationScreen -> calibrationAnalyzer
+                uiState.showQuickAlignScreen -> quickAlignAnalyzer
+                else -> mainViewModel.visionAnalyzer
+            }
             CameraBackground(
                 modifier = Modifier.fillMaxSize(),
-                analyzer = mainViewModel.visionAnalyzer
+                analyzer = activeAnalyzer
             )
         }
 
@@ -46,15 +54,13 @@ fun ProtractorScreen(
 
             uiState.showQuickAlignScreen -> {
                 QuickAlignScreen(
-                    uiState = uiState,
-                    analyzer = mainViewModel.visionAnalyzer,
                     onEvent = mainViewModel::onEvent,
-                    viewModel = quickAlignViewModel
+                    viewModel = quickAlignViewModel,
+                    analyzer = quickAlignAnalyzer
                 )
             }
 
             else -> {
-                // The MainLayout now wraps the ProtractorOverlay, providing the UI chrome
                 MainLayout(uiState = uiState, onEvent = mainViewModel::onEvent) {
                     ProtractorOverlay(
                         uiState = uiState,

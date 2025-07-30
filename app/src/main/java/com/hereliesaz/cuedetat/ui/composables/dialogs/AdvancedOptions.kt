@@ -18,12 +18,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
-import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
 fun AdvancedOptionsDialog(
-    uiState: OverlayState,
+    uiState: CueDetatState,
     onEvent: (MainScreenEvent) -> Unit,
     onDismiss: () -> Unit
 ) {

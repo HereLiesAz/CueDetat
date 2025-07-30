@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/data/VisionRepository.kt
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/data/VisionRepository.kt
 
 package com.hereliesaz.cuedetat.data
@@ -16,6 +15,7 @@ import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.utils.toMat
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
+import com.hereliesaz.cuedetat.view.state.CvRefinementMethod
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.opencv.core.Core
@@ -64,7 +64,6 @@ class VisionRepository @Inject constructor(
 
             genericObjectDetector.process(inputImage)
                 .addOnSuccessListener { detectedObjects ->
-                    // --- FIX: Correct Mat handling to prevent memory leaks/crashes ---
                     val originalMat = imageProxy.toMat()
                     var processedMat = Mat()
                     var matToUse: Mat
@@ -86,14 +85,13 @@ class VisionRepository @Inject constructor(
                         }
 
                         else -> {
-                            matToUse = originalMat // No rotation, use original directly
+                            matToUse = originalMat
                         }
                     }
 
                     if (matToUse !== originalMat) {
-                        originalMat.release() // Release the original if a new rotated one was created
+                        originalMat.release()
                     }
-                    // --- END FIX ---
 
                     val hsvMat = Mat()
                     Imgproc.cvtColor(matToUse, hsvMat, Imgproc.COLOR_BGR2HSV)
@@ -153,11 +151,11 @@ class VisionRepository @Inject constructor(
                         if (state.lockedHsvColor != null && state.lockedHsvStdDev != null) {
                             val mean = state.lockedHsvColor
                             val stdDev = state.lockedHsvStdDev
-                            val stdDevMultiplier = 2.0 // Multiplier for range
+                            val stdDevMultiplier = 2.0
                             val lowerBound = Scalar(
                                 (mean[0] - stdDevMultiplier * stdDev[0]).coerceAtLeast(0.0),
-                                (mean[1] - stdDevMultiplier * stdDev[1]).coerceAtLeast(40.0), // Min saturation
-                                (mean[2] - stdDevMultiplier * stdDev[2]).coerceAtLeast(40.0)  // Min value/brightness
+                                (mean[1] - stdDevMultiplier * stdDev[1]).coerceAtLeast(40.0),
+                                (mean[2] - stdDevMultiplier * stdDev[2]).coerceAtLeast(40.0)
                             )
                             val upperBound = Scalar(
                                 (mean[0] + stdDevMultiplier * stdDev[0]).coerceAtMost(180.0),
@@ -173,7 +171,6 @@ class VisionRepository @Inject constructor(
                                 Scalar((hsv[0] + hueRange).coerceAtMost(180.0), 255.0, 255.0)
                             Core.inRange(hsvMat, lowerBound, upperBound, mask)
                         }
-                        // Morphological closing to fill holes from specular highlights
                         val kernel =
                             Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
                         Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, kernel)
@@ -222,7 +219,7 @@ class VisionRepository @Inject constructor(
                         genericBalls = filteredBalls,
                         detectedHsvColor = hsvTuple?.first ?: hsv,
                         detectedBoundingBoxes = filteredDetectedObjects.map { it.boundingBox },
-                        cvMask = cvMask, // The mask is now correctly oriented
+                        cvMask = cvMask,
                         sourceImageWidth = inputImage.width,
                         sourceImageHeight = inputImage.height,
                         sourceImageRotation = rotationDegrees
@@ -263,7 +260,7 @@ class VisionRepository @Inject constructor(
 
         val expectedRadiusInImageCoords =
             getExpectedRadiusAtImageY(box.centerY().toFloat(), state, imageToScreenMatrix)
-        val tolerance = 0.5f // 50% tolerance
+        val tolerance = 0.5f
         val minRadius = expectedRadiusInImageCoords * (1 - tolerance)
         val maxRadius = expectedRadiusInImageCoords * (1 + tolerance)
 
@@ -281,7 +278,6 @@ class VisionRepository @Inject constructor(
                 state.cannyThreshold1.toDouble(),
                 state.cannyThreshold2.toDouble()
             )
-
             CvRefinementMethod.HOUGH -> findBallByHough(
                 roiMat,
                 minRadius,
