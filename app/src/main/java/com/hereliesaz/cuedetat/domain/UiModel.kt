@@ -115,6 +115,7 @@ data class CueDetatState(
     val hasCueBallBeenMoved: Boolean = false,
     val houghP1: Float = 100f,
     val houghP2: Float = 20f,
+    val houghThreshold: Int = 50,
     val cannyThreshold1: Float = 50f,
     val cannyThreshold2: Float = 150f,
     val showCvMask: Boolean = false,
@@ -251,6 +252,7 @@ sealed class MainScreenEvent {
     object ToggleCvRefinementMethod : MainScreenEvent()
     data class UpdateHoughP1(val value: Float) : MainScreenEvent()
     data class UpdateHoughP2(val value: Float) : MainScreenEvent()
+    data class UpdateHoughThreshold(val value: Float) : MainScreenEvent()
     data class UpdateCannyT1(val value: Float) : MainScreenEvent()
     data class UpdateCannyT2(val value: Float) : MainScreenEvent()
     object ToggleCvModel : MainScreenEvent()

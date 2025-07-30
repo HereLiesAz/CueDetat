@@ -48,7 +48,7 @@ internal fun reduceAdvancedOptionsAction(
             showCvMask = true
         )
 
-        is MainScreenEvent.LockOrUnlockColor.ToggleCvRefinementMethod -> state.copy(
+        is MainScreenEvent.ToggleCvRefinementMethod -> state.copy(
             cvRefinementMethod = state.cvRefinementMethod.next()
         )
 
