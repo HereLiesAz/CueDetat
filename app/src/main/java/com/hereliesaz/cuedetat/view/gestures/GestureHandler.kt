@@ -12,16 +12,16 @@ import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
-import com.hereliesaz.cuedetat.view.state.ExperienceMode
-import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.domain.CueDetatAction
+import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import kotlin.math.abs
 
-fun Modifier.detectManualGestures(uiState: OverlayState, onEvent: (MainScreenEvent) -> Unit) =
+fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (CueDetatAction) -> Unit) =
     this.pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
-            onEvent(MainScreenEvent.ScreenGestureStarted(PointF(down.position.x, down.position.y)))
+            onEvent(CueDetatAction.ScreenGestureStarted(PointF(down.position.x, down.position.y)))
             down.consume()
 
             var lastCentroid: Offset = down.position
@@ -39,13 +39,13 @@ fun Modifier.detectManualGestures(uiState: OverlayState, onEvent: (MainScreenEve
                         // Multi-finger gestures are disabled in locked beginner mode
                         if (uiState.experienceMode != ExperienceMode.BEGINNER || !uiState.isBeginnerViewLocked) {
                             if (zoom != 1f) {
-                                onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
+                                onEvent(CueDetatAction.ZoomScaleChanged(zoom))
                             }
                             if (rotation != 0f) {
-                                onEvent(MainScreenEvent.TableRotationApplied(rotation))
+                                onEvent(CueDetatAction.TableRotationApplied(rotation))
                             }
                             if (abs(pan.y) > 0.1f) {
-                                onEvent(MainScreenEvent.PanView(PointF(0f, pan.y)))
+                                onEvent(CueDetatAction.PanView(PointF(0f, pan.y)))
                             }
                         }
 
@@ -54,13 +54,13 @@ fun Modifier.detectManualGestures(uiState: OverlayState, onEvent: (MainScreenEve
                         if (pan != Offset.Zero) {
                             // Pan is disabled in locked beginner mode
                             if (uiState.isWorldLocked && (uiState.experienceMode != ExperienceMode.BEGINNER || !uiState.isBeginnerViewLocked)) {
-                                onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
+                                onEvent(CueDetatAction.PanView(PointF(pan.x, pan.y)))
                             } else {
                                 // Perform a logical drag on the plane.
                                 val previousPosition = lastCentroid
                                 val currentPosition = centroid
                                 onEvent(
-                                    MainScreenEvent.Drag(
+                                    CueDetatAction.Drag(
                                         previousPosition = PointF(
                                             previousPosition.x,
                                             previousPosition.y
@@ -80,6 +80,6 @@ fun Modifier.detectManualGestures(uiState: OverlayState, onEvent: (MainScreenEve
                 event.changes.forEach { if (it.pressed) it.consume() }
             } while (!canceled && event.changes.any { it.pressed })
 
-            onEvent(MainScreenEvent.GestureEnded)
+            onEvent(CueDetatAction.GestureEnded)
         }
     }

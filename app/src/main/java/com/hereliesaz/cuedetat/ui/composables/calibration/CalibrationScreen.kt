@@ -31,14 +31,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
 import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
-import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
 fun CalibrationScreen(
-    uiState: OverlayState,
+    uiState: CueDetatState,
     onEvent: (MainScreenEvent) -> Unit,
     viewModel: CalibrationViewModel = hiltViewModel(),
     analyzer: CalibrationAnalyzer

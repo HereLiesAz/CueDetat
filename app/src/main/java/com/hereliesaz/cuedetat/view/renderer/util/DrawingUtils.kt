@@ -4,7 +4,7 @@ package com.hereliesaz.cuedetat.view.renderer.util
 
 import android.graphics.Matrix
 import android.graphics.PointF
-import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.sin
@@ -16,7 +16,7 @@ object DrawingUtils {
     fun getPerspectiveRadiusAndLift(
         logicalCenter: PointF,
         logicalRadius: Float,
-        state: OverlayState,
+        state: CueDetatState,
         matrix: Matrix
     ): PerspectiveRadiusInfo {
 

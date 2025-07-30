@@ -16,13 +16,13 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.res.ResourcesCompat
 import com.hereliesaz.cuedetat.R
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
-import com.hereliesaz.cuedetat.view.state.OverlayState
 
 @Composable
 fun ProtractorOverlay(
-    uiState: OverlayState,
+    uiState: CueDetatState,
     systemIsDark: Boolean,
     isTestingCvMask: Boolean,
     onEvent: (MainScreenEvent) -> Unit,

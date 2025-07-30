@@ -7,8 +7,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.VisionData
+import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
 import com.hereliesaz.cuedetat.ui.hatemode.HaterState
-import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
@@ -24,7 +24,6 @@ import org.opencv.core.Mat
 // Represents the different modes the application can be in.
 enum class ExperienceMode {
     EXPERT, BEGINNER, HATER;
-
     fun next(): ExperienceMode {
         val nextOrdinal = (this.ordinal + 1) % values().size
         return values()[nextOrdinal]
@@ -174,7 +173,6 @@ data class CueDetatState(
 
     enum class OrientationLock {
         AUTOMATIC, PORTRAIT, LANDSCAPE;
-
         fun next(): OrientationLock = when (this) {
             AUTOMATIC -> PORTRAIT
             PORTRAIT -> LANDSCAPE
@@ -190,7 +188,7 @@ sealed class CueDetatAction {
     // High-level Actions
     object ToggleExperienceMode : CueDetatAction()
     data class ApplyPendingExperienceMode(val mode: ExperienceMode) : CueDetatAction()
-    data class HaterAction(val action: HaterViewModel.Action) : CueDetatAction()
+    data class HaterAction(val action: HaterEvent) : CueDetatAction()
 
     // UI-Originated Events
     data class ScreenGestureStarted(val position: PointF) : CueDetatAction()
@@ -242,7 +240,6 @@ sealed class CueDetatAction {
     object ApplyPendingOrientationLock : CueDetatAction()
     data class OrientationChanged(val orientationLock: CueDetatState.OrientationLock) :
         CueDetatAction()
-
     data class SetExperienceMode(val mode: ExperienceMode) : CueDetatAction()
     object UnlockBeginnerView : CueDetatAction()
     object LockBeginnerView : CueDetatAction()
@@ -260,7 +257,6 @@ sealed class CueDetatAction {
     object ToggleQuickAlignScreen : CueDetatAction()
     data class ApplyQuickAlign(val translation: Offset, val rotation: Float, val scale: Float) :
         CueDetatAction()
-
     object ToggleCvRefinementMethod : CueDetatAction()
     data class UpdateHoughP1(val value: Float) : CueDetatAction()
     data class UpdateHoughP2(val value: Float) : CueDetatAction()

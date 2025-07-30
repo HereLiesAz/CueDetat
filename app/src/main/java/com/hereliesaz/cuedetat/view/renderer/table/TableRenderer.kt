@@ -7,20 +7,20 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
 import androidx.compose.ui.graphics.toArgb
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.table.Holes
-import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class TableRenderer {
 
     companion object {
-        fun getLogicalPockets(state: OverlayState): List<PointF> {
+        fun getLogicalPockets(state: CueDetatState): List<PointF> {
             return state.table.pockets
         }
     }
 
-    fun drawSurface(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+    fun drawSurface(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
         if (!state.table.isVisible) return
 
         val corners = state.table.corners
@@ -61,7 +61,7 @@ class TableRenderer {
         return PointF(p1.x + (p2.x - p1.x) * fraction, p1.y + (p2.y - p1.y) * fraction)
     }
 
-    fun drawPockets(canvas: Canvas, state: OverlayState, paints: PaintCache) {
+    fun drawPockets(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
         if (!state.table.isVisible) return
         val referenceRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
         if (referenceRadius <= 0) return

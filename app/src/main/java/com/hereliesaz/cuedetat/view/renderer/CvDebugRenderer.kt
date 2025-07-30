@@ -5,7 +5,7 @@ package com.hereliesaz.cuedetat.view.renderer
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
-import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import org.opencv.android.Utils
 import org.opencv.core.Mat
 import org.opencv.imgproc.Imgproc
@@ -17,7 +17,7 @@ class CvDebugRenderer {
     }
     private var bmp: Bitmap? = null
 
-    fun draw(canvas: Canvas, state: OverlayState) {
+    fun draw(canvas: Canvas, state: CueDetatState) {
         if (!state.showCvMask) return
         val maskMat = state.visionData?.cvMask ?: return
 

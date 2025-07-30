@@ -5,22 +5,27 @@ package com.hereliesaz.cuedetat.domain
 import android.graphics.PointF
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
-import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.*
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.sin
 
 @Singleton
 class CalculateSpinPaths @Inject constructor() {
     private val maxPathLengthFactor = 20f
 
-    operator fun invoke(state: OverlayState): Map<Color, List<PointF>> {
+    operator fun invoke(state: CueDetatState): Map<Color, List<PointF>> {
         val interactiveSpinOffset = state.lingeringSpinOffset ?: state.selectedSpinOffset ?: return emptyMap()
 
         return calculateSinglePath(state, interactiveSpinOffset)
     }
 
-    private fun calculateSinglePath(state: OverlayState, spinOffset: PointF): Map<Color, List<PointF>> {
+    private fun calculateSinglePath(
+        state: CueDetatState,
+        spinOffset: PointF
+    ): Map<Color, List<PointF>> {
         val spinControlRadius = 60f * 2
         val spinMagnitude = hypot((spinOffset.x - spinControlRadius).toDouble(), (spinOffset.y - spinControlRadius).toDouble()).toFloat() / spinControlRadius
         val angleDegrees = Math.toDegrees(atan2(spinOffset.y - spinControlRadius, spinOffset.x - spinControlRadius).toDouble()).toFloat()
@@ -37,7 +42,11 @@ class CalculateSpinPaths @Inject constructor() {
         return mapOf(color to finalPath)
     }
 
-    private fun calculatePathForSpin(state: OverlayState, angleDegrees: Float, magnitude: Float): List<PointF> {
+    private fun calculatePathForSpin(
+        state: CueDetatState,
+        angleDegrees: Float,
+        magnitude: Float
+    ): List<PointF> {
         val startPoint = state.protractorUnit.ghostCueBallCenter
         val targetPoint = state.protractorUnit.center
         val tangentDirection = state.tangentDirection
@@ -72,7 +81,7 @@ class CalculateSpinPaths @Inject constructor() {
         return generateBezierCurve(startPoint, controlPoint1, controlPoint2, endPoint)
     }
 
-    private fun bankCurve(path: List<PointF>, state: OverlayState): List<PointF> {
+    private fun bankCurve(path: List<PointF>, state: CueDetatState): List<PointF> {
         if (path.size < 2) return path
 
         for (i in 0 until path.size - 1) {

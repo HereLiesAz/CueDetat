@@ -2,35 +2,32 @@ package com.hereliesaz.cuedetat.data
 
 import android.graphics.Bitmap
 import android.graphics.ImageFormat
+import androidx.annotation.OptIn
+import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import com.hereliesaz.cuedetat.view.state.OverlayState
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 
-/**
- * An ImageAnalysis.Analyzer that forwards camera frames and the current UI
- * state to the VisionRepository for processing.
- */
 class VisionAnalyzer @Inject constructor(
     private val visionRepository: VisionRepository
 ) : ImageAnalysis.Analyzer {
 
-    private val uiStateRef = AtomicReference<OverlayState?>(null)
+    private val uiStateRef = AtomicReference<CueDetatState?>(null)
 
     private val _currentFrameBitmap = MutableStateFlow<Bitmap?>(null)
     val currentFrameBitmap: StateFlow<Bitmap?> = _currentFrameBitmap
 
-    fun updateUiState(newState: OverlayState) {
+    fun updateUiState(newState: CueDetatState) {
         uiStateRef.set(newState)
     }
 
-    @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
+    @OptIn(ExperimentalGetImage::class)
     override fun analyze(image: ImageProxy) {
-        // Update the current frame bitmap
         val bitmap = image.toBitmap()
         if (bitmap != null) {
             _currentFrameBitmap.value = bitmap
@@ -41,10 +38,10 @@ class VisionAnalyzer @Inject constructor(
         } ?: image.close() // Close the image if state is not available to prevent leaks
     }
 
+    @OptIn(ExperimentalGetImage::class)
     private fun ImageProxy.toBitmap(): Bitmap? {
         val image = this.image ?: return null
 
-        // Assuming YUV_420_888 format which is common for camera previews
         if (image.format == ImageFormat.YUV_420_888) {
             val yBuffer = image.planes[0].buffer // Y
             val uBuffer = image.planes[1].buffer // U
@@ -77,7 +74,6 @@ class VisionAnalyzer @Inject constructor(
             val imageBytes = out.toByteArray()
             return android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
         } else {
-            // Fallback for other formats, though YUV_420_888 is most common
             val buffer: ByteBuffer = image.planes[0].buffer
             val bytes = ByteArray(buffer.remaining())
             buffer.get(bytes)

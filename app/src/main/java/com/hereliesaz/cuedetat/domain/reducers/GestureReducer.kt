@@ -4,6 +4,7 @@ package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
 import androidx.compose.ui.geometry.Offset
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.ui.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.ZoomMapping
@@ -25,7 +26,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             is MainScreenEvent.LogicalDragApplied -> handleLogicalDragApplied(currentState, event)
             is MainScreenEvent.GestureEnded -> handleGestureEnded(currentState)
             else -> currentState
-        }
+        } as OverlayState
     }
 
     private fun handleLogicalGestureStarted(currentState: OverlayState, event: MainScreenEvent.LogicalGestureStarted): OverlayState {
@@ -43,7 +44,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         val screenTouchRadiusPx = 96f
         // Calculate the current zoom factor from the slider position
         val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
-            currentState.experienceMode,
+            currentState.experienceMode as com.hereliesaz.cuedetat.domain.ExperienceMode?,
             currentState.isBeginnerViewLocked
         )
         val zoomFactor = ZoomMapping.sliderToZoom(currentState.zoomSliderPosition, minZoom, maxZoom)
@@ -194,7 +195,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         }
     }
 
-    private fun handleGestureEnded(currentState: OverlayState): OverlayState {
+    private fun handleGestureEnded(currentState: OverlayState): CueDetatState {
         var finalState = currentState.copy(interactionMode = InteractionMode.NONE, movingObstacleBallIndex = null, isMagnifierVisible = false)
 
         if (finalState.isSnappingEnabled) {

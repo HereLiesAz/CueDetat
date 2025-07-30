@@ -3,12 +3,12 @@ package com.hereliesaz.cuedetat.domain.reducers
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.domain.CueDetatAction
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
-import com.hereliesaz.cuedetat.view.state.ExperienceMode
 
 internal fun reduceToggleAction(
     state: CueDetatState,
@@ -25,7 +25,6 @@ internal fun reduceToggleAction(
             )
             reducerUtils.snapViolatingBalls(newState)
         }
-
         is CueDetatAction.SetTableSize -> {
             val newState = state.copy(
                 table = state.table.copy(size = action.size),
@@ -33,7 +32,6 @@ internal fun reduceToggleAction(
             )
             reducerUtils.snapViolatingBalls(newState)
         }
-
         is CueDetatAction.ToggleTableSizeDialog -> state.copy(showTableSizeDialog = !state.showTableSizeDialog)
         is CueDetatAction.ToggleForceTheme -> {
             val newMode = when (state.isForceLightMode) {
@@ -41,13 +39,11 @@ internal fun reduceToggleAction(
             }
             state.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)
         }
-
         is CueDetatAction.ToggleCamera -> state.copy(isCameraVisible = !state.isCameraVisible)
         is CueDetatAction.ToggleDistanceUnit -> state.copy(
             distanceUnit = if (state.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC,
             valuesChangedSinceReset = true
         )
-
         is CueDetatAction.ToggleLuminanceDialog -> state.copy(showLuminanceDialog = !state.showLuminanceDialog)
         is CueDetatAction.ToggleGlowStickDialog -> state.copy(showGlowStickDialog = !state.showGlowStickDialog)
         is CueDetatAction.ToggleHelp -> state.copy(areHelpersVisible = !state.areHelpersVisible)
@@ -58,7 +54,6 @@ internal fun reduceToggleAction(
             val current = state.pendingOrientationLock ?: state.orientationLock
             state.copy(pendingOrientationLock = current.next())
         }
-
         is CueDetatAction.ApplyPendingOrientationLock -> {
             if (state.pendingOrientationLock == null) return state
             return state.copy(
@@ -66,14 +61,12 @@ internal fun reduceToggleAction(
                 pendingOrientationLock = null
             )
         }
-
         is CueDetatAction.OrientationChanged -> state.copy(orientationLock = action.orientationLock)
         is CueDetatAction.SetExperienceMode -> handleSetExperienceMode(
             state,
             action.mode,
             reducerUtils
         )
-
         is CueDetatAction.UnlockBeginnerView -> state.copy(isBeginnerViewLocked = false)
         is CueDetatAction.LockBeginnerView -> {
             state.copy(
@@ -86,7 +79,6 @@ internal fun reduceToggleAction(
                 zoomSliderPosition = 50f
             )
         }
-
         is CueDetatAction.ToggleCalibrationScreen -> state.copy(showCalibrationScreen = !state.showCalibrationScreen)
         is CueDetatAction.ToggleQuickAlignScreen -> state.copy(showQuickAlignScreen = !state.showQuickAlignScreen)
         else -> state
@@ -124,7 +116,6 @@ private fun handleSetExperienceMode(
                 areHelpersVisible = false
             )
         }
-
         ExperienceMode.BEGINNER -> {
             newState.copy(
                 table = newState.table.copy(isVisible = false),
@@ -135,7 +126,6 @@ private fun handleSetExperienceMode(
                 zoomSliderPosition = 50f
             )
         }
-
         ExperienceMode.HATER -> {
             newState
         }
@@ -149,7 +139,7 @@ private fun handleToggleBankingMode(
     val bankingEnabled = !state.isBankingMode
     val newState = if (bankingEnabled) {
         val newBankingBall = OnPlaneBall(center = PointF(0f, 0f), radius = LOGICAL_BALL_RADIUS)
-        val defaultTableRotation = 90f // Corrected from 0f to 90f
+        val defaultTableRotation = 90f
         val initialAimTarget =
             calculateInitialBankingAimTarget(newBankingBall, defaultTableRotation)
         state.copy(

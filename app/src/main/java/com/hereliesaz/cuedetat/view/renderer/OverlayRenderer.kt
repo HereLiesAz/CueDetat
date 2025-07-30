@@ -45,14 +45,13 @@ class OverlayRenderer {
             }
 
         // Pass 1: Draw elements on the logical plane
-        canvas.save()
-        canvas.concat(matrixFor2DPlane)
-        if (state.table.isVisible) {
-            tableRenderer.drawSurface(canvas, state, paints)
-            tableRenderer.drawPockets(canvas, state, paints)
+        canvas.withMatrix(matrixFor2DPlane) {
+            if (state.table.isVisible) {
+                tableRenderer.drawSurface(this, state, paints)
+                tableRenderer.drawPockets(this, state, paints)
+            }
+            lineRenderer.drawLogicalLines(this, state, paints, typeface)
         }
-        lineRenderer.drawLogicalLines(canvas, state, paints, typeface)
-        canvas.restore()
 
 
         // Pass 2: Draw the "lifted" table rails

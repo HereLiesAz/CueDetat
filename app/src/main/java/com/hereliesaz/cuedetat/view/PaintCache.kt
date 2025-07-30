@@ -11,6 +11,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.ColorUtils
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.ui.theme.BankLine1Yellow
 import com.hereliesaz.cuedetat.ui.theme.BankLine2Yellow
 import com.hereliesaz.cuedetat.ui.theme.BankLine3Yellow
@@ -18,7 +19,6 @@ import com.hereliesaz.cuedetat.ui.theme.BankLine4Yellow
 import com.hereliesaz.cuedetat.ui.theme.MutedGray
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.config.table.Table
-import com.hereliesaz.cuedetat.view.state.OverlayState
 
 class PaintCache {
     private val strokeWidth = 6f
@@ -78,7 +78,7 @@ class PaintCache {
         textPaint.typeface = typeface
     }
 
-    fun updateColors(uiState: OverlayState, isDark: Boolean) {
+    fun updateColors(uiState: CueDetatState, isDark: Boolean) {
         val LUMINANCE_ADJUST = uiState.luminanceAdjustment
         val baseScheme = uiState.appControlColorScheme ?: darkColorScheme()
 

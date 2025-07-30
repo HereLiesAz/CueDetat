@@ -3,12 +3,11 @@ package com.hereliesaz.cuedetat.ui.hatemode
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.github.minigdx.kphysics.body.BodyDefinition
-import com.github.minigdx.kphysics.body.BodyType
-import com.github.minigdx.kphysics.fixture.FixtureDefinition
-import com.github.minigdx.kphysics.shape.CircleShape
 import de.chaffic.dynamics.Body
 import de.chaffic.dynamics.World
+import de.chaffic.dynamics.bodies.BodyType
+import de.chaffic.dynamics.fixture.Fixture
+import de.chaffic.geometry.Circle
 import de.chaffic.math.Vec2
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -19,8 +18,7 @@ import java.util.UUID
 import javax.inject.Inject
 import kotlin.random.Random
 
-class HaterViewModel @Inject constructor(
-) : ViewModel() {
+class HaterViewModel @Inject constructor() : ViewModel() {
 
     private val reducer = HaterReducer()
 
@@ -42,27 +40,22 @@ class HaterViewModel @Inject constructor(
                 resetForNewSession()
                 startPhysicsLoop()
             }
-
             is HaterEvent.ShowHater -> {
                 if (!_state.value.isCooldownActive) {
                     showNewHaterResponse()
                 }
             }
-
             is HaterEvent.UpdateSensorOffset -> {
-                // Apply gravity based on sensor data
                 val gravityX = event.roll * 0.2f
                 val gravityY = event.pitch * 0.2f
                 world.gravity = Vec2(gravityX.toDouble(), gravityY.toDouble())
             }
-
             is HaterEvent.DragTriangle -> {
                 triangleBody?.apply {
                     val force = Vec2(event.delta.x.toDouble() * 200, event.delta.y.toDouble() * 200)
                     applyForceToCenter(force)
                 }
             }
-
             else -> {}
         }
     }
@@ -71,11 +64,11 @@ class HaterViewModel @Inject constructor(
         physicsJob?.cancel()
         physicsJob = viewModelScope.launch {
             while (true) {
-                world.step(1 / 60f, 8, 3)
+                world.step(1 / 60f)
                 triangleBody?.let { body ->
                     _state.value = _state.value.copy(
-                        position = Offset(body.position.x, body.position.y),
-                        angle = Math.toDegrees(body.angle.toDouble()).toFloat()
+                        position = Offset(body.position.x.toFloat(), body.position.y.toFloat()),
+                        angle = Math.toDegrees(body.angle).toFloat()
                     )
                 }
                 delay(16) // ~60fps
@@ -106,7 +99,6 @@ class HaterViewModel @Inject constructor(
                 availableResponses.random()
             }
 
-            // Create a new physics body for the new answer
             triangleBody?.let { world.destroyBody(it) }
             triangleBody = createTriangleBody()
 
@@ -130,19 +122,24 @@ class HaterViewModel @Inject constructor(
     }
 
     private fun createTriangleBody(): Body {
-        val bodyDef = BodyDefinition(type = BodyType.DYNAMIC, position = Vec2(0.0, 0.0))
-        val body = world.createBody(bodyDef).apply {
-            userData = UUID.randomUUID().toString()
-            linearDamping = 0.8f
-            angularDamping = 0.9f
-        }
-        val circle = CircleShape(radius = 150f)
-        val fixtureDef =
-            FixtureDefinition(shape = circle, density = 0.5f, friction = 0.3f, restitution = 0.5f)
-        body.createFixture(fixtureDef)
-        circle.dispose()
+        val body = Body()
+        body.bodyType = BodyType.DYNAMIC
+        body.position = Vec2(0.0, 0.0)
+        body.userData = UUID.randomUUID().toString()
+        body.linearDamping = 0.8
+        body.angularDamping = 0.9
+
+        val circle = Circle(150.0)
+        val fixture = Fixture(circle)
+        fixture.density = 0.5
+        fixture.friction = 0.3
+        fixture.restitution = 0.5
+        body.addFixture(fixture)
+
+        world.addBody(body)
         return body
     }
+
 
     override fun onCleared() {
         super.onCleared()

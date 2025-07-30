@@ -3,7 +3,6 @@
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
-import com.hereliesaz.cuedetat.view.state.OverlayState
 import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.pow
@@ -13,7 +12,7 @@ data class BankShotResult(val path: List<PointF>, val pocketedPocketIndex: Int?)
 
 class CalculateBankShot @Inject constructor() {
 
-    operator fun invoke(state: OverlayState): BankShotResult {
+    operator fun invoke(state: CueDetatState): BankShotResult {
         if (!state.isBankingMode || state.onPlaneBall == null || state.bankingAimTarget == null) {
             return BankShotResult(emptyList(), null)
         }
@@ -58,7 +57,7 @@ class CalculateBankShot @Inject constructor() {
     private fun checkPocketAim(
         start: PointF,
         end: PointF,
-        state: OverlayState
+        state: CueDetatState
     ): Pair<Int?, PointF?> {
         val dirX = end.x - start.x
         val dirY = end.y - start.y

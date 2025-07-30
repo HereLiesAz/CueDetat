@@ -10,11 +10,11 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.DetectedObject
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.hereliesaz.cuedetat.di.GenericDetector
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.CvRefinementMethod
-import com.hereliesaz.cuedetat.view.state.OverlayState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.opencv.core.Core
@@ -43,7 +43,7 @@ class VisionRepository @Inject constructor(
     private var lastFrameTime = 0L
 
     @SuppressLint("UnsafeOptInUsageError")
-    fun processImage(imageProxy: ImageProxy, state: OverlayState) {
+    fun processImage(imageProxy: ImageProxy, state: CueDetatState) {
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastFrameTime < 33) { // ~30 FPS cap
             imageProxy.close()
@@ -64,7 +64,7 @@ class VisionRepository @Inject constructor(
                 .addOnSuccessListener { detectedObjects ->
                     val unrotatedMat = imageProxyToMat(imageProxy)
                     // --- FIX: Rotate the Mat to match the InputImage orientation BEFORE processing ---
-                    val mat = Mat()
+                    var mat = Mat()
                     val rotationDegrees = imageProxy.imageInfo.rotationDegrees
                     when (rotationDegrees) {
                         90 -> Core.rotate(unrotatedMat, mat, Core.ROTATE_90_CLOCKWISE)
@@ -229,7 +229,7 @@ class VisionRepository @Inject constructor(
     private fun refineBallCenter(
         detectedObject: DetectedObject,
         frame: Mat,
-        state: OverlayState,
+        state: CueDetatState,
         imageToScreenMatrix: Matrix
     ): PointF? {
         val box = detectedObject.boundingBox
@@ -278,7 +278,7 @@ class VisionRepository @Inject constructor(
 
     private fun getExpectedRadiusAtImageY(
         imageY: Float,
-        state: OverlayState,
+        state: CueDetatState,
         imageToScreenMatrix: Matrix
     ): Float {
         val pitchMatrix = state.pitchMatrix

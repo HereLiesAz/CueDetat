@@ -10,6 +10,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.graphics.withMatrix
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.ui.ZoomMapping
@@ -158,11 +159,10 @@ class BallRenderer {
             )
 
             // Draw 2D component (immobile on the flat plane)
-            canvas.save()
-            canvas.concat(logicalBallMatrix)
-            canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, logicalStrokePaint)
-            canvas.drawCircle(ball.center.x, ball.center.y, dotRadius, dotPaint)
-            canvas.restore()
+            canvas.withMatrix(logicalBallMatrix) {
+                drawCircle(ball.center.x, ball.center.y, ball.radius, logicalStrokePaint)
+                drawCircle(ball.center.x, ball.center.y, dotRadius, dotPaint)
+            }
 
             // Calculate bubble offset
             val sensitivity = 2.5f // Pixels of offset per degree of tilt

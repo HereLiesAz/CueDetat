@@ -1,3 +1,0 @@
--- Configuring done
--- Generating done
--- Build files have been written to: G:/My Drive/CueDetat/opencv/.cxx/Debug/5v552x38/arm64-v8a
