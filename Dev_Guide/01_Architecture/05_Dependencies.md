@@ -29,13 +29,14 @@ The main application module must be configured with the following parameters:
         * `targetSdk`: 36
         * `versionCode`: 20
         * `versionName`: "0.8.3.1"
-        * **ABI Filters**: The build must be restricted to `arm64-v8a` to manage APK size.
-    * **`buildTypes`**:
-        * `release`: Must have `isMinifyEnabled` and `isShrinkResources` set to `true`, using the
-          standard Android optimization profile and the project's `proguard-rules.pro`.
-    * **`buildFeatures`**: `compose` and `buildConfig` must be enabled.
+      * **ABI Splitting**: The build is configured to split APKs for four common ABIs (
+        `armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`) to provide optimized builds for different
+        devices.
+* **`buildTypes`**:
+    * `release`: Must have `isMinifyEnabled` and `isShrinkResources` set to `true`, using the
+      standard Android optimization profile and the project's `proguard-rules.pro`.
+* **`buildFeatures`**: `compose` and `buildConfig` must be enabled.
     * **`kotlinOptions`**: `jvmTarget` must be "17".
-
 ## Core Dependencies
 
 The project's dependencies are managed via a `libs.versions.toml` file. The following are the
@@ -51,7 +52,6 @@ essential libraries and their purpose:
     * `compose-bom`: Manages versions for all Compose libraries.
     * `ui`, `ui-graphics`, `ui-tooling-preview`: Core Compose UI components.
     * `material3`, `material-icons-extended`: Material Design 3 components and icons.
-
 * **Dependency Injection (Hilt):**
     * `hilt-android`: Core Hilt/Dagger library.
     * `hilt-compiler`: Kapt annotation processor for Hilt.
@@ -60,10 +60,8 @@ essential libraries and their purpose:
 * **CameraX:**
     * `camera-core`, `camera-camera2`, `camera-lifecycle`, `camera-view`: The core components for
       creating a camera preview and analyzing image streams.
-
 * **Networking (Retrofit):**
     * `retrofit`, `converter-gson`: For making network calls to the GitHub API.
-
 * **Computer Vision:**
     * `project(":opencv")`: The local OpenCV module.
     * `object-detection-custom` & `vision-common` (Google ML Kit): For the "Scout" phase of the

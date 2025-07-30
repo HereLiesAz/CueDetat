@@ -30,7 +30,7 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
 import kotlin.math.atan2
 import kotlin.math.cos

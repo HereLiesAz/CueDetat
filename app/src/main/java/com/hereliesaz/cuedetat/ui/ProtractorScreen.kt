@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
 import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationScreen
 import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel

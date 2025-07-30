@@ -17,7 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.res.ResourcesCompat
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
 
 @Composable

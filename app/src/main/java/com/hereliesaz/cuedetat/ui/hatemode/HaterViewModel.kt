@@ -116,11 +116,10 @@ class HaterViewModel @Inject constructor() : ViewModel() {
         body.angularVelocity = Random.nextDouble(-2.0, 2.0)
 
         val shape = Circle(60.0)
-        val fixture = Fixture(shape)
+        val fixture = body.createFixture(shape)
         fixture.density = 0.7
         fixture.friction = 0.4
         fixture.restitution = 0.5
-        body.addFixture(fixture)
 
         return body
     }
@@ -145,8 +144,7 @@ class HaterViewModel @Inject constructor() : ViewModel() {
         body.bodyType = BodyType.STATIC
         body.position.set(x, y)
         val shape = Polygon(width, height)
-        val fixture = Fixture(shape)
-        body.addFixture(fixture)
+        body.createFixture(shape)
         world.addBody(body)
     }
 

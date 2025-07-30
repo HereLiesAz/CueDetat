@@ -22,7 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.R
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.theme.VoidBlack
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.ExperienceMode

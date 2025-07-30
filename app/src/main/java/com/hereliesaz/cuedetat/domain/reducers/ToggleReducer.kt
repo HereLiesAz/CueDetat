@@ -1,10 +1,10 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
-import com.hereliesaz.cuedetat.domain.CueDetatAction
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
@@ -12,63 +12,70 @@ import com.hereliesaz.cuedetat.view.state.DistanceUnit
 
 internal fun reduceToggleAction(
     state: CueDetatState,
-    action: CueDetatAction,
+    action: MainScreenEvent,
     reducerUtils: ReducerUtils
 ): CueDetatState {
     return when (action) {
-        is CueDetatAction.ToggleSpinControl -> state.copy(isSpinControlVisible = !state.isSpinControlVisible)
-        is CueDetatAction.ToggleBankingMode -> handleToggleBankingMode(state, reducerUtils)
-        is CueDetatAction.CycleTableSize -> {
+        is MainScreenEvent.ToggleSpinControl -> state.copy(isSpinControlVisible = !state.isSpinControlVisible)
+        is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(state, reducerUtils)
+        is MainScreenEvent.CycleTableSize -> {
             val newState = state.copy(
                 table = state.table.copy(size = state.table.size.next()),
                 valuesChangedSinceReset = true
             )
             reducerUtils.snapViolatingBalls(newState)
         }
-        is CueDetatAction.SetTableSize -> {
+
+        is MainScreenEvent.SetTableSize -> {
             val newState = state.copy(
                 table = state.table.copy(size = action.size),
                 valuesChangedSinceReset = true
             )
             reducerUtils.snapViolatingBalls(newState)
         }
-        is CueDetatAction.ToggleTableSizeDialog -> state.copy(showTableSizeDialog = !state.showTableSizeDialog)
-        is CueDetatAction.ToggleForceTheme -> {
+
+        is MainScreenEvent.ToggleTableSizeDialog -> state.copy(showTableSizeDialog = !state.showTableSizeDialog)
+        is MainScreenEvent.ToggleForceTheme -> {
             val newMode = when (state.isForceLightMode) {
                 null -> true; true -> false; false -> null
             }
             state.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)
         }
-        is CueDetatAction.ToggleCamera -> state.copy(isCameraVisible = !state.isCameraVisible)
-        is CueDetatAction.ToggleDistanceUnit -> state.copy(
+
+        is MainScreenEvent.ToggleCamera -> state.copy(isCameraVisible = !state.isCameraVisible)
+        is MainScreenEvent.ToggleDistanceUnit -> state.copy(
             distanceUnit = if (state.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC,
             valuesChangedSinceReset = true
         )
-        is CueDetatAction.ToggleLuminanceDialog -> state.copy(showLuminanceDialog = !state.showLuminanceDialog)
-        is CueDetatAction.ToggleGlowStickDialog -> state.copy(showGlowStickDialog = !state.showGlowStickDialog)
-        is CueDetatAction.ToggleHelp -> state.copy(areHelpersVisible = !state.areHelpersVisible)
-        is CueDetatAction.ToggleMoreHelp -> state.copy(isMoreHelpVisible = !state.isMoreHelpVisible)
-        is CueDetatAction.ToggleSnapping -> state.copy(isSnappingEnabled = !state.isSnappingEnabled)
-        is CueDetatAction.ToggleCvModel -> state.copy(useCustomModel = !state.useCustomModel)
-        is CueDetatAction.ToggleOrientationLock -> {
+
+        is MainScreenEvent.ToggleLuminanceDialog -> state.copy(showLuminanceDialog = !state.showLuminanceDialog)
+        is MainScreenEvent.ToggleGlowStickDialog -> state.copy(showGlowStickDialog = !state.showGlowStickDialog)
+        is MainScreenEvent.ToggleHelp -> state.copy(areHelpersVisible = !state.areHelpersVisible)
+        is MainScreenEvent.ToggleMoreHelp -> state.copy(isMoreHelpVisible = !state.isMoreHelpVisible)
+        is MainScreenEvent.ToggleSnapping -> state.copy(isSnappingEnabled = !state.isSnappingEnabled)
+        is MainScreenEvent.ToggleCvModel -> state.copy(useCustomModel = !state.useCustomModel)
+        is MainScreenEvent.ToggleOrientationLock -> {
             val current = state.pendingOrientationLock ?: state.orientationLock
             state.copy(pendingOrientationLock = current.next())
         }
-        is CueDetatAction.ApplyPendingOrientationLock -> {
+
+        is MainScreenEvent.ApplyPendingOrientationLock -> {
             if (state.pendingOrientationLock == null) return state
             return state.copy(
                 orientationLock = state.pendingOrientationLock,
                 pendingOrientationLock = null
             )
         }
-        is CueDetatAction.OrientationChanged -> state.copy(orientationLock = action.orientationLock)
-        is CueDetatAction.SetExperienceMode -> handleSetExperienceMode(
+
+        is MainScreenEvent.OrientationChanged -> state.copy(orientationLock = action.orientationLock)
+        is MainScreenEvent.SetExperienceMode -> handleSetExperienceMode(
             state,
             action.mode,
             reducerUtils
         )
-        is CueDetatAction.UnlockBeginnerView -> state.copy(isBeginnerViewLocked = false)
-        is CueDetatAction.LockBeginnerView -> {
+
+        is MainScreenEvent.UnlockBeginnerView -> state.copy(isBeginnerViewLocked = false)
+        is MainScreenEvent.LockBeginnerView -> {
             state.copy(
                 isBeginnerViewLocked = true,
                 protractorUnit = ProtractorUnit(
@@ -79,8 +86,9 @@ internal fun reduceToggleAction(
                 zoomSliderPosition = 50f
             )
         }
-        is CueDetatAction.ToggleCalibrationScreen -> state.copy(showCalibrationScreen = !state.showCalibrationScreen)
-        is CueDetatAction.ToggleQuickAlignScreen -> state.copy(showQuickAlignScreen = !state.showQuickAlignScreen)
+
+        is MainScreenEvent.ToggleCalibrationScreen -> state.copy(showCalibrationScreen = !state.showCalibrationScreen)
+        is MainScreenEvent.ToggleQuickAlignScreen -> state.copy(showQuickAlignScreen = !state.showQuickAlignScreen)
         else -> state
     }
 }

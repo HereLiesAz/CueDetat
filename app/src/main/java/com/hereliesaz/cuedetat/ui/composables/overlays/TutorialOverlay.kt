@@ -34,15 +34,15 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import com.hereliesaz.cuedetat.domain.CueDetatAction
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 
 @Composable
 fun TutorialOverlay(
     uiState: CueDetatState,
-    onEvent: (CueDetatAction) -> Unit
+    onEvent: (MainScreenEvent) -> Unit
 ) {
     val tutorialSteps = remember {
         listOf(
@@ -174,11 +174,11 @@ fun TutorialOverlay(
                 Spacer(Modifier.height(16.dp))
                 Row {
                     if (uiState.currentTutorialStep < tutorialSteps.lastIndex) {
-                        TextButton(onClick = { onEvent(CueDetatAction.NextTutorialStep) }) {
+                        TextButton(onClick = { onEvent(MainScreenEvent.NextTutorialStep) }) {
                             Text("Next")
                         }
                     }
-                    TextButton(onClick = { onEvent(CueDetatAction.EndTutorial) }) {
+                    TextButton(onClick = { onEvent(MainScreenEvent.EndTutorial) }) {
                         Text("Finish")
                     }
                 }

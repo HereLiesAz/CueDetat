@@ -1,16 +1,16 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
-import com.hereliesaz.cuedetat.domain.CueDetatAction
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 
-internal fun reduceCvAction(state: CueDetatState, action: CueDetatAction): CueDetatState {
+internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueDetatState {
     return when (action) {
-        is CueDetatAction.CvDataUpdated -> {
+        is MainScreenEvent.CvDataUpdated -> {
             // Forward the data, but let the SnapReducer handle the candidates
             state.copy(visionData = action.visionData)
         }
 
-        is CueDetatAction.LockOrUnlockColor -> {
+        is MainScreenEvent.LockOrUnlockColor -> {
             if (state.lockedHsvColor == null) {
                 state.copy(
                     lockedHsvColor = state.visionData?.detectedHsvColor,
@@ -27,11 +27,11 @@ internal fun reduceCvAction(state: CueDetatState, action: CueDetatAction): CueDe
             }
         }
 
-        is CueDetatAction.LockColor -> {
+        is MainScreenEvent.LockColor -> {
             state.copy(lockedHsvColor = action.hsvMean, lockedHsvStdDev = action.hsvStdDev)
         }
 
-        is CueDetatAction.ClearSamplePoint -> {
+        is MainScreenEvent.ClearSamplePoint -> {
             state.copy(colorSamplePoint = null)
         }
 

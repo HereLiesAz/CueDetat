@@ -10,7 +10,6 @@ import com.hereliesaz.cuedetat.domain.reducers.reduceSpinAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceSystemAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceToggleAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceTutorialAction
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
 
 /**
  * The single, unified reducer for the entire application state. It
@@ -22,69 +21,62 @@ fun stateReducer(
     reducerUtils: ReducerUtils,
     gestureReducer: GestureReducer
 ): CueDetatState {
-    // Downcast to CueDetatAction for all reducers except the gesture reducer
-    val cueDetatAction = action as? CueDetatAction
-
-    return when {
+    return when (action) {
         // Gesture events are handled by the dedicated GestureReducer
-        action is MainScreenEvent.LogicalGestureStarted || action is MainScreenEvent.LogicalDragApplied || action is MainScreenEvent.GestureEnded -> {
+        is MainScreenEvent.LogicalGestureStarted, is MainScreenEvent.LogicalDragApplied, is MainScreenEvent.GestureEnded -> {
             gestureReducer.reduce(currentState, action)
         }
         // All other actions are handled by the sub-reducers
-        cueDetatAction != null -> {
-            when (cueDetatAction) {
-                is CueDetatAction.Reset -> reduceAction(currentState, cueDetatAction, reducerUtils)
-                is CueDetatAction.ToggleAdvancedOptionsDialog, is CueDetatAction.ToggleCvMask,
-                is CueDetatAction.EnterCvMaskTestMode, is CueDetatAction.ExitCvMaskTestMode,
-                is CueDetatAction.EnterCalibrationMode, is CueDetatAction.SampleColorAt,
-                is CueDetatAction.ToggleCvRefinementMethod, is CueDetatAction.UpdateHoughP1,
-                is CueDetatAction.UpdateHoughP2, is CueDetatAction.UpdateCannyT1, is CueDetatAction.UpdateCannyT2,
-                is CueDetatAction.ToggleCvModel, is CueDetatAction.ToggleSnapping ->
-                    reduceAdvancedOptionsAction(currentState, cueDetatAction)
+        is MainScreenEvent.Reset -> reduceAction(currentState, action, reducerUtils)
 
-                is CueDetatAction.ZoomSliderChanged, is CueDetatAction.ZoomScaleChanged,
-                is CueDetatAction.TableRotationApplied, is CueDetatAction.TableRotationChanged,
-                is CueDetatAction.AdjustLuminance, is CueDetatAction.AdjustGlow,
-                is CueDetatAction.PanView, is CueDetatAction.ApplyQuickAlign ->
-                    reduceControlAction(currentState, cueDetatAction)
+        is MainScreenEvent.ToggleAdvancedOptionsDialog, is MainScreenEvent.ToggleCvMask,
+        is MainScreenEvent.EnterCvMaskTestMode, is MainScreenEvent.ExitCvMaskTestMode,
+        is MainScreenEvent.EnterCalibrationMode, is MainScreenEvent.SampleColorAt,
+        is MainScreenEvent.ToggleCvRefinementMethod, is MainScreenEvent.UpdateHoughP1,
+        is MainScreenEvent.UpdateHoughP2, is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2,
+        is MainScreenEvent.ToggleCvModel, is MainScreenEvent.ToggleSnapping ->
+            reduceAdvancedOptionsAction(currentState, action)
 
-                is CueDetatAction.CvDataUpdated, is CueDetatAction.LockOrUnlockColor,
-                is CueDetatAction.LockColor, is CueDetatAction.ClearSamplePoint ->
-                    reduceCvAction(currentState, cueDetatAction)
+        is MainScreenEvent.ZoomSliderChanged, is MainScreenEvent.ZoomScaleChanged,
+        is MainScreenEvent.TableRotationApplied, is MainScreenEvent.TableRotationChanged,
+        is MainScreenEvent.AdjustLuminance, is MainScreenEvent.AdjustGlow,
+        is MainScreenEvent.PanView, is MainScreenEvent.ApplyQuickAlign ->
+            reduceControlAction(currentState, action)
 
-                is CueDetatAction.AddObstacleBall -> reduceObstacleAction(
-                    currentState,
-                    cueDetatAction,
-                    reducerUtils
-                )
+        is MainScreenEvent.CvDataUpdated, is MainScreenEvent.LockOrUnlockColor,
+        is MainScreenEvent.LockColor, is MainScreenEvent.ClearSamplePoint ->
+            reduceCvAction(currentState, action)
 
-                is CueDetatAction.SpinApplied, is CueDetatAction.SpinSelectionEnded,
-                is CueDetatAction.DragSpinControl, is CueDetatAction.ClearSpinState ->
-                    reduceSpinAction(currentState, cueDetatAction)
+        is MainScreenEvent.AddObstacleBall -> reduceObstacleAction(
+            currentState,
+            action,
+            reducerUtils
+        )
 
-                is CueDetatAction.SizeChanged, is CueDetatAction.FullOrientationChanged,
-                is CueDetatAction.ThemeChanged, is CueDetatAction.SetWarning ->
-                    reduceSystemAction(currentState, cueDetatAction)
+        is MainScreenEvent.SpinApplied, is MainScreenEvent.SpinSelectionEnded,
+        is MainScreenEvent.DragSpinControl, is MainScreenEvent.ClearSpinState ->
+            reduceSpinAction(currentState, action)
 
-                is CueDetatAction.ToggleSpinControl, is CueDetatAction.CycleTableSize,
-                is CueDetatAction.SetTableSize, is CueDetatAction.ToggleTableSizeDialog,
-                is CueDetatAction.ToggleForceTheme, is CueDetatAction.ToggleCamera,
-                is CueDetatAction.ToggleDistanceUnit, is CueDetatAction.ToggleLuminanceDialog,
-                is CueDetatAction.ToggleGlowStickDialog, is CueDetatAction.ToggleHelp,
-                is CueDetatAction.ToggleMoreHelp,
-                is CueDetatAction.ToggleOrientationLock,
-                is CueDetatAction.ApplyPendingOrientationLock, is CueDetatAction.OrientationChanged,
-                is CueDetatAction.SetExperienceMode, is CueDetatAction.UnlockBeginnerView,
-                is CueDetatAction.LockBeginnerView, is CueDetatAction.ToggleCalibrationScreen,
-                is CueDetatAction.ToggleQuickAlignScreen, is CueDetatAction.ToggleBankingMode ->
-                    reduceToggleAction(currentState, cueDetatAction, reducerUtils)
+        is MainScreenEvent.SizeChanged, is MainScreenEvent.FullOrientationChanged,
+        is MainScreenEvent.ThemeChanged, is MainScreenEvent.SetWarning ->
+            reduceSystemAction(currentState, action)
 
-                is CueDetatAction.StartTutorial, is CueDetatAction.NextTutorialStep,
-                is CueDetatAction.EndTutorial -> reduceTutorialAction(currentState, cueDetatAction)
+        is MainScreenEvent.ToggleSpinControl, is MainScreenEvent.CycleTableSize,
+        is MainScreenEvent.SetTableSize, is MainScreenEvent.ToggleTableSizeDialog,
+        is MainScreenEvent.ToggleForceTheme, is MainScreenEvent.ToggleCamera,
+        is MainScreenEvent.ToggleDistanceUnit, is MainScreenEvent.ToggleLuminanceDialog,
+        is MainScreenEvent.ToggleGlowStickDialog, is MainScreenEvent.ToggleHelp,
+        is MainScreenEvent.ToggleMoreHelp,
+        is MainScreenEvent.ToggleOrientationLock,
+        is MainScreenEvent.ApplyPendingOrientationLock, is MainScreenEvent.OrientationChanged,
+        is MainScreenEvent.SetExperienceMode, is MainScreenEvent.UnlockBeginnerView,
+        is MainScreenEvent.LockBeginnerView, is MainScreenEvent.ToggleCalibrationScreen,
+        is MainScreenEvent.ToggleQuickAlignScreen, is MainScreenEvent.ToggleBankingMode ->
+            reduceToggleAction(currentState, action, reducerUtils)
 
-                else -> currentState
-            }
-        }
+        is MainScreenEvent.StartTutorial, is MainScreenEvent.NextTutorialStep,
+        is MainScreenEvent.EndTutorial -> reduceTutorialAction(currentState, action)
+
         else -> currentState
     }
 }

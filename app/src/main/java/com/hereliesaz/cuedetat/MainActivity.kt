@@ -28,7 +28,7 @@ import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
 import com.hereliesaz.cuedetat.data.CalibrationRepository
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.MainViewModel
 import com.hereliesaz.cuedetat.ui.ProtractorScreen
 import com.hereliesaz.cuedetat.ui.composables.SplashScreen

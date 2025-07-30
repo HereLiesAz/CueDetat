@@ -9,9 +9,9 @@ import com.hereliesaz.cuedetat.data.ShakeDetector
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.data.VisionAnalyzer
 import com.hereliesaz.cuedetat.data.VisionRepository
-import com.hereliesaz.cuedetat.domain.CueDetatAction
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.domain.UpdateType
@@ -97,7 +97,7 @@ class MainViewModel @Inject constructor(
 
             // Convert screen gestures to logical gestures before reducing
             val logicalEvent = when (event) {
-                is CueDetatAction.ScreenGestureStarted -> {
+                is MainScreenEvent.ScreenGestureStarted -> {
                     val logicalPoint = Perspective.screenToLogical(
                         event.position,
                         currentState.inversePitchMatrix ?: return@launch
@@ -108,7 +108,7 @@ class MainViewModel @Inject constructor(
                     )
                 }
 
-                is CueDetatAction.Drag -> {
+                is MainScreenEvent.Drag -> {
                     val prevLogical = Perspective.screenToLogical(
                         event.previousPosition,
                         currentState.inversePitchMatrix ?: return@launch
@@ -161,40 +161,40 @@ class MainViewModel @Inject constructor(
         event: MainScreenEvent
     ): UpdateType {
         return when (event) {
-            is CueDetatAction.SizeChanged, is CueDetatAction.ZoomScaleChanged, is CueDetatAction.ZoomSliderChanged,
-            is CueDetatAction.PanView, is CueDetatAction.FullOrientationChanged, is CueDetatAction.TableRotationChanged,
-            is CueDetatAction.TableRotationApplied, is CueDetatAction.SetExperienceMode, is CueDetatAction.ToggleBankingMode,
-            is CueDetatAction.SetTableSize, is CueDetatAction.RestoreState -> UpdateType.FULL
+            is MainScreenEvent.SizeChanged, is MainScreenEvent.ZoomScaleChanged, is MainScreenEvent.ZoomSliderChanged,
+            is MainScreenEvent.PanView, is MainScreenEvent.FullOrientationChanged, is MainScreenEvent.TableRotationChanged,
+            is MainScreenEvent.TableRotationApplied, is MainScreenEvent.SetExperienceMode, is MainScreenEvent.ToggleBankingMode,
+            is MainScreenEvent.SetTableSize, is MainScreenEvent.RestoreState -> UpdateType.FULL
 
-            is CueDetatAction.Reset, is MainScreenEvent.LogicalGestureStarted, is MainScreenEvent.LogicalDragApplied,
-            is MainScreenEvent.GestureEnded, is CueDetatAction.AddObstacleBall -> UpdateType.AIMING
+            is MainScreenEvent.Reset, is MainScreenEvent.LogicalGestureStarted, is MainScreenEvent.LogicalDragApplied,
+            is MainScreenEvent.GestureEnded, is MainScreenEvent.AddObstacleBall -> UpdateType.AIMING
 
-            is CueDetatAction.SpinApplied -> UpdateType.SPIN_ONLY
+            is MainScreenEvent.SpinApplied -> UpdateType.SPIN_ONLY
 
             else -> UpdateType.AIMING // Default to aiming for most other toggles
         }
     }
 
     private fun handleSingleEvents(event: MainScreenEvent) {
-        if (event is CueDetatAction) {
+        if (event is MainScreenEvent) {
             viewModelScope.launch {
                 when (event) {
-                    is CueDetatAction.CheckForUpdate -> {
+                    is MainScreenEvent.CheckForUpdate -> {
                         githubRepository.getLatestVersionName()
                         // This logic would be expanded to show a dialog
                     }
 
-                    is CueDetatAction.ViewArt -> _singleEvent.emit(SingleEvent.OpenUrl("https://herelies.az"))
-                    is CueDetatAction.ViewAboutPage -> _singleEvent.emit(SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat"))
-                    is CueDetatAction.SendFeedback -> _singleEvent.emit(
+                    is MainScreenEvent.ViewArt -> _singleEvent.emit(SingleEvent.OpenUrl("https://herelies.az"))
+                    is MainScreenEvent.ViewAboutPage -> _singleEvent.emit(SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat"))
+                    is MainScreenEvent.SendFeedback -> _singleEvent.emit(
                         SingleEvent.SendFeedbackEmail(
                             "dev@herelies.az",
                             "Cue d'Etat Feedback"
                         )
                     )
 
-                    is CueDetatAction.SingleEventConsumed -> _singleEvent.emit(null)
-                    is CueDetatAction.SetExperienceMode -> {
+                    is MainScreenEvent.SingleEventConsumed -> _singleEvent.emit(null)
+                    is MainScreenEvent.SetExperienceMode -> {
                         if (event.mode == ExperienceMode.HATER) {
                             _singleEvent.emit(SingleEvent.InitiateHaterMode)
                         }

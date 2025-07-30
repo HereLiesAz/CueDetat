@@ -30,20 +30,10 @@ enum class ExperienceMode {
     }
 }
 
-// Defines the state of any overlay that might be shown over the main content.
-sealed class OverlayState {
-    // No overlay is visible.
-    object None : OverlayState()
-
-    // The experience mode selection overlay is visible.
-    data class ExperienceModeSelection(val currentMode: ExperienceMode) : OverlayState()
-}
-
 // The single source of truth for the application's entire state.
 data class CueDetatState(
     // High-level state
     val experienceMode: ExperienceMode? = null,
-    val overlay: OverlayState = OverlayState.None,
     val haterState: HaterState = HaterState(),
 
     // View dimensions
@@ -184,104 +174,105 @@ data class CueDetatState(
 const val LOGICAL_BALL_RADIUS = 25f
 
 // A sealed class for all possible actions/events that can be dispatched to the reducer.
-sealed class CueDetatAction {
+sealed class MainScreenEvent {
     // High-level Actions
-    object ToggleExperienceMode : CueDetatAction()
-    data class ApplyPendingExperienceMode(val mode: ExperienceMode) : CueDetatAction()
-    data class HaterAction(val action: HaterEvent) : CueDetatAction()
+    object ToggleExperienceModeSelection : MainScreenEvent()
+    data class SetExperienceMode(val mode: ExperienceMode) : MainScreenEvent()
+    data class HaterAction(val action: HaterEvent) : MainScreenEvent()
 
     // UI-Originated Events
-    data class ScreenGestureStarted(val position: PointF) : CueDetatAction()
-    data class Drag(val previousPosition: PointF, val currentPosition: PointF) : CueDetatAction()
-    object GestureEnded : CueDetatAction()
-    data class SizeChanged(val width: Int, val height: Int) : CueDetatAction()
-    data class ZoomScaleChanged(val scaleFactor: Float) : CueDetatAction()
-    data class TableRotationApplied(val degrees: Float) : CueDetatAction()
-    data class ZoomSliderChanged(val position: Float) : CueDetatAction()
-    data class PanView(val delta: PointF) : CueDetatAction()
+    data class ScreenGestureStarted(val position: PointF) : MainScreenEvent()
+    data class Drag(val previousPosition: PointF, val currentPosition: PointF) : MainScreenEvent()
+    object GestureEnded : MainScreenEvent()
+    data class SizeChanged(val width: Int, val height: Int) : MainScreenEvent()
+    data class ZoomScaleChanged(val scaleFactor: Float) : MainScreenEvent()
+    data class TableRotationApplied(val degrees: Float) : MainScreenEvent()
+    data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
+    data class PanView(val delta: PointF) : MainScreenEvent()
 
     // Spin Control Events
-    object ToggleSpinControl : CueDetatAction()
-    data class SpinApplied(val offset: PointF) : CueDetatAction()
-    object SpinSelectionEnded : CueDetatAction()
-    data class DragSpinControl(val delta: PointF) : CueDetatAction()
-    object ClearSpinState : CueDetatAction()
+    object ToggleSpinControl : MainScreenEvent()
+    data class SpinApplied(val offset: PointF) : MainScreenEvent()
+    object SpinSelectionEnded : MainScreenEvent()
+    data class DragSpinControl(val delta: PointF) : MainScreenEvent()
+    object ClearSpinState : MainScreenEvent()
 
     // Logical Events (dispatched by ViewModel)
     internal data class LogicalGestureStarted(val logicalPoint: PointF, val screenOffset: Offset) :
-        CueDetatAction()
+        MainScreenEvent()
 
     internal data class LogicalDragApplied(
         val previousLogicalPoint: PointF,
         val currentLogicalPoint: PointF,
         val screenDelta: Offset
-    ) : CueDetatAction()
+    ) : MainScreenEvent()
 
     // Direct State Change Events
-    data class TableRotationChanged(val degrees: Float) : CueDetatAction()
-    data class FullOrientationChanged(val orientation: FullOrientation) : CueDetatAction()
-    data class ThemeChanged(val scheme: ColorScheme) : CueDetatAction()
-    object Reset : CueDetatAction()
-    object ToggleHelp : CueDetatAction()
-    object ToggleMoreHelp : CueDetatAction()
-    object ToggleBankingMode : CueDetatAction()
-    object CycleTableSize : CueDetatAction()
-    data class SetTableSize(val size: TableSize) : CueDetatAction()
-    object ToggleTableSizeDialog : CueDetatAction()
-    object ToggleForceTheme : CueDetatAction()
-    object ToggleCamera : CueDetatAction()
-    object ToggleLuminanceDialog : CueDetatAction()
-    data class AdjustLuminance(val adjustment: Float) : CueDetatAction()
-    object ToggleDistanceUnit : CueDetatAction()
-    object ToggleGlowStickDialog : CueDetatAction()
-    data class AdjustGlow(val value: Float) : CueDetatAction()
-    data class SetWarning(val warning: String?) : CueDetatAction()
-    object ToggleOrientationLock : CueDetatAction()
-    object ApplyPendingOrientationLock : CueDetatAction()
+    data class TableRotationChanged(val degrees: Float) : MainScreenEvent()
+    data class FullOrientationChanged(val orientation: FullOrientation) : MainScreenEvent()
+    data class ThemeChanged(val scheme: ColorScheme) : MainScreenEvent()
+    object Reset : MainScreenEvent()
+    object ToggleHelp : MainScreenEvent()
+    object ToggleMoreHelp : MainScreenEvent()
+    object ToggleBankingMode : MainScreenEvent()
+    object CycleTableSize : MainScreenEvent()
+    data class SetTableSize(val size: TableSize) : MainScreenEvent()
+    object ToggleTableSizeDialog : MainScreenEvent()
+    object ToggleForceTheme : MainScreenEvent()
+    object ToggleCamera : MainScreenEvent()
+    object ToggleLuminanceDialog : MainScreenEvent()
+    data class AdjustLuminance(val adjustment: Float) : MainScreenEvent()
+    object ToggleDistanceUnit : MainScreenEvent()
+    object ToggleGlowStickDialog : MainScreenEvent()
+    data class AdjustGlow(val value: Float) : MainScreenEvent()
+    data class SetWarning(val warning: String?) : MainScreenEvent()
+    object ToggleOrientationLock : MainScreenEvent()
+    object ApplyPendingOrientationLock : MainScreenEvent()
     data class OrientationChanged(val orientationLock: CueDetatState.OrientationLock) :
-        CueDetatAction()
-    data class SetExperienceMode(val mode: ExperienceMode) : CueDetatAction()
-    object UnlockBeginnerView : CueDetatAction()
-    object LockBeginnerView : CueDetatAction()
+        MainScreenEvent()
+
+    object UnlockBeginnerView : MainScreenEvent()
+    object LockBeginnerView : MainScreenEvent()
 
     // Obstacle Events
-    object AddObstacleBall : CueDetatAction()
+    object AddObstacleBall : MainScreenEvent()
 
     // CV Events
-    data class CvDataUpdated(val visionData: VisionData) : CueDetatAction()
-    object LockOrUnlockColor : CueDetatAction()
-    data class LockColor(val hsvMean: FloatArray, val hsvStdDev: FloatArray) : CueDetatAction()
-    object ClearSamplePoint : CueDetatAction()
-    object ToggleAdvancedOptionsDialog : CueDetatAction()
-    object ToggleCalibrationScreen : CueDetatAction()
-    object ToggleQuickAlignScreen : CueDetatAction()
+    data class CvDataUpdated(val visionData: VisionData) : MainScreenEvent()
+    object LockOrUnlockColor : MainScreenEvent()
+    data class LockColor(val hsvMean: FloatArray, val hsvStdDev: FloatArray) : MainScreenEvent()
+    object ClearSamplePoint : MainScreenEvent()
+    object ToggleAdvancedOptionsDialog : MainScreenEvent()
+    object ToggleCalibrationScreen : MainScreenEvent()
+    object ToggleQuickAlignScreen : MainScreenEvent()
     data class ApplyQuickAlign(val translation: Offset, val rotation: Float, val scale: Float) :
-        CueDetatAction()
-    object ToggleCvRefinementMethod : CueDetatAction()
-    data class UpdateHoughP1(val value: Float) : CueDetatAction()
-    data class UpdateHoughP2(val value: Float) : CueDetatAction()
-    data class UpdateCannyT1(val value: Float) : CueDetatAction()
-    data class UpdateCannyT2(val value: Float) : CueDetatAction()
-    object ToggleCvModel : CueDetatAction()
-    object ToggleSnapping : CueDetatAction()
-    object ToggleCvMask : CueDetatAction()
-    object EnterCvMaskTestMode : CueDetatAction()
-    object ExitCvMaskTestMode : CueDetatAction()
-    object EnterCalibrationMode : CueDetatAction()
-    data class SampleColorAt(val screenPosition: Offset) : CueDetatAction()
+        MainScreenEvent()
+
+    object ToggleCvRefinementMethod : MainScreenEvent()
+    data class UpdateHoughP1(val value: Float) : MainScreenEvent()
+    data class UpdateHoughP2(val value: Float) : MainScreenEvent()
+    data class UpdateCannyT1(val value: Float) : MainScreenEvent()
+    data class UpdateCannyT2(val value: Float) : MainScreenEvent()
+    object ToggleCvModel : MainScreenEvent()
+    object ToggleSnapping : MainScreenEvent()
+    object ToggleCvMask : MainScreenEvent()
+    object EnterCvMaskTestMode : MainScreenEvent()
+    object ExitCvMaskTestMode : MainScreenEvent()
+    object EnterCalibrationMode : MainScreenEvent()
+    data class SampleColorAt(val screenPosition: Offset) : MainScreenEvent()
 
     // Tutorial Events
-    object StartTutorial : CueDetatAction()
-    object NextTutorialStep : CueDetatAction()
-    object EndTutorial : CueDetatAction()
+    object StartTutorial : MainScreenEvent()
+    object NextTutorialStep : MainScreenEvent()
+    object EndTutorial : MainScreenEvent()
 
     // Meta/Single Events
-    object CheckForUpdate : CueDetatAction()
-    object ViewArt : CueDetatAction()
-    object ViewAboutPage : CueDetatAction()
-    object SendFeedback : CueDetatAction()
-    object SingleEventConsumed : CueDetatAction()
-    object ToastShown : CueDetatAction()
-    data class RestoreState(val state: CueDetatState) : CueDetatAction()
-    object MenuClosed : CueDetatAction()
+    object CheckForUpdate : MainScreenEvent()
+    object ViewArt : MainScreenEvent()
+    object ViewAboutPage : MainScreenEvent()
+    object SendFeedback : MainScreenEvent()
+    object SingleEventConsumed : MainScreenEvent()
+    object ToastShown : MainScreenEvent()
+    data class RestoreState(val state: CueDetatState) : MainScreenEvent()
+    object MenuClosed : MainScreenEvent()
 }

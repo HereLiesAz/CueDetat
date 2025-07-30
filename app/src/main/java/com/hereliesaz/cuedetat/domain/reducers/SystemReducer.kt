@@ -3,28 +3,28 @@ package com.hereliesaz.cuedetat.domain.reducers
 import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
-import com.hereliesaz.cuedetat.domain.CueDetatAction
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.model.Table
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.TableSize
 
-internal fun reduceSystemAction(state: CueDetatState, action: CueDetatAction): CueDetatState {
+internal fun reduceSystemAction(state: CueDetatState, action: MainScreenEvent): CueDetatState {
     return when (action) {
-        is CueDetatAction.SizeChanged -> handleSizeChanged(state, action)
-        is CueDetatAction.FullOrientationChanged -> state.copy(currentOrientation = action.orientation)
-        is CueDetatAction.ThemeChanged -> state.copy(appControlColorScheme = action.scheme)
-        is CueDetatAction.SetWarning -> state.copy(warningText = action.warning)
+        is MainScreenEvent.SizeChanged -> handleSizeChanged(state, action)
+        is MainScreenEvent.FullOrientationChanged -> state.copy(currentOrientation = action.orientation)
+        is MainScreenEvent.ThemeChanged -> state.copy(appControlColorScheme = action.scheme)
+        is MainScreenEvent.SetWarning -> state.copy(warningText = action.warning)
         else -> state
     }
 }
 
 private fun handleSizeChanged(
     state: CueDetatState,
-    action: CueDetatAction.SizeChanged
+    action: MainScreenEvent.SizeChanged
 ): CueDetatState {
     if (state.viewWidth == 0 && state.viewHeight == 0) {
         return createInitialState(

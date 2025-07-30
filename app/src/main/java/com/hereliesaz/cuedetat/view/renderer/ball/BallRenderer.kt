@@ -91,23 +91,26 @@ class BallRenderer {
             alpha = 150
         }
 
-        // Create the transformation matrix on the fly, now that we have the source dimensions.
-        val imageToScreenMatrix = Matrix()
-        val sx = canvas.width.toFloat() / visionData.sourceImageWidth.toFloat()
-        val sy = canvas.height.toFloat() / visionData.sourceImageHeight.toFloat()
-        imageToScreenMatrix.postScale(sx, sy)
+        val rotation = visionData.sourceImageRotation.toFloat()
+        val srcWidth = visionData.sourceImageWidth.toFloat()
+        val srcHeight = visionData.sourceImageHeight.toFloat()
+        val canvasWidth = canvas.width.toFloat()
+        val canvasHeight = canvas.height.toFloat()
 
-        canvas.save()
-        canvas.concat(imageToScreenMatrix)
+        // This matrix correctly transforms coordinates from the camera's coordinate space
+        // to the screen's, accounting for rotation and FILL_CENTER scaling.
+        val matrix = Matrix()
+        val srcRect = RectF(0f, 0f, srcWidth, srcHeight)
+        val destRect = RectF(0f, 0f, canvasWidth, canvasHeight)
+        matrix.setRectToRect(srcRect, destRect, Matrix.ScaleToFit.FILL)
+        matrix.postRotate(rotation, canvasWidth / 2f, canvasHeight / 2f)
+
+
         visionData.detectedBoundingBoxes.forEach { box ->
-            // The box coordinates are from the un-rotated image. We must account for this.
-            val rotatedBox = RectF(box)
-            // Note: CameraX rotation is relative to portrait. If the sensor is landscape, a 90-degree
-            // rotation is applied for portrait display. The bounding box coordinates are relative to
-            // that un-rotated landscape image. For this simple debug view, a direct transform is sufficient.
-            canvas.drawRect(rotatedBox, paint)
+            val boxRect = RectF(box)
+            matrix.mapRect(boxRect) // Apply the full transformation to the box
+            canvas.drawRect(boxRect, paint)
         }
-        canvas.restore()
     }
 
 
@@ -169,6 +172,7 @@ class BallRenderer {
             val screenOffsetX = state.currentOrientation.roll * sensitivity
             val screenOffsetY = -state.currentOrientation.pitch * sensitivity
             val bubbleRadius = radiusInfo.radius
+
 
             // Clamp the offset to the radius of the ball
             val offsetDistance = hypot(screenOffsetX, screenOffsetY)

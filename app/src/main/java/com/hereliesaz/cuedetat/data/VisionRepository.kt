@@ -12,13 +12,13 @@ import com.google.mlkit.vision.objects.ObjectDetector
 import com.hereliesaz.cuedetat.di.GenericDetector
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
+import com.hereliesaz.cuedetat.utils.toMat
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.CvRefinementMethod
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.opencv.core.Core
-import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.MatOfDouble
 import org.opencv.core.MatOfPoint
@@ -54,8 +54,9 @@ class VisionRepository @Inject constructor(
 
         val mediaImage = imageProxy.image
         if (mediaImage != null) {
+            val rotationDegrees = imageProxy.imageInfo.rotationDegrees
             val inputImage =
-                InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                InputImage.fromMediaImage(mediaImage, rotationDegrees)
             val imageToScreenMatrix = getTransformationMatrix(
                 inputImage.width, inputImage.height,
                 state.viewWidth, state.viewHeight
@@ -63,10 +64,8 @@ class VisionRepository @Inject constructor(
 
             genericObjectDetector.process(inputImage)
                 .addOnSuccessListener { detectedObjects ->
-                    val unrotatedMat = imageProxyToMat(imageProxy)
-                    // --- FIX: Rotate the Mat to match the InputImage orientation BEFORE processing ---
+                    val unrotatedMat = imageProxy.toMat()
                     var mat = Mat()
-                    val rotationDegrees = imageProxy.imageInfo.rotationDegrees
                     when (rotationDegrees) {
                         90 -> Core.rotate(unrotatedMat, mat, Core.ROTATE_90_CLOCKWISE)
                         180 -> Core.rotate(unrotatedMat, mat, Core.ROTATE_180)
@@ -207,7 +206,8 @@ class VisionRepository @Inject constructor(
                         detectedBoundingBoxes = filteredDetectedObjects.map { it.boundingBox },
                         cvMask = cvMask, // The mask is now correctly oriented
                         sourceImageWidth = inputImage.width,
-                        sourceImageHeight = inputImage.height
+                        sourceImageHeight = inputImage.height,
+                        sourceImageRotation = rotationDegrees
                     )
 
                     _visionDataFlow.value = finalVisionData
@@ -413,48 +413,6 @@ class VisionRepository @Inject constructor(
         gray.release()
         circles.release()
         return center
-    }
-
-    @SuppressLint("UnsafeOptInUsageError")
-    private fun imageProxyToMat(imageProxy: ImageProxy): Mat {
-        val image = imageProxy.image ?: return Mat()
-        val planes = image.planes
-        val width = image.width
-        val height = image.height
-
-        val bgrMat = Mat()
-
-        val yPlane = planes[0]
-        val yBuffer = yPlane.buffer
-        val yMat = Mat(height, width, CvType.CV_8UC1, yBuffer, yPlane.rowStride.toLong())
-
-        val uPlane = planes[1]
-        val vPlane = planes[2]
-
-        if (vPlane.pixelStride == 2) {
-            val uvBuffer = vPlane.buffer
-            val uvMat =
-                Mat(height / 2, width / 2, CvType.CV_8UC2, uvBuffer, vPlane.rowStride.toLong())
-            Imgproc.cvtColorTwoPlane(yMat, uvMat, bgrMat, Imgproc.COLOR_YUV2BGR_NV21)
-            uvMat.release()
-        } else {
-            val ySize = yPlane.buffer.remaining()
-            val uSize = uPlane.buffer.remaining()
-            val vSize = vPlane.buffer.remaining()
-            val data = ByteArray(ySize + uSize + vSize)
-
-            yPlane.buffer.get(data, 0, ySize)
-            uPlane.buffer.get(data, ySize, uSize)
-            vPlane.buffer.get(data, ySize + uSize, vSize)
-
-            val yuvI420Mat = Mat(height + height / 2, width, CvType.CV_8UC1)
-            yuvI420Mat.put(0, 0, data)
-            Imgproc.cvtColor(yuvI420Mat, bgrMat, Imgproc.COLOR_YUV2BGR_I420)
-            yuvI420Mat.release()
-        }
-
-        yMat.release()
-        return bgrMat
     }
 
     private fun getTransformationMatrix(

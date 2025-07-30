@@ -1,12 +1,12 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
-import com.hereliesaz.cuedetat.domain.CueDetatAction
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 
-internal fun reduceTutorialAction(state: CueDetatState, action: CueDetatAction): CueDetatState {
+internal fun reduceTutorialAction(state: CueDetatState, action: MainScreenEvent): CueDetatState {
     return when (action) {
-        is CueDetatAction.StartTutorial -> {
+        is MainScreenEvent.StartTutorial -> {
             val firstStep = 0
             state.copy(
                 showTutorialOverlay = true,
@@ -19,7 +19,7 @@ internal fun reduceTutorialAction(state: CueDetatState, action: CueDetatAction):
             )
         }
 
-        is CueDetatAction.NextTutorialStep -> {
+        is MainScreenEvent.NextTutorialStep -> {
             val nextStep = state.currentTutorialStep + 1
             state.copy(
                 currentTutorialStep = nextStep,
@@ -28,7 +28,7 @@ internal fun reduceTutorialAction(state: CueDetatState, action: CueDetatAction):
             )
         }
 
-        is CueDetatAction.EndTutorial -> state.copy(
+        is MainScreenEvent.EndTutorial -> state.copy(
             showTutorialOverlay = false,
             currentTutorialStep = 0,
             tutorialHighlight = TutorialHighlightElement.NONE

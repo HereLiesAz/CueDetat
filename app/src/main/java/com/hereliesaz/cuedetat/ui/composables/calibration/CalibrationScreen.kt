@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
 import com.hereliesaz.cuedetat.domain.CueDetatState
-import com.hereliesaz.cuedetat.ui.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
 import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
 

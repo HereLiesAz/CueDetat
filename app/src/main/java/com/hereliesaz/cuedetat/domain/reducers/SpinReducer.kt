@@ -1,12 +1,12 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
-import com.hereliesaz.cuedetat.domain.CueDetatAction
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 
-internal fun reduceSpinAction(state: CueDetatState, action: CueDetatAction): CueDetatState {
+internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): CueDetatState {
     return when (action) {
-        is CueDetatAction.SpinApplied -> {
+        is MainScreenEvent.SpinApplied -> {
             state.copy(
                 selectedSpinOffset = action.offset,
                 valuesChangedSinceReset = true,
@@ -16,21 +16,21 @@ internal fun reduceSpinAction(state: CueDetatState, action: CueDetatAction): Cue
             )
         }
 
-        is CueDetatAction.SpinSelectionEnded -> {
+        is MainScreenEvent.SpinSelectionEnded -> {
             state.copy(
                 lingeringSpinOffset = state.selectedSpinOffset,
                 selectedSpinOffset = null
             )
         }
 
-        is CueDetatAction.DragSpinControl -> {
+        is MainScreenEvent.DragSpinControl -> {
             val currentCenter = state.spinControlCenter ?: return state
             val newCenter =
                 PointF(currentCenter.x + action.delta.x, currentCenter.y + action.delta.y)
             state.copy(spinControlCenter = newCenter)
         }
 
-        is CueDetatAction.ClearSpinState -> {
+        is MainScreenEvent.ClearSpinState -> {
             state.copy(
                 lingeringSpinOffset = null,
                 spinPaths = emptyMap()

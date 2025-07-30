@@ -1,8 +1,8 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
-import com.hereliesaz.cuedetat.domain.CueDetatAction
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import kotlin.math.hypot
@@ -10,11 +10,11 @@ import kotlin.random.Random
 
 internal fun reduceObstacleAction(
     state: CueDetatState,
-    action: CueDetatAction,
+    action: MainScreenEvent,
     reducerUtils: ReducerUtils
 ): CueDetatState {
     return when (action) {
-        is CueDetatAction.AddObstacleBall -> handleAddObstacleBall(state, reducerUtils)
+        is MainScreenEvent.AddObstacleBall -> handleAddObstacleBall(state, reducerUtils)
         else -> state
     }
 }

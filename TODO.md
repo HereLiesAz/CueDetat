@@ -2,10 +2,12 @@
 
 * **Hater Mode Physics:**
   * ~~Implement a full physics simulation for gravity, drag, and rotational inertia.~~ **(Completed
-    07/26/2025)**
+    07/30/2025)**
 * **Object/Ball Detection (Computer Vision):**
   * Initial ML Kit implementation for ball detection is complete. Awaiting real-world testing and parameter tuning for the custom model.
-  * **Table Detection:** This feature has been **removed** as of 07/12/2025. All logic for finding table corners via CV has been purged from the codebase. It was deemed unreliable and may be revisited in a distant future.
+* **Table Detection:** This feature has been **removed** as of 07/12/2025. All logic for finding
+  table corners via CV has been purged from the codebase. It was deemed unreliable and may be
+  revisited in a distant future.
 * **Tutorial Enhancements:**
   * Make the tutorial more interactive.
 * **Shot Difficulty Analysis:**

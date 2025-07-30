@@ -1,20 +1,20 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
-import com.hereliesaz.cuedetat.domain.CueDetatAction
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 
 internal fun reduceAction(
     state: CueDetatState,
-    action: CueDetatAction,
+    action: MainScreenEvent.Reset,
     reducerUtils: ReducerUtils
 ): CueDetatState {
     return when (action) {
-        is CueDetatAction.Reset -> {
+        is MainScreenEvent.Reset -> {
             state.preResetState?.let {
                 return it.copy(
                     preResetState = null,
