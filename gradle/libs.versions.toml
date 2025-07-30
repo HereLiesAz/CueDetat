@@ -35,6 +35,7 @@ materialIconsExtended = "1.7.8"
 multidex = "2.0.1"
 objectDetection = "17.0.2"
 objectDetectionCustom = "17.0.2"
+opencv = "4.12.0"
 palette = "1.0.0"
 guava = "1.10.2"
 # Kotlin & Coroutines
@@ -83,7 +84,6 @@ androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = 
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
 androidx-datastore-preferences-rxjava2 = { module = "androidx.datastore:datastore-preferences-rxjava2", version = "1.2.0-alpha02" }
 androidx-datastore-preferences-rxjava3 = { module = "androidx.datastore:datastore-preferences-rxjava3", version.ref = "datastorePreferences" }
-androidx-glance = { module = "androidx.glance:glance", version.ref = "glance" }
 androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glanceAppwidget" }
 androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycleRuntimeCompose" }
@@ -123,10 +123,11 @@ hilt-android = { group = "com.google.dagger", name = "hilt-android", version = "
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version = "2.57" }
 
 # Retrofit
-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
+material3 = { module = "androidx.compose.material3:material3", name = "material3", version.ref = "material3" }
 minigdx-kphysics = { module = "com.github.minigdx:kphysics", version.ref = "kphysicsVersion" }
 object1-detection = { module = "com.google.mlkit:object-detection", version = "17.0.2" }
 object1-detection-custom = { module = "com.google.mlkit:object-detection-custom", version = "17.0.2" }
+opencv = { module = "org.opencv:opencv", version.ref = "opencv" }
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version = "3.0.0" }
 converter-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version = "3.0.0" }
 
@@ -147,7 +148,6 @@ androidx-compose-animation-core = { group = "androidx.compose.animation", name =
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "roomKtx" }
 kphysics = { group = "com.github.kphysics", name = "kphysics", version.ref = "kphysics" }
 glance = { group = "androidx.glance", name = "glance", version.ref = "glanceVersion" }
-androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3Version" }
 
 
 [plugins]

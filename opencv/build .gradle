@@ -1,0 +1,51 @@
+apply plugin: 'com.android.library'
+try {
+    apply plugin: 'kotlin-android'
+} catch (Exception e) {
+    //
+}
+
+android {
+    namespace 'org.opencv'
+    compileSdkVersion 36
+
+    defaultConfig {
+        minSdkVersion 26 // Aligned with app module
+        targetSdkVersion 36
+
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_STL=c++_shared"
+                targets "opencv_jni_shared"
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    sourceSets {
+        main {
+            // Corrected manifest path to match your file tree
+            manifest.srcFile 'AndroidManifest.xml'
+            // Correct paths based on the official SDK structure
+            java.srcDirs = ['src/main/java']
+            res.srcDirs = ['src/main/res']
+            jniLibs.srcDirs = ['native/libs']
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path(project.projectDir.toString() + '/libcxx_helper/CMakeLists.txt')
+        }
+    }
+}

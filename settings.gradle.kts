@@ -34,5 +34,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "CueDetat"
-include(":app", ":opencv")
+include(":app")
 include(":Dev_Guide")

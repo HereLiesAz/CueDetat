@@ -25,7 +25,6 @@ fun stateReducer(
         // High-level App Actions
         is CueDetatAction.ToggleExperienceMode -> {
             val newOverlay = if (currentState.overlay is OverlayState.None) {
-                // FIX: Provide a default value if experienceMode is null on first launch.
                 OverlayState.ExperienceModeSelection(
                     currentState.experienceMode ?: ExperienceMode.EXPERT
                 )

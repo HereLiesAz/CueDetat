@@ -147,7 +147,6 @@ dependencies {
     implementation(libs.androidx.compose.foundation.layout)
     implementation(libs.androidx.compose.animation.core)
     implementation(libs.androidx.room.ktx)
-    implementation(libs.androidx.compose.material3)
     kapt(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 
@@ -186,7 +185,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences.rxjava3) // optional
 
     // OpenCV for Computer Vision
-    implementation(project(":opencv"))
+    implementation(libs.opencv)
 
     // ML Kit & TensorFlow
     implementation(libs.object1.detection.custom)
