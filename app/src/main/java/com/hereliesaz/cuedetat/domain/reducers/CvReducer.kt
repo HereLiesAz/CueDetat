@@ -7,7 +7,7 @@ internal fun reduceCvAction(state: CueDetatState, action: CueDetatAction): CueDe
     return when (action) {
         is CueDetatAction.CvDataUpdated -> {
             // Forward the data, but let the SnapReducer handle the candidates
-            state.copy(visionData = action.data)
+            state.copy(visionData = action.visionData)
         }
 
         is CueDetatAction.LockOrUnlockColor -> {

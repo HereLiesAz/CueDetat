@@ -49,6 +49,7 @@ fun ProtractorScreen(
                         gestureEvent.currentPosition
                     )
 
+
                     is GestureEvent.Up -> MainScreenEvent.GestureEnded
                     // Add this else branch to handle any other types of GestureEvent
                     else -> null

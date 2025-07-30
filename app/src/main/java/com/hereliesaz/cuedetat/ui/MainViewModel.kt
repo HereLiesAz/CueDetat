@@ -62,7 +62,7 @@ class MainViewModel @Inject constructor(
         // Collect sensor data
         viewModelScope.launch {
             sensorRepository.fullOrientationFlow.collect { orientation ->
-                onEvent(CueDetatAction.FullOrientationChanged(orientation))
+                onEvent(MainScreenEvent.FullOrientationChanged(orientation))
                 if (_uiState.value.experienceMode == ExperienceMode.HATER) {
                     haterViewModel.onEvent(
                         HaterEvent.SensorChanged(
@@ -86,7 +86,7 @@ class MainViewModel @Inject constructor(
         // Forward vision data to the reducer
         viewModelScope.launch {
             visionRepository.visionDataFlow.collect { visionData ->
-                onEvent(CueDetatAction.CvDataUpdated(visionData))
+                onEvent(MainScreenEvent.CvDataUpdated(visionData))
             }
         }
     }
