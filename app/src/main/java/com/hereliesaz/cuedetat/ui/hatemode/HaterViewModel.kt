@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
 import de.chaffic.dynamics.Body
 import de.chaffic.dynamics.World
 import de.chaffic.geometry.Polygon
@@ -21,11 +22,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 import kotlin.math.PI
 import kotlin.math.max
 import kotlin.random.Random
 
-class HaterViewModel : ViewModel() {
+@HiltViewModel
+class HaterViewModel @Inject constructor() : ViewModel() {
 
     private val _haterState = MutableStateFlow(HaterState())
     val haterState = _haterState.asStateFlow()
@@ -141,25 +144,29 @@ class HaterViewModel : ViewModel() {
         val halfW = width / 2.0
         val halfH = height / 2.0
 
-        val topWall = Body(Polygon(width.toDouble(), thickness))
+        // Top Wall
+        val topWall = Body(Polygon(width.toDouble(), thickness), 0.5, 0.5)
         topWall.position.set(0.0, -halfH - thickness / 2)
         topWall.setStatic()
         world.addBody(topWall)
         wallBodies.add(topWall)
 
-        val bottomWall = Body(Polygon(width.toDouble(), thickness))
+        // Bottom Wall
+        val bottomWall = Body(Polygon(width.toDouble(), thickness), 0.5, 0.5)
         bottomWall.position.set(0.0, halfH + thickness / 2)
         bottomWall.setStatic()
         world.addBody(bottomWall)
         wallBodies.add(bottomWall)
 
-        val leftWall = Body(Polygon(thickness, height.toDouble()))
+        // Left Wall
+        val leftWall = Body(Polygon(thickness, height.toDouble()), 0.5, 0.5)
         leftWall.position.set(-halfW - thickness / 2, 0.0)
         leftWall.setStatic()
         world.addBody(leftWall)
         wallBodies.add(leftWall)
 
-        val rightWall = Body(Polygon(thickness, height.toDouble()))
+        // Right Wall
+        val rightWall = Body(Polygon(thickness, height.toDouble()), 0.5, 0.5)
         rightWall.position.set(halfW + thickness / 2, 0.0)
         rightWall.setStatic()
         world.addBody(rightWall)
@@ -194,11 +201,9 @@ class HaterViewModel : ViewModel() {
         dieBody?.let { world.removeBody(it) }
 
         val shape = Polygon(newVertices)
-        val body = Body(shape)
+        val body = Body(shape, 0.6, 0.6)
         body.position.set(Random.nextDouble() * 50 - 25, Random.nextDouble() * 50 - 25)
         body.orientation = Random.nextDouble() * 2 * PI
-        body.dynamicFriction = 0.6
-        body.staticFriction = 0.6
         body.density = 1.0
         body.linearDampening = 5.0
         body.angularDampening = 7.0
@@ -217,7 +222,7 @@ class HaterViewModel : ViewModel() {
                 if (remainingAnswers.isEmpty()) {
                     reshuffleAnswers()
                 }
-                val newAnswer = remainingAnswers.removeFirst()
+                val newAnswer = remainingAnswers.removeAt(0)
                 _haterState.value = _haterState.value.copy(answer = newAnswer)
                 updateDieAndText(newAnswer)
 
