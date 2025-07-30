@@ -1,4 +1,4 @@
-package com.example.magic8ball
+package com.hereliesaz.cuedetat.ui.hatemode
 
 import android.graphics.BlurMaskFilter
 import androidx.compose.animation.core.animateFloatAsState

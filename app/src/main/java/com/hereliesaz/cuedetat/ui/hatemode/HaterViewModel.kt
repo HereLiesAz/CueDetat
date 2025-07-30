@@ -1,4 +1,4 @@
-package com.example.magic8ball
+package com.hereliesaz.cuedetat.ui.hatemode
 
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
@@ -25,7 +25,7 @@ class HaterViewModel : ViewModel() {
     // A mutable state for the current animation/physics state.
     // Start in the EMERGING state to trigger the initial animation.
     private val _triangleState = mutableStateOf(TriangleState.EMERGING)
-    val ballState: State<TriangleState> = _triangleState
+    val triangleState: State<TriangleState> = _triangleState
 
     // The master list of all possible answers for the regular cycle.
     private val masterAnswerList = listOf(

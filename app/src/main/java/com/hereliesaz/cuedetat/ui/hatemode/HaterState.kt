@@ -1,4 +1,4 @@
-package com.example.magic8ball
+package com.hereliesaz.cuedetat.ui.hatemode
 
 import android.content.Context
 import android.graphics.BlurMaskFilter
