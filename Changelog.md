@@ -1,35 +1,26 @@
 # Changelog
 
-## v0.8.4.0 (2025-07-30)
+All notable changes to this project will be documented in this file.
 
-### Feature
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-- Complete rewrite of Hater Mode, now featuring a robust physics simulation powered by the KPhysics
-  engine. User input (device tilt, shake, drag) now applies physical forces to the on-screen
-  objects.
+## [0.9.0] - 2025-07-30
 
-### Fix
+### Changed
 
-- **Build:** Removed duplicate `kphysics` and `DataStore` dependencies from `app/build.gradle.kts`.
-- **Memory:** Patched memory leaks in `QuickAlignAnalyzer` and `CalibrationAnalyzer` by ensuring all
-  OpenCV `Mat` objects are released and coroutines are properly scoped.
-- **Performance:** Optimized the CV pipeline by reusing the `cvMask` `Mat` object across frames in
-  `VisionRepository`, reducing memory churn.
-- **Stability:**
-  - Hardened the Hilt provider for the ML Kit Object Detector in `AppModule.kt` to prevent crashes
-    on initialization failure.
-  - Corrected a potential `NullPointerException` in `GestureHandler` related to the magnifier.
-- **Architecture:**
-  - Purged the obsolete `HaterReducer.kt` and all related logic from the main state management
-    pipeline.
-  - Consolidated snapping logic by removing the redundant implementation from `CvReducer.kt`, making
-    `SnapReducer.kt` the single source of truth.
-  - Corrected a state management violation in `GestureHandler`, which now emits events instead of
-    modifying state directly.
-- **Code Health:**
-  - Replaced hardcoded physics and animation values in `HaterViewModel.kt` with named constants.
-  - Added a missing Proguard rule for the `GithubRelease` data class to prevent deserialization
-    failures in release builds.
-- **Documentation:**
-  - Updated `01_Gestures.md` to accurately reflect that multi-touch gestures have a higher priority
-    than single-finger object interactions.
+- Overhauled the physics simulation in Hater Mode, replacing the previous engine with Google's
+  LiquidFun for improved stability and performance.
+- Adjusted the size of the Hater Mode triangle to better contain its text, and then reduced it to a
+  more reasonable size.
+
+### Fixed
+
+- Resolved a critical bug that prevented the main menu and navigation rail from opening correctly by
+  fixing the underlying state management logic.
+- Eliminated violent vibrations and erratic behavior of the triangle in Hater Mode by implementing a
+  stable, synchronous physics update loop.
+
+### Removed
+
+- Removed the `kphysics` library dependency, which was the source of the physics instability.

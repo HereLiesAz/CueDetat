@@ -27,8 +27,8 @@ The main application module must be configured with the following parameters:
     * **`defaultConfig`**:
         * `minSdk`: 26
         * `targetSdk`: 36
-        * `versionCode`: 20
-        * `versionName`: "0.8.3.1"
+      * `versionCode`: 21
+      * `versionName`: "0.9.0"
       * **ABI Splitting**: The build is configured to split APKs for four common ABIs (
         `armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`) to provide optimized builds for different
         devices.
