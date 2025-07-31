@@ -67,3 +67,5 @@ essential libraries and their purpose:
     * `object-detection-custom` & `vision-common` (Google ML Kit): For the "Scout" phase of the
       vision pipeline.
     * `tensorflow-lite-task-vision`: The TFLite Task Library for custom models.
+* **Physics Engine:**
+    * `com.google.liquidfun:liquidfun:1.1.0`: The physics engine used for Hater Mode.

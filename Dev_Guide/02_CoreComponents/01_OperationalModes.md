@@ -78,6 +78,7 @@ Hater Mode transforms the application into a "Magic 8-Ball" that delivers cynica
 advice."
 
 * **Core Concept**: An interactive, darkly humorous oracle that responds to a device shake.
+* **Physics Engine**: Google's **LiquidFun** library.
 * **User Interface**:
   * The screen renders a large, murky blue triangle (the "die") that floats in a dark void.
   * The triangle drifts and rotates based on the device's gyroscope. It can be "pushed" by the

@@ -7,24 +7,28 @@ import android.text.StaticLayout
 import android.text.TextPaint
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.ShakeDetector
 import dagger.hilt.android.lifecycle.HiltViewModel
-import de.chaffic.dynamics.Body
-import de.chaffic.dynamics.World
-import de.chaffic.geometry.Polygon
-import de.chaffic.math.Vec2
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.liquidfun.Body
+import org.liquidfun.BodyDef
+import org.liquidfun.BodyType
+import org.liquidfun.FixtureDef
+import org.liquidfun.PolygonShape
+import org.liquidfun.Vec2
+import org.liquidfun.World
 import javax.inject.Inject
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 @HiltViewModel
@@ -36,17 +40,18 @@ class HaterViewModel @Inject constructor(
     private val _haterState = MutableStateFlow(HaterState())
     val haterState = _haterState.asStateFlow()
 
-    private val world = World(Vec2(0.0, 0.0))
+    private val world = World(0f, 0f)
     private var dieBody: Body? = null
-    private var wallBodies = mutableListOf<Body>()
+    private var isInitialized = false
     private var physicsJob: Job? = null
+
+    private var screenWidth: Float = 0f
+    private var screenHeight: Float = 0f
 
     private val textPaint = TextPaint().apply {
         isAntiAlias = true
         color = Color.White.toArgb()
     }
-
-    private var staticLayout: StaticLayout? = null
 
     private val masterAnswerList = listOf(
         "Ask again, but with less hope.",
@@ -129,23 +134,26 @@ class HaterViewModel @Inject constructor(
     private fun enterHaterMode() {
         reshuffleAnswers()
         viewModelScope.launch {
-            updateDieAndText(_haterState.value.answer)
+            while (!isInitialized) {
+                delay(16)
+            }
+            updateDieAndText(_haterState.value.answer, screenWidth, 2.5f)
             _haterState.value = _haterState.value.copy(triangleState = TriangleState.EMERGING)
-            startPhysics()
+            startPhysicsLoop()
             delay(1000)
             _haterState.value = _haterState.value.copy(triangleState = TriangleState.SETTLING)
         }
     }
 
-    private fun startPhysics() {
+    private fun startPhysicsLoop() {
         if (physicsJob?.isActive == true) return
         physicsJob = viewModelScope.launch {
             while (true) {
-                world.step(1.0 / 60.0)
+                world.step(1 / 60f, 8, 3)
                 dieBody?.let { body ->
                     _haterState.value = _haterState.value.copy(
-                        diePosition = Offset(body.position.x.toFloat(), body.position.y.toFloat()),
-                        dieAngle = Math.toDegrees(body.orientation).toFloat()
+                        diePosition = Offset(body.position.x, body.position.y),
+                        dieAngle = Math.toDegrees(body.angle.toDouble()).toFloat()
                     )
                 }
                 delay(16L) // ~60 FPS
@@ -154,81 +162,94 @@ class HaterViewModel @Inject constructor(
     }
 
     fun setupBoundaries(width: Float, height: Float) {
-        if (wallBodies.isNotEmpty()) return
+        if (isInitialized) return
 
-        val thickness = 2.0
-        val halfW = width / 2.0
-        val halfH = height / 2.0
-        val halfThick = thickness / 2.0
+        this.screenWidth = width
+        this.screenHeight = height
+
+        val halfW = width / 2f
+        val halfH = height / 2f
+        val thickness = 50f // A thick, invisible wall
 
         // Top Wall
-        val topWall = Body(Polygon(width.toDouble() + thickness * 2, thickness), 0.5, 0.5)
-        topWall.position.set(0.0, -halfH - halfThick)
-        topWall.setStatic()
-        world.addBody(topWall)
-        wallBodies.add(topWall)
+        val topWallDef =
+            BodyDef().apply { type = BodyType.staticBody; position.set(0f, -halfH - thickness / 2) }
+        val topWall = world.createBody(topWallDef)
+        val topShape = PolygonShape().apply { setAsBox(halfW, thickness / 2) }
+        topWall.createFixture(topShape, 0f)
 
         // Bottom Wall
-        val bottomWall = Body(Polygon(width.toDouble() + thickness * 2, thickness), 0.5, 0.5)
-        bottomWall.position.set(0.0, halfH + halfThick)
-        bottomWall.setStatic()
-        world.addBody(bottomWall)
-        wallBodies.add(bottomWall)
+        val bottomWallDef =
+            BodyDef().apply { type = BodyType.staticBody; position.set(0f, halfH + thickness / 2) }
+        val bottomWall = world.createBody(bottomWallDef)
+        val bottomShape = PolygonShape().apply { setAsBox(halfW, thickness / 2) }
+        bottomWall.createFixture(bottomShape, 0f)
 
         // Left Wall
-        val leftWall = Body(Polygon(thickness, height.toDouble() + thickness * 2), 0.5, 0.5)
-        leftWall.position.set(-halfW - halfThick, 0.0)
-        leftWall.setStatic()
-        world.addBody(leftWall)
-        wallBodies.add(leftWall)
+        val leftWallDef =
+            BodyDef().apply { type = BodyType.staticBody; position.set(-halfW - thickness / 2, 0f) }
+        val leftWall = world.createBody(leftWallDef)
+        val leftShape = PolygonShape().apply { setAsBox(thickness / 2, halfH) }
+        leftWall.createFixture(leftShape, 0f)
 
         // Right Wall
-        val rightWall = Body(Polygon(thickness, height.toDouble() + thickness * 2), 0.5, 0.5)
-        rightWall.position.set(halfW + halfThick, 0.0)
-        rightWall.setStatic()
-        world.addBody(rightWall)
-        wallBodies.add(rightWall)
+        val rightWallDef =
+            BodyDef().apply { type = BodyType.staticBody; position.set(halfW + thickness / 2, 0f) }
+        val rightWall = world.createBody(rightWallDef)
+        val rightShape = PolygonShape().apply { setAsBox(thickness / 2, halfH) }
+        rightWall.createFixture(rightShape, 0f)
 
-        _haterState.value = _haterState.value.copy(walls = wallBodies)
+        isInitialized = true
     }
 
-    fun updateDieAndText(text: String, density: Float = 2.5f) {
+    fun updateDieAndText(text: String, canvasWidth: Float, density: Float) {
+        if (canvasWidth == 0f) return
+
         textPaint.textSize = 22.sp.value * density
-        val layoutWidth = 200.dp.value * density
-        staticLayout =
+        val layoutWidth = (canvasWidth * 0.7f)
+        val staticLayout =
             StaticLayout.Builder.obtain(text, 0, text.length, textPaint, layoutWidth.toInt())
                 .setAlignment(Layout.Alignment.ALIGN_CENTER)
                 .build()
 
-        val textHeight = staticLayout!!.height.toFloat()
+        val textHeight = staticLayout.height.toFloat()
+        val triangleHeight = textHeight * 7.5f
 
-        val triangleHeight = textHeight * 5
-
-        val sideLength = (triangleHeight / (kotlin.math.sqrt(3.0) / 2.0)).toFloat()
-        val triangleWidth = sideLength
-
-        val topY = -(2.0 / 3.0) * triangleHeight
-        val bottomY = (1.0 / 3.0) * triangleHeight
-        val halfWidth = triangleWidth / 2.0
-
-        val newVertices = arrayOf(
-            Vec2(0.0, topY),
-            Vec2(-halfWidth, bottomY),
-            Vec2(halfWidth, bottomY)
+        val topY = -(2.0f / 3.0f) * triangleHeight
+        val bottomY = (1.0f / 3.0f) * triangleHeight
+        val halfWidth = triangleHeight / (2 * sqrt(3.0f / 4.0f)) / 2
+        val newVertices = floatArrayOf(
+            0f, topY,
+            -halfWidth, bottomY,
+            halfWidth, bottomY
         )
 
-        dieBody?.let { world.removeBody(it) }
+        val trianglePath = Path().apply {
+            moveTo(0f, topY)
+            lineTo(-halfWidth, bottomY)
+            lineTo(halfWidth, bottomY)
+            close()
+        }
+        _haterState.value = _haterState.value.copy(diePath = trianglePath)
 
-        val shape = Polygon(newVertices)
-        val body = Body(shape, 0.6, 0.6)
-        body.position.set(Random.nextDouble() * 50 - 25, Random.nextDouble() * 50 - 25)
-        body.orientation = 0.0
-        body.density = 1.0
-        body.linearDampening = 1.5
-        body.angularDampening = 2.0
+        dieBody?.let { world.destroyBody(it) }
 
+        val bodyDef = BodyDef().apply {
+            type = BodyType.dynamicBody
+            position.set(Random.nextFloat() * 50 - 25, Random.nextFloat() * 50 - 25)
+            linearDamping = 1.5f
+            angularDamping = 2.0f
+        }
+        val body = world.createBody(bodyDef)
+        val shape = PolygonShape().apply { set(newVertices, 3) }
+        val fixtureDef = FixtureDef().apply {
+            this.shape = shape
+            density = 1.0f
+            friction = 0.3f
+            restitution = 0.6f
+        }
+        body.createFixture(fixtureDef)
         dieBody = body
-        world.addBody(dieBody!!)
     }
 
     private fun onShake() {
@@ -243,7 +264,7 @@ class HaterViewModel @Inject constructor(
                 }
                 val newAnswer = remainingAnswers.removeAt(0)
                 _haterState.value = _haterState.value.copy(answer = newAnswer)
-                updateDieAndText(newAnswer)
+                updateDieAndText(newAnswer, screenWidth, 2.5f)
 
                 _haterState.value = _haterState.value.copy(triangleState = TriangleState.EMERGING)
                 delay(1000)
@@ -253,21 +274,23 @@ class HaterViewModel @Inject constructor(
     }
 
     private fun pushDie(delta: Offset) {
-        dieBody?.applyLinearImpulse(
-            Vec2(delta.x.toDouble(), delta.y.toDouble()).scalar(0.8),
-            dieBody!!.position
-        )
+        val impulse = Vec2(delta.x * 2f, delta.y * 2f)
+        dieBody?.applyLinearImpulse(impulse, dieBody!!.worldCenter, true)
+        angularVelocity += (delta.x * Random.nextFloat() * 0.1f)
     }
 
     private fun applyGravity(roll: Float, pitch: Float) {
-        val gravityMultiplier = 1.5f
-        world.gravity.set(
-            (roll * gravityMultiplier).toDouble(),
-            (pitch * gravityMultiplier).toDouble()
-        )
+        val gravityMultiplier = 15f
+        world.setGravity(Vec2(roll * gravityMultiplier, pitch * gravityMultiplier))
     }
 
     private fun reshuffleAnswers() {
         remainingAnswers = masterAnswerList.shuffled().toMutableList()
+    }
+
+    override fun onCleared() {
+        physicsJob?.cancel()
+        world.release()
+        super.onCleared()
     }
 }

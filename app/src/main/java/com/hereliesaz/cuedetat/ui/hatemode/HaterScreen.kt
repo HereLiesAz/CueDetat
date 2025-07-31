@@ -3,9 +3,6 @@
 package com.hereliesaz.cuedetat.ui.hatemode
 
 import android.graphics.BlurMaskFilter
-import android.text.Layout
-import android.text.StaticLayout
-import android.text.TextPaint
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -29,10 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.PaintingStyle
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asAndroidPath
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -44,7 +38,6 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.ExpressiveNavigationRail
 import com.hereliesaz.cuedetat.ui.composables.MenuDrawerContent
 import com.hereliesaz.cuedetat.ui.composables.TopControls
-import de.chaffic.geometry.Polygon
 
 @Composable
 fun HaterScreen(
@@ -75,20 +68,7 @@ fun HaterScreen(
             maskFilter = BlurMaskFilter(30f, BlurMaskFilter.Blur.NORMAL)
         }
     }
-    val trianglePaint = remember { Paint().apply { color = Color(0xFF3366FF) } }
-    val textPaint = remember {
-        TextPaint().apply {
-            isAntiAlias = true
-            color = Color.White.toArgb()
-        }
-    }
-    remember {
-        Paint().apply {
-            color = Color.Magenta
-            style = PaintingStyle.Stroke
-            strokeWidth = 2f
-        }
-    }
+    val triangleColor = remember { Color(0xFF3366FF) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Canvas(
@@ -107,7 +87,8 @@ fun HaterScreen(
                 }
         ) {
             haterViewModel.setupBoundaries(size.width, size.height)
-            haterViewModel.updateDieAndText(state.answer, density.density)
+            haterViewModel.updateDieAndText(state.answer, size.width, density.density)
+            haterViewModel.stepWorld()
 
             val centerX = size.width / 2
             val centerY = size.height / 2
@@ -118,30 +99,6 @@ fun HaterScreen(
                 canvas.save()
                 canvas.translate(centerX, centerY)
 
-                state.walls.forEach { wallBody ->
-                    val shape = wallBody.shape
-                    if (shape is Polygon) {
-                        val vertices = shape.vertices
-                        if (vertices.isNotEmpty()) {
-                            val path = Path()
-                            val firstVertex = vertices[0]
-                            path.moveTo(
-                                (wallBody.position.x + firstVertex.x).toFloat(),
-                                (wallBody.position.y + firstVertex.y).toFloat()
-                            )
-                            for (i in 1 until vertices.size) {
-                                val vertex = vertices[i]
-                                path.lineTo(
-                                    (wallBody.position.x + vertex.x).toFloat(),
-                                    (wallBody.position.y + vertex.y).toFloat()
-                                )
-                            }
-                            path.close()
-                            drawPath(path, color = Color.Magenta, style = Stroke(width = 2f))
-                        }
-                    }
-                }
-
                 val dieX = state.diePosition.x
                 val dieY = state.diePosition.y
                 val dieAngle = state.dieAngle
@@ -150,43 +107,10 @@ fun HaterScreen(
                 canvas.rotate(dieAngle)
                 canvas.scale(dieAnimationProgress, dieAnimationProgress)
 
-                val text = state.answer
-                val layoutWidth = (size.width * 0.7f).toInt()
-                textPaint.textSize = 22 * density.fontScale * density.density
-
-                val staticLayout =
-                    StaticLayout.Builder
-                        .obtain(text, 0, text.length, textPaint, layoutWidth)
-                        .setAlignment(Layout.Alignment.ALIGN_CENTER)
-                        .build()
-
-                val textHeight = staticLayout.height.toFloat()
-
-                val padding = 30 * density.density
-                val triangleHeight = textHeight + padding
-                val sideLength = (triangleHeight / (kotlin.math.sqrt(3.0) / 2.0)).toFloat()
-                val triangleWidth = sideLength
-
-                val topY = -(2.0 / 3.0) * triangleHeight
-                val bottomY = (1.0 / 3.0) * triangleHeight
-                val halfWidth = triangleWidth / 2.0
-
-                val trianglePath = Path().apply {
-                    moveTo(0f, topY.toFloat())
-                    lineTo(-halfWidth.toFloat(), bottomY.toFloat())
-                    lineTo(halfWidth.toFloat(), bottomY.toFloat())
-                    close()
+                state.diePath?.let { path ->
+                    canvas.nativeCanvas.drawPath(path.asAndroidPath(), glowPaint)
+                    drawPath(path = path, color = triangleColor)
                 }
-
-                textPaint.alpha = (255 * dieAnimationProgress).toInt()
-
-                canvas.nativeCanvas.drawPath(trianglePath.asAndroidPath(), glowPaint)
-                canvas.drawPath(path = trianglePath, paint = trianglePaint)
-
-                canvas.save()
-                canvas.translate(-staticLayout.width / 2f, -staticLayout.height / 2f)
-                staticLayout.draw(canvas.nativeCanvas)
-                canvas.restore()
 
                 canvas.restore()
             }
