@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.PaintingStyle
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -43,6 +44,7 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.ExpressiveNavigationRail
 import com.hereliesaz.cuedetat.ui.composables.MenuDrawerContent
 import com.hereliesaz.cuedetat.ui.composables.TopControls
+import de.chaffic.geometry.Polygon
 
 @Composable
 fun HaterScreen(
@@ -80,14 +82,13 @@ fun HaterScreen(
             color = Color.White.toArgb()
         }
     }
-    val debugPaint =
-        remember {
-            Paint().apply {
-                color = Color.Magenta
-                style = PaintingStyle.Stroke
-                strokeWidth = 2f
-            }
+    remember {
+        Paint().apply {
+            color = Color.Magenta
+            style = PaintingStyle.Stroke
+            strokeWidth = 2f
         }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Canvas(
@@ -117,14 +118,28 @@ fun HaterScreen(
                 canvas.save()
                 canvas.translate(centerX, centerY)
 
-                state.dieAabb?.let { aabb ->
-                    canvas.nativeCanvas.drawRect(
-                        aabb.min.x.toFloat(),
-                        aabb.min.y.toFloat(),
-                        aabb.max.x.toFloat(),
-                        aabb.max.y.toFloat(),
-                        debugPaint.asFrameworkPaint()
-                    )
+                state.walls.forEach { wallBody ->
+                    val shape = wallBody.shape
+                    if (shape is Polygon) {
+                        val vertices = shape.vertices
+                        if (vertices.isNotEmpty()) {
+                            val path = Path()
+                            val firstVertex = vertices[0]
+                            path.moveTo(
+                                (wallBody.position.x + firstVertex.x).toFloat(),
+                                (wallBody.position.y + firstVertex.y).toFloat()
+                            )
+                            for (i in 1 until vertices.size) {
+                                val vertex = vertices[i]
+                                path.lineTo(
+                                    (wallBody.position.x + vertex.x).toFloat(),
+                                    (wallBody.position.y + vertex.y).toFloat()
+                                )
+                            }
+                            path.close()
+                            drawPath(path, color = Color.Magenta, style = Stroke(width = 2f))
+                        }
+                    }
                 }
 
                 val dieX = state.diePosition.x

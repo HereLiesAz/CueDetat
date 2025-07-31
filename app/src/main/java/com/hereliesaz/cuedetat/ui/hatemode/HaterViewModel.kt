@@ -145,8 +145,7 @@ class HaterViewModel @Inject constructor(
                 dieBody?.let { body ->
                     _haterState.value = _haterState.value.copy(
                         diePosition = Offset(body.position.x.toFloat(), body.position.y.toFloat()),
-                        dieAngle = Math.toDegrees(body.orientation).toFloat(),
-                        dieAabb = body.aabb
+                        dieAngle = Math.toDegrees(body.orientation).toFloat()
                     )
                 }
                 delay(16L) // ~60 FPS
@@ -163,32 +162,34 @@ class HaterViewModel @Inject constructor(
         val halfThick = thickness / 2.0
 
         // Top Wall
-        val topWall = Body(Polygon(width.toDouble(), thickness), 0.5, 0.5)
+        val topWall = Body(Polygon(width.toDouble() + thickness * 2, thickness), 0.5, 0.5)
         topWall.position.set(0.0, -halfH - halfThick)
         topWall.setStatic()
         world.addBody(topWall)
         wallBodies.add(topWall)
 
         // Bottom Wall
-        val bottomWall = Body(Polygon(width.toDouble(), thickness), 0.5, 0.5)
+        val bottomWall = Body(Polygon(width.toDouble() + thickness * 2, thickness), 0.5, 0.5)
         bottomWall.position.set(0.0, halfH + halfThick)
         bottomWall.setStatic()
         world.addBody(bottomWall)
         wallBodies.add(bottomWall)
 
         // Left Wall
-        val leftWall = Body(Polygon(thickness, height.toDouble()), 0.5, 0.5)
+        val leftWall = Body(Polygon(thickness, height.toDouble() + thickness * 2), 0.5, 0.5)
         leftWall.position.set(-halfW - halfThick, 0.0)
         leftWall.setStatic()
         world.addBody(leftWall)
         wallBodies.add(leftWall)
 
         // Right Wall
-        val rightWall = Body(Polygon(thickness, height.toDouble()), 0.5, 0.5)
+        val rightWall = Body(Polygon(thickness, height.toDouble() + thickness * 2), 0.5, 0.5)
         rightWall.position.set(halfW + halfThick, 0.0)
         rightWall.setStatic()
         world.addBody(rightWall)
         wallBodies.add(rightWall)
+
+        _haterState.value = _haterState.value.copy(walls = wallBodies)
     }
 
     fun updateDieAndText(text: String, density: Float = 2.5f) {

@@ -5,7 +5,6 @@ package com.hereliesaz.cuedetat.ui.hatemode
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import de.chaffic.collision.AxisAlignedBoundingBox
 
 enum class TriangleState {
     IDLE,
@@ -22,5 +21,4 @@ data class HaterState(
     val triangleState: TriangleState = TriangleState.IDLE,
     val triangleWidth: Dp = 100.dp,
     val triangleHeight: Dp = 86.dp,
-    val dieAabb: AxisAlignedBoundingBox? = null
 )

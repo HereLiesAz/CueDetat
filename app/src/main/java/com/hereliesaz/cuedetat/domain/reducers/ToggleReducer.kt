@@ -18,11 +18,20 @@ internal fun reduceToggleAction(
 ): CueDetatState {
     return when (action) {
         is MainScreenEvent.ToggleMenu -> {
-            // When toggling the main menu rail, always ensure the expanded menu is closed.
-            state.copy(isMenuVisible = !state.isMenuVisible, isExpandedMenuVisible = false)
+            // When toggling the nav rail, always ensure the expanded menu is closed.
+            state.copy(
+                isMenuVisible = !state.isMenuVisible,
+                isExpandedMenuVisible = false
+            )
         }
 
-        is MainScreenEvent.ToggleExpandedMenu -> state.copy(isExpandedMenuVisible = !state.isExpandedMenuVisible)
+        is MainScreenEvent.ToggleExpandedMenu -> {
+            // When toggling the expanded menu, always ensure the nav rail is closed.
+            state.copy(
+                isExpandedMenuVisible = !state.isExpandedMenuVisible,
+                isMenuVisible = false
+            )
+        }
         is MainScreenEvent.ToggleSpinControl -> state.copy(isSpinControlVisible = !state.isSpinControlVisible)
         is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(state, reducerUtils)
         is MainScreenEvent.CycleTableSize -> {
