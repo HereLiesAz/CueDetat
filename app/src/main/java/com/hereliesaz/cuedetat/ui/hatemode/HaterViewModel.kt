@@ -202,8 +202,8 @@ class HaterViewModel @Inject constructor(
 
         val textHeight = staticLayout!!.height.toFloat()
 
-        val padding = 30.dp.value * density
-        val triangleHeight = textHeight + padding
+        val triangleHeight = textHeight * 5
+
         val sideLength = (triangleHeight / (kotlin.math.sqrt(3.0) / 2.0)).toFloat()
         val triangleWidth = sideLength
 

@@ -75,20 +75,12 @@ fun ExpressiveNavigationRail(
                 modifier = Modifier.padding(top = 80.dp)
             ) {
                 railItems.forEach { (label, event) ->
-                    val action = {
-                        onEvent(event)
-                        // If the action is to open the expanded menu, the reducer handles closing the rail.
-                        // For any other action, explicitly close the rail.
-                        if (event !is MainScreenEvent.ToggleExpandedMenu) {
-                            onEvent(MainScreenEvent.ToggleMenu)
-                        }
-                    }
                     NavigationRailItem(
                         selected = false, // Rail items are actions, not destinations
-                        onClick = action,
+                        onClick = { onEvent(event) },
                         icon = {
                             CuedetatButton(
-                                onClick = action,
+                                onClick = { onEvent(event) },
                                 text = label,
                                 size = 64.dp // Smaller buttons for the rail
                             )
