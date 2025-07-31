@@ -116,6 +116,13 @@ android {
 
     buildToolsVersion = "36.0.0"
     ndkVersion = "29.0.13599879 rc2"
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_17
+    }
 
 
 }
@@ -179,7 +186,6 @@ dependencies {
 
     // Animation
     implementation(libs.androidx.compose.animation.core)
-    implementation(libs.kphysics)
 
     // DataStore for persisting user preferences
     implementation(libs.androidx.datastore.preferences)
@@ -196,13 +202,16 @@ dependencies {
     implementation(libs.object1.detection)
 
 
-
-    implementation(libs.kphysics)
-
     // DataStore for persisting user preferences
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.datastore.preferences.rxjava2) // optional
     implementation(libs.androidx.datastore.preferences.rxjava3) // optional
+
+    implementation(libs.jbox2d)
+    implementation(libs.slf4j.bom)
+
+
+
 
 }
 
