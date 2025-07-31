@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.PaintingStyle
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -79,6 +80,14 @@ fun HaterScreen(
             color = Color.White.toArgb()
         }
     }
+    val debugPaint =
+        remember {
+            Paint().apply {
+                color = Color.Magenta
+                style = PaintingStyle.Stroke
+                strokeWidth = 2f
+            }
+        }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Canvas(
@@ -107,6 +116,16 @@ fun HaterScreen(
             drawIntoCanvas { canvas ->
                 canvas.save()
                 canvas.translate(centerX, centerY)
+
+                state.dieAabb?.let { aabb ->
+                    canvas.nativeCanvas.drawRect(
+                        aabb.min.x.toFloat(),
+                        aabb.min.y.toFloat(),
+                        aabb.max.x.toFloat(),
+                        aabb.max.y.toFloat(),
+                        debugPaint.asFrameworkPaint()
+                    )
+                }
 
                 val dieX = state.diePosition.x
                 val dieY = state.diePosition.y

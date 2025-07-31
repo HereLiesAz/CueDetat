@@ -79,8 +79,6 @@ fun ExpressiveNavigationRail(
                         selected = false, // Rail items are actions, not destinations
                         onClick = {
                             onEvent(event)
-                            // Keep the rail open unless the user explicitly closes it,
-                            // unless opening the full menu.
                             if (event is MainScreenEvent.ToggleExpandedMenu) {
                                 onEvent(MainScreenEvent.ToggleMenu)
                             }

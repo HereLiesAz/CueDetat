@@ -144,8 +144,9 @@ class HaterViewModel @Inject constructor(
                 world.step(1.0 / 60.0)
                 dieBody?.let { body ->
                     _haterState.value = _haterState.value.copy(
-                        diePosition = Offset(body.position.x.toFloat(), body.position.y.toFloat())
-                        // The angle is no longer updated from the physics engine, preventing visual spin.
+                        diePosition = Offset(body.position.x.toFloat(), body.position.y.toFloat()),
+                        dieAngle = Math.toDegrees(body.orientation).toFloat(),
+                        dieAabb = body.aabb
                     )
                 }
                 delay(16L) // ~60 FPS
@@ -156,34 +157,35 @@ class HaterViewModel @Inject constructor(
     fun setupBoundaries(width: Float, height: Float) {
         if (wallBodies.isNotEmpty()) return
 
-        val thickness = 2.0 // A thin, invisible wall
+        val thickness = 2.0
         val halfW = width / 2.0
         val halfH = height / 2.0
+        val halfThick = thickness / 2.0
 
         // Top Wall
         val topWall = Body(Polygon(width.toDouble(), thickness), 0.5, 0.5)
-        topWall.position.set(0.0, -halfH)
+        topWall.position.set(0.0, -halfH - halfThick)
         topWall.setStatic()
         world.addBody(topWall)
         wallBodies.add(topWall)
 
         // Bottom Wall
         val bottomWall = Body(Polygon(width.toDouble(), thickness), 0.5, 0.5)
-        bottomWall.position.set(0.0, halfH)
+        bottomWall.position.set(0.0, halfH + halfThick)
         bottomWall.setStatic()
         world.addBody(bottomWall)
         wallBodies.add(bottomWall)
 
         // Left Wall
         val leftWall = Body(Polygon(thickness, height.toDouble()), 0.5, 0.5)
-        leftWall.position.set(-halfW, 0.0)
+        leftWall.position.set(-halfW - halfThick, 0.0)
         leftWall.setStatic()
         world.addBody(leftWall)
         wallBodies.add(leftWall)
 
         // Right Wall
         val rightWall = Body(Polygon(thickness, height.toDouble()), 0.5, 0.5)
-        rightWall.position.set(halfW, 0.0)
+        rightWall.position.set(halfW + halfThick, 0.0)
         rightWall.setStatic()
         world.addBody(rightWall)
         wallBodies.add(rightWall)
@@ -221,8 +223,8 @@ class HaterViewModel @Inject constructor(
         body.position.set(Random.nextDouble() * 50 - 25, Random.nextDouble() * 50 - 25)
         body.orientation = 0.0
         body.density = 1.0
-        body.linearDampening = 10.0
-        body.angularDampening = 12.0
+        body.linearDampening = 1.5
+        body.angularDampening = 2.0
 
         dieBody = body
         world.addBody(dieBody!!)
@@ -251,13 +253,13 @@ class HaterViewModel @Inject constructor(
 
     private fun pushDie(delta: Offset) {
         dieBody?.applyLinearImpulse(
-            Vec2(delta.x.toDouble(), delta.y.toDouble()).scalar(0.1),
+            Vec2(delta.x.toDouble(), delta.y.toDouble()).scalar(0.8),
             dieBody!!.position
         )
     }
 
     private fun applyGravity(roll: Float, pitch: Float) {
-        val gravityMultiplier = 0.05f
+        val gravityMultiplier = 1.5f
         world.gravity.set(
             (roll * gravityMultiplier).toDouble(),
             (pitch * gravityMultiplier).toDouble()
