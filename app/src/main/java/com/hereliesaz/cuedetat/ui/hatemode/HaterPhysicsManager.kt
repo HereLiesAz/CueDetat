@@ -6,19 +6,19 @@ import android.text.TextPaint
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import de.pirckheimer_gymnasium.jbox2d.collision.shapes.PolygonShape
+import de.pirckheimer_gymnasium.jbox2d.common.Vec2
+import de.pirckheimer_gymnasium.jbox2d.dynamics.Body
+import de.pirckheimer_gymnasium.jbox2d.dynamics.BodyDef
+import de.pirckheimer_gymnasium.jbox2d.dynamics.BodyType
+import de.pirckheimer_gymnasium.jbox2d.dynamics.FixtureDef
+import de.pirckheimer_gymnasium.jbox2d.dynamics.World
+import de.pirckheimer_gymnasium.jbox2d.particle.ParticleGroupDef
+import de.pirckheimer_gymnasium.jbox2d.particle.ParticleSystem
+import de.pirckheimer_gymnasium.jbox2d.particle.ParticleType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.jbox2d.collision.shapes.PolygonShape
-import org.jbox2d.common.Vec2
-import org.jbox2d.dynamics.Body
-import org.jbox2d.dynamics.BodyDef
-import org.jbox2d.dynamics.BodyType
-import org.jbox2d.dynamics.FixtureDef
-import org.jbox2d.dynamics.World
-import org.jbox2d.particle.ParticleGroupDef
-import org.jbox2d.particle.ParticleSystem
-import org.jbox2d.particle.ParticleType
 import kotlin.math.sqrt
 import kotlin.random.Random
 
@@ -48,7 +48,7 @@ class HaterPhysicsManager {
     private var viewHeight = 0f
 
     init {
-        val pDef = org.jbox2d.particle.ParticleSystemDef()
+        val pDef = ParticleSystemDef()
         pDef.radius = 0.15f // in meters
         pDef.dampingStrength = 0.2f
         particleSystem = world.createParticleSystem(pDef)

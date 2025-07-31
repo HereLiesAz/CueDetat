@@ -100,7 +100,6 @@ androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-view
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
 androidx-multidex = { group = "androidx.multidex", name = "multidex", version.ref = "multidex" }
 dagger-hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
-jbox2d = { module = "com.github.jbox2d:jbox2d", version.ref = "jbox2dVersion" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesAndroid" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
@@ -156,6 +155,7 @@ androidx-compose-animation-core = { group = "androidx.compose.animation", name =
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "roomKtx" }
 glance = { group = "androidx.glance", name = "glance", version.ref = "glanceVersion" }
 sceneform-base = { group = "com.google.ar.sceneform", name = "sceneform-base", version.ref = "sceneformBase" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidApplication" }

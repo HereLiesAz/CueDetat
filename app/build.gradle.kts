@@ -121,7 +121,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17
+        jvmTarget = "17"
     }
 
 
@@ -207,8 +207,8 @@ dependencies {
     implementation(libs.androidx.datastore.preferences.rxjava2) // optional
     implementation(libs.androidx.datastore.preferences.rxjava3) // optional
 
-    implementation(libs.jbox2d)
     implementation(libs.slf4j.bom)
+    implementation("com.github.engine-pi:jbox2d:v3.1.0")
 
 
 

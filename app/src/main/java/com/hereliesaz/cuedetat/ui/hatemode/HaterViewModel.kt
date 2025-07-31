@@ -1,5 +1,6 @@
 package com.hereliesaz.cuedetat.ui.hatemode
 
+
 import android.text.TextPaint
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -101,6 +102,7 @@ class HaterViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         physicsJob?.cancel()
+        physicsManager.destroy()
     }
 
     fun onEvent(event: HaterEvent) {
