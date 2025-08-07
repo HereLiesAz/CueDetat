@@ -16,7 +16,6 @@ pluginManagement {
 
   }
   plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
     id("com.android.application") version "8.11.1"
       id("com.android.library") version "8.13.0-alpha03"
     id("org.jetbrains.kotlin.android") version "2.2.0"

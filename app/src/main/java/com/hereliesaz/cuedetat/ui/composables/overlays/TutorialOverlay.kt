@@ -69,10 +69,89 @@ fun TutorialOverlay(
         )
         val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = highlightAlpha)
 
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(9f)
+        ) {
+            val matrix = uiState.pitchMatrix
+            if (matrix == null) return@Canvas
+
+            when (uiState.tutorialHighlight ?: TutorialHighlightElement.NONE) {
+                TutorialHighlightElement.TARGET_BALL -> {
+                    val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
+                        uiState.protractorUnit.center,
+                        uiState.protractorUnit.radius,
+                        uiState,
+                        matrix
+                    )
+                    val screenPos = DrawingUtils.mapPoint(uiState.protractorUnit.center, matrix)
+                    drawCircle(
+                        color = highlightColor,
+                        radius = radiusInfo.radius * 2.0f,
+                        center = Offset(screenPos.x, screenPos.y),
+                        style = Stroke(width = 4.dp.toPx())
+                    )
+                }
+
+                TutorialHighlightElement.GHOST_BALL -> {
+                    val ghostCenter = uiState.protractorUnit.ghostCueBallCenter
+                    val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
+                        ghostCenter,
+                        uiState.protractorUnit.radius,
+                        uiState,
+                        matrix
+                    )
+                    val screenPos = DrawingUtils.mapPoint(ghostCenter, matrix)
+                    drawCircle(
+                        color = highlightColor,
+                        radius = radiusInfo.radius * 2.0f,
+                        center = Offset(screenPos.x, screenPos.y),
+                        style = Stroke(width = 4.dp.toPx())
+                    )
+                }
+
+                TutorialHighlightElement.CUE_BALL -> {
+                    uiState.onPlaneBall?.let {
+                        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
+                            it.center,
+                            it.radius,
+                            uiState,
+                            matrix
+                        )
+                        val screenPos = DrawingUtils.mapPoint(it.center, matrix)
+                        drawCircle(
+                            color = highlightColor,
+                            radius = radiusInfo.radius * 2.0f,
+                            center = Offset(screenPos.x, screenPos.y),
+                            style = Stroke(width = 4.dp.toPx())
+                        )
+                    }
+                }
+
+                TutorialHighlightElement.ZOOM_SLIDER -> {
+                    drawRoundRect(
+                        color = highlightColor,
+                        topLeft = Offset(
+                            size.width - 64.dp.toPx(),
+                            center.y - (size.height * 0.3f)
+                        ),
+                        size = Size(60.dp.toPx(), size.height * 0.6f),
+                        cornerRadius = CornerRadius(16.dp.toPx()),
+                        style = Stroke(width = 4.dp.toPx())
+                    )
+                }
+                // Other cases can be added here
+                else -> {}
+            }
+        }
+
         Box(
             modifier = Modifier
+                .fillMaxSize()
                 .navigationBarsPadding()
-                .padding(bottom = 96.dp, start = 16.dp, end = 16.dp),
+                .padding(bottom = 96.dp, start = 16.dp, end = 16.dp)
+                .zIndex(10f),
             contentAlignment = Alignment.BottomCenter
         ) {
             Column(
