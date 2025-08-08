@@ -7,7 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.data.CalibrationRepository
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.opencv.core.Mat
@@ -30,6 +32,9 @@ class CalibrationViewModel @Inject constructor(
 
     private val _showSubmissionDialog = MutableStateFlow(false)
     val showSubmissionDialog = _showSubmissionDialog.asStateFlow()
+
+    private val _toastMessages = MutableSharedFlow<String>()
+    val toastMessages = _toastMessages.asSharedFlow()
 
     private val captured2DPoints = mutableListOf<MatOfPoint2f>()
     private var latestCorners: MatOfPoint2f? = null
@@ -59,7 +64,9 @@ class CalibrationViewModel @Inject constructor(
     fun onCalibrationFinished() {
         val size = imageSize
         if (captured2DPoints.size < 10 || size == null) {
-            // Not enough data to calibrate, handle this with a toast in the future
+            viewModelScope.launch {
+                _toastMessages.emit("Not enough patterns captured. At least 10 are needed.")
+            }
             return
         }
 
@@ -72,7 +79,7 @@ class CalibrationViewModel @Inject constructor(
                 distCoeffs.release()
                 _showSubmissionDialog.value = true
             } else {
-                // Handle calibration failure, show a toast in the future
+                _toastMessages.emit("Calibration failed. Please try again.")
             }
         }
     }
@@ -82,6 +89,11 @@ class CalibrationViewModel @Inject constructor(
     }
 
     fun onSubmitData() {
+        // In the future, we would submit data here and show a toast on success.
+        // For now, just close the dialog.
         _showSubmissionDialog.value = false
+        viewModelScope.launch {
+            _toastMessages.emit("Data submitted successfully! Thank you.")
+        }
     }
 }

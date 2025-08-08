@@ -26,7 +26,6 @@ import com.hereliesaz.cuedetat.view.config.line.TangentLine
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.config.ui.ProtractorGuides
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
-import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -64,7 +63,7 @@ class LineRenderer {
                 if (shotLineIsWarning) paints.warningPaint.color else shotGuideLineConfig.strokeColor.toArgb()
             strokeWidth = shotGuideLineConfig.strokeWidth
         }
-        val shotLineGlow = createGlowPaint(
+        val shotLineGlow = paints.getGlowPaint(
             baseGlowColor = if (shotLineIsWarning) Color(paints.warningPaint.color) else shotGuideLineConfig.glowColor,
             baseGlowWidth = shotGuideLineConfig.glowWidth,
             state = state
@@ -135,11 +134,29 @@ class LineRenderer {
             color = baseAimingColor.toArgb()
             strokeWidth = aimingLineConfig.strokeWidth
         }
-        val aimingLineGlow = createGlowPaint(
+        val aimingLineGlow = paints.getGlowPaint(
             baseGlowColor = aimingLineConfig.glowColor,
             baseGlowWidth = aimingLineConfig.glowWidth,
             state = state
         )
+
+        if (state.showTutorialOverlay && state.flashingTutorialElement == com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.GHOST_BALL) {
+            val flashingPaint = Paint(aimingLinePaint).apply {
+                alpha = (state.highlightAlpha * 255).toInt()
+                strokeWidth = aimingLineConfig.strokeWidth * 3f
+            }
+            state.aimingLineBankPath?.let {
+                drawBankablePath(
+                    canvas,
+                    it,
+                    flashingPaint,
+                    null, // no glow for flashing
+                    isPocketed,
+                    state,
+                    paints
+                )
+            }
+        }
 
         state.aimingLineBankPath?.let {
             drawBankablePath(
@@ -169,7 +186,7 @@ class LineRenderer {
             strokeWidth = tangentLineConfig.strokeWidth
             alpha = (tangentLineConfig.opacity * 255).toInt()
         }
-        val tangentGlow = createGlowPaint(
+        val tangentGlow = paints.getGlowPaint(
             baseGlowColor = tangentLineConfig.glowColor,
             baseGlowWidth = tangentLineConfig.glowWidth,
             state = state
@@ -280,7 +297,7 @@ class LineRenderer {
 
         if (isPocketed) {
             val whitePaint = Paint(paints.shotLinePaint).apply { color = Color.White.toArgb() }
-            val whiteGlowPaint = createGlowPaint(Color.White, 12f, state)
+            val whiteGlowPaint = paints.getGlowPaint(Color.White, 12f, state)
             drawPath(canvas, path, whiteGlowPaint)
             drawPath(canvas, path, whitePaint)
         } else {
@@ -294,7 +311,7 @@ class LineRenderer {
                 val config = bankLineConfigs.getOrElse(i) { bankLineConfigs.last() }
 
                 val linePaint = Paint(paints.bankLine1Paint).apply { color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
-                val glowPaint = createGlowPaint(
+                val glowPaint = paints.getGlowPaint(
                     baseGlowColor = config.glowColor,
                     baseGlowWidth = config.glowWidth,
                     state = state
@@ -314,7 +331,7 @@ class LineRenderer {
                     color = config.strokeColor.toArgb()
                     strokeWidth = config.strokeWidth
                 }
-                val glowPaint = createGlowPaint(
+                val glowPaint = paints.getGlowPaint(
                     baseGlowColor = config.glowColor,
                     baseGlowWidth = config.glowWidth,
                     state = state

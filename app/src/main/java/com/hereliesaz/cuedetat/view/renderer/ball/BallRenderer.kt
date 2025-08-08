@@ -27,7 +27,6 @@ import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.LogicalCircular
 import com.hereliesaz.cuedetat.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
-import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
 import kotlin.math.hypot
 
 class BallRenderer {
@@ -191,7 +190,7 @@ class BallRenderer {
                 strokeWidth = config.strokeWidth
                 alpha = (config.opacity * 255).toInt()
             }
-            val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state)
+            val glowPaint = paints.getGlowPaint(config.glowColor, config.glowWidth, state)
             canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, bubbleRadius, glowPaint)
             canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, bubbleRadius, strokePaint)
 
@@ -217,13 +216,31 @@ class BallRenderer {
                 strokeWidth = config.strokeWidth
                 alpha = (config.opacity * 255).toInt()
             }
-            val glowPaint = createGlowPaint(
+            val glowPaint = paints.getGlowPaint(
                 baseGlowColor = if (isWarning) Color(paints.warningPaint.color) else config.glowColor,
                 baseGlowWidth = config.glowWidth,
                 state = state
             )
 
             // Draw 2D logical ball
+            if (state.showTutorialOverlay) {
+                val flashingPaint = Paint(paints.fillPaint).apply {
+                    alpha = (state.highlightAlpha * 255).toInt()
+                    color = config.strokeColor.toArgb()
+                }
+                when (state.flashingTutorialElement) {
+                    com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.TARGET_BALL -> if (config is TargetBall) {
+                        canvas.drawCircle(logicalScreenPos.x, yPosLifted, radiusInfo.radius, flashingPaint)
+                    }
+                    com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.GHOST_BALL -> if (config is GhostCueBall) {
+                        canvas.drawCircle(logicalScreenPos.x, yPosLifted, radiusInfo.radius, flashingPaint)
+                    }
+                    com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.CUE_BALL -> if (config is ActualCueBall) {
+                        canvas.drawCircle(logicalScreenPos.x, yPosLifted, radiusInfo.radius, flashingPaint)
+                    }
+                    else -> {}
+                }
+            }
             canvas.save()
             canvas.concat(logicalBallMatrix)
             canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, logicalStrokePaint)

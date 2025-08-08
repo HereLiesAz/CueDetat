@@ -12,6 +12,7 @@ internal fun reduceTutorialAction(state: CueDetatState, action: MainScreenEvent)
                 showTutorialOverlay = true,
                 currentTutorialStep = firstStep,
                 tutorialHighlight = getHighlightForStep(firstStep),
+                flashingTutorialElement = getHighlightForStep(firstStep),
                 valuesChangedSinceReset = true,
                 areHelpersVisible = false,
                 showLuminanceDialog = false,
@@ -24,6 +25,7 @@ internal fun reduceTutorialAction(state: CueDetatState, action: MainScreenEvent)
             state.copy(
                 currentTutorialStep = nextStep,
                 tutorialHighlight = getHighlightForStep(nextStep),
+                flashingTutorialElement = getHighlightForStep(nextStep),
                 valuesChangedSinceReset = true
             )
         }
@@ -31,8 +33,11 @@ internal fun reduceTutorialAction(state: CueDetatState, action: MainScreenEvent)
         is MainScreenEvent.EndTutorial -> state.copy(
             showTutorialOverlay = false,
             currentTutorialStep = 0,
-            tutorialHighlight = TutorialHighlightElement.NONE
+            tutorialHighlight = TutorialHighlightElement.NONE,
+            flashingTutorialElement = null
         )
+
+        is MainScreenEvent.UpdateHighlightAlpha -> state.copy(highlightAlpha = action.alpha)
 
         else -> state
     }
@@ -41,10 +46,9 @@ internal fun reduceTutorialAction(state: CueDetatState, action: MainScreenEvent)
 private fun getHighlightForStep(step: Int): TutorialHighlightElement {
     return when (step) {
         1 -> TutorialHighlightElement.TARGET_BALL
-        2 -> TutorialHighlightElement.GHOST_BALL
-        3 -> TutorialHighlightElement.CUE_BALL
-        4 -> TutorialHighlightElement.ZOOM_SLIDER
-        5 -> TutorialHighlightElement.BANK_BUTTON
+        2 -> TutorialHighlightElement.ZOOM_SLIDER
+        3 -> TutorialHighlightElement.GHOST_BALL
+        4 -> TutorialHighlightElement.GHOST_BALL
         else -> TutorialHighlightElement.NONE
     }
 }

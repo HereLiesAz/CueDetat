@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -32,6 +33,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.hereliesaz.cuedetat.domain.CueDetatState
@@ -46,13 +48,11 @@ fun TutorialOverlay(
 ) {
     val tutorialSteps = remember {
         listOf(
-            "Alright, let's get this over with. This isn't a toy. It's a precision instrument. Try to keep up. Tap 'Next'.",
-            "That circle with the dot is the Target Ball. Drag it over your object ball. I'll wait.",
-            "The crosshairs mark the Ghost Ball—that's where you *should* hit the cue ball. Drag a single finger *anywhere* to rotate the aim. The line should point to a pocket. You know what a pocket is, I assume.",
-            "If you insist, you can toggle the 'Cue Ball' from the menu. Drag it to where your real cue ball is. The line between it and the Ghost Ball is the shot you're supposed to be making. It's not rocket science. It's just physics.",
-            "The slider on the right zooms. The one on the bottom rotates the table. I'm not going to hold your hand on this one.",
-            "In the menu, there's a 'Calculate Bank' option. If you're feeling brave, or foolish, press it. We'll see how you handle something that requires actual thought.",
-            "That's the crash course. The rest is a test of your character, or lack thereof. Don't embarrass us both. Press Finish."
+            "Hold your phone flat and point your camera at the ball you want to hit in.",
+            "Fit that ball inside this circle.",
+            "Use the Zoom Slider to get it perfect.",
+            "Point this line at the pocket.",
+            "This is where the cue ball needs to go to put your Target Ball in the pocket."
         )
     }
 
@@ -69,119 +69,117 @@ fun TutorialOverlay(
         )
         val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = highlightAlpha)
 
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .zIndex(9f)
-        ) {
-            val matrix = uiState.pitchMatrix
-            if (matrix == null) return@Canvas
-
-            when (uiState.tutorialHighlight ?: TutorialHighlightElement.NONE) {
-                TutorialHighlightElement.TARGET_BALL -> {
-                    val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
-                        uiState.protractorUnit.center,
-                        uiState.protractorUnit.radius,
-                        uiState,
-                        matrix
-                    )
-                    val screenPos = DrawingUtils.mapPoint(uiState.protractorUnit.center, matrix)
-                    drawCircle(
-                        color = highlightColor,
-                        radius = radiusInfo.radius * 2.0f,
-                        center = Offset(screenPos.x, screenPos.y),
-                        style = Stroke(width = 4.dp.toPx())
-                    )
-                }
-
-                TutorialHighlightElement.GHOST_BALL -> {
-                    val ghostCenter = uiState.protractorUnit.ghostCueBallCenter
-                    val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
-                        ghostCenter,
-                        uiState.protractorUnit.radius,
-                        uiState,
-                        matrix
-                    )
-                    val screenPos = DrawingUtils.mapPoint(ghostCenter, matrix)
-                    drawCircle(
-                        color = highlightColor,
-                        radius = radiusInfo.radius * 2.0f,
-                        center = Offset(screenPos.x, screenPos.y),
-                        style = Stroke(width = 4.dp.toPx())
-                    )
-                }
-
-                TutorialHighlightElement.CUE_BALL -> {
-                    uiState.onPlaneBall?.let {
-                        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
-                            it.center,
-                            it.radius,
-                            uiState,
-                            matrix
-                        )
-                        val screenPos = DrawingUtils.mapPoint(it.center, matrix)
-                        drawCircle(
-                            color = highlightColor,
-                            radius = radiusInfo.radius * 2.0f,
-                            center = Offset(screenPos.x, screenPos.y),
-                            style = Stroke(width = 4.dp.toPx())
-                        )
-                    }
-                }
-
-                TutorialHighlightElement.ZOOM_SLIDER -> {
-                    drawRoundRect(
-                        color = highlightColor,
-                        topLeft = Offset(
-                            size.width - 64.dp.toPx(),
-                            center.y - (size.height * 0.3f)
-                        ),
-                        size = Size(60.dp.toPx(), size.height * 0.6f),
-                        cornerRadius = CornerRadius(16.dp.toPx()),
-                        style = Stroke(width = 4.dp.toPx())
-                    )
-                }
-                // Other cases can be added here
-                else -> {}
-            }
+        LaunchedEffect(highlightAlpha) {
+            onEvent(MainScreenEvent.UpdateHighlightAlpha(highlightAlpha))
         }
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .navigationBarsPadding()
-                .padding(bottom = 96.dp, start = 16.dp, end = 16.dp)
+                .padding(start = 16.dp, end = 16.dp) // Keep horizontal padding
                 .zIndex(10f),
-            contentAlignment = Alignment.BottomCenter
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
-                        RoundedCornerShape(12.dp)
-                    )
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = tutorialSteps.getOrNull(uiState.currentTutorialStep) ?: "The tutorial is over. Go away.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(16.dp))
-                Row {
-                    if (uiState.currentTutorialStep < tutorialSteps.lastIndex) {
-                        TextButton(onClick = { onEvent(MainScreenEvent.NextTutorialStep) }) {
-                            Text("Next")
-                        }
+            val matrix = uiState.pitchMatrix
+            if (matrix != null) {
+                when (uiState.currentTutorialStep) {
+                    0, 1, 2 -> {
+                        val targetBallPosition = DrawingUtils.mapPoint(uiState.protractorUnit.center, matrix)
+                        TutorialTextBox(
+                            text = tutorialSteps[uiState.currentTutorialStep],
+                            onNext = { onEvent(MainScreenEvent.NextTutorialStep) },
+                            onFinish = { onEvent(MainScreenEvent.EndTutorial) },
+                            isLastStep = uiState.currentTutorialStep >= tutorialSteps.lastIndex,
+                            modifier = Modifier.offset {
+                                IntOffset(targetBallPosition.x.toInt() - 150.dp.roundToPx(), targetBallPosition.y.toInt() - 150.dp.roundToPx())
+                            }
+                        )
                     }
-                    TextButton(onClick = { onEvent(MainScreenEvent.EndTutorial) }) {
-                        Text("Finish")
+                    3 -> {
+                        // Placeholder for aiming line position
+                        val aimingLineEnd = uiState.aimingLineEndPoint ?: uiState.protractorUnit.center
+                        val aimingLinePosition = DrawingUtils.mapPoint(aimingLineEnd, matrix)
+                        TutorialTextBox(
+                            text = tutorialSteps[uiState.currentTutorialStep],
+                            onNext = { onEvent(MainScreenEvent.NextTutorialStep) },
+                            onFinish = { onEvent(MainScreenEvent.EndTutorial) },
+                            isLastStep = uiState.currentTutorialStep >= tutorialSteps.lastIndex,
+                            modifier = Modifier.offset {
+                                IntOffset(aimingLinePosition.x.toInt(), aimingLinePosition.y.toInt())
+                            }
+                        )
+                    }
+                    4 -> {
+                        val ghostBallPosition = DrawingUtils.mapPoint(uiState.protractorUnit.ghostCueBallCenter, matrix)
+                        TutorialTextBox(
+                            text = tutorialSteps[uiState.currentTutorialStep],
+                            onNext = { onEvent(MainScreenEvent.NextTutorialStep) },
+                            onFinish = { onEvent(MainScreenEvent.EndTutorial) },
+                            isLastStep = uiState.currentTutorialStep >= tutorialSteps.lastIndex,
+                            modifier = Modifier.offset {
+                                IntOffset(ghostBallPosition.x.toInt() - 150.dp.roundToPx(), ghostBallPosition.y.toInt() - 150.dp.roundToPx())
+                            }
+                        )
+                    }
+                    else -> {
+                        // Default to bottom center if step is out of bounds
+                        TutorialTextBox(
+                            text = "The tutorial is over. Go away.",
+                            onNext = { },
+                            onFinish = { onEvent(MainScreenEvent.EndTutorial) },
+                            isLastStep = true,
+                            modifier = Modifier.align(Alignment.BottomCenter)
+                        )
                     }
                 }
+            } else {
+                // Fallback if matrix is null
+                TutorialTextBox(
+                    text = tutorialSteps.getOrNull(uiState.currentTutorialStep) ?: "The tutorial is over. Go away.",
+                    onNext = { onEvent(MainScreenEvent.NextTutorialStep) },
+                    onFinish = { onEvent(MainScreenEvent.EndTutorial) },
+                    isLastStep = uiState.currentTutorialStep >= tutorialSteps.lastIndex,
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TutorialTextBox(
+    text: String,
+    onNext: () -> Unit,
+    onFinish: () -> Unit,
+    isLastStep: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+                RoundedCornerShape(12.dp)
+            )
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(16.dp))
+        Row {
+            if (!isLastStep) {
+                TextButton(onClick = onNext) {
+                    Text("Next")
+                }
+            }
+            TextButton(onClick = onFinish) {
+                Text("Finish")
             }
         }
     }
