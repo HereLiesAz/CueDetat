@@ -13,9 +13,8 @@ import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
- * Encapsulates all JBox2D/LiquidFun physics simulation logic for
- * HaterMode. This class is not thread-safe and should be managed by a
- * single owner (e.g., a ViewModel).
+ * Encapsulates all KPhysics simulation logic for HaterMode.
+ * This class is not thread-safe and should be managed by a single owner (e.g., a ViewModel).
  */
 class HaterPhysicsManager {
 
@@ -27,7 +26,7 @@ class HaterPhysicsManager {
     var dieAngle: Float = 0f
         private set
 
-    // All physics code is commented out because the JBox2D dependency is broken and cannot be resolved.
+    // All physics code is commented out because the physics dependency is broken and cannot be resolved.
     // This class is now a stub to allow the rest of the application to compile.
 
     fun destroy() {
