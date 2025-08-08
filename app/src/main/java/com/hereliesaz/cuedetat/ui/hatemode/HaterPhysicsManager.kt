@@ -14,7 +14,6 @@ import de.pirckheimer_gymnasium.jbox2d.dynamics.BodyType
 import de.pirckheimer_gymnasium.jbox2d.dynamics.FixtureDef
 import de.pirckheimer_gymnasium.jbox2d.dynamics.World
 import de.pirckheimer_gymnasium.jbox2d.particle.ParticleGroupDef
-import de.pirckheimer_gymnasium.jbox2d.particle.ParticleSystem
 import de.pirckheimer_gymnasium.jbox2d.particle.ParticleType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -39,7 +38,6 @@ class HaterPhysicsManager {
 
     // --- Physics World ---
     private val world = World(Vec2(0.0f, 0.0f))
-    private val particleSystem: ParticleSystem
     private var dieBody: Body? = null
 
     // --- Scaling & Dimensions ---
@@ -48,10 +46,8 @@ class HaterPhysicsManager {
     private var viewHeight = 0f
 
     init {
-        val pDef = ParticleSystemDef()
-        pDef.radius = 0.15f // in meters
-        pDef.dampingStrength = 0.2f
-        particleSystem = world.createParticleSystem(pDef)
+        world.setParticleRadius(0.15f)
+        world.setParticleDamping(0.2f)
     }
 
     // Since this class doesn't own a lifecycle, the owner must call destroy.
@@ -64,7 +60,7 @@ class HaterPhysicsManager {
     fun step() {
         world.step(1.0f / 60.0f, 8, 3)
 
-        particlePositions = particleSystem.particlePositionBuffer.map {
+        particlePositions = world.getParticlePositionBuffer().map {
             Offset(it.x * PPM, it.y * PPM)
         }
 
@@ -140,16 +136,16 @@ class HaterPhysicsManager {
 
 
     fun createParticles() {
-        if (particleSystem.particleCount > 0) return
+        if (world.getParticleCount() > 0) return
 
         val pgd = ParticleGroupDef().apply {
             val shape = PolygonShape()
             shape.setAsBox(viewWidth / PPM * 0.4f, viewHeight / PPM * 0.4f)
             this.shape = shape
-            flags = ParticleType.b2_waterParticle
+            flags = ParticleType.waterParticle
             position.set(0f, 0f)
         }
-        particleSystem.createParticleGroup(pgd)
+        world.createParticleGroup(pgd)
     }
 
     fun agitateParticles(scope: CoroutineScope, onAgitationComplete: () -> Unit) {

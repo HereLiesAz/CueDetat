@@ -183,3 +183,4 @@
 -keep public class com.hereliesaz.cuedetat.MainActivity { *; }
 -keep public class com.hereliesaz.cuedetat.MyApplication { *;
 }
+-dontwarn com.google.devtools.build.android.desugar.runtime.ThrowableExtension
