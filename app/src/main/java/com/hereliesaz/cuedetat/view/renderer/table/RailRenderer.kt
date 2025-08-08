@@ -33,7 +33,8 @@ class RailRenderer {
         val railLineGlowPaint = createGlowPaint(
             baseGlowColor = railConfig.glowColor,
             baseGlowWidth = railConfig.glowWidth,
-            state = state
+            state = state,
+            paints = paints
         )
         val diamondPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL

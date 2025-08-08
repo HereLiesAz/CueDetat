@@ -44,7 +44,7 @@ class CalculateBankShot @Inject constructor() {
                 }
 
                 path.add(intersection)
-                direction = state.table.reflect(direction, normal)
+                direction = state.table.reflect(direction, normal, state.selectedSpinOffset?.x ?: 0f)
                 currentPoint = intersection
             } else {
                 path.add(endOfLine)

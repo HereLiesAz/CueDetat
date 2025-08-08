@@ -112,4 +112,16 @@ data class Table(
         val dot = v.x * n.x + v.y * n.y
         return PointF(v.x - 2 * dot * n.x, v.y - 2 * dot * n.y)
     }
+
+    fun reflect(v: PointF, n: PointF, spin: Float): PointF {
+        val dot = v.x * n.x + v.y * n.y
+        val reflectedVx = v.x - 2 * dot * n.x
+        val reflectedVy = v.y - 2 * dot * n.y
+
+        // Adjust the reflection angle based on the spin
+        val angleAdjustment = spin * 0.1f // This is a magic number, I will need to tune it
+        val newAngle = kotlin.math.atan2(reflectedVy, reflectedVx) + angleAdjustment
+        val mag = kotlin.math.hypot(reflectedVx.toDouble(), reflectedVy.toDouble()).toFloat()
+        return PointF((mag * kotlin.math.cos(newAngle)).toFloat(), (mag * kotlin.math.sin(newAngle)).toFloat())
+    }
 }

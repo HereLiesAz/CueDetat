@@ -31,6 +31,9 @@ class CalibrationViewModel @Inject constructor(
     private val _showSubmissionDialog = MutableStateFlow(false)
     val showSubmissionDialog = _showSubmissionDialog.asStateFlow()
 
+    private val _toastMessage = MutableStateFlow<String?>(null)
+    val toastMessage = _toastMessage.asStateFlow()
+
     private val captured2DPoints = mutableListOf<MatOfPoint2f>()
     private var latestCorners: MatOfPoint2f? = null
     private var imageSize: Size? = null
@@ -72,7 +75,7 @@ class CalibrationViewModel @Inject constructor(
                 distCoeffs.release()
                 _showSubmissionDialog.value = true
             } else {
-                // Handle calibration failure, show a toast in the future
+                _toastMessage.value = "Calibration failed. Please try again."
             }
         }
     }
@@ -82,6 +85,14 @@ class CalibrationViewModel @Inject constructor(
     }
 
     fun onSubmitData() {
+        // TODO: Implement backend submission logic
+        _toastMessage.value = "Calibration data submitted successfully."
         _showSubmissionDialog.value = false
     }
+
+    fun onToastShown() {
+        _toastMessage.value = null
+    }
+
+    // TODO: Implement automatic camera calibration profile selection based on device model
 }

@@ -3,12 +3,14 @@
 package com.hereliesaz.cuedetat.data
 
 import android.graphics.PointF
+import androidx.annotation.Keep
 import android.graphics.Rect
 import org.opencv.core.Mat
 
 /**
  * Data class to hold the results of computer vision processing.
  */
+@Keep
 data class VisionData(
     val genericBalls: List<PointF> = emptyList(),
     val customBalls: List<PointF> = emptyList(),

@@ -67,7 +67,8 @@ class LineRenderer {
         val shotLineGlow = createGlowPaint(
             baseGlowColor = if (shotLineIsWarning) Color(paints.warningPaint.color) else shotGuideLineConfig.glowColor,
             baseGlowWidth = shotGuideLineConfig.glowWidth,
-            state = state
+            state = state,
+            paints = paints
         )
         val obstructionPaint = Paint(paints.pathObstructionPaint).apply {
             strokeWidth = state.protractorUnit.radius * 2
@@ -138,7 +139,8 @@ class LineRenderer {
         val aimingLineGlow = createGlowPaint(
             baseGlowColor = aimingLineConfig.glowColor,
             baseGlowWidth = aimingLineConfig.glowWidth,
-            state = state
+            state = state,
+            paints = paints
         )
 
         state.aimingLineBankPath?.let {
@@ -172,7 +174,8 @@ class LineRenderer {
         val tangentGlow = createGlowPaint(
             baseGlowColor = tangentLineConfig.glowColor,
             baseGlowWidth = tangentLineConfig.glowWidth,
-            state = state
+            state = state,
+            paints = paints
         )
 
         val start = state.protractorUnit.ghostCueBallCenter
@@ -280,7 +283,7 @@ class LineRenderer {
 
         if (isPocketed) {
             val whitePaint = Paint(paints.shotLinePaint).apply { color = Color.White.toArgb() }
-            val whiteGlowPaint = createGlowPaint(Color.White, 12f, state)
+            val whiteGlowPaint = createGlowPaint(Color.White, 12f, state, paints)
             drawPath(canvas, path, whiteGlowPaint)
             drawPath(canvas, path, whitePaint)
         } else {
@@ -297,7 +300,8 @@ class LineRenderer {
                 val glowPaint = createGlowPaint(
                     baseGlowColor = config.glowColor,
                     baseGlowWidth = config.glowWidth,
-                    state = state
+                    state = state,
+                    paints = paints
                 )
                 canvas.drawLine(start.x, start.y, end.x, end.y, glowPaint)
                 canvas.drawLine(start.x, start.y, end.x, end.y, linePaint)
@@ -317,7 +321,8 @@ class LineRenderer {
                 val glowPaint = createGlowPaint(
                     baseGlowColor = config.glowColor,
                     baseGlowWidth = config.glowWidth,
-                    state = state
+                    state = state,
+                    paints = paints
                 )
 
                 drawFadingLine(canvas, start, direction, linePaint, glowPaint, state, paints)

@@ -172,11 +172,11 @@
 #-------------------------------------------------------------------------------
 # Final safeguards for the application's core components.
 # Keep all data, model, and state classes.
--keep class com.hereliesaz.cuedetat.data.** { *; }
--keep class com.hereliesaz.cuedetat.view.model.** { *;
+-keep @androidx.annotation.Keep class * {*;}
+-keepclasseswithmembers class * {
+    @androidx.annotation.Keep <fields>;
+    @androidx.annotation.Keep <methods>;
 }
--keep class com.hereliesaz.cuedetat.view.state.** { *; }
--keep class com.hereliesaz.cuedetat.view.config.** { *; }
 
 
 # Keep your main activity and application class.

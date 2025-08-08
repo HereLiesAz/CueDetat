@@ -4,6 +4,7 @@ package com.hereliesaz.cuedetat.domain
 
 import android.graphics.Matrix
 import android.graphics.PointF
+import androidx.annotation.Keep
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -32,6 +33,7 @@ enum class ExperienceMode {
     }
 }
 
+@Keep
 data class CueDetatState(
     val experienceMode: ExperienceMode? = null,
     val haterState: HaterState = HaterState(),
