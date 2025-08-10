@@ -32,6 +32,14 @@ internal fun reduceToggleAction(
                 isMenuVisible = false
             )
         }
+
+        is MainScreenEvent.ToggleNavigationRail -> {
+            state.copy(
+                isNavigationRailExpanded = !state.isNavigationRailExpanded,
+                isMenuVisible = false,
+                isExpandedMenuVisible = false
+            )
+        }
         is MainScreenEvent.ToggleSpinControl -> state.copy(isSpinControlVisible = !state.isSpinControlVisible)
         is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(state, reducerUtils)
         is MainScreenEvent.CycleTableSize -> {

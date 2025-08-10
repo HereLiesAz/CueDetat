@@ -61,17 +61,18 @@ fun stateReducer(
         is MainScreenEvent.ThemeChanged, is MainScreenEvent.SetWarning ->
             reduceSystemAction(currentState, action)
 
-        is MainScreenEvent.ToggleSpinControl, is MainScreenEvent.CycleTableSize,
-        is MainScreenEvent.SetTableSize, is MainScreenEvent.ToggleTableSizeDialog,
-        is MainScreenEvent.ToggleForceTheme, is MainScreenEvent.ToggleCamera,
-        is MainScreenEvent.ToggleDistanceUnit, is MainScreenEvent.ToggleLuminanceDialog,
-        is MainScreenEvent.ToggleGlowStickDialog, is MainScreenEvent.ToggleHelp,
-        is MainScreenEvent.ToggleMoreHelp,
-        is MainScreenEvent.ToggleOrientationLock,
-        is MainScreenEvent.ApplyPendingOrientationLock, is MainScreenEvent.OrientationChanged,
-        is MainScreenEvent.SetExperienceMode, is MainScreenEvent.UnlockBeginnerView,
-        is MainScreenEvent.LockBeginnerView, is MainScreenEvent.ToggleCalibrationScreen,
-        is MainScreenEvent.ToggleQuickAlignScreen, is MainScreenEvent.ToggleBankingMode ->
+        is MainScreenEvent.ToggleMenu, is MainScreenEvent.ToggleExpandedMenu,
+        is MainScreenEvent.ToggleNavigationRail, is MainScreenEvent.ToggleSpinControl,
+        is MainScreenEvent.CycleTableSize, is MainScreenEvent.SetTableSize,
+        is MainScreenEvent.ToggleTableSizeDialog, is MainScreenEvent.ToggleForceTheme,
+        is MainScreenEvent.ToggleCamera, is MainScreenEvent.ToggleDistanceUnit,
+        is MainScreenEvent.ToggleLuminanceDialog, is MainScreenEvent.ToggleGlowStickDialog,
+        is MainScreenEvent.ToggleHelp, is MainScreenEvent.ToggleMoreHelp,
+        is MainScreenEvent.ToggleOrientationLock, is MainScreenEvent.ApplyPendingOrientationLock,
+        is MainScreenEvent.OrientationChanged, is MainScreenEvent.SetExperienceMode,
+        is MainScreenEvent.UnlockBeginnerView, is MainScreenEvent.LockBeginnerView,
+        is MainScreenEvent.ToggleCalibrationScreen, is MainScreenEvent.ToggleQuickAlignScreen,
+        is MainScreenEvent.ToggleBankingMode ->
             reduceToggleAction(currentState, action, reducerUtils)
 
         is MainScreenEvent.StartTutorial, is MainScreenEvent.NextTutorialStep,
