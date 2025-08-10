@@ -191,7 +191,7 @@ class BallRenderer {
                 strokeWidth = config.strokeWidth
                 alpha = (config.opacity * 255).toInt()
             }
-            val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state)
+            val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints)
             canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, bubbleRadius, glowPaint)
             canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, bubbleRadius, strokePaint)
 
@@ -220,7 +220,8 @@ class BallRenderer {
             val glowPaint = createGlowPaint(
                 baseGlowColor = if (isWarning) Color(paints.warningPaint.color) else config.glowColor,
                 baseGlowWidth = config.glowWidth,
-                state = state
+                state = state,
+                paints = paints
             )
 
             // Draw 2D logical ball

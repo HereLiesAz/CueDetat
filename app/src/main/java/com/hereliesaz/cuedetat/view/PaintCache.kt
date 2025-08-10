@@ -53,6 +53,8 @@ class PaintCache {
         xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
     }
 
+    val glowPaints = mutableMapOf<String, Paint>()
+
     // --- Bank Line Paints ---
     val bankLine1Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     val bankLine2Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }

@@ -71,7 +71,6 @@ fun TutorialOverlay(
 
         Canvas(
             modifier = Modifier
-                .fillMaxSize()
                 .zIndex(9f)
         ) {
             val matrix = uiState.pitchMatrix
@@ -148,7 +147,6 @@ fun TutorialOverlay(
 
         Box(
             modifier = Modifier
-                .fillMaxSize()
                 .navigationBarsPadding()
                 .padding(bottom = 96.dp, start = 16.dp, end = 16.dp)
                 .zIndex(10f),

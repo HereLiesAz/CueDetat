@@ -21,8 +21,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -46,6 +48,15 @@ fun CalibrationScreen(
     val detectedPattern by viewModel.detectedPattern.collectAsState()
     val capturedImageCount by viewModel.capturedImageCount.collectAsState()
     val showSubmissionDialog by viewModel.showSubmissionDialog.collectAsState()
+    val toastMessage by viewModel.toastMessage.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(toastMessage) {
+        toastMessage?.let {
+            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.onToastShown()
+        }
+    }
 
     if (showSubmissionDialog) {
         CalibrationSubmissionDialog(

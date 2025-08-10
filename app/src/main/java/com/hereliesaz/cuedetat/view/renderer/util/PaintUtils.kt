@@ -28,26 +28,35 @@ fun createGlowPaint(
     baseGlowColor: Color,
     baseGlowWidth: Float,
     state: CueDetatState,
+    paints: com.hereliesaz.cuedetat.view.PaintCache
 ): Paint {
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = baseGlowWidth
+    val glowValue = state.glowStickValue
+    val key = if (abs(glowValue) > 0.05f) {
+        "glow_${glowValue}"
+    } else {
+        "glow_${baseGlowColor}_${baseGlowWidth}"
     }
 
-    val glowValue = state.glowStickValue
-    if (abs(glowValue) > 0.05f) {
-        // Glow Stick override is active
-        val glowAlpha = (abs(glowValue) * 255).toInt()
-        val color = if (glowValue > 0) Color.White.toArgb() else Color.Black.toArgb()
-        val blurRadius = 15f * abs(glowValue)
-        paint.color = color
-        paint.alpha = glowAlpha
-        paint.maskFilter = BlurMaskFilter(blurRadius, BlurMaskFilter.Blur.NORMAL)
-    } else {
-        // Default glow effect
-        paint.color = baseGlowColor.toArgb()
-        paint.alpha = (baseGlowColor.alpha * 255 * 0.7f).toInt() // Default glow is 70% alpha
-        paint.maskFilter = BlurMaskFilter(8f, BlurMaskFilter.Blur.NORMAL)
+    return paints.glowPaints.getOrPut(key) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = baseGlowWidth
+        }
+
+        if (abs(glowValue) > 0.05f) {
+            // Glow Stick override is active
+            val glowAlpha = (abs(glowValue) * 255).toInt()
+            val color = if (glowValue > 0) Color.White.toArgb() else Color.Black.toArgb()
+            val blurRadius = 15f * abs(glowValue)
+            paint.color = color
+            paint.alpha = glowAlpha
+            paint.maskFilter = BlurMaskFilter(blurRadius, BlurMaskFilter.Blur.NORMAL)
+        } else {
+            // Default glow effect
+            paint.color = baseGlowColor.toArgb()
+            paint.alpha = (baseGlowColor.alpha * 255 * 0.7f).toInt() // Default glow is 70% alpha
+            paint.maskFilter = BlurMaskFilter(8f, BlurMaskFilter.Blur.NORMAL)
+        }
+        paint
     }
-    return paint
 }

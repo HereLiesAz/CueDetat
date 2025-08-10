@@ -28,12 +28,13 @@ class VisionAnalyzer @Inject constructor(
 
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(image: ImageProxy) {
-        val bitmap = image.toBitmap()
-        if (bitmap != null) {
-            _currentFrameBitmap.value = bitmap
-        }
-
         uiStateRef.get()?.let { state ->
+            if (state.experienceMode == com.hereliesaz.cuedetat.domain.ExperienceMode.HATER) {
+                val bitmap = image.toBitmap()
+                if (bitmap != null) {
+                    _currentFrameBitmap.value = bitmap
+                }
+            }
             visionRepository.processImage(image, state)
         } ?: image.close() // Close the image if state is not available to prevent leaks
     }
