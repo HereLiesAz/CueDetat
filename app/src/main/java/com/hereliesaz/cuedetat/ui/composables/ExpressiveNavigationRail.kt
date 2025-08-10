@@ -83,7 +83,13 @@ fun ExpressiveNavigationRail(
                             "Spin" -> Icons.Default.Timeline
                             "Bank" -> Icons.Default.Wallet
                             "Menu" -> Icons.Default.Menu
-                            else -> Icons.Default.Help
+                            else -> {
+                                android.util.Log.e(
+                                    "ExpressiveNavigationRail",
+                                    "Unmapped label for icon: $label"
+                                )
+                                Icons.Default.Help
+                            }
                         }
                         Icon(imageVector = icon, contentDescription = label)
                     },
