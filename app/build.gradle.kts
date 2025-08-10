@@ -66,7 +66,8 @@ android {
         resources {
             excludes += listOf(
                 "META-INF/AL2.0",
-                "META-INF/LGPL2.1"
+                "META-INF/LGPL2.1",
+                "META-INF/DEPENDENCIES"
             )
         }
     }
@@ -208,7 +209,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences.rxjava3) // optional
 
     implementation(libs.slf4j.bom)
-    implementation("com.github.engine-pi:jbox2d:v3.1.0")
+    implementation("com.github.engine-pi.jbox2d:jbox2d-library:v3.1.0")
 
 
 
