@@ -39,6 +39,7 @@ data class CueDetatState(
     val haterState: HaterState = HaterState(),
     val isMenuVisible: Boolean = false,
     val isExpandedMenuVisible: Boolean = false,
+    val isNavigationRailExpanded: Boolean = false,
     val viewWidth: Int = 0,
     val viewHeight: Int = 0,
     val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), LOGICAL_BALL_RADIUS, 0f),
@@ -157,6 +158,7 @@ sealed class MainScreenEvent {
     data class HaterAction(val action: HaterEvent) : MainScreenEvent()
     object ToggleMenu : MainScreenEvent()
     object ToggleExpandedMenu : MainScreenEvent()
+    object ToggleNavigationRail : MainScreenEvent()
     data class ScreenGestureStarted(val position: PointF) : MainScreenEvent()
     data class Drag(val previousPosition: PointF, val currentPosition: PointF) : MainScreenEvent()
     object GestureEnded : MainScreenEvent()

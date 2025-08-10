@@ -54,7 +54,7 @@ fun MainLayout(
         TopControls(
             uiState = uiState,
             onEvent = onEvent,
-            onMenuClick = { onEvent(MainScreenEvent.ToggleMenu) }
+            onMenuClick = { onEvent(MainScreenEvent.ToggleNavigationRail) }
         )
 
         Row(
@@ -144,7 +144,7 @@ fun MainLayout(
             onDismiss = { onEvent(MainScreenEvent.ToggleTableSizeDialog) }
         )
 
-        // Collapsed Rail (toggled by top-left button)
+        // Expressive navigation rail
         ExpressiveNavigationRail(uiState = uiState, onEvent = onEvent)
 
         // Expanded Menu (toggled by the "Menu" button on the rail)
