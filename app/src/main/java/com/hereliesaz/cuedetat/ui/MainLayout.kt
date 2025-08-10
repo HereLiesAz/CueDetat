@@ -69,12 +69,8 @@ fun MainLayout(
                 modifier = Modifier.weight(1f),
                 horizontalAlignment = Alignment.Start
             ) {
-                if (uiState.experienceMode != ExperienceMode.BEGINNER) {
-                    CuedetatButton(
-                        onClick = { onEvent(MainScreenEvent.AddObstacleBall) },
-                        text = "Add Obstacle"
-                    )
-                }
+                // This column is intentionally left empty.
+                // The buttons have been moved to the navigation rail.
             }
 
             // Center-aligned controls
@@ -99,18 +95,6 @@ fun MainLayout(
                         onEvent = onEvent,
                     )
                 }
-
-                val buttonText = when {
-                    uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> "Unlock View"
-                    uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked -> "Lock View"
-                    else -> "Reset View"
-                }
-                val buttonEvent = when {
-                    uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> MainScreenEvent.UnlockBeginnerView
-                    uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked -> MainScreenEvent.LockBeginnerView
-                    else -> MainScreenEvent.Reset
-                }
-                CuedetatButton(onClick = { onEvent(buttonEvent) }, text = buttonText)
             }
         }
 
@@ -147,38 +131,5 @@ fun MainLayout(
         // Expressive navigation rail
         ExpressiveNavigationRail(uiState = uiState, onEvent = onEvent)
 
-        // Expanded Menu (toggled by the "Menu" button on the rail)
-        AnimatedVisibility(
-            visible = uiState.isExpandedMenuVisible,
-            enter = fadeIn(animationSpec = tween(300)),
-            exit = fadeOut(animationSpec = tween(300))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.7f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { onEvent(MainScreenEvent.ToggleExpandedMenu) }
-            )
-        }
-        AnimatedVisibility(
-            visible = uiState.isExpandedMenuVisible,
-            enter = slideInHorizontally(
-                initialOffsetX = { -it },
-                animationSpec = tween(durationMillis = 300)
-            ) + fadeIn(),
-            exit = slideOutHorizontally(
-                targetOffsetX = { -it },
-                animationSpec = tween(durationMillis = 300)
-            ) + fadeOut()
-        ) {
-            MenuDrawerContent(
-                uiState = uiState,
-                onEvent = onEvent,
-                onCloseDrawer = { onEvent(MainScreenEvent.ToggleExpandedMenu) }
-            )
-        }
     }
 }

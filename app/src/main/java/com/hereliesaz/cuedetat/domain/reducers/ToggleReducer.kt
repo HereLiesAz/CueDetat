@@ -20,24 +20,14 @@ internal fun reduceToggleAction(
         is MainScreenEvent.ToggleMenu -> {
             // When toggling the nav rail, always ensure the expanded menu is closed.
             state.copy(
-                isMenuVisible = !state.isMenuVisible,
-                isExpandedMenuVisible = false
-            )
-        }
-
-        is MainScreenEvent.ToggleExpandedMenu -> {
-            // When toggling the expanded menu, always ensure the nav rail is closed.
-            state.copy(
-                isExpandedMenuVisible = !state.isExpandedMenuVisible,
-                isMenuVisible = false
+                isMenuVisible = !state.isMenuVisible
             )
         }
 
         is MainScreenEvent.ToggleNavigationRail -> {
             state.copy(
                 isNavigationRailExpanded = !state.isNavigationRailExpanded,
-                isMenuVisible = false,
-                isExpandedMenuVisible = false
+                isMenuVisible = false
             )
         }
         is MainScreenEvent.ToggleSpinControl -> state.copy(isSpinControlVisible = !state.isSpinControlVisible)

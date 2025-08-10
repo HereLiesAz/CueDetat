@@ -144,42 +144,9 @@ fun HaterScreen(
         TopControls(
             uiState = uiState,
             onEvent = onEvent,
-            onMenuClick = { onEvent(MainScreenEvent.ToggleMenu) }
+            onMenuClick = { onEvent(MainScreenEvent.ToggleNavigationRail) }
         )
 
         ExpressiveNavigationRail(uiState = uiState, onEvent = onEvent)
-
-        AnimatedVisibility(
-            visible = uiState.isExpandedMenuVisible,
-            enter = fadeIn(animationSpec = tween(300)),
-            exit = fadeOut(animationSpec = tween(300))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.7f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { onEvent(MainScreenEvent.ToggleExpandedMenu) }
-            )
-        }
-        AnimatedVisibility(
-            visible = uiState.isExpandedMenuVisible,
-            enter = slideInHorizontally(
-                initialOffsetX = { -it },
-                animationSpec = tween(durationMillis = 300)
-            ) + fadeIn(),
-            exit = slideOutHorizontally(
-                targetOffsetX = { -it },
-                animationSpec = tween(durationMillis = 300)
-            ) + fadeOut()
-        ) {
-            MenuDrawerContent(
-                uiState = uiState,
-                onEvent = onEvent,
-                onCloseDrawer = { onEvent(MainScreenEvent.ToggleExpandedMenu) }
-            )
-        }
     }
 }
