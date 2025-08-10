@@ -14,7 +14,8 @@ internal fun reduceAction(
     reducerUtils: ReducerUtils
 ): CueDetatState {
     return when (action) {
-        is MainScreenEvent.Reset -> {
+
+        else -> {
             state.preResetState?.let {
                 return it.copy(
                     preResetState = null,
@@ -54,7 +55,5 @@ internal fun reduceAction(
                 viewOffset = PointF(0f, 0f)
             )
         }
-
-        else -> state
     }
 }

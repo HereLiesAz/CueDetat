@@ -147,7 +147,7 @@ class MainViewModel @Inject constructor(
     }
 
     private fun handleSingleEvents(event: MainScreenEvent) {
-        if (event is MainScreenEvent) {
+        if (true) {
             viewModelScope.launch {
                 when (event) {
                     is MainScreenEvent.CheckForUpdate -> {
@@ -158,7 +158,7 @@ class MainViewModel @Inject constructor(
                     is MainScreenEvent.ViewAboutPage -> _singleEvent.emit(SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat"))
                     is MainScreenEvent.SendFeedback -> _singleEvent.emit(
                         SingleEvent.SendFeedbackEmail(
-                            "dev@herelies.az",
+                            "hereliesaz@gmail.com",
                             "Cue d'Etat Feedback"
                         )
                     )
