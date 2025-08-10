@@ -60,6 +60,31 @@ class PaintCache {
     val bankLine2Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     val bankLine3Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     val bankLine4Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    fun getGlowPaint(baseGlowColor: Color, baseGlowWidth: Float, state: CueDetatState): Paint {
+        glowPaint.apply {
+            style = Paint.Style.STROKE
+            strokeWidth = baseGlowWidth
+
+            val glowValue = state.glowStickValue
+            if (kotlin.math.abs(glowValue) > 0.05f) {
+                // Glow Stick override is active
+                val glowAlpha = (kotlin.math.abs(glowValue) * 255).toInt()
+                val color = if (glowValue > 0) Color.White.toArgb() else Color.Black.toArgb()
+                val blurRadius = 15f * kotlin.math.abs(glowValue)
+                this.color = color
+                this.alpha = glowAlpha
+                maskFilter = android.graphics.BlurMaskFilter(blurRadius, android.graphics.BlurMaskFilter.Blur.NORMAL)
+            } else {
+                // Default glow effect
+                this.color = baseGlowColor.toArgb()
+                alpha = (baseGlowColor.alpha * 255 * 0.7f).toInt() // Default glow is 70% alpha
+                maskFilter = android.graphics.BlurMaskFilter(8f, android.graphics.BlurMaskFilter.Blur.NORMAL)
+            }
+        }
+        return glowPaint
+    }
 
     fun setTypeface(typeface: Typeface?) {
         textPaint.typeface = typeface

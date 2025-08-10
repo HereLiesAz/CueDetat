@@ -54,6 +54,7 @@ data class CueDetatState(
     val isMoreHelpVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
     val isCameraVisible: Boolean = true,
+    val showCameraFeed: Boolean = false,
     val viewOffset: PointF = PointF(0f, 0f),
     val orientationLock: OrientationLock = OrientationLock.PORTRAIT,
     @Transient val pendingOrientationLock: OrientationLock? = null,
@@ -77,6 +78,8 @@ data class CueDetatState(
     val showTutorialOverlay: Boolean = false,
     val currentTutorialStep: Int = 0,
     @Transient val tutorialHighlight: TutorialHighlightElement? = TutorialHighlightElement.NONE,
+@Transient val flashingTutorialElement: TutorialHighlightElement? = null,
+@Transient val highlightAlpha: Float = 0f,
     val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f),
     @Transient val pitchMatrix: Matrix? = null,
     @Transient val railPitchMatrix: Matrix? = null,
@@ -227,6 +230,7 @@ sealed class MainScreenEvent {
     object StartTutorial : MainScreenEvent()
     object NextTutorialStep : MainScreenEvent()
     object EndTutorial : MainScreenEvent()
+    data class UpdateHighlightAlpha(val alpha: Float) : MainScreenEvent()
     object CheckForUpdate : MainScreenEvent()
     object ViewArt : MainScreenEvent()
     object ViewAboutPage : MainScreenEvent()
