@@ -1,36 +1,134 @@
-name: Release APK
+# .github/workflows/release.yaml
+
+name: Android Release Build
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    # These permissions are required for the release action to create a release and for the commit step to push changes.
+    permissions:
+      contents: write
+      
     steps:
-    - uses: actions/checkout@v3
+      - name: Checkout repository
+        # We need to fetch the full history to create tags and push changes back.
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: gradle
+      - name: Validate Gradle wrapper
+        uses: gradle/wrapper-validation-action@v1
 
-    - name: Grant execute permission to gradlew
-      run: chmod +x gradlew
+      - name: Extract Java version from build files
+        id: get_java_version
+        run: |
+          # This script attempts to find the Java version specified in your Gradle files.
+          RAW_VERSION=$( (grep -r "JavaVersion.VERSION_" . --include "build.gradle*"; grep -r "jvmTarget" . --include "build.gradle*") | grep -o -E "VERSION_[0-9]+|['\"][0-9\.]+" | head -1)
+          if [[ -z "$RAW_VERSION" ]]; then
+            echo "⚠️ Could not determine Java version automatically. Defaulting to Java 17."
+            VERSION=17
+          else
+            VERSION=$(echo "$RAW_VERSION" | grep -o -E '[0-9\.]+' | sed 's/_/./g')
+          fi
+          if [[ "$VERSION" == "1.8" ]]; then
+            VERSION=8
+          fi
+          echo "Detected Java version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-    - name: Build with Gradle
-      run: ./gradlew assembleRelease
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ steps.get_java_version.outputs.version }}
+          cache: 'gradle'
 
-    - name: Create Release
-      id: create_release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: app/build/outputs/apk/release/app-release-unsigned.apk
-        prerelease: true
-        tag_name: build-${{ github.run_number }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Increment version
+        id: versioning
+        run: |
+          # Define the path to your app's build.gradle file
+          GRADLE_FILE="app/build.gradle"
+
+          # Extract current version code and name
+          CURRENT_VERSION_CODE=$(grep 'versionCode ' $GRADLE_FILE | awk '{print $2}')
+          CURRENT_VERSION_NAME=$(grep 'versionName ' $GRADLE_FILE | awk '{print $2}' | tr -d '"')
+
+          # Increment versionCode
+          NEW_VERSION_CODE=$((CURRENT_VERSION_CODE + 1))
+
+          # Increment patch number in versionName (e.g., 1.2.3 -> 1.2.4)
+          NEW_VERSION_NAME=$(echo $CURRENT_VERSION_NAME | awk -F. -v OFS=. '{$NF = $NF + 1;} 1')
+
+          # Update the build.gradle file with the new versions
+          sed -i "s/versionCode .*/versionCode $NEW_VERSION_CODE/" $GRADLE_FILE
+          sed -i "s/versionName .*/versionName \"$NEW_VERSION_NAME\"/" $GRADLE_FILE
+
+          echo "Version bumped to $NEW_VERSION_NAME (Code: $NEW_VERSION_CODE)"
+          
+          # Set outputs for subsequent steps
+          echo "new_version_name=$NEW_VERSION_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+      
+      - name: Configure Gradle Properties
+        run: |
+          mkdir -p ~/.gradle
+          echo "org.gradle.jvmargs=-Xmx3072m" >> ~/.gradle/gradle.properties
+          echo "android.useAndroidX=true" >> ~/.gradle/gradle.properties
+      
+      - name: Build with Gradle
+        run: ./gradlew clean assembleRelease
+
+      - name: Rename APK
+        id: rename_apk
+        run: |
+          # Find the unsigned APK
+          APK_PATH=$(find ./app/build/outputs/apk/release -name "app-release-unsigned.apk")
+          APK_DIR=$(dirname "$APK_PATH")
+          
+          # Create the new filename
+          NEW_APK_NAME="app-release-unsigned-v${{ steps.versioning.outputs.new_version_name }}.apk"
+          
+          # Rename the file
+          mv "$APK_PATH" "$APK_DIR/$NEW_APK_NAME"
+          
+          # Set output for the upload step
+          echo "new_path=$APK_DIR/$NEW_APK_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and Tag version bump
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add app/build.gradle
+          # Commit only if there are changes
+          if ! git diff --staged --quiet; then
+            git commit -m "chore(release): Bump version to ${{ steps.versioning.outputs.new_version_name }}"
+            git tag v${{ steps.versioning.outputs.new_version_name }}
+            git push
+            git push --tags
+          else
+            echo "No version changes to commit."
+          fi
+
+      - name: Create GitHub Pre-Release
+        uses: softprops/action-gh-release@v1
+        # This step only runs if a new version was committed and tagged
+        if: steps.versioning.outputs.new_version_name != ''
+        with:
+          # The name of the tag for this release
+          tag_name: v${{ steps.versioning.outputs.new_version_name }}
+          # The name of the release
+          name: Release v${{ steps.versioning.outputs.new_version_name }}
+          # Mark this release as a pre-release
+          prerelease: true
+          # A list of files to upload as assets to the release
+          files: ${{ steps.rename_apk.outputs.new_path }}
+        env:
+          # This token is provided by Actions and is required to create a release
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
