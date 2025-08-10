@@ -13,7 +13,7 @@ plugins {
 }
 
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(17)
 }
 
 // Load properties from local.properties file
@@ -66,8 +66,7 @@ android {
         resources {
             excludes += listOf(
                 "META-INF/AL2.0",
-                "META-INF/LGPL2.1",
-                "META-INF/DEPENDENCIES"
+                "META-INF/LGPL2.1"
             )
         }
     }
@@ -118,11 +117,11 @@ android {
     buildToolsVersion = "36.0.0"
     ndkVersion = "29.0.13599879 rc2"
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "21"
+        jvmTarget = "17"
     }
 
 
@@ -208,8 +207,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences.rxjava2) // optional
     implementation(libs.androidx.datastore.preferences.rxjava3) // optional
 
-    implementation(libs.slf4j.bom)
-    implementation("com.github.engine-pi.jbox2d:jbox2d-library:v3.1.0")
+    implementation(platform(libs.slf4j.bom))
 
 
 
