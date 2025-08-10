@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -108,7 +110,7 @@ fun AdvancedOptionsDialog(
                         modifier = Modifier.height(32.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Divider()
+                    HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Fix Lens Warp", style = MaterialTheme.typography.titleMedium)
                     Row(
@@ -124,7 +126,7 @@ fun AdvancedOptionsDialog(
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
-                    Divider()
+                    HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
                     TextButton(onClick = { onEvent(MainScreenEvent.EnterCalibrationMode) }) {
                         Text("Calibrate Felt Color", color = MaterialTheme.colorScheme.tertiary)
                     }
