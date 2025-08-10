@@ -183,3 +183,6 @@
 -keep public class com.hereliesaz.cuedetat.MainActivity { *; }
 -keep public class com.hereliesaz.cuedetat.MyApplication { *;
 }
+
+# Added based on R8 build error
+-dontwarn com.google.devtools.build.android.desugar.runtime.ThrowableExtension

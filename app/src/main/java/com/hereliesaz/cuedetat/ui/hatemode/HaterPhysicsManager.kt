@@ -6,27 +6,16 @@ import android.text.TextPaint
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import de.pirckheimer_gymnasium.jbox2d.collision.shapes.PolygonShape
-import de.pirckheimer_gymnasium.jbox2d.common.Vec2
-import de.pirckheimer_gymnasium.jbox2d.dynamics.Body
-import de.pirckheimer_gymnasium.jbox2d.dynamics.BodyDef
-import de.pirckheimer_gymnasium.jbox2d.dynamics.BodyType
-import de.pirckheimer_gymnasium.jbox2d.dynamics.FixtureDef
-import de.pirckheimer_gymnasium.jbox2d.dynamics.World
-import de.pirckheimer_gymnasium.jbox2d.particle.ParticleGroupDef
-import de.pirckheimer_gymnasium.jbox2d.particle.ParticleSystem
-import de.pirckheimer_gymnasium.jbox2d.particle.ParticleType
+import de.chaffic.dynamics.Body
+import de.chaffic.dynamics.World
+import de.chaffic.geometry.Polygon
+import de.chaffic.math.Vec2
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-/**
- * Encapsulates all JBox2D/LiquidFun physics simulation logic for
- * HaterMode. This class is not thread-safe and should be managed by a
- * single owner (e.g., a ViewModel).
- */
 class HaterPhysicsManager {
 
     // --- Public State ---
@@ -38,8 +27,8 @@ class HaterPhysicsManager {
         private set
 
     // --- Physics World ---
-    private val world = World(Vec2(0.0f, 0.0f))
-    private val particleSystem: ParticleSystem
+    private val world = World(Vec2(0.0, 0.0))
+    private val particles = mutableListOf<Body>()
     private var dieBody: Body? = null
 
     // --- Scaling & Dimensions ---
@@ -47,30 +36,21 @@ class HaterPhysicsManager {
     private var viewWidth = 0f
     private var viewHeight = 0f
 
-    init {
-        val pDef = ParticleSystemDef()
-        pDef.radius = 0.15f // in meters
-        pDef.dampingStrength = 0.2f
-        particleSystem = world.createParticleSystem(pDef)
-    }
-
-    // Since this class doesn't own a lifecycle, the owner must call destroy.
     fun destroy() {
-        // JBox2D doesn't have an explicit world.delete(), relying on GC.
-        // The native LiquidFun wrapper did, but this port does not.
+        // kphysics is pure Kotlin, so GC should handle it.
     }
 
     /** Steps the physics world forward by one frame and updates public state. */
     fun step() {
-        world.step(1.0f / 60.0f, 8, 3)
+        world.step(1.0 / 60.0)
 
-        particlePositions = particleSystem.particlePositionBuffer.map {
-            Offset(it.x * PPM, it.y * PPM)
+        particlePositions = particles.map {
+            Offset(it.position.x.toFloat() * PPM, it.position.y.toFloat() * PPM)
         }
 
         dieBody?.let { body ->
-            diePosition = Offset(body.position.x * PPM, body.position.y * PPM)
-            dieAngle = body.angle * (180f / Math.PI.toFloat())
+            diePosition = Offset(body.position.x.toFloat() * PPM, body.position.y.toFloat() * PPM)
+            dieAngle = body.orientation.toFloat() * (180f / Math.PI.toFloat())
         }
     }
 
@@ -81,24 +61,21 @@ class HaterPhysicsManager {
 
         val w = viewWidth / PPM
         val h = viewHeight / PPM
-        val thickness = 0.1f // in meters
+        val thickness = 0.1f
 
-        val wallPositions = listOf(
-            Vec2(0f, -h / 2f) to Vec2(w, thickness),   // Top
-            Vec2(0f, h / 2f) to Vec2(w, thickness),    // Bottom
-            Vec2(-w / 2f, 0f) to Vec2(thickness, h),   // Left
-            Vec2(w / 2f, 0f) to Vec2(thickness, h)     // Right
-        )
+        val topWall = Body(Polygon(w.toDouble(), thickness.toDouble()), (w / 2f).toDouble(), 0.0)
+        topWall.density = 0.0
+        val bottomWall = Body(Polygon(w.toDouble(), thickness.toDouble()), (w / 2f).toDouble(), h.toDouble())
+        bottomWall.density = 0.0
+        val leftWall = Body(Polygon(thickness.toDouble(), h.toDouble()), 0.0, (h / 2f).toDouble())
+        leftWall.density = 0.0
+        val rightWall = Body(Polygon(thickness.toDouble(), h.toDouble()), w.toDouble(), (h / 2f).toDouble())
+        rightWall.density = 0.0
 
-        wallPositions.forEach { (pos, size) ->
-            val bd = BodyDef().apply {
-                type = BodyType.STATIC
-                position.set(pos)
-            }
-            val shape = PolygonShape().apply { setAsBox(size.x / 2f, size.y / 2f) }
-            val wall = world.createBody(bd)
-            wall.createFixture(shape, 0.0f)
-        }
+        world.addBody(topWall)
+        world.addBody(bottomWall)
+        world.addBody(leftWall)
+        world.addBody(rightWall)
     }
 
     fun updateDieAndText(text: String, textPaint: TextPaint) {
@@ -117,46 +94,44 @@ class HaterPhysicsManager {
         val bottomY = (1.0f / 3.0f) * triangleHeight
 
         val vertices = arrayOf(
-            Vec2(0.0f, topY), Vec2(-halfWidth, bottomY), Vec2(halfWidth, bottomY)
+            Vec2(0.0, topY.toDouble()), Vec2(-halfWidth.toDouble(), bottomY.toDouble()), Vec2(halfWidth.toDouble(), bottomY.toDouble())
         )
 
-        dieBody?.let { world.destroyBody(it) }
+        dieBody?.let { world.removeBody(it) }
 
-        val bd = BodyDef().apply {
-            type = BodyType.DYNAMIC
-            position.set(0f, 0f)
-            linearDamping = 0.5f
-            angularDamping = 0.8f
-        }
-        val shape = PolygonShape().apply { set(vertices, 3) }
-        val fd = FixtureDef().apply {
-            this.shape = shape
-            density = 2.5f // Denser than water (1.0) so it sinks
-            friction = 0.3f
-            restitution = 0.2f
-        }
-        dieBody = world.createBody(bd).apply { createFixture(fd) }
+        val shape = Polygon(vertices)
+        val body = Body(shape, (viewWidth / 2f / PPM).toDouble(), (viewHeight / 2f / PPM).toDouble())
+        body.density = 2.5
+        body.staticFriction = 0.5
+        body.dynamicFriction = 0.3
+        body.restitution = 0.2
+
+        dieBody = body
+        world.addBody(body)
     }
 
 
     fun createParticles() {
-        if (particleSystem.particleCount > 0) return
+        if (particles.isNotEmpty()) return
 
-        val pgd = ParticleGroupDef().apply {
-            val shape = PolygonShape()
-            shape.setAsBox(viewWidth / PPM * 0.4f, viewHeight / PPM * 0.4f)
-            this.shape = shape
-            flags = ParticleType.b2_waterParticle
-            position.set(0f, 0f)
+        val numParticles = 500
+        val particleRadius = 0.05f
+        for (i in 0 until numParticles) {
+            val x = Random.nextFloat() * (viewWidth / PPM)
+            val y = Random.nextFloat() * (viewHeight / PPM)
+            val particleBody = Body(de.chaffic.geometry.Circle(particleRadius.toDouble()), x.toDouble(), y.toDouble())
+            particleBody.density = 1.0
+            particleBody.restitution = 0.5
+            particles.add(particleBody)
+            world.addBody(particleBody)
         }
-        particleSystem.createParticleGroup(pgd)
     }
 
     fun agitateParticles(scope: CoroutineScope, onAgitationComplete: () -> Unit) {
         val strength = 150f
         val xForce = (Random.nextFloat() - 0.5f) * strength
         val yForce = (Random.nextFloat() - 0.5f) * strength
-        world.gravity = Vec2(xForce, yForce)
+        world.gravity = Vec2(xForce.toDouble(), yForce.toDouble())
 
         scope.launch {
             delay(300)
@@ -165,17 +140,15 @@ class HaterPhysicsManager {
     }
 
     fun pushDie(delta: Offset) {
-        val forceMultiplier = 0.05f
-        dieBody?.applyForceToCenter(
-            Vec2(delta.x * forceMultiplier, delta.y * forceMultiplier)
-        )
+        val forceMultiplier = 500.0f // Increased force for better effect
+        dieBody?.applyForce(Vec2(delta.x * forceMultiplier.toDouble(), delta.y * forceMultiplier.toDouble()))
     }
 
     fun applyGravity(roll: Float, pitch: Float) {
         val gravityMultiplier = 9.8f
-        world.gravity.set(
-            (roll / 90f) * gravityMultiplier,
-            (-pitch / 90f) * gravityMultiplier
+        world.gravity = Vec2(
+            (roll / 90f) * gravityMultiplier.toDouble(),
+            (-pitch / 90f) * gravityMultiplier.toDouble()
         )
     }
 }
