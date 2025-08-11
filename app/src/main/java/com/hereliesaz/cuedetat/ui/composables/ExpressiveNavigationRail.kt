@@ -11,25 +11,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Help
-import androidx.compose.material.icons.filled.AddCircle
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Timeline
-import androidx.compose.material.icons.filled.Wallet
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.R
@@ -51,6 +42,7 @@ fun ExpressiveNavigationRail(
 
     NavigationRail(
         modifier = Modifier.width(railWidth),
+        containerColor = if (isExpanded) MaterialTheme.colorScheme.surface else Color.Transparent,
         header = {
             IconButton(
                 onClick = { onEvent(MainScreenEvent.ToggleNavigationRail) },
@@ -72,60 +64,48 @@ fun ExpressiveNavigationRail(
             )
         } else {
             Column(
-                modifier = Modifier.padding(horizontal = 8.dp),
+                modifier = Modifier.padding(horizontal = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)
             ) {
-                // Help
-                NavigationRailItem(
-                    selected = false,
+                CuedetatButton(
                     onClick = { onEvent(MainScreenEvent.ToggleHelp) },
-                    icon = { Icon(imageVector = Icons.AutoMirrored.Filled.Help, contentDescription = "Help") }
+                    text = "Help"
                 )
 
-                // Spin Control
-                NavigationRailItem(
-                    selected = uiState.isSpinControlVisible,
+                CuedetatButton(
                     onClick = { onEvent(MainScreenEvent.ToggleSpinControl) },
-                    icon = { Icon(imageVector = Icons.Default.Timeline, contentDescription = "Spin Control") }
+                    text = "Spin"
                 )
 
-                // Banking Mode
                 if (uiState.experienceMode != ExperienceMode.BEGINNER) {
-                    NavigationRailItem(
-                        selected = uiState.isBankingMode,
+                    CuedetatButton(
                         onClick = { onEvent(MainScreenEvent.ToggleBankingMode) },
-                        icon = { Icon(imageVector = Icons.Default.Wallet, contentDescription = "Banking Mode") }
+                        text = "Bank"
                     )
                 }
 
-                // Add Obstacle
                 if (uiState.experienceMode != ExperienceMode.BEGINNER) {
-                    NavigationRailItem(
-                        selected = false,
+                    CuedetatButton(
                         onClick = { onEvent(MainScreenEvent.AddObstacleBall) },
-                        icon = { Icon(imageVector = Icons.Default.AddCircle, contentDescription = "Add Obstacle") }
+                        text = "Add"
                     )
                 }
 
-                // Reset/Lock/Unlock View
-                val (icon, event) = when {
-                    uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> Icons.Default.LockOpen to MainScreenEvent.UnlockBeginnerView
-                    uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked -> Icons.Default.Lock to MainScreenEvent.LockBeginnerView
-                    else -> Icons.Default.Refresh to MainScreenEvent.Reset
+                val (text, event) = when {
+                    uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> "Unlock" to MainScreenEvent.UnlockBeginnerView
+                    uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked -> "Lock" to MainScreenEvent.LockBeginnerView
+                    else -> "Reset" to MainScreenEvent.Reset
                 }
-                NavigationRailItem(
-                    selected = false,
+                CuedetatButton(
                     onClick = { onEvent(event) },
-                    icon = { Icon(imageVector = icon, contentDescription = "View Lock") }
+                    text = text
                 )
 
-                // Camera
                 if (uiState.experienceMode != ExperienceMode.BEGINNER) {
-                    NavigationRailItem(
-                        selected = uiState.isCameraVisible,
+                    CuedetatButton(
                         onClick = { onEvent(MainScreenEvent.ToggleCamera) },
-                        icon = { Icon(imageVector = Icons.Default.PhotoCamera, contentDescription = "Camera") }
+                        text = "Cam"
                     )
                 }
             }

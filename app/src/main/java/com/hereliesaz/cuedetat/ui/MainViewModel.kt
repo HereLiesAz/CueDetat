@@ -24,6 +24,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -40,6 +42,7 @@ class MainViewModel @Inject constructor(
     visionRepository: VisionRepository,
 ) : ViewModel() {
 
+    private var experienceModeUpdateJob: Job? = null
     private val _uiState = MutableStateFlow(CueDetatState())
     val uiState = _uiState.asStateFlow()
 
@@ -70,6 +73,18 @@ class MainViewModel @Inject constructor(
 
     fun onEvent(event: MainScreenEvent) {
         viewModelScope.launch {
+            if (event is MainScreenEvent.ToggleExperienceModeSelection) {
+                experienceModeUpdateJob?.cancel()
+                val currentState = _uiState.value
+                val nextMode = currentState.pendingExperienceMode?.next() ?: currentState.experienceMode?.next() ?: ExperienceMode.EXPERT
+                _uiState.value = currentState.copy(pendingExperienceMode = nextMode)
+                experienceModeUpdateJob = viewModelScope.launch {
+                    delay(1000)
+                    onEvent(MainScreenEvent.ApplyPendingExperienceMode)
+                }
+                return@launch
+            }
+
             val currentState = _uiState.value
 
             val logicalEvent = when (event) {
