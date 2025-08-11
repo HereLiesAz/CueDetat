@@ -36,9 +36,6 @@ object Perspective {
         // The camera is at a fixed Z distance.
         camera.setLocation(0f, 0f, -32f)
 
-        // 1. Apply world rotation around the Y-axis (spin) before other transformations.
-        camera.rotateY(worldRotationDegrees)
-
         if (applyPitch) {
             val physicalPitch = currentOrientation.pitch
             val physicalMaxPitch = 75f
@@ -77,9 +74,12 @@ object Perspective {
             // Re-apply the original sign to the calculated magnitude
             val visualPitch = if (physicalPitch < 0) -visualPitchMagnitude else visualPitchMagnitude
 
-            // 2. Apply pitch (forward-back tilt).
+            // 1. Apply pitch (forward-back tilt) before rotating the world.
             camera.rotateX(visualPitch.coerceIn(-90f, 90f))
         }
+
+        // 2. Apply world rotation around the Y-axis (spin).
+        camera.rotateY(worldRotationDegrees)
 
         // 3. Translate must happen AFTER rotation to function as a "lift".
         if (lift != 0f) {
