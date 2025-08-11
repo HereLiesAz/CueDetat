@@ -111,12 +111,26 @@ class UpdateStateUseCase @Inject constructor(
         )
         val flatMatrix = createFullMatrix(stateWithCoercedPan, 1f, flatPerspectiveMatrix)
 
-        val logicalPlaneMatrix =
-            createFullMatrix(stateWithCoercedPan, zoomFactor, flatPerspectiveMatrix)
+
+        val logicalPlanePerspectiveMatrix = Perspective.createPerspectiveMatrix(
+            currentOrientation = stateWithCoercedPan.currentOrientation,
+            worldRotationDegrees = stateWithCoercedPan.worldRotationDegrees,
+            camera = camera,
+            applyPitch = false
+        )
 
 
-        val sizeCalculationMatrix =
-            createFullMatrix(state, zoomFactor, perspectiveMatrix)
+
+
+        val sizeCalculationPerspectiveMatrix =
+            Perspective.createPerspectiveMatrix(
+                currentOrientation = state.currentOrientation,
+                worldRotationDegrees = state.worldRotationDegrees,
+                camera = camera,
+                lift = 0f,
+                applyPitch = isPitchApplied
+            )
+
 
 
         return stateWithCoercedPan.copy(
