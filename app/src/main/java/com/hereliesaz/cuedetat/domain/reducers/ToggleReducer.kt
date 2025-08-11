@@ -87,6 +87,11 @@ internal fun reduceToggleAction(
             action.mode,
             reducerUtils
         )
+        is MainScreenEvent.ApplyPendingExperienceMode -> {
+            if (state.pendingExperienceMode == null) return state
+            return handleSetExperienceMode(state, state.pendingExperienceMode, reducerUtils)
+                .copy(pendingExperienceMode = null)
+        }
 
         is MainScreenEvent.UnlockBeginnerView -> state.copy(isBeginnerViewLocked = false)
         is MainScreenEvent.LockBeginnerView -> {

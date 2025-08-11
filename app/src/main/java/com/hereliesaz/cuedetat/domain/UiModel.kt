@@ -22,6 +22,7 @@ import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
 import com.hereliesaz.cuedetat.view.state.TableSize
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
+import kotlinx.coroutines.Job
 import org.opencv.core.Mat
 
 
@@ -36,6 +37,7 @@ enum class ExperienceMode {
 @Keep
 data class CueDetatState(
     val experienceMode: ExperienceMode? = null,
+    val pendingExperienceMode: ExperienceMode? = null,
     val haterState: HaterState = HaterState(),
     val isMenuVisible: Boolean = false,
     val isNavigationRailExpanded: Boolean = false,
@@ -153,6 +155,7 @@ const val LOGICAL_BALL_RADIUS = 25f
 
 sealed class MainScreenEvent {
     object ToggleExperienceModeSelection : MainScreenEvent()
+    object ApplyPendingExperienceMode : MainScreenEvent()
     data class SetExperienceMode(val mode: ExperienceMode) : MainScreenEvent()
     data class HaterAction(val action: HaterEvent) : MainScreenEvent()
     object ToggleMenu : MainScreenEvent()
