@@ -78,7 +78,6 @@ class UpdateStateUseCase @Inject constructor(
 
         val perspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = stateWithCoercedPan.currentOrientation,
-            worldRotationDegrees = stateWithCoercedPan.worldRotationDegrees,
             camera = camera,
             lift = 0f,
             applyPitch = isPitchApplied
@@ -95,7 +94,6 @@ class UpdateStateUseCase @Inject constructor(
 
         val railPerspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = stateWithCoercedPan.currentOrientation,
-            worldRotationDegrees = stateWithCoercedPan.worldRotationDegrees,
             camera = camera,
             lift = railLiftAmount,
             applyPitch = isPitchApplied
@@ -105,7 +103,6 @@ class UpdateStateUseCase @Inject constructor(
 
         val flatPerspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = stateWithCoercedPan.currentOrientation,
-            worldRotationDegrees = stateWithCoercedPan.worldRotationDegrees,
             camera = camera,
             applyPitch = false
         )
@@ -113,7 +110,6 @@ class UpdateStateUseCase @Inject constructor(
 
         val logicalPlanePerspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = stateWithCoercedPan.currentOrientation,
-            worldRotationDegrees = stateWithCoercedPan.worldRotationDegrees,
             camera = camera,
             applyPitch = false
         )
@@ -124,7 +120,6 @@ class UpdateStateUseCase @Inject constructor(
         val sizeCalculationPerspectiveMatrix =
             Perspective.createPerspectiveMatrix(
                 currentOrientation = state.currentOrientation,
-                worldRotationDegrees = 0f, // No rotation for sizing
                 camera = camera,
                 lift = 0f,
                 applyPitch = isPitchApplied
@@ -258,10 +253,13 @@ class UpdateStateUseCase @Inject constructor(
         zoom: Float,
         perspectiveMatrix: Matrix
     ): Matrix {
-        val worldMatrix = Matrix().apply { postScale(zoom, zoom) }
+        val worldMatrix = Matrix().apply {
+            postScale(zoom, zoom)
+            postRotate(state.worldRotationDegrees)
+        }
         val finalMatrix = Matrix()
-        finalMatrix.set(worldMatrix)
-        finalMatrix.postConcat(perspectiveMatrix)
+        finalMatrix.set(perspectiveMatrix)
+        finalMatrix.preConcat(worldMatrix)
         finalMatrix.postTranslate(
             (state.viewWidth / 2f) + state.viewOffset.x,
             (state.viewHeight / 2f) + state.viewOffset.y

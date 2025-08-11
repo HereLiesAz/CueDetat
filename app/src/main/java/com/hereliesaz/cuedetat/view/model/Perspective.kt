@@ -25,7 +25,6 @@ object Perspective {
      */
     fun createPerspectiveMatrix(
         currentOrientation: FullOrientation,
-        worldRotationDegrees: Float,
         camera: Camera,
         lift: Float = 0f,
         applyPitch: Boolean = true,
