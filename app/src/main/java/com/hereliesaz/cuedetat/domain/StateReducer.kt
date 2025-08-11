@@ -61,8 +61,8 @@ fun stateReducer(
         is MainScreenEvent.ThemeChanged, is MainScreenEvent.SetWarning ->
             reduceSystemAction(currentState, action)
 
-        is MainScreenEvent.ToggleMenu, is MainScreenEvent.ToggleExpandedMenu,
-        is MainScreenEvent.ToggleNavigationRail, is MainScreenEvent.ToggleSpinControl,
+        is MainScreenEvent.ToggleMenu, is MainScreenEvent.ToggleNavigationRail,
+        is MainScreenEvent.ToggleSpinControl,
         is MainScreenEvent.CycleTableSize, is MainScreenEvent.SetTableSize,
         is MainScreenEvent.ToggleTableSizeDialog, is MainScreenEvent.ToggleForceTheme,
         is MainScreenEvent.ToggleCamera, is MainScreenEvent.ToggleDistanceUnit,

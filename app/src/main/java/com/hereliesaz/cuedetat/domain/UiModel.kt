@@ -38,7 +38,6 @@ data class CueDetatState(
     val experienceMode: ExperienceMode? = null,
     val haterState: HaterState = HaterState(),
     val isMenuVisible: Boolean = false,
-    val isExpandedMenuVisible: Boolean = false,
     val isNavigationRailExpanded: Boolean = false,
     val viewWidth: Int = 0,
     val viewHeight: Int = 0,
@@ -157,7 +156,6 @@ sealed class MainScreenEvent {
     data class SetExperienceMode(val mode: ExperienceMode) : MainScreenEvent()
     data class HaterAction(val action: HaterEvent) : MainScreenEvent()
     object ToggleMenu : MainScreenEvent()
-    object ToggleExpandedMenu : MainScreenEvent()
     object ToggleNavigationRail : MainScreenEvent()
     data class ScreenGestureStarted(val position: PointF) : MainScreenEvent()
     data class Drag(val previousPosition: PointF, val currentPosition: PointF) : MainScreenEvent()
