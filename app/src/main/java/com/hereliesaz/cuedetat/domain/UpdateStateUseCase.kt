@@ -78,6 +78,7 @@ class UpdateStateUseCase @Inject constructor(
 
         val perspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = stateWithCoercedPan.currentOrientation,
+            worldRotationDegrees = stateWithCoercedPan.worldRotationDegrees,
             camera = camera,
             lift = 0f,
             applyPitch = isPitchApplied
@@ -94,6 +95,7 @@ class UpdateStateUseCase @Inject constructor(
 
         val railPerspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = stateWithCoercedPan.currentOrientation,
+            worldRotationDegrees = stateWithCoercedPan.worldRotationDegrees,
             camera = camera,
             lift = railLiftAmount,
             applyPitch = isPitchApplied
@@ -103,29 +105,18 @@ class UpdateStateUseCase @Inject constructor(
 
         val flatPerspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = stateWithCoercedPan.currentOrientation,
+            worldRotationDegrees = stateWithCoercedPan.worldRotationDegrees,
             camera = camera,
             applyPitch = false
         )
         val flatMatrix = createFullMatrix(stateWithCoercedPan, 1f, flatPerspectiveMatrix)
 
-        val logicalPlanePerspectiveMatrix = Perspective.createPerspectiveMatrix(
-            currentOrientation = stateWithCoercedPan.currentOrientation,
-            camera = camera,
-            applyPitch = false
-        )
         val logicalPlaneMatrix =
-            createFullMatrix(stateWithCoercedPan, zoomFactor, logicalPlanePerspectiveMatrix)
+            createFullMatrix(stateWithCoercedPan, zoomFactor, flatPerspectiveMatrix)
 
 
-        val sizeCalculationPerspectiveMatrix =
-            Perspective.createPerspectiveMatrix(
-                currentOrientation = state.currentOrientation,
-                camera = camera,
-                lift = 0f,
-                applyPitch = isPitchApplied
-            )
         val sizeCalculationMatrix =
-            createFullMatrix(state, zoomFactor, sizeCalculationPerspectiveMatrix)
+            createFullMatrix(state, zoomFactor, perspectiveMatrix)
 
 
         return stateWithCoercedPan.copy(
