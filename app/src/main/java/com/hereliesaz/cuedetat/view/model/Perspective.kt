@@ -25,7 +25,6 @@ object Perspective {
      */
     fun createPerspectiveMatrix(
         currentOrientation: FullOrientation,
-        worldRotationDegrees: Float,
         camera: Camera,
         lift: Float = 0f,
         applyPitch: Boolean = true,
@@ -35,9 +34,6 @@ object Perspective {
 
         // The camera is at a fixed Z distance.
         camera.setLocation(0f, 0f, -32f)
-
-        // 1. Apply world rotation around the Y-axis (spin) before other transformations.
-        camera.rotateY(worldRotationDegrees)
 
         if (applyPitch) {
             val physicalPitch = currentOrientation.pitch
