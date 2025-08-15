@@ -248,15 +248,15 @@ class UpdateStateUseCase @Inject constructor(
             postScale(zoom, zoom)
             postRotate(state.worldRotationDegrees)
             postTranslate(state.viewOffset.x, state.viewOffset.y)
+			postTranslate(
+				(state.viewWidth / 2f),
+				(state.viewHeight / 2f)
+			)
         }
 
         val finalMatrix = Matrix()
         finalMatrix.set(perspectiveMatrix)
         finalMatrix.preConcat(worldMatrix)
-        finalMatrix.postTranslate(
-            (state.viewWidth / 2f),
-            (state.viewHeight / 2f)
-        )
         return finalMatrix
     }
 
