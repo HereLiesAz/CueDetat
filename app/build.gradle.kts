@@ -149,6 +149,7 @@ dependencies {
     implementation(libs.material3) // Consolidating material3 dependencies
     implementation(libs.material)
     implementation(libs.androidx.material.icons.extended)
+    implementation(libs.aznavrail)
 
     // Hilt for Dependency Injection
     implementation(libs.hilt.android)

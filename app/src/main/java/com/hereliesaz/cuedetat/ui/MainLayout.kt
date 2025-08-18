@@ -27,9 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
-import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
-import com.hereliesaz.cuedetat.ui.composables.ExpressiveNavigationRail
-import com.hereliesaz.cuedetat.ui.composables.MenuDrawerContent
+import com.hereliesaz.cuedetat.ui.composables.AzzNavRail
 import com.hereliesaz.cuedetat.ui.composables.SpinControl
 import com.hereliesaz.cuedetat.ui.composables.TopControls
 import com.hereliesaz.cuedetat.ui.composables.ZoomControls
@@ -129,7 +127,7 @@ fun MainLayout(
         )
 
         // Expressive navigation rail
-        ExpressiveNavigationRail(uiState = uiState, onEvent = onEvent)
+        AzzNavRail(uiState = uiState, onEvent = onEvent)
 
     }
 }
