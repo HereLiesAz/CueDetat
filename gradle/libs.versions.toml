@@ -7,11 +7,11 @@ appVersionCode = "23"
 applicationId = "com.hereliesaz.cuedetat"
 appName = "Cue D’état"
 # Android & Jetpack
-activityCompose = "1.12.0-alpha05"
+activityCompose = "1.12.0-alpha06"
 appcompat = "1.7.1"
 camera = "1.4.2"
 cameraxVersion = "1.4.2"
-composeBom = "2025.07.00"
+composeBom = "2025.08.00"
 constraintlayout = "2.2.1"
 coreKtx = "1.16.0"
 datastorePreferences = "1.2.0-alpha02"
@@ -61,16 +61,16 @@ kotlinCompose = "2.2.0"
 benchmarkCommon = "1.4.0"
 composeMaterial3 = "1.5.0-rc01"
 tensorflowLiteTaskVision = "0.4.4"
-ui = "1.9.0-rc01"
+ui = "1.9.0"
 animationCore = "1.8.3"
-uiGraphics = "1.8.3"
+uiGraphics = "1.9.0"
 visionCommon = "17.3.0"
 lifecycleKtx = "2.9.2"
-androidxCore = "1.17.0-rc01"
-cameraVideo = "1.5.0-beta02"
+androidxCore = "1.17.0"
+cameraVideo = "1.5.0-rc01"
 glance = "1.2.0-alpha01"
-foundationLayout = "1.8.3"
-animationCoreVersion = "1.8.3"
+foundationLayout = "1.9.0"
+animationCoreVersion = "1.9.0"
 roomKtx = "2.7.2"
 glanceVersion = "1.1.1"
 material3Version = "1.3.2"
@@ -116,10 +116,10 @@ androidx-foundation = { group = "androidx.compose.foundation", name = "foundatio
 
 
 # CameraX
-androidx-camera-core = { group = "androidx.camera", name = "camera-core", version = "1.5.0-beta02" }
-androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version = "1.5.0-beta02" }
-androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version = "1.5.0-beta02" }
-androidx-camera-view = { group = "androidx.camera", name = "camera-view", version = "1.5.0-beta02" }
+androidx-camera-core = { group = "androidx.camera", name = "camera-core", version = "1.5.0-rc01" }
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version = "1.5.0-rc01" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version = "1.5.0-rc01" }
+androidx-camera-view = { group = "androidx.camera", name = "camera-view", version = "1.5.0-rc01" }
 kotlinx-coroutines-guava = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-guava", version.ref = "guava" }
 
 
@@ -143,7 +143,7 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version = "1.3.0" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version = "3.7.0" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4", version.ref = "junitExt" }
-androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest", version = "1.9.0-rc01" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest", version = "1.9.0" }
 androidx-benchmark-common = { group = "androidx.benchmark", name = "benchmark-common", version.ref = "benchmarkCommon" }
 
 androidx-palette = { group = "androidx.palette", name = "palette-ktx", version = "1.0.0" }
