@@ -1,11 +1,16 @@
 package com.hereliesaz.cuedetat.ui.composables
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import com.hereliesaz.aznavrail.AzNavRail
-import com.hereliesaz.aznavrail.NavItem
-import com.hereliesaz.aznavrail.NavItemData
-import com.hereliesaz.aznavrail.NavRailMenuSection
+import androidx.compose.ui.platform.LocalContext
+import com.hereliesaz.aznavrail.model.NavItem
+import com.hereliesaz.aznavrail.model.NavItemData
+import com.hereliesaz.aznavrail.model.NavRailHeader
+import com.hereliesaz.aznavrail.model.NavRailMenuSection
+import com.hereliesaz.aznavrail.model.PredefinedAction
+import com.hereliesaz.aznavrail.ui.AzNavRail
 import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
@@ -14,15 +19,37 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 
 @Composable
-fun AzzNavRail(
+fun AzNavRailMenu(
     uiState: CueDetatState,
     onEvent: (MainScreenEvent) -> Unit,
 ) {
+    val context = LocalContext.current
+    val appName: String = context.packageManager.getApplicationLabel(context.applicationInfo).toString() // appName is still defined but not used in AzNavRail call
+
     AzNavRail(
-        menuSections = createMenuSections(uiState, onEvent),
         useAppIconAsHeader = true,
-        creditText = "@HereLiesAz",
-        onCreditClicked = { onEvent(MainScreenEvent.ViewArt) }
+        header = NavRailHeader { /* ... */ },
+        menuSections = createMenuSections(uiState, onEvent),
+        showDefaultPredefinedItems = false,
+        onPredefinedAction = { action ->
+            when (action) {
+                PredefinedAction.ABOUT -> {
+                    val intent = Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse("https://github.com/hereliesaz/$appName")
+                    )
+                    context.startActivity(intent)
+                }
+                PredefinedAction.FEEDBACK -> {
+                    val intent = Intent(Intent.ACTION_SENDTO).apply {
+                        data = Uri.parse("mailto:hereliesaz@gmail.com")
+                        putExtra(Intent.EXTRA_SUBJECT, "$appName - Feedback")
+                    }
+                    context.startActivity(intent)
+                }
+                else -> {}
+            }
+        }
     )
 }
 
@@ -31,7 +58,8 @@ private fun createMenuSections(
     uiState: CueDetatState,
     onEvent: (MainScreenEvent) -> Unit
 ): List<NavRailMenuSection> {
-    val versionInfo = "v${BuildConfig.VERSION_NAME}" + (uiState.latestVersionName?.let { " (latest: $it)" } ?: "")
+    val versionInfo =
+        "v${BuildConfig.VERSION_NAME}" + (uiState.latestVersionName?.let { " (latest: $it)" } ?: "")
 
     return listOf(
         NavRailMenuSection(
@@ -67,7 +95,7 @@ private fun createMenuSections(
                     showOnRail = uiState.experienceMode != ExperienceMode.BEGINNER,
                     railButtonText = "Bank"
                 ),
-                 NavItem(
+                NavItem(
                     text = "Add Obstacle",
                     data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.AddObstacleBall) }),
                     showOnRail = uiState.experienceMode != ExperienceMode.BEGINNER,
@@ -137,7 +165,7 @@ private fun createMenuSections(
                     text = "Luminance",
                     data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog) })
                 ),
-                 NavItem(
+                NavItem(
                     text = "Too Advanced Options",
                     data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }),
                     enabled = uiState.experienceMode != ExperienceMode.BEGINNER
@@ -148,7 +176,10 @@ private fun createMenuSections(
             title = "Meta",
             items = listOf(
                 NavItem(
-                    text = "Mode: ${uiState.experienceMode?.name?.lowercase()?.replaceFirstChar { it.titlecase() }}",
+                    text = "Mode: ${
+                        uiState.experienceMode?.name?.lowercase()
+                            ?.replaceFirstChar { it.titlecase() }
+                    }",
                     data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) })
                 ),
                 NavItem(

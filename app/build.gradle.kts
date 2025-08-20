@@ -204,7 +204,6 @@ dependencies {
     implementation(libs.tensorflow.lite.task.vision)
     implementation(libs.object1.detection)
 
-
     // DataStore for persisting user preferences
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.datastore.preferences.rxjava2) // optional
