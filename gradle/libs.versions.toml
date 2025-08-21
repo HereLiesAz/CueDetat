@@ -30,8 +30,8 @@ lifecycleRuntimeCompose = "2.9.2"
 lifecycleViewmodelCompose = "2.9.2"
 lifecycleViewmodelKtx = "2.9.2"
 material = "1.12.0"
-material3 = "1.4.0-beta01"
-material3Expressive = "1.0.0-alpha01"
+material3 = "1.4.0-beta02"
+material3AdaptiveNavSuite = "1.5.0-alpha02"
 materialIconsExtended = "1.7.8"
 multidex = "2.0.1"
 objectDetection = "17.0.2"
@@ -108,6 +108,8 @@ aznavrail = { group = "com.github.HereLiesAz", name = "AzNavRail", version.ref =
 
 # Jetpack Compose
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "androidxMaterial3" }
+androidx-compose-material3-adaptive-navigation-suite = { group = "androidx.compose.material3", name = "material3-adaptive-navigation-suite", version.ref = "material3AdaptiveNavSuite" }
 androidx-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "ui" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics", version.ref = "uiGraphics" }
 androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling", version.ref = "ui" }
@@ -131,7 +133,7 @@ hilt-android = { group = "com.google.dagger", name = "hilt-android", version = "
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version = "2.57" }
 
 # Retrofit
-material3 = { module = "androidx.compose.material3:material3", name = "material3", version.ref = "material3" }
+material3 = { module = "androidx.compose.material3:material3", name = "material3", version.ref = "material3" } # This 'material3' alias seems to conflict with androidx-compose-material3. Keeping the more specific one.
 object1-detection = { module = "com.google.mlkit:object-detection", version = "17.0.2" }
 object1-detection-custom = { module = "com.google.mlkit:object-detection-custom", version = "17.0.2" }
 opencv = { module = "org.opencv:opencv", version.ref = "opencv" }
@@ -147,7 +149,7 @@ androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-man
 androidx-benchmark-common = { group = "androidx.benchmark", name = "benchmark-common", version.ref = "benchmarkCommon" }
 
 androidx-palette = { group = "androidx.palette", name = "palette-ktx", version = "1.0.0" }
-compose-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "composeMaterial3" }
+compose-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "composeMaterial3" } # This is for Wear Compose, likely not what's needed for ExpressiveNavigationRail
 slf4j-bom = { module = "org.slf4j:slf4j-bom", version.ref = "slf4jBom" }
 tensorflow-lite-task-vision = { module = "org.tensorflow:tensorflow-lite-task-vision", version = "0.4.4" }
 vision-common = { module = "com.google.mlkit:vision-common", version = "17.3.0" }
@@ -157,7 +159,7 @@ androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = 
 glance = { group = "androidx.glance", name = "glance", version.ref = "glanceVersion" }
 sceneform-base = { group = "com.google.ar.sceneform", name = "sceneform-base", version.ref = "sceneformBase" }
 jbox2d-library = { group = "org.jbox2d", name = "jbox2d-library", version.ref = "jbox2d" }
-androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "androidxMaterial3" }
+# androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "androidxMaterial3" } # This is a duplicate of an earlier alias, commented out.
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidApplication" }

@@ -15,6 +15,8 @@ object Perspective {
      *
      * @param currentOrientation The raw sensor data for the device's
      *    orientation.
+     * @param worldRotationDegrees The desired 3D rotation of the world around
+     *    the Y-axis.
      * @param camera A reusable Camera object for 3D transformations.
      * @param lift An optional vertical translation for rendering elements like
      *    rails above the table surface.
@@ -23,6 +25,7 @@ object Perspective {
      */
     fun createPerspectiveMatrix(
         currentOrientation: FullOrientation,
+        worldRotationDegrees: Float,
         camera: Camera,
         lift: Float = 0f,
         applyPitch: Boolean = true,
@@ -71,11 +74,14 @@ object Perspective {
             // Re-apply the original sign to the calculated magnitude
             val visualPitch = if (physicalPitch < 0) -visualPitchMagnitude else visualPitchMagnitude
 
-            // Apply pitch (forward-back tilt)
+            // 1. Apply pitch (forward-back tilt) before rotating the world.
             camera.rotateX(visualPitch.coerceIn(-90f, 90f))
         }
 
-        // Translate must happen AFTER rotation to function as a "lift".
+        // 2. Apply world rotation around the Y-axis (spin).
+        camera.rotateY(worldRotationDegrees)
+
+        // 3. Translate must happen AFTER rotation to function as a "lift".
         if (lift != 0f) {
             camera.translate(0f, lift, 0f)
         }

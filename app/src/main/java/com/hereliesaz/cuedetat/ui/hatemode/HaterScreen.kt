@@ -37,8 +37,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
-import com.hereliesaz.cuedetat.ui.composables.ExpressiveNavigationRail
-import com.hereliesaz.cuedetat.ui.composables.MenuDrawerContent
+import com.hereliesaz.cuedetat.ui.composables.AzNavRailMenu
 import com.hereliesaz.cuedetat.ui.composables.TopControls
 import kotlin.math.sqrt
 
@@ -147,6 +146,6 @@ fun HaterScreen(
             onMenuClick = { onEvent(MainScreenEvent.ToggleNavigationRail) }
         )
 
-        ExpressiveNavigationRail(uiState = uiState, onEvent = onEvent)
+        AzNavRailMenu ( uiState = uiState, onEvent = onEvent)
     }
 }
