@@ -78,7 +78,6 @@ class UpdateStateUseCase @Inject constructor(
 
         val perspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = stateWithCoercedPan.currentOrientation,
-            worldRotationDegrees = stateWithCoercedPan.worldRotationDegrees,
             camera = camera,
             lift = 0f,
             applyPitch = isPitchApplied
@@ -95,7 +94,6 @@ class UpdateStateUseCase @Inject constructor(
 
         val railPerspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = stateWithCoercedPan.currentOrientation,
-            worldRotationDegrees = stateWithCoercedPan.worldRotationDegrees,
             camera = camera,
             lift = railLiftAmount,
             applyPitch = isPitchApplied
@@ -105,7 +103,6 @@ class UpdateStateUseCase @Inject constructor(
 
         val flatPerspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = stateWithCoercedPan.currentOrientation,
-            worldRotationDegrees = stateWithCoercedPan.worldRotationDegrees,
             camera = camera,
             applyPitch = false
         )
