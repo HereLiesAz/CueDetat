@@ -30,9 +30,7 @@ object Perspective {
         val matrix = Matrix()
         camera.save()
 
-        // The camera is at a fixed Z distance.
-        camera.setLocation(0f, 0f, -32f)
-
+        // The camera's Z position is translated after rotation to pivot around the table's center.
         if (applyPitch) {
             val physicalPitch = currentOrientation.pitch
             val physicalMaxPitch = 75f
@@ -75,10 +73,8 @@ object Perspective {
             camera.rotateX(visualPitch.coerceIn(-90f, 90f))
         }
 
-        // Translate must happen AFTER rotation to function as a "lift".
-        if (lift != 0f) {
-            camera.translate(0f, lift, 0f)
-        }
+        // Translate must happen AFTER rotation to function as a "lift" and to set camera distance.
+        camera.translate(0f, lift, -32f)
 
         camera.getMatrix(matrix)
         camera.restore()
