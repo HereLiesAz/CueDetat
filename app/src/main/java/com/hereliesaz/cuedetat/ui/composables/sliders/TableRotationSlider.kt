@@ -28,13 +28,13 @@ fun TableRotationSlider(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                "Table Rotation: ${uiState.worldRotationDegrees.toInt()}°",
+                "Table Rotation: ${-uiState.worldRotationDegrees.toInt()}°",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Slider(
-                value = uiState.worldRotationDegrees,
-                onValueChange = { onEvent(MainScreenEvent.TableRotationChanged(it)) },
+                value = -uiState.worldRotationDegrees,
+                onValueChange = { onEvent(MainScreenEvent.TableRotationChanged(-it)) },
                 valueRange = -179f..180f, // Centered range
                 steps = 358,
                 modifier = Modifier

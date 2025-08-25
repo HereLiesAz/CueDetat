@@ -1,10 +1,10 @@
 package com.hereliesaz.cuedetat.ui.composables
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.core.net.toUri
 import com.hereliesaz.aznavrail.model.NavItem
 import com.hereliesaz.aznavrail.model.NavItemData
 import com.hereliesaz.aznavrail.model.NavRailHeader
@@ -24,25 +24,26 @@ fun AzNavRailMenu(
     onEvent: (MainScreenEvent) -> Unit,
 ) {
     val context = LocalContext.current
-    val appName: String = context.packageManager.getApplicationLabel(context.applicationInfo).toString() // appName is still defined but not used in AzNavRail call
+    val appName: String =
+        context.packageManager.getApplicationLabel(context.applicationInfo).toString()
 
     AzNavRail(
+        appName = appName,
         useAppIconAsHeader = true,
         header = NavRailHeader { /* ... */ },
         menuSections = createMenuSections(uiState, onEvent),
-        showDefaultPredefinedItems = false,
         onPredefinedAction = { action ->
             when (action) {
                 PredefinedAction.ABOUT -> {
                     val intent = Intent(
                         Intent.ACTION_VIEW,
-                        Uri.parse("https://github.com/hereliesaz/$appName")
+                        "https://github.com/hereliesaz/$appName".toUri()
                     )
                     context.startActivity(intent)
                 }
                 PredefinedAction.FEEDBACK -> {
                     val intent = Intent(Intent.ACTION_SENDTO).apply {
-                        data = Uri.parse("mailto:hereliesaz@gmail.com")
+                        data = "mailto:hereliesaz@gmail.com".toUri()
                         putExtra(Intent.EXTRA_SUBJECT, "$appName - Feedback")
                     }
                     context.startActivity(intent)

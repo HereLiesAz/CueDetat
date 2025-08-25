@@ -10,6 +10,7 @@ import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.ui.theme.MutedGray
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.config.ball.ActualCueBall
 import com.hereliesaz.cuedetat.view.config.ball.GhostCueBall
@@ -46,7 +47,10 @@ class PaintCache {
         style = Paint.Style.STROKE; strokeWidth = 5f; pathEffect =
         DashPathEffect(floatArrayOf(15f, 15f), 0f)
     }
-    val pathObstructionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    val pathObstructionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = MutedGray.copy(alpha = 0.2f).toArgb()
+    }
     val cvResultPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     val gradientMaskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
