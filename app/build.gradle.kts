@@ -78,7 +78,6 @@ dependencies {
     implementation(libs.retrofit.converter.gson)
 
     // Computer Vision
-    implementation(project(":opencv"))
     implementation(libs.bundles.mlkit)
 
     // Physics
@@ -91,6 +90,8 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    implementation("cljsjs:liquidfun:1.1.0-0")
+
 }
 
 kapt {
