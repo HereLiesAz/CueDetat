@@ -248,15 +248,12 @@ class UpdateStateUseCase @Inject constructor(
             postScale(zoom, zoom)
             postRotate(state.worldRotationDegrees)
             postTranslate(state.viewOffset.x, state.viewOffset.y)
-            // The final translation to the center of the screen must be part
-            // of the 2D matrix, so that it is applied BEFORE the 3D
-            // perspective transformation.
-			postTranslate(centerX, centerY)
         }
 
         val finalMatrix = Matrix()
-        finalMatrix.set(perspectiveMatrix)
-        finalMatrix.preConcat(worldMatrix)
+        finalMatrix.set(worldMatrix)
+        finalMatrix.postConcat(perspectiveMatrix)
+        finalMatrix.postTranslate(centerX, centerY)
         return finalMatrix
     }
 

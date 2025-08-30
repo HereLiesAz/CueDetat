@@ -39,7 +39,7 @@ fun createGlowPaint(
 
     return paints.glowPaints.getOrPut(key) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
+            style = Paint.Style.FILL_AND_STROKE
             strokeWidth = baseGlowWidth
         }
 

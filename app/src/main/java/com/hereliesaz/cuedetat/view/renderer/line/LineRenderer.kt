@@ -143,7 +143,21 @@ class LineRenderer {
             paints = paints
         )
 
+        val obstructionPaint = Paint(paints.pathObstructionPaint).apply {
+            strokeWidth = state.protractorUnit.radius * 2
+        }
+
         state.aimingLineBankPath?.let {
+            drawBankablePath(
+                canvas,
+                it,
+                obstructionPaint,
+                null, // No glow for pathway
+                isPocketed = false,
+                state,
+                paints
+            )
+
             drawBankablePath(
                 canvas,
                 it,

@@ -16,9 +16,9 @@ pluginManagement {
 
     }
     plugins {
-        id("com.android.application") version "9.0.0-alpha01"
-        id("com.android.library") version "8.13.0-alpha03"
-        id("org.jetbrains.kotlin.android") version "2.2.0"
+        id("com.android.application") version "8.12.1"
+        id("com.android.library") version "8.12.1"
+        id("org.jetbrains.kotlin.android") version "2.2.10"
         id("com.github.triplet.play") version "3.12.1"
 
     }
@@ -36,4 +36,3 @@ dependencyResolutionManagement {
 rootProject.name = "CueDetat"
 include(":app")
 include(":Dev_Guide")
-include(":")
