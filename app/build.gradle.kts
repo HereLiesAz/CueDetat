@@ -59,11 +59,11 @@ dependencies {
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.material.icons.extended)
+    implementation(libs.androidx.compose.material.icons.extended)
 
     // Hilt
     implementation(libs.hilt.android)
@@ -75,23 +75,23 @@ dependencies {
 
     // Networking
     implementation(libs.retrofit)
-    implementation(libs.converter.gson)
+    implementation(libs.retrofit.converter.gson)
 
     // Computer Vision
-    implementation(libs.object1.detection.custom)
-    implementation(libs.vision.common)
-    implementation(libs.tensorflow.lite.task.vision)
+    implementation(libs.bundles.mlkit)
 
     // Physics
-    implementation("cljsjs:liquidfun:1.1.0-0")
+    implementation(libs.google.liquidfun)
 
     // Testing
     testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
-    debugImplementation(libs.androidx.ui.tooling)
-    debugImplementation(libs.androidx.ui.test.manifest)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+    implementation("cljsjs:liquidfun:1.1.0-0")
+
 }
 
 kapt {
