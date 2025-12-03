@@ -1,4 +1,4 @@
-# 1.2. Core Concepts & Terminology
+# 03. Core Concepts & Terminology
 
 A precise vocabulary is critical for development. The following terms must be used consistently.
 
