@@ -6,6 +6,7 @@ import android.annotation.SuppressLint
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.camera.core.ImageProxy
+import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.DetectedObject
 import com.google.mlkit.vision.objects.ObjectDetector
@@ -26,6 +27,7 @@ import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Scalar
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
+import java.util.concurrent.ExecutionException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
@@ -42,6 +44,11 @@ class VisionRepository @Inject constructor(
 
     private var lastFrameTime = 0L
     private var reusableMask: Mat? = null
+
+    // Reusable Mats to avoid allocation churn
+    private val reusableFrameMat = Mat()
+    private val reusableRotatedMat = Mat()
+    private val reusableHsvMat = Mat()
 
     @SuppressLint("UnsafeOptInUsageError")
     fun processImage(imageProxy: ImageProxy, state: CueDetatState) {
@@ -62,186 +69,194 @@ class VisionRepository @Inject constructor(
                 state.viewWidth, state.viewHeight
             )
 
-            genericObjectDetector.process(inputImage)
-                .addOnSuccessListener { detectedObjects ->
-                    val originalMat = imageProxy.toMat()
-                    var processedMat = Mat()
-                    var matToUse: Mat
+            // Execute on the current (background) thread instead of using async callbacks
+            // which default to the Main Thread. This prevents blocking the UI.
+            try {
+                val detectedObjects = Tasks.await(genericObjectDetector.process(inputImage))
 
-                    when (rotationDegrees) {
-                        90 -> {
-                            Core.rotate(originalMat, processedMat, Core.ROTATE_90_CLOCKWISE)
-                            matToUse = processedMat
-                        }
+                // Reuse reusableFrameMat for initial conversion
+                val originalMat = imageProxy.toMat(reusableFrameMat)
 
-                        180 -> {
-                            Core.rotate(originalMat, processedMat, Core.ROTATE_180)
-                            matToUse = processedMat
-                        }
+                // Reuse reusableRotatedMat if needed
+                var matToUse: Mat
 
-                        270 -> {
-                            Core.rotate(originalMat, processedMat, Core.ROTATE_90_COUNTERCLOCKWISE)
-                            matToUse = processedMat
-                        }
-
-                        else -> {
-                            matToUse = originalMat
-                        }
+                when (rotationDegrees) {
+                    90 -> {
+                        Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_CLOCKWISE)
+                        matToUse = reusableRotatedMat
                     }
 
-                    if (matToUse !== originalMat) {
-                        originalMat.release()
+                    180 -> {
+                        Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_180)
+                        matToUse = reusableRotatedMat
                     }
 
-                    val hsvMat = Mat()
-                    Imgproc.cvtColor(matToUse, hsvMat, Imgproc.COLOR_BGR2HSV)
-
-                    val hsvTuple = state.colorSamplePoint?.let {
-                        val imageX = (it.x * (hsvMat.cols() / state.viewWidth.toFloat())).toInt()
-                        val imageY = (it.y * (hsvMat.rows() / state.viewHeight.toFloat())).toInt()
-
-                        val patchSize = 5
-                        val roiX = (imageX - patchSize / 2).coerceIn(0, hsvMat.cols() - patchSize)
-                        val roiY = (imageY - patchSize / 2).coerceIn(0, hsvMat.rows() - patchSize)
-                        val roi = OCVRect(roiX, roiY, patchSize, patchSize)
-                        val sampleRegion = hsvMat.submat(roi)
-
-                        val mean = MatOfDouble()
-                        val stddev = MatOfDouble()
-                        Core.meanStdDev(sampleRegion, mean, stddev)
-
-                        val meanArray = floatArrayOf(
-                            mean.get(0, 0)[0].toFloat(),
-                            mean.get(1, 0)[0].toFloat(),
-                            mean.get(2, 0)[0].toFloat()
-                        )
-                        val stddevArray = floatArrayOf(
-                            stddev.get(0, 0)[0].toFloat(),
-                            stddev.get(1, 0)[0].toFloat(),
-                            stddev.get(2, 0)[0].toFloat()
-                        )
-
-                        sampleRegion.release()
-                        mean.release()
-                        stddev.release()
-
-                        Pair(meanArray, stddevArray)
+                    270 -> {
+                        Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_COUNTERCLOCKWISE)
+                        matToUse = reusableRotatedMat
                     }
 
-                    val hsv = state.lockedHsvColor ?: hsvTuple?.first ?: run {
-                        val roiWidth = 50
-                        val roiHeight = 50
-                        val roiX = (hsvMat.cols() - roiWidth) / 2
-                        val roiY = (hsvMat.rows() - roiHeight) / 2
-                        val centerRoi = hsvMat.submat(OCVRect(roiX, roiY, roiWidth, roiHeight))
-                        val meanColor = Core.mean(centerRoi)
-                        centerRoi.release()
-                        floatArrayOf(
-                            meanColor.`val`[0].toFloat(),
-                            meanColor.`val`[1].toFloat(),
-                            meanColor.`val`[2].toFloat()
-                        )
+                    else -> {
+                        matToUse = originalMat
                     }
+                }
 
-                    val cvMask = if (state.showCvMask) {
-                        if (reusableMask == null) {
-                            reusableMask = Mat()
-                        }
-                        val mask = reusableMask!!
-                        if (state.lockedHsvColor != null && state.lockedHsvStdDev != null) {
-                            val mean = state.lockedHsvColor
-                            val stdDev = state.lockedHsvStdDev
-                            val stdDevMultiplier = 2.0
-                            val lowerBound = Scalar(
-                                (mean[0] - stdDevMultiplier * stdDev[0]).coerceAtLeast(0.0),
-                                (mean[1] - stdDevMultiplier * stdDev[1]).coerceAtLeast(40.0),
-                                (mean[2] - stdDevMultiplier * stdDev[2]).coerceAtLeast(40.0)
-                            )
-                            val upperBound = Scalar(
-                                (mean[0] + stdDevMultiplier * stdDev[0]).coerceAtMost(180.0),
-                                (mean[1] + stdDevMultiplier * stdDev[1]).coerceAtMost(255.0),
-                                (mean[2] + stdDevMultiplier * stdDev[2]).coerceAtMost(255.0)
-                            )
-                            Core.inRange(hsvMat, lowerBound, upperBound, mask)
-                        } else {
-                            val hueRange = 10.0
-                            val lowerBound =
-                                Scalar((hsv[0] - hueRange).coerceAtLeast(0.0), 100.0, 100.0)
-                            val upperBound =
-                                Scalar((hsv[0] + hueRange).coerceAtMost(180.0), 255.0, 255.0)
-                            Core.inRange(hsvMat, lowerBound, upperBound, mask)
-                        }
-                        val kernel =
-                            Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
-                        Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, kernel)
-                        kernel.release()
-                        mask
-                    } else {
-                        reusableMask?.release()
-                        reusableMask = null
-                        null
-                    }
+                // Note: We do NOT release originalMat here because it is reusableFrameMat (or points to it)
 
-                    val filteredDetectedObjects = detectedObjects.filter {
-                        val box = it.boundingBox
-                        val expectedRadius = getExpectedRadiusAtImageY(
-                            box.centerY().toFloat(),
-                            state,
-                            imageToScreenMatrix
-                        )
-                        val maxAllowedArea = 2 * Math.PI * expectedRadius.pow(2)
-                        (box.width() * box.height()) <= maxAllowedArea
-                    }
+                // Reuse reusableHsvMat
+                Imgproc.cvtColor(matToUse, reusableHsvMat, Imgproc.COLOR_BGR2HSV)
+                val hsvMat = reusableHsvMat
 
-                    val refinedScreenPoints = filteredDetectedObjects.mapNotNull { detectedObject ->
-                        refineBallCenter(detectedObject, matToUse, state, imageToScreenMatrix)
-                    }.map { pointInImageCoords ->
-                        val screenPointArray =
-                            floatArrayOf(pointInImageCoords.x, pointInImageCoords.y)
-                        imageToScreenMatrix.mapPoints(screenPointArray)
-                        PointF(screenPointArray[0], screenPointArray[1])
-                    }
+                val hsvTuple = state.colorSamplePoint?.let {
+                    val imageX = (it.x * (hsvMat.cols() / state.viewWidth.toFloat())).toInt()
+                    val imageY = (it.y * (hsvMat.rows() / state.viewHeight.toFloat())).toInt()
 
-                    val detectedLogicalPoints = if (state.hasInverseMatrix) {
-                        val inverseMatrix = state.inversePitchMatrix ?: Matrix()
-                        refinedScreenPoints.map { screenPoint ->
-                            Perspective.screenToLogical(screenPoint, inverseMatrix)
-                        }
-                    } else {
-                        emptyList()
-                    }
+                    val patchSize = 5
+                    val roiX = (imageX - patchSize / 2).coerceIn(0, hsvMat.cols() - patchSize)
+                    val roiY = (imageY - patchSize / 2).coerceIn(0, hsvMat.rows() - patchSize)
+                    val roi = OCVRect(roiX, roiY, patchSize, patchSize)
+                    val sampleRegion = hsvMat.submat(roi)
 
-                    val filteredBalls = if (state.table.isVisible) {
-                        detectedLogicalPoints.filter { state.table.isPointInside(it) }
-                    } else {
-                        detectedLogicalPoints
-                    }
+                    val mean = MatOfDouble()
+                    val stddev = MatOfDouble()
+                    Core.meanStdDev(sampleRegion, mean, stddev)
 
-                    val finalVisionData = VisionData(
-                        genericBalls = filteredBalls,
-                        detectedHsvColor = hsvTuple?.first ?: hsv,
-                        detectedBoundingBoxes = filteredDetectedObjects.map { it.boundingBox },
-                        cvMask = cvMask,
-                        sourceImageWidth = inputImage.width,
-                        sourceImageHeight = inputImage.height,
-                        sourceImageRotation = rotationDegrees
+                    val meanArray = floatArrayOf(
+                        mean.get(0, 0)[0].toFloat(),
+                        mean.get(1, 0)[0].toFloat(),
+                        mean.get(2, 0)[0].toFloat()
+                    )
+                    val stddevArray = floatArrayOf(
+                        stddev.get(0, 0)[0].toFloat(),
+                        stddev.get(1, 0)[0].toFloat(),
+                        stddev.get(2, 0)[0].toFloat()
                     )
 
-                    _visionDataFlow.value = finalVisionData
-                    if (hsvTuple != null) {
-                        _visionDataFlow.value = _visionDataFlow.value.copy(
-                            detectedHsvColor = hsvTuple.first,
-                        )
+                    sampleRegion.release()
+                    mean.release()
+                    stddev.release()
+
+                    Pair(meanArray, stddevArray)
+                }
+
+                val hsv = state.lockedHsvColor ?: hsvTuple?.first ?: run {
+                    val roiWidth = 50
+                    val roiHeight = 50
+                    val roiX = (hsvMat.cols() - roiWidth) / 2
+                    val roiY = (hsvMat.rows() - roiHeight) / 2
+                    val centerRoi = hsvMat.submat(OCVRect(roiX, roiY, roiWidth, roiHeight))
+                    val meanColor = Core.mean(centerRoi)
+                    centerRoi.release()
+                    floatArrayOf(
+                        meanColor.`val`[0].toFloat(),
+                        meanColor.`val`[1].toFloat(),
+                        meanColor.`val`[2].toFloat()
+                    )
+                }
+
+                val cvMask = if (state.showCvMask) {
+                    if (reusableMask == null) {
+                        reusableMask = Mat()
                     }
+                    val mask = reusableMask!!
+                    if (state.lockedHsvColor != null && state.lockedHsvStdDev != null) {
+                        val mean = state.lockedHsvColor
+                        val stdDev = state.lockedHsvStdDev
+                        val stdDevMultiplier = 2.0
+                        val lowerBound = Scalar(
+                            (mean[0] - stdDevMultiplier * stdDev[0]).coerceAtLeast(0.0),
+                            (mean[1] - stdDevMultiplier * stdDev[1]).coerceAtLeast(40.0),
+                            (mean[2] - stdDevMultiplier * stdDev[2]).coerceAtLeast(40.0)
+                        )
+                        val upperBound = Scalar(
+                            (mean[0] + stdDevMultiplier * stdDev[0]).coerceAtMost(180.0),
+                            (mean[1] + stdDevMultiplier * stdDev[1]).coerceAtMost(255.0),
+                            (mean[2] + stdDevMultiplier * stdDev[2]).coerceAtMost(255.0)
+                        )
+                        Core.inRange(hsvMat, lowerBound, upperBound, mask)
+                    } else {
+                        val hueRange = 10.0
+                        val lowerBound =
+                            Scalar((hsv[0] - hueRange).coerceAtLeast(0.0), 100.0, 100.0)
+                        val upperBound =
+                            Scalar((hsv[0] + hueRange).coerceAtMost(180.0), 255.0, 255.0)
+                        Core.inRange(hsvMat, lowerBound, upperBound, mask)
+                    }
+                    val kernel =
+                        Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
+                    Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, kernel)
+                    kernel.release()
 
-                    matToUse.release()
-                    hsvMat.release()
+                    // Clone the mask because it is being updated on a background thread
+                    // while the UI might read it on the main thread.
+                    mask.clone()
+                } else {
+                    reusableMask?.release()
+                    reusableMask = null
+                    null
+                }
 
-                    imageProxy.close()
+                val filteredDetectedObjects = detectedObjects.filter {
+                    val box = it.boundingBox
+                    val expectedRadius = getExpectedRadiusAtImageY(
+                        box.centerY().toFloat(),
+                        state,
+                        imageToScreenMatrix
+                    )
+                    val maxAllowedArea = 2 * Math.PI * expectedRadius.pow(2)
+                    (box.width() * box.height()) <= maxAllowedArea
                 }
-                .addOnFailureListener {
-                    imageProxy.close()
+
+                val refinedScreenPoints = filteredDetectedObjects.mapNotNull { detectedObject ->
+                    refineBallCenter(detectedObject, matToUse, state, imageToScreenMatrix)
+                }.map { pointInImageCoords ->
+                    val screenPointArray =
+                        floatArrayOf(pointInImageCoords.x, pointInImageCoords.y)
+                    imageToScreenMatrix.mapPoints(screenPointArray)
+                    PointF(screenPointArray[0], screenPointArray[1])
                 }
+
+                val detectedLogicalPoints = if (state.hasInverseMatrix) {
+                    val inverseMatrix = state.inversePitchMatrix ?: Matrix()
+                    refinedScreenPoints.map { screenPoint ->
+                        Perspective.screenToLogical(screenPoint, inverseMatrix)
+                    }
+                } else {
+                    emptyList()
+                }
+
+                val filteredBalls = if (state.table.isVisible) {
+                    detectedLogicalPoints.filter { state.table.isPointInside(it) }
+                } else {
+                    detectedLogicalPoints
+                }
+
+                var finalVisionData = VisionData(
+                    genericBalls = filteredBalls,
+                    detectedHsvColor = hsvTuple?.first ?: hsv,
+                    detectedBoundingBoxes = filteredDetectedObjects.map { it.boundingBox },
+                    cvMask = cvMask,
+                    sourceImageWidth = inputImage.width,
+                    sourceImageHeight = inputImage.height,
+                    sourceImageRotation = rotationDegrees
+                )
+
+                if (hsvTuple != null) {
+                    finalVisionData = finalVisionData.copy(
+                        detectedHsvColor = hsvTuple.first,
+                    )
+                }
+
+                _visionDataFlow.value = finalVisionData
+
+                // Do NOT release matToUse or hsvMat as they are reusable
+
+            } catch (e: Exception) {
+                // Log exception if needed
+                e.printStackTrace()
+            } finally {
+                imageProxy.close()
+            }
         } else {
             imageProxy.close()
         }
