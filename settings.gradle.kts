@@ -35,4 +35,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "CueDetat"
 include(":app")
-include(":Dev_Guide")
