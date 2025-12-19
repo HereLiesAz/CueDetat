@@ -7,13 +7,13 @@ import org.opencv.core.Mat
 import org.opencv.imgproc.Imgproc
 
 @SuppressLint("UnsafeOptInUsageError")
-fun ImageProxy.toMat(): Mat {
+fun ImageProxy.toMat(dst: Mat = Mat()): Mat {
     val image = this.image ?: return Mat()
     val planes = image.planes
     val width = image.width
     val height = image.height
 
-    val bgrMat = Mat()
+    val bgrMat = dst
 
     val yPlane = planes[0]
     val yBuffer = yPlane.buffer
