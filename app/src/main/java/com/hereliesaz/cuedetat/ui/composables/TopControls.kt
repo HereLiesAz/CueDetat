@@ -3,7 +3,7 @@
 package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,9 +19,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,13 +50,22 @@ fun TopControls(
         verticalAlignment = Alignment.Top
     ) {
         Box(
-            modifier = Modifier.pointerInput(Unit) {
-                detectTapGestures { onMenuClick() }
-            },
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable(
+                    onClickLabel = "Open Menu",
+                    role = Role.Button,
+                    onClick = onMenuClick
+                )
+                .semantics {
+                    contentDescription = "Menu"
+                },
             contentAlignment = Alignment.CenterStart
         ) {
             if (uiState.areHelpersVisible && uiState.experienceMode != ExperienceMode.HATER) {
-                Column {
+                Column(
+                     modifier = Modifier.padding(8.dp)
+                ) {
                     Text(
                         text = stringResource(id = R.string.app_name),
                         style = MaterialTheme.typography.titleLarge.copy(fontSize = 28.sp),
@@ -70,10 +82,8 @@ fun TopControls(
             } else {
                 Image(
                     painter = painterResource(id = R.drawable.ic_launcher),
-                    contentDescription = "Menu",
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
+                    contentDescription = null, // Handled by parent semantics
+                    modifier = Modifier.size(64.dp)
                 )
             }
         }
@@ -86,9 +96,16 @@ fun TopControls(
                 if (uiState.table.isVisible) {
                     Column(
                         horizontalAlignment = Alignment.End,
-                        modifier = Modifier.pointerInput(Unit) {
-                            detectTapGestures { onEvent(MainScreenEvent.CycleTableSize) }
-                        }
+                        modifier = Modifier
+                            .clickable(
+                                onClickLabel = "Change Table Size",
+                                role = Role.Button,
+                                onClick = { onEvent(MainScreenEvent.CycleTableSize) }
+                            )
+                            .semantics {
+                                contentDescription = "Current table size: ${uiState.table.size.feet} feet. Double tap to cycle."
+                            }
+                            .padding(8.dp)
                     ) {
                         Text(
                             text = "Table Size",

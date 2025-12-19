@@ -5,13 +5,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
-import com.hereliesaz.aznavrail.model.NavItem
-import com.hereliesaz.aznavrail.model.NavItemData
-import com.hereliesaz.aznavrail.model.NavRailHeader
-import com.hereliesaz.aznavrail.model.NavRailMenuSection
-import com.hereliesaz.aznavrail.model.PredefinedAction // Added import
-import com.hereliesaz.aznavrail.ui.AzNavRail
-import com.hereliesaz.cuedetat.BuildConfig
+import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.aznavrail.model.AzButtonShape
+import com.hereliesaz.aznavrail.model.AzHeaderIconShape
+// import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
@@ -25,171 +22,205 @@ fun AzNavRailMenu(
 ) {
     val context = LocalContext.current
     val appName: String = context.packageManager.getApplicationLabel(context.applicationInfo).toString()
+    val versionInfo = "v1.0" + (uiState.latestVersionName?.let { " (latest: $it)" } ?: "")
+
+    // Pre-resolve strings to avoid calling @Composable in non-composable DSL
+    val strAppName = stringResource(id = R.string.app_name)
+    val strHideHelpers = stringResource(R.string.hide_helpers)
+    val strShowHelpers = stringResource(R.string.show_helpers)
 
     AzNavRail(
-        useAppIconAsHeader = true,
-        header = NavRailHeader { /* ... */ },
-        menuSections = createMenuSections(uiState, onEvent),
-        onPredefinedAction = { action -> // Reinstated onPredefinedAction
-            when (action) {
-                PredefinedAction.ABOUT -> {
-                    val intent = Intent(
-                        Intent.ACTION_VIEW,
-                        "https://github.com/hereliesaz/$appName".toUri()
-                    )
-                    context.startActivity(intent)
-                }
-                PredefinedAction.FEEDBACK -> {
-                    val intent = Intent(Intent.ACTION_SENDTO).apply {
-                        data = "mailto:hereliesaz@gmail.com".toUri()
-                        putExtra(Intent.EXTRA_SUBJECT, "$appName - Feedback")
-                    }
-                    context.startActivity(intent)
-                }
-                else -> {}
-            }
-        }
-    )
-}
-
-@Composable
-private fun createMenuSections(
-    uiState: CueDetatState,
-    onEvent: (MainScreenEvent) -> Unit
-): List<NavRailMenuSection> {
-    val versionInfo =
-        "v${BuildConfig.VERSION_NAME}" + (uiState.latestVersionName?.let { " (latest: $it)" } ?: "")
-
-    return listOf(
-        NavRailMenuSection(
-            title = stringResource(id = R.string.app_name),
-            items = listOf(
-                NavItem(
-                    text = versionInfo,
-                    data = NavItemData.Action(onClick = {})
-                )
-            )
-        ),
-        NavRailMenuSection(
-            title = "Core Controls",
-            items = listOf(
-                NavItem(
-                    text = stringResource(if (uiState.areHelpersVisible) R.string.hide_helpers else R.string.show_helpers),
-                    data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.ToggleHelp) }),
-                    showOnRail = true,
-                    railButtonText = "Help"
-                ),
-                NavItem(
-                    text = "Show Tutorial",
-                    data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.StartTutorial) })
-                ),
-                NavItem(
-                    text = "Spin",
-                    data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.ToggleSpinControl) }),
-                    showOnRail = true
-                ),
-                NavItem(
-                    text = if (uiState.isBankingMode) "Ghost Ball Aiming" else "Calculate Bank",
-                    data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.ToggleBankingMode) }),
-                    showOnRail = uiState.experienceMode != ExperienceMode.BEGINNER,
-                    railButtonText = "Bank"
-                ),
-                NavItem(
-                    text = "Add Obstacle",
-                    data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.AddObstacleBall) }),
-                    showOnRail = uiState.experienceMode != ExperienceMode.BEGINNER,
-                    railButtonText = "Add"
-                ),
-                NavItem(
-                    text = when {
-                        uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> "Unlock View"
-                        uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked -> "Lock View"
-                        else -> "Reset"
-                    },
-                    data = NavItemData.Action(onClick = {
-                        val event = when {
-                            uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> MainScreenEvent.UnlockBeginnerView
-                            uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked -> MainScreenEvent.LockBeginnerView
-                            else -> MainScreenEvent.Reset
-                        }
-                        onEvent(event)
-                    }),
-                    showOnRail = true,
-                    railButtonText = when {
-                        uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> "Unlock" // Corrected typo
-                        uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked -> "Lock"  // Corrected typo
-                        else -> "Reset"
-                    }
-                ),
-            )
-        ),
-        NavRailMenuSection(
-            title = "Table & Units",
-            items = listOf(
-                NavItem(
-                    text = "Table Alignment",
-                    data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.ToggleQuickAlignScreen) }),
-                    enabled = uiState.experienceMode != ExperienceMode.BEGINNER
-                ),
-                NavItem(
-                    text = "Table Size",
-                    data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) }),
-                    enabled = uiState.experienceMode != ExperienceMode.BEGINNER
-                ),
-                NavItem(
-                    text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units",
-                    data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) }),
-                    enabled = uiState.experienceMode != ExperienceMode.BEGINNER
-                ),
-            )
-        ),
-        NavRailMenuSection(
-            title = "Appearance",
-            items = listOf(
-                NavItem(
-                    text = if (uiState.isCameraVisible) "Turn Camera Off" else "Turn Camera On",
-                    data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.ToggleCamera) }),
-                    showOnRail = uiState.experienceMode != ExperienceMode.BEGINNER,
-                    railButtonText = "Cam"
-                ),
-                NavItem(
-                    text = when (uiState.pendingOrientationLock ?: uiState.orientationLock) {
-                        CueDetatState.OrientationLock.AUTOMATIC -> "Orientation: Auto"
-                        CueDetatState.OrientationLock.PORTRAIT -> "Orientation: Portrait"
-                        CueDetatState.OrientationLock.LANDSCAPE -> "Orientation: Landscape"
-                    },
-                    data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) })
-                ),
-                NavItem(
-                    text = "Luminance",
-                    data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog) })
-                ),
-                NavItem(
-                    text = "Too Advanced Options",
-                    data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }),
-                    enabled = uiState.experienceMode != ExperienceMode.BEGINNER
-                ),
-            )
-        ),
-        NavRailMenuSection(
-            title = "Meta",
-            items = listOf(
-                NavItem(
-                    text = "Mode: ${
-                        uiState.experienceMode?.name?.lowercase()
-                            ?.replaceFirstChar { it.titlecase() }
-                    }",
-                    data = NavItemData.Action(onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) })
-                ),
-                NavItem(
-                    text = "About",
-                    data = NavItemData.Action(predefinedAction = PredefinedAction.ABOUT)
-                ),
-                NavItem(
-                    text = "Feedback",
-                    data = NavItemData.Action(predefinedAction = PredefinedAction.FEEDBACK)
-                )
-            )
+        navController = null,
+        currentDestination = null,
+        isLandscape = false
+    ) {
+        azSettings(
+            displayAppNameInHeader = true,
+            headerIconShape = AzHeaderIconShape.CIRCLE
         )
-    )
+
+        azMenuItem(
+            id = "app_name",
+            text = strAppName,
+            route = "header",
+            disabled = true
+        )
+        azMenuItem(
+            id = "version",
+            text = versionInfo,
+            route = "version",
+            disabled = true
+        )
+
+        azDivider()
+
+        // Core Controls
+        // Fix: Removed railToggleOnText/railToggleOffText parameters which are not in the API
+        azRailToggle(
+            id = "help",
+            isChecked = uiState.areHelpersVisible,
+            toggleOnText = strHideHelpers,
+            toggleOffText = strShowHelpers,
+            route = "help",
+            onClick = { onEvent(MainScreenEvent.ToggleHelp) }
+        )
+
+        azMenuItem(
+            id = "tutorial",
+            text = "Show Tutorial",
+            route = "tutorial",
+            onClick = { onEvent(MainScreenEvent.StartTutorial) }
+        )
+
+        azRailToggle(
+            id = "spin",
+            isChecked = uiState.isSpinControlVisible,
+            toggleOnText = "Spin Control On",
+            toggleOffText = "Spin Control Off",
+            route = "spin",
+            onClick = { onEvent(MainScreenEvent.ToggleSpinControl) }
+        )
+
+        if (uiState.experienceMode != ExperienceMode.BEGINNER) {
+             azRailToggle(
+                id = "bank",
+                isChecked = uiState.isBankingMode,
+                toggleOnText = "Ghost Ball Aiming",
+                toggleOffText = "Calculate Bank",
+                route = "bank",
+                onClick = { onEvent(MainScreenEvent.ToggleBankingMode) }
+            )
+
+             // Fix: Removed railText param
+             azRailItem(
+                id = "add_obstacle",
+                text = "Add Obstacle",
+                route = "add_obstacle",
+                onClick = { onEvent(MainScreenEvent.AddObstacleBall) }
+            )
+        }
+
+        val lockResetText = when {
+            uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> "Unlock View"
+            uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked -> "Lock View"
+            else -> "Reset"
+        }
+
+        azRailItem(
+            id = "reset",
+            text = lockResetText,
+            route = "reset",
+            onClick = {
+                val event = when {
+                    uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> MainScreenEvent.UnlockBeginnerView
+                    uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked -> MainScreenEvent.LockBeginnerView
+                    else -> MainScreenEvent.Reset
+                }
+                onEvent(event)
+            }
+        )
+
+        azDivider()
+
+        // Table & Units
+        if (uiState.experienceMode != ExperienceMode.BEGINNER) {
+            azMenuItem(
+                id = "align",
+                text = "Table Alignment",
+                route = "align",
+                onClick = { onEvent(MainScreenEvent.ToggleQuickAlignScreen) }
+            )
+            azMenuItem(
+                id = "size",
+                text = "Table Size",
+                route = "size",
+                onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) }
+            )
+            azMenuItem(
+                id = "units",
+                text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units",
+                route = "units",
+                onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) }
+            )
+            azDivider()
+        }
+
+        // Appearance
+        if (uiState.experienceMode != ExperienceMode.BEGINNER) {
+            azRailToggle(
+                id = "cam",
+                isChecked = uiState.isCameraVisible,
+                toggleOnText = "Turn Camera Off",
+                toggleOffText = "Turn Camera On",
+                route = "cam",
+                onClick = { onEvent(MainScreenEvent.ToggleCamera) }
+            )
+        }
+
+        azMenuItem(
+            id = "orientation",
+            text = when (uiState.pendingOrientationLock ?: uiState.orientationLock) {
+                CueDetatState.OrientationLock.AUTOMATIC -> "Orientation: Auto"
+                CueDetatState.OrientationLock.PORTRAIT -> "Orientation: Portrait"
+                CueDetatState.OrientationLock.LANDSCAPE -> "Orientation: Landscape"
+            },
+            route = "orientation",
+            onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) }
+        )
+
+        azMenuItem(
+            id = "luminance",
+            text = "Luminance",
+            route = "luminance",
+            onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
+        )
+
+        if (uiState.experienceMode != ExperienceMode.BEGINNER) {
+            azMenuItem(
+                id = "advanced",
+                text = "Too Advanced Options",
+                route = "advanced",
+                onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }
+            )
+        }
+
+        azDivider()
+
+        // Meta
+         azMenuItem(
+            id = "mode",
+            text = "Mode: ${
+                uiState.experienceMode?.name?.lowercase()
+                    ?.replaceFirstChar { it.titlecase() }
+            }",
+            route = "mode",
+            onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) }
+        )
+
+        azMenuItem(
+            id = "about",
+            text = "About",
+            route = "about",
+            onClick = {
+                val intent = Intent(
+                    Intent.ACTION_VIEW,
+                    "https://github.com/hereliesaz/$appName".toUri()
+                )
+                context.startActivity(intent)
+            }
+        )
+
+        azMenuItem(
+            id = "feedback",
+            text = "Feedback",
+            route = "feedback",
+            onClick = {
+                val intent = Intent(Intent.ACTION_SENDTO).apply {
+                    data = "mailto:hereliesaz@gmail.com".toUri()
+                    putExtra(Intent.EXTRA_SUBJECT, "$appName - Feedback")
+                }
+                context.startActivity(intent)
+            }
+        )
+    }
 }
