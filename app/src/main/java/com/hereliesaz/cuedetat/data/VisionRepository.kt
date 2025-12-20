@@ -50,6 +50,25 @@ class VisionRepository @Inject constructor(
     private val reusableRotatedMat = Mat()
     private val reusableHsvMat = Mat()
 
+    // Reusable Mats for refineBallCenter and other helpers
+    private val reusableGray = Mat()
+    private val reusableEdges = Mat()
+    private val reusableHierarchy = Mat()
+    private val reusableCircles = Mat()
+
+    // Reusable arrays for calculations
+    private val reusableMatrixValues = FloatArray(9)
+    private val reusablePointArray = FloatArray(2)
+
+    // Reusable Mats for HSV sampling
+    private val reusableMean = MatOfDouble()
+    private val reusableStdDev = MatOfDouble()
+
+    // Lazily initialized kernel
+    private val reusableMorphKernel by lazy {
+        Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
+    }
+
     @SuppressLint("UnsafeOptInUsageError")
     fun processImage(imageProxy: ImageProxy, state: CueDetatState) {
         val currentTime = System.currentTimeMillis()
@@ -117,24 +136,21 @@ class VisionRepository @Inject constructor(
                     val roi = OCVRect(roiX, roiY, patchSize, patchSize)
                     val sampleRegion = hsvMat.submat(roi)
 
-                    val mean = MatOfDouble()
-                    val stddev = MatOfDouble()
-                    Core.meanStdDev(sampleRegion, mean, stddev)
+                    Core.meanStdDev(sampleRegion, reusableMean, reusableStdDev)
 
                     val meanArray = floatArrayOf(
-                        mean.get(0, 0)[0].toFloat(),
-                        mean.get(1, 0)[0].toFloat(),
-                        mean.get(2, 0)[0].toFloat()
+                        reusableMean.get(0, 0)[0].toFloat(),
+                        reusableMean.get(1, 0)[0].toFloat(),
+                        reusableMean.get(2, 0)[0].toFloat()
                     )
                     val stddevArray = floatArrayOf(
-                        stddev.get(0, 0)[0].toFloat(),
-                        stddev.get(1, 0)[0].toFloat(),
-                        stddev.get(2, 0)[0].toFloat()
+                        reusableStdDev.get(0, 0)[0].toFloat(),
+                        reusableStdDev.get(1, 0)[0].toFloat(),
+                        reusableStdDev.get(2, 0)[0].toFloat()
                     )
 
                     sampleRegion.release()
-                    mean.release()
-                    stddev.release()
+                    // reusableMean and reusableStdDev are reused, no release needed
 
                     Pair(meanArray, stddevArray)
                 }
@@ -182,10 +198,7 @@ class VisionRepository @Inject constructor(
                             Scalar((hsv[0] + hueRange).coerceAtMost(180.0), 255.0, 255.0)
                         Core.inRange(hsvMat, lowerBound, upperBound, mask)
                     }
-                    val kernel =
-                        Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
-                    Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, kernel)
-                    kernel.release()
+                    Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, reusableMorphKernel)
 
                     // Clone the mask because it is being updated on a background thread
                     // while the UI might read it on the main thread.
@@ -283,9 +296,7 @@ class VisionRepository @Inject constructor(
 
         val roiMat = frame.submat(roi)
 
-        val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
-        Imgproc.morphologyEx(roiMat, roiMat, Imgproc.MORPH_OPEN, kernel)
-        kernel.release()
+        Imgproc.morphologyEx(roiMat, roiMat, Imgproc.MORPH_OPEN, reusableMorphKernel)
 
         val refinedCenterInRoi = when (state.cvRefinementMethod) {
             CvRefinementMethod.CONTOUR -> findBallByContour(
@@ -319,9 +330,10 @@ class VisionRepository @Inject constructor(
         val pitchMatrix = state.pitchMatrix
         if (!state.hasInverseMatrix || pitchMatrix == null) return LOGICAL_BALL_RADIUS
 
-        val point = floatArrayOf(0f, imageY)
-        imageToScreenMatrix.mapPoints(point)
-        val screenY = point[1]
+        reusablePointArray[0] = 0f
+        reusablePointArray[1] = imageY
+        imageToScreenMatrix.mapPoints(reusablePointArray)
+        val screenY = reusablePointArray[1]
 
         val logicalTopY = if (state.table.isVisible) -state.table.logicalHeight / 2f else -200f
         val logicalBottomY = if (state.table.isVisible) state.table.logicalHeight / 2f else 200f
@@ -350,9 +362,8 @@ class VisionRepository @Inject constructor(
         val interpolatedRadius =
             screenTopInfo.radius + fraction * (screenBottomInfo.radius - screenTopInfo.radius)
 
-        val values = FloatArray(9)
-        imageToScreenMatrix.getValues(values)
-        val scaleY = values[Matrix.MSCALE_Y]
+        imageToScreenMatrix.getValues(reusableMatrixValues)
+        val scaleY = reusableMatrixValues[Matrix.MSCALE_Y]
 
         return if (scaleY > 0) interpolatedRadius / scaleY else LOGICAL_BALL_RADIUS
     }
@@ -364,19 +375,17 @@ class VisionRepository @Inject constructor(
         cannyT1: Double,
         cannyT2: Double
     ): PointF? {
-        val gray = Mat()
-        Imgproc.cvtColor(roiMat, gray, Imgproc.COLOR_BGR2GRAY)
-        Imgproc.GaussianBlur(gray, gray, Size(5.0, 5.0), 2.0, 2.0)
+        Imgproc.cvtColor(roiMat, reusableGray, Imgproc.COLOR_BGR2GRAY)
+        Imgproc.GaussianBlur(reusableGray, reusableGray, Size(5.0, 5.0), 2.0, 2.0)
 
-        val edges = Mat()
-        Imgproc.Canny(gray, edges, cannyT1, cannyT2)
+        Imgproc.Canny(reusableGray, reusableEdges, cannyT1, cannyT2)
 
         val contours = ArrayList<MatOfPoint>()
-        val hierarchy = Mat()
+        // reusableHierarchy is reused, no need to allocate
         Imgproc.findContours(
-            edges,
+            reusableEdges,
             contours,
-            hierarchy,
+            reusableHierarchy,
             Imgproc.RETR_EXTERNAL,
             Imgproc.CHAIN_APPROX_SIMPLE
         )
@@ -401,10 +410,9 @@ class VisionRepository @Inject constructor(
             allPoints2f.release()
         }
 
+        // Release the individual contours created by findContours
         contours.forEach { it.release() }
-        gray.release()
-        edges.release()
-        hierarchy.release()
+        // Do not release reusableGray, reusableEdges, reusableHierarchy
 
         return bestCenter
     }
@@ -416,14 +424,13 @@ class VisionRepository @Inject constructor(
         houghP1: Double,
         houghP2: Double
     ): PointF? {
-        val gray = Mat()
-        Imgproc.cvtColor(roiMat, gray, Imgproc.COLOR_BGR2GRAY)
-        Imgproc.medianBlur(gray, gray, 5)
+        Imgproc.cvtColor(roiMat, reusableGray, Imgproc.COLOR_BGR2GRAY)
+        Imgproc.medianBlur(reusableGray, reusableGray, 5)
 
-        val circles = Mat()
+        // reusableCircles is reused
         Imgproc.HoughCircles(
-            gray,
-            circles,
+            reusableGray,
+            reusableCircles,
             Imgproc.HOUGH_GRADIENT,
             1.0,
             roiMat.rows().toDouble() / 8,
@@ -434,15 +441,14 @@ class VisionRepository @Inject constructor(
         )
 
         var center: PointF? = null
-        if (circles.cols() > 0) {
-            val circleData = circles[0, 0]
+        if (reusableCircles.cols() > 0) {
+            val circleData = reusableCircles[0, 0]
             if (circleData != null && circleData.isNotEmpty()) {
                 center = PointF(circleData[0].toFloat(), circleData[1].toFloat())
             }
         }
 
-        gray.release()
-        circles.release()
+        // Do not release reusableGray, reusableCircles
         return center
     }
 
