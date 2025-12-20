@@ -38,6 +38,7 @@ import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
 import com.hereliesaz.cuedetat.ui.hatemode.HaterScreen
 import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
+import com.hereliesaz.cuedetat.utils.SecurityUtils
 import com.hereliesaz.cuedetat.view.state.SingleEvent
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.launchIn
@@ -95,8 +96,12 @@ class MainActivity : ComponentActivity() {
         viewModel.singleEvent.onEach { event ->
             when (event) {
                 is SingleEvent.OpenUrl -> {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
-                    startActivity(intent)
+                    if (SecurityUtils.isSafeUrl(event.url)) {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
+                        startActivity(intent)
+                    } else {
+                        // Log suspicious URL attempt or handle gracefully
+                    }
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 is SingleEvent.SendFeedbackEmail -> {
