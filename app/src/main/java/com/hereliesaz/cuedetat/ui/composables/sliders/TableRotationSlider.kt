@@ -13,28 +13,27 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.cuedetat.domain.CueDetatState
-import com.hereliesaz.cuedetat.domain.MainScreenEvent
 
 @Composable
 fun TableRotationSlider(
-    uiState: CueDetatState,
-    onEvent: (MainScreenEvent) -> Unit,
+    isVisible: Boolean,
+    worldRotationDegrees: Float,
+    onRotationChange: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (uiState.table.isVisible) {
+    if (isVisible) {
         Column(
             modifier = modifier,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                "Table Rotation: ${-uiState.worldRotationDegrees.toInt()}°",
+                "Table Rotation: ${-worldRotationDegrees.toInt()}°",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Slider(
-                value = -uiState.worldRotationDegrees,
-                onValueChange = { onEvent(MainScreenEvent.TableRotationChanged(-it)) },
+                value = -worldRotationDegrees,
+                onValueChange = { onRotationChange(-it) },
                 valueRange = -179f..180f, // Centered range
                 steps = 358,
                 modifier = Modifier
