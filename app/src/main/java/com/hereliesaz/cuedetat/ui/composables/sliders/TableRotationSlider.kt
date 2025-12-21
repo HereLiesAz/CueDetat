@@ -12,6 +12,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -37,6 +39,7 @@ fun TableRotationSlider(
                 valueRange = -179f..180f, // Centered range
                 steps = 358,
                 modifier = Modifier
+                    .semantics { contentDescription = "Table Rotation" }
                     .fillMaxWidth()
                     .height(32.dp),
                 colors = SliderDefaults.colors(

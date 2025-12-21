@@ -19,6 +19,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
@@ -80,7 +82,9 @@ fun AdvancedOptionsDialog(
                         value = uiState.houghP1,
                         onValueChange = { onEvent(MainScreenEvent.UpdateHoughP1(it)) },
                         valueRange = 50f..250f,
-                        modifier = Modifier.height(32.dp)
+                        modifier = Modifier
+                            .semantics { contentDescription = "Hough P1 Canny Edge" }
+                            .height(32.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -89,7 +93,9 @@ fun AdvancedOptionsDialog(
                         value = uiState.houghP2,
                         onValueChange = { onEvent(MainScreenEvent.UpdateHoughP2(it)) },
                         valueRange = 10f..100f,
-                        modifier = Modifier.height(32.dp)
+                        modifier = Modifier
+                            .semantics { contentDescription = "Hough P2 Accumulator" }
+                            .height(32.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -98,7 +104,9 @@ fun AdvancedOptionsDialog(
                         value = uiState.cannyThreshold1,
                         onValueChange = { onEvent(MainScreenEvent.UpdateCannyT1(it)) },
                         valueRange = 10f..200f,
-                        modifier = Modifier.height(32.dp)
+                        modifier = Modifier
+                            .semantics { contentDescription = "Canny Threshold 1" }
+                            .height(32.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -107,7 +115,9 @@ fun AdvancedOptionsDialog(
                         value = uiState.cannyThreshold2,
                         onValueChange = { onEvent(MainScreenEvent.UpdateCannyT2(it)) },
                         valueRange = 50f..300f,
-                        modifier = Modifier.height(32.dp)
+                        modifier = Modifier
+                            .semantics { contentDescription = "Canny Threshold 2" }
+                            .height(32.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
