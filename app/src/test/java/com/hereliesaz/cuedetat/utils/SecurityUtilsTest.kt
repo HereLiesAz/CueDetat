@@ -12,8 +12,8 @@ class SecurityUtilsTest {
     }
 
     @Test
-    fun `isSafeUrl returns true for http urls`() {
-        assertTrue(SecurityUtils.isSafeUrl("http://example.com"))
+    fun `isSafeUrl returns false for http urls`() {
+        assertFalse(SecurityUtils.isSafeUrl("http://example.com"))
     }
 
     @Test
