@@ -50,8 +50,14 @@ fun MainLayout(
 
         // UI Controls layered on top
         TopControls(
-            uiState = uiState,
-            onEvent = onEvent,
+            areHelpersVisible = uiState.areHelpersVisible,
+            experienceMode = uiState.experienceMode,
+            isTableVisible = uiState.table.isVisible,
+            tableSizeFeet = uiState.table.size.feet,
+            isBeginnerViewLocked = uiState.isBeginnerViewLocked,
+            targetBallDistance = uiState.targetBallDistance,
+            distanceUnit = uiState.distanceUnit,
+            onCycleTableSize = { onEvent(MainScreenEvent.CycleTableSize) },
             onMenuClick = { onEvent(MainScreenEvent.ToggleNavigationRail) }
         )
 
@@ -76,7 +82,11 @@ fun MainLayout(
                 modifier = Modifier.weight(2f),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                TableRotationSlider(uiState = uiState, onEvent = onEvent)
+                TableRotationSlider(
+                    isVisible = uiState.table.isVisible,
+                    worldRotationDegrees = uiState.worldRotationDegrees,
+                    onRotationChange = { onEvent(MainScreenEvent.TableRotationChanged(it)) }
+                )
             }
 
             // Right-aligned controls
@@ -97,8 +107,8 @@ fun MainLayout(
         }
 
         ZoomControls(
-            uiState = uiState,
-            onEvent = onEvent,
+            zoomSliderPosition = uiState.zoomSliderPosition,
+            onZoomChange = { onEvent(MainScreenEvent.ZoomSliderChanged(it)) },
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight(0.6f)

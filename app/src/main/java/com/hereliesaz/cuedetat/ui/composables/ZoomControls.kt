@@ -25,14 +25,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.cuedetat.domain.CueDetatState
-import com.hereliesaz.cuedetat.domain.MainScreenEvent
 
 
 @Composable
 fun ZoomControls(
-    uiState: CueDetatState,
-    onEvent: (MainScreenEvent) -> Unit,
+    zoomSliderPosition: Float,
+    onZoomChange: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -40,7 +38,7 @@ fun ZoomControls(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        IconButton(onClick = { onEvent(MainScreenEvent.ZoomSliderChanged(uiState.zoomSliderPosition + 1)) }) {
+        IconButton(onClick = { onZoomChange(zoomSliderPosition + 1) }) {
             Icon(
                 Icons.Default.Add,
                 contentDescription = "Zoom In",
@@ -49,8 +47,8 @@ fun ZoomControls(
         }
         Spacer(modifier = Modifier.height(16.dp))
         Slider(
-            value = uiState.zoomSliderPosition,
-            onValueChange = { onEvent(MainScreenEvent.ZoomSliderChanged(it)) },
+            value = zoomSliderPosition,
+            onValueChange = { onZoomChange(it) },
             valueRange = -50f..50f,
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
@@ -82,7 +80,7 @@ fun ZoomControls(
                 .height(32.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
-        IconButton(onClick = { onEvent(MainScreenEvent.ZoomSliderChanged(uiState.zoomSliderPosition - 1)) }) {
+        IconButton(onClick = { onZoomChange(zoomSliderPosition - 1) }) {
             Icon(
                 Icons.Default.Remove,
                 contentDescription = "Zoom Out",
