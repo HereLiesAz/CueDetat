@@ -10,6 +10,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
@@ -33,7 +35,9 @@ fun LuminanceAdjustmentDialog(
                         onValueChange = { onEvent(MainScreenEvent.AdjustLuminance(it)) },
                         valueRange = -0.4f..0.4f,
                         steps = 79,
-                        modifier = Modifier.height(32.dp),
+                        modifier = Modifier
+                            .semantics { contentDescription = "Luminance Adjustment" }
+                            .height(32.dp),
                         colors = SliderDefaults.colors(
                             activeTrackColor = MaterialTheme.colorScheme.primary,
                             inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
