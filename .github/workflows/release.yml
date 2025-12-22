@@ -12,7 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     # These permissions are required for the release action to create a release and for the commit step to push changes.
     permissions:
-      contents: write
+     contents: read
+     pull-requests: write
       
     steps:
       - name: Checkout repository
