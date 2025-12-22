@@ -25,28 +25,11 @@ jobs:
       - name: Validate Gradle wrapper
         uses: gradle/wrapper-validation-action@v1
 
-      - name: Extract Java version from build files
-        id: get_java_version
-        run: |
-          # This script attempts to find the Java version specified in your Gradle files.
-          RAW_VERSION=$( (grep -r "JavaVersion.VERSION_" . --include "build.gradle*"; grep -r "jvmTarget" . --include "build.gradle*") | grep -o -E "VERSION_[0-9]+|['\"][0-9\.]+" | head -1)
-          if [[ -z "$RAW_VERSION" ]]; then
-            echo "⚠️ Could not determine Java version automatically. Defaulting to Java 21."
-            VERSION=17
-          else
-            VERSION=$(echo "$RAW_VERSION" | grep -o -E '[0-9\.]+' | sed 's/_/./g')
-          fi
-          if [[ "$VERSION" == "21" ]]; then
-            VERSION=8
-          fi
-          echo "Detected Java version: $VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: ${{ steps.get_java_version.outputs.version }}
+          java-version: '21'
           cache: 'gradle'
 
       - name: Increment version
