@@ -1,14 +1,9 @@
 package com.hereliesaz.cuedetat.ui.composables
 
-import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.net.toUri
 import com.hereliesaz.aznavrail.AzNavRail
-import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
-// import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
@@ -20,8 +15,6 @@ fun AzNavRailMenu(
     uiState: CueDetatState,
     onEvent: (MainScreenEvent) -> Unit,
 ) {
-    val context = LocalContext.current
-    val appName: String = context.packageManager.getApplicationLabel(context.applicationInfo).toString()
     val versionInfo = "v1.0" + (uiState.latestVersionName?.let { " (latest: $it)" } ?: "")
 
     // Pre-resolve strings to avoid calling @Composable in non-composable DSL
@@ -201,26 +194,14 @@ fun AzNavRailMenu(
             id = "about",
             text = "About",
             route = "about",
-            onClick = {
-                val intent = Intent(
-                    Intent.ACTION_VIEW,
-                    "https://github.com/hereliesaz/$appName".toUri()
-                )
-                context.startActivity(intent)
-            }
+            onClick = { onEvent(MainScreenEvent.ViewAboutPage) }
         )
 
         azMenuItem(
             id = "feedback",
             text = "Feedback",
             route = "feedback",
-            onClick = {
-                val intent = Intent(Intent.ACTION_SENDTO).apply {
-                    data = "mailto:hereliesaz@gmail.com".toUri()
-                    putExtra(Intent.EXTRA_SUBJECT, "$appName - Feedback")
-                }
-                context.startActivity(intent)
-            }
+            onClick = { onEvent(MainScreenEvent.SendFeedback) }
         )
     }
 }
