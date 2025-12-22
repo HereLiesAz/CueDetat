@@ -6,6 +6,7 @@ appVersionName = "0.9.2.1"
 appVersionCode = "23"
 applicationId = "com.hereliesaz.cuedetat"
 appName = "Cue D’état"
+jvm = "21"
 # Android & Jetpack
 activityCompose = "1.12.2"
 appcompat = "1.7.1"

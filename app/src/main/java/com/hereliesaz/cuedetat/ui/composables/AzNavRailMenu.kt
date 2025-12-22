@@ -28,8 +28,9 @@ fun AzNavRailMenu(
         isLandscape = false
     ) {
         azSettings(
-            displayAppNameInHeader = true,
-            headerIconShape = AzHeaderIconShape.CIRCLE
+            displayAppNameInHeader = false,
+            headerIconShape = AzHeaderIconShape.CIRCLE,
+            packRailButtons = true
         )
 
         azMenuItem(
@@ -49,7 +50,7 @@ fun AzNavRailMenu(
 
         // Core Controls
         // Fix: Removed railToggleOnText/railToggleOffText parameters which are not in the API
-        azRailToggle(
+        azMenuToggle(
             id = "help",
             isChecked = uiState.areHelpersVisible,
             toggleOnText = strHideHelpers,
