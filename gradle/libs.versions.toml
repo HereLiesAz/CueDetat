@@ -7,31 +7,31 @@ appVersionCode = "23"
 applicationId = "com.hereliesaz.cuedetat"
 appName = "Cue D’état"
 # Android & Jetpack
-activityCompose = "1.12.0-alpha07"
+activityCompose = "1.12.2"
 appcompat = "1.7.1"
 camera = "1.4.2"
 cameraxVersion = "1.4.2"
-composeBom = "2025.08.01"
+composeBom = "2025.12.01"
 constraintlayout = "2.2.1"
 coreKtx = "1.16.0"
-datastorePreferences = "1.2.0-alpha02"
+datastorePreferences = "1.2.0"
 espresso = "3.6.1"
-glanceAppwidget = "1.2.0-beta01"
-hiltNavigationCompose = "1.2.0"
+glanceAppwidget = "1.2.0-rc01"
+hiltNavigationCompose = "1.3.0"
 jbox2d = "2.3.0-BETA"
 junit = "4.13.2"
 junitTest = "1.2.1"
-junitExt = "1.9.0"
+junitExt = "1.10.0"
 kotlinxCoroutinesAndroid = "1.10.2"
 kotlinxCoroutinesCore = "1.10.2"
 kphysicsVersion = "1.0.0"
 lifecycle = "2.9.1"
-lifecycleRuntimeCompose = "2.9.3"
-lifecycleViewmodelCompose = "2.9.3"
-lifecycleViewmodelKtx = "2.9.3"
-material = "1.12.0"
+lifecycleRuntimeCompose = "2.10.0"
+lifecycleViewmodelCompose = "2.10.0"
+lifecycleViewmodelKtx = "2.10.0"
+material = "1.13.0"
 material3 = "1.4.0-beta02"
-material3AdaptiveNavSuite = "1.5.0-alpha02"
+material3AdaptiveNavSuite = "1.5.0-alpha11"
 materialIconsExtended = "1.7.8"
 multidex = "2.0.1"
 objectDetection = "17.0.2"
@@ -42,11 +42,11 @@ guava = "1.10.2"
 # Kotlin & Coroutines
 kotlinxCoroutinesGuava = "1.10.2"
 slf4jBom = "2.1.0-alpha1"
-stdlib = "2.2.10"
+stdlib = "2.2.21"
 camerax = "1.4.2"
 
 # Hilt (Dependency Injection)
-hilt = "2.57.1" # Matches plugin version
+hilt = "2.57.2" # Matches plugin version
 
 # Networking
 retrofit = "3.0.0"
@@ -55,28 +55,28 @@ kphysics = "master-SNAPSHOT"
 
 
 # Plugins
-androidApplication = "8.12.1" # Example, use your actual AGP version
-kotlinAndroid = "2.2.10"
-kotlinCompose = "2.2.10"
-benchmarkCommon = "1.4.0"
-composeMaterial3 = "1.5.0"
+androidApplication = "8.13.2" # Example, use your actual AGP version
+kotlinAndroid = "2.3.0"
+kotlinCompose = "2.3.0"
+benchmarkCommon = "1.4.1"
+composeMaterial3 = "1.5.6"
 tensorflowLiteTaskVision = "0.4.4"
-ui = "1.9.0"
+ui = "1.10.0"
 animationCore = "1.8.3"
-uiGraphics = "1.9.0"
+uiGraphics = "1.10.0"
 visionCommon = "17.3.0"
-lifecycleKtx = "2.9.3"
+lifecycleKtx = "2.10.0"
 androidxCore = "1.17.0"
-cameraVideo = "1.5.0-rc01"
+cameraVideo = "1.5.2"
 glance = "1.2.0-alpha01"
-foundationLayout = "1.9.0"
-animationCoreVersion = "1.9.0"
-roomKtx = "2.7.2"
+foundationLayout = "1.10.0"
+animationCoreVersion = "1.10.0"
+roomKtx = "2.8.4"
 glanceVersion = "1.1.1"
 material3Version = "1.3.2"
 sceneformBase = "1.17.1"
 liquidfun = "1.1.0"
-androidxMaterial3 = "1.3.2"
+androidxMaterial3 = "1.4.0"
 aznavrail = "5.3"
 
 
@@ -89,7 +89,7 @@ androidx-camera-video = { module = "androidx.camera:camera-video", version.ref =
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCore" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
-androidx-datastore-preferences-rxjava2 = { module = "androidx.datastore:datastore-preferences-rxjava2", version = "1.2.0-alpha02" }
+androidx-datastore-preferences-rxjava2 = { module = "androidx.datastore:datastore-preferences-rxjava2", version = "1.2.0" }
 androidx-datastore-preferences-rxjava3 = { module = "androidx.datastore:datastore-preferences-rxjava3", version.ref = "datastorePreferences" }
 androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glanceAppwidget" }
 androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
@@ -118,10 +118,10 @@ androidx-foundation = { group = "androidx.compose.foundation", name = "foundatio
 
 
 # CameraX
-androidx-camera-core = { group = "androidx.camera", name = "camera-core", version = "1.5.0-rc01" }
-androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version = "1.5.0-rc01" }
-androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version = "1.5.0-rc01" }
-androidx-camera-view = { group = "androidx.camera", name = "camera-view", version = "1.5.0-rc01" }
+androidx-camera-core = { group = "androidx.camera", name = "camera-core", version = "1.5.2" }
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version = "1.5.2" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version = "1.5.2" }
+androidx-camera-view = { group = "androidx.camera", name = "camera-view", version = "1.5.2" }
 kotlinx-coroutines-guava = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-guava", version.ref = "guava" }
 
 
@@ -129,11 +129,10 @@ kotlinx-coroutines-guava = { group = "org.jetbrains.kotlinx", name = "kotlinx-co
 kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "stdlib" }
 
 # Hilt
-hilt-android = { group = "com.google.dagger", name = "hilt-android", version = "2.57" }
-hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version = "2.57" }
+hilt-android = { group = "com.google.dagger", name = "hilt-android", version = "2.57.2" }
+hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version = "2.57.2" }
 
 # Retrofit
-material3 = { module = "androidx.compose.material3:material3", name = "material3", version.ref = "material3" } # This 'material3' alias seems to conflict with androidx-compose-material3. Keeping the more specific one.
 object1-detection = { module = "com.google.mlkit:object-detection", version = "17.0.2" }
 object1-detection-custom = { module = "com.google.mlkit:object-detection-custom", version = "17.0.2" }
 mlkit = { module = "com.google.mlkit:object-detection", version = "17.0.2" } # Placeholder for bundle creation
@@ -146,7 +145,7 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version = "1.3.0" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version = "3.7.0" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4", version.ref = "junitExt" }
-androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest", version = "1.9.0" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest", version = "1.10.0" }
 androidx-benchmark-common = { group = "androidx.benchmark", name = "benchmark-common", version.ref = "benchmarkCommon" }
 
 androidx-palette = { group = "androidx.palette", name = "palette-ktx", version = "1.0.0" }
