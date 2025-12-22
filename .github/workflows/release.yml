@@ -1,118 +1,182 @@
-# .github/workflows/release.yaml
-
-name: Android Release Build
+name: Merged Build & Release
 
 on:
   push:
+    branches: [ "**" ]
+  pull_request:
     branches: [ "main" ]
   workflow_dispatch:
 
+# ⚡ Concurrency: Cancels the entire job if a new push comes in.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
-    # These permissions are required for the release action to create a release and for the commit step to push changes.
     permissions:
-     contents: read
-     pull-requests: write
-      
+      contents: write
+      issues: write
+      pull-requests: write
+      checks: read
+
     steps:
-      - name: Checkout repository
-        # We need to fetch the full history to create tags and push changes back.
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 
+          fetch-depth: 0
 
-      - name: Validate Gradle wrapper
-        uses: gradle/wrapper-validation-action@v1
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: 'gradle'
-
-      - name: Increment version
-        id: versioning
+      - name: Inject Google Services
+        env:
+          GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
+          PROJECT_ID: ${{ secrets.PROJECT_ID }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
         run: |
-          # Define the path to your app's build.gradle file
-          GRADLE_FILE="app/build.gradle.kts"
-
-          # Extract current version code and name
-          CURRENT_VERSION_CODE=$(grep 'versionCode ' $GRADLE_FILE | awk '{print $2}')
-          CURRENT_VERSION_NAME=$(grep 'versionName ' $GRADLE_FILE | awk '{print $2}' | tr -d '"')
-
-          # Increment versionCode
-          NEW_VERSION_CODE=$((CURRENT_VERSION_CODE + 1))
-
-          # Increment patch number in versionName (e.g., 1.2.3 -> 1.2.4)
-          NEW_VERSION_NAME=$(echo $CURRENT_VERSION_NAME | awk -F. -v OFS=. '{$NF = $NF + 1;} 1')
-
-          # Update the build.gradle file with the new versions
-          sed -i "s/versionCode .*/versionCode $NEW_VERSION_CODE/" $GRADLE_FILE
-          sed -i "s/versionName .*/versionName \"$NEW_VERSION_NAME\"/" $GRADLE_FILE
-
-          echo "Version bumped to $NEW_VERSION_NAME (Code: $NEW_VERSION_CODE)"
-          
-          # Set outputs for subsequent steps
-          echo "new_version_name=$NEW_VERSION_NAME" >> "$GITHUB_OUTPUT"
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x ./gradlew
-      
-      - name: Configure Gradle Properties
-        run: |
-          mkdir -p ~/.gradle
-          echo "org.gradle.jvmargs=-Xmx3072m" >> ~/.gradle/gradle.properties
-          echo "android.useAndroidX=true" >> ~/.gradle/gradle.properties
-      
-      - name: Build with Gradle
-        run: ./gradlew clean assembleRelease
-
-      - name: Rename APK
-        id: rename_apk
-        run: |
-          # Find the unsigned APK
-          APK_PATH=$(find ./app/build/outputs/apk/release -name "app-release-unsigned.apk")
-          APK_DIR=$(dirname "$APK_PATH")
-          
-          # Create the new filename
-          NEW_APK_NAME="app-release-unsigned-v${{ steps.versioning.outputs.new_version_name }}.apk"
-          
-          # Rename the file
-          mv "$APK_PATH" "$APK_DIR/$NEW_APK_NAME"
-          
-          # Set output for the upload step
-          echo "new_path=$APK_DIR/$NEW_APK_NAME" >> "$GITHUB_OUTPUT"
-
-      - name: Commit and Tag version bump
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add app/build.gradle.kts
-          # Commit only if there are changes
-          if ! git diff --staged --quiet; then
-            git commit -m "chore(release): Bump version to ${{ steps.versioning.outputs.new_version_name }}"
-            git tag v${{ steps.versioning.outputs.new_version_name }}
-            git push
-            git push --tags
+          if [ -f "app/google-services.json.template" ]; then
+            echo "Template found. Injecting secrets..."
+            sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
           else
-            echo "No version changes to commit."
+            echo "Warning: google-services.json.template not found. Skipping injection."
           fi
 
-      - name: Create GitHub Pre-Release
-        uses: softprops/action-gh-release@v1
-        # This step only runs if a new version was committed and tagged
-        if: steps.versioning.outputs.new_version_name != ''
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
         with:
-          # The name of the tag for this release
-          tag_name: v${{ steps.versioning.outputs.new_version_name }}
-          # The name of the release
-          name: Release v${{ steps.versioning.outputs.new_version_name }}
-          # Mark this release as a pre-release
-          prerelease: true
-          # A list of files to upload as assets to the release
-          files: ${{ steps.rename_apk.outputs.new_path }}
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        id: gradle-build
+        run: |
+          set +e
+          export BUILD_NUMBER=$(git rev-list --count HEAD)
+
+          # Build the APK
+          ./gradlew assembleDebug -PversionBuild=$BUILD_NUMBER --build-cache > build.log 2>&1
+
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          cat build.log
+          exit $EXIT_CODE
+
+      # ------------------------------------------------------------------
+      # FAILURE HANDLING
+      # ------------------------------------------------------------------
+      - name: Report Failure to Jules
+        if: failure() && steps.gradle-build.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            let logTail = 'Log file not found.';
+            try { logTail = fs.readFileSync('build.log', 'utf8').slice(-4000); } catch (e) {}
+
+            const assignee = 'gemini-code-assist';
+
+            try {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `Build Failure on ${context.eventName === 'pull_request' ? 'PR #' + context.issue.number : context.ref}`,
+                body: `@${assignee} /jules debug this build error\n\n**Log:**\n\`\`\`\n${logTail}\n\`\`\``,
+                labels: ['jules', 'bug'],
+                assignees: [assignee]
+              });
+            } catch (error) {
+              console.log("Failed to create issue with assignee. Retrying without assignee.");
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `Build Failure on ${context.eventName === 'pull_request' ? 'PR #' + context.issue.number : context.ref}`,
+                body: `@${assignee} /jules debug this build error\n\n**Log:**\n\`\`\`\n${logTail}\n\`\`\``,
+                labels: ['jules', 'bug']
+              });
+            }
+
+      # ------------------------------------------------------------------
+      # RELEASE STEPS (Only run on PUSH, not Pull Requests)
+      # ------------------------------------------------------------------
+      - name: Prepare Release Variables
+        if: success() && github.event_name == 'push'
+        id: release_vars
+        run: |
+          export BUILD_NUMBER=$(git rev-list --count HEAD)
+          
+          # Extract version info from properties file
+          MAJOR=$(grep 'major=' version.properties | cut -d'=' -f2)
+          MINOR=$(grep 'minor=' version.properties | cut -d'=' -f2)
+
+          # Calculate Patch version programmatically based on commits since Minor update
+          MINOR_COMMIT=$(git blame -L '/minor=/',+1 version.properties | awk '{print $1}' | tr -d '^')
+          if [ -n "$MINOR_COMMIT" ]; then
+            PATCH=$(git rev-list --count $MINOR_COMMIT..HEAD)
+          else
+            PATCH=$(grep 'patch=' version.properties | cut -d'=' -f2)
+          fi
+
+          VERSION_NAME="$MAJOR.$MINOR.$PATCH.$BUILD_NUMBER"
+          
+          TAG_NAME="latest-debug-v${MAJOR}.${MINOR}"
+          
+          # Dynamic App Name from settings.gradle
+          if [ -f "settings.gradle.kts" ]; then
+             APP_NAME=$(grep 'rootProject.name' settings.gradle.kts | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
+          elif [ -f "settings.gradle" ]; then
+             APP_NAME=$(grep 'rootProject.name' settings.gradle | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
+          else
+             APP_NAME="App"
+          fi
+
+          # Locate built APK
+          APK_ORIGINAL=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          
+          if [ -z "$APK_ORIGINAL" ]; then
+             echo "Error: No APK found to release!"
+             exit 1
+          fi
+
+          TARGET_NAME="${APP_NAME}-${VERSION_NAME}-debug.apk"
+
+          # Rename for release
+          mv "$APK_ORIGINAL" "$TARGET_NAME"
+
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "APK_FILE=$TARGET_NAME" >> $GITHUB_ENV
+
+      - name: Publish Release
+        if: success() && github.event_name == 'push'
         env:
-          # This token is provided by Actions and is required to create a release
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Force update tag to point to current commit
+          git tag -fa $TAG_NAME -m "Latest Debug Build"
+          git push origin $TAG_NAME --force
+
+          # Check if release exists
+          if gh release view $TAG_NAME > /dev/null 2>&1; then
+             echo "Updating existing release..."
+             gh release edit $TAG_NAME --prerelease \
+               --title "Latest Debug Build ($TAG_NAME)" \
+               --notes "Auto-build from commit $GITHUB_SHA" \
+               --target $GITHUB_SHA
+             gh release upload $TAG_NAME "$APK_FILE" --clobber
+          else
+             echo "Creating new release..."
+             gh release create $TAG_NAME "$APK_FILE" --prerelease \
+               --title "Latest Debug Build ($TAG_NAME)" \
+               --notes "Auto-build from commit $GITHUB_SHA" \
+               --target $GITHUB_SHA
+          fi
