@@ -93,9 +93,25 @@ class CalibrationViewModel @Inject constructor(
     }
 
     fun onSubmitData() {
-        // TODO: Implement backend submission logic
-        _toastMessage.value = "Calibration data submitted successfully."
-        _showSubmissionDialog.value = false
+        viewModelScope.launch {
+            val (cameraMatrix, distCoeffs) = userPreferencesRepository.calibrationDataFlow.first()
+
+            if (cameraMatrix != null && distCoeffs != null) {
+                val success = calibrationRepository.submitCalibrationData(cameraMatrix, distCoeffs)
+
+                if (success) {
+                    _toastMessage.value = "Calibration data submitted successfully."
+                    _showSubmissionDialog.value = false
+                } else {
+                    _toastMessage.value = "Submission failed."
+                }
+            } else {
+                _toastMessage.value = "No calibration data to submit."
+            }
+
+            cameraMatrix?.release()
+            distCoeffs?.release()
+        }
     }
 
     fun onToastShown() {
