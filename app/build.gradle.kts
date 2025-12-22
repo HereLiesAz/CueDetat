@@ -87,7 +87,7 @@ dependencies {
     implementation(libs.aznavrail)
 
     // Computer Vision
-    implementation(libs.bundles.mlkit)
+    implementation(libs.mlkit)
     implementation(libs.opencv)
 
     // Physics

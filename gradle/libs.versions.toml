@@ -172,4 +172,3 @@ hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 [bundles]
 camera = ["androidx-camera-core", "androidx-camera-camera2", "androidx-camera-lifecycle", "androidx-camera-view", "kotlinx-coroutines-guava"]
 compose = ["androidx-ui", "androidx-ui-graphics", "androidx-ui-tooling-preview", "androidx-compose-material3", "androidx-activity-compose"]
-mlkit = ["object1-detection", "object1-detection-custom", "vision-common"]
