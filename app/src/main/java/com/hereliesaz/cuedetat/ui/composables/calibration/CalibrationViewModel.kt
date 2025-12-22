@@ -9,6 +9,7 @@ import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.opencv.core.Mat
 import org.opencv.core.MatOfPoint2f
@@ -85,9 +86,25 @@ class CalibrationViewModel @Inject constructor(
     }
 
     fun onSubmitData() {
-        // TODO: Implement backend submission logic
-        _toastMessage.value = "Calibration data submitted successfully."
-        _showSubmissionDialog.value = false
+        viewModelScope.launch {
+            val (cameraMatrix, distCoeffs) = userPreferencesRepository.calibrationDataFlow.first()
+
+            if (cameraMatrix != null && distCoeffs != null) {
+                val success = calibrationRepository.submitCalibrationData(cameraMatrix, distCoeffs)
+
+                if (success) {
+                    _toastMessage.value = "Calibration data submitted successfully."
+                    _showSubmissionDialog.value = false
+                } else {
+                    _toastMessage.value = "Submission failed."
+                }
+            } else {
+                _toastMessage.value = "No calibration data to submit."
+            }
+
+            cameraMatrix?.release()
+            distCoeffs?.release()
+        }
     }
 
     fun onToastShown() {
