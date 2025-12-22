@@ -18,6 +18,20 @@ import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignScreen
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
 
+/**
+ * The main screen of the application for the "Expert" and "Beginner" experience modes.
+ *
+ * This composable serves as a container that orchestrates the display of various UI layers:
+ * - The live camera feed as the background.
+ * - The main protractor overlay with all the aiming guides.
+ * - Conditional screens for camera calibration and quick alignment, which are displayed on top
+ *   of the other layers when active.
+ *
+ * @param mainViewModel The primary [MainViewModel] that holds the main application state.
+ * @param calibrationViewModel The [CalibrationViewModel] for managing the camera calibration process.
+ * @param quickAlignViewModel The [QuickAlignViewModel] for managing the quick alignment process.
+ * @param calibrationAnalyzer The [CalibrationAnalyzer] responsible for processing camera frames during calibration.
+ */
 @Composable
 fun ProtractorScreen(
     mainViewModel: MainViewModel,
@@ -25,17 +39,25 @@ fun ProtractorScreen(
     quickAlignViewModel: QuickAlignViewModel,
     calibrationAnalyzer: CalibrationAnalyzer
 ) {
+    // Observe the main UI state from the MainViewModel.
     val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
     val systemIsDark = isSystemInDarkTheme()
+
+    // Remember a QuickAlignAnalyzer instance, which is tied to the lifecycle of the QuickAlignViewModel.
     val quickAlignAnalyzer =
         remember(quickAlignViewModel) { QuickAlignAnalyzer(quickAlignViewModel) }
 
+    // A Box layout allows layering composables on top of each other.
     Box(modifier = Modifier.fillMaxSize()) {
+
+        // Display the camera feed as the background if it's set to be visible.
         if (uiState.isCameraVisible) {
+            // Determine which analyzer should be active based on the current UI state.
+            // This ensures that the correct image processing logic is applied to the camera feed.
             val activeAnalyzer = when {
                 uiState.showCalibrationScreen -> calibrationAnalyzer
                 uiState.showQuickAlignScreen -> quickAlignAnalyzer
-                else -> mainViewModel.visionAnalyzer
+                else -> mainViewModel.visionAnalyzer // Default analyzer for general computer vision tasks.
             }
             CameraBackground(
                 modifier = Modifier.fillMaxSize(),
@@ -43,7 +65,9 @@ fun ProtractorScreen(
             )
         }
 
+        // Conditionally display the appropriate screen on top of the camera background.
         when {
+            // If the calibration screen should be shown, display it.
             uiState.showCalibrationScreen -> {
                 CalibrationScreen(
                     uiState = uiState,
@@ -53,6 +77,7 @@ fun ProtractorScreen(
                 )
             }
 
+            // If the quick align screen should be shown, display it.
             uiState.showQuickAlignScreen -> {
                 QuickAlignScreen(
                     onEvent = mainViewModel::onEvent,
@@ -61,6 +86,7 @@ fun ProtractorScreen(
                 )
             }
 
+            // Otherwise, display the main layout with the protractor overlay.
             else -> {
                 MainLayout(uiState = uiState, onEvent = mainViewModel::onEvent) {
                     ProtractorOverlay(
