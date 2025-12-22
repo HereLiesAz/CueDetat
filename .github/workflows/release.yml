@@ -31,12 +31,12 @@ jobs:
           # This script attempts to find the Java version specified in your Gradle files.
           RAW_VERSION=$( (grep -r "JavaVersion.VERSION_" . --include "build.gradle*"; grep -r "jvmTarget" . --include "build.gradle*") | grep -o -E "VERSION_[0-9]+|['\"][0-9\.]+" | head -1)
           if [[ -z "$RAW_VERSION" ]]; then
-            echo "⚠️ Could not determine Java version automatically. Defaulting to Java 17."
+            echo "⚠️ Could not determine Java version automatically. Defaulting to Java 21."
             VERSION=17
           else
             VERSION=$(echo "$RAW_VERSION" | grep -o -E '[0-9\.]+' | sed 's/_/./g')
           fi
-          if [[ "$VERSION" == "1.8" ]]; then
+          if [[ "$VERSION" == "21" ]]; then
             VERSION=8
           fi
           echo "Detected Java version: $VERSION"
@@ -53,7 +53,7 @@ jobs:
         id: versioning
         run: |
           # Define the path to your app's build.gradle file
-          GRADLE_FILE="app/build.gradle"
+          GRADLE_FILE="app/build.gradle.kts"
 
           # Extract current version code and name
           CURRENT_VERSION_CODE=$(grep 'versionCode ' $GRADLE_FILE | awk '{print $2}')
@@ -106,7 +106,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add app/build.gradle
+          git add app/build.gradle.kts
           # Commit only if there are changes
           if ! git diff --staged --quiet; then
             git commit -m "chore(release): Bump version to ${{ steps.versioning.outputs.new_version_name }}"
