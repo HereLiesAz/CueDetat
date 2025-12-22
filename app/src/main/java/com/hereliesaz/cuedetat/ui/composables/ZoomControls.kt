@@ -49,7 +49,7 @@ fun ZoomControls(
         Slider(
             value = zoomSliderPosition,
             onValueChange = { onZoomChange(it) },
-            valueRange = -50f..50f,
+            valueRange = -50f..0f,
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
                 activeTrackColor = MaterialTheme.colorScheme.primary,
