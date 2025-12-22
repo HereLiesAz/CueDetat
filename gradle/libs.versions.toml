@@ -42,7 +42,7 @@ guava = "1.10.2"
 # Kotlin & Coroutines
 kotlinxCoroutinesGuava = "1.10.2"
 slf4jBom = "2.1.0-alpha1"
-stdlib = "2.2.21"
+stdlib = "2.3.0"
 camerax = "1.4.2"
 
 # Hilt (Dependency Injection)
