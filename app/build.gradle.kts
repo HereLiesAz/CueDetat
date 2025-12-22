@@ -101,6 +101,7 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
     // implementation("cljsjs:liquidfun:1.1.0-0")
+    implementation(libs.kotlin.metadata.jvm)
 
 }
 
