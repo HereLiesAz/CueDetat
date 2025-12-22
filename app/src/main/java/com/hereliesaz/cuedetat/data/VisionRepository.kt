@@ -56,6 +56,10 @@ class VisionRepository @Inject constructor(
     private val reusableHierarchy = Mat()
     private val reusableCircles = Mat()
 
+    // Reusable objects for calculations (added by Bolt ⚡)
+    private val reusableBlurSize = Size(5.0, 5.0)
+    private val reusableTransformationMatrix = Matrix()
+
     // Reusable arrays for calculations
     private val reusableMatrixValues = FloatArray(9)
     private val reusablePointArray = FloatArray(2)
@@ -83,10 +87,12 @@ class VisionRepository @Inject constructor(
             val rotationDegrees = imageProxy.imageInfo.rotationDegrees
             val inputImage =
                 InputImage.fromMediaImage(mediaImage, rotationDegrees)
-            val imageToScreenMatrix = getTransformationMatrix(
+
+            updateTransformationMatrix(
                 inputImage.width, inputImage.height,
                 state.viewWidth, state.viewHeight
             )
+            val imageToScreenMatrix = reusableTransformationMatrix
 
             // Execute on the current (background) thread instead of using async callbacks
             // which default to the Main Thread. This prevents blocking the UI.
@@ -376,7 +382,7 @@ class VisionRepository @Inject constructor(
         cannyT2: Double
     ): PointF? {
         Imgproc.cvtColor(roiMat, reusableGray, Imgproc.COLOR_BGR2GRAY)
-        Imgproc.GaussianBlur(reusableGray, reusableGray, Size(5.0, 5.0), 2.0, 2.0)
+        Imgproc.GaussianBlur(reusableGray, reusableGray, reusableBlurSize, 2.0, 2.0)
 
         Imgproc.Canny(reusableGray, reusableEdges, cannyT1, cannyT2)
 
@@ -452,14 +458,12 @@ class VisionRepository @Inject constructor(
         return center
     }
 
-    private fun getTransformationMatrix(
+    private fun updateTransformationMatrix(
         sourceWidth: Int, sourceHeight: Int,
         destWidth: Int, destHeight: Int
-    ): Matrix {
-        val matrix = Matrix()
+    ) {
         val sx = destWidth.toFloat() / sourceWidth.toFloat()
         val sy = destHeight.toFloat() / sourceHeight.toFloat()
-        matrix.postScale(sx, sy)
-        return matrix
+        reusableTransformationMatrix.setScale(sx, sy)
     }
 }
