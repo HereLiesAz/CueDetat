@@ -80,7 +80,7 @@ sceneformBase = "1.17.1"
 liquidfun = "1.1.0"
 androidxMaterial3 = "1.4.0"
 aznavrail = "5.3"
-arCore = "1.52.0"
+arCore = "1.41.0"
 
 
 [libraries]
