@@ -108,6 +108,23 @@ internal fun reduceToggleAction(
 
         is MainScreenEvent.ToggleCalibrationScreen -> state.copy(showCalibrationScreen = !state.showCalibrationScreen)
         is MainScreenEvent.ToggleQuickAlignScreen -> state.copy(showQuickAlignScreen = !state.showQuickAlignScreen)
+        is MainScreenEvent.ToggleArScreen -> {
+             if (state.showArScreen) {
+                 // Turning OFF: Reset all AR snapping
+                 state.copy(
+                     showArScreen = false,
+                     isArTableSnapping = false,
+                     isArBallSnapping = false,
+                     areArObstaclesEnabled = false
+                 )
+             } else {
+                 state.copy(showArScreen = true)
+             }
+        }
+        is MainScreenEvent.ToggleArTableSnapping -> state.copy(isArTableSnapping = !state.isArTableSnapping)
+        is MainScreenEvent.ToggleArBallSnapping -> state.copy(isArBallSnapping = !state.isArBallSnapping)
+        is MainScreenEvent.ToggleArObstacles -> state.copy(areArObstaclesEnabled = !state.areArObstaclesEnabled)
+        is MainScreenEvent.UpdateArTablePose -> state.copy(arTablePose = action.pose)
         else -> state
     }
 }

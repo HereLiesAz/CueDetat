@@ -97,6 +97,11 @@ data class CueDetatState(
     val showAdvancedOptionsDialog: Boolean = false,
     val showCalibrationScreen: Boolean = false,
     val showQuickAlignScreen: Boolean = false,
+    val showArScreen: Boolean = false,
+    val isArTableSnapping: Boolean = false,
+    val isArBallSnapping: Boolean = false,
+    val areArObstaclesEnabled: Boolean = false,
+    val arTablePose: FloatArray? = null,
     val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
     val useCustomModel: Boolean = false,
     val isSnappingEnabled: Boolean = true,
@@ -214,6 +219,12 @@ sealed class MainScreenEvent {
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
     object ToggleCalibrationScreen : MainScreenEvent()
     object ToggleQuickAlignScreen : MainScreenEvent()
+    object ToggleArScreen : MainScreenEvent()
+    object ToggleArTableSnapping : MainScreenEvent()
+    object ToggleArBallSnapping : MainScreenEvent()
+    object ToggleArObstacles : MainScreenEvent()
+    data class ArTap(val offset: Offset) : MainScreenEvent()
+    data class UpdateArTablePose(val pose: FloatArray) : MainScreenEvent()
     data class ApplyQuickAlign(val translation: Offset, val rotation: Float, val scale: Float) :
         MainScreenEvent()
 
