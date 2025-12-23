@@ -53,6 +53,13 @@ fun stateReducer(
             reducerUtils
         )
 
+        is MainScreenEvent.PlaceArObstacles -> {
+            val newObstacles = action.logicalPositions.map {
+                com.hereliesaz.cuedetat.view.model.OnPlaneBall(center = it, radius = com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS)
+            }
+            currentState.copy(obstacleBalls = newObstacles, valuesChangedSinceReset = true)
+        }
+
         is MainScreenEvent.SpinApplied, is MainScreenEvent.SpinSelectionEnded,
         is MainScreenEvent.DragSpinControl, is MainScreenEvent.ClearSpinState ->
             reduceSpinAction(currentState, action)

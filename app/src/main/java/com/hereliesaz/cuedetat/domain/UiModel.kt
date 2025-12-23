@@ -5,6 +5,7 @@ package com.hereliesaz.cuedetat.domain
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.annotation.Keep
+import kotlin.jvm.Transient
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -97,6 +98,12 @@ data class CueDetatState(
     val showAdvancedOptionsDialog: Boolean = false,
     val showCalibrationScreen: Boolean = false,
     val showQuickAlignScreen: Boolean = false,
+    val showArScreen: Boolean = false,
+    @Transient val isArTableSnapping: Boolean = false,
+    @Transient val isArBallSnapping: Boolean = false,
+    @Transient val arSnapStep: ArSnapStep = ArSnapStep.TARGET,
+    @Transient val areArObstaclesEnabled: Boolean = false,
+    @Transient val arTablePose: FloatArray? = null,
     val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
     val useCustomModel: Boolean = false,
     val isSnappingEnabled: Boolean = true,
@@ -150,6 +157,8 @@ data class CueDetatState(
         }
     }
 }
+
+enum class ArSnapStep { TARGET, CUE }
 
 const val LOGICAL_BALL_RADIUS = 25f
 
@@ -214,6 +223,14 @@ sealed class MainScreenEvent {
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
     object ToggleCalibrationScreen : MainScreenEvent()
     object ToggleQuickAlignScreen : MainScreenEvent()
+    object ToggleArScreen : MainScreenEvent()
+    object ToggleArTableSnapping : MainScreenEvent()
+    object ToggleArBallSnapping : MainScreenEvent()
+    object ToggleArObstacles : MainScreenEvent()
+    data class ArTap(val offset: Offset) : MainScreenEvent()
+    data class ArBallDetected(val logicalPosition: PointF) : MainScreenEvent()
+    data class PlaceArObstacles(val logicalPositions: List<PointF>) : MainScreenEvent()
+    data class UpdateArTablePose(val pose: FloatArray) : MainScreenEvent()
     data class ApplyQuickAlign(val translation: Offset, val rotation: Float, val scale: Float) :
         MainScreenEvent()
 
