@@ -5,7 +5,6 @@ package com.hereliesaz.cuedetat.ui
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.data.VisionAnalyzer
@@ -46,9 +45,9 @@ import javax.inject.Inject
  * @property gestureReducer The specific reducer responsible for handling all gesture-related events.
  * @property updateStateUseCase The use case that calculates derived properties of the state (e.g., matrices, line coordinates).
  * @property sensorRepository The repository for accessing device sensor data (e.g., orientation).
- * @property githubRepository The repository for checking for new app versions on GitHub.
  * @property userPreferencesRepository The repository for persisting user settings and the application state.
  * @property visionRepository The repository for receiving data from the computer vision module.
+ * @property visionAnalyzer The analyzer responsible for processing camera frames for computer vision tasks.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -56,9 +55,9 @@ class MainViewModel @Inject constructor(
     private val gestureReducer: GestureReducer,
     private val updateStateUseCase: UpdateStateUseCase,
     private val sensorRepository: SensorRepository,
-    private val githubRepository: GithubRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
-    visionRepository: VisionRepository,
+    private val visionRepository: VisionRepository,
+    val visionAnalyzer: VisionAnalyzer,
 ) : ViewModel() {
 
     private var experienceModeUpdateJob: Job? = null
@@ -70,9 +69,6 @@ class MainViewModel @Inject constructor(
     private val _singleEvent = MutableSharedFlow<SingleEvent?>()
     /** The SharedFlow for one-time events that should not be tied to the state (e.g., navigation). */
     val singleEvent = _singleEvent.asSharedFlow()
-
-    /** The analyzer responsible for processing camera frames for computer vision tasks. */
-    val visionAnalyzer: VisionAnalyzer = VisionAnalyzer(visionRepository)
 
     init {
         // On initialization, load the last saved state from user preferences.
@@ -257,7 +253,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             when (event) {
                 is MainScreenEvent.CheckForUpdate -> {
-                    githubRepository.getLatestVersionName()
+                    // githubRepository.getLatestVersionName()
                 }
                 is MainScreenEvent.ViewArt -> _singleEvent.emit(SingleEvent.OpenUrl("https://herelies.az"))
                 is MainScreenEvent.ViewAboutPage -> _singleEvent.emit(SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat"))
