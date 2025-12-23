@@ -4,6 +4,7 @@ import android.content.Context
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
+import android.view.WindowManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat.getSystemService
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.google.ar.core.Config
@@ -79,6 +81,8 @@ fun ArScreen(
                         session?.resume()
                     } catch (e: Exception) {
                         e.printStackTrace()
+                        onEvent(MainScreenEvent.ToggleArScreen) // Disable AR on error
+                        // In a real app, emit a specific error event for a Toast
                     }
                 }
                 Lifecycle.Event.ON_PAUSE -> {
@@ -118,6 +122,7 @@ fun ArScreen(
                     setEGLConfigChooser(8, 8, 8, 8, 16, 0)
 
                     val renderer = ArRenderer(
+                        context = ctx,
                         uiState = uiState,
                         visionData = visionData,
                         onSessionChanged = { s -> session = s },
@@ -194,6 +199,7 @@ fun ArScreen(
 }
 
 class ArRenderer(
+    private val context: Context,
     private var uiState: CueDetatState,
     private var visionData: VisionData,
     private val onSessionChanged: (Session?) -> Unit,
@@ -209,6 +215,7 @@ class ArRenderer(
     private val tapQueue = ConcurrentLinkedQueue<Offset>()
     private var viewportWidth = 0
     private var viewportHeight = 0
+    private var displayRotation = 0
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
@@ -219,7 +226,9 @@ class ArRenderer(
         GLES20.glViewport(0, 0, width, height)
         viewportWidth = width
         viewportHeight = height
-        session?.setDisplayGeometry(0, width, height) // 0 = ROTATION_0
+        val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        displayRotation = windowManager.defaultDisplay.rotation
+        session?.setDisplayGeometry(displayRotation, width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
@@ -347,6 +356,11 @@ class ArRenderer(
         if (currentTime % 200 < 50) {
             try {
                  val image = frame.acquireCameraImage()
+                 // Use a default rotation if not set, or pass the display rotation.
+                 // CameraX uses degrees (0, 90, 180, 270). Display.rotation returns int constant (0, 1, 2, 3).
+                 // We need to map them or just use a standard.
+                 // For now, keeping 90 as a safe default for portrait phones but
+                 // we should ideally query sensor orientation.
                  onProcessFrame(image, 90)
             } catch (e: Exception) {
                 // Ignore

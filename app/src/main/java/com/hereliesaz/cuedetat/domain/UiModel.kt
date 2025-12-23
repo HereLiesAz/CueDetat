@@ -5,6 +5,7 @@ package com.hereliesaz.cuedetat.domain
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.annotation.Keep
+import kotlin.jvm.Transient
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -98,11 +99,11 @@ data class CueDetatState(
     val showCalibrationScreen: Boolean = false,
     val showQuickAlignScreen: Boolean = false,
     val showArScreen: Boolean = false,
-    val isArTableSnapping: Boolean = false,
-    val isArBallSnapping: Boolean = false,
-    val arSnapStep: ArSnapStep = ArSnapStep.TARGET,
-    val areArObstaclesEnabled: Boolean = false,
-    val arTablePose: FloatArray? = null,
+    @Transient val isArTableSnapping: Boolean = false,
+    @Transient val isArBallSnapping: Boolean = false,
+    @Transient val arSnapStep: ArSnapStep = ArSnapStep.TARGET,
+    @Transient val areArObstaclesEnabled: Boolean = false,
+    @Transient val arTablePose: FloatArray? = null,
     val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
     val useCustomModel: Boolean = false,
     val isSnappingEnabled: Boolean = true,
