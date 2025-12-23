@@ -13,11 +13,18 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Intent
+import android.net.Uri
+import android.util.Log
 import androidx.activity.viewModels
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.geometry.Offset
 import androidx.core.content.ContextCompat
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
+import com.hereliesaz.cuedetat.utils.SecurityUtils
+import com.hereliesaz.cuedetat.view.state.SingleEvent
 import androidx.core.view.WindowCompat
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
@@ -147,6 +154,38 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val uiState by viewModel.uiState.collectAsState()
+            val singleEvent by viewModel.singleEvent.collectAsState(initial = null)
+
+            LaunchedEffect(singleEvent) {
+                singleEvent?.let { event ->
+                    when (event) {
+                        is SingleEvent.OpenUrl -> {
+                            if (SecurityUtils.isSafeUrl(event.url)) {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
+                                startActivity(intent)
+                            } else {
+                                Log.e("MainActivity", "Blocked unsafe URL: ${event.url}")
+                            }
+                        }
+                        is SingleEvent.SendFeedbackEmail -> {
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:")
+                                putExtra(Intent.EXTRA_EMAIL, arrayOf(event.email))
+                                putExtra(Intent.EXTRA_SUBJECT, event.subject)
+                            }
+                            try {
+                                startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(this@MainActivity, "No email app found", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        is SingleEvent.InitiateHaterMode -> {
+                            Toast.makeText(this@MainActivity, "Hater Mode Initiated!", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
+                }
+            }
 
             // The renderer is only updated with state. It no longer needs a callback here.
             renderer?.updateState(uiState)
@@ -175,7 +214,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         } catch (e: CameraAccessException) {
-            e.printStackTrace()
+            Log.e("MainActivity", "Failed to access camera", e)
         }
     }
 
