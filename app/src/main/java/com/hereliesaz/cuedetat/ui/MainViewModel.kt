@@ -62,6 +62,7 @@ class MainViewModel @Inject constructor(
 ) : ViewModel() {
 
     private var experienceModeUpdateJob: Job? = null
+    private var saveStateJob: Job? = null
     private val _uiState = MutableStateFlow(CueDetatState())
     /** The StateFlow that exposes the current UI state to the Composables. */
     val uiState = _uiState.asStateFlow()
@@ -156,8 +157,25 @@ class MainViewModel @Inject constructor(
             // Determine the type of update needed based on the event and state change.
             val updateType = determineUpdateType(currentState, reducedState, logicalEvent)
 
+            // Determine if we should persist this change
+            val shouldPersist = when (event) {
+                is MainScreenEvent.FullOrientationChanged,
+                is MainScreenEvent.CvDataUpdated -> false
+                else -> true
+            }
+
+            // Determine if we should debounce the persistence
+            val shouldDebounce = when (event) {
+                is MainScreenEvent.Drag,
+                is MainScreenEvent.LogicalDragApplied,
+                is MainScreenEvent.ZoomSliderChanged,
+                is MainScreenEvent.PanView,
+                is MainScreenEvent.TableRotationChanged -> true
+                else -> false
+            }
+
             // Process the new state to calculate derived properties and emit it to the UI.
-            processAndEmitState(reducedState, updateType)
+            processAndEmitState(reducedState, updateType, shouldPersist, shouldDebounce)
 
             // Handle any side-effects (single events) triggered by the event.
             handleSingleEvents(logicalEvent)
@@ -170,16 +188,31 @@ class MainViewModel @Inject constructor(
      *
      * @param state The new state to be processed.
      * @param type The [UpdateType] indicating how much of the derived state needs to be recalculated.
+     * @param shouldPersist Whether to persist the state to storage.
+     * @param shouldDebounce Whether to debounce the persistence operation.
      */
-    private fun processAndEmitState(state: CueDetatState, type: UpdateType) {
+    private fun processAndEmitState(
+        state: CueDetatState,
+        type: UpdateType,
+        shouldPersist: Boolean = true,
+        shouldDebounce: Boolean = false
+    ) {
         val derivedState = updateStateUseCase(state, type)
         _uiState.value = derivedState
         visionAnalyzer.updateUiState(derivedState) // Keep the vision analyzer in sync.
 
-        // Persist the state unless it was a minor, transient update (like spin).
-        if (type != UpdateType.SPIN_ONLY) {
-            viewModelScope.launch {
-                userPreferencesRepository.saveState(derivedState)
+        // Persist the state unless it was a minor, transient update (like spin) or explicitly disabled.
+        if (type != UpdateType.SPIN_ONLY && shouldPersist) {
+            saveStateJob?.cancel()
+            if (shouldDebounce) {
+                saveStateJob = viewModelScope.launch {
+                    delay(500)
+                    userPreferencesRepository.saveState(derivedState)
+                }
+            } else {
+                viewModelScope.launch {
+                    userPreferencesRepository.saveState(derivedState)
+                }
             }
         }
     }
