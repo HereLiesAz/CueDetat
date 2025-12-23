@@ -23,7 +23,31 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             is MainScreenEvent.LogicalGestureStarted -> handleLogicalGestureStarted(currentState, event)
             is MainScreenEvent.LogicalDragApplied -> handleLogicalDragApplied(currentState, event)
             is MainScreenEvent.GestureEnded -> handleGestureEnded(currentState)
+            is MainScreenEvent.ArBallDetected -> handleArBallDetected(currentState, event)
             else -> currentState
+        }
+    }
+
+    private fun handleArBallDetected(
+        state: CueDetatState,
+        event: MainScreenEvent.ArBallDetected
+    ): CueDetatState {
+        // Toggle between Target and Cue based on step
+        return when (state.arSnapStep) {
+            com.hereliesaz.cuedetat.domain.ArSnapStep.TARGET -> {
+                state.copy(
+                    protractorUnit = state.protractorUnit.copy(center = event.logicalPosition),
+                    arSnapStep = com.hereliesaz.cuedetat.domain.ArSnapStep.CUE,
+                    valuesChangedSinceReset = true
+                )
+            }
+            com.hereliesaz.cuedetat.domain.ArSnapStep.CUE -> {
+                state.copy(
+                    onPlaneBall = state.onPlaneBall?.copy(center = event.logicalPosition),
+                    arSnapStep = com.hereliesaz.cuedetat.domain.ArSnapStep.TARGET,
+                    valuesChangedSinceReset = true
+                )
+            }
         }
     }
 
