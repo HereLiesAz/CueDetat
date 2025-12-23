@@ -1,11 +1,10 @@
+@Suppress("DSL_SCOPE_VIOLATION") // TODO: Remove once KTIJ-19369 is fixed
 plugins {
-    alias(libs.plugins.androidApplication)
-    alias(libs.plugins.jetbrainsKotlinAndroid)
-    alias(libs.plugins.hilt)
-    alias(libs.plugins.ksp)
-    alias(libs.plugins.composeCompiler)
-    kotlin("kapt")
-
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.hilt.android)
+    alias(libs.plugins.kotlin.compose)
+    id("kotlin-kapt")
 }
 
 android {
@@ -14,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "com.hereliesaz.cuedetat"
-        minSdk = 28
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -27,7 +26,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -35,14 +34,12 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
+    
     buildFeatures {
         compose = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
     }
     packaging {
         resources {
@@ -50,77 +47,66 @@ android {
         }
     }
 }
-kotlin {
-    jvmToolchain(17)
 
+// Migrated from kotlinOptions to compilerOptions
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+    }
 }
 
 dependencies {
+    implementation(libs.androidx.datastore.preferences)
 
-    implementation(libs.androidx.xr.scenecore)
-    // Required for Java
-    // Required for Kotlin
-    implementation(libs.kotlinx.coroutines.guava)
-    implementation(libs.sceneform.base)
-    implementation(libs.androidx.graphics.shapes)
-    implementation(libs.androidx.ui.geometry)
-    implementation(libs.rendering)
-
-    // Use to write unit tests
-    testImplementation(libs.androidx.scenecore.testing)
-
-    // AndroidX
+    // Core & Jetpack
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+
+    // Compose
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
+    implementation(libs.material)
+    implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.material.icons.extended)
-    implementation(libs.androidx.material.icons.core)
-    implementation(libs.androidx.adaptive)
-    implementation(libs.androidx.adaptive.layout)
-    implementation(libs.androidx.adaptive.navigation)
-    implementation(libs.androidx.navigation.compose)
-    implementation(libs.androidx.hilt.navigation.compose)
-    implementation(libs.androidx.datastore.preferences)
-
-    // Jetpack XR
-    implementation(libs.androidx.xr.compose.material3)
-    implementation(libs.androidx.xr.compose)
-    implementation(libs.androidx.xr.scenecore)
-    implementation(libs.androidx.xr.runtime)
-    implementation(libs.androidx.xr.arcore)
 
     // Hilt
     implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
+    kapt(libs.hilt.compiler)
+    implementation(libs.androidx.hilt.navigation.compose)
 
-    // ARCore
-    implementation(libs.arcore.client)
+    // CameraX
+    implementation(libs.bundles.camera)
 
-    // Android XR Dependencies (New)
-    val xrVersion = "1.0.0-alpha04"
-    implementation("androidx.xr.scenecore:scenecore:$xrVersion")
-    implementation("androidx.xr.compose:compose:$xrVersion")
-    implementation("androidx.xr.runtime:runtime-openxr:$xrVersion")
-    implementation("androidx.xr.arcore:arcore:$xrVersion")
+    // Networking
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
+    implementation(libs.aznavrail)
 
-    // Test
+    // Computer Vision
+    implementation(libs.mlkit)
+    implementation(libs.opencv)
+
+    // AR
+    implementation(libs.ar.core)
+
+    // Physics
+    // implementation(libs.google.liquidfun)
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+    // implementation("cljsjs:liquidfun:1.1.0-0")
+    implementation(libs.kotlin.metadata.jvm)
+    kapt(libs.kotlin.metadata.jvm)
 
-    implementation(libs.androidx.xr.runtime)
-
-    // Use in environments that do not support OpenXR
-    testImplementation(libs.androidx.runtime.testing)
 }
 
 kapt {

@@ -28,8 +28,9 @@ fun AzNavRailMenu(
         isLandscape = false
     ) {
         azSettings(
-            displayAppNameInHeader = true,
-            headerIconShape = AzHeaderIconShape.CIRCLE
+            displayAppNameInHeader = false,
+            headerIconShape = AzHeaderIconShape.CIRCLE,
+            packRailButtons = true
         )
 
         azMenuItem(
@@ -45,11 +46,20 @@ fun AzNavRailMenu(
             disabled = true
         )
 
+        if (uiState.experienceMode == ExperienceMode.EXPERT) {
+            azMenuItem(
+                id = "ar",
+                text = "AR",
+                route = "ar",
+                onClick = { onEvent(MainScreenEvent.ToggleArScreen) }
+            )
+        }
+
         azDivider()
 
         // Core Controls
         // Fix: Removed railToggleOnText/railToggleOffText parameters which are not in the API
-        azRailToggle(
+        azMenuToggle(
             id = "help",
             isChecked = uiState.areHelpersVisible,
             toggleOnText = strHideHelpers,

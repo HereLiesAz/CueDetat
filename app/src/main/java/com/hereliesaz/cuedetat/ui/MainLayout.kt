@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -44,100 +45,110 @@ fun MainLayout(
     onEvent: (MainScreenEvent) -> Unit,
     content: @Composable () -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val safeTopPadding = maxHeight * 0.1f
+
         // Main content, e.g., the rendering canvas
+        // Canvas fills the whole screen, usually.
         content()
 
-        // UI Controls layered on top
-        TopControls(
-            areHelpersVisible = uiState.areHelpersVisible,
-            experienceMode = uiState.experienceMode,
-            isTableVisible = uiState.table.isVisible,
-            tableSizeFeet = uiState.table.size.feet,
-            isBeginnerViewLocked = uiState.isBeginnerViewLocked,
-            targetBallDistance = uiState.targetBallDistance,
-            distanceUnit = uiState.distanceUnit,
-            onCycleTableSize = { onEvent(MainScreenEvent.CycleTableSize) },
-            onMenuClick = { onEvent(MainScreenEvent.ToggleNavigationRail) }
-        )
-
-        Row(
+        // Wrapper for all UI elements to enforce top 10% safety margin
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .navigationBarsPadding()
-                .padding(bottom = 16.dp, end = 16.dp, start = 16.dp),
-            verticalAlignment = Alignment.Bottom
+                .padding(top = safeTopPadding)
         ) {
-            // Left-aligned controls
-            Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.Start
-            ) {
-                // This column is intentionally left empty.
-                // The buttons have been moved to the navigation rail.
-            }
+            // UI Controls layered on top
+            TopControls(
+                areHelpersVisible = uiState.areHelpersVisible,
+                experienceMode = uiState.experienceMode,
+                isTableVisible = uiState.table.isVisible,
+                tableSizeFeet = uiState.table.size.feet,
+                isBeginnerViewLocked = uiState.isBeginnerViewLocked,
+                targetBallDistance = uiState.targetBallDistance,
+                distanceUnit = uiState.distanceUnit,
+                onCycleTableSize = { onEvent(MainScreenEvent.CycleTableSize) },
+                onMenuClick = { onEvent(MainScreenEvent.ToggleNavigationRail) }
+            )
 
-            // Center-aligned controls
-            Column(
-                modifier = Modifier.weight(2f),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .navigationBarsPadding()
+                    .padding(bottom = 16.dp, end = 16.dp, start = 16.dp),
+                verticalAlignment = Alignment.Bottom
             ) {
-                TableRotationSlider(
-                    isVisible = uiState.table.isVisible,
-                    worldRotationDegrees = uiState.worldRotationDegrees,
-                    onRotationChange = { onEvent(MainScreenEvent.TableRotationChanged(it)) }
-                )
-            }
+                // Left-aligned controls
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    // This column is intentionally left empty.
+                    // The buttons have been moved to the navigation rail.
+                }
 
-            // Right-aligned controls
-            Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.End
-            ) {
-                if (uiState.isSpinControlVisible && uiState.spinControlCenter != null) {
-                    SpinControl(
-                        centerPosition = uiState.spinControlCenter!!,
-                        selectedSpinOffset = uiState.selectedSpinOffset,
-                        lingeringSpinOffset = uiState.lingeringSpinOffset,
-                        spinPathAlpha = uiState.spinPathsAlpha,
-                        onEvent = onEvent,
+                // Center-aligned controls
+                Column(
+                    modifier = Modifier.weight(2f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    TableRotationSlider(
+                        isVisible = uiState.table.isVisible,
+                        worldRotationDegrees = uiState.worldRotationDegrees,
+                        onRotationChange = { onEvent(MainScreenEvent.TableRotationChanged(it)) }
                     )
                 }
+
+                // Right-aligned controls
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    if (uiState.isSpinControlVisible && uiState.spinControlCenter != null) {
+                        SpinControl(
+                            centerPosition = uiState.spinControlCenter!!,
+                            selectedSpinOffset = uiState.selectedSpinOffset,
+                            lingeringSpinOffset = uiState.lingeringSpinOffset,
+                            spinPathAlpha = uiState.spinPathsAlpha,
+                            onEvent = onEvent,
+                        )
+                    }
+                }
             }
+
+            ZoomControls(
+                zoomSliderPosition = uiState.zoomSliderPosition,
+                onZoomChange = { onEvent(MainScreenEvent.ZoomSliderChanged(it)) },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight(0.6f)
+                    .padding(end = 12.dp)
+                    .width(48.dp)
+            )
+
+            // Overlays and Dialogs
+            KineticWarningOverlay(text = uiState.warningText)
+            TutorialOverlay(uiState = uiState, onEvent = onEvent)
+            AdvancedOptionsDialog(
+                uiState = uiState,
+                onEvent = onEvent,
+                onDismiss = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }
+            )
+            LuminanceAdjustmentDialog(
+                uiState = uiState,
+                onEvent = onEvent,
+                onDismiss = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
+            )
+
+            TableSizeSelectionDialog(
+                uiState = uiState,
+                onEvent = onEvent,
+                onDismiss = { onEvent(MainScreenEvent.ToggleTableSizeDialog) }
+            )
+
+            // Expressive navigation rail
+            // Note: AzNavRail typically attaches to the side. Padding it down by 10% ensures it's safe.
+            AzNavRailMenu(uiState = uiState, onEvent = onEvent)
         }
-
-        ZoomControls(
-            zoomSliderPosition = uiState.zoomSliderPosition,
-            onZoomChange = { onEvent(MainScreenEvent.ZoomSliderChanged(it)) },
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight(0.6f)
-                .padding(end = 12.dp)
-                .width(48.dp)
-        )
-
-        // Overlays and Dialogs
-        KineticWarningOverlay(text = uiState.warningText)
-        TutorialOverlay(uiState = uiState, onEvent = onEvent)
-        AdvancedOptionsDialog(
-            uiState = uiState,
-            onEvent = onEvent,
-            onDismiss = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }
-        )
-        LuminanceAdjustmentDialog(
-            uiState = uiState,
-            onEvent = onEvent,
-            onDismiss = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
-        )
-
-        TableSizeSelectionDialog(
-            uiState = uiState,
-            onEvent = onEvent,
-            onDismiss = { onEvent(MainScreenEvent.ToggleTableSizeDialog) }
-        )
-
-        // Expressive navigation rail
-        AzNavRailMenu(uiState = uiState, onEvent = onEvent)
-
     }
 }
