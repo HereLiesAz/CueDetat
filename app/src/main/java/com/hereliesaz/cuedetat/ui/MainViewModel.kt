@@ -204,6 +204,8 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.Reset, is MainScreenEvent.LogicalGestureStarted, is MainScreenEvent.LogicalDragApplied,
             is MainScreenEvent.GestureEnded, is MainScreenEvent.AddObstacleBall -> UpdateType.AIMING
 
+            is MainScreenEvent.ToggleArScreen -> UpdateType.FULL
+
             // Events that only affect the spin visualization.
             is MainScreenEvent.SpinApplied -> UpdateType.SPIN_ONLY
 

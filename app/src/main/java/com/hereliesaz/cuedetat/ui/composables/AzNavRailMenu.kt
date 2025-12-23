@@ -46,6 +46,15 @@ fun AzNavRailMenu(
             disabled = true
         )
 
+        if (uiState.experienceMode == ExperienceMode.EXPERT) {
+            azMenuItem(
+                id = "ar",
+                text = "AR",
+                route = "ar",
+                onClick = { onEvent(MainScreenEvent.ToggleArScreen) }
+            )
+        }
+
         azDivider()
 
         // Core Controls

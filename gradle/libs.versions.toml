@@ -80,6 +80,7 @@ sceneformBase = "1.17.1"
 liquidfun = "1.1.0"
 androidxMaterial3 = "1.4.0"
 aznavrail = "5.3"
+arCore = "1.41.0"
 
 
 [libraries]
@@ -162,6 +163,7 @@ androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = 
 glance = { group = "androidx.glance", name = "glance", version.ref = "glanceVersion" }
 sceneform-base = { group = "com.google.ar.sceneform", name = "sceneform-base", version.ref = "sceneformBase" }
 jbox2d-library = { group = "org.jbox2d", name = "jbox2d-library", version.ref = "jbox2d" }
+ar-core = { group = "com.google.ar", name = "core", version.ref = "arCore" }
 # androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "androidxMaterial3" } # This is a duplicate of an earlier alias, commented out.
 
 [plugins]

@@ -86,6 +86,15 @@ fun ProtractorScreen(
                 )
             }
 
+            // If the AR screen should be shown, display it.
+            uiState.showArScreen -> {
+                ArScreen(
+                    uiState = uiState,
+                    visionRepository = mainViewModel.visionAnalyzer.visionRepository, // Access the repo via analyzer
+                    onEvent = mainViewModel::onEvent
+                )
+            }
+
             // Otherwise, display the main layout with the protractor overlay.
             else -> {
                 MainLayout(uiState = uiState, onEvent = mainViewModel::onEvent) {

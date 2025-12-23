@@ -97,6 +97,7 @@ data class CueDetatState(
     val showAdvancedOptionsDialog: Boolean = false,
     val showCalibrationScreen: Boolean = false,
     val showQuickAlignScreen: Boolean = false,
+    val showArScreen: Boolean = false,
     val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
     val useCustomModel: Boolean = false,
     val isSnappingEnabled: Boolean = true,
@@ -214,6 +215,7 @@ sealed class MainScreenEvent {
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
     object ToggleCalibrationScreen : MainScreenEvent()
     object ToggleQuickAlignScreen : MainScreenEvent()
+    object ToggleArScreen : MainScreenEvent()
     data class ApplyQuickAlign(val translation: Offset, val rotation: Float, val scale: Float) :
         MainScreenEvent()
 
