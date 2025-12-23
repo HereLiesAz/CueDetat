@@ -60,6 +60,7 @@ kphysics = "master-SNAPSHOT"
 androidApplication = "8.13.2" # Example, use your actual AGP version
 kotlinAndroid = "2.3.0"
 kotlinCompose = "2.3.0"
+ksp = "2.3.0-1.0.25" # Update this to match your Kotlin version
 benchmarkCommon = "1.4.1"
 composeMaterial3 = "1.5.6"
 tensorflowLiteTaskVision = "0.4.4"
@@ -80,7 +81,7 @@ sceneformBase = "1.17.1"
 liquidfun = "1.1.0"
 androidxMaterial3 = "1.4.0"
 aznavrail = "5.3"
-arCore = "1.41.0"
+arCore = "1.52.0"
 
 
 [libraries]
@@ -171,6 +172,7 @@ android-application = { id = "com.android.application", version.ref = "androidAp
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlinAndroid" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlinCompose" }
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 
 [bundles]
 camera = ["androidx-camera-core", "androidx-camera-camera2", "androidx-camera-lifecycle", "androidx-camera-view", "kotlinx-coroutines-guava"]
