@@ -47,11 +47,42 @@ fun AzNavRailMenu(
         )
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azMenuItem(
+            azRailHostItem(
                 id = "ar",
                 text = "AR",
                 route = "ar",
                 onClick = { onEvent(MainScreenEvent.ToggleArScreen) }
+            )
+
+            azRailSubToggle(
+                hostId = "ar",
+                id = "snap_table",
+                isChecked = uiState.isArTableSnapping,
+                toggleOnText = "Snap Table On",
+                toggleOffText = "Snap Table Off",
+                route = "snap_table",
+                shape = null,
+                onClick = { onEvent(MainScreenEvent.ToggleArTableSnapping) }
+            )
+            azRailSubToggle(
+                hostId = "ar",
+                id = "snap_balls",
+                isChecked = uiState.isArBallSnapping,
+                toggleOnText = "Snap Balls On",
+                toggleOffText = "Snap Balls Off",
+                route = "snap_balls",
+                shape = null,
+                onClick = { onEvent(MainScreenEvent.ToggleArBallSnapping) }
+            )
+            azRailSubToggle(
+                hostId = "ar",
+                id = "snap_obs",
+                isChecked = uiState.areArObstaclesEnabled,
+                toggleOnText = "Snap Obstacles On",
+                toggleOffText = "Snap Obstacles Off",
+                route = "snap_obs",
+                shape = null,
+                onClick = { onEvent(MainScreenEvent.ToggleArObstacles) }
             )
         }
 

@@ -51,7 +51,9 @@ fun ProtractorScreen(
     Box(modifier = Modifier.fillMaxSize()) {
 
         // Display the camera feed as the background if it's set to be visible.
-        if (uiState.isCameraVisible) {
+        // Important: If AR Screen is active, we MUST NOT render CameraBackground (CameraX)
+        // because ARCore needs exclusive access to the camera.
+        if (uiState.isCameraVisible && !uiState.showArScreen) {
             // Determine which analyzer should be active based on the current UI state.
             // This ensures that the correct image processing logic is applied to the camera feed.
             val activeAnalyzer = when {
@@ -86,13 +88,22 @@ fun ProtractorScreen(
                 )
             }
 
-            // If the AR screen should be shown, display it.
+            // If AR is enabled, we use ArScreen as the background but still show the MainLayout overlays.
             uiState.showArScreen -> {
                 ArScreen(
                     uiState = uiState,
-                    visionRepository = mainViewModel.visionAnalyzer.visionRepository, // Access the repo via analyzer
+                    visionRepository = mainViewModel.visionAnalyzer.visionRepository,
                     onEvent = mainViewModel::onEvent
                 )
+                // Overlay the standard UI on top of AR
+                MainLayout(uiState = uiState, onEvent = mainViewModel::onEvent) {
+                    ProtractorOverlay(
+                        uiState = uiState,
+                        systemIsDark = systemIsDark,
+                        isTestingCvMask = uiState.isTestingCvMask,
+                        onEvent = mainViewModel::onEvent
+                    )
+                }
             }
 
             // Otherwise, display the main layout with the protractor overlay.

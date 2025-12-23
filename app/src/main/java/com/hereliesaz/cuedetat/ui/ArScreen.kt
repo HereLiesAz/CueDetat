@@ -5,6 +5,7 @@ import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -25,9 +27,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
+import com.google.ar.core.HitResult
 import com.google.ar.core.Plane
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import com.hereliesaz.cuedetat.data.VisionData
 import com.hereliesaz.cuedetat.data.VisionRepository
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
@@ -35,8 +39,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.FloatBuffer
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.ConcurrentLinkedQueue
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -69,6 +72,7 @@ fun ArScreen(
                             session = Session(context).apply {
                                 val config = config
                                 config.focusMode = Config.FocusMode.AUTO
+                                config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
                                 configure(config)
                             }
                         }
@@ -100,6 +104,11 @@ fun ArScreen(
             .onSizeChanged { size ->
                 onEvent(MainScreenEvent.SizeChanged(size.width, size.height))
             }
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    arRenderer?.queueTap(offset)
+                }
+            }
     ) {
         AndroidView(
             factory = { ctx ->
@@ -110,6 +119,7 @@ fun ArScreen(
 
                     val renderer = ArRenderer(
                         uiState = uiState,
+                        visionData = visionData,
                         onSessionChanged = { s -> session = s },
                         onProcessFrame = { image, rotation ->
                             coroutineScope.launch(Dispatchers.Default) {
@@ -119,7 +129,8 @@ fun ArScreen(
                                     image.close()
                                 }
                             }
-                        }
+                        },
+                        onEventDispatch = onEvent
                     )
                     setRenderer(renderer)
                     renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
@@ -129,6 +140,7 @@ fun ArScreen(
             update = { view ->
                 arRenderer?.updateSession(session)
                 arRenderer?.updateUiState(uiState)
+                arRenderer?.updateVisionData(visionData)
             },
             modifier = Modifier.fillMaxSize()
         )
@@ -136,11 +148,6 @@ fun ArScreen(
         // Debug Overlay for Vision Data
         Canvas(modifier = Modifier.fillMaxSize()) {
             visionData.detectedBoundingBoxes.forEach { box ->
-                // Boxes are in image coordinates (camera resolution).
-                // We need to scale them to the view size.
-                // Note: This scaling assumes aspect fill or fit, which matches standard ARCore/CameraX preview behavior
-                // but strictly speaking should respect the exact matrix.
-                // For "Expert" debug, this is sufficient.
                 val scaleX = size.width / visionData.sourceImageWidth
                 val scaleY = size.height / visionData.sourceImageHeight
 
@@ -161,6 +168,18 @@ fun ArScreen(
                     center = Offset(50f, 50f)
                 )
             }
+
+            // Visualize current AR table pose if set
+            if (uiState.arTablePose != null) {
+                // Drawing 3D pose in 2D canvas is hard without ViewMatrix/ProjectionMatrix access.
+                // We'll trust the logic for now.
+                drawCircle(
+                    color = Color.Magenta,
+                    radius = 30f,
+                    center = Offset(size.width/2, size.height/2),
+                    style = Stroke(width=5f)
+                )
+            }
         }
 
         Button(
@@ -176,14 +195,20 @@ fun ArScreen(
 
 class ArRenderer(
     private var uiState: CueDetatState,
+    private var visionData: VisionData,
     private val onSessionChanged: (Session?) -> Unit,
-    private val onProcessFrame: (android.media.Image, Int) -> Unit
+    private val onProcessFrame: (android.media.Image, Int) -> Unit,
+    private val onEventDispatch: (MainScreenEvent) -> Unit
 ) : GLSurfaceView.Renderer {
 
     private var session: Session? = null
     private var backgroundRenderer = BackgroundRenderer()
 
-    private val isProcessingFrame = AtomicBoolean(false)
+    private var lastTableSnapTime = 0L
+    private var lastObstacleSnapTime = 0L
+    private val tapQueue = ConcurrentLinkedQueue<Offset>()
+    private var viewportWidth = 0
+    private var viewportHeight = 0
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.1f, 0.1f, 0.1f, 1.0f)
@@ -192,6 +217,8 @@ class ArRenderer(
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES20.glViewport(0, 0, width, height)
+        viewportWidth = width
+        viewportHeight = height
         session?.setDisplayGeometry(0, width, height) // 0 = ROTATION_0
     }
 
@@ -206,38 +233,129 @@ class ArRenderer(
 
             backgroundRenderer.draw(frame)
 
-            // Logic to send frame to VisionRepository
-            // Only capture if not currently processing to avoid backlog/stutter
-            // Simple atomic flag check.
-            // NOTE: processArFrame in the repository has a throttle check too,
-            // but we want to avoid even acquiring the image if possible.
-            // Also we need to make sure the repository throttle doesn't conflict with our desire to close images.
-            // The repository implementation assumes it receives an image.
-
-            // We use a simple timestamp check here too or just rely on the atomic flag to
-            // ensure we don't launch multiple coroutines.
-            // But we can't easily know when the coroutine finishes unless we pass a callback.
-            // The lambda passed `onProcessFrame` launches a job.
-            // Actually, `image.close()` happens in that coroutine.
-
-            // To properly throttle without callback:
-            // Just acquire every Nth frame or use time.
-
-            val currentTime = System.currentTimeMillis()
-            if (currentTime % 200 < 50) { // Rough 5fps check
-                try {
-                     val image = frame.acquireCameraImage()
-                     // We must ensure this image is eventually closed.
-                     // The callback is responsible for it.
-                     onProcessFrame(image, 90)
-                } catch (e: Exception) {
-                    // Ignore
-                }
-            }
+            processFrameForVision(frame)
+            handleTableSnapping(frame)
+            processTapQueue(frame)
+            handleObstacleSnapping(frame)
 
         } catch (t: Throwable) {
             t.printStackTrace()
         }
+    }
+
+    private fun handleTableSnapping(frame: Frame) {
+        if (uiState.isArTableSnapping && viewportWidth > 0 && viewportHeight > 0) {
+             val currentTime = System.currentTimeMillis()
+             if (currentTime - lastTableSnapTime > 100) {
+                 lastTableSnapTime = currentTime
+
+                 val hits = frame.hitTest(viewportWidth / 2f, viewportHeight / 2f)
+                 val hit = hits.firstOrNull {
+                     val trackable = it.trackable
+                     trackable is Plane && trackable.isPoseInPolygon(it.hitPose)
+                 }
+
+                 if (hit != null) {
+                     val pose = hit.hitPose
+                     val poseArray = FloatArray(16)
+                     pose.toMatrix(poseArray, 0)
+                     onEventDispatch(MainScreenEvent.UpdateArTablePose(poseArray))
+                 }
+             }
+        }
+    }
+
+    private fun handleObstacleSnapping(frame: Frame) {
+        val tablePose = uiState.arTablePose
+        if (uiState.areArObstaclesEnabled && tablePose != null && viewportWidth > 0 && viewportHeight > 0) {
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastObstacleSnapTime > 500) { // Update every 500ms
+                lastObstacleSnapTime = currentTime
+
+                val scaleX = viewportWidth.toFloat() / visionData.sourceImageWidth
+                val scaleY = viewportHeight.toFloat() / visionData.sourceImageHeight
+                val logicalPoints = mutableListOf<androidx.compose.ui.geometry.Offset>()
+
+                visionData.detectedBoundingBoxes.forEach { box ->
+                    val screenCX = box.centerX() * scaleX
+                    val screenCY = box.centerY() * scaleY
+
+                    val hits = frame.hitTest(screenCX, screenCY)
+                    val hit = hits.firstOrNull { it.trackable is Plane }
+
+                    if (hit != null) {
+                        val pose = hit.hitPose
+                        val worldPoint = floatArrayOf(pose.tx(), pose.ty(), pose.tz())
+                        val logicalPoint = com.hereliesaz.cuedetat.utils.ArMath.worldToLogical(worldPoint, tablePose)
+                        logicalPoints.add(androidx.compose.ui.geometry.Offset(logicalPoint.x, logicalPoint.y))
+                    }
+                }
+
+                if (logicalPoints.isNotEmpty()) {
+                    // Convert Offset to PointF for the event
+                    val pointFs = logicalPoints.map { android.graphics.PointF(it.x, it.y) }
+                    onEventDispatch(MainScreenEvent.PlaceArObstacles(pointFs))
+                }
+            }
+        }
+    }
+
+    private fun processTapQueue(frame: Frame) {
+        val tap = tapQueue.poll() ?: return
+        val tablePose = uiState.arTablePose
+
+        if (uiState.isArBallSnapping && tablePose != null) {
+            val scaleX = viewportWidth.toFloat() / visionData.sourceImageWidth
+            val scaleY = viewportHeight.toFloat() / visionData.sourceImageHeight
+
+            var tappedBallCenter: android.graphics.PointF? = null
+
+            for (box in visionData.detectedBoundingBoxes) {
+                 val left = box.left * scaleX
+                 val top = box.top * scaleY
+                 val right = left + box.width() * scaleX
+                 val bottom = top + box.height() * scaleY
+
+                 if (tap.x >= left && tap.x <= right && tap.y >= top && tap.y <= bottom) {
+                     tappedBallCenter = android.graphics.PointF(box.centerX().toFloat(), box.centerY().toFloat())
+                     break
+                 }
+            }
+
+            if (tappedBallCenter != null) {
+                val screenCX = tappedBallCenter.x * scaleX
+                val screenCY = tappedBallCenter.y * scaleY
+
+                val hits = frame.hitTest(screenCX, screenCY)
+                 val hit = hits.firstOrNull {
+                     it.trackable is Plane
+                 }
+
+                 if (hit != null) {
+                     val pose = hit.hitPose
+                     val worldPoint = floatArrayOf(pose.tx(), pose.ty(), pose.tz())
+                     val logicalPoint = com.hereliesaz.cuedetat.utils.ArMath.worldToLogical(worldPoint, tablePose)
+
+                     onEventDispatch(MainScreenEvent.ArBallDetected(logicalPoint))
+                 }
+            }
+        }
+    }
+
+    private fun processFrameForVision(frame: Frame) {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime % 200 < 50) {
+            try {
+                 val image = frame.acquireCameraImage()
+                 onProcessFrame(image, 90)
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
+    }
+
+    fun queueTap(offset: Offset) {
+        tapQueue.offer(offset)
     }
 
     fun updateSession(newSession: Session?) {
@@ -248,9 +366,13 @@ class ArRenderer(
     fun updateUiState(newState: CueDetatState) {
         this.uiState = newState
     }
+
+    fun updateVisionData(data: VisionData) {
+        this.visionData = data
+    }
 }
 
-// Minimal Background Renderer to draw camera feed
+// BackgroundRenderer class (same as before) ...
 class BackgroundRenderer {
     var textureId = -1
 
