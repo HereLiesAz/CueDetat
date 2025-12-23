@@ -1,97 +1,62 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/theme/Color.kt
-
 package com.hereliesaz.cuedetat.ui.theme
+
 import androidx.compose.ui.graphics.Color
 
-// --- New Color Palette ---
+val Purple80 = Color(0xFFD0BCFF)
+val PurpleGrey80 = Color(0xFFCCC2DC)
+val Pink80 = Color(0xFFEFB8C8)
 
-// Reds / Pinks
-val Red100 = Color(0xFFF1CFCE)
-val Red200 = Color(0xFFE69C9B)
-val Red300 = Color(0xFFDE625F)
-val Red400 = Color(0xFFAF403D)
-val Red500 = Color(0xFF782B27)
-val Red600 = Color(0xFF4A1413)
-val Red700 = Color(0xFF250706)
+val Purple40 = Color(0xFF6650a4)
+val PurpleGrey40 = Color(0xFF625b71)
+val Pink40 = Color(0xFF7D5260)
+val AccentGold = Color(0xFFBDA559)
+val DarkerAccentGold = Color(0xFF968141)
+val MutedMaroon = Color(0xFF7E344D) // Adjusted for more brightness
+val MutedGray = Color(0xFFA9A9A9)
+val WarningRed = Color(0xFFC05D5D)
 
-// Yellows / Golds
-val Yellow100 = Color(0xFFFFD885)
-val Yellow200 = Color(0xFFDDAF0F)
-val Yellow300 = Color(0xFFAF8A09)
-val Yellow400 = Color(0xFF836705)
-val Yellow500 = Color(0xFF5A4602)
-val Yellow600 = Color(0xFF342701)
-val Yellow700 = Color(0xFF171000)
 
-// Light Blues
-val LightBlue100 = Color(0xFFA9E0F3)
-val LightBlue200 = Color(0xFF78C2CC)
-val LightBlue300 = Color(0xFF5E99A1)
-val LightBlue400 = Color(0xFF457379)
-val LightBlue500 = Color(0xFF2E4E53)
-val LightBlue600 = Color(0xFF182D30)
-val LightBlue700 = Color(0xFF071314)
+val AcidPatina = Color(0xFF8EA96E)       // Muted strange green
+val RustedEmber = Color(0xFFA85632)      // Burnt rust, toned down
+val OilSlick = Color(0xFF555E5C)         // Gritty gray-green
+val OxidizedBrass = Color(0xFFB98E5A)    // Warm, muted highlight
+val VioletResidue = Color(0xFF8374A9)    // Muted violet gray
+val ScorchedUmber = Color(0xFF4A2E1C)    // Deep, rich, almost-black
+val ColdAsh = Color(0xFFA6A6A6)          // High-vis light gray
 
-// Greens
-val Green100 = Color(0xFFDAFBC3)
-val Green200 = Color(0xFFA9E078)
-val Green300 = Color(0xFF89B661)
-val Green400 = Color(0xFF6A8E4A)
-val Green500 = Color(0xFF4D6834)
-val Green600 = Color(0xFF314420)
-val Green700 = Color(0xFF18230E)
 
-// Blues
-val Blue100 = Color(0xFFECF1FD)
-val Blue200 = Color(0xFFBFD2F9)
-val Blue300 = Color(0xFF7EABF4)
-val Blue400 = Color(0xFF3D86DD)
-val Blue500 = Color(0xFF2862A4)
-val Blue600 = Color(0xFF18406E)
-val Blue700 = Color(0xFF0B213D)
+val TargetAcid = Color(0xFFA4FF00)      // Neon toxic green
+val TacticalRust = Color(0xFFC1440E)    // Aggressive orange-red
+val ConcreteVein = Color(0xFF7D7D7D)    // Mid-gray, utility
+val MoltenBrass = Color(0xFFD9821B)     // Warm, edgy accent
+val GuerillaViolet = Color(0xFF6E44FF)  // Striking contrast color
+val AshlineFog = Color(0xFFBFBFBF)      // High-vis neutral
+val RebelYellow = Color(0xFFFFD000)  // Primary yellow
+val BurntBrass = Color(0xFF8A5A00)   // Dirty metallic accent
+val SmokeyGrunge = Color(0xFF3B3B3B) // Deep, gritty gray (but not black)
 
-// Mints
-val Mint100 = Color(0xFFB1F2C6)
-val Mint200 = Color(0xFF87CA9D)
-val Mint300 = Color(0xFF6BA18C)
-val Mint400 = Color(0xFF507A6D)
-val Mint500 = Color(0xFF36554D)
-val Mint600 = Color(0xFF1E3525)
-val Mint700 = Color(0xFF08130C)
 
-// Purples
-val Purple100 = Color(0xFFEFE7EE)
-val Purple200 = Color(0xFFD2BAD1)
-val Purple300 = Color(0xFFB78EB4)
-val Purple400 = Color(0xFF9D6EA8)
-val Purple500 = Color(0xFF661A64)
-val Purple600 = Color(0xFF3F2D3E)
-val Purple700 = Color(0xFF1C121B)
+val TargetGold = Color(0xFFFFB700)   // Vibrant highlight gold
+val MellowYellow = Color(0xFFD4AF37)    // Muted gold
+val AgedAmber = Color(0xFFC69026)       // Secondary accent
+val SmokedOchre = Color(0xFF9B6A17)     // Button-friendly highlight
+val RogueUmber = Color(0xFF5C2E00)      // Dark background substitute
+val SteelAsh = Color(0xFF4A4A4A)        // Surface gray
+val GunmetalFog = Color(0xFF6A6A6A)     // Light neutral gray
+val FaintGoldmist = Color(0xFFF0DFAF)   // Subtle text glow
 
-// Grays (Warm)
-val Gray100 = Color(0xFFE0E0E0)
-val Gray200 = Color(0xFFBBBBBB)
-val Gray300 = Color(0xFF929292)
-val Gray400 = Color(0xFF6E6E6E)
-val Gray500 = Color(0xFF4B4B4B)
-val Gray600 = Color(0xFF2B2B2B)
-val Gray700 = Color(0xFF111111)
+val StaticClay = Color(0xFFCEBCA8)       // Neutral base
+val DeadChannel = Color(0xFF817F8D)      // Digital noise purple-gray
+val SmokeSignal = Color(0xFF5A5D63)      // Mid gray with cold nerve
+val CharredOlive = Color(0xFF484C3E)     // Military murk green
+val PyrrhicRust = Color(0xFF9C4E2C)      // Bloodied rust
+val AshWasp = Color(0xFFADA44F)          // Acid ghost
+val LowFidelityBlue = Color(0xFF5C6E83)  // Desaturated steel blue
 
-// --- Semantic Aliases for Compatibility ---
-val WarningRed = Red400
-val SulfurDust = Yellow300
-val HippieGreen = Green400
-val Mariner = Blue500
-val MonteCarlo = Mint200
-val BruisedPlum = Purple500
-val GunmetalBlue = LightBlue400
-val IcedOpal = Gray100
-val MutedGray = Gray300
-val VoidBlack = Gray700
-val Eight_ball_blue = Color(0xFF1923E7)
-
-// Bank lines can still be semantic
-val BankLine1Yellow = Yellow300.copy(alpha = 0.9f)
-val BankLine2Yellow = Yellow300.copy(alpha = 0.7f)
-val BankLine3Yellow = Yellow300.copy(alpha = 0.5f)
-val BankLine4Yellow = Yellow300.copy(alpha = 0.3f)
+val IcedOpal = Color(0xFFD5E4E2)         // Pale blue-gray
+val SoftInterference = Color(0xFFB6A4D6) // Powdered lavender
+val StaticMint = Color(0xFF9DDDC8)       // Desaturated mint
+val CorrodedSky = Color(0xFF8A99B2)      // Faded blue
+val HalogenDusk = Color(0xFFD3B18A)      // Pale copper light
+val FeverSlate = Color(0xFF6B7079)       // Cool slate anchor
+val TarnishedMauve = Color(0xFFA08C98)   // Soft mauve-gray
