@@ -46,7 +46,6 @@ kotlinxCoroutinesGuava = "1.10.2"
 slf4jBom = "2.1.0-alpha1"
 stdlib = "2.3.0"
 camerax = "1.4.2"
-
 # Hilt (Dependency Injection)
 hilt = "2.57.2" # Matches plugin version
 
@@ -60,6 +59,7 @@ kphysics = "master-SNAPSHOT"
 androidApplication = "8.13.2" # Example, use your actual AGP version
 kotlinAndroid = "2.3.0"
 kotlinCompose = "2.3.0"
+ksp = "2.3.4" # Update this to match your Kotlin version
 benchmarkCommon = "1.4.1"
 composeMaterial3 = "1.5.6"
 tensorflowLiteTaskVision = "0.4.4"
@@ -165,12 +165,14 @@ sceneform-base = { group = "com.google.ar.sceneform", name = "sceneform-base", v
 jbox2d-library = { group = "org.jbox2d", name = "jbox2d-library", version.ref = "jbox2d" }
 ar-core = { group = "com.google.ar", name = "core", version.ref = "arCore" }
 # androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "androidxMaterial3" } # This is a duplicate of an earlier alias, commented out.
+ksp = {group = "com.google.devtools.ksp:gradle.plugin", name = "ksp", version.ref = "ksp"}
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidApplication" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlinAndroid" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlinCompose" }
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 
 [bundles]
 camera = ["androidx-camera-core", "androidx-camera-camera2", "androidx-camera-lifecycle", "androidx-camera-view", "kotlinx-coroutines-guava"]
