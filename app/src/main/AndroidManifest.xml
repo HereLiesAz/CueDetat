@@ -6,6 +6,8 @@
     <uses-feature android:name="android.hardware.camera.any" />
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
 
     <application
         android:name=".MyApplication"
@@ -21,6 +23,9 @@
         android:theme="@style/Theme.CueDetat"
 
         tools:targetApi="36">
+
+        <meta-data android:name="com.google.ar.core" android:value="optional" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

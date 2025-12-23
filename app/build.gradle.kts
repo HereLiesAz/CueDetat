@@ -90,6 +90,9 @@ dependencies {
     implementation(libs.mlkit)
     implementation(libs.opencv)
 
+    // AR
+    implementation(libs.ar.core)
+
     // Physics
     // implementation(libs.google.liquidfun)
 

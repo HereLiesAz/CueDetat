@@ -108,6 +108,7 @@ internal fun reduceToggleAction(
 
         is MainScreenEvent.ToggleCalibrationScreen -> state.copy(showCalibrationScreen = !state.showCalibrationScreen)
         is MainScreenEvent.ToggleQuickAlignScreen -> state.copy(showQuickAlignScreen = !state.showQuickAlignScreen)
+        is MainScreenEvent.ToggleArScreen -> state.copy(showArScreen = !state.showArScreen)
         else -> state
     }
 }
