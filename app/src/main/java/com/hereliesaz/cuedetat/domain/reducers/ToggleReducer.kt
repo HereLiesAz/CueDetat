@@ -115,15 +115,28 @@ internal fun reduceToggleAction(
                      showArScreen = false,
                      isArTableSnapping = false,
                      isArBallSnapping = false,
-                     areArObstaclesEnabled = false
+                     areArObstaclesEnabled = false,
+                     obstacleBalls = emptyList()
                  )
              } else {
                  state.copy(showArScreen = true)
              }
         }
         is MainScreenEvent.ToggleArTableSnapping -> state.copy(isArTableSnapping = !state.isArTableSnapping)
-        is MainScreenEvent.ToggleArBallSnapping -> state.copy(isArBallSnapping = !state.isArBallSnapping)
-        is MainScreenEvent.ToggleArObstacles -> state.copy(areArObstaclesEnabled = !state.areArObstaclesEnabled)
+        is MainScreenEvent.ToggleArBallSnapping -> {
+            val isEnabled = !state.isArBallSnapping
+            state.copy(
+                isArBallSnapping = isEnabled,
+                arSnapStep = com.hereliesaz.cuedetat.domain.ArSnapStep.TARGET // Always reset to Target first
+            )
+        }
+        is MainScreenEvent.ToggleArObstacles -> {
+            val isEnabled = !state.areArObstaclesEnabled
+            state.copy(
+                areArObstaclesEnabled = isEnabled,
+                obstacleBalls = if (!isEnabled) emptyList() else state.obstacleBalls
+            )
+        }
         is MainScreenEvent.UpdateArTablePose -> state.copy(arTablePose = action.pose)
         else -> state
     }

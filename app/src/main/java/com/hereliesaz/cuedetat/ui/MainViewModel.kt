@@ -206,7 +206,8 @@ class MainViewModel @Inject constructor(
 
             is MainScreenEvent.ToggleArScreen, is MainScreenEvent.ToggleArTableSnapping,
             is MainScreenEvent.ToggleArBallSnapping, is MainScreenEvent.ToggleArObstacles,
-            is MainScreenEvent.ArTap, is MainScreenEvent.UpdateArTablePose -> UpdateType.FULL
+            is MainScreenEvent.ArTap, is MainScreenEvent.UpdateArTablePose,
+            is MainScreenEvent.ArBallDetected, is MainScreenEvent.PlaceArObstacles -> UpdateType.FULL
 
             // Events that only affect the spin visualization.
             is MainScreenEvent.SpinApplied -> UpdateType.SPIN_ONLY

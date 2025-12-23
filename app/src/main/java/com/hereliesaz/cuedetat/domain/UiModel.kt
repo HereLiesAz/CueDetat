@@ -100,6 +100,7 @@ data class CueDetatState(
     val showArScreen: Boolean = false,
     val isArTableSnapping: Boolean = false,
     val isArBallSnapping: Boolean = false,
+    val arSnapStep: ArSnapStep = ArSnapStep.TARGET,
     val areArObstaclesEnabled: Boolean = false,
     val arTablePose: FloatArray? = null,
     val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
@@ -155,6 +156,8 @@ data class CueDetatState(
         }
     }
 }
+
+enum class ArSnapStep { TARGET, CUE }
 
 const val LOGICAL_BALL_RADIUS = 25f
 
@@ -224,6 +227,8 @@ sealed class MainScreenEvent {
     object ToggleArBallSnapping : MainScreenEvent()
     object ToggleArObstacles : MainScreenEvent()
     data class ArTap(val offset: Offset) : MainScreenEvent()
+    data class ArBallDetected(val logicalPosition: PointF) : MainScreenEvent()
+    data class PlaceArObstacles(val logicalPositions: List<PointF>) : MainScreenEvent()
     data class UpdateArTablePose(val pose: FloatArray) : MainScreenEvent()
     data class ApplyQuickAlign(val translation: Offset, val rotation: Float, val scale: Float) :
         MainScreenEvent()

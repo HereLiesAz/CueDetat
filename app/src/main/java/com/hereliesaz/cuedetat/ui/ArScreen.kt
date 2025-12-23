@@ -205,6 +205,7 @@ class ArRenderer(
     private var backgroundRenderer = BackgroundRenderer()
 
     private var lastTableSnapTime = 0L
+    private var lastObstacleSnapTime = 0L
     private val tapQueue = ConcurrentLinkedQueue<Offset>()
     private var viewportWidth = 0
     private var viewportHeight = 0
@@ -235,6 +236,7 @@ class ArRenderer(
             processFrameForVision(frame)
             handleTableSnapping(frame)
             processTapQueue(frame)
+            handleObstacleSnapping(frame)
 
         } catch (t: Throwable) {
             t.printStackTrace()
@@ -263,16 +265,46 @@ class ArRenderer(
         }
     }
 
+    private fun handleObstacleSnapping(frame: Frame) {
+        val tablePose = uiState.arTablePose
+        if (uiState.areArObstaclesEnabled && tablePose != null && viewportWidth > 0 && viewportHeight > 0) {
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastObstacleSnapTime > 500) { // Update every 500ms
+                lastObstacleSnapTime = currentTime
+
+                val scaleX = viewportWidth.toFloat() / visionData.sourceImageWidth
+                val scaleY = viewportHeight.toFloat() / visionData.sourceImageHeight
+                val logicalPoints = mutableListOf<androidx.compose.ui.geometry.Offset>()
+
+                visionData.detectedBoundingBoxes.forEach { box ->
+                    val screenCX = box.centerX() * scaleX
+                    val screenCY = box.centerY() * scaleY
+
+                    val hits = frame.hitTest(screenCX, screenCY)
+                    val hit = hits.firstOrNull { it.trackable is Plane }
+
+                    if (hit != null) {
+                        val pose = hit.hitPose
+                        val worldPoint = floatArrayOf(pose.tx(), pose.ty(), pose.tz())
+                        val logicalPoint = com.hereliesaz.cuedetat.utils.ArMath.worldToLogical(worldPoint, tablePose)
+                        logicalPoints.add(androidx.compose.ui.geometry.Offset(logicalPoint.x, logicalPoint.y))
+                    }
+                }
+
+                if (logicalPoints.isNotEmpty()) {
+                    // Convert Offset to PointF for the event
+                    val pointFs = logicalPoints.map { android.graphics.PointF(it.x, it.y) }
+                    onEventDispatch(MainScreenEvent.PlaceArObstacles(pointFs))
+                }
+            }
+        }
+    }
+
     private fun processTapQueue(frame: Frame) {
         val tap = tapQueue.poll() ?: return
+        val tablePose = uiState.arTablePose
 
-        if (uiState.isArBallSnapping) {
-            // Find if tap is on a ball (2D check first)
-            // Scaling logic must match Canvas scaling.
-            // Simplified: If visionData detected a ball near tap.
-
-            // Assuming simple scaling for now (AspectFit/Fill behavior not perfectly replicated without matrix)
-            // But for Expert mode we can approximate.
+        if (uiState.isArBallSnapping && tablePose != null) {
             val scaleX = viewportWidth.toFloat() / visionData.sourceImageWidth
             val scaleY = viewportHeight.toFloat() / visionData.sourceImageHeight
 
@@ -285,65 +317,26 @@ class ArRenderer(
                  val bottom = top + box.height() * scaleY
 
                  if (tap.x >= left && tap.x <= right && tap.y >= top && tap.y <= bottom) {
-                     // Found ball
                      tappedBallCenter = android.graphics.PointF(box.centerX().toFloat(), box.centerY().toFloat())
-                     break // Take first one
+                     break
                  }
             }
 
             if (tappedBallCenter != null) {
-                // Now raycast this center (unscaled image coords) to 3D table plane
-                // We need to unscale tap or use image coords.
-                // ARCore hitTest works on SCREEN coords.
-                // So we need screen coords of the ball center.
-                // Re-calculate screen center.
-                val screenCX = tappedBallCenter.x * scaleX // Wait, center was image coords?
-                // box.centerX() is image coords.
-                // So screenCX = box.centerX() * scaleX
+                val screenCX = tappedBallCenter.x * scaleX
+                val screenCY = tappedBallCenter.y * scaleY
 
-                // Raycast against table plane.
-                // Since we don't have explicit plane intersection helper, we use frame.hitTest again?
-                // frame.hitTest hits REAL planes. We want hits on VIRTUAL table plane if it's placed?
-                // Or just real plane?
-                // User said "Stick to real table". So we hit test against Real Planes.
-                val hits = frame.hitTest(screenCX, tappedBallCenter.y * scaleY)
+                val hits = frame.hitTest(screenCX, screenCY)
                  val hit = hits.firstOrNull {
                      it.trackable is Plane
                  }
 
                  if (hit != null) {
-                     // We found the 3D position of the ball on the table.
-                     // Now we need to convert this 3D Pose to Logical Table Coords.
-                     // Requires: uiState.arTablePose
-                     val tablePoseArray = uiState.arTablePose
-                     if (tablePoseArray != null) {
-                         // Math time.
-                         // But for now, let's just emit ArTap with Offset and maybe let Reducer handle?
-                         // No, Reducer can't do 3D math easily without helper.
-                         // Let's emit the 3D point.
-                         // We need a new event: ArBallPlaced(pose)
-                         // But I only added ArTap(Offset).
-                         // Let's stick to ArTap(Offset) and assume Reducer can't handle 3D.
-                         // I will dispatch ArTap(Offset) but that was 2D.
-                         // I will override ArTap to accept 3D? Or add new event.
-                         // I can't add new event easily now without editing UiModel again.
-                         // Let's rely on ArTap(Offset) where Offset is actually the 2D Logical Coordinate?
-                         // Yes! Calculate Logical Coord here.
+                     val pose = hit.hitPose
+                     val worldPoint = floatArrayOf(pose.tx(), pose.ty(), pose.tz())
+                     val logicalPoint = com.hereliesaz.cuedetat.utils.ArMath.worldToLogical(worldPoint, tablePose)
 
-                         // Logical X/Y:
-                         // 1. Invert Table Pose.
-                         // 2. Multiply Hit Pose.
-                         // 3. Resulting Translation X/Y is logical pos relative to table center.
-                         // (Ignoring rotation for now, or assuming aligned).
-
-                         // This requires Matrix math.
-                         // I'll skip complex math in this step to avoid errors and just emit ArTap with screen coords
-                         // and let the user know I need to implement the Math helper in next iteration if needed.
-                         // Actually, I can just emit ArTap(Offset(screenCX, screenCY)) and let it fail gracefully?
-                         // No, the requirement is "Place the target ball".
-                         // I will assume for now ArTap just selects the ball 2D.
-                         onEventDispatch(MainScreenEvent.ArTap(Offset(screenCX, tappedBallCenter.y * scaleY)))
-                     }
+                     onEventDispatch(MainScreenEvent.ArBallDetected(logicalPoint))
                  }
             }
         }
