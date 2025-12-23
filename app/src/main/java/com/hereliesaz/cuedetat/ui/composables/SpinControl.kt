@@ -29,6 +29,11 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
@@ -54,6 +59,13 @@ fun SpinControl(
 
     Box(
         modifier = modifier
+            .semantics {
+                contentDescription = "Spin Control"
+                stateDescription = selectedSpinOffset?.let {
+                    "Horizontal: %.2f, Vertical: %.2f".format(it.x, it.y)
+                } ?: "No spin applied"
+                role = Role.Image
+            }
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
