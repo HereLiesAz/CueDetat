@@ -25,15 +25,28 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.cuedetat.R
-import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
-import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 
+/**
+ * Renders the top control bar, showing app name or menu button and status information.
+ *
+ * PERFORMANCE OPTIMIZATION:
+ * This composable uses primitive parameters instead of the monolithic `CueDetatState`.
+ * Jetpack Compose can skip recomposition if the primitive parameters haven't changed.
+ * Passing the entire state object would cause this to recompose on *any* state change,
+ * even if it didn't affect the top controls (e.g., sensor updates, CV data).
+ */
 @Composable
 fun TopControls(
-    uiState: CueDetatState,
-    onEvent: (MainScreenEvent) -> Unit,
+    areHelpersVisible: Boolean,
+    experienceMode: ExperienceMode?,
+    isTableVisible: Boolean,
+    tableSizeFeet: Float,
+    isBeginnerViewLocked: Boolean,
+    targetBallDistance: Float,
+    distanceUnit: DistanceUnit,
+    onCycleTableSize: () -> Unit,
     onMenuClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -58,7 +71,7 @@ fun TopControls(
                 .clickable(onClick = onMenuClick),
             contentAlignment = Alignment.CenterStart
         ) {
-            if (uiState.areHelpersVisible && uiState.experienceMode != ExperienceMode.HATER) {
+            if (areHelpersVisible && experienceMode != ExperienceMode.HATER) {
                 Column {
                     Text(
                         text = stringResource(id = R.string.app_name),
@@ -85,15 +98,15 @@ fun TopControls(
             }
         }
 
-        if (uiState.experienceMode != ExperienceMode.HATER) {
+        if (experienceMode != ExperienceMode.HATER) {
             Column(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (uiState.table.isVisible) {
+                if (isTableVisible) {
                     Column(
                         horizontalAlignment = Alignment.End,
-                        modifier = Modifier.clickable { onEvent(MainScreenEvent.CycleTableSize) }
+                        modifier = Modifier.clickable { onCycleTableSize() }
                     ) {
                         Text(
                             text = "Table Size",
@@ -101,7 +114,7 @@ fun TopControls(
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
                         Text(
-                            text = "${uiState.table.size.feet}'",
+                            text = "${tableSizeFeet}'",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
                             modifier = Modifier.padding(top = 4.dp)
@@ -109,15 +122,15 @@ fun TopControls(
                     }
                 }
 
-                if (uiState.experienceMode != ExperienceMode.BEGINNER || !uiState.isBeginnerViewLocked) {
+                if (experienceMode != ExperienceMode.BEGINNER || !isBeginnerViewLocked) {
                     Column(horizontalAlignment = Alignment.End) {
-                        val distanceText = if (uiState.targetBallDistance > 0) {
-                            if (uiState.distanceUnit == DistanceUnit.IMPERIAL) {
-                                val feet = (uiState.targetBallDistance / 12).toInt()
-                                val inches = (uiState.targetBallDistance % 12).toInt()
+                        val distanceText = if (targetBallDistance > 0) {
+                            if (distanceUnit == DistanceUnit.IMPERIAL) {
+                                val feet = (targetBallDistance / 12).toInt()
+                                val inches = (targetBallDistance % 12).toInt()
                                 "$feet ft $inches in"
                             } else {
-                                val cm = (uiState.targetBallDistance * 2.54).toInt()
+                                val cm = (targetBallDistance * 2.54).toInt()
                                 "$cm cm"
                             }
                         } else {
