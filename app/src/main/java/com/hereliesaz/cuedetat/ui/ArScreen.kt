@@ -5,6 +5,7 @@ import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.view.WindowManager
+import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -80,7 +81,7 @@ fun ArScreen(
                         }
                         session?.resume()
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        Log.e("ArScreen", "Error resuming AR session", e)
                         onEvent(MainScreenEvent.ToggleArScreen) // Disable AR on error
                         // In a real app, emit a specific error event for a Toast
                     }
@@ -248,7 +249,7 @@ class ArRenderer(
             handleObstacleSnapping(frame)
 
         } catch (t: Throwable) {
-            t.printStackTrace()
+            Log.e("ArRenderer", "Error drawing frame", t)
         }
     }
 
