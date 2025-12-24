@@ -25,7 +25,7 @@ import com.hereliesaz.cuedetat.view.config.line.ShotGuideLine
 import com.hereliesaz.cuedetat.view.config.line.TangentLine
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.config.ui.ProtractorGuides
-import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
+import com.hereliesaz.cuedetat.view.renderer.util.LineTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -33,10 +33,10 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 class LineRenderer {
-    private val textRenderer = LineTextRenderer()
+    private val textRenderer = LineTextRenderer
     private val protractorAngles = floatArrayOf(10f, 20f, 30f, 40f, 50f, 60f, 70f, 80f)
 
-    fun drawLogicalLines(
+    fun draw(
         canvas: Canvas,
         state: CueDetatState,
         paints: PaintCache,

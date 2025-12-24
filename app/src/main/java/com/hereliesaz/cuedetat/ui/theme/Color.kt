@@ -60,3 +60,14 @@ val CorrodedSky = Color(0xFF8A99B2)      // Faded blue
 val HalogenDusk = Color(0xFFD3B18A)      // Pale copper light
 val FeverSlate = Color(0xFF6B7079)       // Cool slate anchor
 val TarnishedMauve = Color(0xFFA08C98)   // Soft mauve-gray
+
+// Added based on build errors
+val SulfurDust = Color(0xFFE8DE37)
+val Mariner = Color(0xFF3B5BDB)
+val HippieGreen = Color(0xFF528F42)
+val BankLine1Yellow = Color(0xFFFFEB3B)
+val BankLine2Yellow = Color(0xFFFDD835)
+val BankLine3Yellow = Color(0xFFFBC02D)
+val BankLine4Yellow = Color(0xFFF9A825)
+val BruisedPlum = Color(0xFF5A3A52)
+val MonteCarlo = Color(0xFF83D0C9)

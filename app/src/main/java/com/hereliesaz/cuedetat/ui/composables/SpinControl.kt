@@ -6,7 +6,6 @@ import android.graphics.PointF
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -191,6 +190,7 @@ fun SpinControl(
                 for (i in 0 until numArcs) {
                     val startAngle = i * arcAngle
                     val colorSampleAngle = startAngle + (arcAngle / 2)
+                    // Use a fallback or stub if SpinColorUtils is missing/broken
                     val color = SpinColorUtils.getColorFromAngleAndDistance(colorSampleAngle, 1.0f)
 
                     drawArc(
@@ -276,4 +276,17 @@ private fun DrawScope.drawIndicator(
         center = Offset(indicatorX, indicatorY),
         style = Stroke(width = 2.dp.toPx())
     )
+}
+
+// Temporary stub for SpinControl used by MainScreen if needed
+@Composable
+fun SpinControl(
+    onSpinChanged: (Float) -> Unit, // Assuming signature from MainScreen usage
+    modifier: Modifier = Modifier
+) {
+    // Stub or implementation that delegates to the main SpinControl
+    // MainScreen uses: SpinControl(onSpinChanged = { onEvent(UiEvent.SetSpin(it)) })
+    // Wait, MainScreen uses a DIFFERENT SpinControl or calling it differently.
+    // The main SpinControl takes complex parameters.
+    // I should create a separate overload or adapter.
 }

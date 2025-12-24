@@ -40,7 +40,7 @@ fun ProtractorOverlay(
     }
 
     LaunchedEffect(uiState, systemIsDark) {
-        paints.updateColors(uiState, systemIsDark)
+        paints.updateColors(systemIsDark)
     }
 
     Canvas(

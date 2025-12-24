@@ -14,7 +14,7 @@ import com.hereliesaz.cuedetat.ui.theme.MonteCarlo
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.table.Diamonds
 import com.hereliesaz.cuedetat.view.config.table.Rail
-import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
+import com.hereliesaz.cuedetat.view.renderer.util.LineTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
 import kotlin.math.pow
@@ -24,7 +24,7 @@ class RailRenderer {
     private val diamondSizeFactor = 0.5f
     private val railConfig = Rail()
     private val diamondConfig = Diamonds()
-    private val textRenderer = LineTextRenderer()
+    private val textRenderer = LineTextRenderer
 
     fun draw(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?) {
         if (!state.table.isVisible || state.table.corners.size < 4) return
