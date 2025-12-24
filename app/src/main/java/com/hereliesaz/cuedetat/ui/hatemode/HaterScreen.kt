@@ -141,14 +141,8 @@ fun HaterScreen(
         }
 
         TopControls(
-            areHelpersVisible = uiState.areHelpersVisible,
-            experienceMode = uiState.experienceMode,
-            isTableVisible = uiState.table.isVisible,
-            tableSizeFeet = uiState.table.size.feet.toFloat(),
-            isBeginnerViewLocked = uiState.isBeginnerViewLocked,
-            targetBallDistance = uiState.targetBallDistance.toFloat(),
-            distanceUnit = uiState.distanceUnit,
-            onCycleTableSize = { onEvent(MainScreenEvent.CycleTableSize) },
+            uiState = uiState,
+            onEvent = onEvent,
             onMenuClick = { onEvent(MainScreenEvent.ToggleNavigationRail) }
         )
 
