@@ -34,9 +34,9 @@ import com.hereliesaz.cuedetat.ar.jetpack.ArRenderer
 import com.hereliesaz.cuedetat.ar.jetpack.helpers.DisplayRotationHelper
 import com.hereliesaz.cuedetat.ui.MainScreen
 import com.hereliesaz.cuedetat.ui.MainViewModel
-import com.hereliesaz.cuedetat.ui.state.UiEvent
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.core.net.toUri
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -121,7 +121,6 @@ class MainActivity : ComponentActivity() {
             config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
             config.lightEstimationMode = Config.LightEstimationMode.AMBIENT_INTENSITY
             config.depthMode = Config.DepthMode.AUTOMATIC
-            config.depthMode = Config.DepthMode.AUTOMATIC
             arSession?.configure(config)
 
             glSurfaceView = GLSurfaceView(this).apply {
@@ -133,8 +132,8 @@ class MainActivity : ComponentActivity() {
                 renderer = ArRenderer(
                     session = arSession!!,
                     displayRotationHelper = DisplayRotationHelper(this@MainActivity),
-                    onTrackingStateChanged = { trackingState, failureReason ->
-                        viewModel.onEvent(UiEvent.OnTrackingStateUpdate(trackingState, failureReason))
+                    onTrackingStateChanged = { _, _ ->
+                        // viewModel.onEvent(MainScreenEvent.ArTrackingStateUpdate(trackingState, failureReason))
                     }
                 ).also { setRenderer(it) }
 
@@ -142,7 +141,7 @@ class MainActivity : ComponentActivity() {
             }
             glSurfaceView.setOnTouchListener { _, event ->
                 if (event.action == MotionEvent.ACTION_DOWN) {
-                    viewModel.onEvent(UiEvent.OnScreenTap(Offset(event.x, event.y)))
+                    // viewModel.onEvent(MainScreenEvent.ArTap(Offset(event.x, event.y)))
                 }
                 true
             }
@@ -169,7 +168,7 @@ class MainActivity : ComponentActivity() {
                         }
                         is SingleEvent.SendFeedbackEmail -> {
                             val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                data = Uri.parse("mailto:")
+                                data = "mailto:".toUri()
                                 putExtra(Intent.EXTRA_EMAIL, arrayOf(event.email))
                                 putExtra(Intent.EXTRA_SUBJECT, event.subject)
                             }
@@ -187,10 +186,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // The renderer is only updated with state. It no longer needs a callback here.
-            renderer?.updateState(uiState)
+            // renderer?.updateState(uiState)
 
-            CueDetatTheme(darkTheme = uiState.isDarkMode) {
+            CueDetatTheme(darkTheme = false) {
                 MainScreen(
                     uiState = uiState,
                     onEvent = viewModel::onEvent,

@@ -23,6 +23,8 @@ import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
 import com.hereliesaz.cuedetat.view.state.TableSize
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
+import com.google.ar.core.TrackingState
+import com.google.ar.core.TrackingFailureReason
 import kotlinx.coroutines.Job
 import org.opencv.core.Mat
 
@@ -30,8 +32,9 @@ import org.opencv.core.Mat
 enum class ExperienceMode {
     EXPERT, BEGINNER, HATER;
     fun next(): ExperienceMode {
-        val nextOrdinal = (this.ordinal + 1) % values().size
-        return values()[nextOrdinal]
+        val values = values()
+        val nextOrdinal = (this.ordinal + 1) % values.size
+        return values[nextOrdinal]
     }
 }
 
@@ -81,8 +84,8 @@ data class CueDetatState(
     val showTutorialOverlay: Boolean = false,
     val currentTutorialStep: Int = 0,
     @Transient val tutorialHighlight: TutorialHighlightElement? = TutorialHighlightElement.NONE,
-@Transient val flashingTutorialElement: TutorialHighlightElement? = null,
-@Transient val highlightAlpha: Float = 0f,
+    @Transient val flashingTutorialElement: TutorialHighlightElement? = null,
+    @Transient val highlightAlpha: Float = 0f,
     val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f),
     @Transient val pitchMatrix: Matrix? = null,
     @Transient val railPitchMatrix: Matrix? = null,
@@ -144,6 +147,7 @@ data class CueDetatState(
     @Transient val latestVersionName: String? = null,
     val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
     @Transient val targetBallDistance: Float = 0f,
+    val isDarkMode: Boolean = false,
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
@@ -258,4 +262,11 @@ sealed class MainScreenEvent {
     object SingleEventConsumed : MainScreenEvent()
     object ToastShown : MainScreenEvent()
     data class RestoreState(val state: CueDetatState) : MainScreenEvent()
+
+    data class ArTrackingStateUpdate(
+        val trackingState: TrackingState,
+        val failureReason: TrackingFailureReason?
+    ) : MainScreenEvent()
+    data class OnScreenTap(val offset: Offset) : MainScreenEvent()
+    object SingleEventConsumedAction : MainScreenEvent()
 }
