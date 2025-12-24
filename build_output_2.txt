@@ -1,0 +1,455 @@
+Reusing configuration cache.
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:kspDebugKotlin
+> Task :app:compileDebugKotlin
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/MainActivity.kt:137:43 Argument type mismatch: actual type is 'UiEvent.OnTrackingStateUpdate', but 'MainScreenEvent' was expected.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/MainActivity.kt:145:39 Argument type mismatch: actual type is 'UiEvent.OnScreenTap', but 'MainScreenEvent' was expected.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/MainActivity.kt:191:35 Argument type mismatch: actual type is 'CueDetatState', but 'UiState' was expected.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/MainActivity.kt:193:47 Unresolved reference 'isDarkMode'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/MainActivity.kt:195:31 Argument type mismatch: actual type is 'CueDetatState', but 'UiState' was expected.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/MainActivity.kt:196:42 Inapplicable candidate(s): fun onEvent(event: MainScreenEvent): Unit
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/CalculateBankShot.kt:70:49 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/CalculateSpinPaths.kt:50:47 Unresolved reference 'ghostCueBallCenter'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/CalculateSpinPaths.kt:51:48 Unresolved reference 'center'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/CalculateSpinPaths.kt:63:51 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/CalculateSpinPaths.kt:67:84 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/CalculateSpinPaths.kt:68:84 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/CalculateSpinPaths.kt:72:84 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/CalculateSpinPaths.kt:73:84 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/CalculateSpinPaths.kt:77:82 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/CalculateSpinPaths.kt:78:82 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/ReducerUtils.kt:24:61 Unresolved reference 'center'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/ReducerUtils.kt:26:55 Unresolved reference 'copy'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/UiModel.kt:18:43 Unresolved reference 'ProtractorUnit'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/UiModel.kt:47:25 Unresolved reference 'ProtractorUnit'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/UiModel.kt:47:42 Unresolved reference 'ProtractorUnit'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ActionReducer.kt:9:43 Unresolved reference 'ProtractorUnit'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ActionReducer.kt:32:37 Unresolved reference 'ProtractorUnit'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt:39:59 Unresolved reference 'copy'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt:69:73 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt:92:77 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt:123:73 Unresolved reference 'center'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt:134:72 Unresolved reference 'ghostCueBallCenter'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt:156:68 Unresolved reference 'center'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt:156:111 Unresolved reference 'center'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt:157:80 Unresolved reference 'copy'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt:162:58 Unresolved reference 'center'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt:167:63 Unresolved reference 'rotationDegrees'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt:169:66 Unresolved reference 'copy'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt:225:84 Unresolved reference 'copy'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt:244:76 Unresolved reference 'center'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt:249:77 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ObstacleReducer.kt:23:75 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ObstacleReducer.kt:43:39 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ObstacleReducer.kt:67:47 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ObstacleReducer.kt:76:43 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/SystemReducer.kt:10:43 Unresolved reference 'ProtractorUnit'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/SystemReducer.kt:54:26 Unresolved reference 'ProtractorUnit'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ToggleReducer.kt:11:43 Unresolved reference 'ProtractorUnit'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ToggleReducer.kt:100:34 Unresolved reference 'ProtractorUnit'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ToggleReducer.kt:152:26 Unresolved reference 'ProtractorUnit'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ToggleReducer.kt:208:51 Unresolved reference 'copy'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ToggleReducer.kt:224:51 Unresolved reference 'copy'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/MainLayout.kt:33:47 Unresolved reference 'TopControls'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/MainLayout.kt:38:56 Unresolved reference 'KineticWarningOverlay'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/MainLayout.kt:62:13 Unresolved reference 'TopControls'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/MainLayout.kt:130:13 Unresolved reference 'KineticWarningOverlay'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt:70:41 No parameter with name 'onSpinChanged' found.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt:70:41 No value passed for parameter 'centerPosition'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt:70:41 No value passed for parameter 'selectedSpinOffset'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt:70:41 No value passed for parameter 'lingeringSpinOffset'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt:70:41 No value passed for parameter 'spinPathAlpha'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt:70:41 No value passed for parameter 'onEvent'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/MainScreen.kt:70:83 Unresolved reference 'it'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/ProtractorScreen.kt:13:47 Unresolved reference 'CameraBackground'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/ProtractorScreen.kt:64:13 Unresolved reference 'CameraBackground'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/composables/calibration/CalibrationScreen.kt:38:47 Unresolved reference 'CameraBackground'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/composables/calibration/CalibrationScreen.kt:73:9 Unresolved reference 'CameraBackground'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/TutorialOverlay.kt:82:48 Unresolved reference 'center'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/TutorialOverlay.kt:83:48 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/TutorialOverlay.kt:87:82 Unresolved reference 'center'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/TutorialOverlay.kt:97:62 Unresolved reference 'ghostCueBallCenter'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/TutorialOverlay.kt:100:48 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/composables/quickalign/QuickAlignScreen.kt:43:47 Unresolved reference 'CameraBackground'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/composables/quickalign/QuickAlignScreen.kt:219:9 Unresolved reference 'CameraBackground'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/hatemode/HaterScreen.kt:41:47 Unresolved reference 'TopControls'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/hatemode/HaterScreen.kt:143:9 Unresolved reference 'TopControls'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/ProtractorOverlay.kt:20:46 Unresolved reference 'OverlayRenderer'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/ProtractorOverlay.kt:30:18 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/ProtractorOverlay.kt:30:29 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/ProtractorOverlay.kt:31:20 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/ProtractorOverlay.kt:31:31 Unresolved reference 'OverlayRenderer'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/ProtractorOverlay.kt:39:16 Unresolved reference 'setTypeface'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/ProtractorOverlay.kt:43:16 Unresolved reference 'updateColors'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/ProtractorOverlay.kt:55:22 Unresolved reference 'draw'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ball/ActualCueBall.kt:4:41 Unresolved reference 'Mariner'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ball/ActualCueBall.kt:12:37 Unresolved reference 'Mariner'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ball/ActualCueBall.kt:14:39 Unresolved reference 'Mariner'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ball/BankingBall.kt:4:41 Unresolved reference 'BruisedPlum'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ball/BankingBall.kt:12:37 Unresolved reference 'BruisedPlum'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ball/BankingBall.kt:14:39 Unresolved reference 'BruisedPlum'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ball/GhostCueBall.kt:5:41 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ball/GhostCueBall.kt:19:39 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ball/ObstacleBall.kt:4:41 Unresolved reference 'BruisedPlum'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ball/ObstacleBall.kt:12:37 Unresolved reference 'BruisedPlum'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ball/ObstacleBall.kt:14:39 Unresolved reference 'BruisedPlum'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ball/TargetBall.kt:4:41 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ball/TargetBall.kt:12:37 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ball/TargetBall.kt:14:39 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/AimingLine.kt:4:41 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/AimingLine.kt:11:37 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/AimingLine.kt:13:39 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/BankLine1.kt:4:41 Unresolved reference 'BankLine1Yellow'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/BankLine1.kt:11:37 Unresolved reference 'BankLine1Yellow'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/BankLine1.kt:13:39 Unresolved reference 'BankLine1Yellow'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/BankLine2.kt:4:41 Unresolved reference 'BankLine2Yellow'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/BankLine2.kt:11:37 Unresolved reference 'BankLine2Yellow'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/BankLine2.kt:13:39 Unresolved reference 'BankLine2Yellow'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/BankLine3.kt:4:41 Unresolved reference 'BankLine3Yellow'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/BankLine3.kt:11:37 Unresolved reference 'BankLine3Yellow'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/BankLine3.kt:13:39 Unresolved reference 'BankLine3Yellow'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/BankLine4.kt:4:41 Unresolved reference 'BankLine4Yellow'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/BankLine4.kt:11:37 Unresolved reference 'BankLine4Yellow'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/BankLine4.kt:13:39 Unresolved reference 'BankLine4Yellow'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/ShotGuideLine.kt:4:41 Unresolved reference 'Mariner'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/ShotGuideLine.kt:11:37 Unresolved reference 'Mariner'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/line/ShotGuideLine.kt:13:39 Unresolved reference 'Mariner'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/table/Holes.kt:4:41 Unresolved reference 'HippieGreen'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/table/Holes.kt:13:39 Unresolved reference 'HippieGreen'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/table/Rail.kt:4:41 Unresolved reference 'HippieGreen'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/table/Rail.kt:11:37 Unresolved reference 'HippieGreen'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/table/Rail.kt:13:39 Unresolved reference 'HippieGreen'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/table/Table.kt:4:41 Unresolved reference 'HippieGreen'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/table/Table.kt:11:37 Unresolved reference 'HippieGreen'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/table/Table.kt:13:39 Unresolved reference 'HippieGreen'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ui/LabelConfig.kt:6:41 Unresolved reference 'Mariner'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ui/LabelConfig.kt:8:41 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ui/LabelConfig.kt:23:33 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ui/LabelConfig.kt:41:33 Unresolved reference 'Mariner'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ui/LabelConfig.kt:50:33 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ui/LabelConfig.kt:68:33 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ui/LabelConfig.kt:77:33 Unresolved reference 'Mariner'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/config/ui/LabelConfig.kt:104:33 Unresolved reference 'Mariner'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:17:41 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:18:37 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:28:46 Unresolved reference 'text'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:35:32 Unresolved reference 'BallTextRenderer'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:37:60 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:55:41 Unresolved reference 'targetCirclePaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:55:60 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:55:60 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:55:66 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:56:13 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:56:21 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:57:13 Unresolved reference 'style'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:58:13 Unresolved reference 'alpha'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:84:81 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:88:34 Unresolved reference 'cvResultPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:88:49 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:88:49 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:88:55 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:89:13 Unresolved reference 'style'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:90:13 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:91:13 Unresolved reference 'alpha'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:117:87 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:123:46 Unresolved reference 'ghostCueBallCenter'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:124:46 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:137:17 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:142:13 Too many arguments for 'fun getZoomRange(mode: ExperienceMode?): Pair<Float, Float>'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:145:47 Unresolved reference 'targetCirclePaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:145:66 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:145:66 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:145:72 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:146:13 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:147:13 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:148:13 Unresolved reference 'alpha'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:150:37 Unresolved reference 'fillPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:150:48 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:150:48 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:150:54 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:150:56 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:189:44 Unresolved reference 'targetCirclePaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:189:63 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:189:63 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:189:69 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:190:17 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:191:17 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:192:17 Unresolved reference 'alpha'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:215:44 Unresolved reference 'targetCirclePaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:215:63 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:215:63 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:215:69 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:216:17 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:216:47 Unresolved reference 'warningPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:217:17 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:218:17 Unresolved reference 'alpha'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:221:61 Unresolved reference 'warningPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:243:44 Unresolved reference 'fillPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:243:55 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:243:55 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:243:61 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:243:63 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:244:53 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:244:53 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:244:59 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:245:17 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:245:54 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:260:36 Unresolved reference 'style'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:298:17 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:301:32 Unresolved reference 'textPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:301:42 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:301:48 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:301:50 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:301:55 Unresolved reference 'typeface'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:303:28 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:322:60 Unresolved reference 'ghostCueBallCenter'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/ball/BallRenderer.kt:323:60 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:16:41 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:18:37 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:28:46 Unresolved reference 'text'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:36:32 Unresolved reference 'LineTextRenderer'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:42:17 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:55:17 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:58:51 Unresolved reference 'ghostCueBallCenter'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:62:42 Unresolved reference 'shotLinePaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:62:57 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:62:57 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:62:63 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:63:13 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:64:47 Unresolved reference 'warningPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:65:13 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:68:65 Unresolved reference 'warningPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:73:45 Unresolved reference 'pathObstructionPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:73:67 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:73:67 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:73:73 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:74:13 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:74:48 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:129:79 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:133:47 Unresolved reference 'SulfurDust'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:135:44 Unresolved reference 'targetCirclePaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:135:63 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:135:63 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:135:69 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:136:13 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:137:13 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:146:45 Unresolved reference 'pathObstructionPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:146:67 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:146:67 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:146:73 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:147:13 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:147:48 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:174:80 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:179:46 Unresolved reference 'tangentLineSolidPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:179:69 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:179:69 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:179:75 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:180:13 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:181:13 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:183:47 Unresolved reference 'tangentLineDottedPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:183:71 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:183:71 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:183:77 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:184:13 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:185:13 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:186:13 Unresolved reference 'alpha'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:195:42 Unresolved reference 'ghostCueBallCenter'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:196:44 Unresolved reference 'center'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:258:77 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:263:42 Unresolved reference 'shotLinePaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:263:57 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:263:57 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:263:63 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:264:13 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:281:27 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:282:27 Unresolved reference 'alpha'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:292:80 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:299:43 Unresolved reference 'shotLinePaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:299:58 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:299:58 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:299:64 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:299:66 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:313:46 Unresolved reference 'bankLine1Paint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:313:62 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:313:62 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:313:68 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:313:70 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:313:107 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:331:46 Unresolved reference 'bankLine1Paint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:331:62 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:331:62 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:331:68 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:332:21 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:333:21 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:347:84 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:348:51 Unresolved reference 'ghostCueBallCenter'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:349:49 Unresolved reference 'center'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:353:39 Unresolved reference 'angleGuidePaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:353:56 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:353:56 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:353:62 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:354:13 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:355:13 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:356:13 Unresolved reference 'alpha'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:358:38 Unresolved reference 'textPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:358:49 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:358:49 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:358:55 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:359:13 Unresolved reference 'alpha'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:360:13 Unresolved reference 'textSize'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:367:122 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:368:123 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:380:17 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:418:17 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:434:17 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:457:20 Unresolved reference 'gradientMaskPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:458:93 Unresolved reference 'gradientMaskPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/line/LineRenderer.kt:460:20 Unresolved reference 'gradientMaskPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:13:41 Unresolved reference 'MonteCarlo'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:14:37 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:17:46 Unresolved reference 'text'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:27:32 Unresolved reference 'LineTextRenderer'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:29:60 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:32:36 Unresolved reference 'tableOutlinePaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:164:17 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:169:34 Unresolved reference 'center'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:169:63 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:172:32 Unresolved reference 'textPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:172:42 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:172:48 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:173:13 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:173:18 Unresolved reference 'typeface'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:174:13 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:174:18 Unresolved reference 'textSize'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:175:13 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:175:18 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:175:26 Unresolved reference 'MonteCarlo'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:181:13 Inapplicable candidate(s): fun <K> WHEN_CALL(vararg branches: K): K
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:183:52 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:183:52 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:183:52 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T, R> T.let(block: (T) -> R): R
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:183:58 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:198:17 Inapplicable candidate(s): fun <K> WHEN_CALL(vararg branches: K): K
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:200:63 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:200:63 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:200:63 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T, R> T.let(block: (T) -> R): R
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:200:69 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:216:41 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:217:54 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:217:54 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:217:54 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T, R> T.let(block: (T) -> R): R
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:217:60 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:224:71 Unresolved reference 'LineTextRenderer'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:231:87 Unresolved reference 'LineTextRenderer'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:232:87 Unresolved reference 'LineTextRenderer'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:233:87 Unresolved reference 'LineTextRenderer'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:234:87 Unresolved reference 'LineTextRenderer'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:12:37 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:23:67 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:29:40 Unresolved reference 'tableOutlinePaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:30:39 Unresolved reference 'gridLinePaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:64:67 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:66:81 Unresolved reference 'radius'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:74:26 Unresolved reference 'pocketFillPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:74:43 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:74:43 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:74:49 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:74:51 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:75:45 Unresolved reference 'pocketFillPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:75:62 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:75:62 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:75:68 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:75:70 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:76:47 Unresolved reference 'tableOutlinePaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:76:66 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:76:66 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:76:72 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:77:13 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:78:13 Unresolved reference 'strokeWidth'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:80:44 Unresolved reference 'pocketFillPaint'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:80:61 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:80:61 Unresolved reference. None of the following candidates is applicable because of a receiver type mismatch:
+fun <T> T.apply(block: T.() -> Unit): T
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:80:67 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/TableRenderer.kt:81:13 Unresolved reference 'color'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/util/PaintUtils.kt:31:42 Unresolved reference 'PaintCache'.
+e: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/util/PaintUtils.kt:40:19 Unresolved reference 'glowPaints'.
+
+> Task :app:compileDebugKotlin FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 54s
+31 actionable tasks: 2 executed, 29 up-to-date
+Configuration cache entry reused.
