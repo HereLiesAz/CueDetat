@@ -21,6 +21,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,6 +64,10 @@ fun TopControls(
     ) {
         Box(
             modifier = Modifier
+                .semantics {
+                    role = Role.Button
+                    contentDescription = "Open Menu"
+                }
                 .pointerInput(Unit) {
                     detectDragGestures { change, dragAmount ->
                         if (dragAmount.y > 2.0f) {
@@ -90,7 +98,7 @@ fun TopControls(
             } else {
                 Image(
                     painter = painterResource(id = R.drawable.ic_launcher),
-                    contentDescription = "Menu",
+                    contentDescription = null, // Handled by parent semantics
                     modifier = Modifier
                         .size(64.dp)
                         .clip(CircleShape)
@@ -106,7 +114,12 @@ fun TopControls(
                 if (isTableVisible) {
                     Column(
                         horizontalAlignment = Alignment.End,
-                        modifier = Modifier.clickable { onCycleTableSize() }
+                        modifier = Modifier
+                            .semantics {
+                                role = Role.Button
+                                contentDescription = "Change Table Size"
+                            }
+                            .clickable { onEvent(MainScreenEvent.CycleTableSize) }
                     ) {
                         Text(
                             text = "Table Size",
