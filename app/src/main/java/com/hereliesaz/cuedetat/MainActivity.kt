@@ -36,7 +36,7 @@ import com.hereliesaz.cuedetat.ui.MainScreen
 import com.hereliesaz.cuedetat.ui.MainViewModel
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import dagger.hilt.android.AndroidEntryPoint
-import androidx.core.net.toUri
+import android.graphics.PointF
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -132,8 +132,8 @@ class MainActivity : ComponentActivity() {
                 renderer = ArRenderer(
                     session = arSession!!,
                     displayRotationHelper = DisplayRotationHelper(this@MainActivity),
-                    onTrackingStateChanged = { _, _ ->
-                        // viewModel.onEvent(MainScreenEvent.ArTrackingStateUpdate(trackingState, failureReason))
+                    onTrackingStateChanged = { trackingState, failureReason ->
+                        viewModel.onEvent(MainScreenEvent.ArTrackingStateUpdate(trackingState, failureReason))
                     }
                 ).also { setRenderer(it) }
 
@@ -141,7 +141,7 @@ class MainActivity : ComponentActivity() {
             }
             glSurfaceView.setOnTouchListener { _, event ->
                 if (event.action == MotionEvent.ACTION_DOWN) {
-                    // viewModel.onEvent(MainScreenEvent.ArTap(Offset(event.x, event.y)))
+                    viewModel.onEvent(MainScreenEvent.OnScreenTap(Offset(event.x, event.y)))
                 }
                 true
             }
@@ -168,7 +168,7 @@ class MainActivity : ComponentActivity() {
                         }
                         is SingleEvent.SendFeedbackEmail -> {
                             val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                data = "mailto:".toUri()
+                                data = Uri.parse("mailto:")
                                 putExtra(Intent.EXTRA_EMAIL, arrayOf(event.email))
                                 putExtra(Intent.EXTRA_SUBJECT, event.subject)
                             }
@@ -186,9 +186,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            // The renderer is only updated with state. It no longer needs a callback here.
             // renderer?.updateState(uiState)
 
-            CueDetatTheme(darkTheme = false) {
+            CueDetatTheme(darkTheme = uiState.isDarkMode) {
                 MainScreen(
                     uiState = uiState,
                     onEvent = viewModel::onEvent,

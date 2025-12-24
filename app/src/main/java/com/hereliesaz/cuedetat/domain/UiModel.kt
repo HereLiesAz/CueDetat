@@ -148,6 +148,7 @@ data class CueDetatState(
     val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
     @Transient val targetBallDistance: Float = 0f,
     val isDarkMode: Boolean = false,
+    val instructionText: String = ""
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
@@ -269,4 +270,5 @@ sealed class MainScreenEvent {
     ) : MainScreenEvent()
     data class OnScreenTap(val offset: Offset) : MainScreenEvent()
     object SingleEventConsumedAction : MainScreenEvent()
+    object ToggleHelpDialog : MainScreenEvent()
 }
