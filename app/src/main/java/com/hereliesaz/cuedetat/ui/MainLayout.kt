@@ -63,9 +63,9 @@ fun MainLayout(
                 areHelpersVisible = uiState.areHelpersVisible,
                 experienceMode = uiState.experienceMode,
                 isTableVisible = uiState.table.isVisible,
-                tableSizeFeet = uiState.table.size.feet,
+                tableSizeFeet = uiState.table.size.feet.toFloat(),
                 isBeginnerViewLocked = uiState.isBeginnerViewLocked,
-                targetBallDistance = uiState.targetBallDistance,
+                targetBallDistance = uiState.targetBallDistance.toFloat(),
                 distanceUnit = uiState.distanceUnit,
                 onCycleTableSize = { onEvent(MainScreenEvent.CycleTableSize) },
                 onMenuClick = { onEvent(MainScreenEvent.ToggleNavigationRail) }

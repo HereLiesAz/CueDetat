@@ -25,7 +25,7 @@ import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.LogicalCircular
-import com.hereliesaz.cuedetat.view.renderer.text.BallTextRenderer
+import com.hereliesaz.cuedetat.view.renderer.util.BallTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
 import kotlin.math.hypot
