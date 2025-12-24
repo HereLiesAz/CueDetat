@@ -28,6 +28,15 @@ import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 
+/**
+ * Renders the top control bar, showing app name or menu button and status information.
+ *
+ * PERFORMANCE OPTIMIZATION:
+ * This composable uses primitive parameters instead of the monolithic `CueDetatState`.
+ * Jetpack Compose can skip recomposition if the primitive parameters haven't changed.
+ * Passing the entire state object would cause this to recompose on *any* state change,
+ * even if it didn't affect the top controls (e.g., sensor updates, CV data).
+ */
 @Composable
 fun TopControls(
     areHelpersVisible: Boolean,
