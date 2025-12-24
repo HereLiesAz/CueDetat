@@ -3,6 +3,7 @@
 package com.hereliesaz.cuedetat.data
 
 import android.annotation.SuppressLint
+import android.util.Log
 import android.graphics.Matrix
 import android.graphics.PointF
 import android.media.Image
@@ -321,7 +322,7 @@ class VisionRepository @Inject constructor(
 
         } catch (e: Exception) {
             // Log exception if needed
-            e.printStackTrace()
+            Log.e("VisionRepository", "Error processing frame", e)
         }
     }
 
