@@ -32,9 +32,18 @@ fun createGlowPaint(
 ): Paint {
     val glowValue = state.glowStickValue
     val key = if (abs(glowValue) > 0.05f) {
-        "glow_${glowValue}"
+        // Use a composite key encoded in the Pair
+        // Since Pair expects <Int, Float>, we'll use hashcode of the string key for Int and 0f for Float
+        // Or better, adapt the caching strategy in PaintCache to be more flexible if possible.
+        // But PaintCache is strict Pair<Int, Float>.
+        // Let's reuse PaintCache.getGlowPaint logic instead of direct map access if possible.
+        // But getGlowPaint takes Color and Width.
+
+        // If glow stick is active, we are effectively overriding the color and width/blur.
+        val color = if (glowValue > 0) Color.White else Color.Black
+        color.toArgb() to (15f * abs(glowValue)) // Pair<Int, Float>
     } else {
-        "glow_${baseGlowColor}_${baseGlowWidth}"
+        baseGlowColor.toArgb() to baseGlowWidth
     }
 
     return paints.glowPaints.getOrPut(key) {
