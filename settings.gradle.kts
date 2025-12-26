@@ -15,5 +15,5 @@ dependencyResolutionManagement {
     maven { url = uri("https://androidx.dev/snapshots/builds/LATEST/repository") }
   }
 }
-rootProject.name = "Cue D'etat"
+rootProject.name = "CueDetat"
 include(":app")

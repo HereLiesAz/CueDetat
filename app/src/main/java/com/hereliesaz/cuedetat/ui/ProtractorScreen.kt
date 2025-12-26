@@ -10,7 +10,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
+import com.hereliesaz.cuedetat.ui.composables.SplashScreen
 import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationScreen
 import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignAnalyzer
@@ -53,7 +55,7 @@ fun ProtractorScreen(
         // Display the camera feed as the background if it's set to be visible.
         // Important: If AR Screen is active, we MUST NOT render CameraBackground (CameraX)
         // because ARCore needs exclusive access to the camera.
-        if (uiState.isCameraVisible && !uiState.showArScreen) {
+        if (uiState.isCameraVisible && !uiState.showArScreen && uiState.experienceMode != null) {
             // Determine which analyzer should be active based on the current UI state.
             // This ensures that the correct image processing logic is applied to the camera feed.
             val activeAnalyzer = when {
@@ -69,6 +71,13 @@ fun ProtractorScreen(
 
         // Conditionally display the appropriate screen on top of the camera background.
         when {
+            // If experience mode is not set, show Splash Screen
+            uiState.experienceMode == null -> {
+                SplashScreen { mode ->
+                    mainViewModel.onEvent(MainScreenEvent.SetExperienceMode(mode))
+                }
+            }
+
             // If the calibration screen should be shown, display it.
             uiState.showCalibrationScreen -> {
                 CalibrationScreen(
