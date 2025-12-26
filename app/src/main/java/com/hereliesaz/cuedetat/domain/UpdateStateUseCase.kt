@@ -16,6 +16,12 @@ class UpdateStateUseCase @Inject constructor(
             return state
         }
 
+        // We cannot calculate a valid matrix if the view has no dimensions.
+        if (state.viewWidth <= 0 || state.viewHeight <= 0) {
+            // Return existing state or safe default.
+            return state
+        }
+
         val camera = Camera()
         val matrix = Matrix()
 
@@ -28,20 +34,23 @@ class UpdateStateUseCase @Inject constructor(
         val zoomRange = com.hereliesaz.cuedetat.ui.ZoomMapping.getZoomRange(state.experienceMode)
         val zoomZ = com.hereliesaz.cuedetat.ui.ZoomMapping.sliderToZoom(state.zoomSliderPosition, zoomRange.first, zoomRange.second)
 
+        // Calculate Scale to fit the table to the screen width (with padding).
+        // The logical table width is small (~48-100 units depending on calculation),
+        // while the screen is ~1080 pixels. We must scale up.
+        // We target 90% of screen width.
+        val targetScale = (width * 0.9f) / state.table.logicalWidth
+
         camera.save()
 
         // Apply pitch (rotate around X axis)
         // state.currentOrientation.pitch is in degrees (15..90).
-        // 0 degrees = Looking straight down (Top-down view).
-        // 90 degrees = Looking at horizon.
+        // 0 degrees (Flat) -> We see top down.
+        // 90 degrees (Vertical) -> We see edge on.
+        // rotateX rotates the Model. Rotating Model by +Theta is equivalent to Camera looking from +Theta?
+        // Yes.
         camera.rotateX(state.currentOrientation.pitch)
 
         // Apply zoom (move camera along Z axis)
-        // Note: In Android Camera, +Z is "away" into the screen?
-        // We translate the *view*?
-        // Standard usage: translate(0, 0, -distance) to move camera back / object forward?
-        // Existing logic used `zoomZ` (range -50 to 0).
-        // We'll stick to that.
         camera.translate(0f, 0f, zoomZ)
 
         // Get the matrix from camera
@@ -51,22 +60,21 @@ class UpdateStateUseCase @Inject constructor(
         // Construct the final transformation matrix
         val m = Matrix()
 
-        // 1. Rotate Table (Yaw) around its center (0,0)
-        // This spins the table on the 2D logical plane.
+        // 1. Scale the Model (Logical Units -> Screen-ish Units)
+        // We apply this first so the Model is the "Right Size" before rotation/projection.
+        m.postScale(targetScale, targetScale)
+
+        // 2. Rotate Table (Yaw) around its center (0,0)
         m.postRotate(state.worldRotationDegrees)
 
-        // 2. Apply Camera Matrix (Pitch + Zoom)
-        // The Camera matrix transforms coordinates from "World" (centered at 0,0)
-        // to "Camera Space" (centered at 0,0).
+        // 3. Apply Camera Matrix (Pitch + Zoom)
         m.postConcat(matrix)
 
-        // 3. Move to Screen Center
-        // We want the logical (0,0) (now projected) to be at the center of the screen.
+        // 4. Move to Screen Center
+        // The projection centers at (0,0). We move it to screen center.
         m.postTranslate(centerX, centerY)
 
-        // 4. Apply Pan (View Offset)
-        // We apply the pan in Screen Space so it moves the view consistently
-        // regardless of rotation/pitch.
+        // 5. Apply Pan (View Offset)
         m.postTranslate(state.viewOffset.x, state.viewOffset.y)
 
         val pitchMatrix = m
@@ -75,7 +83,7 @@ class UpdateStateUseCase @Inject constructor(
         val inversePitchMatrix = Matrix()
         val hasInverse = pitchMatrix.invert(inversePitchMatrix)
 
-        // Calculate size calculation matrix (Zoom only, no pitch)
+        // Calculate size calculation matrix (Zoom + Scale only, no pitch)
         val flatCamera = Camera()
         flatCamera.save()
         flatCamera.translate(0f, 0f, zoomZ)
@@ -84,13 +92,13 @@ class UpdateStateUseCase @Inject constructor(
         flatCamera.getMatrix(flatCamMatrix)
 
         val sizeCalculationMatrix = Matrix()
+        sizeCalculationMatrix.postScale(targetScale, targetScale) // Apply Scale!
         sizeCalculationMatrix.postRotate(state.worldRotationDegrees)
         sizeCalculationMatrix.postConcat(flatCamMatrix)
-        // Note: DrawingUtils often uses mapRadius which ignores translation,
-        // so we don't strictly need to translate here, but scaling must be correct.
 
         // Logical Plane Matrix (2D only, for mapping screen to logical table plane)
         val logicalPlaneMatrix = Matrix()
+        logicalPlaneMatrix.postScale(targetScale, targetScale) // Apply Scale!
         logicalPlaneMatrix.postRotate(state.worldRotationDegrees)
         logicalPlaneMatrix.postTranslate(centerX, centerY)
         logicalPlaneMatrix.postTranslate(state.viewOffset.x, state.viewOffset.y)
@@ -98,9 +106,14 @@ class UpdateStateUseCase @Inject constructor(
         // Rail Pitch Matrix (Same as main matrix for now)
         val railPitchMatrix = pitchMatrix
 
-        // Recalculate Bank Shots and Spin Paths if needed (Full update)
-        // Ideally we'd call the injected use cases here.
-        // But for now, we just update the matrices.
+        // Recalculate Bank Shots and Spin Paths
+        // Note: CalculateBankShot relies on the logical model state, not the view matrix.
+        // However, we should re-run it if the state changed.
+        val bankResult = calculateBankShot(state)
+        // We don't have a use case for spin paths update in this context easily available without injection check,
+        // but typically we'd update spin paths here too.
+        // For now, we preserve existing spin paths or clear them if needed.
+        // Existing logic suggests spin paths update on specific events.
 
         return state.copy(
             pitchMatrix = pitchMatrix,
@@ -109,7 +122,9 @@ class UpdateStateUseCase @Inject constructor(
             sizeCalculationMatrix = sizeCalculationMatrix,
             logicalPlaneMatrix = logicalPlaneMatrix,
             railPitchMatrix = railPitchMatrix,
-            flatMatrix = logicalPlaneMatrix
+            flatMatrix = logicalPlaneMatrix,
+            bankShotPath = bankResult.path,
+            pocketedBankShotPocketIndex = bankResult.pocketedPocketIndex
         )
     }
 }

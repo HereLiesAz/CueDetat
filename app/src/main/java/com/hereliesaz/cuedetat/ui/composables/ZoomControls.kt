@@ -38,7 +38,8 @@ fun ZoomControls(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        IconButton(onClick = { onZoomChange(zoomSliderPosition + 1) }) {
+        // Increment by 0.05 for smoother button zooming
+        IconButton(onClick = { onZoomChange((zoomSliderPosition + 0.05f).coerceIn(0f, 1f)) }) {
             Icon(
                 Icons.Default.Add,
                 contentDescription = "Zoom In",
@@ -49,7 +50,7 @@ fun ZoomControls(
         Slider(
             value = zoomSliderPosition,
             onValueChange = { onZoomChange(it) },
-            valueRange = -50f..0f,
+            valueRange = 0f..1f, // Normalized range
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
                 activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -80,7 +81,7 @@ fun ZoomControls(
                 .height(32.dp)
         )
         Spacer(modifier = Modifier.height(16.dp))
-        IconButton(onClick = { onZoomChange(zoomSliderPosition - 1) }) {
+        IconButton(onClick = { onZoomChange((zoomSliderPosition - 0.05f).coerceIn(0f, 1f)) }) {
             Icon(
                 Icons.Default.Remove,
                 contentDescription = "Zoom Out",
