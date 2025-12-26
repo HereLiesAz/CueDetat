@@ -299,6 +299,7 @@ class BallRenderer {
         typeface: Typeface?
     ) {
         val textPaint = paints.textPaint.apply { this.typeface = typeface }
+        val matrix = state.pitchMatrix ?: return
 
         state.onPlaneBall?.let {
             val (label, config) = if (state.isBankingMode) {
@@ -306,29 +307,31 @@ class BallRenderer {
             } else {
                 "Actual Cue Ball" to LabelConfig.actualCueBall
             }
-            textRenderer.draw(canvas, textPaint, it, label, config, state)
+            val screenPos = DrawingUtils.mapPoint(it.center, matrix)
+            textRenderer.draw(canvas, textPaint, screenPos, label, config, state)
         }
 
         if (!state.isBankingMode) {
+            val targetScreenPos = DrawingUtils.mapPoint(state.protractorUnit.center, matrix)
             textRenderer.draw(
                 canvas,
                 textPaint,
-                state.protractorUnit,
+                targetScreenPos,
                 "Target Ball",
                 LabelConfig.targetBall,
                 state
             )
-            textRenderer.draw(canvas, textPaint, object : LogicalCircular {
-                override val center = state.protractorUnit.ghostCueBallCenter
-                override val radius = state.protractorUnit.radius
-            }, "Ghost Cue Ball", LabelConfig.ghostCueBall, state)
+
+            val ghostCueScreenPos = DrawingUtils.mapPoint(state.protractorUnit.ghostCueBallCenter, matrix)
+            textRenderer.draw(canvas, textPaint, ghostCueScreenPos, "Ghost Cue Ball", LabelConfig.ghostCueBall, state)
         }
 
         state.obstacleBalls.forEachIndexed { index, obstacle ->
+            val screenPos = DrawingUtils.mapPoint(obstacle.center, matrix)
             textRenderer.draw(
                 canvas,
                 textPaint,
-                obstacle,
+                screenPos,
                 "Obstacle ${index + 1}",
                 LabelConfig.obstacleBall,
                 state
