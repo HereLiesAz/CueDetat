@@ -7,6 +7,8 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.Shader
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
@@ -526,9 +528,12 @@ class LineRenderer {
                 Shader.TileMode.CLAMP
             )
             paints.gradientMaskPaint.shader = gradient
-            canvas.drawRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), paints.gradientMaskPaint)
+            paints.gradientMaskPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+            // Use a large enough rect to cover the entire logical space
+            canvas.drawRect(-10000f, -10000f, 10000f, 10000f, paints.gradientMaskPaint)
         } finally {
             paints.gradientMaskPaint.shader = null // Reset the shader
+            paints.gradientMaskPaint.xfermode = null // Reset the xfermode
             canvas.restoreToCount(layer)
         }
     }
