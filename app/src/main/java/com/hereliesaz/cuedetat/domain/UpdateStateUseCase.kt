@@ -2,7 +2,6 @@ package com.hereliesaz.cuedetat.domain
 
 import android.graphics.Camera
 import android.graphics.Matrix
-import android.graphics.PointF
 import com.hereliesaz.cuedetat.domain.CalculateBankShot
 import com.hereliesaz.cuedetat.domain.CalculateSpinPaths
 import javax.inject.Inject
