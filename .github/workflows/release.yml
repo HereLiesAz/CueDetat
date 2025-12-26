@@ -129,8 +129,8 @@ jobs:
           fi
 
           # Calculate Patch version programmatically based on commits since Minor update
-          # Use grep to find the line number matching "minor" (case insensitive) to pass to git blame
-          MINOR_LINE=$(grep -in "minor=" version.properties | cut -d: -f1 | head -n 1)
+          # Use grep to find the line number of the actual 'minor' key assignment (case insensitive) to pass to git blame
+          MINOR_LINE=$(grep -inE '^[[:space:]]*minor[[:space:]]*=' version.properties | cut -d: -f1 | head -n 1)
 
           if [ -n "$MINOR_LINE" ]; then
              MINOR_COMMIT=$(git blame -L "${MINOR_LINE},${MINOR_LINE}" version.properties | awk '{print $1}' | tr -d '^')
