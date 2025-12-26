@@ -11,6 +11,7 @@ import android.graphics.Shader
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.graphics.withMatrix
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.ui.theme.SulfurDust
@@ -25,6 +26,7 @@ import com.hereliesaz.cuedetat.view.config.line.ShotGuideLine
 import com.hereliesaz.cuedetat.view.config.line.TangentLine
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.config.ui.ProtractorGuides
+import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.renderer.util.LineTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
 import kotlin.math.atan2
@@ -42,17 +44,102 @@ class LineRenderer {
         paints: PaintCache,
         typeface: Typeface?
     ) {
-        if (state.isBankingMode) {
-            drawBankingLines(canvas, state, paints)
-        } else {
-            drawProtractorLines(canvas, state, paints, typeface)
-            drawProtractorGuides(canvas, state, paints)
+        val matrix = state.pitchMatrix ?: return
+
+        // Wrap line drawing in matrix transformation
+        canvas.withMatrix(matrix) {
+            if (state.isBankingMode) {
+                drawBankingLines(this, state, paints)
+            } else {
+                drawProtractorLines(this, state, paints)
+                drawAimingLines(this, state, paints)
+                drawTangentLines(this, state, paints)
+                drawSpinPaths(this, state, paints)
+                drawProtractorGuides(this, state, paints)
+            }
         }
+
+        // Draw labels outside of matrix transformation (Screen Space) to ensure billboarding
+        if (!state.isBankingMode) {
+             drawProtractorLabels(canvas, state, paints, typeface)
+             drawProtractorGuideLabels(canvas, state, paints, matrix)
+        }
+    }
+
+    private fun drawProtractorLabels(
+        canvas: Canvas,
+        state: CueDetatState,
+        paints: PaintCache,
+        typeface: Typeface?
+    ) {
+        if (state.areHelpersVisible) {
+             // textRenderer.drawProtractorLabels expects untransformed canvas, but needs state to calculate positions.
+             // We need to ensure textRenderer handles mapping internally or we map here.
+             // LineTextRenderer.drawProtractorLabels implementation likely needs mapping.
+             // Let's assume for now we pass the state and it calculates based on current props.
+             // But we should verify LineTextRenderer uses DrawingUtils.mapPoint.
+             textRenderer.drawProtractorLabels(canvas, state, paints, typeface)
+        }
+    }
+
+    private fun drawProtractorGuideLabels(
+        canvas: Canvas,
+        state: CueDetatState,
+        paints: PaintCache,
+        matrix: android.graphics.Matrix
+    ) {
+        val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
+        val targetCenter = state.protractorUnit.center
+        val config = ProtractorGuides()
+        val labelConfig = LabelConfig.angleGuide
+
+        val textPaint = Paint(paints.textPaint).apply {
+            alpha = (config.opacity * 255).toInt()
+            textSize = 30f
+        }
+
+        if (state.areHelpersVisible || labelConfig.isPersistentlyVisible) {
+             protractorAngles.forEach { angle ->
+                 // Need to map center and reference point to screen space for the label?
+                 // drawAngleLabel signature: (canvas, center, reference, angle, paint, radius)
+                 // It likely draws at `center + radius` rotated by angle.
+                 // If we pass logical points, it will calculate logical position.
+                 // We want SCREEN position.
+
+                 // However, the angle guide label is drawn at the END of the guide line.
+                 // The guide line is drawn in logical space.
+
+                 // Let's map the center and reference to screen space?
+                 // No, that distorts the angle calculation.
+
+                 // Better: Calculate the logical position of the label, THEN map it to screen space.
+                 val labelPosPositive = calculateAngleLabelPos(ghostCueCenter, targetCenter, angle, state.protractorUnit.radius)
+                 val screenPosPositive = DrawingUtils.mapPoint(labelPosPositive, matrix)
+
+                 val labelPosNegative = calculateAngleLabelPos(ghostCueCenter, targetCenter, -angle, state.protractorUnit.radius)
+                 val screenPosNegative = DrawingUtils.mapPoint(labelPosNegative, matrix)
+
+                 // We overload drawAngleLabel to take a position instead of calculating it?
+                 // Or we modify LineTextRenderer.
+                 // For now, let's call a new method on textRenderer or just drawText here.
+
+                 textRenderer.drawAngleLabelAt(canvas, screenPosPositive, angle, textPaint)
+                 textRenderer.drawAngleLabelAt(canvas, screenPosNegative, -angle, textPaint)
+             }
+        }
+    }
+
+    private fun calculateAngleLabelPos(center: PointF, reference: PointF, angle: Float, radius: Float): PointF {
+        val initialAngleRad = atan2(reference.y - center.y, reference.x - center.x)
+        val finalAngleRad = initialAngleRad + Math.toRadians(angle.toDouble())
+        val x = center.x + radius * cos(finalAngleRad).toFloat()
+        val y = center.y + radius * sin(finalAngleRad).toFloat()
+        return PointF(x, y)
     }
 
     private fun drawProtractorLines(
         canvas: Canvas, state: CueDetatState,
-        paints: PaintCache, typeface: Typeface?
+        paints: PaintCache
     ) {
         val shotLineAnchor = state.shotLineAnchor ?: return
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
@@ -116,13 +203,6 @@ class LineRenderer {
                 state,
                 paints
             )
-        }
-        drawTangentLines(canvas, state, paints)
-        drawAimingLines(canvas, state, paints)
-        drawSpinPaths(canvas, state, paints)
-
-        if (state.areHelpersVisible) {
-            textRenderer.drawProtractorLabels(canvas, state, paints, typeface)
         }
     }
 
@@ -348,25 +428,16 @@ class LineRenderer {
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
         val targetCenter = state.protractorUnit.center
         val config = ProtractorGuides()
-        val labelConfig = LabelConfig.angleGuide
 
         val guidePaint = Paint(paints.angleGuidePaint).apply {
             color = config.strokeColor.toArgb()
             strokeWidth = config.strokeWidth
             alpha = (config.opacity * 255).toInt()
         }
-        val textPaint = Paint(paints.textPaint).apply {
-            alpha = (config.opacity * 255).toInt()
-            textSize = 30f
-        }
 
         protractorAngles.forEach { angle ->
             drawAngleGuide(canvas, ghostCueCenter, targetCenter, angle, guidePaint, state, paints)
             drawAngleGuide(canvas, ghostCueCenter, targetCenter, -angle, guidePaint, state, paints)
-            if (state.areHelpersVisible || labelConfig.isPersistentlyVisible) {
-                textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, angle, textPaint, state.protractorUnit.radius)
-                textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, -angle, textPaint, state.protractorUnit.radius)
-            }
         }
     }
 
