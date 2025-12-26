@@ -8,7 +8,8 @@ import com.hereliesaz.cuedetat.ui.ZoomMapping
 internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent): CueDetatState {
     return when (action) {
         is MainScreenEvent.ZoomSliderChanged -> {
-            val newSliderPos = action.position.coerceIn(-50f, 50f)
+            // Slider is now 0..1, but let's coerce just in case
+            val newSliderPos = action.position.coerceIn(0f, 1f)
             state.copy(zoomSliderPosition = newSliderPos, valuesChangedSinceReset = true)
         }
 
@@ -16,7 +17,11 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode)
             val oldZoomSliderPos = state.zoomSliderPosition
             val currentZoomValue = ZoomMapping.sliderToZoom(oldZoomSliderPos, minZoom, maxZoom)
-            val newZoomValue = (currentZoomValue * action.scaleFactor).coerceIn(minZoom, maxZoom)
+
+            // Fix: Divide by scaleFactor for correct zoom direction (Pinch Out > 1 -> Zoom In -> Larger Z value toward 0)
+            // Z is negative (e.g. -50). Dividing by 1.1 gives -45 (Closer to 0).
+            val newZoomValue = (currentZoomValue / action.scaleFactor).coerceIn(minZoom, maxZoom)
+
             val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue, minZoom, maxZoom)
             state.copy(zoomSliderPosition = newSliderPos, valuesChangedSinceReset = true)
         }
