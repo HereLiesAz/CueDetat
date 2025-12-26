@@ -116,9 +116,9 @@ jobs:
           echo "Content of version.properties:"
           cat version.properties
 
-          # Extract version info from properties file using awk to handle potential whitespace
-          MAJOR=$(awk -F= '/versionMajor/ {print $2}' version.properties | tr -d '[:space:]')
-          MINOR=$(awk -F= '/versionMinor/ {print $2}' version.properties | tr -d '[:space:]')
+          # Extract version info from properties file using awk to handle potential whitespace and case-insensitive matching
+          MAJOR=$(awk -F= 'tolower($1) ~ /major/ {print $2}' version.properties | tr -d '[:space:]')
+          MINOR=$(awk -F= 'tolower($1) ~ /minor/ {print $2}' version.properties | tr -d '[:space:]')
 
           echo "Detected MAJOR: '$MAJOR'"
           echo "Detected MINOR: '$MINOR'"
@@ -129,11 +129,19 @@ jobs:
           fi
 
           # Calculate Patch version programmatically based on commits since Minor update
-          MINOR_COMMIT=$(git blame -L '/versionMinor=/',+1 version.properties | awk '{print $1}' | tr -d '^')
+          # Use grep to find the line number of the actual 'minor' key assignment (case insensitive) to pass to git blame
+          MINOR_LINE=$(grep -inE '^[[:space:]]*minor[[:space:]]*=' version.properties | cut -d: -f1 | head -n 1)
+
+          if [ -n "$MINOR_LINE" ]; then
+             MINOR_COMMIT=$(git blame -L "${MINOR_LINE},${MINOR_LINE}" version.properties | awk '{print $1}' | tr -d '^')
+          else
+             echo "Warning: Could not find 'minor=' line for git blame."
+          fi
+
           if [ -n "$MINOR_COMMIT" ]; then
             PATCH=$(git rev-list --count $MINOR_COMMIT..HEAD)
           else
-            PATCH=$(awk -F= '/versionPatch/ {print $2}' version.properties | tr -d '[:space:]')
+            PATCH=$(awk -F= 'tolower($1) ~ /patch/ {print $2}' version.properties | tr -d '[:space:]')
           fi
 
           VERSION_NAME="$MAJOR.$MINOR.$PATCH.$BUILD_NUMBER"
