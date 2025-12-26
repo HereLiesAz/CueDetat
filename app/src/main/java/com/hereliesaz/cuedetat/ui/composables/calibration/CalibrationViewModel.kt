@@ -136,6 +136,7 @@ class CalibrationViewModel @Inject constructor(
             existingData.second?.release()
 
             val model = android.os.Build.MODEL
+            // getProfile is now suspend and thread-safe
             val profile = deviceCalibrationDatabase.getProfile(model)
 
             if (profile != null) {
