@@ -112,16 +112,36 @@ jobs:
         run: |
           export BUILD_NUMBER=$(git rev-list --count HEAD)
           
-          # Extract version info from properties file
-          MAJOR=$(grep 'major=' version.properties | cut -d'=' -f2)
-          MINOR=$(grep 'minor=' version.properties | cut -d'=' -f2)
+          # Debug: List file content
+          echo "Content of version.properties:"
+          cat version.properties
+
+          # Extract version info from properties file using awk to handle potential whitespace and case-insensitive matching
+          MAJOR=$(awk -F= 'tolower($1) ~ /major/ {print $2}' version.properties | tr -d '[:space:]')
+          MINOR=$(awk -F= 'tolower($1) ~ /minor/ {print $2}' version.properties | tr -d '[:space:]')
+
+          echo "Detected MAJOR: '$MAJOR'"
+          echo "Detected MINOR: '$MINOR'"
+
+          if [ -z "$MAJOR" ] || [ -z "$MINOR" ]; then
+             echo "Error: Could not extract version info from version.properties"
+             exit 1
+          fi
 
           # Calculate Patch version programmatically based on commits since Minor update
-          MINOR_COMMIT=$(git blame -L '/minor=/',+1 version.properties | awk '{print $1}' | tr -d '^')
+          # Use grep to find the line number matching "minor" (case insensitive) to pass to git blame
+          MINOR_LINE=$(grep -in "minor=" version.properties | cut -d: -f1 | head -n 1)
+
+          if [ -n "$MINOR_LINE" ]; then
+             MINOR_COMMIT=$(git blame -L "${MINOR_LINE},${MINOR_LINE}" version.properties | awk '{print $1}' | tr -d '^')
+          else
+             echo "Warning: Could not find 'minor=' line for git blame."
+          fi
+
           if [ -n "$MINOR_COMMIT" ]; then
             PATCH=$(git rev-list --count $MINOR_COMMIT..HEAD)
           else
-            PATCH=$(grep 'patch=' version.properties | cut -d'=' -f2)
+            PATCH=$(awk -F= 'tolower($1) ~ /patch/ {print $2}' version.properties | tr -d '[:space:]')
           fi
 
           VERSION_NAME="$MAJOR.$MINOR.$PATCH.$BUILD_NUMBER"
