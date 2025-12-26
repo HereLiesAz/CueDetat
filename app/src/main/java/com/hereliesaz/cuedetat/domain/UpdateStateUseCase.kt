@@ -38,15 +38,16 @@ class UpdateStateUseCase @Inject constructor(
         val zoomZ = com.hereliesaz.cuedetat.ui.ZoomMapping.sliderToZoom(state.zoomSliderPosition, zoomRange.first, zoomRange.second)
 
         camera.save()
-        // Apply zoom (move camera along Z axis)
-        camera.translate(0f, 0f, zoomZ)
 
-        // Apply pitch (rotate around X axis)
+        // Apply pitch (rotate around X axis) FIRST
         // Note: state.currentOrientation.pitch is in degrees?
         // SensorRepository usually gives degrees or radians. Let's assume degrees based on usage elsewhere.
         // UiModel says `val pitchAngle: Float get() = currentOrientation.pitch`.
         // README says "The pitch is primarily used to tilt the 2D protractor plane."
         camera.rotateX(state.currentOrientation.pitch)
+
+        // Apply zoom (move camera along Z axis) SECOND
+        camera.translate(0f, 0f, zoomZ)
 
         // Get the matrix from camera
         camera.getMatrix(matrix)
