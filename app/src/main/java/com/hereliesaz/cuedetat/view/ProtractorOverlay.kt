@@ -18,6 +18,7 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.gestures.detectManualGestures
 import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
+import com.hereliesaz.cuedetat.view.renderer.util.PaintCache
 
 @Composable
 fun ProtractorOverlay(
@@ -40,7 +41,7 @@ fun ProtractorOverlay(
     }
 
     LaunchedEffect(uiState, systemIsDark) {
-        paints.updateColors(systemIsDark)
+        paints.updateColors(uiState, systemIsDark)
     }
 
     Canvas(

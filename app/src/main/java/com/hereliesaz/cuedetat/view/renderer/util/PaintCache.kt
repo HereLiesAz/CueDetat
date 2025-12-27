@@ -129,6 +129,8 @@ class PaintCache {
         style = Paint.Style.FILL
     }
 
+    val glowPaints = mutableMapOf<Pair<Int, Float>, Paint>()
+
     fun setTypeface(typeface: Typeface?) {
         textPaint.typeface = typeface
     }

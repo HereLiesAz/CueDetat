@@ -18,7 +18,7 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.ui.theme.SulfurDust
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
-import com.hereliesaz.cuedetat.view.PaintCache
+import com.hereliesaz.cuedetat.view.renderer.util.PaintCache
 import com.hereliesaz.cuedetat.view.config.line.AimingLine
 import com.hereliesaz.cuedetat.view.config.line.BankLine1
 import com.hereliesaz.cuedetat.view.config.line.BankLine2
@@ -508,34 +508,12 @@ class LineRenderer {
     ) {
         val tableLength = state.table.logicalHeight
         val totalLength = tableLength * 2.0f
-        val fadeStartDistance = tableLength * 1.2f
 
         val end = PointF(start.x + direction.x * totalLength, start.y + direction.y * totalLength)
-        val fadeStart = PointF(start.x + direction.x * fadeStartDistance, start.y + direction.y * fadeStartDistance)
 
-        val layer = canvas.saveLayer(null, null)
-        try {
-            // 1. Draw the full, opaque line(s)
-            glowPaint?.let { canvas.drawLine(start.x, start.y, end.x, end.y, it) }
-            canvas.drawLine(start.x, start.y, end.x, end.y, paint)
-
-            // 2. Create and apply the gradient mask
-            val gradient = LinearGradient(
-                fadeStart.x, fadeStart.y,
-                end.x, end.y,
-                intArrayOf(paint.color, Color.Transparent.toArgb()),
-                null,
-                Shader.TileMode.CLAMP
-            )
-            paints.gradientMaskPaint.shader = gradient
-            paints.gradientMaskPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
-            // Use a large enough rect to cover the entire logical space
-            canvas.drawRect(-10000f, -10000f, 10000f, 10000f, paints.gradientMaskPaint)
-        } finally {
-            paints.gradientMaskPaint.shader = null // Reset the shader
-            paints.gradientMaskPaint.xfermode = null // Reset the xfermode
-            canvas.restoreToCount(layer)
-        }
+        // Simply draw the line without fading for now to ensure visibility
+        glowPaint?.let { canvas.drawLine(start.x, start.y, end.x, end.y, it) }
+        canvas.drawLine(start.x, start.y, end.x, end.y, paint)
     }
 
     private fun normalize(p: PointF): PointF {
