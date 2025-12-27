@@ -15,3 +15,4 @@ app/build/
 .cxx
 local.properties
 /project_context_for_ai_*.txt
+build_output*
