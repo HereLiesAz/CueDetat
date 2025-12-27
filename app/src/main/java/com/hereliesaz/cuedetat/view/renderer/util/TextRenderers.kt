@@ -5,7 +5,7 @@ import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.Typeface
 import com.hereliesaz.cuedetat.domain.CueDetatState
-import com.hereliesaz.cuedetat.view.PaintCache
+import com.hereliesaz.cuedetat.view.renderer.util.PaintCache
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.LogicalCircular
 

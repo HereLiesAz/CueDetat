@@ -20,7 +20,11 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
 
             // Fix: Divide by scaleFactor for correct zoom direction (Pinch Out > 1 -> Zoom In -> Larger Z value toward 0)
             // Z is negative (e.g. -50). Dividing by 1.1 gives -45 (Closer to 0).
-            val newZoomValue = (currentZoomValue / action.scaleFactor).coerceIn(minZoom, maxZoom)
+            // Prevent getting stuck at 0 (Max Zoom) when pinching in (Zoom Out).
+            // If currentZoomValue is 0, we can't divide to get a smaller number (more negative).
+            val effectiveZoom = if (currentZoomValue == 0f && action.scaleFactor < 1f) -0.1f else currentZoomValue
+
+            val newZoomValue = (effectiveZoom / action.scaleFactor).coerceIn(minZoom, maxZoom)
 
             val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue, minZoom, maxZoom)
             state.copy(zoomSliderPosition = newSliderPos, valuesChangedSinceReset = true)
