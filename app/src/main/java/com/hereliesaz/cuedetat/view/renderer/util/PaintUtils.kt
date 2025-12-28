@@ -28,7 +28,7 @@ fun createGlowPaint(
     baseGlowColor: Color,
     baseGlowWidth: Float,
     state: CueDetatState,
-    paints: com.hereliesaz.cuedetat.view.PaintCache
+    paints: PaintCache
 ): Paint {
     val glowValue = state.glowStickValue
     val key = if (abs(glowValue) > 0.05f) {
