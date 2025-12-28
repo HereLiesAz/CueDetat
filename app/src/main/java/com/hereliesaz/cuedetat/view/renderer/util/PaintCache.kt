@@ -15,6 +15,8 @@ import com.hereliesaz.cuedetat.ui.theme.SulfurDust
 import com.hereliesaz.cuedetat.ui.theme.Mariner
 import com.hereliesaz.cuedetat.ui.theme.BruisedPlum
 import com.hereliesaz.cuedetat.ui.theme.MonteCarlo
+import com.hereliesaz.cuedetat.ui.theme.IcedOpal
+import com.hereliesaz.cuedetat.ui.theme.BankLine1Yellow
 
 class PaintCache {
     val targetCirclePaint = Paint().apply {
@@ -139,6 +141,9 @@ class PaintCache {
         val baseColor = if (systemIsDark) Color.White else Color.Black
         targetCirclePaint.color = SulfurDust.toArgb()
         shotLinePaint.color = Mariner.toArgb()
+        tangentLineSolidPaint.color = IcedOpal.toArgb()
+        tangentLineDottedPaint.color = IcedOpal.toArgb()
+        bankLine1Paint.color = BankLine1Yellow.toArgb()
         
         val glowRadius = if (state.glowStickValue > 0) state.glowStickValue * 20f else 10f
         lineGlowPaint.maskFilter = BlurMaskFilter(glowRadius, BlurMaskFilter.Blur.NORMAL)

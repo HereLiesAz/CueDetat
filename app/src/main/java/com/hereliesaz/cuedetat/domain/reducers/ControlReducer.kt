@@ -22,7 +22,7 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             // Z is negative (e.g. -50). Dividing by 1.1 gives -45 (Closer to 0).
             // Prevent getting stuck at 0 (Max Zoom) when pinching in (Zoom Out).
             // If currentZoomValue is 0, we can't divide to get a smaller number (more negative).
-            val effectiveZoom = if (currentZoomValue == 0f && action.scaleFactor < 1f) -0.1f else currentZoomValue // TODO: Extract -0.1f to a constant
+            val effectiveZoom = if (currentZoomValue == 0f && action.scaleFactor < 1f) -0.1f else currentZoomValue
 
             val newZoomValue = (effectiveZoom / action.scaleFactor).coerceIn(minZoom, maxZoom)
 
