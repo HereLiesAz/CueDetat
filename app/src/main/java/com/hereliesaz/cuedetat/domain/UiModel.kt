@@ -272,3 +272,9 @@ sealed class MainScreenEvent {
     object SingleEventConsumedAction : MainScreenEvent()
     object ToggleHelpDialog : MainScreenEvent()
 }
+
+enum class UpdateType {
+    FULL,
+    AIMING,
+    SPIN_ONLY
+}

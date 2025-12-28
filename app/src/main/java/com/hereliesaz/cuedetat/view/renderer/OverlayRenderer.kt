@@ -1,9 +1,11 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/view/renderer/OverlayRenderer.kt
+
 package com.hereliesaz.cuedetat.view.renderer
 
 import android.graphics.Canvas
 import android.graphics.Typeface
 import com.hereliesaz.cuedetat.domain.CueDetatState
-import com.hereliesaz.cuedetat.view.PaintCache
+import com.hereliesaz.cuedetat.view.renderer.util.PaintCache
 import com.hereliesaz.cuedetat.view.renderer.ball.BallRenderer
 import com.hereliesaz.cuedetat.view.renderer.line.LineRenderer
 import com.hereliesaz.cuedetat.view.renderer.table.RailRenderer
