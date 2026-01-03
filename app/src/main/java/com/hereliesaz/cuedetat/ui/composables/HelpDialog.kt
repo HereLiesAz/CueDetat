@@ -17,24 +17,24 @@ import androidx.compose.ui.unit.dp
 fun HelpDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("How to Use Cue D'état AR", style = MaterialTheme.typography.titleLarge) },
+        title = { Text("How to Use Cue D'état AR") },
         text = {
             Column {
-                Text("Initial Setup", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                Text("1. Move your phone around to detect a flat surface.\n2. When prompted, tap the 'Place Table Here' button.", style = MaterialTheme.typography.bodyLarge)
+                Text("Initial Setup", fontWeight = FontWeight.Bold)
+                Text("1. Move your phone around to detect a flat surface.\n2. When prompted, tap the 'Place Table Here' button.")
                 Spacer(Modifier.height(12.dp))
 
-                Text("Placing & Moving Balls", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                Text("1. Tap on the green table surface to place the Cue Ball, then tap again to place the Object Ball.\n2. To move a ball, simply tap its new location on the table.", style = MaterialTheme.typography.bodyLarge)
+                Text("Placing & Moving Balls", fontWeight = FontWeight.Bold)
+                Text("1. Tap on the green table surface to place the Cue Ball, then tap again to place the Object Ball.\n2. To move a ball, simply tap its new location on the table.")
                 Spacer(Modifier.height(12.dp))
 
-                Text("Shot Types", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                Text("• Use the controls at the bottom to switch between Cut, Bank, and Kick shots.\n• In Bank/Kick mode, use the slider to rotate the table and buttons to select a rail.\n• In Cut mode, use the 2D pad to apply spin and see its effect.", style = MaterialTheme.typography.bodyLarge)
+                Text("Shot Types", fontWeight = FontWeight.Bold)
+                Text("• Use the controls at the bottom to switch between Cut, Bank, and Kick shots.\n• In Bank/Kick mode, use the slider to rotate the table and buttons to select a rail.\n• In Cut mode, use the 2D pad to apply spin and see its effect.")
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Got it!", style = MaterialTheme.typography.bodyLarge)
+                Text("Got it!")
             }
         },
         modifier = Modifier.padding(16.dp)

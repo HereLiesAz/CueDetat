@@ -56,6 +56,4 @@
         <item>HaterIcon03</item>
         <item>HaterIcon04</item>
     </string-array>
-
-    <string name="table_alignment_workspace_desc">Table alignment workspace. Drag the yellow pocket markers to match the table corners in the image.</string>
 </resources>

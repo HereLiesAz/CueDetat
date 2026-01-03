@@ -9,38 +9,20 @@ import org.opencv.core.MatOfPoint3f
 import org.opencv.core.Point3
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
-import com.google.gson.Gson
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.delay
 
 @Singleton
-class CalibrationRepository @Inject constructor(
-    private val gson: Gson
-) {
+class CalibrationRepository @Inject constructor() {
     private val patternSize = Size(4.0, 11.0) // 4x11 grid of circles
 
     suspend fun submitCalibrationData(cameraMatrix: Mat, distCoeffs: Mat): Boolean {
         // Simulate network delay
         delay(2000)
-
-        // Convert the Mats to a serializable format (simulating payload preparation)
-        val cameraMatrixData = DoubleArray(9)
-        cameraMatrix.get(0, 0, cameraMatrixData)
-        val distCoeffsData = DoubleArray(5)
-        distCoeffs.get(0, 0, distCoeffsData)
-
-        val payload = mapOf(
-            "cameraMatrix" to cameraMatrixData.toList(),
-            "distCoeffs" to distCoeffsData.toList()
-        )
-
-        val jsonPayload = gson.toJson(payload)
-
         // Log the data submission (simulated)
-        android.util.Log.d("CalibrationRepository", "Submitting calibration data: $jsonPayload")
-
-        // In a real implementation, we would send 'jsonPayload' to an endpoint.
+        // In a real implementation, we would convert the Mats to a serializable format
+        // and send them to an endpoint.
         return true
     }
 

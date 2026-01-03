@@ -2,12 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera.any" />
-
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- This is the ONLY feature tag needed for a standard ARCore app. -->
     <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
+    <!-- Required for AR passthrough -->
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:name=".di.CueDetatApplication"
@@ -19,12 +21,11 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+
         android:enableOnBackInvokedCallback="true"
         android:theme="@style/Theme.CueDetat"
 
         tools:targetApi="36">
-
-        <meta-data android:name="com.google.ar.core" android:value="optional" />
 
         <activity
             android:name=".MainActivity"
@@ -34,6 +35,9 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- REMOVED the conflicting xr.spatial property tag -->
+
         </activity>
     </application>
 

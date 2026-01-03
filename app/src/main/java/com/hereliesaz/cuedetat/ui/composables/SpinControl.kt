@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/SpinControl.kt
 
 package com.hereliesaz.cuedetat.ui.composables
@@ -6,6 +7,8 @@ import android.graphics.PointF
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -27,25 +30,43 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
-import androidx.compose.ui.platform.LocalViewConfiguration
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.withTimeout
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
+=======
+package com.hereliesaz.cuedetat.ui.composables
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.sqrt
+>>>>>>> origin/CueDetatAR
 
 @Composable
 fun SpinControl(
     modifier: Modifier = Modifier,
+<<<<<<< HEAD
     centerPosition: PointF,
     selectedSpinOffset: PointF?,
     lingeringSpinOffset: PointF?,
@@ -54,121 +75,74 @@ fun SpinControl(
 ) {
     var isMoveModeActive by remember { mutableStateOf(false) }
     val moveIconPainter = rememberVectorPainter(image = Icons.Default.OpenWith)
-    val viewConfiguration = LocalViewConfiguration.current
 
     Box(
         modifier = modifier
-            .semantics {
-                contentDescription = "Spin Control"
-                stateDescription = selectedSpinOffset?.let {
-                    "Horizontal: %.2f, Vertical: %.2f".format(it.x, it.y)
-                } ?: "No spin applied"
-                role = Role.Image
-            }
             .pointerInput(Unit) {
                 awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    val downId = down.id
-                    var dragged = false
-                    var spinDragActive = false
-                    var moveDragActive = false
+                    awaitFirstDown(requireUnconsumed = false)
+                    val firstUp = waitForUpOrCancellation()
 
-                    // Phase 1: Check for Spin Drag (Immediate) or Tap (Up)
-                    var upOrCancel: androidx.compose.ui.input.pointer.PointerInputChange? = null
-
-                    try {
-                        withTimeout(viewConfiguration.longPressTimeoutMillis) {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.find { it.id == downId }
-
-                                if (change == null || !change.pressed) {
-                                    upOrCancel = change
-                                    break
-                                }
-
-                                val panChange = change.positionChange()
-                                if (panChange.getDistance() > viewConfiguration.touchSlop) {
-                                    dragged = true
-                                    spinDragActive = true
-                                    change.consume()
-                                    break
-                                }
-                            }
-                        }
-                    } catch (e: TimeoutCancellationException) {
-                        // Long press without move? Could be start of drag too.
-                    }
-
-                    if (spinDragActive) {
-                        // Handle Spin Drag
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.find { it.id == downId } ?: break
-                            if (!change.pressed) {
-                                onEvent(MainScreenEvent.SpinSelectionEnded)
-                                break
-                            }
-
-                            // For spin, we want the absolute position relative to the control center
-                            // But change.position is relative to the composable (0,0 is top left)
-                            // The `onDragStart` in detectDragGestures gave us the local position.
-                            // Here `change.position` is local position.
-                            onEvent(MainScreenEvent.SpinApplied(PointF(change.position.x, change.position.y)))
-                            change.consume()
-                        }
-                    } else if (upOrCancel != null) {
-                        // It was a tap (Up). Now wait for second down.
-                        upOrCancel!!.consume()
-
-                        var secondDown: androidx.compose.ui.input.pointer.PointerInputChange? = null
-                        try {
-                            withTimeout(viewConfiguration.doubleTapTimeoutMillis) {
-                                val event = awaitFirstDown(requireUnconsumed = false)
-                                secondDown = event
-                            }
-                        } catch (e: TimeoutCancellationException) {
-                            // Single tap
+                    if (firstUp != null) {
+                        firstUp.consume()
+                        val secondDown = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
+                            awaitFirstDown(requireUnconsumed = false)
                         }
 
                         if (secondDown != null) {
-                            // Double Tap detected. Now check for Drag (Move).
-                            secondDown!!.consume()
-                            val secondDownId = secondDown!!.id
+                            secondDown.consume()
+                            isMoveModeActive = true
+                            var pointerId = secondDown.id
 
-                            isMoveModeActive = true // Visual feedback
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val dragChange = event.changes.find { it.id == pointerId }
 
-                            var moveDragged = false
-
-                            // Monitor for drag
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.find { it.id == secondDownId }
-
-                                if (change == null || !change.pressed) {
-                                    break // Lifted
-                                }
-
-                                val panChange = change.positionChange()
-                                if (panChange != Offset.Zero) {
-                                    moveDragged = true
-                                    onEvent(
-                                        MainScreenEvent.DragSpinControl(
-                                            PointF(panChange.x, panChange.y)
+                                    if (dragChange == null || !dragChange.pressed) {
+                                        break
+                                    }
+                                    if (dragChange.isConsumed) {
+                                        continue
+                                    }
+                                    val pan = dragChange.positionChange()
+                                    if (pan != Offset.Zero) {
+                                        onEvent(
+                                            MainScreenEvent.DragSpinControl(
+                                                PointF(
+                                                    pan.x,
+                                                    pan.y
+                                                )
+                                            )
                                         )
-                                    )
-                                    change.consume()
+                                        dragChange.consume()
+                                    }
                                 }
+                            } finally {
+                                isMoveModeActive = false
                             }
-
-                            isMoveModeActive = false
                         }
                     }
                 }
             }
     ) {
         Canvas(
-            modifier = Modifier.size(120.dp)
+            modifier = Modifier
+                .size(120.dp)
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            val eventOffset = PointF(offset.x, offset.y)
+                            onEvent(MainScreenEvent.SpinApplied(eventOffset))
+                        },
+                        onDragEnd = { onEvent(MainScreenEvent.SpinSelectionEnded) },
+                        onDragCancel = { onEvent(MainScreenEvent.SpinSelectionEnded) }
+                    ) { change, _ ->
+                        val eventOffset = PointF(change.position.x, change.position.y)
+                        onEvent(MainScreenEvent.SpinApplied(eventOffset))
+                        change.consume()
+                    }
+                }
         ) {
             val radius = size.minDimension / 2f
             val center = Offset(radius, radius)
@@ -190,7 +164,6 @@ fun SpinControl(
                 for (i in 0 until numArcs) {
                     val startAngle = i * arcAngle
                     val colorSampleAngle = startAngle + (arcAngle / 2)
-                    // Use a fallback or stub if SpinColorUtils is missing/broken
                     val color = SpinColorUtils.getColorFromAngleAndDistance(colorSampleAngle, 1.0f)
 
                     drawArc(
@@ -276,17 +249,57 @@ private fun DrawScope.drawIndicator(
         center = Offset(indicatorX, indicatorY),
         style = Stroke(width = 2.dp.toPx())
     )
-}
-
-// Temporary stub for SpinControl used by MainScreen if needed
-@Composable
-fun SpinControl(
-    onSpinChanged: (Float) -> Unit, // Assuming signature from MainScreen usage
-    modifier: Modifier = Modifier
+=======
+    onSpinChanged: (Offset) -> Unit
 ) {
-    // Stub or implementation that delegates to the main SpinControl
-    // MainScreen uses: SpinControl(onSpinChanged = { onEvent(UiEvent.SetSpin(it)) })
-    // Wait, MainScreen uses a DIFFERENT SpinControl or calling it differently.
-    // The main SpinControl takes complex parameters.
-    // I should create a separate overload or adapter.
+    var thumbOffset by remember { mutableStateOf(Offset.Zero) }
+    val controlSize = 100.dp
+    val thumbSize = 20.dp
+
+    Box(
+        modifier = modifier
+            .size(controlSize)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragEnd = {
+                        thumbOffset = Offset.Zero
+                        onSpinChanged(Offset.Zero)
+                    }
+                ) { change, _ ->
+                    val sizePx = size.width.toFloat()
+                    val radius = sizePx / 2f
+                    val dragPosition = change.position - Offset(radius, radius)
+                    val distance = sqrt(dragPosition.x * dragPosition.x + dragPosition.y * dragPosition.y)
+
+                    val clampedDistance = min(distance, radius)
+                    val angle = atan2(dragPosition.y, dragPosition.x)
+
+                    thumbOffset = Offset(
+                        x = clampedDistance * cos(angle),
+                        y = clampedDistance * sin(angle)
+                    )
+
+                    // Normalize the offset to a [-1, 1] range for the ViewModel
+                    val normalizedOffset = Offset(
+                        x = thumbOffset.x / radius,
+                        y = thumbOffset.y / radius
+                    )
+                    onSpinChanged(normalizedOffset)
+                    change.consume()
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        // Thumb
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(thumbOffset.x.roundToInt(), thumbOffset.y.roundToInt()) }
+                .size(thumbSize)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+        )
+    }
+>>>>>>> origin/CueDetatAR
 }

@@ -36,11 +36,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -121,14 +116,9 @@ private fun AlignmentStep(
     var draggedPocket by remember { mutableStateOf<DraggablePocket?>(null) }
     val touchRadius = 60f
 
-    val description = stringResource(com.hereliesaz.cuedetat.R.string.table_alignment_workspace_desc)
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .semantics {
-                contentDescription = description
-                role = Role.Image
-            }
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { startOffset ->

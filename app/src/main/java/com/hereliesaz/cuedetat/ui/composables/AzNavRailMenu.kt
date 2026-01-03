@@ -28,9 +28,8 @@ fun AzNavRailMenu(
         isLandscape = false
     ) {
         azSettings(
-            displayAppNameInHeader = false,
-            headerIconShape = AzHeaderIconShape.CIRCLE,
-            packRailButtons = true
+            displayAppNameInHeader = true,
+            headerIconShape = AzHeaderIconShape.CIRCLE
         )
 
         azMenuItem(
@@ -46,51 +45,11 @@ fun AzNavRailMenu(
             disabled = true
         )
 
-        if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailHostItem(
-                id = "ar",
-                text = "AR",
-                route = "ar",
-                onClick = { onEvent(MainScreenEvent.ToggleArScreen) }
-            )
-
-            azRailSubToggle(
-                hostId = "ar",
-                id = "snap_table",
-                isChecked = uiState.isArTableSnapping,
-                toggleOnText = "Snap Table On",
-                toggleOffText = "Snap Table Off",
-                route = "snap_table",
-                shape = null,
-                onClick = { onEvent(MainScreenEvent.ToggleArTableSnapping) }
-            )
-            azRailSubToggle(
-                hostId = "ar",
-                id = "snap_balls",
-                isChecked = uiState.isArBallSnapping,
-                toggleOnText = "Snap Balls On",
-                toggleOffText = "Snap Balls Off",
-                route = "snap_balls",
-                shape = null,
-                onClick = { onEvent(MainScreenEvent.ToggleArBallSnapping) }
-            )
-            azRailSubToggle(
-                hostId = "ar",
-                id = "snap_obs",
-                isChecked = uiState.areArObstaclesEnabled,
-                toggleOnText = "Snap Obstacles On",
-                toggleOffText = "Snap Obstacles Off",
-                route = "snap_obs",
-                shape = null,
-                onClick = { onEvent(MainScreenEvent.ToggleArObstacles) }
-            )
-        }
-
         azDivider()
 
         // Core Controls
         // Fix: Removed railToggleOnText/railToggleOffText parameters which are not in the API
-        azMenuToggle(
+        azRailToggle(
             id = "help",
             isChecked = uiState.areHelpersVisible,
             toggleOnText = strHideHelpers,

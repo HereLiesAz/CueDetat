@@ -48,9 +48,7 @@ class SensorRepository @Inject constructor(
                     SensorManager.getOrientation(rotationMatrix, orientationAngles)
                     // orientationAngles[1] is pitch. Convert radians to degrees.
                     val pitchInDegrees = Math.toDegrees(orientationAngles[1].toDouble()).toFloat()
-                    // Send negative pitch as per existing convention, clamped to [15, 90]
-                    val clampedPitch = (-pitchInDegrees).coerceIn(15f, 90f)
-                    trySend(clampedPitch)
+                    trySend(-pitchInDegrees) // Send negative pitch as per existing convention
                 }
             }
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) { /* Not used */ }
@@ -81,8 +79,7 @@ class SensorRepository @Inject constructor(
                     smoothedRoll = smoothedRoll?.let { (rawRoll * alpha) + (it * (1 - alpha)) } ?: rawRoll
 
                     // Send pitch as negative to match existing convention for `pitchAngle` in state.
-                    val finalPitch = (-smoothedPitch!!).coerceIn(15f, 90f)
-                    trySend(FullOrientation(yaw = smoothedYaw!!, pitch = finalPitch, roll = smoothedRoll!!))
+                    trySend(FullOrientation(yaw = smoothedYaw!!, pitch = -smoothedPitch!!, roll = smoothedRoll!!))
                 }
             }
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) { /* Not used */ }

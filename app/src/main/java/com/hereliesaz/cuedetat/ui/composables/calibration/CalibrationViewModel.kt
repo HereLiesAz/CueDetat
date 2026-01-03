@@ -97,7 +97,6 @@ class CalibrationViewModel @Inject constructor(
             val (cameraMatrix, distCoeffs) = userPreferencesRepository.calibrationDataFlow.first()
 
             if (cameraMatrix != null && distCoeffs != null) {
-                android.util.Log.d("CalibrationViewModel", "Initiating calibration data submission...")
                 val success = calibrationRepository.submitCalibrationData(cameraMatrix, distCoeffs)
 
                 if (success) {
@@ -137,7 +136,6 @@ class CalibrationViewModel @Inject constructor(
             existingData.second?.release()
 
             val model = android.os.Build.MODEL
-            // getProfile is now suspend and thread-safe
             val profile = deviceCalibrationDatabase.getProfile(model)
 
             if (profile != null) {

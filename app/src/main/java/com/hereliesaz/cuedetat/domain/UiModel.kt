@@ -5,7 +5,6 @@ package com.hereliesaz.cuedetat.domain
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.annotation.Keep
-import kotlin.jvm.Transient
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -23,8 +22,6 @@ import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
 import com.hereliesaz.cuedetat.view.state.TableSize
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
-import com.google.ar.core.TrackingState
-import com.google.ar.core.TrackingFailureReason
 import kotlinx.coroutines.Job
 import org.opencv.core.Mat
 
@@ -32,9 +29,8 @@ import org.opencv.core.Mat
 enum class ExperienceMode {
     EXPERT, BEGINNER, HATER;
     fun next(): ExperienceMode {
-        val values = values()
-        val nextOrdinal = (this.ordinal + 1) % values.size
-        return values[nextOrdinal]
+        val nextOrdinal = (this.ordinal + 1) % values().size
+        return values()[nextOrdinal]
     }
 }
 
@@ -84,8 +80,8 @@ data class CueDetatState(
     val showTutorialOverlay: Boolean = false,
     val currentTutorialStep: Int = 0,
     @Transient val tutorialHighlight: TutorialHighlightElement? = TutorialHighlightElement.NONE,
-    @Transient val flashingTutorialElement: TutorialHighlightElement? = null,
-    @Transient val highlightAlpha: Float = 0f,
+@Transient val flashingTutorialElement: TutorialHighlightElement? = null,
+@Transient val highlightAlpha: Float = 0f,
     val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f),
     @Transient val pitchMatrix: Matrix? = null,
     @Transient val railPitchMatrix: Matrix? = null,
@@ -101,12 +97,6 @@ data class CueDetatState(
     val showAdvancedOptionsDialog: Boolean = false,
     val showCalibrationScreen: Boolean = false,
     val showQuickAlignScreen: Boolean = false,
-    val showArScreen: Boolean = false,
-    @Transient val isArTableSnapping: Boolean = false,
-    @Transient val isArBallSnapping: Boolean = false,
-    @Transient val arSnapStep: ArSnapStep = ArSnapStep.TARGET,
-    @Transient val areArObstaclesEnabled: Boolean = false,
-    @Transient val arTablePose: FloatArray? = null,
     val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
     val useCustomModel: Boolean = false,
     val isSnappingEnabled: Boolean = true,
@@ -147,8 +137,6 @@ data class CueDetatState(
     @Transient val latestVersionName: String? = null,
     val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
     @Transient val targetBallDistance: Float = 0f,
-    val isDarkMode: Boolean = false,
-    val instructionText: String = ""
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
@@ -162,8 +150,6 @@ data class CueDetatState(
         }
     }
 }
-
-enum class ArSnapStep { TARGET, CUE }
 
 const val LOGICAL_BALL_RADIUS = 25f
 
@@ -228,14 +214,6 @@ sealed class MainScreenEvent {
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
     object ToggleCalibrationScreen : MainScreenEvent()
     object ToggleQuickAlignScreen : MainScreenEvent()
-    object ToggleArScreen : MainScreenEvent()
-    object ToggleArTableSnapping : MainScreenEvent()
-    object ToggleArBallSnapping : MainScreenEvent()
-    object ToggleArObstacles : MainScreenEvent()
-    data class ArTap(val offset: Offset) : MainScreenEvent()
-    data class ArBallDetected(val logicalPosition: PointF) : MainScreenEvent()
-    data class PlaceArObstacles(val logicalPositions: List<PointF>) : MainScreenEvent()
-    data class UpdateArTablePose(val pose: FloatArray) : MainScreenEvent()
     data class ApplyQuickAlign(val translation: Offset, val rotation: Float, val scale: Float) :
         MainScreenEvent()
 
@@ -263,18 +241,4 @@ sealed class MainScreenEvent {
     object SingleEventConsumed : MainScreenEvent()
     object ToastShown : MainScreenEvent()
     data class RestoreState(val state: CueDetatState) : MainScreenEvent()
-
-    data class ArTrackingStateUpdate(
-        val trackingState: TrackingState,
-        val failureReason: TrackingFailureReason?
-    ) : MainScreenEvent()
-    data class OnScreenTap(val offset: Offset) : MainScreenEvent()
-    object SingleEventConsumedAction : MainScreenEvent()
-    object ToggleHelpDialog : MainScreenEvent()
-}
-
-enum class UpdateType {
-    FULL,
-    AIMING,
-    SPIN_ONLY
 }

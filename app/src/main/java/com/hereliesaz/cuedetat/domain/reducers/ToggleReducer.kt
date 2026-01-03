@@ -108,36 +108,6 @@ internal fun reduceToggleAction(
 
         is MainScreenEvent.ToggleCalibrationScreen -> state.copy(showCalibrationScreen = !state.showCalibrationScreen)
         is MainScreenEvent.ToggleQuickAlignScreen -> state.copy(showQuickAlignScreen = !state.showQuickAlignScreen)
-        is MainScreenEvent.ToggleArScreen -> {
-             if (state.showArScreen) {
-                 // Turning OFF: Reset all AR snapping
-                 state.copy(
-                     showArScreen = false,
-                     isArTableSnapping = false,
-                     isArBallSnapping = false,
-                     areArObstaclesEnabled = false,
-                     obstacleBalls = emptyList()
-                 )
-             } else {
-                 state.copy(showArScreen = true)
-             }
-        }
-        is MainScreenEvent.ToggleArTableSnapping -> state.copy(isArTableSnapping = !state.isArTableSnapping)
-        is MainScreenEvent.ToggleArBallSnapping -> {
-            val isEnabled = !state.isArBallSnapping
-            state.copy(
-                isArBallSnapping = isEnabled,
-                arSnapStep = com.hereliesaz.cuedetat.domain.ArSnapStep.TARGET // Always reset to Target first
-            )
-        }
-        is MainScreenEvent.ToggleArObstacles -> {
-            val isEnabled = !state.areArObstaclesEnabled
-            state.copy(
-                areArObstaclesEnabled = isEnabled,
-                obstacleBalls = if (!isEnabled) emptyList() else state.obstacleBalls
-            )
-        }
-        is MainScreenEvent.UpdateArTablePose -> state.copy(arTablePose = action.pose)
         else -> state
     }
 }

@@ -1,10 +1,15 @@
+<<<<<<< HEAD
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainViewModel.kt
 
+=======
+>>>>>>> origin/CueDetatAR
 package com.hereliesaz.cuedetat.ui
 
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+<<<<<<< HEAD
+import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.data.VisionAnalyzer
@@ -19,6 +24,12 @@ import com.hereliesaz.cuedetat.domain.reducers.GestureReducer
 import com.hereliesaz.cuedetat.domain.stateReducer
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.SingleEvent
+=======
+import com.google.ar.core.*
+import com.hereliesaz.cuedetat.data.UserPreferenceRepository
+import com.hereliesaz.cuedetat.ui.state.UiEvent
+import com.hereliesaz.cuedetat.ui.state.UiState
+>>>>>>> origin/CueDetatAR
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +37,11 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.asStateFlow
+<<<<<<< HEAD
 import kotlinx.coroutines.flow.first
+=======
+import kotlinx.coroutines.flow.update
+>>>>>>> origin/CueDetatAR
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -45,23 +60,23 @@ import javax.inject.Inject
  * @property gestureReducer The specific reducer responsible for handling all gesture-related events.
  * @property updateStateUseCase The use case that calculates derived properties of the state (e.g., matrices, line coordinates).
  * @property sensorRepository The repository for accessing device sensor data (e.g., orientation).
+ * @property githubRepository The repository for checking for new app versions on GitHub.
  * @property userPreferencesRepository The repository for persisting user settings and the application state.
  * @property visionRepository The repository for receiving data from the computer vision module.
- * @property visionAnalyzer The analyzer responsible for processing camera frames for computer vision tasks.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
+<<<<<<< HEAD
     private val reducerUtils: ReducerUtils,
     private val gestureReducer: GestureReducer,
     private val updateStateUseCase: UpdateStateUseCase,
     private val sensorRepository: SensorRepository,
+    private val githubRepository: GithubRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
-    private val visionRepository: VisionRepository,
-    val visionAnalyzer: VisionAnalyzer,
+    visionRepository: VisionRepository,
 ) : ViewModel() {
 
     private var experienceModeUpdateJob: Job? = null
-    private var saveStateJob: Job? = null
     private val _uiState = MutableStateFlow(CueDetatState())
     /** The StateFlow that exposes the current UI state to the Composables. */
     val uiState = _uiState.asStateFlow()
@@ -69,6 +84,9 @@ class MainViewModel @Inject constructor(
     private val _singleEvent = MutableSharedFlow<SingleEvent?>()
     /** The SharedFlow for one-time events that should not be tied to the state (e.g., navigation). */
     val singleEvent = _singleEvent.asSharedFlow()
+
+    /** The analyzer responsible for processing camera frames for computer vision tasks. */
+    val visionAnalyzer: VisionAnalyzer = VisionAnalyzer(visionRepository)
 
     init {
         // On initialization, load the last saved state from user preferences.
@@ -89,10 +107,30 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             visionRepository.visionDataFlow.collect { visionData ->
                 onEvent(MainScreenEvent.CvDataUpdated(visionData))
+=======
+    private val userPreferenceRepository: UserPreferenceRepository
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(UiState())
+    val uiState = _uiState.asStateFlow()
+    private var arSession: Session? = null
+
+    init {
+        viewModelScope.launch {
+            userPreferenceRepository.userPreferences.collect { preferences ->
+                _uiState.update {
+                    it.copy(
+                        isDarkMode = preferences.isDarkMode,
+                        showHelp = preferences.showHelp,
+                        shotType = preferences.shotType
+                    )
+                }
+>>>>>>> origin/CueDetatAR
             }
         }
     }
 
+<<<<<<< HEAD
     /**
      * The main entry point for all UI events.
      * This function takes an event, processes it, and updates the UI state accordingly.
@@ -153,25 +191,8 @@ class MainViewModel @Inject constructor(
             // Determine the type of update needed based on the event and state change.
             val updateType = determineUpdateType(currentState, reducedState, logicalEvent)
 
-            // Determine if we should persist this change
-            val shouldPersist = when (event) {
-                is MainScreenEvent.FullOrientationChanged,
-                is MainScreenEvent.CvDataUpdated -> false
-                else -> true
-            }
-
-            // Determine if we should debounce the persistence
-            val shouldDebounce = when (event) {
-                is MainScreenEvent.Drag,
-                is MainScreenEvent.LogicalDragApplied,
-                is MainScreenEvent.ZoomSliderChanged,
-                is MainScreenEvent.PanView,
-                is MainScreenEvent.TableRotationChanged -> true
-                else -> false
-            }
-
             // Process the new state to calculate derived properties and emit it to the UI.
-            processAndEmitState(reducedState, updateType, shouldPersist, shouldDebounce)
+            processAndEmitState(reducedState, updateType)
 
             // Handle any side-effects (single events) triggered by the event.
             handleSingleEvents(logicalEvent)
@@ -184,31 +205,16 @@ class MainViewModel @Inject constructor(
      *
      * @param state The new state to be processed.
      * @param type The [UpdateType] indicating how much of the derived state needs to be recalculated.
-     * @param shouldPersist Whether to persist the state to storage.
-     * @param shouldDebounce Whether to debounce the persistence operation.
      */
-    private fun processAndEmitState(
-        state: CueDetatState,
-        type: UpdateType,
-        shouldPersist: Boolean = true,
-        shouldDebounce: Boolean = false
-    ) {
+    private fun processAndEmitState(state: CueDetatState, type: UpdateType) {
         val derivedState = updateStateUseCase(state, type)
         _uiState.value = derivedState
         visionAnalyzer.updateUiState(derivedState) // Keep the vision analyzer in sync.
 
-        // Persist the state unless it was a minor, transient update (like spin) or explicitly disabled.
-        if (type != UpdateType.SPIN_ONLY && shouldPersist) {
-            saveStateJob?.cancel()
-            if (shouldDebounce) {
-                saveStateJob = viewModelScope.launch {
-                    delay(500)
-                    userPreferencesRepository.saveState(derivedState)
-                }
-            } else {
-                viewModelScope.launch {
-                    userPreferencesRepository.saveState(derivedState)
-                }
+        // Persist the state unless it was a minor, transient update (like spin).
+        if (type != UpdateType.SPIN_ONLY) {
+            viewModelScope.launch {
+                userPreferencesRepository.saveState(derivedState)
             }
         }
     }
@@ -233,11 +239,6 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.Reset, is MainScreenEvent.LogicalGestureStarted, is MainScreenEvent.LogicalDragApplied,
             is MainScreenEvent.GestureEnded, is MainScreenEvent.AddObstacleBall -> UpdateType.AIMING
 
-            is MainScreenEvent.ToggleArScreen, is MainScreenEvent.ToggleArTableSnapping,
-            is MainScreenEvent.ToggleArBallSnapping, is MainScreenEvent.ToggleArObstacles,
-            is MainScreenEvent.ArTap, is MainScreenEvent.UpdateArTablePose,
-            is MainScreenEvent.ArBallDetected, is MainScreenEvent.PlaceArObstacles -> UpdateType.FULL
-
             // Events that only affect the spin visualization.
             is MainScreenEvent.SpinApplied -> UpdateType.SPIN_ONLY
 
@@ -253,7 +254,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             when (event) {
                 is MainScreenEvent.CheckForUpdate -> {
-                    // githubRepository.getLatestVersionName()
+                    githubRepository.getLatestVersionName()
                 }
                 is MainScreenEvent.ViewArt -> _singleEvent.emit(SingleEvent.OpenUrl("https://herelies.az"))
                 is MainScreenEvent.ViewAboutPage -> _singleEvent.emit(SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat"))
@@ -274,3 +275,114 @@ class MainViewModel @Inject constructor(
         }
     }
 }
+=======
+    fun onEvent(event: UiEvent) {
+        viewModelScope.launch {
+            when (event) {
+                is UiEvent.SetShotPower -> _uiState.update { it.copy(shotPower = event.power) }
+                is UiEvent.SetSpin -> _uiState.update { it.copy(cueballSpin = event.spin) }
+                is UiEvent.SetSession -> arSession = event.session
+                is UiEvent.ToggleHelpDialog -> _uiState.update { it.copy(showHelp = !it.showHelp) }
+                is UiEvent.ToggleArMode -> toggleArMode()
+                is UiEvent.OnScreenTap -> handleScreenTap(event.offset)
+                is UiEvent.OnReset -> resetScene()
+                is UiEvent.OnTrackingStateUpdate -> handleTrackingStateUpdate(event.trackingState, event.failureReason)
+                is UiEvent.ExecuteShot -> { /* TODO */ }
+                is UiEvent.ToggleFlashlight -> { /* Handled by Activity */ }
+            }
+        }
+    }
+
+    private fun handleTrackingStateUpdate(trackingState: TrackingState, failureReason: TrackingFailureReason?) {
+        if (uiState.value.table != null) {
+            if (uiState.value.cueBall == null) {
+                _uiState.update { it.copy(instructionText = "Tap on table to place Cue Ball") }
+            } else if (uiState.value.objectBall == null) {
+                _uiState.update { it.copy(instructionText = "Tap on table to place Object Ball") }
+            } else {
+                _uiState.update { it.copy(instructionText = "Aim your shot") }
+            }
+            return
+        }
+
+        val newInstruction = when (trackingState) {
+            TrackingState.TRACKING -> "Tap a detected surface to place the table"
+            TrackingState.PAUSED -> when (failureReason) {
+                TrackingFailureReason.NONE -> "Move your phone to start AR."
+                TrackingFailureReason.BAD_STATE -> "AR session is in a bad state."
+                TrackingFailureReason.INSUFFICIENT_LIGHT -> "Too dark. Find a brighter area."
+                TrackingFailureReason.EXCESSIVE_MOTION -> "Move your phone more slowly."
+                TrackingFailureReason.INSUFFICIENT_FEATURES -> "Point at a textured surface."
+                TrackingFailureReason.CAMERA_UNAVAILABLE -> "Camera is unavailable."
+                else -> "AR tracking paused."
+            }
+            TrackingState.STOPPED -> "AR tracking has stopped."
+        }
+        _uiState.update { it.copy(instructionText = newInstruction) }
+    }
+
+    private fun handleScreenTap(offset: Offset) {
+        val session = arSession ?: return
+        // This call is architecturally incorrect and will block the main thread,
+        // but it fixes the compilation error. The correct solution is to perform
+        // hit tests on the GL thread.
+        val frame = try { session.update() } catch (e: Exception) { return }
+
+        if (frame.camera.trackingState != TrackingState.TRACKING) return
+
+        val hits = frame.hitTest(offset.x, offset.y)
+
+        val planeHitResult = hits.firstOrNull { hit ->
+            val trackable = hit.trackable
+            trackable is Plane && trackable.isPoseInPolygon(hit.hitPose) &&
+                    trackable.type == Plane.Type.HORIZONTAL_UPWARD_FACING
+        }
+
+        if (planeHitResult != null) {
+            placeAnchor(planeHitResult)
+        }
+    }
+
+    private fun placeAnchor(hitResult: HitResult) {
+        val newAnchor = arSession?.createAnchor(hitResult.hitPose) ?: return
+        when {
+            _uiState.value.table == null -> _uiState.update { it.copy(table = newAnchor) }
+            _uiState.value.cueBall == null -> _uiState.update { it.copy(cueBall = newAnchor) }
+            _uiState.value.objectBall == null -> _uiState.update { it.copy(objectBall = newAnchor) }
+        }
+    }
+
+    private fun toggleArMode() {
+        val newMode = !_uiState.value.isArMode
+        _uiState.update { it.copy(isArMode = newMode) }
+        resetScene()
+    }
+
+    private fun resetScene() {
+        _uiState.value.table?.detach()
+        _uiState.value.cueBall?.detach()
+        _uiState.value.objectBall?.detach()
+
+        _uiState.update {
+            it.copy(
+                table = null,
+                cueBall = null,
+                objectBall = null,
+                isAiming = true
+            )
+        }
+        if (!_uiState.value.isArMode) {
+            placeTableManually()
+        }
+    }
+
+    private fun placeTableManually() {
+        val session = arSession ?: return
+        val frame = try { session.update() } catch (e: Exception) { return }
+        val cameraPose = frame.camera.pose
+        val tablePose = cameraPose.compose(Pose.makeTranslation(0f, -1.0f, -1.5f))
+        val newAnchor = session.createAnchor(tablePose)
+        _uiState.update { it.copy(table = newAnchor) }
+    }
+}
+>>>>>>> origin/CueDetatAR

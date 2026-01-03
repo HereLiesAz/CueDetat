@@ -5,7 +5,3 @@
 ## 2024-05-23 - Accessibility of Custom Clickables
 **Learning:** Using `Box` with `clickable` creates an interactive element that screen readers announce as "clickable" but often fail to identify as a button, confusing users about the element's role.
 **Action:** Use `Button` or `OutlinedButton` composables which provide `Role.Button` and proper semantic signals by default, or explicitly add `modifier.semantics { role = Role.Button }` to custom clickables.
-
-## 2024-05-24 - Accessibility of Complex Gesture Controls
-**Learning:** Custom drawn controls using `Canvas` and `pointerInput` (like joystick/spin controls) are invisible to accessibility services by default, leaving users unaware of their existence or state.
-**Action:** Apply `semantics` modifier with `contentDescription`, `stateDescription` (to expose dynamic values), and an appropriate `role` (e.g., `Role.Image`) to the container to make it discoverable and informative.

@@ -10,9 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
-import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
-import com.hereliesaz.cuedetat.ui.composables.SplashScreen
 import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationScreen
 import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignAnalyzer
@@ -20,20 +18,6 @@ import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignScreen
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
 
-/**
- * The main screen of the application for the "Expert" and "Beginner" experience modes.
- *
- * This composable serves as a container that orchestrates the display of various UI layers:
- * - The live camera feed as the background.
- * - The main protractor overlay with all the aiming guides.
- * - Conditional screens for camera calibration and quick alignment, which are displayed on top
- *   of the other layers when active.
- *
- * @param mainViewModel The primary [MainViewModel] that holds the main application state.
- * @param calibrationViewModel The [CalibrationViewModel] for managing the camera calibration process.
- * @param quickAlignViewModel The [QuickAlignViewModel] for managing the quick alignment process.
- * @param calibrationAnalyzer The [CalibrationAnalyzer] responsible for processing camera frames during calibration.
- */
 @Composable
 fun ProtractorScreen(
     mainViewModel: MainViewModel,
@@ -41,27 +25,17 @@ fun ProtractorScreen(
     quickAlignViewModel: QuickAlignViewModel,
     calibrationAnalyzer: CalibrationAnalyzer
 ) {
-    // Observe the main UI state from the MainViewModel.
     val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
     val systemIsDark = isSystemInDarkTheme()
-
-    // Remember a QuickAlignAnalyzer instance, which is tied to the lifecycle of the QuickAlignViewModel.
     val quickAlignAnalyzer =
         remember(quickAlignViewModel) { QuickAlignAnalyzer(quickAlignViewModel) }
 
-    // A Box layout allows layering composables on top of each other.
     Box(modifier = Modifier.fillMaxSize()) {
-
-        // Display the camera feed as the background if it's set to be visible.
-        // Important: If AR Screen is active, we MUST NOT render CameraBackground (CameraX)
-        // because ARCore needs exclusive access to the camera.
-        if (uiState.isCameraVisible && !uiState.showArScreen && uiState.experienceMode != null) {
-            // Determine which analyzer should be active based on the current UI state.
-            // This ensures that the correct image processing logic is applied to the camera feed.
+        if (uiState.isCameraVisible) {
             val activeAnalyzer = when {
                 uiState.showCalibrationScreen -> calibrationAnalyzer
                 uiState.showQuickAlignScreen -> quickAlignAnalyzer
-                else -> mainViewModel.visionAnalyzer // Default analyzer for general computer vision tasks.
+                else -> mainViewModel.visionAnalyzer
             }
             CameraBackground(
                 modifier = Modifier.fillMaxSize(),
@@ -69,16 +43,7 @@ fun ProtractorScreen(
             )
         }
 
-        // Conditionally display the appropriate screen on top of the camera background.
         when {
-            // If experience mode is not set, show Splash Screen
-            uiState.experienceMode == null -> {
-                SplashScreen { mode ->
-                    mainViewModel.onEvent(MainScreenEvent.SetExperienceMode(mode))
-                }
-            }
-
-            // If the calibration screen should be shown, display it.
             uiState.showCalibrationScreen -> {
                 CalibrationScreen(
                     uiState = uiState,
@@ -88,7 +53,6 @@ fun ProtractorScreen(
                 )
             }
 
-            // If the quick align screen should be shown, display it.
             uiState.showQuickAlignScreen -> {
                 QuickAlignScreen(
                     onEvent = mainViewModel::onEvent,
@@ -97,25 +61,6 @@ fun ProtractorScreen(
                 )
             }
 
-            // If AR is enabled, we use ArScreen as the background but still show the MainLayout overlays.
-            uiState.showArScreen -> {
-                ArScreen(
-                    uiState = uiState,
-                    visionRepository = mainViewModel.visionAnalyzer.visionRepository,
-                    onEvent = mainViewModel::onEvent
-                )
-                // Overlay the standard UI on top of AR
-                MainLayout(uiState = uiState, onEvent = mainViewModel::onEvent) {
-                    ProtractorOverlay(
-                        uiState = uiState,
-                        systemIsDark = systemIsDark,
-                        isTestingCvMask = uiState.isTestingCvMask,
-                        onEvent = mainViewModel::onEvent
-                    )
-                }
-            }
-
-            // Otherwise, display the main layout with the protractor overlay.
             else -> {
                 MainLayout(uiState = uiState, onEvent = mainViewModel::onEvent) {
                     ProtractorOverlay(
