@@ -1,231 +1,159 @@
-// app/src/main/java/com/hereliesaz/cuedetat/MainActivity.kt
 package com.hereliesaz.cuedetat
 
 import android.Manifest
-import android.content.Intent
-import android.content.pm.ActivityInfo
+import android.content.Context
 import android.content.pm.PackageManager
-import android.content.res.Configuration
-import android.net.Uri
+import android.hardware.camera2.CameraAccessException
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Intent
+import android.net.Uri
+import android.util.Log
 import androidx.activity.viewModels
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
-import androidx.core.view.WindowCompat
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
-import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
-import com.hereliesaz.cuedetat.data.CalibrationRepository
-import com.hereliesaz.cuedetat.domain.CueDetatState
-import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
-import com.hereliesaz.cuedetat.ui.MainViewModel
-import com.hereliesaz.cuedetat.ui.ProtractorScreen
-import com.hereliesaz.cuedetat.ui.composables.SplashScreen
-import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
-import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
-import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
-import com.hereliesaz.cuedetat.ui.hatemode.HaterScreen
-import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
-import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import com.hereliesaz.cuedetat.utils.SecurityUtils
 import com.hereliesaz.cuedetat.view.state.SingleEvent
+import androidx.core.view.WindowCompat
+import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
+import com.hereliesaz.cuedetat.ui.ProtractorScreen
+import com.hereliesaz.cuedetat.ui.MainViewModel
+import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
+import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
+import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import javax.inject.Inject
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.remember
 
-/**
- * The main and only activity of the application.
- *
- * This activity is the entry point for the user interface. It is responsible for:
- * - Handling camera permission requests.
- * - Setting up the core Jetpack Compose content.
- * - Observing and handling one-time events from the [MainViewModel].
- * - Managing the overall UI flow, including the splash screen and the main protractor/hater screens.
- * - Controlling screen orientation based on the current application state.
- */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    // ViewModels for different parts of the UI, injected by Hilt.
-    private val viewModel: MainViewModel by viewModels()
-    private val calibrationViewModel: CalibrationViewModel by viewModels()
-    private val quickAlignViewModel: QuickAlignViewModel by viewModels()
-    private val haterViewModel: HaterViewModel by viewModels()
+    val viewModel: MainViewModel by viewModels()
+    val calibrationViewModel: CalibrationViewModel by viewModels()
+    val quickAlignViewModel: QuickAlignViewModel by viewModels()
 
-    @Inject
-    lateinit var calibrationRepository: CalibrationRepository
+    private var isFlashlightOn = false
+    private var backCameraId: String? = null
 
-    private lateinit var calibrationAnalyzer: CalibrationAnalyzer
-
-    /**
-     * An ActivityResultLauncher that requests the CAMERA permission.
-     * The result of this request determines the application's flow.
-     */
-    private val requestCameraPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
-                // If permission is granted, recreate the activity to initialize the camera and UI.
-                recreate()
+                this.recreate()
             } else {
-                // If permission is denied, the app is unusable. Inform the user and close the app.
-                // This is a deliberate design choice: the app's core functionality depends on the camera.
-                Toast.makeText(
-                    this,
-                    "Camera permission is required. The app will now close.",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(this, "Camera permission is required", Toast.LENGTH_LONG).show()
                 finish()
             }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Allow the app to draw behind the system bars for an immersive, full-screen experience.
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        initializeCameraId()
 
-        calibrationAnalyzer = CalibrationAnalyzer(calibrationViewModel)
-
-        // Check for camera permission and either launch the permission request or set the content.
-        when {
-            hasCameraPermission() -> {
-                setContent {
-                    AppContent()
-                }
-            }
-            else -> {
-                requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-            }
+        if (hasCameraPermission()) {
+            setContent()
+        } else {
+            requestPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
-        observeSingleEvents()
     }
 
-    /**
-     * Observes a [SharedFlow] in the [MainViewModel] for one-time events.
-     * These are events that should only be handled once, such as navigation or showing a Toast.
-     */
-    private fun observeSingleEvents() {
-        viewModel.singleEvent.onEach { event ->
-            when (event) {
-                is SingleEvent.OpenUrl -> {
-                    // Before opening any URL, validate it to prevent security vulnerabilities.
-                    if (SecurityUtils.isSafeUrl(event.url)) {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
-                        startActivity(intent)
-                    } else {
-                        // Log or handle the attempt to open an unsafe URL.
-                    }
-                    // Consume the event to prevent it from being triggered again on configuration change.
-                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
-                }
-                is SingleEvent.SendFeedbackEmail -> {
-                    // Create an email intent to allow the user to send feedback.
-                    val intent = Intent(Intent.ACTION_SENDTO).apply {
-                        data = Uri.parse("mailto:")
-                        putExtra(Intent.EXTRA_EMAIL, arrayOf(event.email))
-                        putExtra(Intent.EXTRA_SUBJECT, event.subject)
-                    }
-                    // Ensure there is an app that can handle the intent before starting the activity.
-                    if (intent.resolveActivity(packageManager) != null) {
-                        startActivity(intent)
-                    }
-                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
-                }
-                is SingleEvent.InitiateHaterMode -> {
-                    // Trigger the hater mode from the main ViewModel.
-                    haterViewModel.onEvent(HaterEvent.EnterHaterMode)
-                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
-                }
-                null -> { /* This state is expected when the flow is first collected. */ }
-            }
-        }.launchIn(lifecycleScope)
+    override fun onPause() {
+        super.onPause()
+        if (isFlashlightOn) {
+            toggleFlashlight(forceOff = true)
+        }
     }
 
-    /**
-     * The main composable function that defines the application's UI.
-     * It observes the UI state and displays the appropriate screen.
-     */
-    @Composable
-    private fun AppContent() {
-        val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-        val showSplashScreen = uiState.experienceMode == null
-        // Remember the initial orientation when entering Hater Mode to lock it.
-        var haterModeLockedOrientation by rememberSaveable { mutableStateOf(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) }
+    private fun setContent() {
+        setContent {
+            val uiState by viewModel.uiState.collectAsState()
+            val singleEvent by viewModel.singleEvent.collectAsState(initial = null)
+            val calibrationAnalyzer = remember(calibrationViewModel) { CalibrationAnalyzer(calibrationViewModel) }
 
-        // A side-effect that triggers when the experience mode or orientation lock setting changes.
-        LaunchedEffect(uiState.experienceMode, uiState.orientationLock) {
-            if (uiState.experienceMode == ExperienceMode.HATER) {
-                // Lock the screen orientation to the current orientation when entering Hater Mode.
-                if (haterModeLockedOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
-                    haterModeLockedOrientation = when (resources.configuration.orientation) {
-                        Configuration.ORIENTATION_LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                        else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            LaunchedEffect(singleEvent) {
+                singleEvent?.let { event ->
+                    when (event) {
+                        is SingleEvent.OpenUrl -> {
+                            if (SecurityUtils.isSafeUrl(event.url)) {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
+                                startActivity(intent)
+                            } else {
+                                Log.e("MainActivity", "Blocked unsafe URL: ${event.url}")
+                            }
+                        }
+                        is SingleEvent.SendFeedbackEmail -> {
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:")
+                                putExtra(Intent.EXTRA_EMAIL, arrayOf(event.email))
+                                putExtra(Intent.EXTRA_SUBJECT, event.subject)
+                            }
+                            try {
+                                startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(this@MainActivity, "No email app found", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        is SingleEvent.InitiateHaterMode -> {
+                            Toast.makeText(this@MainActivity, "Hater Mode Initiated!", Toast.LENGTH_SHORT).show()
+                        }
                     }
-                }
-                requestedOrientation = haterModeLockedOrientation
-            } else {
-                // When not in Hater Mode, respect the user's selected orientation lock setting.
-                haterModeLockedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                requestedOrientation = when (uiState.orientationLock) {
-                    CueDetatState.OrientationLock.AUTOMATIC -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                    CueDetatState.OrientationLock.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                    CueDetatState.OrientationLock.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
             }
-        }
 
-        // The main theme of the application.
-        CueDetatTheme(luminanceAdjustment = uiState.luminanceAdjustment) {
-            if (showSplashScreen) {
-                // Show the splash screen on first launch to let the user select an experience mode.
-                SplashScreen(onRoleSelected = { selectedMode ->
-                    viewModel.onEvent(MainScreenEvent.SetExperienceMode(selectedMode))
-                })
-            } else {
-                // A side-effect to notify the ViewModel when the color scheme changes (e.g., dark/light mode).
-                val currentAppControlColorScheme = MaterialTheme.colorScheme
-                LaunchedEffect(currentAppControlColorScheme) {
-                    viewModel.onEvent(MainScreenEvent.ThemeChanged(currentAppControlColorScheme))
-                }
+            val darkTheme = isSystemInDarkTheme() || uiState.isForceLightMode == false
 
-                // Display the appropriate screen based on the selected experience mode.
-                when (uiState.experienceMode) {
-                    ExperienceMode.HATER -> HaterScreen(
-                        haterViewModel = haterViewModel,
-                        uiState = uiState,
-                        onEvent = viewModel::onEvent
-                    )
-                    else -> { // EXPERT and BEGINNER modes share the same main screen.
-                        ProtractorScreen(
-                            mainViewModel = viewModel,
-                            calibrationViewModel = calibrationViewModel,
-                            quickAlignViewModel = quickAlignViewModel,
-                            calibrationAnalyzer = calibrationAnalyzer
-                        )
-                    }
-                }
+            CueDetatTheme(darkTheme = darkTheme) {
+                ProtractorScreen(
+                    mainViewModel = viewModel,
+                    calibrationViewModel = calibrationViewModel,
+                    quickAlignViewModel = quickAlignViewModel,
+                    calibrationAnalyzer = calibrationAnalyzer
+                )
             }
         }
     }
 
-    /**
-     * A helper function to check if the CAMERA permission has been granted.
-     * @return `true` if the permission is granted, `false` otherwise.
-     */
-    private fun hasCameraPermission() =
-        ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.CAMERA
-        ) == PackageManager.PERMISSION_GRANTED
+    private fun initializeCameraId() {
+        val cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        try {
+            for (id in cameraManager.cameraIdList) {
+                val characteristics = cameraManager.getCameraCharacteristics(id)
+                val facing = characteristics.get(CameraCharacteristics.LENS_FACING)
+                val hasFlash = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE)
+                if (facing == CameraCharacteristics.LENS_FACING_BACK && hasFlash == true) {
+                    backCameraId = id
+                    return
+                }
+            }
+        } catch (e: CameraAccessException) {
+            Log.e("MainActivity", "Failed to access camera", e)
+        }
+    }
+
+    fun toggleFlashlight(forceOff: Boolean = false) {
+        if (backCameraId == null) {
+            Toast.makeText(this, "Flashlight not available", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        try {
+            val newState = if (forceOff) false else !isFlashlightOn
+            cameraManager.setTorchMode(backCameraId!!, newState)
+            isFlashlightOn = newState
+        } catch (e: Exception) {
+            isFlashlightOn = false
+            Toast.makeText(this, "Flashlight unavailable while AR is active", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun hasCameraPermission(): Boolean = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
 }

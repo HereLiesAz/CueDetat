@@ -1,37 +1,19 @@
 pluginManagement {
-    repositories {
-        google {
-            content {
-                includeGroupByRegex("com\\.android.*")
-                includeGroupByRegex("com\\.google.*")
-                includeGroupByRegex("androidx.*")
-
-            }
-        }
-        mavenCentral()
-        gradlePluginPortal()
-        maven(url = "https://jitpack.io")
-        mavenLocal()
-        maven("https://oss.sonatype.org/content/repositories/snapshots")
-
-    }
-    plugins {
-        id("com.android.application") version "8.13.2"
-        id("com.android.library") version "8.13.2"
-        id("org.jetbrains.kotlin.android") version "2.3.0"
-        id("com.github.triplet.play") version "3.13.0"
-
-    }
+  repositories {
+    google()
+    mavenCentral()
+    gradlePluginPortal()
+  }
 }
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        google()
-        mavenCentral()
-        mavenLocal()
-        maven(url = "https://jitpack.io")
-    }
+  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+  repositories {
+    google()
+    mavenCentral()
+    maven { url = uri("https://jitpack.io") }
+    // Required for AndroidX pre-release libraries
+    maven { url = uri("https://androidx.dev/snapshots/builds/LATEST/repository") }
+  }
 }
-
 rootProject.name = "CueDetat"
 include(":app")
