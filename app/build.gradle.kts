@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.ksp)
+    id("kotlin-kapt")
 }
 
 android {
@@ -75,8 +75,7 @@ dependencies {
 
     // Hilt
     implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
-    ksp(libs.kotlin.metadata.jvm)
+    kapt(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 
     // CameraX
@@ -91,9 +90,6 @@ dependencies {
     implementation(libs.mlkit)
     implementation(libs.opencv)
 
-    // AR
-    implementation(libs.ar.core)
-
     // Physics
     // implementation(libs.google.liquidfun)
 
@@ -104,7 +100,11 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-
+    // implementation("cljsjs:liquidfun:1.1.0-0")
     implementation(libs.kotlin.metadata.jvm)
-    implementation(kotlin("stdlib-jdk8"))
+
+}
+
+kapt {
+    correctErrorTypes = true
 }

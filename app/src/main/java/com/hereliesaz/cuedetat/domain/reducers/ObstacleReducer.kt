@@ -5,8 +5,6 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
-import com.hereliesaz.cuedetat.view.model.ProtractorUnit
-import com.hereliesaz.cuedetat.view.model.LogicalCircular
 import kotlin.math.hypot
 import kotlin.random.Random
 
@@ -30,26 +28,24 @@ private fun handleAddObstacleBall(state: CueDetatState, reducerUtils: ReducerUti
 }
 
 private fun findNextAvailablePlacement(state: CueDetatState, reducerUtils: ReducerUtils): PointF {
-    val visionData = state.visionData
-    // Explicitly cast to List<PointF> for type inference clarity
-    val allLogicalBalls: List<PointF> = (listOfNotNull(
+    val visionData = state.visionData ?: return reducerUtils.getDefaultTargetBallPosition()
+    val detectedBalls = visionData.genericBalls + visionData.customBalls
+    val allLogicalBalls = (listOfNotNull(
         state.onPlaneBall,
         state.protractorUnit
-    ) + state.obstacleBalls).map { (it as LogicalCircular).center }
+    ) + state.obstacleBalls).map { it.center }
 
-    if (visionData != null) {
-        val detectedBalls = visionData.genericBalls + visionData.customBalls
-        val nextAvailableBall = detectedBalls.firstOrNull { detected ->
-            allLogicalBalls.none { logical ->
-                hypot(
-                    (logical.x - detected.x).toDouble(),
-                    (logical.y - detected.y).toDouble()
-                ) < (state.protractorUnit.radius * 2)
-            }
+    val nextAvailableBall = detectedBalls.firstOrNull { detected ->
+        allLogicalBalls.none { logical ->
+            hypot(
+                (logical.x - detected.x).toDouble(),
+                (logical.y - detected.y).toDouble()
+            ) < (state.protractorUnit.radius * 2)
         }
-        if (nextAvailableBall != null) {
-            return nextAvailableBall
-        }
+    }
+
+    if (nextAvailableBall != null) {
+        return nextAvailableBall
     }
 
     if (state.table.isVisible) {

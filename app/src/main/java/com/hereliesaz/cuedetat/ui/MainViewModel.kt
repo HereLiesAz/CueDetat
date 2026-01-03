@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainViewModel.kt
+
 package com.hereliesaz.cuedetat.ui
 
 import androidx.compose.ui.geometry.Offset
@@ -29,9 +31,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * The central ViewModel for the main application screen.
- */
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val reducerUtils: ReducerUtils,
@@ -45,32 +44,26 @@ class MainViewModel @Inject constructor(
 
     private var experienceModeUpdateJob: Job? = null
     private val _uiState = MutableStateFlow(CueDetatState())
-    /** The StateFlow that exposes the current UI state to the Composables. */
     val uiState = _uiState.asStateFlow()
 
     private val _singleEvent = MutableSharedFlow<SingleEvent?>()
-    /** The SharedFlow for one-time events that should not be tied to the state (e.g., navigation). */
     val singleEvent = _singleEvent.asSharedFlow()
 
-    /** The analyzer responsible for processing camera frames for computer vision tasks. */
     val visionAnalyzer: VisionAnalyzer = VisionAnalyzer(visionRepository)
 
     init {
-        // On initialization, load the last saved state from user preferences.
         viewModelScope.launch {
             val savedState = userPreferencesRepository.stateFlow.first()
             val initialState = savedState ?: CueDetatState()
             processAndEmitState(initialState, UpdateType.FULL)
         }
 
-        // Collect orientation data from the sensor repository and dispatch events.
         viewModelScope.launch {
             sensorRepository.fullOrientationFlow.collect { orientation ->
                 onEvent(MainScreenEvent.FullOrientationChanged(orientation))
             }
         }
 
-        // Collect computer vision data and dispatch events.
         viewModelScope.launch {
             visionRepository.visionDataFlow.collect { visionData ->
                 onEvent(MainScreenEvent.CvDataUpdated(visionData))
@@ -78,15 +71,8 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    /**
-     * The main entry point for all UI events.
-     * This function takes an event, processes it, and updates the UI state accordingly.
-     *
-     * @param event The [MainScreenEvent] to be processed.
-     */
     fun onEvent(event: MainScreenEvent) {
         viewModelScope.launch {
-            // Handle special case for toggling experience mode with a delay.
             if (event is MainScreenEvent.ToggleExperienceModeSelection) {
                 experienceModeUpdateJob?.cancel()
                 val currentState = _uiState.value
@@ -101,7 +87,6 @@ class MainViewModel @Inject constructor(
 
             val currentState = _uiState.value
 
-            // Convert screen-space gesture events into logical-space events.
             val logicalEvent = when (event) {
                 is MainScreenEvent.ScreenGestureStarted -> {
                     val logicalPoint = Perspective.screenToLogical(
@@ -113,6 +98,7 @@ class MainViewModel @Inject constructor(
                         Offset(event.position.x, event.position.y)
                     )
                 }
+
                 is MainScreenEvent.Drag -> {
                     val prevLogical = Perspective.screenToLogical(
                         event.previousPosition,
@@ -128,37 +114,26 @@ class MainViewModel @Inject constructor(
                     )
                     MainScreenEvent.LogicalDragApplied(prevLogical, currLogical, screenDelta)
                 }
+
                 else -> event
             }
 
-            // The core of the MVI loop: reduce the current state and event to a new state.
             val reducedState =
                 stateReducer(currentState, logicalEvent, reducerUtils, gestureReducer)
 
-            // Determine the type of update needed based on the event and state change.
             val updateType = determineUpdateType(currentState, reducedState, logicalEvent)
 
-            // Process the new state to calculate derived properties and emit it to the UI.
             processAndEmitState(reducedState, updateType)
 
-            // Handle any side-effects (single events) triggered by the event.
             handleSingleEvents(logicalEvent)
         }
     }
 
-    /**
-     * Processes a new state, calculates its derived properties, and emits it to the UI.
-     * Also handles persisting the state.
-     *
-     * @param state The new state to be processed.
-     * @param type The [UpdateType] indicating how much of the derived state needs to be recalculated.
-     */
     private fun processAndEmitState(state: CueDetatState, type: UpdateType) {
         val derivedState = updateStateUseCase(state, type)
         _uiState.value = derivedState
-        visionAnalyzer.updateUiState(derivedState) // Keep the vision analyzer in sync.
+        visionAnalyzer.updateUiState(derivedState)
 
-        // Persist the state unless it was a minor, transient update (like spin).
         if (type != UpdateType.SPIN_ONLY) {
             viewModelScope.launch {
                 userPreferencesRepository.saveState(derivedState)
@@ -166,9 +141,6 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Determines the [UpdateType] based on the event and the changes between the old and new state.
-     */
     private fun determineUpdateType(
         oldState: CueDetatState,
         newState: CueDetatState,
@@ -189,30 +161,33 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Handles events that should trigger a one-time side-effect.
-     */
     private fun handleSingleEvents(event: MainScreenEvent) {
-        viewModelScope.launch {
-            when (event) {
-                is MainScreenEvent.CheckForUpdate -> {
-                    githubRepository.getLatestVersionName()
-                }
-                is MainScreenEvent.ViewArt -> _singleEvent.emit(SingleEvent.OpenUrl("https://herelies.az"))
-                is MainScreenEvent.ViewAboutPage -> _singleEvent.emit(SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat"))
-                is MainScreenEvent.SendFeedback -> _singleEvent.emit(
-                    SingleEvent.SendFeedbackEmail(
-                        "hereliesaz@gmail.com",
-                        "Cue d'Etat Feedback"
+        if (true) {
+            viewModelScope.launch {
+                when (event) {
+                    is MainScreenEvent.CheckForUpdate -> {
+                        githubRepository.getLatestVersionName()
+                    }
+
+                    is MainScreenEvent.ViewArt -> _singleEvent.emit(SingleEvent.OpenUrl("https://herelies.az"))
+                    is MainScreenEvent.ViewAboutPage -> _singleEvent.emit(SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat"))
+                    is MainScreenEvent.SendFeedback -> _singleEvent.emit(
+                        SingleEvent.SendFeedbackEmail(
+                            "hereliesaz@gmail.com",
+                            "Cue d'Etat Feedback"
+                        )
                     )
-                )
-                is MainScreenEvent.SingleEventConsumed -> _singleEvent.emit(null)
-                is MainScreenEvent.SetExperienceMode -> {
-                    if (event.mode == ExperienceMode.HATER) {
-                        _singleEvent.emit(SingleEvent.InitiateHaterMode)
+
+                    is MainScreenEvent.SingleEventConsumed -> _singleEvent.emit(null)
+                    is MainScreenEvent.SetExperienceMode -> {
+                        if (event.mode == ExperienceMode.HATER) {
+                            _singleEvent.emit(SingleEvent.InitiateHaterMode)
+                        }
+                    }
+
+                    else -> { /* Do nothing for state-changing events */
                     }
                 }
-                else -> { /* Do nothing */ }
             }
         }
     }

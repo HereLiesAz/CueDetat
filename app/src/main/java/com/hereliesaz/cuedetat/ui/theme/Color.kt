@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/theme/Color.kt
+
 package com.hereliesaz.cuedetat.ui.theme
 import androidx.compose.ui.graphics.Color
 

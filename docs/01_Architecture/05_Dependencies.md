@@ -17,7 +17,7 @@ The main application module must be configured with the following parameters:
 * **Plugins:**
     * `com.android.application`
     * `org.jetbrains.kotlin.android`
-    * `com.google.devtools.ksp`
+    * `kotlin-kapt`
     * `com.google.dagger.hilt.android`
     * `org.jetbrains.kotlin.plugin.compose`
 
@@ -36,7 +36,7 @@ The main application module must be configured with the following parameters:
     * `release`: Must have `isMinifyEnabled` and `isShrinkResources` set to `true`, using the
       standard Android optimization profile and the project's `proguard-rules.pro`.
 * **`buildFeatures`**: `compose` and `buildConfig` must be enabled.
-    * **`compilerOptions`**: `jvmTarget` must be "21".
+    * **`kotlinOptions`**: `jvmTarget` must be "17".
 ## Core Dependencies
 
 The project's dependencies are managed via a `libs.versions.toml` file. The following are the
@@ -54,7 +54,7 @@ essential libraries and their purpose:
     * `material3`, `material-icons-extended`: Material Design 3 components and icons.
 * **Dependency Injection (Hilt):**
     * `hilt-android`: Core Hilt/Dagger library.
-    * `hilt-compiler`: KSP symbol processor for Hilt.
+    * `hilt-compiler`: Kapt annotation processor for Hilt.
     * `hilt-navigation-compose`: Integration for Hilt with Compose Navigation.
 
 * **CameraX:**

@@ -11,20 +11,10 @@ import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.delay
 
 @Singleton
 class CalibrationRepository @Inject constructor() {
     private val patternSize = Size(4.0, 11.0) // 4x11 grid of circles
-
-    suspend fun submitCalibrationData(cameraMatrix: Mat, distCoeffs: Mat): Boolean {
-        // Simulate network delay
-        delay(2000)
-        // Log the data submission (simulated)
-        // In a real implementation, we would convert the Mats to a serializable format
-        // and send them to an endpoint.
-        return true
-    }
 
     fun findPattern(frame: Mat): MatOfPoint2f? {
         val gray = Mat()

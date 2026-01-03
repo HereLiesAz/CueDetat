@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 
 class VisionAnalyzer @Inject constructor(
-    val visionRepository: VisionRepository
+    private val visionRepository: VisionRepository
 ) : ImageAnalysis.Analyzer {
 
     private val uiStateRef = AtomicReference<CueDetatState?>(null)

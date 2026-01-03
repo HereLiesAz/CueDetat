@@ -26,24 +26,16 @@ private fun handleSizeChanged(
     state: CueDetatState,
     action: MainScreenEvent.SizeChanged
 ): CueDetatState {
-    // FIX: Do not wipe state on size change. Only update dimensions and initialize transients if needed.
-    val initialSpinControlCenter = if (state.spinControlCenter == null) {
-        PointF(action.width / 2f, action.height * 0.75f)
-    } else {
-        state.spinControlCenter
+    if (state.viewWidth == 0 && state.viewHeight == 0) {
+        return createInitialState(
+            action.width,
+            action.height,
+            state.appControlColorScheme ?: darkColorScheme()
+        )
     }
-
-    // If we are coming from a completely uninitialized state (viewWidth=0), we might want to set defaults
-    // but without overwriting preferences that were just loaded (like experienceMode).
-    // The previous logic called createInitialState which defaulted experienceMode to NULL.
-
-    // If experienceMode is null, we force selection on first load (as per previous logic intent),
-    // but we shouldn't force it if it's already set.
-
     return state.copy(
         viewWidth = action.width,
         viewHeight = action.height,
-        spinControlCenter = initialSpinControlCenter
     )
 }
 

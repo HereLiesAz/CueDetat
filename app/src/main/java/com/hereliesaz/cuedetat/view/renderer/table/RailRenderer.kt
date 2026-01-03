@@ -8,14 +8,13 @@ import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
-import androidx.core.graphics.withMatrix
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.ui.theme.MonteCarlo
-import com.hereliesaz.cuedetat.view.renderer.util.PaintCache
+import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.table.Diamonds
 import com.hereliesaz.cuedetat.view.config.table.Rail
-import com.hereliesaz.cuedetat.view.renderer.util.LineTextRenderer
+import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
 import kotlin.math.pow
@@ -25,7 +24,7 @@ class RailRenderer {
     private val diamondSizeFactor = 0.5f
     private val railConfig = Rail()
     private val diamondConfig = Diamonds()
-    private val textRenderer = LineTextRenderer
+    private val textRenderer = LineTextRenderer()
 
     fun draw(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?) {
         if (!state.table.isVisible || state.table.corners.size < 4) return
@@ -60,97 +59,92 @@ class RailRenderer {
             )
         }
 
-        // Apply global transformation matrix
-        val matrix = state.pitchMatrix ?: return
-        canvas.withMatrix(matrix) {
+        // --- Draw Rail Segments ---
+        val railSegments = listOf(
+            getPointAlongLine(offsetCorners[0], offsetCorners[1], pocketRadius) to getPointAlongLine(offsetCorners[1], offsetCorners[0], pocketRadius),
+            getPointAlongLine(offsetCorners[3], offsetCorners[2], pocketRadius) to getPointAlongLine(offsetCorners[2], offsetCorners[3], pocketRadius),
+            getPointAlongLine(offsetCorners[0], offsetCorners[3], pocketRadius * 1.5f) to getPointAlongLine(offsetCorners[0], offsetCorners[3], state.table.logicalHeight / 2f - pocketRadius),
+            getPointAlongLine(offsetCorners[3], offsetCorners[0], pocketRadius * 1.5f) to getPointAlongLine(offsetCorners[3], offsetCorners[0], state.table.logicalHeight / 2f - pocketRadius),
+            getPointAlongLine(offsetCorners[1], offsetCorners[2], pocketRadius * 1.5f) to getPointAlongLine(offsetCorners[1], offsetCorners[2], state.table.logicalHeight / 2f - pocketRadius),
+            getPointAlongLine(offsetCorners[2], offsetCorners[1], pocketRadius * 1.5f) to getPointAlongLine(offsetCorners[2], offsetCorners[1], state.table.logicalHeight / 2f - pocketRadius)
+        )
 
-            // --- Draw Rail Segments ---
-            val railSegments = listOf(
-                getPointAlongLine(offsetCorners[0], offsetCorners[1], pocketRadius) to getPointAlongLine(offsetCorners[1], offsetCorners[0], pocketRadius),
-                getPointAlongLine(offsetCorners[3], offsetCorners[2], pocketRadius) to getPointAlongLine(offsetCorners[2], offsetCorners[3], pocketRadius),
-                getPointAlongLine(offsetCorners[0], offsetCorners[3], pocketRadius * 1.5f) to getPointAlongLine(offsetCorners[0], offsetCorners[3], state.table.logicalHeight / 2f - pocketRadius),
-                getPointAlongLine(offsetCorners[3], offsetCorners[0], pocketRadius * 1.5f) to getPointAlongLine(offsetCorners[3], offsetCorners[0], state.table.logicalHeight / 2f - pocketRadius),
-                getPointAlongLine(offsetCorners[1], offsetCorners[2], pocketRadius * 1.5f) to getPointAlongLine(offsetCorners[1], offsetCorners[2], state.table.logicalHeight / 2f - pocketRadius),
-                getPointAlongLine(offsetCorners[2], offsetCorners[1], pocketRadius * 1.5f) to getPointAlongLine(offsetCorners[2], offsetCorners[1], state.table.logicalHeight / 2f - pocketRadius)
+        railSegments.forEach { (start, end) ->
+            canvas.drawLine(start.x, start.y, end.x, end.y, railLineGlowPaint)
+            canvas.drawLine(start.x, start.y, end.x, end.y, railLinePaint)
+        }
+
+        // --- Draw Diamonds ---
+        val diamondRadius = LOGICAL_BALL_RADIUS * diamondSizeFactor
+        val diamondOffset = 50f
+        val normals = state.table.normals
+
+        for (i in 1..3) {
+            val fraction = i / 4.0f
+            val top = interpolate(offsetCorners[0], offsetCorners[1], fraction)
+            val bottom = interpolate(offsetCorners[3], offsetCorners[2], fraction)
+
+            drawDiamond(
+                canvas,
+                PointF(top.x + normals[0].x * diamondOffset, top.y + normals[0].y * diamondOffset),
+                diamondRadius,
+                diamondPaint
+            )
+            drawDiamond(
+                canvas,
+                PointF(
+                    bottom.x + normals[2].x * diamondOffset,
+                    bottom.y + normals[2].y * diamondOffset
+                ),
+                diamondRadius,
+                diamondPaint
+            )
+        }
+
+        for (i in 1..3) {
+            // Upper half of side rails
+            val leftTop = interpolate(offsetCorners[0], offsetCorners[3], i / 8.0f)
+            val rightTop = interpolate(offsetCorners[1], offsetCorners[2], i / 8.0f)
+            drawDiamond(
+                canvas,
+                PointF(
+                    leftTop.x + normals[3].x * diamondOffset,
+                    leftTop.y + normals[3].y * diamondOffset
+                ),
+                diamondRadius,
+                diamondPaint
+            )
+            drawDiamond(
+                canvas,
+                PointF(
+                    rightTop.x + normals[1].x * diamondOffset,
+                    rightTop.y + normals[1].y * diamondOffset
+                ),
+                diamondRadius,
+                diamondPaint
             )
 
-            railSegments.forEach { (start, end) ->
-                drawLine(start.x, start.y, end.x, end.y, railLineGlowPaint)
-                drawLine(start.x, start.y, end.x, end.y, railLinePaint)
-            }
-
-            // --- Draw Diamonds ---
-            val diamondRadius = LOGICAL_BALL_RADIUS * diamondSizeFactor
-            val diamondOffset = 50f
-            val normals = state.table.normals
-
-            for (i in 1..3) {
-                val fraction = i / 4.0f
-                val top = interpolate(offsetCorners[0], offsetCorners[1], fraction)
-                val bottom = interpolate(offsetCorners[3], offsetCorners[2], fraction)
-
-                drawDiamond(
-                    this, // pass canvas
-                    PointF(top.x + normals[0].x * diamondOffset, top.y + normals[0].y * diamondOffset),
-                    diamondRadius,
-                    diamondPaint
-                )
-                drawDiamond(
-                    this,
-                    PointF(
-                        bottom.x + normals[2].x * diamondOffset,
-                        bottom.y + normals[2].y * diamondOffset
-                    ),
-                    diamondRadius,
-                    diamondPaint
-                )
-            }
-
-            for (i in 1..3) {
-                // Upper half of side rails
-                val leftTop = interpolate(offsetCorners[0], offsetCorners[3], i / 8.0f)
-                val rightTop = interpolate(offsetCorners[1], offsetCorners[2], i / 8.0f)
-                drawDiamond(
-                    this,
-                    PointF(
-                        leftTop.x + normals[3].x * diamondOffset,
-                        leftTop.y + normals[3].y * diamondOffset
-                    ),
-                    diamondRadius,
-                    diamondPaint
-                )
-                drawDiamond(
-                    this,
-                    PointF(
-                        rightTop.x + normals[1].x * diamondOffset,
-                        rightTop.y + normals[1].y * diamondOffset
-                    ),
-                    diamondRadius,
-                    diamondPaint
-                )
-
-                // Lower half of side rails
-                val leftBottom = interpolate(offsetCorners[0], offsetCorners[3], (8 - i) / 8.0f)
-                val rightBottom = interpolate(offsetCorners[1], offsetCorners[2], (8 - i) / 8.0f)
-                drawDiamond(
-                    this,
-                    PointF(
-                        leftBottom.x + normals[3].x * diamondOffset,
-                        leftBottom.y + normals[3].y * diamondOffset
-                    ),
-                    diamondRadius,
-                    diamondPaint
-                )
-                drawDiamond(
-                    this,
-                    PointF(
-                        rightBottom.x + normals[1].x * diamondOffset,
-                        rightBottom.y + normals[1].y * diamondOffset
-                    ),
-                    diamondRadius,
-                    diamondPaint
-                )
-            }
+            // Lower half of side rails
+            val leftBottom = interpolate(offsetCorners[0], offsetCorners[3], (8 - i) / 8.0f)
+            val rightBottom = interpolate(offsetCorners[1], offsetCorners[2], (8 - i) / 8.0f)
+            drawDiamond(
+                canvas,
+                PointF(
+                    leftBottom.x + normals[3].x * diamondOffset,
+                    leftBottom.y + normals[3].y * diamondOffset
+                ),
+                diamondRadius,
+                diamondPaint
+            )
+            drawDiamond(
+                canvas,
+                PointF(
+                    rightBottom.x + normals[1].x * diamondOffset,
+                    rightBottom.y + normals[1].y * diamondOffset
+                ),
+                diamondRadius,
+                diamondPaint
+            )
         }
     }
 
@@ -170,7 +164,7 @@ class RailRenderer {
         paints: PaintCache,
         typeface: Typeface?
     ) {
-        val matrix = state.pitchMatrix ?: return // Use the same matrix for mapping
+        val matrix = state.railPitchMatrix ?: return
         val referenceRadius = DrawingUtils.getPerspectiveRadiusAndLift(
             state.protractorUnit.center, state.protractorUnit.radius, state, matrix
         ).radius
@@ -182,20 +176,14 @@ class RailRenderer {
         }
         val textPadding = referenceRadius * 5f
 
-        // Map points before passing to text renderer?
-        // Or text renderer will map them?
-        // Let's assume textRenderer expects SCREEN coordinates if we are not transforming the canvas here.
-        // We are NOT transforming the canvas in this function, so we must map points.
-
         val pathToLabel = if (state.isBankingMode) state.bankShotPath else state.aimingLineBankPath
         pathToLabel?.let { path ->
             if (path.size > 1) {
                 val bankPoint = path[1]
-                val screenBankPoint = DrawingUtils.mapPoint(bankPoint, matrix)
                 getRailForPoint(bankPoint, state)?.let { railType ->
                     textRenderer.drawDiamondLabel(
                         canvas,
-                        screenBankPoint,
+                        bankPoint,
                         railType,
                         state,
                         textPaint,
@@ -209,11 +197,10 @@ class RailRenderer {
             state.tangentLineBankPath?.let { path ->
                 if (path.size > 1) {
                     val tangentBankPoint = path[1]
-                    val screenTangentPoint = DrawingUtils.mapPoint(tangentBankPoint, matrix)
                     getRailForPoint(tangentBankPoint, state)?.let { railType ->
                         textRenderer.drawDiamondLabel(
                             canvas,
-                            screenTangentPoint,
+                            tangentBankPoint,
                             railType,
                             state,
                             textPaint,
@@ -227,9 +214,8 @@ class RailRenderer {
 
         if (!state.isBankingMode) {
             state.shotGuideImpactPoint?.let { impactPoint ->
-                val screenImpactPoint = DrawingUtils.mapPoint(impactPoint, matrix)
                 getRailForPoint(impactPoint, state)?.let { railType ->
-                    textRenderer.drawDiamondLabel(canvas, screenImpactPoint, railType, state, textPaint, textPadding)
+                    textRenderer.drawDiamondLabel(canvas, impactPoint, railType, state, textPaint, textPadding)
                 }
             }
         }

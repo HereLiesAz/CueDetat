@@ -15,7 +15,7 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.ui.theme.SulfurDust
-import com.hereliesaz.cuedetat.view.renderer.util.PaintCache
+import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.ball.ActualCueBall
 import com.hereliesaz.cuedetat.view.config.ball.BankingBall
 import com.hereliesaz.cuedetat.view.config.ball.GhostCueBall
@@ -25,7 +25,7 @@ import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.LogicalCircular
-import com.hereliesaz.cuedetat.view.renderer.util.BallTextRenderer
+import com.hereliesaz.cuedetat.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
 import kotlin.math.hypot
@@ -299,7 +299,6 @@ class BallRenderer {
         typeface: Typeface?
     ) {
         val textPaint = paints.textPaint.apply { this.typeface = typeface }
-        val matrix = state.pitchMatrix ?: return
 
         state.onPlaneBall?.let {
             val (label, config) = if (state.isBankingMode) {
@@ -307,31 +306,29 @@ class BallRenderer {
             } else {
                 "Actual Cue Ball" to LabelConfig.actualCueBall
             }
-            val screenPos = DrawingUtils.mapPoint(it.center, matrix)
-            textRenderer.draw(canvas, textPaint, screenPos, label, config, state)
+            textRenderer.draw(canvas, textPaint, it, label, config, state)
         }
 
         if (!state.isBankingMode) {
-            val targetScreenPos = DrawingUtils.mapPoint(state.protractorUnit.center, matrix)
             textRenderer.draw(
                 canvas,
                 textPaint,
-                targetScreenPos,
+                state.protractorUnit,
                 "Target Ball",
                 LabelConfig.targetBall,
                 state
             )
-
-            val ghostCueScreenPos = DrawingUtils.mapPoint(state.protractorUnit.ghostCueBallCenter, matrix)
-            textRenderer.draw(canvas, textPaint, ghostCueScreenPos, "Ghost Cue Ball", LabelConfig.ghostCueBall, state)
+            textRenderer.draw(canvas, textPaint, object : LogicalCircular {
+                override val center = state.protractorUnit.ghostCueBallCenter
+                override val radius = state.protractorUnit.radius
+            }, "Ghost Cue Ball", LabelConfig.ghostCueBall, state)
         }
 
         state.obstacleBalls.forEachIndexed { index, obstacle ->
-            val screenPos = DrawingUtils.mapPoint(obstacle.center, matrix)
             textRenderer.draw(
                 canvas,
                 textPaint,
-                screenPos,
+                obstacle,
                 "Obstacle ${index + 1}",
                 LabelConfig.obstacleBall,
                 state
