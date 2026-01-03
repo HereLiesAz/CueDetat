@@ -17,7 +17,7 @@ The main application module must be configured with the following parameters:
 * **Plugins:**
     * `com.android.application`
     * `org.jetbrains.kotlin.android`
-    * `kotlin-kapt`
+    * `com.google.devtools.ksp`
     * `com.google.dagger.hilt.android`
     * `org.jetbrains.kotlin.plugin.compose`
 
@@ -54,7 +54,7 @@ essential libraries and their purpose:
     * `material3`, `material-icons-extended`: Material Design 3 components and icons.
 * **Dependency Injection (Hilt):**
     * `hilt-android`: Core Hilt/Dagger library.
-    * `hilt-compiler`: Kapt annotation processor for Hilt.
+    * `hilt-compiler`: KSP annotation processor for Hilt.
     * `hilt-navigation-compose`: Integration for Hilt with Compose Navigation.
 
 * **CameraX:**
