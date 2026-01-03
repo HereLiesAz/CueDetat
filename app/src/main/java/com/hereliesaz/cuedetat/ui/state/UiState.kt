@@ -1,22 +1,20 @@
 package com.hereliesaz.cuedetat.ui.state
 
 import androidx.compose.ui.geometry.Offset
-import androidx.xr.runtime.math.Pose
+import com.google.ar.core.Anchor
 
 enum class AppState { DetectingPlanes, ReadyToPlace, ScenePlaced }
-enum class ShotType { CUT, BANK, KICK, JUMP, MASSE } // Added JUMP and MASSE
-data class BallState(var pose: Pose, var isBeingDragged: Boolean = false)
 
-data class MainUiState(
-    val appState: AppState = AppState.DetectingPlanes,
-    val statusText: String = "Move phone to detect a surface...",
-    val tablePose: Pose? = null,
-    val cueBallPose: Pose? = null,
-    val objectBallPose: Pose? = null,
-    val shotType: ShotType = ShotType.CUT,
-    val selectedBall: Int? = null,
-    val showHelpDialog: Boolean = false,
-    val spinOffset: Offset = Offset.Zero,
-    val cueElevation: Float = 0f, // For jump/masse shots, range 0.0 to 1.0
-    val warningMessage: String? = null
+data class UiState(
+    val isArMode: Boolean = false,
+    val isDarkMode: Boolean = true,
+    val showHelp: Boolean = false,
+    val instructionText: String = "Move phone to start AR.",
+    val table: Anchor? = null,
+    val cueBall: Anchor? = null,
+    val objectBall: Anchor? = null,
+    val isAiming: Boolean = true,
+    val shotPower: Float = 0.5f,
+    val cueballSpin: Offset = Offset.Zero,
+    val shotType: ShotType = ShotType.CUT
 )
