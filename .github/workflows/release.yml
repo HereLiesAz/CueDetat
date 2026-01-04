@@ -52,11 +52,11 @@ jobs:
         id: versioning
         run: |
           # Define the path to your app's build.gradle file
-          GRADLE_FILE="app/build.gradle"
+          GRADLE_FILE="app/build.gradle.kts"
 
           # Extract current version code and name
-          CURRENT_VERSION_CODE=$(grep 'versionCode ' $GRADLE_FILE | awk '{print $2}')
-          CURRENT_VERSION_NAME=$(grep 'versionName ' $GRADLE_FILE | awk '{print $2}' | tr -d '"')
+          CURRENT_VERSION_CODE=$(grep 'versionCode =' $GRADLE_FILE | awk '{print $3}')
+          CURRENT_VERSION_NAME=$(grep 'versionName =' $GRADLE_FILE | awk '{print $3}' | tr -d '"')
 
           # Increment versionCode
           NEW_VERSION_CODE=$((CURRENT_VERSION_CODE + 1))
@@ -65,8 +65,8 @@ jobs:
           NEW_VERSION_NAME=$(echo $CURRENT_VERSION_NAME | awk -F. -v OFS=. '{$NF = $NF + 1;} 1')
 
           # Update the build.gradle file with the new versions
-          sed -i "s/versionCode .*/versionCode $NEW_VERSION_CODE/" $GRADLE_FILE
-          sed -i "s/versionName .*/versionName \"$NEW_VERSION_NAME\"/" $GRADLE_FILE
+          sed -i "s/versionCode = .*/versionCode = $NEW_VERSION_CODE/" $GRADLE_FILE
+          sed -i "s/versionName = .*/versionName = \"$NEW_VERSION_NAME\"/" $GRADLE_FILE
 
           echo "Version bumped to $NEW_VERSION_NAME (Code: $NEW_VERSION_CODE)"
           
@@ -105,7 +105,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add app/build.gradle
+          git add app/build.gradle.kts
           # Commit only if there are changes
           if ! git diff --staged --quiet; then
             git commit -m "chore(release): Bump version to ${{ steps.versioning.outputs.new_version_name }}"
