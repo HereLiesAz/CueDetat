@@ -15,8 +15,8 @@ android {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = project.findProperty("versionCode")?.toString()?.toInt() ?: 2
+        versionName = project.findProperty("versionName")?.toString() ?: "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

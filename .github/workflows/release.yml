@@ -48,30 +48,22 @@ jobs:
           java-version: ${{ steps.get_java_version.outputs.version }}
           cache: 'gradle'
 
-      - name: Increment version
+      - name: Determine Version
         id: versioning
         run: |
-          # Define the path to your app's build.gradle file
-          GRADLE_FILE="app/build.gradle.kts"
+          # Base version for pre-releases
+          BASE_VERSION_NAME="1.1"
 
-          # Extract current version code and name
-          CURRENT_VERSION_CODE=$(grep 'versionCode =' $GRADLE_FILE | awk '{print $3}')
-          CURRENT_VERSION_NAME=$(grep 'versionName =' $GRADLE_FILE | awk '{print $3}' | tr -d '"')
+          # Create unique version using run number
+          NEW_VERSION_NAME="${BASE_VERSION_NAME}.${{ github.run_number }}"
+          # Use run number as versionCode to ensure it increases
+          NEW_VERSION_CODE=${{ github.run_number }}
 
-          # Increment versionCode
-          NEW_VERSION_CODE=$((CURRENT_VERSION_CODE + 1))
-
-          # Increment patch number in versionName (e.g., 1.2.3 -> 1.2.4)
-          NEW_VERSION_NAME=$(echo $CURRENT_VERSION_NAME | awk -F. -v OFS=. '{$NF = $NF + 1;} 1')
-
-          # Update the build.gradle file with the new versions
-          sed -i "s/versionCode = .*/versionCode = $NEW_VERSION_CODE/" $GRADLE_FILE
-          sed -i "s/versionName = .*/versionName = \"$NEW_VERSION_NAME\"/" $GRADLE_FILE
-
-          echo "Version bumped to $NEW_VERSION_NAME (Code: $NEW_VERSION_CODE)"
+          echo "Version: $NEW_VERSION_NAME (Code: $NEW_VERSION_CODE)"
           
           # Set outputs for subsequent steps
           echo "new_version_name=$NEW_VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "new_version_code=$NEW_VERSION_CODE" >> "$GITHUB_OUTPUT"
 
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
@@ -83,7 +75,7 @@ jobs:
           echo "android.useAndroidX=true" >> ~/.gradle/gradle.properties
       
       - name: Build with Gradle
-        run: ./gradlew clean assembleRelease
+        run: ./gradlew clean assembleRelease -PversionCode=${{ steps.versioning.outputs.new_version_code }} -PversionName=${{ steps.versioning.outputs.new_version_name }}
 
       - name: Rename APK
         id: rename_apk
@@ -101,25 +93,8 @@ jobs:
           # Set output for the upload step
           echo "new_path=$APK_DIR/$NEW_APK_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Commit and Tag version bump
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add app/build.gradle.kts
-          # Commit only if there are changes
-          if ! git diff --staged --quiet; then
-            git commit -m "chore(release): Bump version to ${{ steps.versioning.outputs.new_version_name }}"
-            git tag v${{ steps.versioning.outputs.new_version_name }}
-            git push
-            git push --tags
-          else
-            echo "No version changes to commit."
-          fi
-
       - name: Create GitHub Pre-Release
         uses: softprops/action-gh-release@v1
-        # This step only runs if a new version was committed and tagged
-        if: steps.versioning.outputs.new_version_name != ''
         with:
           # The name of the tag for this release
           tag_name: v${{ steps.versioning.outputs.new_version_name }}
