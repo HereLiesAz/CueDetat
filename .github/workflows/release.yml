@@ -52,7 +52,7 @@ jobs:
         id: versioning
         run: |
           # Base version for pre-releases
-          BASE_VERSION_NAME="1.2"
+          BASE_VERSION_NAME="1.2.0"
 
           # Create unique version using run number
           NEW_VERSION_NAME="${BASE_VERSION_NAME}.${{ github.run_number }}"
