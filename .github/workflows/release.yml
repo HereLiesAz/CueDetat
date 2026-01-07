@@ -74,18 +74,29 @@ jobs:
           echo "org.gradle.jvmargs=-Xmx3072m" >> ~/.gradle/gradle.properties
           echo "android.useAndroidX=true" >> ~/.gradle/gradle.properties
       
+      - name: Create Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_PRIVATE }}" > private.key
+          echo "${{ secrets.KEYSTORE_CHAIN }}" > fullchain.crt
+          openssl pkcs12 -export -in fullchain.crt -inkey private.key -out app/release.keystore -name "${{ secrets.KEY_ALIAS }}" -passout pass:"${{ secrets.KEYSTORE_PASSWORD }}"
+
       - name: Build with Gradle
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/app/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: ./gradlew clean assembleRelease -PversionCode=${{ steps.versioning.outputs.new_version_code }} -PversionName=${{ steps.versioning.outputs.new_version_name }}
 
       - name: Rename APK
         id: rename_apk
         run: |
-          # Find the unsigned APK
-          APK_PATH=$(find ./app/build/outputs/apk/release -name "app-release-unsigned.apk")
+          # Find the APK (now signed)
+          APK_PATH=$(find ./app/build/outputs/apk/release -name "app-release.apk")
           APK_DIR=$(dirname "$APK_PATH")
           
           # Create the new filename
-          NEW_APK_NAME="app-release-unsigned-v${{ steps.versioning.outputs.new_version_name }}.apk"
+          NEW_APK_NAME="app-release-v${{ steps.versioning.outputs.new_version_name }}.apk"
           
           # Rename the file
           mv "$APK_PATH" "$APK_DIR/$NEW_APK_NAME"
