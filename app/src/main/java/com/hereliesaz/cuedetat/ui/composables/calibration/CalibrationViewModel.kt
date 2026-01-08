@@ -4,11 +4,14 @@ package com.hereliesaz.cuedetat.ui.composables.calibration
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.os.Build
 import com.hereliesaz.cuedetat.data.CalibrationRepository
+import com.hereliesaz.cuedetat.data.DeviceCalibrationDatabase
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import org.opencv.core.Mat
 import org.opencv.core.MatOfPoint2f
@@ -19,8 +22,13 @@ import javax.inject.Inject
 @HiltViewModel
 class CalibrationViewModel @Inject constructor(
     private val calibrationRepository: CalibrationRepository,
-    private val userPreferencesRepository: UserPreferencesRepository
+    private val userPreferencesRepository: UserPreferencesRepository,
+    private val deviceCalibrationDatabase: DeviceCalibrationDatabase
 ) : ViewModel() {
+
+    init {
+        checkAutoCalibration()
+    }
 
     private val _detectedPattern = MutableStateFlow<List<Point>?>(null)
     val detectedPattern = _detectedPattern.asStateFlow()
@@ -94,5 +102,32 @@ class CalibrationViewModel @Inject constructor(
         _toastMessage.value = null
     }
 
-    // TODO: Implement automatic camera calibration profile selection based on device model
+    private fun checkAutoCalibration() {
+        viewModelScope.launch {
+            val existingData = userPreferencesRepository.calibrationDataFlow.firstOrNull()
+            val (existingMatrix, existingCoeffs) = existingData ?: Pair(null, null)
+
+            var hasCalibration = false
+            if (existingMatrix != null && existingCoeffs != null) {
+                hasCalibration = true
+                existingMatrix.release()
+                existingCoeffs.release()
+            } else {
+                existingMatrix?.release()
+                existingCoeffs?.release()
+            }
+
+            if (!hasCalibration) {
+                val deviceModel = Build.MODEL
+                val profile = deviceCalibrationDatabase.getProfile(deviceModel)
+                if (profile != null) {
+                    val (cameraMatrix, distCoeffs) = profile
+                    userPreferencesRepository.saveCalibrationData(cameraMatrix, distCoeffs)
+                    _toastMessage.value = "Auto-calibrated for $deviceModel"
+                    cameraMatrix.release()
+                    distCoeffs.release()
+                }
+            }
+        }
+    }
 }
