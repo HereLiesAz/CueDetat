@@ -93,9 +93,37 @@ class CalibrationViewModel @Inject constructor(
     }
 
     fun onSubmitData() {
-        // TODO: Implement backend submission logic
-        _toastMessage.value = "Calibration data submitted successfully."
-        _showSubmissionDialog.value = false
+        viewModelScope.launch {
+            try {
+                // Get the latest calibration data from preferences
+                val calibrationData = userPreferencesRepository.calibrationDataFlow.firstOrNull()
+
+                if (calibrationData != null) {
+                    val cameraMatrix = calibrationData.first
+                    val distCoeffs = calibrationData.second
+
+                    if (cameraMatrix != null && distCoeffs != null) {
+                        calibrationRepository.submitCalibrationData(cameraMatrix, distCoeffs)
+
+                        // Release Mats after submission.
+                        // Safe to do so because UserPreferencesRepository creates new Mat instances
+                        // for each emission of calibrationDataFlow.
+                        cameraMatrix.release()
+                        distCoeffs.release()
+
+                        _toastMessage.value = "Calibration data submitted successfully."
+                        _showSubmissionDialog.value = false
+                    } else {
+                        _toastMessage.value = "No calibration data to submit."
+                    }
+                } else {
+                    _toastMessage.value = "Failed to retrieve calibration data."
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("CalibrationViewModel", "Error submitting data", e)
+                _toastMessage.value = "Submission failed."
+            }
+        }
     }
 
     fun onToastShown() {
