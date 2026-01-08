@@ -9,11 +9,15 @@ import org.opencv.core.MatOfPoint3f
 import org.opencv.core.Point3
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
+import com.google.gson.Gson
+import kotlinx.coroutines.delay
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class CalibrationRepository @Inject constructor() {
+class CalibrationRepository @Inject constructor(
+    private val gson: Gson
+) {
     private val patternSize = Size(4.0, 11.0) // 4x11 grid of circles
 
     fun findPattern(frame: Mat): MatOfPoint2f? {
@@ -79,5 +83,22 @@ class CalibrationRepository @Inject constructor() {
             distCoeffs.release()
             return null
         }
+    }
+
+    suspend fun submitCalibrationData(cameraMatrix: Mat, distCoeffs: Mat) {
+        val cameraMatrixData = DoubleArray(9)
+        cameraMatrix.get(0, 0, cameraMatrixData)
+
+        val distCoeffsData = DoubleArray(5)
+        distCoeffs.get(0, 0, distCoeffsData)
+
+        val payload = mapOf(
+            "cameraMatrix" to cameraMatrixData.toList(),
+            "distCoeffs" to distCoeffsData.toList()
+        )
+
+        val json = gson.toJson(payload)
+        android.util.Log.d("CalibrationRepository", "Submitting calibration data: $json")
+        delay(2000)
     }
 }
