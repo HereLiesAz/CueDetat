@@ -1,0 +1,41 @@
+name: Branch Manager
+
+on:
+  create:
+
+jobs:
+  manage_branch:
+    if: github.event.ref_type == 'branch' && github.event.ref != 'main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Invoke Jules
+        uses: google-labs-code/jules-invoke@v1
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        with:
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
+          prompt: |
+            You are Jules, an expert software engineer.
+            A new branch '${{ github.event.ref }}' has been created.
+
+            Your mission is to manage the lifecycle of this branch.
+
+            1. Checkout the repository.
+            2. Compare '${{ github.event.ref }}' with the default branch 'main'.
+            3. If there are no differences (empty branch or same head):
+               - Delete the branch '${{ github.event.ref }}'.
+               - Exit.
+            4. If there are differences:
+               a. Check if a Pull Request already exists for this branch targeting 'main'. If not, create one.
+               b. Analyze the changes for validity, necessity, and code quality.
+               c. If you find issues (bugs, style violations, etc.), fix them by modifying the code and pushing to the branch '${{ github.event.ref }}'.
+               d. Handle any merge conflicts if they arise.
+               e. Once satisfied (and valid/necessary), approve the PR (if possible, or just proceed to merge).
+               f. Merge the Pull Request into 'main'.
+               g. Delete the branch '${{ github.event.ref }}'.
+
+            Use the 'gh' CLI tool for GitHub interactions where possible.
