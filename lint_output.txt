@@ -1,0 +1,70 @@
+Calculating task graph as configuration cache cannot be reused because environment variable 'ANDROID_HOME' has changed.
+> Task :app:preBuild UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:extractProguardFiles UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:preDebugAndroidTestBuild SKIPPED
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:generateDebugAndroidTestResValues UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:kspDebugKotlin
+> Task :app:compileDebugKotlin
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/MyApplication.kt:17:26 'static fun initDebug(): Boolean' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/data/ShakeDetector.kt:17:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to field.
+- To opt in to applying to both value parameter and field, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/data/VisionAnalyzer.kt:41:28 This extension is shadowed by a member: 'fun toBitmap(): Bitmap' defined in 'androidx.camera.core.ImageProxy'.
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/data/VisionRepository.kt:39:5 This annotation is currently applied to the value parameter only, but in the future it will also be applied to property.
+- To opt in to applying to both value parameter and property, add '-Xannotation-default-target=param-property' to your compiler arguments.
+- To keep applying to the value parameter only, use the '@param:' annotation target.
+
+See https://youtrack.jetbrains.com/issue/KT-73255 for more details.
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/MainLayout.kt:99:67 Unnecessary non-null assertion (!!) on a non-null receiver of type 'PointF'.
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/MainViewModel.kt:109:57 Elvis operator (?:) always returns the left operand of non-nullable type 'Matrix'.
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/composables/calibration/CalibrationScreen.kt:45:39 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/composables/quickalign/QuickAlignScreen.kt:51:38 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/ui/theme/Theme.kt:132:20 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/model/Table.kt:90:37 Unnecessary non-null assertion (!!) on a non-null receiver of type 'PointF'.
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/model/Table.kt:90:59 Unnecessary non-null assertion (!!) on a non-null receiver of type 'PointF'.
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/model/Table.kt:125:57 Redundant call of conversion method.
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/model/Table.kt:125:102 Redundant call of conversion method.
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:251:46 Redundant call of conversion method.
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/table/RailRenderer.kt:251:67 Redundant call of conversion method.
+w: file:///app/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/text/LineTextRenderer.kt:107:19 Redundant call of conversion method.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:hiltAggregateDepsDebug
+> Task :app:hiltJavaCompileDebug
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:generateDebugAndroidTestLintModel
+> Task :app:generateDebugLintReportModel
+> Task :app:generateDebugUnitTestLintModel
+> Task :app:lintAnalyzeDebugAndroidTest
+> Task :app:lintAnalyzeDebugUnitTest
+> Task :app:lintAnalyzeDebug
+
+> Task :app:lintReportDebug
+Wrote HTML report to file:///app/app/build/reports/lint-results-debug.html
+
+> Task :app:lintDebug
+
+BUILD SUCCESSFUL in 3m 13s
+32 actionable tasks: 14 executed, 18 up-to-date
+Configuration cache entry stored.
