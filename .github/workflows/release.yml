@@ -52,7 +52,7 @@ jobs:
         id: versioning
         run: |
           # Base version for pre-releases
-          BASE_VERSION_NAME="1.1"
+          BASE_VERSION_NAME="1.2.0"
 
           # Create unique version using run number
           NEW_VERSION_NAME="${BASE_VERSION_NAME}.${{ github.run_number }}"
@@ -67,6 +67,10 @@ jobs:
 
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > app/release.keystore
       
       - name: Configure Gradle Properties
         run: |
@@ -85,13 +89,13 @@ jobs:
           KEYSTORE_PATH: ${{ github.workspace }}/app/release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew clean assembleRelease -PversionCode=${{ steps.versioning.outputs.new_version_code }} -PversionName=${{ steps.versioning.outputs.new_version_name }}
 
       - name: Rename APK
         id: rename_apk
         run: |
-          # Find the APK (now signed)
+          # Find the signed APK
           APK_PATH=$(find ./app/build/outputs/apk/release -name "app-release.apk")
           APK_DIR=$(dirname "$APK_PATH")
           
@@ -108,9 +112,9 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           # The name of the tag for this release
-          tag_name: v${{ steps.versioning.outputs.new_version_name }}
+          tag_name: v1.2-debug
           # The name of the release
-          name: Release v${{ steps.versioning.outputs.new_version_name }}
+          name: 1.2 Debug Builds
           # Mark this release as a pre-release
           prerelease: true
           # A list of files to upload as assets to the release
