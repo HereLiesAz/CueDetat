@@ -1,0 +1,35 @@
+name: Jules Issue Handler
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  handle_issue:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Invoke Jules
+        uses: google-labs-code/jules-invoke@v1
+        with:
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
+          prompt: |
+            You are an expert software engineer and security agent named Jules.
+            You have been assigned to handle the following issue:
+
+            Title: ${{ github.event.issue.title }}
+
+            Body:
+            ${{ github.event.issue.body }}
+
+            Your goal is to resolve this issue efficiently and correctly.
+            - If this is a bug report, analyze the codebase, reproduce the issue if possible, and fix it.
+            - If this is a feature request, implement the requested feature.
+            - If this is a security issue, prioritize it, analyze the vulnerability, and implement a fix.
+            - If this is a question, provide a helpful and accurate answer.
+
+            IMPORTANT:
+            When you have completed the task, you MUST ensure the issue is closed.
+            - If you create a Pull Request to fix the issue, include "Fixes #${{ github.event.issue.number }}" in the Pull Request description so that the issue is automatically closed when the PR is merged.
+            - If no code change is required (e.g., answering a question), you should close the issue yourself or instruct on how to close it.
