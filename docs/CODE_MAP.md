@@ -7,7 +7,7 @@ This document serves as an index, mapping high-level concepts to their concrete 
 ### Vision & Computer Vision (OpenCV)
 *   **Main Entry Point:** `app/src/main/java/com/hereliesaz/cuedetat/data/VisionRepository.kt`
     *   *Responsibility:* Manages CameraX input, converts `ImageProxy` to OpenCV `Mat`, and runs detection pipelines.
-*   **State Analysis:** `app/src/main/java/com/hereliesaz/cuedetat/data/VisionAnalyzer.kt` (if exists) or integrated into Repository.
+*   **State Analysis:** Integrated directly into `VisionRepository.kt` as part of the `processImage` pipeline.
 *   **Data Structure:** `app/src/main/java/com/hereliesaz/cuedetat/data/VisionData.kt`
     *   *Responsibility:* Holds the frame-by-frame results (balls, mask, timestamps).
 *   **Redux Integration:** `app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/CvReducer.kt`
