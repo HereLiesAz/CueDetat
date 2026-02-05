@@ -18,6 +18,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/**
+ * A customized circular outlined button used consistently across the app.
+ *
+ * @param onClick Callback when the button is clicked.
+ * @param text The text label inside the button.
+ * @param modifier Modifier for external styling/positioning.
+ * @param size The diameter of the button (default 72.dp).
+ * @param color The primary color for the border and text.
+ */
 @Composable
 fun CuedetatButton(
     onClick: () -> Unit,
@@ -30,13 +39,15 @@ fun CuedetatButton(
         onClick = onClick,
         modifier = modifier.size(size),
         shape = CircleShape,
+        // Semi-transparent border.
         border = BorderStroke(3.dp, color.copy(alpha = 0.7f)),
         colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = Color.Transparent,
-            contentColor = color
+            containerColor = Color.Transparent, // Transparent background.
+            contentColor = color // Colored text.
         ),
         contentPadding = PaddingValues(4.dp)
     ) {
+        // Button Label.
         Text(
             text = text,
             textAlign = TextAlign.Center,

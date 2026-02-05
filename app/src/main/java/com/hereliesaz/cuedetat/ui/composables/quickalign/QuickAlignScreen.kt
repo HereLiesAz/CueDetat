@@ -45,6 +45,15 @@ import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
 import com.hereliesaz.cuedetat.view.state.TableSize
 import kotlin.math.hypot
 
+/**
+ * A wizard-style screen for quickly aligning the virtual table to the real world.
+ *
+ * Steps:
+ * 1. Select Table Size.
+ * 2. Capture a photo of the table.
+ * 3. Drag virtual pocket markers to match the photo.
+ * 4. Calculate and apply the Homography matrix.
+ */
 @Composable
 fun QuickAlignScreen(
     onEvent: (MainScreenEvent) -> Unit,
@@ -55,6 +64,7 @@ fun QuickAlignScreen(
     val capturedBitmap by viewModel.capturedBitmap.collectAsState()
     val pocketPositions by viewModel.pocketPositions.collectAsState()
 
+    // Listen for completion event to dispatch the result to the main state.
     LaunchedEffect(viewModel) {
         viewModel.alignResult.collect { event ->
             onEvent(event)
@@ -66,6 +76,7 @@ fun QuickAlignScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        // Step Content Switcher
         when (currentStep) {
             QuickAlignStep.SELECT_SIZE -> SizeSelectionStep(viewModel)
             QuickAlignStep.CAPTURE_PHOTO -> CaptureStep(analyzer)
@@ -77,10 +88,10 @@ fun QuickAlignScreen(
                 )
             }
 
-            QuickAlignStep.FINISHED -> {} // Handled by event
+            QuickAlignStep.FINISHED -> {} // Handled by event logic.
         }
 
-        // Common bottom controls
+        // Common bottom control bar (Cancel / Reset / Finish).
         if (currentStep != QuickAlignStep.CAPTURE_PHOTO) {
             Row(
                 modifier = Modifier
@@ -107,6 +118,10 @@ fun QuickAlignScreen(
     }
 }
 
+/**
+ * Step 3: Interactive alignment.
+ * Users drag control points (pockets) over the captured image.
+ */
 @Composable
 private fun AlignmentStep(
     viewModel: QuickAlignViewModel,
@@ -122,6 +137,7 @@ private fun AlignmentStep(
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { startOffset ->
+                        // Find if touch is near any pocket control point.
                         draggedPocket = pocketPositions
                             .minByOrNull { (_, pos) ->
                                 hypot(
@@ -146,6 +162,7 @@ private fun AlignmentStep(
                     }
                 )
             }) {
+        // Background: The captured photo.
         Image(
             bitmap = bitmap.asImageBitmap(),
             contentDescription = "Table Photo for Alignment",
@@ -153,6 +170,7 @@ private fun AlignmentStep(
             contentScale = ContentScale.Fit
         )
 
+        // Overlay: The virtual table shape (yellow outline).
         Canvas(modifier = Modifier.fillMaxSize()) {
             val tl = pocketPositions[DraggablePocket.TOP_LEFT] ?: return@Canvas
             val tr = pocketPositions[DraggablePocket.TOP_RIGHT] ?: return@Canvas
@@ -161,6 +179,7 @@ private fun AlignmentStep(
             pocketPositions[DraggablePocket.SIDE_LEFT] ?: return@Canvas
             pocketPositions[DraggablePocket.SIDE_RIGHT] ?: return@Canvas
 
+            // Draw table boundary.
             val railPath = Path().apply {
                 moveTo(tl.x, tl.y)
                 lineTo(tr.x, tr.y)
@@ -170,6 +189,7 @@ private fun AlignmentStep(
             }
             drawPath(railPath, Color.Yellow, alpha = 0.7f, style = Stroke(width = 4.dp.toPx()))
 
+            // Draw control points (circles).
             pocketPositions.forEach { (pocket, pos) ->
                 val isCorner =
                     pocket != DraggablePocket.SIDE_LEFT && pocket != DraggablePocket.SIDE_RIGHT
@@ -181,6 +201,7 @@ private fun AlignmentStep(
                     style = Stroke(width = 4.dp.toPx()),
                     alpha = 0.9f
                 )
+                // Center dot.
                 drawCircle(Color.Yellow, radius = 8f, center = pos, alpha = 0.9f)
             }
         }
@@ -188,6 +209,9 @@ private fun AlignmentStep(
     }
 }
 
+/**
+ * Step 1: Table Size Selection.
+ */
 @Composable
 private fun SizeSelectionStep(viewModel: QuickAlignViewModel) {
     Column(
@@ -213,6 +237,9 @@ private fun SizeSelectionStep(viewModel: QuickAlignViewModel) {
     }
 }
 
+/**
+ * Step 2: Photo Capture.
+ */
 @Composable
 private fun CaptureStep(analyzer: QuickAlignAnalyzer) {
     Box(Modifier.fillMaxSize()) {

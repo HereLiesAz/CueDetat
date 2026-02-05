@@ -37,21 +37,30 @@ import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import kotlinx.coroutines.delay
 
+/**
+ * The initial launch screen of the application.
+ *
+ * It displays the logo/tagline and then prompts the user to select an [ExperienceMode].
+ *
+ * @param onRoleSelected Callback triggered when the user selects a role (Expert, Beginner, etc.).
+ */
 @Composable
 fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
+    // State to trigger the appearance of the question/buttons after delay.
     var showQuestion by remember { mutableStateOf(false) }
 
+    // Start a timer on launch.
     LaunchedEffect(Unit) {
-        delay(3000L)
-        showQuestion = true
+        delay(3000L) // Wait 3 seconds.
+        showQuestion = true // Reveal UI.
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(Color.Black) // Black background for cinematic feel.
     ) {
-        // Logo and Tagline container, always centered
+        // Logo and Tagline container, always centered in the screen.
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.Center,
@@ -64,6 +73,7 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
             )
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Tagline fades out when the question appears to reduce clutter.
             AnimatedVisibility(
                 visible = !showQuestion,
                 exit = fadeOut(animationSpec = tween(durationMillis = 500))
@@ -77,14 +87,15 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
             }
         }
 
-        // Bottom question and buttons, appears from the bottom
+        // Question and buttons container.
+        // Slides in from the bottom while fading in.
         AnimatedVisibility(
             visible = showQuestion,
             modifier = Modifier.fillMaxSize(),
             enter = fadeIn(animationSpec = tween(durationMillis = 500, delayMillis = 200)) +
                     slideInVertically(
                         animationSpec = tween(durationMillis = 500, delayMillis = 200),
-                        initialOffsetY = { it / 2 }
+                        initialOffsetY = { it / 2 } // Start from halfway down.
                     )
         ) {
             Column(
@@ -100,7 +111,7 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
                     color = Color.White,
                     modifier = Modifier.padding(16.dp)
                 )
-                // Buttons are now in a Column for vertical layout
+                // Vertical list of choice buttons.
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -115,11 +126,14 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
     }
 }
 
+/**
+ * Helper composable for the role selection buttons.
+ */
 @Composable
 private fun QuestionButton(label: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .fillMaxWidth(0.6f) // Give the buttons a consistent width
+            .fillMaxWidth(0.6f) // Consistent width (60% of screen).
             .clickable { onClick() }
             .padding(horizontal = 24.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center

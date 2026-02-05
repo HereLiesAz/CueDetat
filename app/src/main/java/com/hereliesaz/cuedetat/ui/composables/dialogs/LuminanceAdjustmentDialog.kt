@@ -16,6 +16,15 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 
+/**
+ * A dialog allowing the user to adjust the global luminance (brightness) of the virtual overlay.
+ *
+ * This helps integrate the AR elements with the real-world lighting conditions (e.g. dimming them in a dark pool hall).
+ *
+ * @param uiState Current application state.
+ * @param onEvent Callback to update luminance.
+ * @param onDismiss Callback to close dialog.
+ */
 @Composable
 fun LuminanceAdjustmentDialog(
     uiState: CueDetatState,
@@ -33,7 +42,9 @@ fun LuminanceAdjustmentDialog(
                     Slider(
                         value = uiState.luminanceAdjustment,
                         onValueChange = { onEvent(MainScreenEvent.AdjustLuminance(it)) },
+                        // Range from -40% to +40% brightness.
                         valueRange = -0.4f..0.4f,
+                        // Granular steps.
                         steps = 79,
                         modifier = Modifier
                             .semantics { contentDescription = "Luminance Adjustment" }
