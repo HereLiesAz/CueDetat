@@ -25,7 +25,7 @@ The `pitchMatrix` (calculated in `UpdateStateUseCase`) combines the following tr
 1.  **Translation to Center:** Move logical (0,0) to the center of the drawing area.
 2.  **Scale (Zoom):** Apply uniform scaling based on the user's zoom level.
 3.  **Rotation (Pitch):** Rotate around the X-axis to simulate camera tilt.
-    *   *Note:* This is a "fake" 3D effect achieved via `Matrix.setPolyToPoly` or similar affine skews in some implementations, or true 3D projection in others. In this app, we use a custom `Perspective` helper that likely uses standard projection math.
+*   *Note:* This is a true 3D perspective projection achieved using Android's `android.graphics.Camera` helper class, which maps the 2D logical plane into 3D space.
 4.  **Translation to Screen Center:** Move the result to the center of the device screen.
 
 ### "Billboarding" Text
