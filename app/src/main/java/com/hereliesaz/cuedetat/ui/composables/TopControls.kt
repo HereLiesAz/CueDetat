@@ -31,6 +31,20 @@ import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 
+/**
+ * The top bar UI containing the Menu button, App Title/Tagline, and Contextual Status Info.
+ *
+ * @param areHelpersVisible Whether helper labels (and the full title) should be shown.
+ * @param experienceMode Current experience mode (affects visibility of controls).
+ * @param isTableVisible Whether the table is visible (affects table size display).
+ * @param tableSizeFeet Current table size in feet.
+ * @param isBeginnerViewLocked Whether the camera view is locked (Beginner mode).
+ * @param targetBallDistance Distance to the target ball.
+ * @param distanceUnit Unit of measurement (Metric/Imperial).
+ * @param onCycleTableSize Callback to cycle table size.
+ * @param onMenuClick Callback to toggle the main menu.
+ * @param modifier Styling modifier.
+ */
 @Composable
 fun TopControls(
     areHelpersVisible: Boolean,
@@ -47,11 +61,12 @@ fun TopControls(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .statusBarsPadding()
+            .statusBarsPadding() // Avoid overlapping system status bar.
             .padding(start = 16.dp, end = 16.dp, top = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Top
     ) {
+        // --- Left Side: Menu / App Info ---
         Box(
             modifier = Modifier
                 .clip(CircleShape)
@@ -61,10 +76,11 @@ fun TopControls(
                     onClick = onMenuClick
                 )
                 .semantics {
-                    contentDescription = "Menu"
+                    contentDescription = "Menu" // Accessibility label.
                 },
             contentAlignment = Alignment.CenterStart
         ) {
+            // Show full text title if helpers are ON.
             if (areHelpersVisible && experienceMode != ExperienceMode.HATER) {
                 Column(
                      modifier = Modifier.padding(8.dp)
@@ -83,6 +99,7 @@ fun TopControls(
                     )
                 }
             } else {
+                // Show compact Logo icon if helpers are OFF.
                 Image(
                     painter = painterResource(id = R.drawable.ic_launcher),
                     contentDescription = null, // Handled by parent semantics
@@ -91,11 +108,13 @@ fun TopControls(
             }
         }
 
+        // --- Right Side: Contextual Status (Table Size, Distance) ---
         if (experienceMode != ExperienceMode.HATER) {
             Column(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Table Size Indicator (Clickable to change).
                 if (isTableVisible) {
                     Column(
                         horizontalAlignment = Alignment.End,
@@ -124,6 +143,7 @@ fun TopControls(
                     }
                 }
 
+                // Distance Indicator.
                 if (experienceMode != ExperienceMode.BEGINNER || !isBeginnerViewLocked) {
                     Column(horizontalAlignment = Alignment.End) {
                         val distanceText = if (targetBallDistance > 0) {

@@ -1,15 +1,6 @@
-// app/src/main/java/com/hereliesaz/cuedetat/ui/MainLayout.kt
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/MainLayout.kt
 package com.hereliesaz.cuedetat.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,13 +10,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.domain.CueDetatState
-import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.AzNavRailMenu
 import com.hereliesaz.cuedetat.ui.composables.SpinControl
@@ -38,6 +26,18 @@ import com.hereliesaz.cuedetat.ui.composables.overlays.KineticWarningOverlay
 import com.hereliesaz.cuedetat.ui.composables.overlays.TutorialOverlay
 import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
 
+/**
+ * The high-level layout of the main screen.
+ *
+ * It acts as a container for:
+ * 1. The main content (Camera/AR view) passed as a composable lambda.
+ * 2. The HUD/UI layer overlaid on top (TopControls, NavRail, SpinControl, Sliders).
+ * 3. Dialogs and Overlays.
+ *
+ * @param uiState Current application state.
+ * @param onEvent Event dispatcher.
+ * @param content The background content (usually the AR ProtractorScreen).
+ */
 @Composable
 fun MainLayout(
     uiState: CueDetatState,
@@ -45,10 +45,12 @@ fun MainLayout(
     content: @Composable () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        // Main content, e.g., the rendering canvas
+        // Main content, e.g., the rendering canvas/camera.
         content()
 
-        // UI Controls layered on top
+        // --- HUD Layer ---
+
+        // Top Control Bar (App Title, Status).
         TopControls(
             areHelpersVisible = uiState.areHelpersVisible,
             experienceMode = uiState.experienceMode,
@@ -61,6 +63,7 @@ fun MainLayout(
             onMenuClick = { onEvent(MainScreenEvent.ToggleNavigationRail) }
         )
 
+        // Bottom Controls Container (Rotation Slider, Spin Control).
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -68,16 +71,15 @@ fun MainLayout(
                 .padding(bottom = 16.dp, end = 16.dp, start = 16.dp),
             verticalAlignment = Alignment.Bottom
         ) {
-            // Left-aligned controls
+            // Left-aligned controls (Empty - buttons moved to rail).
             Column(
                 modifier = Modifier.weight(1f),
                 horizontalAlignment = Alignment.Start
             ) {
-                // This column is intentionally left empty.
-                // The buttons have been moved to the navigation rail.
+                // Intentionally empty.
             }
 
-            // Center-aligned controls
+            // Center-aligned controls (Table Rotation).
             Column(
                 modifier = Modifier.weight(2f),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -89,7 +91,7 @@ fun MainLayout(
                 )
             }
 
-            // Right-aligned controls
+            // Right-aligned controls (Spin Control).
             Column(
                 modifier = Modifier.weight(1f),
                 horizontalAlignment = Alignment.End
@@ -106,6 +108,7 @@ fun MainLayout(
             }
         }
 
+        // Zoom Slider (Vertical, Right Side).
         ZoomControls(
             zoomSliderPosition = uiState.zoomSliderPosition,
             onZoomChange = { onEvent(MainScreenEvent.ZoomSliderChanged(it)) },
@@ -116,28 +119,36 @@ fun MainLayout(
                 .width(48.dp)
         )
 
-        // Overlays and Dialogs
+        // --- Overlays and Dialogs ---
+
+        // Warning Text Overlay.
         KineticWarningOverlay(text = uiState.warningText)
+
+        // Tutorial Overlay.
         TutorialOverlay(uiState = uiState, onEvent = onEvent)
+
+        // Advanced Options Dialog.
         AdvancedOptionsDialog(
             uiState = uiState,
             onEvent = onEvent,
             onDismiss = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }
         )
+
+        // Luminance Adjustment Dialog.
         LuminanceAdjustmentDialog(
             uiState = uiState,
             onEvent = onEvent,
             onDismiss = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
         )
 
+        // Table Size Selection Dialog.
         TableSizeSelectionDialog(
             uiState = uiState,
             onEvent = onEvent,
             onDismiss = { onEvent(MainScreenEvent.ToggleTableSizeDialog) }
         )
 
-        // Expressive navigation rail
+        // Navigation Rail (Menu).
         AzNavRailMenu(uiState = uiState, onEvent = onEvent)
-
     }
 }

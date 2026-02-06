@@ -16,6 +16,15 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
+/**
+ * A horizontal slider for manually rotating the virtual table relative to the camera view.
+ * Useful when the device orientation sensors are drifting or inaccurate.
+ *
+ * @param isVisible Visibility flag.
+ * @param worldRotationDegrees Current rotation in degrees.
+ * @param onRotationChange Callback for value changes.
+ * @param modifier Styling modifier.
+ */
 @Composable
 fun TableRotationSlider(
     isVisible: Boolean,
@@ -36,7 +45,9 @@ fun TableRotationSlider(
             Slider(
                 value = -worldRotationDegrees,
                 onValueChange = { onRotationChange(-it) },
-                valueRange = -179f..180f, // Centered range
+                // Range covers full 360 degrees.
+                valueRange = -179f..180f,
+                // Granular control.
                 steps = 358,
                 modifier = Modifier
                     .semantics { contentDescription = "Table Rotation" }

@@ -8,11 +8,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.cuedetat.R
 
+// Define the custom "Barbaro" font family.
 val Barbaro = FontFamily(
     Font(R.font.barbaro, FontWeight.Normal)
 )
 
-// Set of Material typography styles to start with
+/**
+ * Material 3 Typography definitions.
+ * Overrides standard styles to use the custom font and specific sizes.
+ */
 val Typography = Typography(
     displayLarge = TextStyle(
         fontFamily = Barbaro,

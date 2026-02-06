@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +24,19 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 
+/**
+ * A dialog containing advanced configuration options, primarily for debugging or fine-tuning Computer Vision.
+ *
+ * Exposes parameters for:
+ * - Edge detection thresholds (Canny).
+ * - Circle detection parameters (Hough Transform).
+ * - Debug masks (CV binary view).
+ * - Lens Calibration triggers.
+ *
+ * @param uiState Current application state.
+ * @param onEvent Callback to update settings.
+ * @param onDismiss Callback to close the dialog.
+ */
 @Composable
 fun AdvancedOptionsDialog(
     uiState: CueDetatState,
@@ -38,6 +50,7 @@ fun AdvancedOptionsDialog(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
             text = {
                 Column {
+                    // Toggle: Auto-snap virtual ball to detected ball.
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Auto-Snap Balls:", modifier = Modifier.weight(1f))
                         TextButton(onClick = { onEvent(MainScreenEvent.ToggleSnapping) }) {
@@ -45,6 +58,7 @@ fun AdvancedOptionsDialog(
                         }
                     }
 
+                    // Toggle: Show the black-and-white CV mask overlay.
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Show CV Mask:", modifier = Modifier.weight(1f))
                         TextButton(onClick = { onEvent(MainScreenEvent.ToggleCvMask) }) {
@@ -52,6 +66,7 @@ fun AdvancedOptionsDialog(
                         }
                     }
 
+                    // Action: Enter a dedicated mode for tuning the mask (live view).
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
@@ -61,7 +76,7 @@ fun AdvancedOptionsDialog(
                         }
                     }
 
-
+                    // Toggle: Select CV Model (Generic/Custom).
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Active AI Model:", modifier = Modifier.weight(1f))
                         TextButton(onClick = { onEvent(MainScreenEvent.ToggleCvModel) }) {
@@ -69,6 +84,7 @@ fun AdvancedOptionsDialog(
                         }
                     }
 
+                    // Toggle: Cycle through CV refinement algorithms.
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text("Refinement:", modifier = Modifier.weight(1f))
                         TextButton(onClick = { onEvent(MainScreenEvent.ToggleCvRefinementMethod) }) {
@@ -77,6 +93,9 @@ fun AdvancedOptionsDialog(
                     }
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // --- CV Parameters Sliders ---
+
+                    // Hough P1: Canny edge threshold for the Hough Transform.
                     Text("Hough P1 (Canny Edge): ${uiState.houghP1.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Slider(
                         value = uiState.houghP1,
@@ -88,6 +107,7 @@ fun AdvancedOptionsDialog(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Hough P2: Accumulator threshold for circle detection. Lower = more circles (and false positives).
                     Text("Hough P2 (Accumulator): ${uiState.houghP2.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Slider(
                         value = uiState.houghP2,
@@ -99,6 +119,7 @@ fun AdvancedOptionsDialog(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Canny T1: Lower threshold for hysteresis procedure.
                     Text("Canny T1: ${uiState.cannyThreshold1.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Slider(
                         value = uiState.cannyThreshold1,
@@ -110,6 +131,7 @@ fun AdvancedOptionsDialog(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Canny T2: Upper threshold for hysteresis procedure.
                     Text("Canny T2: ${uiState.cannyThreshold2.toInt()}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Slider(
                         value = uiState.cannyThreshold2,
@@ -120,8 +142,11 @@ fun AdvancedOptionsDialog(
                             .height(32.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
+
                     HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
                     Spacer(modifier = Modifier.height(8.dp))
+
+                    // --- Calibration Controls ---
                     Text("Fix Lens Warp", style = MaterialTheme.typography.titleMedium)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -137,13 +162,14 @@ fun AdvancedOptionsDialog(
 
                     Spacer(modifier = Modifier.height(8.dp))
                     HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
+                    // Action: Sample table color for masking.
                     TextButton(onClick = { onEvent(MainScreenEvent.EnterCalibrationMode) }) {
                         Text("Calibrate Felt Color", color = MaterialTheme.colorScheme.tertiary)
                     }
                 }
             },
             dismissButton = {
-                // This is intentionally left blank to allow the confirm button to be the only one in the standard action row.
+                // No secondary dismiss button needed.
             },
             confirmButton = { TextButton(onClick = onDismiss) { Text("Done", color = MaterialTheme.colorScheme.primary) } }
         )

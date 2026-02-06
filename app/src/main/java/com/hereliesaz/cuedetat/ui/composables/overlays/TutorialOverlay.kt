@@ -39,11 +39,22 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 
+/**
+ * An overlay that guides the user through the application features.
+ *
+ * It draws attention to specific UI elements (like balls or sliders) by drawing
+ * pulsing highlights around them on a Canvas layer sitting above the main view.
+ * It uses the [DrawingUtils] to correctly project 2D screen coordinates onto 3D world objects.
+ *
+ * @param uiState Current application state.
+ * @param onEvent Event dispatcher.
+ */
 @Composable
 fun TutorialOverlay(
     uiState: CueDetatState,
     onEvent: (MainScreenEvent) -> Unit
 ) {
+    // The hardcoded tutorial script.
     val tutorialSteps = remember {
         listOf(
             "Alright, let's get this over with. This isn't a toy. It's a precision instrument. Try to keep up. Tap 'Next'.",
@@ -57,6 +68,7 @@ fun TutorialOverlay(
     }
 
     if (uiState.showTutorialOverlay) {
+        // Animation for the pulsing highlight effect.
         val infiniteTransition = rememberInfiniteTransition(label = "highlight-transition")
         val highlightAlpha by infiniteTransition.animateFloat(
             initialValue = 0.3f,
@@ -69,15 +81,18 @@ fun TutorialOverlay(
         )
         val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = highlightAlpha)
 
+        // Canvas for drawing highlights over 3D objects.
         Canvas(
             modifier = Modifier
-                .zIndex(9f)
+                .zIndex(9f) // Ensure it draws above the GLSurfaceView/Camera.
         ) {
             val matrix = uiState.pitchMatrix
             if (matrix == null) return@Canvas
 
+            // Switch on which element should be highlighted for the current step.
             when (uiState.tutorialHighlight ?: TutorialHighlightElement.NONE) {
                 TutorialHighlightElement.TARGET_BALL -> {
+                    // Calculate screen position and radius for the target ball.
                     val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
                         uiState.protractorUnit.center,
                         uiState.protractorUnit.radius,
@@ -87,7 +102,7 @@ fun TutorialOverlay(
                     val screenPos = DrawingUtils.mapPoint(uiState.protractorUnit.center, matrix)
                     drawCircle(
                         color = highlightColor,
-                        radius = radiusInfo.radius * 2.0f,
+                        radius = radiusInfo.radius * 2.0f, // Draw slightly larger than the ball.
                         center = Offset(screenPos.x, screenPos.y),
                         style = Stroke(width = 4.dp.toPx())
                     )
@@ -129,6 +144,7 @@ fun TutorialOverlay(
                 }
 
                 TutorialHighlightElement.ZOOM_SLIDER -> {
+                    // Highlight the area where the zoom slider is typically located (right side).
                     drawRoundRect(
                         color = highlightColor,
                         topLeft = Offset(
@@ -145,6 +161,7 @@ fun TutorialOverlay(
             }
         }
 
+        // Bottom text box for instructions.
         Box(
             modifier = Modifier
                 .navigationBarsPadding()

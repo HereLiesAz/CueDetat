@@ -38,6 +38,17 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
 import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
 
+/**
+ * A dedicated screen for performing Camera Calibration.
+ *
+ * It displays the live camera feed with an overlay visualizing detected calibration patterns.
+ * Users capture multiple frames of a calibration board to compute lens distortion parameters.
+ *
+ * @param uiState Current app state.
+ * @param onEvent Event dispatcher.
+ * @param viewModel Hilt-injected ViewModel for calibration logic.
+ * @param analyzer The ImageAnalysis.Analyzer used to detect patterns.
+ */
 @Composable
 fun CalibrationScreen(
     uiState: CueDetatState,
@@ -45,12 +56,14 @@ fun CalibrationScreen(
     viewModel: CalibrationViewModel = hiltViewModel(),
     analyzer: CalibrationAnalyzer
 ) {
+    // Observe ViewModel state.
     val detectedPattern by viewModel.detectedPattern.collectAsState()
     val capturedImageCount by viewModel.capturedImageCount.collectAsState()
     val showSubmissionDialog by viewModel.showSubmissionDialog.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val context = LocalContext.current
 
+    // Show Android Toasts when the ViewModel requests them.
     LaunchedEffect(toastMessage) {
         toastMessage?.let {
             android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show()
@@ -58,6 +71,7 @@ fun CalibrationScreen(
         }
     }
 
+    // Show the optional submission dialog when calibration completes.
     if (showSubmissionDialog) {
         CalibrationSubmissionDialog(
             onDismiss = { viewModel.onDismissSubmission(); onEvent(MainScreenEvent.ToggleCalibrationScreen) },
@@ -70,8 +84,10 @@ fun CalibrationScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        // Live camera feed.
         CameraBackground(modifier = Modifier.fillMaxSize(), analyzer = analyzer)
 
+        // Overlay canvas to draw the detected pattern grid.
         Canvas(modifier = Modifier.fillMaxSize()) {
             detectedPattern?.let { points ->
                 if (points.isNotEmpty()) {
@@ -84,14 +100,14 @@ fun CalibrationScreen(
                             path.lineTo(offset.x, offset.y)
                         }
                     }
-                    // Draw lines connecting all points for a spider-web effect
+                    // Draw lines connecting detected points (visual verification).
                     drawPath(
                         path,
                         color = Color.Green,
                         style = Stroke(width = 2.dp.toPx()),
                         alpha = 0.7f
                     )
-                    // Draw circles at each detected point
+                    // Draw dots at each detected corner.
                     points.forEach { point ->
                         drawCircle(
                             Color.Green,
@@ -104,12 +120,13 @@ fun CalibrationScreen(
             }
         }
 
+        // UI Controls and Instructions.
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top Instructions
+            // Top Instructions Panel.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -137,7 +154,7 @@ fun CalibrationScreen(
                 )
             }
 
-            // Bottom Controls
+            // Bottom Control Bar.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -146,21 +163,24 @@ fun CalibrationScreen(
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Progress counter.
                 Text(
                     text = "Images: $capturedImageCount/15",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
+                // Capture button.
                 CuedetatButton(
                     onClick = { viewModel.capturePattern() },
                     text = "Capture",
-                    // Enable button only when a pattern is detected
+                    // Enable button only when a pattern is currently detected in the frame.
                     color = if (detectedPattern != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(
                         alpha = 0.5f
                     )
                 )
 
+                // Finish button to compute calibration.
                 TextButton(onClick = { viewModel.onCalibrationFinished() }) {
                     Text("Finish")
                 }

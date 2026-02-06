@@ -19,6 +19,8 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowCompat
 
+// --- Color Schemes ---
+
 private val DarkColorScheme = darkColorScheme(
     primary = SulfurDust,
     onPrimary = Gray700,
@@ -83,11 +85,18 @@ private val LightColorScheme = lightColorScheme(
     scrim = Color.Black
 )
 
+/**
+ * Utility function to adjust the luminance (lightness) of a color by a fixed factor.
+ * Used for the "Glow Stick" or dimmer effects.
+ *
+ * @param factor Positive values lighten, negative values darken.
+ */
 private fun Color.adjustLuminance(factor: Float): Color {
     if (factor == 0f || this == Color.Transparent) return this
     val hsl = FloatArray(3)
     try {
         ColorUtils.colorToHSL(this.toArgb(), hsl)
+        // Clamp lightness between 0.0 and 1.0.
         hsl[2] = (hsl[2] + factor).coerceIn(0f, 1f)
         return Color(ColorUtils.HSLToColor(hsl))
     } catch (e: IllegalArgumentException) {
@@ -95,7 +104,20 @@ private fun Color.adjustLuminance(factor: Float): Color {
     }
 }
 
-
+/**
+ * Main Theme Composable.
+ *
+ * Handles:
+ * - Dynamic Color (Material You) on Android 12+.
+ * - Light/Dark mode switching.
+ * - Global luminance adjustment (dimming).
+ * - Status bar styling.
+ *
+ * @param darkTheme Whether to use dark mode.
+ * @param dynamicColor Whether to use dynamic system colors.
+ * @param luminanceAdjustment Global brightness offset (-0.4 to 0.4).
+ * @param content The composable content to wrap.
+ */
 @Composable
 fun CueDetatTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -103,6 +125,7 @@ fun CueDetatTheme(
     luminanceAdjustment: Float = 0f,
     content: @Composable () -> Unit
 ) {
+    // Select base scheme.
     val baseColorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
@@ -113,6 +136,7 @@ fun CueDetatTheme(
         else -> LightColorScheme
     }
 
+    // Apply luminance adjustment if needed.
     val colorScheme = if (luminanceAdjustment != 0f) {
         baseColorScheme.copy(
             background = baseColorScheme.background.adjustLuminance(luminanceAdjustment),
@@ -125,6 +149,7 @@ fun CueDetatTheme(
         baseColorScheme
     }
 
+    // Update System Status Bar.
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
@@ -134,6 +159,7 @@ fun CueDetatTheme(
         }
     }
 
+    // Provide MaterialTheme to children.
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,

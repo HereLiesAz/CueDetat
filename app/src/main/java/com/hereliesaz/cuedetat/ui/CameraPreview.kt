@@ -1,3 +1,5 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/CameraPreview.kt
+
 package com.hereliesaz.cuedetat.ui
 
 import androidx.camera.core.CameraSelector
@@ -12,6 +14,16 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
+/**
+ * A basic Camera Preview composable.
+ *
+ * Note: This appears to be a simplified version of [com.hereliesaz.cuedetat.ui.composables.CameraBackground].
+ * It lacks the ImageAnalysis binding required for Computer Vision.
+ * It might be used in contexts where only a viewfinder is needed, or as a fallback.
+ *
+ * @param modifier Styling modifier.
+ * @param scaleType How the preview should scale to fill the view.
+ */
 @Composable
 fun CameraPreview(
     modifier: Modifier = Modifier,

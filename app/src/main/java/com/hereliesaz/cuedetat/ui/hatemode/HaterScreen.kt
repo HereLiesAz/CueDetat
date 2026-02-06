@@ -1,20 +1,13 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/hatemode/HaterScreen.kt
+
 package com.hereliesaz.cuedetat.ui.hatemode
 
 import android.graphics.BlurMaskFilter
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -41,6 +34,16 @@ import com.hereliesaz.cuedetat.ui.composables.AzNavRailMenu
 import com.hereliesaz.cuedetat.ui.composables.TopControls
 import kotlin.math.sqrt
 
+/**
+ * The main screen for "Hater Mode".
+ *
+ * Simulates a Magic-8-Ball experience where a 20-sided die floats in liquid.
+ * Note: The physics simulation is currently stubbed out (see [HaterPhysicsManager]).
+ *
+ * @param haterViewModel The ViewModel managing the physics state.
+ * @param uiState Global app state (for shared UI elements like the menu).
+ * @param onEvent Event dispatcher.
+ */
 @Composable
 fun HaterScreen(
     haterViewModel: HaterViewModel,
@@ -50,13 +53,15 @@ fun HaterScreen(
     val state by haterViewModel.haterState.collectAsStateWithLifecycle()
     LocalDensity.current
 
+    // Initialize mode on entry.
     LaunchedEffect(Unit) {
         haterViewModel.onEvent(HaterEvent.EnterHaterMode)
     }
 
+    // Configure paints for the die (triangle) and glowing text.
     val glowPaint = remember {
         Paint().asFrameworkPaint().apply {
-            color = Color(0x993366FF).toArgb()
+            color = Color(0x993366FF).toArgb() // Blue glow
             maskFilter = BlurMaskFilter(30f, BlurMaskFilter.Blur.NORMAL)
         }
     }
@@ -70,10 +75,12 @@ fun HaterScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        // Main rendering canvas.
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
+                    // Detect drags to "push" the fluid/die.
                     detectDragGestures(
                         onDrag = { change, dragAmount ->
                             change.consume()
@@ -87,9 +94,10 @@ fun HaterScreen(
             val centerX = size.width / 2
             val centerY = size.height / 2
 
+            // Black background (inside the 8-ball).
             drawRect(color = Color.Black)
 
-            // Draw Particles using DrawScope API
+            // Draw floating particles.
             state.particles.forEach { particleOffset ->
                 drawCircle(
                     color = particleColor,
@@ -98,13 +106,13 @@ fun HaterScreen(
                 )
             }
 
-            // Draw Die and Text using native canvas for complex path/text rendering
+            // Draw Die and Text using native canvas for complex path/text rendering.
             drawIntoCanvas { canvas ->
                 canvas.save()
                 canvas.translate(centerX + state.diePosition.x, centerY + state.diePosition.y)
                 canvas.rotate(state.dieAngle)
 
-                // Calculate triangle shape based on text size
+                // Calculate triangle shape based on text size dynamically.
                 val text = state.answer
                 textPaint.textSize = 22.sp.toPx()
                 val layoutWidth = (200.dp.toPx()).toInt()
@@ -120,6 +128,7 @@ fun HaterScreen(
                 val topY = -(2.0f / 3.0f) * triangleHeight
                 val bottomY = (1.0f / 3.0f) * triangleHeight
 
+                // Create the triangle path.
                 val trianglePath = Path().apply {
                     moveTo(0f, topY)
                     lineTo(-halfWidth, bottomY)
@@ -127,11 +136,13 @@ fun HaterScreen(
                     close()
                 }
 
+                // Draw glow then fill.
                 canvas.nativeCanvas.drawPath(trianglePath.asAndroidPath(), glowPaint)
                 canvas.drawPath(path = trianglePath, paint = trianglePaint)
 
-                // Draw Text inside die
+                // Draw Text inside die.
                 canvas.save()
+                // Center text within the triangle.
                 canvas.translate(-staticLayout.width / 2f, -staticLayout.height / 2f)
                 staticLayout.draw(canvas.nativeCanvas)
                 canvas.restore()
@@ -140,6 +151,7 @@ fun HaterScreen(
             }
         }
 
+        // Overlay standard UI controls (Menu/TopBar).
         TopControls(
             areHelpersVisible = uiState.areHelpersVisible,
             experienceMode = uiState.experienceMode,

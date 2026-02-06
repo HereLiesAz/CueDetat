@@ -14,6 +14,14 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.TableSize
 
+/**
+ * A dialog for selecting the physical size of the pool table (e.g., 7ft, 8ft, 9ft).
+ * This scaling factor is critical for accurate bank shot calculations.
+ *
+ * @param uiState Current application state.
+ * @param onEvent Callback to set the table size.
+ * @param onDismiss Callback to close the dialog.
+ */
 @Composable
 fun TableSizeSelectionDialog(
     uiState: CueDetatState,
@@ -29,6 +37,7 @@ fun TableSizeSelectionDialog(
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // Iterate through all defined table sizes enum.
                     TableSize.entries.forEach { size ->
                         TextButton(
                             onClick = { onEvent(MainScreenEvent.SetTableSize(size)); onDismiss() },

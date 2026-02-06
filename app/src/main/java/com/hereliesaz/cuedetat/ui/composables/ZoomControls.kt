@@ -27,6 +27,17 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 
 
+/**
+ * A dedicated vertical slider component for controlling zoom levels.
+ *
+ * Includes +/- buttons for fine adjustment and a vertical slider for coarse adjustment.
+ * Note: Material3 Slider is horizontal by default. We rotate it 270 degrees to make it vertical,
+ * and adjust layout measurement to compensate for the rotation.
+ *
+ * @param zoomSliderPosition Current zoom value (normalized -50 to 50).
+ * @param onZoomChange Callback for value changes.
+ * @param modifier Styling modifier.
+ */
 @Composable
 fun ZoomControls(
     zoomSliderPosition: Float,
@@ -38,6 +49,7 @@ fun ZoomControls(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        // Zoom In Button (+).
         IconButton(onClick = { onZoomChange(zoomSliderPosition + 1) }) {
             Icon(
                 Icons.Default.Add,
@@ -46,6 +58,8 @@ fun ZoomControls(
             )
         }
         Spacer(modifier = Modifier.height(16.dp))
+
+        // Vertical Slider.
         Slider(
             value = zoomSliderPosition,
             onValueChange = { onZoomChange(it) },
@@ -60,10 +74,12 @@ fun ZoomControls(
                     contentDescription = "Zoom Level"
                 }
                 .graphicsLayer {
+                    // Rotate the horizontal slider to be vertical.
                     rotationZ = 270f
                     transformOrigin = TransformOrigin(0f, 0f)
                 }
                 .layout { measurable, constraints ->
+                    // Swap width and height constraints to accommodate the rotation.
                     val placeable = measurable.measure(
                         Constraints(
                             minWidth = constraints.minHeight,
@@ -72,14 +88,17 @@ fun ZoomControls(
                             maxHeight = constraints.maxHeight,
                         )
                     )
+                    // Layout the component with swapped dimensions and offset.
                     layout(placeable.height, placeable.width) {
                         placeable.place(-placeable.width, 0)
                     }
                 }
-                .fillMaxHeight(0.7f)
-                .height(32.dp)
+                .fillMaxHeight(0.7f) // Occupy 70% of the available height.
+                .height(32.dp) // Thickness of the slider track/thumb area.
         )
         Spacer(modifier = Modifier.height(16.dp))
+
+        // Zoom Out Button (-).
         IconButton(onClick = { onZoomChange(zoomSliderPosition - 1) }) {
             Icon(
                 Icons.Default.Remove,
