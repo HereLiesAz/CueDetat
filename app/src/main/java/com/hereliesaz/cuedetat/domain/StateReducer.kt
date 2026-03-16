@@ -56,7 +56,8 @@ fun stateReducer(
         is MainScreenEvent.EnterCvMaskTestMode, is MainScreenEvent.ExitCvMaskTestMode,
         is MainScreenEvent.EnterCalibrationMode, is MainScreenEvent.SampleColorAt,
         is MainScreenEvent.ToggleCvRefinementMethod, is MainScreenEvent.UpdateHoughP1,
-        is MainScreenEvent.UpdateHoughP2, is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2,
+        is MainScreenEvent.UpdateHoughP2, is MainScreenEvent.UpdateHoughThreshold,
+        is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2,
         is MainScreenEvent.ToggleCvModel, is MainScreenEvent.ToggleSnapping ->
             reduceAdvancedOptionsAction(currentState, action)
 
@@ -107,8 +108,9 @@ fun stateReducer(
         is MainScreenEvent.ToggleTableSizeDialog, is MainScreenEvent.ToggleForceTheme,
         is MainScreenEvent.ToggleCamera, is MainScreenEvent.ToggleDistanceUnit,
         is MainScreenEvent.ToggleLuminanceDialog, is MainScreenEvent.ToggleGlowStickDialog,
-        is MainScreenEvent.ToggleHelp, is MainScreenEvent.ToggleMoreHelp,
+        is MainScreenEvent.ToggleHelp,
         is MainScreenEvent.ToggleOrientationLock, is MainScreenEvent.ApplyPendingOrientationLock,
+        is MainScreenEvent.ApplyPendingExperienceMode,
         is MainScreenEvent.OrientationChanged, is MainScreenEvent.SetExperienceMode,
         is MainScreenEvent.UnlockBeginnerView, is MainScreenEvent.LockBeginnerView,
         is MainScreenEvent.ToggleCalibrationScreen, is MainScreenEvent.ToggleQuickAlignScreen,
@@ -118,7 +120,8 @@ fun stateReducer(
         // --- ONBOARDING ---
         // Handled by [TutorialReducer].
         is MainScreenEvent.StartTutorial, is MainScreenEvent.NextTutorialStep,
-        is MainScreenEvent.EndTutorial -> reduceTutorialAction(currentState, action)
+        is MainScreenEvent.EndTutorial, is MainScreenEvent.UpdateHighlightAlpha ->
+            reduceTutorialAction(currentState, action)
 
         // Default catch-all (should ideally never happen for known events).
         else -> currentState

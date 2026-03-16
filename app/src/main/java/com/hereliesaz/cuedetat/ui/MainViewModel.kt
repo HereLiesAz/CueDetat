@@ -162,32 +162,29 @@ class MainViewModel @Inject constructor(
     }
 
     private fun handleSingleEvents(event: MainScreenEvent) {
-        if (true) {
-            viewModelScope.launch {
-                when (event) {
-                    is MainScreenEvent.CheckForUpdate -> {
-                        githubRepository.getLatestVersionName()
-                    }
+        viewModelScope.launch {
+            when (event) {
+                is MainScreenEvent.CheckForUpdate -> {
+                    githubRepository.getLatestVersionName()
+                }
 
-                    is MainScreenEvent.ViewArt -> _singleEvent.emit(SingleEvent.OpenUrl("https://herelies.az"))
-                    is MainScreenEvent.ViewAboutPage -> _singleEvent.emit(SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat"))
-                    is MainScreenEvent.SendFeedback -> _singleEvent.emit(
-                        SingleEvent.SendFeedbackEmail(
-                            "hereliesaz@gmail.com",
-                            "Cue d'Etat Feedback"
-                        )
+                is MainScreenEvent.ViewArt -> _singleEvent.emit(SingleEvent.OpenUrl("https://herelies.az"))
+                is MainScreenEvent.ViewAboutPage -> _singleEvent.emit(SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat"))
+                is MainScreenEvent.SendFeedback -> _singleEvent.emit(
+                    SingleEvent.SendFeedbackEmail(
+                        "hereliesaz@gmail.com",
+                        "Cue d'Etat Feedback"
                     )
+                )
 
-                    is MainScreenEvent.SingleEventConsumed -> _singleEvent.emit(null)
-                    is MainScreenEvent.SetExperienceMode -> {
-                        if (event.mode == ExperienceMode.HATER) {
-                            _singleEvent.emit(SingleEvent.InitiateHaterMode)
-                        }
-                    }
-
-                    else -> { /* Do nothing for state-changing events */
+                is MainScreenEvent.SingleEventConsumed -> _singleEvent.emit(null)
+                is MainScreenEvent.SetExperienceMode -> {
+                    if (event.mode == ExperienceMode.HATER) {
+                        _singleEvent.emit(SingleEvent.InitiateHaterMode)
                     }
                 }
+
+                else -> { /* Do nothing for state-changing events */ }
             }
         }
     }

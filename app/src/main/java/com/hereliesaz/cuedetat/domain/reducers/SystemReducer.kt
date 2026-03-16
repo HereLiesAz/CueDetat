@@ -119,7 +119,6 @@ private fun createInitialState(
         bankingAimTarget = null,
         valuesChangedSinceReset = false,
         areHelpersVisible = LabelConfig.showLabelsByDefault, // Respect global config.
-        isMoreHelpVisible = false,
         isForceLightMode = null, // Follow system theme by default.
         luminanceAdjustment = 0f, // No brightness adjustment.
         showLuminanceDialog = false,

@@ -29,8 +29,7 @@ internal fun reduceTutorialAction(state: CueDetatState, action: MainScreenEvent)
                 flashingTutorialElement = getHighlightForStep(firstStep), // Flash the initial element.
                 valuesChangedSinceReset = true,
                 areHelpersVisible = false, // clear distraction.
-                showLuminanceDialog = false, // clear distraction.
-                isMoreHelpVisible = false // clear distraction.
+                showLuminanceDialog = false // clear distraction.
             )
         }
 

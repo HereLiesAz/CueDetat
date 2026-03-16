@@ -86,9 +86,6 @@ internal fun reduceToggleAction(
         // Toggle visibility of basic helper labels.
         is MainScreenEvent.ToggleHelp -> state.copy(areHelpersVisible = !state.areHelpersVisible)
 
-        // Toggle visibility of the extended help/tutorial overlay.
-        is MainScreenEvent.ToggleMoreHelp -> state.copy(isMoreHelpVisible = !state.isMoreHelpVisible)
-
         // Toggle the snap-to-ball functionality.
         is MainScreenEvent.ToggleSnapping -> state.copy(isSnappingEnabled = !state.isSnappingEnabled)
 

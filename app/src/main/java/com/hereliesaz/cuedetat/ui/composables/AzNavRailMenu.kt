@@ -108,7 +108,7 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.ToggleSpinControl) }
         )
 
-        if (uiState.experienceMode != ExperienceMode.BEGINNER) {
+        if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azRailToggle(
                 id = "bank",
                 isChecked = uiState.isBankingMode,
@@ -146,17 +146,11 @@ fun AzNavRailMenu(
         azDivider()
 
         // --- Table & Units Section ---
-        if (uiState.experienceMode != ExperienceMode.BEGINNER) {
-            // onClick handles navigation explicitly to use launchSingleTop.
+        if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azRailItem(
                 id = "align",
                 text = "Table Alignment",
-                onClick = {
-                    if (navController.currentBackStackEntry?.destination?.route != "align") {
-                        navController.navigate("align") { launchSingleTop = true }
-                        onEvent(MainScreenEvent.ToggleQuickAlignScreen)
-                    }
-                }
+                onClick = { onEvent(MainScreenEvent.ToggleQuickAlignScreen) }
             )
             azRailItem(
                 id = "size",
@@ -172,7 +166,7 @@ fun AzNavRailMenu(
         }
 
         // --- Appearance Section ---
-        if (uiState.experienceMode != ExperienceMode.BEGINNER) {
+        if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azRailToggle(
                 id = "cam",
                 isChecked = uiState.isCameraVisible,
@@ -198,7 +192,7 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
         )
 
-        if (uiState.experienceMode != ExperienceMode.BEGINNER) {
+        if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azRailItem(
                 id = "advanced",
                 text = "Too Advanced Options",

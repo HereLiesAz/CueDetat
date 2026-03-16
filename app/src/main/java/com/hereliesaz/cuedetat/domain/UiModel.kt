@@ -10,7 +10,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.VisionData
-import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
 import com.hereliesaz.cuedetat.ui.hatemode.HaterState
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
@@ -51,10 +50,8 @@ data class CueDetatState(
     val zoomSliderPosition: Float = 0f,
     val worldRotationDegrees: Float = 0f,
     val areHelpersVisible: Boolean = LabelConfig.showLabelsByDefault,
-    val isMoreHelpVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
     val isCameraVisible: Boolean = true,
-    val showCameraFeed: Boolean = false,
     val viewOffset: PointF = PointF(0f, 0f),
     val orientationLock: OrientationLock = OrientationLock.PORTRAIT,
     @Transient val pendingOrientationLock: OrientationLock? = null,
@@ -155,7 +152,6 @@ sealed class MainScreenEvent {
     object ToggleExperienceModeSelection : MainScreenEvent()
     object ApplyPendingExperienceMode : MainScreenEvent()
     data class SetExperienceMode(val mode: ExperienceMode) : MainScreenEvent()
-    data class HaterAction(val action: HaterEvent) : MainScreenEvent()
     data class ScreenGestureStarted(val position: PointF) : MainScreenEvent()
     data class Drag(val previousPosition: PointF, val currentPosition: PointF) : MainScreenEvent()
     object GestureEnded : MainScreenEvent()
@@ -182,7 +178,6 @@ sealed class MainScreenEvent {
     data class ThemeChanged(val scheme: ColorScheme) : MainScreenEvent()
     object Reset : MainScreenEvent()
     object ToggleHelp : MainScreenEvent()
-    object ToggleMoreHelp : MainScreenEvent()
     object ToggleBankingMode : MainScreenEvent()
     object CycleTableSize : MainScreenEvent()
     data class SetTableSize(val size: TableSize) : MainScreenEvent()
@@ -235,6 +230,5 @@ sealed class MainScreenEvent {
     object ViewAboutPage : MainScreenEvent()
     object SendFeedback : MainScreenEvent()
     object SingleEventConsumed : MainScreenEvent()
-    object ToastShown : MainScreenEvent()
     data class RestoreState(val state: CueDetatState) : MainScreenEvent()
 }
