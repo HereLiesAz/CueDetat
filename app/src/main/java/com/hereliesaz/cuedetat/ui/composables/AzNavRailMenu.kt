@@ -100,7 +100,6 @@ fun AzNavRailMenu(
         azRailItem(
             id = "tutorial",
             text = "Show Tutorial",
-            route = "tutorial",
             onClick = { onEvent(MainScreenEvent.StartTutorial) }
         )
 
@@ -126,7 +125,6 @@ fun AzNavRailMenu(
             azRailItem(
                 id = "add_obstacle",
                 text = "Add Obstacle",
-                route = "add_obstacle",
                 onClick = { onEvent(MainScreenEvent.AddObstacleBall) }
             )
         }
@@ -140,7 +138,6 @@ fun AzNavRailMenu(
         azRailItem(
             id = "reset",
             text = lockResetText,
-            route = "reset",
             onClick = {
                 val event = when {
                     uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> MainScreenEvent.UnlockBeginnerView
@@ -155,11 +152,10 @@ fun AzNavRailMenu(
 
         // --- Table & Units Section ---
         if (uiState.experienceMode != ExperienceMode.BEGINNER) {
-            // Navigates to the Quick Align screen via navController routing.
+            // onClick handles navigation explicitly to use launchSingleTop.
             azRailItem(
                 id = "align",
                 text = "Table Alignment",
-                route = "align",
                 onClick = {
                     if (navController.currentBackStackEntry?.destination?.route != "align") {
                         navController.navigate("align") { launchSingleTop = true }
@@ -170,13 +166,11 @@ fun AzNavRailMenu(
             azRailItem(
                 id = "size",
                 text = "Table Size",
-                route = "size",
                 onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) }
             )
             azRailItem(
                 id = "units",
                 text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units",
-                route = "units",
                 onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) }
             )
             azDivider()
@@ -201,14 +195,12 @@ fun AzNavRailMenu(
                 CueDetatState.OrientationLock.PORTRAIT -> "Orientation: Portrait"
                 CueDetatState.OrientationLock.LANDSCAPE -> "Orientation: Landscape"
             },
-            route = "orientation",
             onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) }
         )
 
         azRailItem(
             id = "luminance",
             text = "Luminance",
-            route = "luminance",
             onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
         )
 
@@ -216,7 +208,6 @@ fun AzNavRailMenu(
             azRailItem(
                 id = "advanced",
                 text = "Too Advanced Options",
-                route = "advanced",
                 onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }
             )
         }
@@ -230,21 +221,18 @@ fun AzNavRailMenu(
                 uiState.experienceMode?.name?.lowercase()
                     ?.replaceFirstChar { it.titlecase() }
             }",
-            route = "mode",
             onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) }
         )
 
         azRailItem(
             id = "about",
             text = "About",
-            route = "about",
             onClick = { onEvent(MainScreenEvent.ViewAboutPage) }
         )
 
         azRailItem(
             id = "feedback",
             text = "Feedback",
-            route = "feedback",
             onClick = { onEvent(MainScreenEvent.SendFeedback) }
         )
 
