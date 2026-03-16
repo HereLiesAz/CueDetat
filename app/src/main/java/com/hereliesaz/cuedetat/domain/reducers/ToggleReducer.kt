@@ -29,24 +29,6 @@ internal fun reduceToggleAction(
 ): CueDetatState {
     // Switch on the specific event type.
     return when (action) {
-        // Toggle the visibility of the main side menu.
-        is MainScreenEvent.ToggleMenu -> {
-            // When toggling the nav rail/menu, we simply flip the visibility flag.
-            // Note: Implementation detail regarding interaction with 'isNavigationRailExpanded' handles elsewhere.
-            state.copy(
-                isMenuVisible = !state.isMenuVisible
-            )
-        }
-
-        // Toggle the expansion state of the navigation rail.
-        is MainScreenEvent.ToggleNavigationRail -> {
-            state.copy(
-                isNavigationRailExpanded = !state.isNavigationRailExpanded,
-                // If expanding the rail, ensure the standard menu is closed to avoid clutter.
-                isMenuVisible = false
-            )
-        }
-
         // Toggle the visibility of the Spin (English) control widget.
         is MainScreenEvent.ToggleSpinControl -> state.copy(isSpinControlVisible = !state.isSpinControlVisible)
 

@@ -102,7 +102,6 @@ fun stateReducer(
         // --- UI TOGGLES ---
         // Handled by [ToggleReducer].
         // Simple boolean flips for showing/hiding dialogs and menus.
-        is MainScreenEvent.ToggleMenu, is MainScreenEvent.ToggleNavigationRail,
         is MainScreenEvent.ToggleSpinControl,
         is MainScreenEvent.CycleTableSize, is MainScreenEvent.SetTableSize,
         is MainScreenEvent.ToggleTableSizeDialog, is MainScreenEvent.ToggleForceTheme,

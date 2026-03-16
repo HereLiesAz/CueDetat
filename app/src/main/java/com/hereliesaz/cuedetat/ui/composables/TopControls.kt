@@ -49,7 +49,7 @@ fun TopControls(
             .fillMaxWidth()
             .statusBarsPadding() // Avoid overlapping system status bar.
             .padding(start = 16.dp, end = 16.dp, top = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.Top
     ) {
         // --- Right Side: Contextual Status (Table Size, Distance) ---
