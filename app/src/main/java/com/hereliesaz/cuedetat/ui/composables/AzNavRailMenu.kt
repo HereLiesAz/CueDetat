@@ -1,13 +1,17 @@
 package com.hereliesaz.cuedetat.ui.composables
 
 import android.content.Intent
+import android.content.res.Configuration
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.core.net.toUri
-import com.hereliesaz.aznavrail.AzNavRail
+import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.model.AzButtonShape
-import com.hereliesaz.aznavrail.model.AzHeaderIconShape
+import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
@@ -19,38 +23,49 @@ import com.hereliesaz.cuedetat.view.state.DistanceUnit
  *
  * Uses the external `AzNavRail` library to provide a side menu with toggles and actions.
  * It adapts its content based on the current [ExperienceMode] (e.g., hiding advanced options for beginners).
+ * Acts as the top-level layout container, managing safe zones and z-ordering via [AzHostActivityLayout].
  *
  * @param uiState The current state of the application.
  * @param onEvent Callback to dispatch events when menu items are clicked.
+ * @param content The screen content to display in the background layer.
  */
 @Composable
 fun AzNavRailMenu(
     uiState: CueDetatState,
     onEvent: (MainScreenEvent) -> Unit,
+    content: @Composable () -> Unit,
 ) {
-    // Get local context for launching Intents (browser, email).
     val context = LocalContext.current
-    // Retrieve app name dynamically.
     val appName: String = context.packageManager.getApplicationLabel(context.applicationInfo).toString()
-    // Construct version string with optional update info.
     val versionInfo = "v1.0" + (uiState.latestVersionName?.let { " (latest: $it)" } ?: "")
 
-    // Pre-resolve strings to avoid calling @Composable in non-composable DSL blocks if needed,
-    // though AzNavRail DSL might handle it, it's safer here.
     val strAppName = stringResource(id = R.string.app_name)
     val strHideHelpers = stringResource(R.string.hide_helpers)
     val strShowHelpers = stringResource(R.string.show_helpers)
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val activeColor = MaterialTheme.colorScheme.primary
 
-    // Render the Navigation Rail.
-    AzNavRail(
-        navController = null, // We handle navigation manually via events, not NavController.
+    AzHostActivityLayout(
+        navController = null,
+        modifier = Modifier,
         currentDestination = null,
-        isLandscape = false // Force portrait layout logic (vertical rail).
+        isLandscape = isLandscape,
+        initiallyExpanded = false
     ) {
-        // Configure global settings for the rail.
-        azSettings(
-            displayAppNameInHeader = true,
-            headerIconShape = AzHeaderIconShape.CIRCLE
+        azConfig(
+            dockingSide = AzDockingSide.LEFT
+        )
+
+        azTheme(
+            defaultShape = AzButtonShape.RECTANGLE,
+            activeColor = activeColor
+        )
+
+        azAdvanced(
+            isLoading = false,
+            enableRailDragging = true,
+            helpEnabled = false,
+            onDismissHelp = {}
         )
 
         // --- Header Section ---
@@ -58,20 +73,19 @@ fun AzNavRailMenu(
             id = "app_name",
             text = strAppName,
             route = "header",
-            disabled = true // Header is not clickable.
+            disabled = true
         )
         azMenuItem(
             id = "version",
             text = versionInfo,
             route = "version",
-            disabled = true // Version info is informational only.
+            disabled = true
         )
 
         azDivider()
 
         // --- Core Controls Section ---
 
-        // Toggle: Show/Hide Helper Labels.
         azRailToggle(
             id = "help",
             isChecked = uiState.areHelpersVisible,
@@ -81,7 +95,6 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.ToggleHelp) }
         )
 
-        // Action: Start the tutorial overlay.
         azMenuItem(
             id = "tutorial",
             text = "Show Tutorial",
@@ -89,7 +102,6 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.StartTutorial) }
         )
 
-        // Toggle: Show/Hide Spin Control widget.
         azRailToggle(
             id = "spin",
             isChecked = uiState.isSpinControlVisible,
@@ -99,10 +111,8 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.ToggleSpinControl) }
         )
 
-        // Expert-only features.
         if (uiState.experienceMode != ExperienceMode.BEGINNER) {
-             // Toggle: Banking Mode (Ghost Ball vs Bank Calculation).
-             azRailToggle(
+            azRailToggle(
                 id = "bank",
                 isChecked = uiState.isBankingMode,
                 toggleOnText = "Ghost Ball Aiming",
@@ -111,8 +121,7 @@ fun AzNavRailMenu(
                 onClick = { onEvent(MainScreenEvent.ToggleBankingMode) }
             )
 
-             // Action: Add obstacle ball to table.
-             azRailItem(
+            azRailItem(
                 id = "add_obstacle",
                 text = "Add Obstacle",
                 route = "add_obstacle",
@@ -120,14 +129,12 @@ fun AzNavRailMenu(
             )
         }
 
-        // Determine text for the Reset/Lock button based on context.
         val lockResetText = when {
             uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> "Unlock View"
             uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked -> "Lock View"
             else -> "Reset"
         }
 
-        // Action: Reset State or Lock/Unlock View.
         azRailItem(
             id = "reset",
             text = lockResetText,
@@ -146,21 +153,18 @@ fun AzNavRailMenu(
 
         // --- Table & Units Section ---
         if (uiState.experienceMode != ExperienceMode.BEGINNER) {
-            // Action: Open Alignment Screen.
             azMenuItem(
                 id = "align",
                 text = "Table Alignment",
                 route = "align",
                 onClick = { onEvent(MainScreenEvent.ToggleQuickAlignScreen) }
             )
-            // Action: Open Table Size Dialog.
             azMenuItem(
                 id = "size",
                 text = "Table Size",
                 route = "size",
                 onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) }
             )
-            // Toggle: Metric/Imperial Units.
             azMenuItem(
                 id = "units",
                 text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units",
@@ -172,7 +176,6 @@ fun AzNavRailMenu(
 
         // --- Appearance Section ---
         if (uiState.experienceMode != ExperienceMode.BEGINNER) {
-            // Toggle: Camera visibility.
             azRailToggle(
                 id = "cam",
                 isChecked = uiState.isCameraVisible,
@@ -183,7 +186,6 @@ fun AzNavRailMenu(
             )
         }
 
-        // Toggle: Orientation Lock.
         azMenuItem(
             id = "orientation",
             text = when (uiState.pendingOrientationLock ?: uiState.orientationLock) {
@@ -195,7 +197,6 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) }
         )
 
-        // Action: Open Luminance Dialog.
         azMenuItem(
             id = "luminance",
             text = "Luminance",
@@ -203,7 +204,6 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
         )
 
-        // Action: Open Advanced (Developer) Options.
         if (uiState.experienceMode != ExperienceMode.BEGINNER) {
             azMenuItem(
                 id = "advanced",
@@ -216,7 +216,7 @@ fun AzNavRailMenu(
         azDivider()
 
         // --- Meta/App Info Section ---
-         azMenuItem(
+        azMenuItem(
             id = "mode",
             text = "Mode: ${
                 uiState.experienceMode?.name?.lowercase()
@@ -226,7 +226,6 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) }
         )
 
-        // Action: Open GitHub.
         azMenuItem(
             id = "about",
             text = "About",
@@ -240,7 +239,6 @@ fun AzNavRailMenu(
             }
         )
 
-        // Action: Send Feedback Email.
         azMenuItem(
             id = "feedback",
             text = "Feedback",
@@ -253,5 +251,10 @@ fun AzNavRailMenu(
                 context.startActivity(intent)
             }
         )
+
+        // --- Background Layer: main screen content ---
+        background(weight = 0) {
+            content()
+        }
     }
 }
