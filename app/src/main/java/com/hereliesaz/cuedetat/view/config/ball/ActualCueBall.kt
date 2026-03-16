@@ -1,7 +1,7 @@
 package com.hereliesaz.cuedetat.view.config.ball
 
 import androidx.compose.ui.graphics.Color
-import com.hereliesaz.cuedetat.ui.theme.Mariner
+import com.hereliesaz.cuedetat.ui.theme.MutedGray
 import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
 
@@ -17,12 +17,12 @@ data class ActualCueBall(
     override val opacity: Float = 1.0f,
     /** Width of the glow effect. */
     override val glowWidth: Float = 12f,
-    /** Glow color (Mariner Blue). */
-    override val glowColor: Color = Mariner,
+    /** Glow color (MutedGray Blue). */
+    override val glowColor: Color = MutedGray,
     /** Stroke width for the ball outline. */
     override val strokeWidth: Float = 6f,
-    /** Stroke color (Mariner Blue). */
-    override val strokeColor: Color = Mariner,
+    /** Stroke color (MutedGray Blue). */
+    override val strokeColor: Color = MutedGray,
     /** No additional 2D offset. */
     override val additionalOffset: Float = 0f,
     /** Center marker shape is a simple DOT. */

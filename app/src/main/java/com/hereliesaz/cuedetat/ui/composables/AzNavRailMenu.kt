@@ -1,14 +1,11 @@
 package com.hereliesaz.cuedetat.ui.composables
 
-import android.content.Intent
 import android.content.res.Configuration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.core.net.toUri
 import androidx.navigation.NavHostController
 import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.model.AzButtonShape
@@ -40,8 +37,6 @@ fun AzNavRailMenu(
     currentDestination: String?,
     content: @Composable () -> Unit,
 ) {
-    val context = LocalContext.current
-    val appName: String = context.packageManager.getApplicationLabel(context.applicationInfo).toString()
     val versionInfo = "v1.0" + (uiState.latestVersionName?.let { " (latest: $it)" } ?: "")
 
     val strAppName = stringResource(id = R.string.app_name)
@@ -58,7 +53,8 @@ fun AzNavRailMenu(
         initiallyExpanded = false
     ) {
         azConfig(
-            dockingSide = AzDockingSide.LEFT
+            dockingSide = AzDockingSide.LEFT,
+            packButtons = true
         )
 
         azTheme(
@@ -69,7 +65,7 @@ fun AzNavRailMenu(
 
         azAdvanced(
             isLoading = false,
-            enableRailDragging = true,
+            enableRailDragging = false,
             helpEnabled = false,
             onDismissHelp = {}
         )
@@ -242,26 +238,14 @@ fun AzNavRailMenu(
             id = "about",
             text = "About",
             route = "about",
-            onClick = {
-                val intent = Intent(
-                    Intent.ACTION_VIEW,
-                    "https://github.com/hereliesaz/$appName".toUri()
-                )
-                context.startActivity(intent)
-            }
+            onClick = { onEvent(MainScreenEvent.ViewAboutPage) }
         )
 
         azMenuItem(
             id = "feedback",
             text = "Feedback",
             route = "feedback",
-            onClick = {
-                val intent = Intent(Intent.ACTION_SENDTO).apply {
-                    data = "mailto:hereliesaz@gmail.com".toUri()
-                    putExtra(Intent.EXTRA_SUBJECT, "$appName - Feedback")
-                }
-                context.startActivity(intent)
-            }
+            onClick = { onEvent(MainScreenEvent.SendFeedback) }
         )
 
         // --- Background Layer: main screen content ---

@@ -1,7 +1,7 @@
 package com.hereliesaz.cuedetat.view.config.ball
 
 import androidx.compose.ui.graphics.Color
-import com.hereliesaz.cuedetat.ui.theme.MutedGray
+import com.hereliesaz.cuedetat.ui.theme.Mariner
 import com.hereliesaz.cuedetat.view.config.base.BallsConfig
 import com.hereliesaz.cuedetat.view.config.base.CenterShape
 
@@ -18,11 +18,11 @@ data class GhostCueBall(
     /** Width of the glow effect. */
     override val glowWidth: Float = 12f,
     /** Glow color (Gray). */
-    override val glowColor: Color = MutedGray,
+    override val glowColor: Color = Mariner,
     /** Stroke width for the ball outline. */
     override val strokeWidth: Float = 3f,
     /** Stroke color (Gray). */
-    override val strokeColor: Color = MutedGray,
+    override val strokeColor: Color = Mariner,
     /** No additional 2D offset. */
     override val additionalOffset: Float = 0f,
     /** Center marker shape is a CROSSHAIR. */
