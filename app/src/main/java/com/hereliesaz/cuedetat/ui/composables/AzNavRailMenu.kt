@@ -97,7 +97,7 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.ToggleHelp) }
         )
 
-        azMenuItem(
+        azRailItem(
             id = "tutorial",
             text = "Show Tutorial",
             route = "tutorial",
@@ -156,7 +156,7 @@ fun AzNavRailMenu(
         // --- Table & Units Section ---
         if (uiState.experienceMode != ExperienceMode.BEGINNER) {
             // Navigates to the Quick Align screen via navController routing.
-            azMenuItem(
+            azRailItem(
                 id = "align",
                 text = "Table Alignment",
                 route = "align",
@@ -167,13 +167,13 @@ fun AzNavRailMenu(
                     }
                 }
             )
-            azMenuItem(
+            azRailItem(
                 id = "size",
                 text = "Table Size",
                 route = "size",
                 onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) }
             )
-            azMenuItem(
+            azRailItem(
                 id = "units",
                 text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units",
                 route = "units",
@@ -194,7 +194,7 @@ fun AzNavRailMenu(
             )
         }
 
-        azMenuItem(
+        azRailItem(
             id = "orientation",
             text = when (uiState.pendingOrientationLock ?: uiState.orientationLock) {
                 CueDetatState.OrientationLock.AUTOMATIC -> "Orientation: Auto"
@@ -205,7 +205,7 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) }
         )
 
-        azMenuItem(
+        azRailItem(
             id = "luminance",
             text = "Luminance",
             route = "luminance",
@@ -213,7 +213,7 @@ fun AzNavRailMenu(
         )
 
         if (uiState.experienceMode != ExperienceMode.BEGINNER) {
-            azMenuItem(
+            azRailItem(
                 id = "advanced",
                 text = "Too Advanced Options",
                 route = "advanced",
@@ -224,7 +224,7 @@ fun AzNavRailMenu(
         azDivider()
 
         // --- Meta/App Info Section ---
-        azMenuItem(
+        azRailItem(
             id = "mode",
             text = "Mode: ${
                 uiState.experienceMode?.name?.lowercase()
@@ -234,14 +234,14 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) }
         )
 
-        azMenuItem(
+        azRailItem(
             id = "about",
             text = "About",
             route = "about",
             onClick = { onEvent(MainScreenEvent.ViewAboutPage) }
         )
 
-        azMenuItem(
+        azRailItem(
             id = "feedback",
             text = "Feedback",
             route = "feedback",

@@ -4,35 +4,26 @@ package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 
 /**
- * The top bar UI containing the Menu button, App Title/Tagline, and Contextual Status Info.
+ * The top bar UI containing Contextual Status Info (table size, distance).
  *
- * @param areHelpersVisible Whether helper labels (and the full title) should be shown.
  * @param experienceMode Current experience mode (affects visibility of controls).
  * @param isTableVisible Whether the table is visible (affects table size display).
  * @param tableSizeFeet Current table size in feet.
@@ -40,12 +31,10 @@ import com.hereliesaz.cuedetat.view.state.DistanceUnit
  * @param targetBallDistance Distance to the target ball.
  * @param distanceUnit Unit of measurement (Metric/Imperial).
  * @param onCycleTableSize Callback to cycle table size.
- * @param onMenuClick Callback to toggle the main menu.
  * @param modifier Styling modifier.
  */
 @Composable
 fun TopControls(
-    areHelpersVisible: Boolean,
     experienceMode: ExperienceMode?,
     isTableVisible: Boolean,
     tableSizeFeet: Int,
@@ -53,7 +42,6 @@ fun TopControls(
     targetBallDistance: Float,
     distanceUnit: DistanceUnit,
     onCycleTableSize: () -> Unit,
-    onMenuClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -64,41 +52,6 @@ fun TopControls(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Top
     ) {
-        // --- Left Side: Menu / App Info ---
-        Box(
-            modifier = Modifier
-                .clip(CircleShape)
-                .clickable(
-                    onClickLabel = "Open Menu",
-                    role = Role.Button,
-                    onClick = onMenuClick
-                )
-                .semantics {
-                    contentDescription = "Menu" // Accessibility label.
-                },
-            contentAlignment = Alignment.CenterStart
-        ) {
-            // Show full text title if helpers are ON.
-            if (areHelpersVisible && experienceMode != ExperienceMode.HATER) {
-                Column(
-                     modifier = Modifier.padding(8.dp)
-                ) {
-                    Text(
-                        text = stringResource(id = R.string.app_name),
-                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 28.sp),
-                        color = MaterialTheme.colorScheme.primary,
-                        textAlign = TextAlign.Start
-                    )
-                    Text(
-                        text = stringResource(id = R.string.tagline),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Start
-                    )
-                }
-            }
-        }
-
         // --- Right Side: Contextual Status (Table Size, Distance) ---
         if (experienceMode != ExperienceMode.HATER) {
             Column(
