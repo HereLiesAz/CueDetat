@@ -27,10 +27,10 @@ This is an Android application that uses your device's camera and a frankly exce
 *   **Make Bank**
     *   Calculate your multi-rail bank shots.
     *   Proof that even chaos subscribes to the laws of reflection, and it might be time to look at your own. 
-*   **All of the Balls You Could Want**
+*   **All the Balls You Could Want**
     *   (You definitely want them.)
     *   Simulated motherf---ing balls on a projected motherf---ing plane.
-    *   Determine whether or not another ball is in the way. 
+    *   Determine whether another ball is in the way. 
 *   **Spin Control**    
     *   A tool for applying English. Maybe even British.
     *   Explore the subtle arts of post-impact trajectory, and other new and exciting ways to scratch.

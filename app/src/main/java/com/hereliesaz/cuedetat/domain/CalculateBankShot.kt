@@ -31,16 +31,20 @@ class CalculateBankShot @Inject constructor() {
      * @return A [BankShotResult] containing the path and success status.
      */
     operator fun invoke(state: CueDetatState): BankShotResult {
-        // Validation: Ensure banking mode is active and necessary objects (cue ball, aim target) exist.
-        if (!state.isBankingMode || state.onPlaneBall == null || state.bankingAimTarget == null) {
+        // Validation: Ensure banking mode is active and we have an aim target.
+        if (!state.isBankingMode || state.bankingAimTarget == null) {
             return BankShotResult(emptyList(), null)
         }
 
-        // Initialize path with the starting point (cue ball position).
-        val path = mutableListOf(state.onPlaneBall.center)
-        var currentPoint = state.onPlaneBall.center
+        // Determine the starting point (cue ball position). 
+        // Use CV-detected ball if available, otherwise fallback to the logical shot anchor.
+        val startPoint = state.onPlaneBall?.center ?: state.shotLineAnchor ?: return BankShotResult(emptyList(), null)
 
-        // Calculate the initial direction vector from the cue ball towards the aim target.
+        // Initialize path with the starting point.
+        val path = mutableListOf(startPoint)
+        var currentPoint = startPoint
+
+        // Calculate the initial direction vector towards the aim target.
         var direction = normalize(PointF(
             state.bankingAimTarget.x - currentPoint.x,
             state.bankingAimTarget.y - currentPoint.y

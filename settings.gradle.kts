@@ -16,12 +16,15 @@ pluginManagement {
 
     }
     plugins {
-        id("com.android.application") version "8.13.2"
-        id("com.android.library") version "8.13.2"
+        id("com.android.application") version "9.1.0"
+        id("com.android.library") version "9.1.0"
         id("org.jetbrains.kotlin.android") version "2.3.0"
         id("com.github.triplet.play") version "3.13.0"
 
     }
+}
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)

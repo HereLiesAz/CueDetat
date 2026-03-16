@@ -7,6 +7,8 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.Shader
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
@@ -147,27 +149,34 @@ class LineRenderer {
             strokeWidth = state.protractorUnit.radius * 2
         }
 
-        state.aimingLineBankPath?.let {
+        val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
+        val targetCenter = state.protractorUnit.center
+
+        // Always draw the pathway and core line. 
+        // Use bank path if available, otherwise draw a straight extended line.
+        val path = state.aimingLineBankPath ?: listOf(ghostCueCenter, targetCenter)
+
+        if (state.table.isVisible || state.obstacleBalls.isNotEmpty()) {
             drawBankablePath(
                 canvas,
-                it,
+                path,
                 obstructionPaint,
                 null, // No glow for pathway
                 isPocketed = false,
                 state,
                 paints
             )
-
-            drawBankablePath(
-                canvas,
-                it,
-                aimingLinePaint,
-                aimingLineGlow,
-                isPocketed,
-                state,
-                paints
-            )
         }
+
+        drawBankablePath(
+            canvas,
+            path,
+            aimingLinePaint,
+            aimingLineGlow,
+            isPocketed,
+            state,
+            paints
+        )
     }
 
 
@@ -235,12 +244,11 @@ class LineRenderer {
                 paints
             )
         } else {
-            // Active / Inactive logic
-            state.tangentLineBankPath?.let {
-                drawBankablePath(canvas, it, tangentSolidPaint, tangentGlow, isPocketed, state, paints)
-            }
+            // Active side (usually solid)
+            val activePath = state.tangentLineBankPath ?: listOf(start, PointF(start.x + tangentDx * 5000f * state.tangentDirection, start.y + tangentDy * 5000f * state.tangentDirection))
+            drawBankablePath(canvas, activePath, tangentSolidPaint, tangentGlow, isPocketed, state, paints)
 
-            // Draw inactive line with fading logic
+            // Inactive side (always dotted/fading)
             val inactiveDirection = normalize(PointF(tangentDx * -state.tangentDirection, tangentDy * -state.tangentDirection))
             drawFadingLine(
                 canvas,
@@ -434,30 +442,38 @@ class LineRenderer {
         paints: PaintCache
     ) {
         val tableLength = state.table.logicalHeight
-        val totalLength = tableLength * 2.0f
+        val totalLength = tableLength * 4.0f // Ensure it reaches well off-screen
         val fadeStartDistance = tableLength * 1.2f
 
         val end = PointF(start.x + direction.x * totalLength, start.y + direction.y * totalLength)
         val fadeStart = PointF(start.x + direction.x * fadeStartDistance, start.y + direction.y * fadeStartDistance)
 
+        // Save layer for off-screen compositing (needed for DST_IN xfermode)
         val layer = canvas.saveLayer(null, null)
         try {
-            // 1. Draw the full, opaque line(s)
+            // 1. Draw the full, opaque line and its glow.
             glowPaint?.let { canvas.drawLine(start.x, start.y, end.x, end.y, it) }
             canvas.drawLine(start.x, start.y, end.x, end.y, paint)
 
-            // 2. Create and apply the gradient mask
+            // 2. Apply a gradient mask to fade the tail of the line.
+            // DST_IN mode keeps the destination (the line) only where the source (the mask) is drawn,
+            // with transparency from the source multiplied into the destination.
             val gradient = LinearGradient(
                 fadeStart.x, fadeStart.y,
                 end.x, end.y,
-                intArrayOf(paint.color, Color.Transparent.toArgb()),
+                intArrayOf(Color.White.toArgb(), Color.Transparent.toArgb()),
                 null,
                 Shader.TileMode.CLAMP
             )
             paints.gradientMaskPaint.shader = gradient
-            canvas.drawRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), paints.gradientMaskPaint)
+            paints.gradientMaskPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+
+            // Cover the entire potential logical coordinate space to ensure no artifacts.
+            canvas.drawRect(-10000f, -10000f, 10000f, 10000f, paints.gradientMaskPaint)
         } finally {
-            paints.gradientMaskPaint.shader = null // Reset the shader
+            // Reset paint properties for reuse.
+            paints.gradientMaskPaint.shader = null
+            paints.gradientMaskPaint.xfermode = null
             canvas.restoreToCount(layer)
         }
     }
