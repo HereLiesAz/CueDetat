@@ -13,6 +13,7 @@ import androidx.navigation.NavHostController
 import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
+import com.hereliesaz.aznavrail.model.AzHeaderIconShape
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
@@ -61,8 +62,9 @@ fun AzNavRailMenu(
         )
 
         azTheme(
-            defaultShape = AzButtonShape.RECTANGLE,
-            activeColor = activeColor
+            defaultShape = AzButtonShape.CIRCLE,
+            activeColor = activeColor,
+            headerIconShape = AzHeaderIconShape.NONE
         )
 
         azAdvanced(
