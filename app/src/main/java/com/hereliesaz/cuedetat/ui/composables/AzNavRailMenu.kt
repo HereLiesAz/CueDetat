@@ -74,13 +74,11 @@ fun AzNavRailMenu(
         azMenuItem(
             id = "app_name",
             text = strAppName,
-            route = "header",
             disabled = true
         )
         azMenuItem(
             id = "version",
             text = versionInfo,
-            route = "version",
             disabled = true
         )
 
@@ -93,7 +91,6 @@ fun AzNavRailMenu(
             isChecked = uiState.areHelpersVisible,
             toggleOnText = strHideHelpers,
             toggleOffText = strShowHelpers,
-            route = "help",
             onClick = { onEvent(MainScreenEvent.ToggleHelp) }
         )
 
@@ -108,7 +105,6 @@ fun AzNavRailMenu(
             isChecked = uiState.isSpinControlVisible,
             toggleOnText = "Spin Control On",
             toggleOffText = "Spin Control Off",
-            route = "spin",
             onClick = { onEvent(MainScreenEvent.ToggleSpinControl) }
         )
 
@@ -118,7 +114,6 @@ fun AzNavRailMenu(
                 isChecked = uiState.isBankingMode,
                 toggleOnText = "Ghost Ball Aiming",
                 toggleOffText = "Calculate Bank",
-                route = "bank",
                 onClick = { onEvent(MainScreenEvent.ToggleBankingMode) }
             )
 
@@ -183,7 +178,6 @@ fun AzNavRailMenu(
                 isChecked = uiState.isCameraVisible,
                 toggleOnText = "Turn Camera Off",
                 toggleOffText = "Turn Camera On",
-                route = "cam",
                 onClick = { onEvent(MainScreenEvent.ToggleCamera) }
             )
         }
