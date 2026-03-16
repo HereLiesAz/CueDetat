@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.core.net.toUri
+import androidx.navigation.NavHostController
 import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
@@ -21,18 +22,21 @@ import com.hereliesaz.cuedetat.view.state.DistanceUnit
 /**
  * The main navigation and control rail for the application.
  *
- * Uses the external `AzNavRail` library to provide a side menu with toggles and actions.
- * It adapts its content based on the current [ExperienceMode] (e.g., hiding advanced options for beginners).
- * Acts as the top-level layout container, managing safe zones and z-ordering via [AzHostActivityLayout].
+ * Uses [AzHostActivityLayout] as the mandatory top-level container, managing safe zones,
+ * device rotation, and z-ordering. Navigation items drive the [navController] for routing.
  *
  * @param uiState The current state of the application.
  * @param onEvent Callback to dispatch events when menu items are clicked.
+ * @param navController The NavHostController used for screen routing.
+ * @param currentDestination The current back-stack route, used to highlight the active item.
  * @param content The screen content to display in the background layer.
  */
 @Composable
 fun AzNavRailMenu(
     uiState: CueDetatState,
     onEvent: (MainScreenEvent) -> Unit,
+    navController: NavHostController,
+    currentDestination: String?,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -46,9 +50,9 @@ fun AzNavRailMenu(
     val activeColor = MaterialTheme.colorScheme.primary
 
     AzHostActivityLayout(
-        navController = null,
+        navController = navController,
         modifier = Modifier,
-        currentDestination = null,
+        currentDestination = currentDestination,
         isLandscape = isLandscape,
         initiallyExpanded = false
     ) {
@@ -153,11 +157,17 @@ fun AzNavRailMenu(
 
         // --- Table & Units Section ---
         if (uiState.experienceMode != ExperienceMode.BEGINNER) {
+            // Navigates to the Quick Align screen via navController routing.
             azMenuItem(
                 id = "align",
                 text = "Table Alignment",
                 route = "align",
-                onClick = { onEvent(MainScreenEvent.ToggleQuickAlignScreen) }
+                onClick = {
+                    if (navController.currentBackStackEntry?.destination?.route != "align") {
+                        navController.navigate("align") { launchSingleTop = true }
+                        onEvent(MainScreenEvent.ToggleQuickAlignScreen)
+                    }
+                }
             )
             azMenuItem(
                 id = "size",

@@ -28,17 +28,26 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.AzNavRailMenu
 import com.hereliesaz.cuedetat.ui.composables.TopControls
 import kotlin.math.sqrt
 
+private const val ROUTE_HATER = "hater"
+private const val ROUTE_ALIGN = "align"
+
 /**
  * The main screen for "Hater Mode".
  *
  * Simulates a Magic-8-Ball experience where a 20-sided die floats in liquid.
- * Note: The physics simulation is currently stubbed out (see [HaterPhysicsManager]).
+ * Uses [AzHostActivityLayout] (via [AzNavRailMenu]) as the top-level container with a
+ * [NavHost] for routing compliance. "Align" navigates back immediately since it is not
+ * applicable in this mode.
  *
  * @param haterViewModel The ViewModel managing the physics state.
  * @param uiState Global app state (for shared UI elements like the menu).
@@ -53,15 +62,17 @@ fun HaterScreen(
     val state by haterViewModel.haterState.collectAsStateWithLifecycle()
     LocalDensity.current
 
-    // Initialize mode on entry.
+    val navController = rememberNavController()
+    val currentBackStack by navController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStack?.destination?.route
+
     LaunchedEffect(Unit) {
         haterViewModel.onEvent(HaterEvent.EnterHaterMode)
     }
 
-    // Configure paints for the die (triangle) and glowing text.
     val glowPaint = remember {
         Paint().asFrameworkPaint().apply {
-            color = Color(0x993366FF).toArgb() // Blue glow
+            color = Color(0x993366FF).toArgb()
             maskFilter = BlurMaskFilter(30f, BlurMaskFilter.Blur.NORMAL)
         }
     }
@@ -74,96 +85,101 @@ fun HaterScreen(
         }
     }
 
-    AzNavRailMenu(uiState = uiState, onEvent = onEvent) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Main rendering canvas.
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        // Detect drags to "push" the fluid/die.
-                        detectDragGestures(
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                haterViewModel.onEvent(HaterEvent.Dragging(dragAmount))
-                            },
-                            onDragEnd = { haterViewModel.onEvent(HaterEvent.DragEnd) }
-                        )
+    AzNavRailMenu(
+        uiState = uiState,
+        onEvent = onEvent,
+        navController = navController,
+        currentDestination = currentRoute
+    ) {
+        NavHost(navController = navController, startDestination = ROUTE_HATER) {
+            composable(ROUTE_HATER) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        haterViewModel.onEvent(HaterEvent.Dragging(dragAmount))
+                                    },
+                                    onDragEnd = { haterViewModel.onEvent(HaterEvent.DragEnd) }
+                                )
+                            }
+                    ) {
+                        haterViewModel.setupBoundaries(size.width, size.height)
+                        val centerX = size.width / 2
+                        val centerY = size.height / 2
+
+                        drawRect(color = Color.Black)
+
+                        state.particles.forEach { particleOffset ->
+                            drawCircle(
+                                color = particleColor,
+                                radius = 4.dp.toPx(),
+                                center = Offset(centerX + particleOffset.x, centerY + particleOffset.y)
+                            )
+                        }
+
+                        drawIntoCanvas { canvas ->
+                            canvas.save()
+                            canvas.translate(centerX + state.diePosition.x, centerY + state.diePosition.y)
+                            canvas.rotate(state.dieAngle)
+
+                            val text = state.answer
+                            textPaint.textSize = 22.sp.toPx()
+                            val layoutWidth = (200.dp.toPx()).toInt()
+                            val staticLayout = StaticLayout.Builder
+                                .obtain(text, 0, text.length, textPaint, layoutWidth)
+                                .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                                .build()
+                            val textHeight = staticLayout.height.toFloat()
+                            val padding = 30.dp.toPx()
+                            val triangleHeight = textHeight + padding
+                            val sideLength = (triangleHeight / (sqrt(3.0) / 2.0)).toFloat()
+                            val halfWidth = sideLength / 2.0f
+                            val topY = -(2.0f / 3.0f) * triangleHeight
+                            val bottomY = (1.0f / 3.0f) * triangleHeight
+
+                            val trianglePath = Path().apply {
+                                moveTo(0f, topY)
+                                lineTo(-halfWidth, bottomY)
+                                lineTo(halfWidth, bottomY)
+                                close()
+                            }
+
+                            canvas.nativeCanvas.drawPath(trianglePath.asAndroidPath(), glowPaint)
+                            canvas.drawPath(path = trianglePath, paint = trianglePaint)
+
+                            canvas.save()
+                            canvas.translate(-staticLayout.width / 2f, -staticLayout.height / 2f)
+                            staticLayout.draw(canvas.nativeCanvas)
+                            canvas.restore()
+
+                            canvas.restore()
+                        }
                     }
-            ) {
-                haterViewModel.setupBoundaries(size.width, size.height)
-                val centerX = size.width / 2
-                val centerY = size.height / 2
 
-                // Black background (inside the 8-ball).
-                drawRect(color = Color.Black)
-
-                // Draw floating particles.
-                state.particles.forEach { particleOffset ->
-                    drawCircle(
-                        color = particleColor,
-                        radius = 4.dp.toPx(),
-                        center = Offset(centerX + particleOffset.x, centerY + particleOffset.y)
+                    TopControls(
+                        areHelpersVisible = uiState.areHelpersVisible,
+                        experienceMode = uiState.experienceMode,
+                        isTableVisible = uiState.table.isVisible,
+                        tableSizeFeet = uiState.table.size.feet,
+                        isBeginnerViewLocked = uiState.isBeginnerViewLocked,
+                        targetBallDistance = uiState.targetBallDistance,
+                        distanceUnit = uiState.distanceUnit,
+                        onCycleTableSize = { onEvent(MainScreenEvent.CycleTableSize) },
+                        onMenuClick = { onEvent(MainScreenEvent.ToggleNavigationRail) }
                     )
-                }
-
-                // Draw Die and Text using native canvas for complex path/text rendering.
-                drawIntoCanvas { canvas ->
-                    canvas.save()
-                    canvas.translate(centerX + state.diePosition.x, centerY + state.diePosition.y)
-                    canvas.rotate(state.dieAngle)
-
-                    // Calculate triangle shape based on text size dynamically.
-                    val text = state.answer
-                    textPaint.textSize = 22.sp.toPx()
-                    val layoutWidth = (200.dp.toPx()).toInt()
-                    val staticLayout = StaticLayout.Builder
-                        .obtain(text, 0, text.length, textPaint, layoutWidth)
-                        .setAlignment(Layout.Alignment.ALIGN_CENTER)
-                        .build()
-                    val textHeight = staticLayout.height.toFloat()
-                    val padding = 30.dp.toPx()
-                    val triangleHeight = textHeight + padding
-                    val sideLength = (triangleHeight / (sqrt(3.0) / 2.0)).toFloat()
-                    val halfWidth = sideLength / 2.0f
-                    val topY = -(2.0f / 3.0f) * triangleHeight
-                    val bottomY = (1.0f / 3.0f) * triangleHeight
-
-                    // Create the triangle path.
-                    val trianglePath = Path().apply {
-                        moveTo(0f, topY)
-                        lineTo(-halfWidth, bottomY)
-                        lineTo(halfWidth, bottomY)
-                        close()
-                    }
-
-                    // Draw glow then fill.
-                    canvas.nativeCanvas.drawPath(trianglePath.asAndroidPath(), glowPaint)
-                    canvas.drawPath(path = trianglePath, paint = trianglePaint)
-
-                    // Draw Text inside die.
-                    canvas.save()
-                    // Center text within the triangle.
-                    canvas.translate(-staticLayout.width / 2f, -staticLayout.height / 2f)
-                    staticLayout.draw(canvas.nativeCanvas)
-                    canvas.restore()
-
-                    canvas.restore()
                 }
             }
 
-            // Overlay standard UI controls (Menu/TopBar).
-            TopControls(
-                areHelpersVisible = uiState.areHelpersVisible,
-                experienceMode = uiState.experienceMode,
-                isTableVisible = uiState.table.isVisible,
-                tableSizeFeet = uiState.table.size.feet,
-                isBeginnerViewLocked = uiState.isBeginnerViewLocked,
-                targetBallDistance = uiState.targetBallDistance,
-                distanceUnit = uiState.distanceUnit,
-                onCycleTableSize = { onEvent(MainScreenEvent.CycleTableSize) },
-                onMenuClick = { onEvent(MainScreenEvent.ToggleNavigationRail) }
-            )
+            // "align" is not applicable in Hater mode — navigate back immediately.
+            composable(ROUTE_ALIGN) {
+                LaunchedEffect(Unit) {
+                    navController.popBackStack()
+                }
+            }
         }
     }
 }

@@ -15,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
-import com.hereliesaz.cuedetat.ui.composables.AzNavRailMenu
 import com.hereliesaz.cuedetat.ui.composables.SpinControl
 import com.hereliesaz.cuedetat.ui.composables.TopControls
 import com.hereliesaz.cuedetat.ui.composables.ZoomControls
@@ -27,15 +26,14 @@ import com.hereliesaz.cuedetat.ui.composables.overlays.TutorialOverlay
 import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
 
 /**
- * The high-level layout of the main screen.
+ * The HUD layer of the main screen, rendered as a [NavHost] destination inside
+ * the [AzHostActivityLayout] background layer managed by [ProtractorScreen].
  *
- * Uses [AzHostActivityLayout] (via [AzNavRailMenu]) as the top-level container, which manages
- * safe zones, device rotation, and z-ordering. The HUD and AR content are placed in a
- * background layer managed by the rail layout.
+ * Contains the AR overlay content, top bar, sliders, spin control, and all dialogs/overlays.
  *
  * @param uiState Current application state.
  * @param onEvent Event dispatcher.
- * @param content The background content (usually the AR ProtractorScreen).
+ * @param content The AR content (ProtractorOverlay).
  */
 @Composable
 fun MainLayout(
@@ -43,102 +41,92 @@ fun MainLayout(
     onEvent: (MainScreenEvent) -> Unit,
     content: @Composable () -> Unit
 ) {
-    AzNavRailMenu(uiState = uiState, onEvent = onEvent) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Main content, e.g., the rendering canvas/camera.
-            content()
+    Box(modifier = Modifier.fillMaxSize()) {
+        content()
 
-            // --- HUD Layer ---
+        TopControls(
+            areHelpersVisible = uiState.areHelpersVisible,
+            experienceMode = uiState.experienceMode,
+            isTableVisible = uiState.table.isVisible,
+            tableSizeFeet = uiState.table.size.feet,
+            isBeginnerViewLocked = uiState.isBeginnerViewLocked,
+            targetBallDistance = uiState.targetBallDistance,
+            distanceUnit = uiState.distanceUnit,
+            onCycleTableSize = { onEvent(MainScreenEvent.CycleTableSize) },
+            onMenuClick = { onEvent(MainScreenEvent.ToggleNavigationRail) }
+        )
 
-            // Top Control Bar (App Title, Status).
-            TopControls(
-                areHelpersVisible = uiState.areHelpersVisible,
-                experienceMode = uiState.experienceMode,
-                isTableVisible = uiState.table.isVisible,
-                tableSizeFeet = uiState.table.size.feet,
-                isBeginnerViewLocked = uiState.isBeginnerViewLocked,
-                targetBallDistance = uiState.targetBallDistance,
-                distanceUnit = uiState.distanceUnit,
-                onCycleTableSize = { onEvent(MainScreenEvent.CycleTableSize) },
-                onMenuClick = { onEvent(MainScreenEvent.ToggleNavigationRail) }
-            )
-
-            // Bottom Controls Container (Rotation Slider, Spin Control).
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .navigationBarsPadding()
-                    .padding(bottom = 16.dp, end = 16.dp, start = 16.dp),
-                verticalAlignment = Alignment.Bottom
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp, end = 16.dp, start = 16.dp),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.Start
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    // Intentionally empty.
-                }
-
-                Column(
-                    modifier = Modifier.weight(2f),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    TableRotationSlider(
-                        isVisible = uiState.table.isVisible,
-                        worldRotationDegrees = uiState.worldRotationDegrees,
-                        onRotationChange = { onEvent(MainScreenEvent.TableRotationChanged(it)) }
-                    )
-                }
-
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.End
-                ) {
-                    if (uiState.isSpinControlVisible && uiState.spinControlCenter != null) {
-                        SpinControl(
-                            centerPosition = uiState.spinControlCenter!!,
-                            selectedSpinOffset = uiState.selectedSpinOffset,
-                            lingeringSpinOffset = uiState.lingeringSpinOffset,
-                            spinPathAlpha = uiState.spinPathsAlpha,
-                            onEvent = onEvent,
-                        )
-                    }
-                }
+                // Intentionally empty.
             }
 
-            // Zoom Slider (Vertical, Right Side).
-            ZoomControls(
-                zoomSliderPosition = uiState.zoomSliderPosition,
-                onZoomChange = { onEvent(MainScreenEvent.ZoomSliderChanged(it)) },
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight(0.6f)
-                    .padding(end = 12.dp)
-                    .width(48.dp)
-            )
+            Column(
+                modifier = Modifier.weight(2f),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                TableRotationSlider(
+                    isVisible = uiState.table.isVisible,
+                    worldRotationDegrees = uiState.worldRotationDegrees,
+                    onRotationChange = { onEvent(MainScreenEvent.TableRotationChanged(it)) }
+                )
+            }
 
-            // --- Overlays and Dialogs ---
-
-            KineticWarningOverlay(text = uiState.warningText)
-
-            TutorialOverlay(uiState = uiState, onEvent = onEvent)
-
-            AdvancedOptionsDialog(
-                uiState = uiState,
-                onEvent = onEvent,
-                onDismiss = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }
-            )
-
-            LuminanceAdjustmentDialog(
-                uiState = uiState,
-                onEvent = onEvent,
-                onDismiss = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
-            )
-
-            TableSizeSelectionDialog(
-                uiState = uiState,
-                onEvent = onEvent,
-                onDismiss = { onEvent(MainScreenEvent.ToggleTableSizeDialog) }
-            )
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.End
+            ) {
+                if (uiState.isSpinControlVisible && uiState.spinControlCenter != null) {
+                    SpinControl(
+                        centerPosition = uiState.spinControlCenter!!,
+                        selectedSpinOffset = uiState.selectedSpinOffset,
+                        lingeringSpinOffset = uiState.lingeringSpinOffset,
+                        spinPathAlpha = uiState.spinPathsAlpha,
+                        onEvent = onEvent,
+                    )
+                }
+            }
         }
+
+        ZoomControls(
+            zoomSliderPosition = uiState.zoomSliderPosition,
+            onZoomChange = { onEvent(MainScreenEvent.ZoomSliderChanged(it)) },
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight(0.6f)
+                .padding(end = 12.dp)
+                .width(48.dp)
+        )
+
+        KineticWarningOverlay(text = uiState.warningText)
+
+        TutorialOverlay(uiState = uiState, onEvent = onEvent)
+
+        AdvancedOptionsDialog(
+            uiState = uiState,
+            onEvent = onEvent,
+            onDismiss = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }
+        )
+
+        LuminanceAdjustmentDialog(
+            uiState = uiState,
+            onEvent = onEvent,
+            onDismiss = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
+        )
+
+        TableSizeSelectionDialog(
+            uiState = uiState,
+            onEvent = onEvent,
+            onDismiss = { onEvent(MainScreenEvent.ToggleTableSizeDialog) }
+        )
     }
 }
