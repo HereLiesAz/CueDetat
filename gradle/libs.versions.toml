@@ -22,7 +22,7 @@ jbox2d = "2.3.0-BETA"
 junit = "4.13.2"
 junitTest = "1.2.1"
 junitExt = "1.10.5"
-kotlinMetadataJvm = "2.3.0"
+kotlinMetadataJvm = "2.3.10"
 kotlinxCoroutinesAndroid = "1.10.2"
 kotlinxCoroutinesCore = "1.10.2"
 kphysicsVersion = "1.0.0"
@@ -79,7 +79,7 @@ material3Version = "1.3.2"
 sceneformBase = "1.17.1"
 liquidfun = "1.1.0"
 androidxMaterial3 = "1.4.0"
-aznavrail = "7.80"
+aznavrail = "7.81"
 
 
 [libraries]
