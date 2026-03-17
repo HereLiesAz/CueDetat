@@ -205,64 +205,57 @@ fun HaterScreen(
 /**
  * Creates a 512×512 bitmap depicting a d20 triangular face with [text] centered inside.
  *
- * The triangle is equilateral, apex-up, deep navy fill with a purple border, and white
- * auto-sized text. The bitmap is transparent outside the triangle so the black canvas
- * background shows through cleanly.
+ * The triangle is equilateral (apex-up), deep navy fill, with a neon-blue inner glow
+ * that feathers inward from the edge to transparent. Text is white bold, auto-sized and
+ * placed in the triangle's wider lower zone so it never touches the edges.
+ *
+ * Text geometry constraint for an apex-up equilateral triangle with circumradius R:
+ *   at height y from the top vertex, the triangle width = y × 2/√3
+ *   so a text block of width W centred at (cx, textCY) is safe when its top line
+ *   satisfies: W ≤ (textCY − halfH − apex_y) × 2/√3
  */
 private fun createDieFaceBitmap(text: String): Bitmap {
-    val size    = 512
-    val bmp     = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    val canvas  = android.graphics.Canvas(bmp)
+    val size   = 512
+    val bmp    = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bmp)
 
-    val cx      = size / 2f
-    val cy      = size / 2f
-    val R       = 210f                  // circumradius
-    val sin60   = sqrt(3.0).toFloat() / 2f
+    val cx    = size / 2f
+    val cy    = size / 2f
+    val R     = 210f
+    val sin60 = sqrt(3.0).toFloat() / 2f
 
-    // Equilateral triangle: apex UP
+    // Equilateral triangle: apex UP, centroid at (cx, cy)
     val path = Path().apply {
-        moveTo(cx,                cy - R)               // top
-        lineTo(cx + R * sin60,   cy + R * 0.5f)        // bottom-right
-        lineTo(cx - R * sin60,   cy + R * 0.5f)        // bottom-left
+        moveTo(cx,             cy - R)           // top vertex
+        lineTo(cx + R * sin60, cy + R * 0.5f)   // bottom-right
+        lineTo(cx - R * sin60, cy + R * 0.5f)   // bottom-left
         close()
     }
 
-    // Fill: deep navy
+    // --- Fill: deep navy ---
     canvas.drawPath(path, Paint().apply {
-        color       = Color.argb(255, 8, 10, 60)
+        color       = Color.argb(255, 6, 8, 52)
         style       = Paint.Style.FILL
         isAntiAlias = true
     })
 
-    // Inner fill gradient: very subtle radial depth hint (lightest at centre)
+    // --- Neon blue inner glow feathered inward from the triangle edge ---
+    // BlurMaskFilter(INNER) on a filled path: alpha is highest at the perimeter
+    // and decays toward the interior, creating the "inner-border glow" look.
     canvas.drawPath(path, Paint().apply {
-        shader = android.graphics.RadialGradient(
-            cx, cy, R * 0.55f,
-            Color.argb(60, 100, 60, 220),   // soft purple tint at centre
-            Color.argb(0, 0, 0, 0),
-            Shader.TileMode.CLAMP
-        )
-        style       = Paint.Style.FILL
+        color      = Color.argb(255, 0, 180, 255)   // neon cyan-blue
+        style      = Paint.Style.FILL
+        maskFilter = android.graphics.BlurMaskFilter(22f, android.graphics.BlurMaskFilter.Blur.INNER)
         isAntiAlias = true
     })
 
-    // Border: purple glow, thick outer + thin inner highlight
-    canvas.drawPath(path, Paint().apply {
-        color       = Color.argb(255, 120, 50, 255)
-        style       = Paint.Style.STROKE
-        strokeWidth = 7f
-        isAntiAlias = true
-    })
-    canvas.drawPath(path, Paint().apply {
-        color       = Color.argb(120, 200, 160, 255)
-        style       = Paint.Style.STROKE
-        strokeWidth = 2f
-        isAntiAlias = true
-    })
-
-    // Text: white, bold, auto-sized to fit within incircle (r = R/2 = 105)
-    val maxTextWidth = (R * 0.95f).toInt()   // ~200px — fits well within incircle
-    val maxTextHeight = R * 0.90f            // ~189px height budget
+    // --- Text: white bold, auto-sized to fit safely inside the triangle ---
+    // textCY is shifted 12% of R below the geometric centroid — the triangle is wider
+    // there, so more horizontal space is available for the top lines.
+    val textCY   = cy + R * 0.12f   // ≈ 281 — sits in the wider lower zone
+    // Max height budget: halfH ≈ 65 → yTop ≈ 216 → safe width = (216−46)×2/√3×0.88 ≈ 171
+    val maxTextH = R * 0.62f        // ≈ 130px
+    val maxTextW = 160              // well within safe width at yTop
 
     val textPaint = TextPaint().apply {
         color       = Color.WHITE
@@ -275,17 +268,16 @@ private fun createDieFaceBitmap(text: String): Bitmap {
     do {
         textPaint.textSize = fontSize
         layout = StaticLayout.Builder
-            .obtain(text, 0, text.length, textPaint, maxTextWidth)
+            .obtain(text, 0, text.length, textPaint, maxTextW)
             .setAlignment(Layout.Alignment.ALIGN_CENTER)
-            .setLineSpacing(0f, 1.15f)
+            .setLineSpacing(0f, 1.12f)
             .setIncludePad(false)
             .build()
         fontSize -= 2f
-    } while (layout.height > maxTextHeight && fontSize > 10f)
+    } while (layout.height > maxTextH && fontSize > 10f)
 
-    // Center the text block at the triangle centroid
     canvas.save()
-    canvas.translate(cx - maxTextWidth / 2f, cy - layout.height / 2f)
+    canvas.translate(cx - maxTextW / 2f, textCY - layout.height / 2f)
     layout.draw(canvas)
     canvas.restore()
 

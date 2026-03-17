@@ -38,10 +38,11 @@ class HaterPhysicsManager {
     private var phase: TriangleState = TriangleState.IDLE
 
     // --- Z-scale (depth) state ---
-    private var dieScale    = 0f
-    private var scaleVel    = 0f
-    private var targetScale = 1f
-    private var bobPhase    = 0f
+    private var dieScale      = 0f
+    private var scaleVel      = 0f
+    private var targetScale   = 1f
+    private var bobPhase      = 0f
+    private var bobAmplitude  = 0f  // decays after emergence or touch; drives all bob/rock
 
     // --- Public state ---
     var diePosition: Offset = Offset.Zero
@@ -62,10 +63,11 @@ class HaterPhysicsManager {
         private const val RESTITUTION   = 0.03f   // dead stop at walls
         private const val SCALE_SPRING  = 0.018f  // slow, deliberate Z-scale rise on emerge
         private const val SCALE_DAMPING = 0.96f   // smooth overdamped approach
-        private const val BOB_SPEED     = 0.14f   // ~1.3 Hz — realistic floating-object frequency
+        private const val BOB_SPEED     = 0.14f    // ~1.3 Hz — realistic floating-object frequency
         private const val BOB_SCALE_AMP = 0.012f  // ±1.2% scale — barely visible shimmer
         private const val MAX_ROCK_X    = 2.5f    // peak X-axis tilt (degrees) — very subtle
         private const val MAX_ROCK_Y    = 1.5f    // peak Y-axis tilt (degrees) — very subtle
+        private const val BOB_DECAY     = 0.988f  // ~2.5 s to 10% — fades after emergence/touch
     }
 
     private fun rng(min: Float, max: Float) = Random.nextFloat() * (max - min) + min
@@ -110,18 +112,18 @@ class HaterPhysicsManager {
         scaleVel *= SCALE_DAMPING
         dieScale = (dieScale + scaleVel).coerceIn(0f, 1.05f)
 
-        // --- Bob: scale oscillation + perspective rock while settling ---
-        // Scale bob: die rises toward camera (grows) and sinks (shrinks) cyclically.
-        // Rock: two slightly out-of-phase tilts make different triangle edges dip into
-        // and rise from the liquid surface, with independent darkening handled by the renderer.
+        // --- Bob: decaying amplitude drives scale shimmer + perspective rock ---
+        // Amplitude is set on SETTLING entry and on touch, then decays to zero.
+        // No continuous sloshing — the die settles to stillness naturally.
+        bobAmplitude *= BOB_DECAY
         var publicScale = dieScale
-        if (phase == TriangleState.SETTLING) {
+        if (phase == TriangleState.SETTLING && bobAmplitude > 0.005f) {
             bobPhase += BOB_SPEED
             val s1 = sin(bobPhase.toDouble()).toFloat()
             val s2 = sin(bobPhase * 0.65).toFloat() // different freq, no offset — starts at zero
-            publicScale  += BOB_SCALE_AMP * s1
-            currentRockX  = MAX_ROCK_X * s1
-            currentRockY  = MAX_ROCK_Y * s2
+            publicScale  += BOB_SCALE_AMP * s1 * bobAmplitude
+            currentRockX  = MAX_ROCK_X  * s1 * bobAmplitude
+            currentRockY  = MAX_ROCK_Y  * s2 * bobAmplitude
         } else {
             currentRockX = 0f
             currentRockY = 0f
@@ -151,8 +153,9 @@ class HaterPhysicsManager {
                 bobPhase   = 0f
             }
             TriangleState.SETTLING -> {
-                targetScale = 1f
-                bobPhase    = 0f
+                targetScale  = 1f
+                bobPhase     = 0f
+                bobAmplitude = 1.0f  // full bob on emergence landing; decays naturally
             }
             TriangleState.IDLE -> {
                 targetScale = 1f
@@ -172,6 +175,13 @@ class HaterPhysicsManager {
     fun pushDie(delta: Offset) {
         dieVel     += delta * 0.04f
         angularVel += (delta.x - delta.y) * 0.015f
+        // Touching stirs the surface; ensure bob is active but don't oversaturate
+        if (bobAmplitude < 0.35f) bobAmplitude = 0.35f
+    }
+
+    fun onDragEnd() {
+        // Finger lifting off gives a small bob pulse
+        bobAmplitude = bobAmplitude.coerceAtLeast(0.5f)
     }
 
     fun applyGravity(roll: Float, pitch: Float) {

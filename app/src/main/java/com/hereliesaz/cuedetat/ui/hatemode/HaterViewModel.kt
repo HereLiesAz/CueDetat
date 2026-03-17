@@ -54,7 +54,7 @@ class HaterViewModel @Inject constructor(
             is HaterEvent.ShakeDetected -> onShake()
             is HaterEvent.Dragging -> physicsManager.pushDie(event.delta)
             is HaterEvent.SensorChanged -> physicsManager.applyGravity(event.roll, event.pitch)
-            is HaterEvent.DragEnd -> { /* no-op */ }
+            is HaterEvent.DragEnd -> physicsManager.onDragEnd()
         }
     }
 
