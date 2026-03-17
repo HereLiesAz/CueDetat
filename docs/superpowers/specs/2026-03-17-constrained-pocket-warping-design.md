@@ -66,38 +66,39 @@ Pockets start at their ideal positions (undistorted rectangle on the captured ph
 
 ### ThinPlateSpline.kt (new)
 
-A pure-Kotlin TPS solver and evaluator. For N control points it solves two independent (N+3)×(N+3) linear systems — one per output axis (x and y). At N=6 this is two 9×9 solves (6 control points + 3 affine terms: constant, x-coefficient, y-coefficient). Negligible cost, computed once at alignment time (and once per drag event on a background thread).
+A pure-Kotlin TPS solver and evaluator. For N control points it solves two independent (N+3)×(N+3) linear systems — one per output axis (x and y). At N=6 this is two 9×9 solves (6 control points + 3 affine terms: constant, x-coefficient, y-coefficient).
 
-**Direction of stored TPS:** Image space → logical space (natural for CV output).
-- Source points: 6 pocket positions in image space (user-placed on the captured photo).
-- Destination points: 6 known pocket positions in logical space (inches, from selected table size).
+**`ThinPlateSpline` exposes two static evaluation methods:**
+- `evaluate(tps: TpsWarpData, point: PointF): PointF` — image→logical (forward, for CV)
+- `evaluateInverse(tps: TpsWarpData, point: PointF): PointF` — logical→image (for rendering), solved by swapping src/dst
 
-For rendering (logical → image), swap src/dst in the solver. Both directions are computed and stored in `TpsWarpData`.
+Weights are **not stored in `TpsWarpData`** — they are solved on first use and cached at runtime in a `WeakHashMap<TpsWarpData, SolvedTps>` inside `ThinPlateSpline`. This avoids serializing Float arrays entirely, and both directions are available from a single stored data object.
 
 **TpsWarpData.kt (new) — serializable state:**
 
 ```kotlin
 @Keep
 data class TpsWarpData(
-    val srcPoints: List<PointF>,      // 6 residual source positions (image-space deltas)
-    val dstPoints: List<PointF>,      // 6 residual destination positions (logical-space deltas)
-    val weightsX: List<Float>,        // N+3 TPS kernel weights for x-axis output
-    val weightsY: List<Float>,        // N+3 TPS kernel weights for y-axis output
-    val affineX: List<Float>,         // 3 affine terms for x-axis (constant, cx, cy)
-    val affineY: List<Float>          // 3 affine terms for y-axis (constant, cx, cy)
+    val srcPoints: List<PointF>,  // 6 image-space residual positions
+    val dstPoints: List<PointF>   // 6 logical-space residual positions
 )
 ```
 
-`List<Float>` is used throughout (not `FloatArray`) to ensure clean JSON serialization via Gson, consistent with the rest of `CueDetatState`.
+Only the control points are persisted. `PointF` serialization is already handled by the project's existing Gson setup (used by `viewOffset`, `bankingAimTarget`, and other `CueDetatState` fields).
 
 ### Output of QuickAlign (onFinishAlign)
 
-**Note:** The current `onFinishAlign` builds the homography from only 4 corner pockets. This must be changed to use all 6 points.
+**Required fix to existing code:** `QuickAlignViewModel.onFinishAlign()` currently builds the homography from only the 4 corner pockets (`TOP_LEFT`, `TOP_RIGHT`, `BOTTOM_RIGHT`, `BOTTOM_LEFT`). This must be changed to use all 6 points including the side pockets.
 
+Steps:
 1. Fit homography to **all 6** final point positions → decompose to translation, rotation, scale.
 2. For each of the 6 pockets, compute the residual: `actual image position − homography-predicted image position`.
 3. Solve the residual TPS: source = 6 homography-predicted positions, destination = 6 actual user-placed positions (both in image space).
-4. Emit `ApplyQuickAlign(translation, rotation, scale, tpsWarpData)`.
+4. Emit `ApplyQuickAlign(translation, rotation, scale, tpsWarpData)` via `_alignResult`.
+
+**Update sites for the `ApplyQuickAlign` signature change:**
+- `QuickAlignViewModel._alignResult.emit(...)` — add `tpsWarpData` argument
+- `ControlReducer.kt` `ApplyQuickAlign` handler — add `state.copy(lensWarpTps = action.tpsWarpData)`
 
 The residual TPS encodes only the non-linear component. Applying it inside `canvas.withMatrix(pitchMatrix)` (which already encodes the linear pose) does not double-count anything.
 
@@ -106,6 +107,8 @@ The residual TPS encodes only the non-linear component. Applying it inside `canv
 ```kotlin
 val lensWarpTps: TpsWarpData? = null
 ```
+
+The field is nullable with a default of null. Existing serialized states deserialized by Gson will populate it as null, which is handled gracefully throughout — all warp calls check for null and pass points through unchanged.
 
 `ApplyQuickAlign` handler in `ControlReducer` stores `lensWarpTps` from the event.
 
@@ -163,7 +166,7 @@ The forward TPS evaluation is added as a single step at the end of the coordinat
 | Component | Type | Change |
 |---|---|---|
 | `ThinPlateSpline.kt` | New | TPS solver (two N+3 systems) + forward/inverse evaluator |
-| `TpsWarpData.kt` | New | Serializable TPS state (`List<Float>` for Gson compatibility) |
+| `TpsWarpData.kt` | New | Serializable TPS state (control points only; weights cached at runtime) |
 | `TpsUtils.kt` | New | `PointF.warpedBy(tps)` extension, lives in `view/renderer/` |
 | `QuickAlignViewModel.kt` | Modified | Accumulating TPS constraints on drag (background thread); residual TPS output; Reset clears pin set; homography uses all 6 points |
 | `QuickAlignScreen.kt` | Modified | Visual distinction between pinned and unpinned pockets |
