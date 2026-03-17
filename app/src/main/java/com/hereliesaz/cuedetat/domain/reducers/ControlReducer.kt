@@ -79,7 +79,9 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             state.copy(
                 viewOffset = PointF(action.translation.x, action.translation.y),
                 worldRotationDegrees = action.rotation,
-                zoomSliderPosition = newZoomSliderPos
+                zoomSliderPosition = newZoomSliderPos,
+                isWorldLocked = true,
+                valuesChangedSinceReset = true
             )
         }
 
