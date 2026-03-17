@@ -19,7 +19,7 @@ import kotlin.math.hypot
 object TableGeometryFitter {
 
     /** Lightweight coordinate pair, usable in both Android and plain-JVM tests. */
-    data class Pt(val x: Float, val y: Float)
+    internal data class Pt(val x: Float, val y: Float)
 
     private const val ASPECT_RATIO = 2.0f
     private const val ASPECT_TOLERANCE = 0.25f  // ±25% tolerance on 2:1 ratio
@@ -41,7 +41,7 @@ object TableGeometryFitter {
      * Variant that accepts [Pt] directly — used by unit tests to avoid
      * dependency on the Android framework mock.
      */
-    fun fitPt(points: List<Pt>): List<Pair<PocketId, Pt>>? {
+    internal fun fitPt(points: List<Pt>): List<Pair<PocketId, Pt>>? {
         if (points.size != 6) return null
 
         var bestScore = Float.MAX_VALUE
@@ -107,6 +107,11 @@ object TableGeometryFitter {
             sides[0] to sides[1] else sides[1] to sides[0]
     }
 
+    /**
+     * Tie-breaker score for ranking valid rectangle candidates.
+     * A perfect rectangle has equal-length diagonals; score = squared diagonal difference.
+     * Lower is better. Used only to pick among candidates that already passed aspect check.
+     */
     private fun rectResidual(result: List<Pair<PocketId, Pt>>): Float {
         val m = result.associate { it.first to it.second }
         val d1 = dist(m[PocketId.TL]!!, m[PocketId.BR]!!)
