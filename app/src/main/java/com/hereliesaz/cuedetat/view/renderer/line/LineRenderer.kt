@@ -28,6 +28,7 @@ import com.hereliesaz.cuedetat.view.config.line.TangentLine
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.config.ui.ProtractorGuides
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
+import com.hereliesaz.cuedetat.view.renderer.warpedBy
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -149,12 +150,14 @@ class LineRenderer {
             strokeWidth = state.protractorUnit.radius * 2
         }
 
+        val tps = state.lensWarpTps
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
         val targetCenter = state.protractorUnit.center
 
-        // Always draw the pathway and core line. 
+        // Always draw the pathway and core line.
         // Use bank path if available, otherwise draw a straight extended line.
-        val path = state.aimingLineBankPath ?: listOf(ghostCueCenter, targetCenter)
+        val rawPath = state.aimingLineBankPath ?: listOf(ghostCueCenter, targetCenter)
+        val path = rawPath.map { it.warpedBy(tps) }
 
         if (state.table.isVisible || state.obstacleBalls.isNotEmpty()) {
             drawBankablePath(
@@ -201,16 +204,19 @@ class LineRenderer {
             paints = paints
         )
 
-        val start = state.protractorUnit.ghostCueBallCenter
+        val tps = state.lensWarpTps
+        val rawStart = state.protractorUnit.ghostCueBallCenter
         val towards = state.protractorUnit.center
-        val dxToTarget = towards.x - start.x
-        val dyToTarget = towards.y - start.y
+        val dxToTarget = towards.x - rawStart.x
+        val dyToTarget = towards.y - rawStart.y
         val magToTarget = sqrt(dxToTarget * dxToTarget + dyToTarget * dyToTarget)
 
         if (magToTarget < 0.001f) return
 
         val tangentDx = -dyToTarget / magToTarget
         val tangentDy = dxToTarget / magToTarget
+
+        val start = rawStart.warpedBy(tps)
 
         if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
             val direction1 = normalize(PointF(tangentDx, tangentDy))
@@ -245,7 +251,8 @@ class LineRenderer {
             )
         } else {
             // Active side (usually solid)
-            val activePath = state.tangentLineBankPath ?: listOf(start, PointF(start.x + tangentDx * 5000f * state.tangentDirection, start.y + tangentDy * 5000f * state.tangentDirection))
+            val rawActivePath = state.tangentLineBankPath ?: listOf(rawStart, PointF(rawStart.x + tangentDx * 5000f * state.tangentDirection, rawStart.y + tangentDy * 5000f * state.tangentDirection))
+            val activePath = rawActivePath.map { it.warpedBy(tps) }
             drawBankablePath(canvas, activePath, tangentSolidPaint, tangentGlow, isPocketed, state, paints)
 
             // Inactive side (always dotted/fading)
@@ -298,8 +305,11 @@ class LineRenderer {
     }
 
     private fun drawBankingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
-        val path = state.bankShotPath ?: return
-        if (path.size < 2) return
+        val rawPath = state.bankShotPath ?: return
+        if (rawPath.size < 2) return
+
+        val tps = state.lensWarpTps
+        val path = rawPath.map { it.warpedBy(tps) }
 
         val isPocketed = state.pocketedBankShotPocketIndex != null
 
