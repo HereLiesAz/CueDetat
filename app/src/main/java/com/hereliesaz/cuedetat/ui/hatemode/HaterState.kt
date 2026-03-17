@@ -20,14 +20,14 @@ enum class TriangleState {
  *
  * @property diePosition Current (x,y) offset of the die from the screen center.
  * @property dieAngle Current rotation of the die in degrees.
- * @property particles List of particle positions for the fluid effect.
+ * @property dieScale Scale multiplier of the die.
  * @property answerResId The drawable resource ID of the webp image displayed on the die.
  * @property triangleState The current phase of the reveal animation.
  */
 data class HaterState(
     val diePosition: Offset = Offset.Zero,
     val dieAngle: Float = 0f,
-    val particles: List<Offset> = emptyList(),
+    val dieScale: Float = 0f,
     val answerResId: Int = R.drawable.group0,
     val triangleState: TriangleState = TriangleState.IDLE,
 )
