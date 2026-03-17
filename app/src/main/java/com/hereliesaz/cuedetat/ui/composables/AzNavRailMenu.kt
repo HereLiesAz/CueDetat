@@ -40,6 +40,7 @@ fun AzNavRailMenu(
     onEvent: (MainScreenEvent) -> Unit,
     navController: NavHostController,
     currentDestination: String?,
+    hasTableModel: Boolean = false,
     content: AzNavHostScope.() -> Unit = {},
 ) {
     val strAppName = stringResource(id = R.string.app_name)
@@ -160,10 +161,20 @@ fun AzNavRailMenu(
         // --- Table & Units Section ---
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azMenuItem(
-                id = "align",
-                text = "Table Alignment",
-                onClick = { onEvent(MainScreenEvent.ToggleQuickAlignScreen) }
+                id = "scan",
+                text = "Scan Table",
+                onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen) }
             )
+            if (hasTableModel) {
+                azMenuItem(
+                    id = "rescan",
+                    text = "Rescan Table",
+                    onClick = {
+                        onEvent(MainScreenEvent.ClearTableScan)
+                        onEvent(MainScreenEvent.ToggleTableScanScreen)
+                    }
+                )
+            }
             azMenuItem(
                 id = "size",
                 text = "Table Size",

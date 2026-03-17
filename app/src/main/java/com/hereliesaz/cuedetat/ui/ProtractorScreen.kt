@@ -38,11 +38,13 @@ import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignAnalyzer
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignScreen
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
 import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
+import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanScreen
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
 
 private const val ROUTE_MAIN = "main"
 private const val ROUTE_ALIGN = "align"
 private const val ROUTE_CALIBRATION = "calibration"
+private const val ROUTE_SCAN = "scan"
 
 @Composable
 fun ProtractorScreen(
@@ -76,13 +78,23 @@ fun ProtractorScreen(
         }
     }
 
+    LaunchedEffect(uiState.showTableScanScreen) {
+        val route = navController.currentBackStackEntry?.destination?.route
+        if (uiState.showTableScanScreen && route != ROUTE_SCAN) {
+            navController.navigate(ROUTE_SCAN) { launchSingleTop = true }
+        } else if (!uiState.showTableScanScreen && route == ROUTE_SCAN) {
+            navController.popBackStack()
+        }
+    }
+
     val isOnMain = currentRoute == ROUTE_MAIN || currentRoute == null
 
     AzNavRailMenu(
         uiState = uiState,
         onEvent = mainViewModel::onEvent,
         navController = navController,
-        currentDestination = currentRoute
+        currentDestination = currentRoute,
+        hasTableModel = uiState.tableScanModel != null
     ) {
         // --- Background layer 0: Camera ---
         background(weight = 0) {
@@ -128,6 +140,12 @@ fun ProtractorScreen(
                         onEvent = mainViewModel::onEvent,
                         viewModel = calibrationViewModel,
                         analyzer = calibrationAnalyzer
+                    )
+                }
+                composable(ROUTE_SCAN) {
+                    TableScanScreen(
+                        onEvent = mainViewModel::onEvent,
+                        uiState = uiState
                     )
                 }
             }
