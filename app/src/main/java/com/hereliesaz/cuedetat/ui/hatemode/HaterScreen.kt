@@ -5,12 +5,12 @@ package com.hereliesaz.cuedetat.ui.hatemode
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -22,8 +22,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.cuedetat.domain.CueDetatState
@@ -31,16 +29,12 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.AzNavRailMenu
 import com.hereliesaz.cuedetat.ui.composables.TopControls
 
-private const val ROUTE_HATER = "hater"
-private const val ROUTE_ALIGN = "align"
-
 /**
  * The main screen for "Hater Mode".
  *
  * Simulates a Magic-8-Ball experience where a 20-sided die floats in liquid.
- * Uses [AzHostActivityLayout] (via [AzNavRailMenu]) as the top-level container with a
- * [NavHost] for routing compliance. "Align" navigates back immediately since it is not
- * applicable in this mode.
+ * The physics canvas is placed in a [background] layer; [TopControls] is placed
+ * in an [onscreen] block per the AzNavRail architecture contract.
  *
  * @param haterViewModel The ViewModel managing the physics state.
  * @param uiState Global app state (for shared UI elements like the menu).
@@ -70,83 +64,76 @@ fun HaterScreen(
         navController = navController,
         currentDestination = currentRoute
     ) {
-        NavHost(navController = navController, startDestination = ROUTE_HATER) {
-            composable(ROUTE_HATER) {
-                val context = LocalContext.current
-                val bitmap = remember(state.answerResId) {
-                    BitmapFactory.decodeResource(context.resources, state.answerResId)
-                        ?.asImageBitmap()
-                }
+        // --- Background layer: physics / die canvas ---
+        background(weight = 0) {
+            val context = LocalContext.current
+            val bitmap = remember(state.answerResId) {
+                BitmapFactory.decodeResource(context.resources, state.answerResId)
+                    ?.asImageBitmap()
+            }
 
-                Box(modifier = Modifier.fillMaxSize()) {
-                    Canvas(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectDragGestures(
-                                    onDrag = { change, dragAmount ->
-                                        change.consume()
-                                        haterViewModel.onEvent(HaterEvent.Dragging(dragAmount))
-                                    },
-                                    onDragEnd = { haterViewModel.onEvent(HaterEvent.DragEnd) }
-                                )
-                            }
-                    ) {
-                        haterViewModel.setupBoundaries(size.width, size.height)
-                        val centerX = size.width / 2
-                        val centerY = size.height / 2
-
-                        drawRect(color = Color.Black)
-
-                        state.particles.forEach { particleOffset ->
-                            drawCircle(
-                                color = particleColor,
-                                radius = 4.dp.toPx(),
-                                center = Offset(centerX + particleOffset.x, centerY + particleOffset.y)
-                            )
-                        }
-
-                        bitmap?.let {
-                            drawIntoCanvas { canvas ->
-                                canvas.save()
-                                canvas.translate(
-                                    centerX + state.diePosition.x,
-                                    centerY + state.diePosition.y
-                                )
-                                canvas.rotate(state.dieAngle)
-                                val halfW = it.width / 2f
-                                val halfH = it.height / 2f
-                                val targetSize = minOf(size.width, size.height) * 0.55f
-                                val scale = targetSize / maxOf(it.width, it.height)
-                                canvas.scale(scale, scale)
-                                canvas.nativeCanvas.drawBitmap(
-                                    it.asAndroidBitmap(),
-                                    -halfW, -halfH,
-                                    null
-                                )
-                                canvas.restore()
-                            }
-                        }
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                haterViewModel.onEvent(HaterEvent.Dragging(dragAmount))
+                            },
+                            onDragEnd = { haterViewModel.onEvent(HaterEvent.DragEnd) }
+                        )
                     }
+            ) {
+                haterViewModel.setupBoundaries(size.width, size.height)
+                val centerX = size.width / 2
+                val centerY = size.height / 2
 
-                    TopControls(
-                        experienceMode = uiState.experienceMode,
-                        isTableVisible = uiState.table.isVisible,
-                        tableSizeFeet = uiState.table.size.feet,
-                        isBeginnerViewLocked = uiState.isBeginnerViewLocked,
-                        targetBallDistance = uiState.targetBallDistance,
-                        distanceUnit = uiState.distanceUnit,
-                        onCycleTableSize = { onEvent(MainScreenEvent.CycleTableSize) }
+                drawRect(color = Color.Black)
+
+                state.particles.forEach { particleOffset ->
+                    drawCircle(
+                        color = particleColor,
+                        radius = 4.dp.toPx(),
+                        center = Offset(centerX + particleOffset.x, centerY + particleOffset.y)
                     )
                 }
-            }
 
-            // "align" is not applicable in Hater mode — navigate back immediately.
-            composable(ROUTE_ALIGN) {
-                LaunchedEffect(Unit) {
-                    navController.popBackStack()
+                bitmap?.let {
+                    drawIntoCanvas { canvas ->
+                        canvas.save()
+                        canvas.translate(
+                            centerX + state.diePosition.x,
+                            centerY + state.diePosition.y
+                        )
+                        canvas.rotate(state.dieAngle)
+                        val halfW = it.width / 2f
+                        val halfH = it.height / 2f
+                        val targetSize = minOf(size.width, size.height) * 0.55f
+                        val scale = targetSize / maxOf(it.width, it.height)
+                        canvas.scale(scale, scale)
+                        canvas.nativeCanvas.drawBitmap(
+                            it.asAndroidBitmap(),
+                            -halfW, -halfH,
+                            null
+                        )
+                        canvas.restore()
+                    }
                 }
             }
+        }
+
+        // --- Onscreen: top status bar ---
+        onscreen(alignment = Alignment.TopEnd) {
+            TopControls(
+                experienceMode = uiState.experienceMode,
+                isTableVisible = uiState.table.isVisible,
+                tableSizeFeet = uiState.table.size.feet,
+                isBeginnerViewLocked = uiState.isBeginnerViewLocked,
+                targetBallDistance = uiState.targetBallDistance,
+                distanceUnit = uiState.distanceUnit,
+                onCycleTableSize = { onEvent(MainScreenEvent.CycleTableSize) }
+            )
         }
     }
 }

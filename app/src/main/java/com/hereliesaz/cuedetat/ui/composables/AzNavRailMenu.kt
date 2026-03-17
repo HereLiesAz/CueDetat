@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavHostController
 import com.hereliesaz.aznavrail.AzHostActivityLayout
+import com.hereliesaz.aznavrail.AzNavHostScope
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
@@ -23,11 +24,15 @@ import com.hereliesaz.cuedetat.view.state.DistanceUnit
  * Uses [AzHostActivityLayout] as the mandatory top-level container, managing safe zones,
  * device rotation, and z-ordering. Navigation items drive the [navController] for routing.
  *
+ * The [content] lambda receives an [AzNavHostScope], allowing callers to add
+ * [AzNavHostScope.background] layers (full-screen) and [AzNavHostScope.onscreen] elements
+ * (safe-area HUD) in addition to any extra rail items.
+ *
  * @param uiState The current state of the application.
  * @param onEvent Callback to dispatch events when menu items are clicked.
  * @param navController The NavHostController used for screen routing.
  * @param currentDestination The current back-stack route, used to highlight the active item.
- * @param content The screen content to display in the background layer.
+ * @param content DSL block for adding background layers and onscreen HUD elements.
  */
 @Composable
 fun AzNavRailMenu(
@@ -35,7 +40,7 @@ fun AzNavRailMenu(
     onEvent: (MainScreenEvent) -> Unit,
     navController: NavHostController,
     currentDestination: String?,
-    content: @Composable () -> Unit,
+    content: AzNavHostScope.() -> Unit = {},
 ) {
     val versionInfo = "v1.0" + (uiState.latestVersionName?.let { " (latest: $it)" } ?: "")
 
@@ -230,9 +235,7 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.SendFeedback) }
         )
 
-        // --- Background Layer: main screen content ---
-        background(weight = 0) {
-            content()
-        }
+        // Caller-provided backgrounds and onscreen elements
+        content()
     }
 }

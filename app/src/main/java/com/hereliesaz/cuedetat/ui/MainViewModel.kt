@@ -2,9 +2,11 @@
 
 package com.hereliesaz.cuedetat.ui
 
+import android.content.Context
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
@@ -16,11 +18,13 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.domain.UpdateType
+import com.hereliesaz.cuedetat.domain.WarningManager
 import com.hereliesaz.cuedetat.domain.reducers.GestureReducer
 import com.hereliesaz.cuedetat.domain.stateReducer
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.SingleEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -39,6 +43,8 @@ class MainViewModel @Inject constructor(
     private val sensorRepository: SensorRepository,
     private val githubRepository: GithubRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
+    private val warningManager: WarningManager,
+    @ApplicationContext private val appContext: Context,
     visionRepository: VisionRepository,
 ) : ViewModel() {
 
@@ -51,11 +57,22 @@ class MainViewModel @Inject constructor(
 
     val visionAnalyzer: VisionAnalyzer = VisionAnalyzer(visionRepository)
 
+    private val warningMessages: Array<String> by lazy {
+        appContext.resources.getStringArray(R.array.insulting_warnings)
+    }
+
     init {
         viewModelScope.launch {
             val savedState = userPreferencesRepository.stateFlow.first()
             val initialState = savedState ?: CueDetatState()
             processAndEmitState(initialState, UpdateType.FULL)
+        }
+
+        // Pipe WarningManager's timed messages into uiState.warningText
+        viewModelScope.launch {
+            warningManager.currentWarning.collect { warning ->
+                _uiState.value = _uiState.value.copy(warningText = warning)
+            }
         }
 
         viewModelScope.launch {
@@ -134,7 +151,16 @@ class MainViewModel @Inject constructor(
     }
 
     private fun processAndEmitState(state: CueDetatState, type: UpdateType) {
+        val previousState = _uiState.value
         val derivedState = updateStateUseCase(state, type)
+
+        // Trigger a cycling insult when the shot first becomes impossible/obstructed.
+        val wasWarning = previousState.isGeometricallyImpossible || previousState.isObstructed || previousState.isTiltBeyondLimit
+        val isWarning = derivedState.isGeometricallyImpossible || derivedState.isObstructed || derivedState.isTiltBeyondLimit
+        if (isWarning && !wasWarning && warningMessages.isNotEmpty()) {
+            warningManager.triggerWarning(warningMessages, viewModelScope)
+        }
+
         _uiState.value = derivedState
         visionAnalyzer.updateUiState(derivedState)
 
