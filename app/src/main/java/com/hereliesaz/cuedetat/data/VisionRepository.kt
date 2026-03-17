@@ -13,6 +13,7 @@ import com.google.mlkit.vision.objects.ObjectDetector
 import com.hereliesaz.cuedetat.di.GenericDetector
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
+import com.hereliesaz.cuedetat.domain.ThinPlateSpline
 import com.hereliesaz.cuedetat.utils.toMat
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
@@ -307,8 +308,11 @@ class VisionRepository @Inject constructor(
                 // Convert Screen Pixels -> Logical Inches using the inverse perspective matrix.
                 val detectedLogicalPoints = if (state.hasInverseMatrix) {
                     val inverseMatrix = state.inversePitchMatrix ?: Matrix()
+                    val tps = state.lensWarpTps
                     refinedScreenPoints.map { screenPoint ->
-                        Perspective.screenToLogical(screenPoint, inverseMatrix)
+                        val logical = Perspective.screenToLogical(screenPoint, inverseMatrix)
+                        // Apply forward residual TPS: homography-estimated logical → true logical.
+                        if (tps != null) ThinPlateSpline.applyWarp(tps, logical) else logical
                     }
                 } else {
                     emptyList()
