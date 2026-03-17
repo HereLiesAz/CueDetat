@@ -10,8 +10,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.VisionData
-import com.hereliesaz.cuedetat.domain.PocketCluster
-import com.hereliesaz.cuedetat.domain.TableScanModel
 import com.hereliesaz.cuedetat.ui.hatemode.HaterState
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
