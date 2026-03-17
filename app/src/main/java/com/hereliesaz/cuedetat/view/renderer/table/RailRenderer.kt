@@ -17,6 +17,7 @@ import com.hereliesaz.cuedetat.view.config.table.Rail
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
+import com.hereliesaz.cuedetat.view.renderer.warpedBy
 import kotlin.math.pow
 
 class RailRenderer {
@@ -45,7 +46,24 @@ class RailRenderer {
         val railOffsetAmount = LOGICAL_BALL_RADIUS * railVisualOffsetFromEdgeFactor
         val pocketRadius = LOGICAL_BALL_RADIUS * 1.8f
 
-        val corners = state.table.corners
+        val tps = state.lensWarpTps
+        val corners = state.table.corners.map { it.warpedBy(tps) }
+
+        // Recompute outward normals from warped corner edges.
+        // Corner order: [0]=TL, [1]=TR, [2]=BR, [3]=BL (clockwise).
+        val tableCenter = PointF(
+            corners.sumOf { it.x.toDouble() }.toFloat() / 4,
+            corners.sumOf { it.y.toDouble() }.toFloat() / 4
+        )
+        val warpedNormals = (0 until 4).map { i ->
+            val a = corners[i]
+            val b = corners[(i + 1) % 4]
+            val perp = normalize(PointF(-(b.y - a.y), b.x - a.x))
+            val edgeMid = PointF((a.x + b.x) / 2f, (a.y + b.y) / 2f)
+            val toCenter = PointF(tableCenter.x - edgeMid.x, tableCenter.y - edgeMid.y)
+            val dot = perp.x * toCenter.x + perp.y * toCenter.y
+            if (dot <= 0f) perp else PointF(-perp.x, -perp.y)
+        }
 
         val offsetCorners = corners.mapIndexed { index, corner ->
             // Inward normal for segment from previous corner to current corner
@@ -77,7 +95,7 @@ class RailRenderer {
         // --- Draw Diamonds ---
         val diamondRadius = LOGICAL_BALL_RADIUS * diamondSizeFactor
         val diamondOffset = 50f
-        val normals = state.table.normals
+        val normals = warpedNormals
 
         for (i in 1..3) {
             val fraction = i / 4.0f

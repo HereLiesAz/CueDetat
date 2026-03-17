@@ -11,6 +11,7 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.table.Holes
+import com.hereliesaz.cuedetat.view.renderer.warpedBy
 
 /**
  * Responsible for rendering the virtual pool table surface, its boundaries, grid lines, and pockets.
@@ -46,7 +47,8 @@ class TableRenderer {
         if (!state.table.isVisible) return
 
         // The corners are defined in Logical Inches relative to the table center (0,0).
-        val corners = state.table.corners
+        val tps = state.lensWarpTps
+        val corners = state.table.corners.map { it.warpedBy(tps) }
         if (corners.size < 4) return // Safety check.
 
         val tableOutlinePaint = paints.tableOutlinePaint
@@ -110,7 +112,8 @@ class TableRenderer {
         if (referenceRadius <= 0) return
 
         val holesConfig = Holes() // Visual config (colors).
-        val pockets = getLogicalPockets(state)
+        val tps = state.lensWarpTps
+        val pockets = getLogicalPockets(state).map { it.warpedBy(tps) }
         val pocketRadius = referenceRadius * 1.8f
 
         // Pre-allocate paints for different states (Normal, Aimed, Banked).
