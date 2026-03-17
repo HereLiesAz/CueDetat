@@ -175,13 +175,13 @@ class HaterPhysicsManager {
     fun pushDie(delta: Offset) {
         dieVel     += delta * 0.04f
         angularVel += (delta.x - delta.y) * 0.015f
-        // Touching stirs the surface; ensure bob is active but don't oversaturate
-        if (bobAmplitude < 0.35f) bobAmplitude = 0.35f
+        // Touching stirs the surface noticeably
+        if (bobAmplitude < 0.75f) bobAmplitude = 0.75f
     }
 
     fun onDragEnd() {
-        // Finger lifting off gives a small bob pulse
-        bobAmplitude = bobAmplitude.coerceAtLeast(0.5f)
+        // Finger lifting off gives a strong bob pulse — more extreme than settling arrival
+        bobAmplitude = bobAmplitude.coerceAtLeast(1.4f)
     }
 
     fun applyGravity(roll: Float, pitch: Float) {
