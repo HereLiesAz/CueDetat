@@ -56,16 +56,16 @@ class HaterPhysicsManager {
         private set
 
     companion object {
-        private const val GRAVITY_SCALE = 0.06f   // slow, deliberate gravity drift across surface
-        private const val DAMPING       = 0.97f   // graceful curved deceleration (~380 ms to half-speed)
-        private const val ANG_DAMPING   = 0.98f
+        private const val GRAVITY_SCALE = 0.018f  // barely perceptible drift across liquid surface
+        private const val DAMPING       = 0.94f   // impulses die out within ~0.5s
+        private const val ANG_DAMPING   = 0.97f
         private const val RESTITUTION   = 0.05f   // near-dead stop at walls
         private const val SCALE_SPRING  = 0.018f  // slow, deliberate Z-scale rise
         private const val SCALE_DAMPING = 0.96f   // smooth overdamped approach
-        private const val BOB_SPEED     = 0.018f  // slow hypnotic cycle
-        private const val BOB_SCALE_AMP = 0.07f   // ±7% scale oscillation
-        private const val MAX_ROCK_X    = 12f     // peak X-axis perspective tilt (degrees)
-        private const val MAX_ROCK_Y    = 8f      // peak Y-axis perspective tilt (degrees)
+        private const val BOB_SPEED     = 0.007f  // very slow: ~15 s per full cycle
+        private const val BOB_SCALE_AMP = 0.03f   // ±3% scale — subtle
+        private const val MAX_ROCK_X    = 6f      // peak X-axis perspective tilt (degrees) — subtle
+        private const val MAX_ROCK_Y    = 4f      // peak Y-axis perspective tilt (degrees) — subtle
     }
 
     private fun rng(min: Float, max: Float) = Random.nextFloat() * (max - min) + min
@@ -118,7 +118,7 @@ class HaterPhysicsManager {
         if (phase == TriangleState.SETTLING) {
             bobPhase += BOB_SPEED
             val s1 = sin(bobPhase.toDouble()).toFloat()
-            val s2 = sin(bobPhase * 0.65 + 1.3).toFloat() // different freq for Y-axis rock
+            val s2 = sin(bobPhase * 0.65).toFloat() // different freq, no offset — starts at zero
             publicScale  += BOB_SCALE_AMP * s1
             currentRockX  = MAX_ROCK_X * s1
             currentRockY  = MAX_ROCK_Y * s2
@@ -137,17 +137,17 @@ class HaterPhysicsManager {
         when (newPhase) {
             TriangleState.SUBMERGING -> {
                 targetScale = 0f
-                dieVel     = Offset(rng(-1.5f, 1.5f), rng(-1.5f, 1.5f))
-                angularVel = rng(-2f, 2f)
+                dieVel     = Offset(rng(-0.8f, 0.8f), rng(-0.8f, 0.8f))
+                angularVel = rng(-1f, 1f)
             }
             TriangleState.EMERGING -> {
                 dieScale    = 0f
                 scaleVel    = 0f
                 targetScale = 1f
-                // Emerge at the current position (or near center): Z-only, no XY jump
-                diePos     = Offset(rng(-60f, 60f), rng(-60f, 60f))
+                // Emerge at screen centre — Z-only appearance, no XY jump
+                diePos     = Offset.Zero
                 dieVel     = Offset.Zero
-                angularVel = rng(-1.5f, 1.5f)
+                angularVel = rng(-0.5f, 0.5f)
                 bobPhase   = 0f
             }
             TriangleState.SETTLING -> {
@@ -161,8 +161,8 @@ class HaterPhysicsManager {
     }
 
     fun agitate(scope: CoroutineScope, onAgitationComplete: () -> Unit) {
-        dieVel     += Offset(rng(-8f, 8f), rng(-8f, 8f))
-        angularVel += rng(-5f, 5f)
+        dieVel     += Offset(rng(-3f, 3f), rng(-3f, 3f))
+        angularVel += rng(-3f, 3f)
         scope.launch {
             delay(1200)
             onAgitationComplete()
@@ -170,8 +170,8 @@ class HaterPhysicsManager {
     }
 
     fun pushDie(delta: Offset) {
-        dieVel     += delta * 0.06f
-        angularVel += (delta.x - delta.y) * 0.025f
+        dieVel     += delta * 0.04f
+        angularVel += (delta.x - delta.y) * 0.015f
     }
 
     fun applyGravity(roll: Float, pitch: Float) {
