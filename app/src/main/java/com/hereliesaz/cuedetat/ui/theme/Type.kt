@@ -75,27 +75,27 @@ val Typography = Typography(
     bodyMedium = TextStyle(
         fontFamily = Barbaro,
         fontWeight = FontWeight.Normal,
-        fontSize = 11.sp,
+        fontSize = 15.sp,
     ),
     bodySmall = TextStyle(
         fontFamily = Barbaro,
         fontWeight = FontWeight.Normal,
-        fontSize = 10.sp,
+        fontSize = 13.sp,
     ),
     labelLarge = TextStyle(
         fontFamily = Barbaro,
         fontWeight = FontWeight.Normal,
-        fontSize = 11.sp,
+        fontSize = 14.sp,
     ),
     labelMedium = TextStyle(
         fontFamily = Barbaro,
         fontWeight = FontWeight.Normal,
-        fontSize = 10.sp,
+        fontSize = 13.sp,
     ),
     labelSmall = TextStyle(
         fontFamily = Barbaro,
         fontWeight = FontWeight.Normal,
-        fontSize = 9.sp,
+        fontSize = 11.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.5.sp
     )

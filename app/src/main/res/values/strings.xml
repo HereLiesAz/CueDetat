@@ -2,7 +2,7 @@
     <string name="app_name">Cue D\’état</string>
     <string name="zoom_icon">Zoom Icon</string>
     <string name="reset_view">Reset View</string>
-    <string name="show_helpers">WTF is all this?</string>
+    <string name="show_helpers">WTF</string>
     <string name="hide_helpers">Okay, I get it</string>
     <string name="permission_denied">Camera permission is required to use this app.</string>
     <string name="toggle_help_lines">Help</string>
@@ -33,7 +33,7 @@
         <item>Try harder.</item>
         <item>PLEASE try harder.</item>
         <item>Try gooder?</item>
-        <item>Try... better. That\'s the one I was looking for. No, not your shot. The word I was looking for.</item>
+        <item>Try… better. That\'s it. Not your shot—the word I was looking for.</item>
         <item>No.</item>
         <item>Physics says no.</item>
         <item>God says no.</item>

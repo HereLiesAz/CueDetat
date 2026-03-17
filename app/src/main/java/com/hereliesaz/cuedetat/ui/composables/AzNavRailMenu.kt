@@ -59,13 +59,14 @@ fun AzNavRailMenu(
     ) {
         azConfig(
             dockingSide = AzDockingSide.LEFT,
-            packButtons = true
+            packButtons = true,
+            showFooter = false
         )
 
         azTheme(
             defaultShape = AzButtonShape.CIRCLE,
             activeColor = activeColor,
-            headerIconShape = AzHeaderIconShape.NONE
+            headerIconShape = if (uiState.areHelpersVisible) AzHeaderIconShape.NONE else AzHeaderIconShape.CIRCLE
         )
 
         azAdvanced(
@@ -152,17 +153,17 @@ fun AzNavRailMenu(
 
         // --- Table & Units Section ---
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailItem(
+            azMenuItem(
                 id = "align",
                 text = "Table Alignment",
                 onClick = { onEvent(MainScreenEvent.ToggleQuickAlignScreen) }
             )
-            azRailItem(
+            azMenuItem(
                 id = "size",
                 text = "Table Size",
                 onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) }
             )
-            azRailItem(
+            azMenuItem(
                 id = "units",
                 text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units",
                 onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) }
@@ -181,7 +182,7 @@ fun AzNavRailMenu(
             )
         }
 
-        azRailItem(
+        azMenuItem(
             id = "orientation",
             text = when (uiState.pendingOrientationLock ?: uiState.orientationLock) {
                 CueDetatState.OrientationLock.AUTOMATIC -> "Orientation: Auto"
@@ -191,20 +192,20 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) }
         )
 
-        azRailItem(
+        azMenuItem(
             id = "luminance",
             text = "Luminance",
             onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
         )
 
-        azRailItem(
+        azMenuItem(
             id = "glow",
             text = "Glow Stick",
             onClick = { onEvent(MainScreenEvent.ToggleGlowStickDialog) }
         )
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailItem(
+            azMenuItem(
                 id = "advanced",
                 text = "Too Advanced Options",
                 onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }
@@ -214,25 +215,13 @@ fun AzNavRailMenu(
         azDivider()
 
         // --- Meta/App Info Section ---
-        azRailItem(
+        azMenuItem(
             id = "mode",
             text = "Mode: ${
                 uiState.experienceMode?.name?.lowercase()
                     ?.replaceFirstChar { it.titlecase() }
             }",
             onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) }
-        )
-
-        azRailItem(
-            id = "about",
-            text = "About",
-            onClick = { onEvent(MainScreenEvent.ViewAboutPage) }
-        )
-
-        azRailItem(
-            id = "feedback",
-            text = "Feedback",
-            onClick = { onEvent(MainScreenEvent.SendFeedback) }
         )
 
         // Caller-provided backgrounds and onscreen elements
