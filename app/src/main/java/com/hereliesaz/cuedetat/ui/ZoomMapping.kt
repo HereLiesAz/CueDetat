@@ -15,8 +15,8 @@ internal object ZoomMapping {
     // --- Master Zoom Controls ---
     const val DEFAULT_ZOOM = 1.0f
 
-    // Standard Mode Range (0.5x to 4.0x)
-    private const val STANDARD_MIN_ZOOM = 0.5f
+    // Standard Mode Range (0.2x to 4.0x)
+    private const val STANDARD_MIN_ZOOM = 0.2f
     private const val STANDARD_MAX_ZOOM = 4.0f
 
     // Beginner Mode Range (0.5x to 9.6x)

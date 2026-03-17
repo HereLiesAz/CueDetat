@@ -59,9 +59,9 @@ object Perspective {
             val physicalMaxPitch = 75f
 
             // Define the maximum visual tilt angle we want to render.
-            // We aim for 87 degrees (nearly 90, which is perfectly flat) to create a dramatic depth effect.
-            // We avoid 90 because math breaks at 90 (division by zero, infinite planes).
-            val virtualMaxPitch = 87f
+            // Capped at 78° — ensures the camera always views from at least 12° above the table
+            // surface. 90° would be eye-level (at the table) and must never be reached.
+            val virtualMaxPitch = 78f
 
             // Define the "Smoothing Zone". Up to 60 degrees, the mapping is linear.
             // After 60 degrees, we apply an easing curve to "soft land" the perspective at the max.
