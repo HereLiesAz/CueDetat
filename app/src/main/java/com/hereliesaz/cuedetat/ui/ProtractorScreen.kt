@@ -38,7 +38,9 @@ import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignAnalyzer
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignScreen
 import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
 import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
+import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanAnalyzer
 import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanScreen
+import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanViewModel
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
 
 private const val ROUTE_MAIN = "main"
@@ -51,6 +53,7 @@ fun ProtractorScreen(
     mainViewModel: MainViewModel,
     calibrationViewModel: CalibrationViewModel,
     quickAlignViewModel: QuickAlignViewModel,
+    tableScanViewModel: TableScanViewModel,
     calibrationAnalyzer: CalibrationAnalyzer
 ) {
     val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
@@ -59,6 +62,7 @@ fun ProtractorScreen(
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
     val quickAlignAnalyzer = remember(quickAlignViewModel) { QuickAlignAnalyzer(quickAlignViewModel) }
+    val tableScanAnalyzer = remember(tableScanViewModel) { TableScanAnalyzer(tableScanViewModel::onFrame, tableScanViewModel::onFeltColorSampled) }
 
     LaunchedEffect(uiState.showQuickAlignScreen) {
         val route = navController.currentBackStackEntry?.destination?.route
@@ -102,6 +106,7 @@ fun ProtractorScreen(
                 val activeAnalyzer = when (currentRoute) {
                     ROUTE_CALIBRATION -> calibrationAnalyzer
                     ROUTE_ALIGN -> quickAlignAnalyzer
+                    ROUTE_SCAN -> tableScanAnalyzer
                     else -> mainViewModel.visionAnalyzer
                 }
                 CameraBackground(
@@ -145,7 +150,8 @@ fun ProtractorScreen(
                 composable(ROUTE_SCAN) {
                     TableScanScreen(
                         onEvent = mainViewModel::onEvent,
-                        uiState = uiState
+                        uiState = uiState,
+                        viewModel = tableScanViewModel
                     )
                 }
             }

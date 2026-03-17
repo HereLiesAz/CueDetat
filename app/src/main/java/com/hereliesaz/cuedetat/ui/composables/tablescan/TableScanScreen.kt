@@ -31,7 +31,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.PocketId
-import com.hereliesaz.cuedetat.ui.composables.CameraBackground
 
 /**
  * Full-screen scan UI.
@@ -83,16 +82,10 @@ fun TableScanScreen(
         }
     }
 
-    val analyzer = remember { TableScanAnalyzer(viewModel::onFrame, viewModel::onFeltColorSampled) }
     val foundCount = scanProgress.count { it.value }
     val allFound = foundCount >= 6
 
     Box(modifier = Modifier.fillMaxSize()) {
-        CameraBackground(
-            analyzer = analyzer,
-            modifier = Modifier.fillMaxSize()
-        )
-
         // Pocket progress overlay.
         // Positions match PocketId enum order: TL, TR, BL, BR, SL, SR.
         val pocketPositionFractions = remember {
