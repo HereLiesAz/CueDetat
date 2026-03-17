@@ -78,8 +78,11 @@ class QuickAlignViewModel @Inject constructor() : ViewModel() {
     private val _alignResult = MutableSharedFlow<MainScreenEvent.ApplyQuickAlign>()
     val alignResult = _alignResult.asSharedFlow()
 
-    // Ideal (undistorted) pocket positions — set once when photo is captured.
+    // Ideal (undistorted) pocket positions — set once when display size is known.
     private var _idealPositions: Map<DraggablePocket, Offset> = emptyMap()
+
+    // Last known display size for the alignment composable (display-pixel space).
+    private var _displaySize: IntSize? = null
 
     // Which pockets the user has explicitly placed (released a drag on).
     private val _pinnedPockets = MutableStateFlow<Set<DraggablePocket>>(emptySet())
@@ -97,7 +100,8 @@ class QuickAlignViewModel @Inject constructor() : ViewModel() {
     }
 
     /**
-     * Photo captured from analyzer. Convert to Bitmap and initialize control points.
+     * Photo captured from analyzer. Convert to Bitmap and advance to alignment step.
+     * Pocket positions are initialized later once the display size is known.
      */
     fun onPhotoCaptured(mat: Mat) {
         viewModelScope.launch {
@@ -107,9 +111,22 @@ class QuickAlignViewModel @Inject constructor() : ViewModel() {
             mat.release()
             _capturedBitmap.value = bmp
 
-            // Set initial pocket positions to defaults (inset rectangle).
-            initializePocketPositions(IntSize(bmp.width, bmp.height))
+            // Reset display size and positions so onDisplaySizeAvailable re-initializes.
+            _displaySize = null
+            _pocketPositions.value = emptyMap()
             _currentStep.value = QuickAlignStep.ALIGN_TABLE
+        }
+    }
+
+    /**
+     * Called by the AlignmentStep composable once it knows its display size.
+     * Initializes pocket positions in display-pixel coordinates so that
+     * change.position values from pointer input are in the same space.
+     */
+    fun onDisplaySizeAvailable(displaySize: IntSize) {
+        _displaySize = displaySize
+        if (_pocketPositions.value.isEmpty()) {
+            initializePocketPositions(displaySize)
         }
     }
 
@@ -286,11 +303,7 @@ class QuickAlignViewModel @Inject constructor() : ViewModel() {
      */
     fun onResetPoints() {
         _pinnedPockets.value = emptySet()
-        _selectedTableSize.value?.let {
-            _capturedBitmap.value?.let { bmp ->
-                initializePocketPositions(IntSize(bmp.width, bmp.height))
-            }
-        }
+        _displaySize?.let { initializePocketPositions(it) }
     }
 
     /**
@@ -300,6 +313,7 @@ class QuickAlignViewModel @Inject constructor() : ViewModel() {
         _capturedBitmap.value?.recycle()
         _capturedBitmap.value = null
         _pocketPositions.value = emptyMap()
+        _displaySize = null
         _currentStep.value = QuickAlignStep.SELECT_SIZE
     }
 }

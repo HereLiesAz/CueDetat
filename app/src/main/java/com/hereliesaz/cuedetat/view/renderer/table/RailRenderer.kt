@@ -194,11 +194,15 @@ class RailRenderer {
         }
         val textPadding = referenceRadius * 5f
 
+        if (!state.table.isVisible || state.table.corners.size < 4) return
+        val tps = state.lensWarpTps
+        val warpedCorners = state.table.corners.map { it.warpedBy(tps) }
+
         val pathToLabel = if (state.isBankingMode) state.bankShotPath else state.aimingLineBankPath
         pathToLabel?.let { path ->
             if (path.size > 1) {
                 val bankPoint = path[1]
-                getRailForPoint(bankPoint, state)?.let { railType ->
+                getRailForPoint(bankPoint, warpedCorners)?.let { railType ->
                     textRenderer.drawDiamondLabel(
                         canvas,
                         bankPoint,
@@ -215,7 +219,7 @@ class RailRenderer {
             state.tangentLineBankPath?.let { path ->
                 if (path.size > 1) {
                     val tangentBankPoint = path[1]
-                    getRailForPoint(tangentBankPoint, state)?.let { railType ->
+                    getRailForPoint(tangentBankPoint, warpedCorners)?.let { railType ->
                         textRenderer.drawDiamondLabel(
                             canvas,
                             tangentBankPoint,
@@ -232,24 +236,20 @@ class RailRenderer {
 
         if (!state.isBankingMode) {
             state.shotGuideImpactPoint?.let { impactPoint ->
-                getRailForPoint(impactPoint, state)?.let { railType ->
+                getRailForPoint(impactPoint, warpedCorners)?.let { railType ->
                     textRenderer.drawDiamondLabel(canvas, impactPoint, railType, state, textPaint, textPadding)
                 }
             }
         }
     }
 
-    private fun getRailForPoint(point: PointF, state: CueDetatState): LineTextRenderer.RailType? {
-        val table = state.table
-        if (!table.isVisible) return null
-
-        val corners = table.corners
+    private fun getRailForPoint(point: PointF, warpedCorners: List<PointF>): LineTextRenderer.RailType? {
         val tolerance = 5f
 
-        if (pointToSegmentDistance(point, corners[0], corners[1]) < tolerance) return LineTextRenderer.RailType.TOP
-        if (pointToSegmentDistance(point, corners[1], corners[2]) < tolerance) return LineTextRenderer.RailType.RIGHT
-        if (pointToSegmentDistance(point, corners[2], corners[3]) < tolerance) return LineTextRenderer.RailType.BOTTOM
-        if (pointToSegmentDistance(point, corners[3], corners[0]) < tolerance) return LineTextRenderer.RailType.LEFT
+        if (pointToSegmentDistance(point, warpedCorners[0], warpedCorners[1]) < tolerance) return LineTextRenderer.RailType.TOP
+        if (pointToSegmentDistance(point, warpedCorners[1], warpedCorners[2]) < tolerance) return LineTextRenderer.RailType.RIGHT
+        if (pointToSegmentDistance(point, warpedCorners[2], warpedCorners[3]) < tolerance) return LineTextRenderer.RailType.BOTTOM
+        if (pointToSegmentDistance(point, warpedCorners[3], warpedCorners[0]) < tolerance) return LineTextRenderer.RailType.LEFT
 
         return null
     }

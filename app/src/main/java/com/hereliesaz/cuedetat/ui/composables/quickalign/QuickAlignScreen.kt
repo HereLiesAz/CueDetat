@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,6 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
@@ -132,6 +135,18 @@ private fun AlignmentStep(
     val pinnedPockets by viewModel.pinnedPockets.collectAsState()
     var draggedPocket by remember { mutableStateOf<DraggablePocket?>(null) }
     val touchRadius = 60f
+    val density = LocalDensity.current
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        // Notify the VM of the display size in pixels so pocket positions are
+        // initialized in the same coordinate space as pointer-input change.position.
+        val displayWidthPx = with(density) { maxWidth.roundToPx() }
+        val displayHeightPx = with(density) { maxHeight.roundToPx() }
+        LaunchedEffect(displayWidthPx, displayHeightPx) {
+            if (displayWidthPx > 0 && displayHeightPx > 0) {
+                viewModel.onDisplaySizeAvailable(IntSize(displayWidthPx, displayHeightPx))
+            }
+        }
 
     Box(
         modifier = Modifier
@@ -217,6 +232,7 @@ private fun AlignmentStep(
         }
         Instructions(text = "Drag the yellow pockets to match the photo.")
     }
+    } // end BoxWithConstraints
 }
 
 /**
