@@ -9,15 +9,21 @@ import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.ThinPlateSpline
 import com.hereliesaz.cuedetat.domain.TpsWarpData
+import com.hereliesaz.cuedetat.view.model.Table
 import com.hereliesaz.cuedetat.view.state.TableSize
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.opencv.android.Utils
+import org.opencv.core.Core
 import org.opencv.calib3d.Calib3d
 import org.opencv.core.Mat
 import org.opencv.core.MatOfPoint2f
@@ -72,6 +78,16 @@ class QuickAlignViewModel @Inject constructor() : ViewModel() {
     private val _alignResult = MutableSharedFlow<MainScreenEvent.ApplyQuickAlign>()
     val alignResult = _alignResult.asSharedFlow()
 
+    // Ideal (undistorted) pocket positions — set once when photo is captured.
+    private var _idealPositions: Map<DraggablePocket, Offset> = emptyMap()
+
+    // Which pockets the user has explicitly placed (released a drag on).
+    private val _pinnedPockets = MutableStateFlow<Set<DraggablePocket>>(emptySet())
+    val pinnedPockets = _pinnedPockets.asStateFlow()
+
+    // Cancellable job for background TPS prediction during drag.
+    private var dragJob: Job? = null
+
     /**
      * User selects table size. Proceed to capture.
      */
@@ -98,80 +114,80 @@ class QuickAlignViewModel @Inject constructor() : ViewModel() {
     }
 
     private fun initializePocketPositions(size: IntSize) {
-        val padding = 0.2f // 20% margin from edges.
-        _pocketPositions.value = mapOf(
-            DraggablePocket.TOP_LEFT to Offset(size.width * padding, size.height * padding),
-            DraggablePocket.TOP_RIGHT to Offset(size.width * (1 - padding), size.height * padding),
-            DraggablePocket.BOTTOM_RIGHT to Offset(
-                size.width * (1 - padding),
-                size.height * (1 - padding)
-            ),
-            DraggablePocket.BOTTOM_LEFT to Offset(
-                size.width * padding,
-                size.height * (1 - padding)
-            ),
-            // Side pockets halfway down.
-            DraggablePocket.SIDE_LEFT to Offset(size.width * padding, size.height * 0.5f),
-            DraggablePocket.SIDE_RIGHT to Offset(size.width * (1 - padding), size.height * 0.5f)
+        val padding = 0.2f
+        val positions = mapOf(
+            DraggablePocket.TOP_LEFT     to Offset(size.width * padding,       size.height * padding),
+            DraggablePocket.TOP_RIGHT    to Offset(size.width * (1 - padding), size.height * padding),
+            DraggablePocket.BOTTOM_RIGHT to Offset(size.width * (1 - padding), size.height * (1 - padding)),
+            DraggablePocket.BOTTOM_LEFT  to Offset(size.width * padding,       size.height * (1 - padding)),
+            DraggablePocket.SIDE_LEFT    to Offset(size.width * padding,       size.height * 0.5f),
+            DraggablePocket.SIDE_RIGHT   to Offset(size.width * (1 - padding), size.height * 0.5f)
         )
+        _pocketPositions.value = positions
+        _idealPositions = positions
     }
 
     /**
-     * Updates the position of a pocket marker during a drag gesture.
-     * Enforces constraints (e.g., side pockets stay on the line between corners).
+     * Updates the dragged pocket immediately for responsiveness, then predicts
+     * all unpinned pockets on a background thread using TPS. Cancels any
+     * in-progress prediction (replace-on-new strategy).
      */
     fun onPocketDrag(pocket: DraggablePocket, newPosition: Offset) {
-        val currentPositions = _pocketPositions.value.toMutableMap()
-        when (pocket) {
-            DraggablePocket.SIDE_LEFT -> {
-                // Constrain left side pocket to the line segment between TL and BL.
-                val tl = currentPositions[DraggablePocket.TOP_LEFT]!!
-                val bl = currentPositions[DraggablePocket.BOTTOM_LEFT]!!
-                currentPositions[pocket] = getClosestPointOnSegment(newPosition, tl, bl)
-            }
+        // Update dragged pocket immediately.
+        val current = _pocketPositions.value.toMutableMap()
+        current[pocket] = newPosition
+        _pocketPositions.value = current
 
-            DraggablePocket.SIDE_RIGHT -> {
-                // Constrain right side pocket to the line segment between TR and BR.
-                val tr = currentPositions[DraggablePocket.TOP_RIGHT]!!
-                val br = currentPositions[DraggablePocket.BOTTOM_RIGHT]!!
-                currentPositions[pocket] = getClosestPointOnSegment(newPosition, tr, br)
-            }
+        dragJob?.cancel()
 
-            else -> { // Corner pockets
-                currentPositions[pocket] = newPosition
-                // If a corner moves, re-snap the adjacent side pocket to the new line.
-                val tl = currentPositions[DraggablePocket.TOP_LEFT]!!
-                val tr = currentPositions[DraggablePocket.TOP_RIGHT]!!
-                val bl = currentPositions[DraggablePocket.BOTTOM_LEFT]!!
-                val br = currentPositions[DraggablePocket.BOTTOM_RIGHT]!!
+        val idealPositions = _idealPositions
+        val allPockets = DraggablePocket.values().toList()
 
-                currentPositions[DraggablePocket.SIDE_LEFT] =
-                    getClosestPointOnSegment(currentPositions[DraggablePocket.SIDE_LEFT]!!, tl, bl)
-                currentPositions[DraggablePocket.SIDE_RIGHT] =
-                    getClosestPointOnSegment(currentPositions[DraggablePocket.SIDE_RIGHT]!!, tr, br)
-            }
+        // Build constraint set: all pinned pockets + currently dragged pocket.
+        val constrained = buildMap<DraggablePocket, Offset> {
+            _pinnedPockets.value.forEach { p -> current[p]?.let { put(p, it) } }
+            put(pocket, newPosition)  // Dragged overrides pinned if same pocket.
         }
-        _pocketPositions.value = currentPositions
+
+        dragJob = viewModelScope.launch {
+            val unpinned = allPockets - constrained.keys
+            if (unpinned.isEmpty()) return@launch
+
+            val predicted = withContext(Dispatchers.Default) {
+                val srcPts = constrained.entries.map { (p, _) ->
+                    android.graphics.PointF(idealPositions[p]!!.x, idealPositions[p]!!.y)
+                }
+                val dstPts = constrained.entries.map { (_, pos) ->
+                    android.graphics.PointF(pos.x, pos.y)
+                }
+                val imageTps = TpsWarpData(srcPoints = srcPts, dstPoints = dstPts)
+                unpinned.associateWith { p ->
+                    val ideal = idealPositions[p]!!
+                    val result = ThinPlateSpline.applyWarp(imageTps, android.graphics.PointF(ideal.x, ideal.y))
+                    Offset(result.x, result.y)
+                }
+            }
+
+            val updated = _pocketPositions.value.toMutableMap()
+            predicted.forEach { (p, pos) -> updated[p] = pos }
+            _pocketPositions.value = updated
+        }
     }
 
     /**
-     * Geometrically projects a point onto a line segment.
+     * Pins the pocket at its current position. Called on drag end from the screen.
      */
-    private fun getClosestPointOnSegment(point: Offset, start: Offset, end: Offset): Offset {
-        val segmentVec = end - start
-        val pointVec = point - start
-        val segmentLengthSq = segmentVec.getDistanceSquared()
-        if (segmentLengthSq == 0f) return start
-
-        // Project point onto line, clamp t to [0, 1].
-        val t = (pointVec.x * segmentVec.x + pointVec.y * segmentVec.y) / segmentLengthSq
-        val clampedT = t.coerceIn(0f, 1f)
-        return start + segmentVec * clampedT
+    fun onPocketReleased(pocket: DraggablePocket) {
+        _pinnedPockets.value = _pinnedPockets.value + pocket
     }
 
-
     /**
-     * Computes the homography and emits the result.
+     * Computes homography from all 6 pocket positions, decomposes it to
+     * translation/rotation/scale, then computes the residual TPS from the
+     * homography-estimated logical positions to the true logical positions.
+     *
+     * Note on Table.pockets index order: [0]=TL, [1]=TR, [2]=BL, [3]=BR, [4]=SL, [5]=SR
+     * The BL/BR indices are swapped from intuitive order — [2] is BL, [3] is BR.
      */
     fun onFinishAlign() {
         val imagePoints = _pocketPositions.value
@@ -180,41 +196,55 @@ class QuickAlignViewModel @Inject constructor() : ViewModel() {
         if (imagePoints.size != 6 || tableSize == null || image == null) return
 
         viewModelScope.launch {
-            // Source points: The user-defined corners in the image.
-            val srcPointsList = listOf(
-                imagePoints[DraggablePocket.TOP_LEFT]!!,
-                imagePoints[DraggablePocket.TOP_RIGHT]!!,
-                imagePoints[DraggablePocket.BOTTOM_RIGHT]!!,
-                imagePoints[DraggablePocket.BOTTOM_LEFT]!!
+            val logicalTable = Table(tableSize, true)
+
+            // Map DraggablePocket → Table.pockets index (note BL=2, BR=3 swap)
+            val pocketOrder = listOf(
+                DraggablePocket.TOP_LEFT,
+                DraggablePocket.TOP_RIGHT,
+                DraggablePocket.BOTTOM_RIGHT,
+                DraggablePocket.BOTTOM_LEFT,
+                DraggablePocket.SIDE_LEFT,
+                DraggablePocket.SIDE_RIGHT
+            )
+            val logicalOrder = listOf(
+                logicalTable.pockets[0], // TL
+                logicalTable.pockets[1], // TR
+                logicalTable.pockets[3], // BR (index 3, not 2!)
+                logicalTable.pockets[2], // BL (index 2, not 3!)
+                logicalTable.pockets[4], // SL
+                logicalTable.pockets[5]  // SR
             )
 
-            val srcPoints = MatOfPoint2f()
-            srcPoints.fromList(srcPointsList.map { Point(it.x.toDouble(), it.y.toDouble()) })
+            val imagePts = pocketOrder.map { imagePoints[it]!! }
 
-            // Destination points: The known logical corners of the selected table size.
-            val logicalTable = com.hereliesaz.cuedetat.view.model.Table(tableSize, true)
-            val logicalCorners = logicalTable.pockets.slice(0..3)
+            val srcMat = MatOfPoint2f()
+            srcMat.fromList(imagePts.map { Point(it.x.toDouble(), it.y.toDouble()) })
 
-            val dstPoints = MatOfPoint2f()
-            dstPoints.fromList(logicalCorners.map { Point(it.x.toDouble(), it.y.toDouble()) })
+            val dstMat = MatOfPoint2f()
+            dstMat.fromList(logicalOrder.map { Point(it.x.toDouble(), it.y.toDouble()) })
 
-            // Calculate Homography: src -> dst.
-            val homography = Calib3d.findHomography(srcPoints, dstPoints, Calib3d.RANSAC, 5.0)
+            val homography = Calib3d.findHomography(srcMat, dstMat, Calib3d.RANSAC, 5.0)
 
             if (!homography.empty()) {
-                // Decompose the homography to get simple translation/rotation/scale for the AR engine.
                 val (translation, rotation, scale) = decomposeHomography(
-                    homography,
-                    image.width.toFloat(),
-                    image.height.toFloat()
+                    homography, image.width.toFloat(), image.height.toFloat()
                 )
-                // Convert Mat points to PointF lists for TpsWarpData
-                val srcPointsF = srcPointsList.map { PointF(it.x, it.y) }
-                val dstPointsF = logicalCorners.map { PointF(it.x.toFloat(), it.y.toFloat()) }
-                val tpsWarpData = TpsWarpData(srcPointsF, dstPointsF)
+
+                // Homography-estimated logical positions: H * image_pts
+                val estimatedDst = MatOfPoint2f()
+                Core.perspectiveTransform(srcMat, estimatedDst, homography)
+                val estimatedLogical = estimatedDst.toList()
+                    .map { android.graphics.PointF(it.x.toFloat(), it.y.toFloat()) }
+
+                // True logical positions
+                val trueLogical = logicalOrder.map { android.graphics.PointF(it.x, it.y) }
+
+                // Residual TPS: estimated logical → true logical.
+                val tpsWarpData = TpsWarpData(srcPoints = estimatedLogical, dstPoints = trueLogical)
+
                 _alignResult.emit(MainScreenEvent.ApplyQuickAlign(translation, rotation, scale, tpsWarpData))
             }
-            // Reset for next use.
             onResetPoints()
         }
     }
@@ -255,6 +285,7 @@ class QuickAlignViewModel @Inject constructor() : ViewModel() {
      * Resets the control points to defaults.
      */
     fun onResetPoints() {
+        _pinnedPockets.value = emptySet()
         _selectedTableSize.value?.let {
             _capturedBitmap.value?.let { bmp ->
                 initializePocketPositions(IntSize(bmp.width, bmp.height))
