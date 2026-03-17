@@ -20,7 +20,6 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -56,8 +55,6 @@ fun HaterScreen(
         haterViewModel.onEvent(HaterEvent.EnterHaterMode)
     }
 
-    val particleColor = remember { Color(0xAA013FE8) }
-
     AzNavRailMenu(
         uiState = uiState,
         onEvent = onEvent,
@@ -91,30 +88,32 @@ fun HaterScreen(
 
                 drawRect(color = Color.Black)
 
-                state.particles.forEach { particleOffset ->
-                    drawCircle(
-                        color = particleColor,
-                        radius = 4.dp.toPx(),
-                        center = Offset(centerX + particleOffset.x, centerY + particleOffset.y)
-                    )
+                val targetSize = minOf(size.width, size.height) * 0.55f
+
+                // Glow: concentric purplish-blue halos around the die position, scaled with dieScale
+                if (state.dieScale > 0.01f) {
+                    val dieCenter = Offset(centerX + state.diePosition.x, centerY + state.diePosition.y)
+                    val glowBase  = targetSize * 0.5f * state.dieScale
+                    for (i in 5 downTo 0) {
+                        drawCircle(
+                            color  = Color(0xFF6622DD).copy(alpha = 0.07f * (6 - i)),
+                            radius = glowBase * (1f + i * 0.20f),
+                            center = dieCenter
+                        )
+                    }
                 }
 
-                bitmap?.let {
+                bitmap?.let { bmp ->
                     drawIntoCanvas { canvas ->
                         canvas.save()
-                        canvas.translate(
-                            centerX + state.diePosition.x,
-                            centerY + state.diePosition.y
-                        )
+                        canvas.translate(centerX + state.diePosition.x, centerY + state.diePosition.y)
                         canvas.rotate(state.dieAngle)
-                        val halfW = it.width / 2f
-                        val halfH = it.height / 2f
-                        val targetSize = minOf(size.width, size.height) * 0.55f
-                        val scale = targetSize / maxOf(it.width, it.height)
+                        val scale = (targetSize / maxOf(bmp.width, bmp.height)) * state.dieScale
                         canvas.scale(scale, scale)
                         canvas.nativeCanvas.drawBitmap(
-                            it.asAndroidBitmap(),
-                            -halfW, -halfH,
+                            bmp.asAndroidBitmap(),
+                            -bmp.width / 2f,
+                            -bmp.height / 2f,
                             null
                         )
                         canvas.restore()
