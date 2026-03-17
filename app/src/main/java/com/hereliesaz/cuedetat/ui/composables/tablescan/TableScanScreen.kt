@@ -94,19 +94,23 @@ fun TableScanScreen(
         )
 
         // Pocket progress overlay.
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val pocketIds = PocketId.values()
-            val positions = listOf(
-                Offset(size.width * 0.15f, size.height * 0.15f), // TL
-                Offset(size.width * 0.85f, size.height * 0.15f), // TR
-                Offset(size.width * 0.85f, size.height * 0.85f), // BR
-                Offset(size.width * 0.15f, size.height * 0.85f), // BL
-                Offset(size.width * 0.15f, size.height * 0.50f), // SL
-                Offset(size.width * 0.85f, size.height * 0.50f)  // SR
+        // Positions match PocketId enum order: TL, TR, BL, BR, SL, SR.
+        val pocketPositionFractions = remember {
+            listOf(
+                0.15f to 0.15f, // TL
+                0.85f to 0.15f, // TR
+                0.15f to 0.85f, // BL
+                0.85f to 0.85f, // BR
+                0.15f to 0.50f, // SL
+                0.85f to 0.50f  // SR
             )
+        }
+        val pocketIds = remember { PocketId.values() }
+        Canvas(modifier = Modifier.fillMaxSize()) {
             pocketIds.forEachIndexed { i, id ->
-                val pos = positions[i]
-                val isFound = scanProgress[id] == true || i < foundCount
+                val (xFrac, yFrac) = pocketPositionFractions[i]
+                val pos = Offset(size.width * xFrac, size.height * yFrac)
+                val isFound = scanProgress[id] == true
                 drawCircle(
                     color = Color.Yellow,
                     radius = 24.dp.toPx(),
@@ -135,7 +139,7 @@ fun TableScanScreen(
                     viewModel.resetScan()
                 }) { Text("Reset") }
                 Button(
-                    onClick = { /* Done is triggered automatically — this closes early */ },
+                    onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen) },
                     enabled = allFound
                 ) { Text("Done") }
             }
