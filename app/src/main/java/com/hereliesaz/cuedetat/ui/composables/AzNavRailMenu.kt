@@ -146,7 +146,7 @@ fun AzNavRailMenu(
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azRailCycler(
                 id = "cam",
-                menuOptions = listOf("Off", "Cam", "AR"),
+                options = listOf("Off", "Cam", "AR"),
                 selectedOption = when (uiState.cameraMode) {
                     com.hereliesaz.cuedetat.domain.CameraMode.OFF -> "Off"
                     com.hereliesaz.cuedetat.domain.CameraMode.CAMERA -> "Cam"
