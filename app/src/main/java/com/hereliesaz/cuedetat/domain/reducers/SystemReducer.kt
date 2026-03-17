@@ -70,9 +70,12 @@ private fun handleSizeChanged(
         )
     }
     // If state already exists, just update the dimensions to match the new layout.
+    // Also initialize spinControlCenter if null (e.g., restored from old saved state).
     return state.copy(
         viewWidth = action.width,
         viewHeight = action.height,
+        spinControlCenter = state.spinControlCenter
+            ?: PointF(action.width * 0.15f, action.height * 0.70f),
     )
 }
 
