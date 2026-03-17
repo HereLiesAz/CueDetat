@@ -5,6 +5,7 @@ import android.graphics.PointF
 import androidx.annotation.Keep
 import com.hereliesaz.cuedetat.view.state.TableSize
 
+@Keep
 enum class PocketId { TL, TR, BL, BR, SL, SR }
 
 /**
@@ -40,7 +41,7 @@ data class TableScanModel(
     val pockets: List<PocketCluster>,       // 6 entries, one per PocketId in declaration order
     val lensWarpTps: TpsWarpData,
     val tableSize: TableSize,
-    val feltColorHsv: FloatArray,           // 3-element [H, S, V]
+    val feltColorHsv: List<Float>,          // 3-element [H, S, V]
     val scanLatitude: Double?,
     val scanLongitude: Double?
 )
