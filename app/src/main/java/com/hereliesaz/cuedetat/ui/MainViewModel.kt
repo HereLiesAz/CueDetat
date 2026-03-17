@@ -41,6 +41,7 @@ import javax.inject.Inject
 class MainViewModel @Inject constructor(
     private val reducerUtils: ReducerUtils,
     private val gestureReducer: GestureReducer,
+    private val snapReducer: com.hereliesaz.cuedetat.domain.reducers.SnapReducer,
     private val updateStateUseCase: UpdateStateUseCase,
     private val sensorRepository: SensorRepository,
     private val githubRepository: GithubRepository,
@@ -157,9 +158,16 @@ class MainViewModel @Inject constructor(
             val reducedState =
                 stateReducer(currentState, logicalEvent, reducerUtils, gestureReducer)
 
-            val updateType = determineUpdateType(currentState, reducedState, logicalEvent)
+            // After CV data is integrated into state, update snap candidates.
+            val finalState = if (logicalEvent is MainScreenEvent.CvDataUpdated) {
+                snapReducer.reduce(reducedState, logicalEvent.visionData)
+            } else {
+                reducedState
+            }
 
-            processAndEmitState(reducedState, updateType)
+            val updateType = determineUpdateType(currentState, finalState, logicalEvent)
+
+            processAndEmitState(finalState, updateType)
 
             handleSingleEvents(logicalEvent)
         }

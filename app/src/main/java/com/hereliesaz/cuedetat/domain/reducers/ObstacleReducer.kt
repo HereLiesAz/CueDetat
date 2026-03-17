@@ -8,6 +8,9 @@ import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import kotlin.math.hypot
 import kotlin.random.Random
 
+private fun distanceBetween(a: PointF, b: PointF) =
+    hypot((a.x - b.x).toDouble(), (a.y - b.y).toDouble()).toFloat()
+
 /**
  * Reducer function responsible for handling Obstacle-related events.
  *
@@ -35,29 +38,49 @@ internal fun reduceObstacleAction(
 }
 
 /**
- * Handles the logic for adding a single obstacle ball to the state.
+ * Handles the logic for adding obstacle ball(s) to the state.
  *
- * It calculates a valid position for the new ball and adds it to the list.
- *
- * @param state The current state.
- * @param reducerUtils Utility for defaults.
- * @return The updated state with the new obstacle ball added.
+ * When in AR mode and both the cue ball and target ball are placed on confirmed
+ * real-ball detections, ALL remaining detected balls are added as obstacles at once.
+ * Otherwise, a single ball is added using the existing CV / random / grid strategy.
  */
 private fun handleAddObstacleBall(state: CueDetatState, reducerUtils: ReducerUtils): CueDetatState {
-    // Determine the radius for the new ball. Use the cue ball radius if available, else target ball radius.
     val newBallRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
+    val snapRadius = newBallRadius * 1.5f
 
-    // Calculate a valid placement position (x, y) for the new obstacle.
+    val confirmedCandidates = state.snapCandidates?.filter { it.isConfirmed } ?: emptyList()
+
+    // Determine whether cue ball and target ball are both sitting on confirmed real-ball positions.
+    val cueBallOnReal = state.onPlaneBall?.let { cue ->
+        confirmedCandidates.any { distanceBetween(cue.center, it.detectedPoint) <= snapRadius }
+    } ?: false
+    val targetBallOnReal = confirmedCandidates.any {
+        distanceBetween(state.protractorUnit.center, it.detectedPoint) <= snapRadius
+    }
+
+    if (cueBallOnReal && targetBallOnReal) {
+        // Bulk fill: add obstacle balls for every confirmed real-ball position not already occupied.
+        val virtualCenters = buildList {
+            state.onPlaneBall?.let { add(it.center) }
+            add(state.protractorUnit.center)
+            addAll(state.obstacleBalls.map { it.center })
+        }
+        val newObstacles = confirmedCandidates
+            .filter { candidate ->
+                virtualCenters.none { distanceBetween(it, candidate.detectedPoint) <= snapRadius }
+            }
+            .map { OnPlaneBall(center = it.detectedPoint, radius = newBallRadius) }
+        if (newObstacles.isNotEmpty()) {
+            return state.copy(obstacleBalls = state.obstacleBalls + newObstacles, valuesChangedSinceReset = true)
+        }
+    }
+
+    // Fallback: add a single ball using CV / random / grid placement.
     val placement = findNextAvailablePlacement(state, reducerUtils)
-
-    // Create the new obstacle ball object at the calculated position.
-    val newBall = OnPlaneBall(center = placement, radius = newBallRadius)
-
-    // Append the new ball to the existing list of obstacle balls.
-    val updatedList = state.obstacleBalls + newBall
-
-    // Return the updated state with the new list and mark that values have changed.
-    return state.copy(obstacleBalls = updatedList, valuesChangedSinceReset = true)
+    return state.copy(
+        obstacleBalls = state.obstacleBalls + OnPlaneBall(center = placement, radius = newBallRadius),
+        valuesChangedSinceReset = true
+    )
 }
 
 /**
