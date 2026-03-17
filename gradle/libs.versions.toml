@@ -162,6 +162,7 @@ androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = 
 glance = { group = "androidx.glance", name = "glance", version.ref = "glanceVersion" }
 sceneform-base = { group = "com.google.ar.sceneform", name = "sceneform-base", version.ref = "sceneformBase" }
 jbox2d-library = { group = "org.jbox2d", name = "jbox2d-library", version.ref = "jbox2d" }
+play-services-location = { group = "com.google.android.gms", name = "play-services-location", version = "21.3.0" }
 # androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "androidxMaterial3" } # This is a duplicate of an earlier alias, commented out.
 
 [plugins]

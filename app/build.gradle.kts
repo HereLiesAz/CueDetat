@@ -105,6 +105,9 @@ dependencies {
     implementation(libs.converter.gson)
     implementation(libs.aznavrail)
 
+    // Location
+    implementation(libs.play.services.location)
+
     // Computer Vision
     implementation(libs.mlkit)
     implementation(libs.opencv)
