@@ -61,7 +61,6 @@ class HaterViewModel @Inject constructor(
     private fun enterHaterMode() {
         reshuffleAnswers()
         viewModelScope.launch {
-            physicsManager.createParticles()
             physicsManager.setPhase(TriangleState.EMERGING)
             _haterState.value = _haterState.value.copy(triangleState = TriangleState.EMERGING)
             startPhysics()
@@ -77,9 +76,9 @@ class HaterViewModel @Inject constructor(
             while (true) {
                 physicsManager.step()
                 _haterState.value = _haterState.value.copy(
-                    particles = physicsManager.particlePositions,
                     diePosition = physicsManager.diePosition,
-                    dieAngle = physicsManager.dieAngle
+                    dieAngle    = physicsManager.dieAngle,
+                    dieScale    = physicsManager.currentDieScale
                 )
                 delay(16L) // ~60 FPS
             }
@@ -97,7 +96,7 @@ class HaterViewModel @Inject constructor(
                 physicsManager.setPhase(TriangleState.SUBMERGING)
                 _haterState.value = _haterState.value.copy(triangleState = TriangleState.SUBMERGING)
 
-                physicsManager.agitateParticles(viewModelScope) {
+                physicsManager.agitate(viewModelScope) {
                     viewModelScope.launch {
                         val currentOrientation = sensorRepository.fullOrientationFlow.first()
                         physicsManager.applyGravity(

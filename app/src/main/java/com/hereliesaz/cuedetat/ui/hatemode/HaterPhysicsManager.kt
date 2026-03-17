@@ -10,10 +10,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Pure-Kotlin Newtonian physics simulation for HaterMode.
+ * Pure-Kotlin physics simulation for Hater Mode.
  *
- * Manages a rigid-body die floating in a 2-D fluid of particles, responding to
- * gravity (device tilt), user drag, and shake agitation.
+ * Models a die floating in a viscous liquid: XY position with damped gravity response,
+ * angular momentum, and a Z-axis scale spring that drives emergence/submergence.
+ * No particle system.
  */
 class HaterPhysicsManager {
 
@@ -22,7 +23,7 @@ class HaterPhysicsManager {
     private var screenHeight = 0f
     private val dieRadius    = 150f
 
-    // --- Die state ---
+    // --- Die XY state ---
     private var diePos     = Offset.Zero
     private var dieVel     = Offset.Zero
     private var angle      = 0f
@@ -34,81 +35,54 @@ class HaterPhysicsManager {
     // --- Phase ---
     private var phase: TriangleState = TriangleState.IDLE
 
-    // --- Particles (parallel lists to avoid per-frame allocation) ---
-    private val particlePos = mutableListOf<Offset>()
-    private val particleVel = mutableListOf<Offset>()
+    // --- Z-scale (depth) state ---
+    private var dieScale    = 0f
+    private var scaleVel    = 0f
+    private var targetScale = 1f
+    private var bobPhase    = 0f
 
     // --- Public state ---
-
-    /** Absolute screen positions of all fluid particles. */
-    var particlePositions: List<Offset> = emptyList()
-        private set
-
-    /** Current center position of the die (offset from screen center). */
     var diePosition: Offset = Offset.Zero
         private set
-
-    /** Current rotation of the die in degrees. */
     var dieAngle: Float = 0f
         private set
+    var currentDieScale: Float = 0f
+        private set
 
-    // --- Constants ---
     companion object {
-        private const val GRAVITY_SCALE    = 0.18f
-        private const val DAMPING          = 0.97f
-        private const val ANG_DAMPING      = 0.96f
-        private const val RESTITUTION      = 0.35f
-        private const val SPRING_STRENGTH  = 0.012f
-        private const val PARTICLE_COUNT   = 65
-        private const val PARTICLE_DAMPING = 0.985f
-        private const val AGITATE_FORCE    = 28f
+        private const val GRAVITY_SCALE   = 0.08f   // sluggish in thick liquid
+        private const val DAMPING         = 0.90f   // high viscosity
+        private const val ANG_DAMPING     = 0.94f
+        private const val RESTITUTION     = 0.20f   // barely bounces
+        private const val SPRING_STRENGTH = 0.010f  // gentle return to center
+        private const val SCALE_SPRING    = 0.04f   // Z-depth spring stiffness
+        private const val SCALE_DAMPING   = 0.88f   // Z-depth spring damping
+        private const val BOB_SPEED       = 0.025f  // radians per frame
+        private const val BOB_AMPLITUDE   = 0.03f   // ±3% scale oscillation
     }
 
     private fun rng(min: Float, max: Float) = Random.nextFloat() * (max - min) + min
 
-    // --- API ---
-
     fun setupBoundaries(width: Float, height: Float) {
         screenWidth  = width
         screenHeight = height
-        // Reclamp existing particles to new bounds
-        val hw = width / 2f
-        val hh = height / 2f
-        for (i in particlePos.indices) {
-            val p = particlePos[i]
-            particlePos[i] = Offset(
-                p.x.coerceIn(-hw, hw),
-                p.y.coerceIn(-hh, hh)
-            )
-        }
-    }
-
-    fun createParticles() {
-        particlePos.clear()
-        particleVel.clear()
-        val hw = screenWidth / 2f
-        val hh = screenHeight / 2f
-        repeat(PARTICLE_COUNT) {
-            particlePos.add(Offset(rng(-hw, hw), rng(-hh, hh)))
-            particleVel.add(Offset.Zero)
-        }
-        publishParticlePositions()
     }
 
     fun step() {
         if (screenWidth == 0f) return
 
-        // --- Die ---
+        // --- XY physics ---
         dieVel += gravityVec * GRAVITY_SCALE
 
-        if (phase == TriangleState.SETTLING) {
+        // Spring back to center in SETTLING and IDLE
+        if (phase == TriangleState.SETTLING || phase == TriangleState.IDLE) {
             dieVel += -diePos * SPRING_STRENGTH
         }
 
-        dieVel  *= DAMPING
-        diePos  += dieVel
+        dieVel     *= DAMPING
+        diePos     += dieVel
         angularVel *= ANG_DAMPING
-        angle   += angularVel
+        angle      += angularVel
 
         // Boundary bounce X
         val maxX = screenWidth / 2f - dieRadius
@@ -130,58 +104,60 @@ class HaterPhysicsManager {
             dieVel = Offset(dieVel.x, -dieVel.y * RESTITUTION)
         }
 
-        diePosition = diePos
-        dieAngle    = angle
+        // --- Z-scale spring ---
+        scaleVel += (targetScale - dieScale) * SCALE_SPRING
+        scaleVel *= SCALE_DAMPING
+        dieScale = (dieScale + scaleVel).coerceIn(0f, 1.12f) // allow tiny overshoot
 
-        // --- Particles ---
-        val hw = screenWidth / 2f
-        val hh = screenHeight / 2f
-        for (i in particlePos.indices) {
-            val nudge = Offset(rng(-0.4f, 0.4f), rng(-0.4f, 0.4f))
-            particleVel[i] = (particleVel[i] + nudge) * PARTICLE_DAMPING
-            var p = particlePos[i] + particleVel[i]
-
-            // Soft boundary wrap
-            if (p.x >  hw) p = Offset(p.x - screenWidth,  p.y)
-            if (p.x < -hw) p = Offset(p.x + screenWidth,  p.y)
-            if (p.y >  hh) p = Offset(p.x, p.y - screenHeight)
-            if (p.y < -hh) p = Offset(p.x, p.y + screenHeight)
-
-            particlePos[i] = p
+        // --- Bob: sinusoidal depth oscillation while settling ---
+        var publicScale = dieScale
+        if (phase == TriangleState.SETTLING) {
+            bobPhase += BOB_SPEED
+            publicScale += BOB_AMPLITUDE * sin(bobPhase.toDouble()).toFloat()
         }
 
-        publishParticlePositions()
+        diePosition    = diePos
+        dieAngle       = angle
+        currentDieScale = publicScale.coerceAtLeast(0f)
     }
 
     fun setPhase(newPhase: TriangleState) {
         phase = newPhase
         when (newPhase) {
             TriangleState.SUBMERGING -> {
-                dieVel     = Offset(rng(-3f, 3f), 18f)
-                angularVel = rng(-4f, 4f)
+                targetScale = 0f
+                // Small XY tumble as it sinks
+                dieVel     = Offset(rng(-2f, 2f), rng(-2f, 2f))
+                angularVel = rng(-3f, 3f)
             }
             TriangleState.EMERGING -> {
-                diePos     = Offset(rng(-60f, 60f), screenHeight / 2f + dieRadius + 20f)
-                dieVel     = Offset(rng(-1f, 1f), -16f)
+                // Reset scale from zero — it grows up from the deep
+                dieScale    = 0f
+                scaleVel    = 0f
+                targetScale = 1f
+                // Start near center with a tiny drift
+                diePos  = Offset(rng(-40f, 40f), rng(-40f, 40f))
+                dieVel  = Offset(rng(-0.5f, 0.5f), rng(-0.5f, 0.5f))
                 angularVel = rng(-2f, 2f)
+                bobPhase = 0f
             }
-            TriangleState.SETTLING -> { /* spring activated in step() */ }
-            TriangleState.IDLE     -> { /* free float */ }
+            TriangleState.SETTLING -> {
+                targetScale = 1f
+                bobPhase    = 0f
+            }
+            TriangleState.IDLE -> {
+                targetScale = 1f
+            }
         }
     }
 
-    fun agitateParticles(scope: CoroutineScope, onAgitationComplete: () -> Unit) {
-        // Random impulse to every particle
-        for (i in particlePos.indices) {
-            particleVel[i] = Offset(
-                rng(-AGITATE_FORCE, AGITATE_FORCE),
-                rng(-AGITATE_FORCE, AGITATE_FORCE)
-            )
-        }
-        // Send the die tumbling during the shake
-        dieVel     += Offset(rng(-12f, 12f), rng(-12f, 12f))
-        angularVel += rng(-8f, 8f)
-
+    /**
+     * Briefly agitates the die (used during the shake/reveal sequence).
+     * Calls [onAgitationComplete] after [delay] ms so the ViewModel can swap the answer.
+     */
+    fun agitate(scope: CoroutineScope, onAgitationComplete: () -> Unit) {
+        dieVel     += Offset(rng(-10f, 10f), rng(-10f, 10f))
+        angularVel += rng(-6f, 6f)
         scope.launch {
             delay(1200)
             onAgitationComplete()
@@ -189,8 +165,8 @@ class HaterPhysicsManager {
     }
 
     fun pushDie(delta: Offset) {
-        dieVel     += delta * 0.12f
-        angularVel += (delta.x - delta.y) * 0.04f
+        dieVel     += delta * 0.08f                   // thick liquid: less responsive to touch
+        angularVel += (delta.x - delta.y) * 0.03f
     }
 
     fun applyGravity(roll: Float, pitch: Float) {
@@ -200,14 +176,5 @@ class HaterPhysicsManager {
         )
     }
 
-    fun destroy() {
-        particlePos.clear()
-        particleVel.clear()
-    }
-
-    // --- Helpers ---
-
-    private fun publishParticlePositions() {
-        particlePositions = particlePos.toList()
-    }
+    fun destroy() { /* stateless — nothing to release */ }
 }
