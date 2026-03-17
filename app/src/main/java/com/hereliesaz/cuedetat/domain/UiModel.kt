@@ -10,6 +10,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.VisionData
+import com.hereliesaz.cuedetat.domain.PocketCluster
+import com.hereliesaz.cuedetat.domain.TableScanModel
 import com.hereliesaz.cuedetat.ui.hatemode.HaterState
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
@@ -95,11 +97,13 @@ data class CueDetatState(
     @Transient val hasInverseMatrix: Boolean = false,
     @Transient val visionData: VisionData? = null,
     @Transient val snapCandidates: List<SnapCandidate>? = null,
+    @Transient val tableScanModel: TableScanModel? = null,
     val lockedHsvColor: FloatArray? = null,
     val lockedHsvStdDev: FloatArray? = null,
     val showAdvancedOptionsDialog: Boolean = false,
     val showCalibrationScreen: Boolean = false,
     val showQuickAlignScreen: Boolean = false,
+    val showTableScanScreen: Boolean = false,
     val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
     val useCustomModel: Boolean = false,
     val isSnappingEnabled: Boolean = true,
@@ -244,4 +248,17 @@ sealed class MainScreenEvent {
     object SendFeedback : MainScreenEvent()
     object SingleEventConsumed : MainScreenEvent()
     data class RestoreState(val state: CueDetatState) : MainScreenEvent()
+
+    // Table scan events
+    data class LoadTableScan(val model: TableScanModel) : MainScreenEvent()
+    object ClearTableScan : MainScreenEvent()
+    data class UpdateArPose(
+        val translation: Offset,
+        val rotation: Float,
+        val scale: Float
+    ) : MainScreenEvent()
+    data class UpdateTableScanClusters(
+        val updatedClusters: List<PocketCluster>
+    ) : MainScreenEvent()
+    object ToggleTableScanScreen : MainScreenEvent()
 }
