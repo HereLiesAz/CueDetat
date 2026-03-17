@@ -56,16 +56,16 @@ class HaterPhysicsManager {
         private set
 
     companion object {
-        private const val GRAVITY_SCALE = 0.018f  // barely perceptible drift across liquid surface
-        private const val DAMPING       = 0.94f   // impulses die out within ~0.5s
-        private const val ANG_DAMPING   = 0.97f
-        private const val RESTITUTION   = 0.05f   // near-dead stop at walls
-        private const val SCALE_SPRING  = 0.018f  // slow, deliberate Z-scale rise
+        private const val GRAVITY_SCALE = 0.010f  // ice-cube drift: barely moves unless tilted hard
+        private const val DAMPING       = 0.93f   // stops within a few hundred ms when tilt removed
+        private const val ANG_DAMPING   = 0.96f
+        private const val RESTITUTION   = 0.03f   // dead stop at walls
+        private const val SCALE_SPRING  = 0.018f  // slow, deliberate Z-scale rise on emerge
         private const val SCALE_DAMPING = 0.96f   // smooth overdamped approach
-        private const val BOB_SPEED     = 0.007f  // very slow: ~15 s per full cycle
-        private const val BOB_SCALE_AMP = 0.03f   // ±3% scale — subtle
-        private const val MAX_ROCK_X    = 6f      // peak X-axis perspective tilt (degrees) — subtle
-        private const val MAX_ROCK_Y    = 4f      // peak Y-axis perspective tilt (degrees) — subtle
+        private const val BOB_SPEED     = 0.14f   // ~1.3 Hz — realistic floating-object frequency
+        private const val BOB_SCALE_AMP = 0.012f  // ±1.2% scale — barely visible shimmer
+        private const val MAX_ROCK_X    = 2.5f    // peak X-axis tilt (degrees) — very subtle
+        private const val MAX_ROCK_Y    = 1.5f    // peak Y-axis tilt (degrees) — very subtle
     }
 
     private fun rng(min: Float, max: Float) = Random.nextFloat() * (max - min) + min
