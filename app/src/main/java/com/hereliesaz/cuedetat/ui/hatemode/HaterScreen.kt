@@ -209,10 +209,8 @@ fun HaterScreen(
  * that feathers inward from the edge to transparent. Text is white bold, auto-sized and
  * placed in the triangle's wider lower zone so it never touches the edges.
  *
- * Text geometry constraint for an apex-up equilateral triangle with circumradius R:
- *   at height y from the top vertex, the triangle width = y × 2/√3
- *   so a text block of width W centred at (cx, textCY) is safe when its top line
- *   satisfies: W ≤ (textCY − halfH − apex_y) × 2/√3
+ * Text is centred at the geometric centroid (= incircle centre), which is equidistant
+ * from all three sides, giving equal perpendicular padding on every edge.
  */
 private fun createDieFaceBitmap(text: String): Bitmap {
     val size   = 512
@@ -250,12 +248,13 @@ private fun createDieFaceBitmap(text: String): Bitmap {
     })
 
     // --- Text: white bold, auto-sized to fit safely inside the triangle ---
-    // textCY is shifted 12% of R below the geometric centroid — the triangle is wider
-    // there, so more horizontal space is available for the top lines.
-    val textCY   = cy + R * 0.12f   // ≈ 281 — sits in the wider lower zone
-    // Max height budget: halfH ≈ 65 → yTop ≈ 216 → safe width = (216−46)×2/√3×0.88 ≈ 171
-    val maxTextH = R * 0.62f        // ≈ 130px
-    val maxTextW = 160              // well within safe width at yTop
+    // textCY = cy (geometric centroid = incircle centre): equidistant from all three sides,
+    // so the text block has the same perpendicular margin to every edge.
+    // Safe width at the top of the block: W ≤ (R − halfH) × 2/√3
+    // With halfH ≈ 57 (H ≈ 115): safe W = (210−57)×1.155 ≈ 177 → use 160 for visual margin.
+    val textCY   = cy
+    val maxTextH = R * 0.54f        // ≈ 113px  (halfH ≈ 57)
+    val maxTextW = 160
 
     val textPaint = TextPaint().apply {
         color       = Color.WHITE
