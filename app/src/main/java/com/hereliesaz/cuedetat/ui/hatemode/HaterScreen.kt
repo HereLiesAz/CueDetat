@@ -13,8 +13,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -87,40 +85,50 @@ fun HaterScreen(
                 val centerX = size.width / 2
                 val centerY = size.height / 2
 
-                drawRect(color = Color.Black)
+                drawRect(color = androidx.compose.ui.graphics.Color.Black)
 
                 val targetSize = minOf(size.width, size.height) * 0.55f
 
-                // Glow: soft bioluminescent emanation — very subtle, deepens with scale
-                if (state.dieScale > 0.01f) {
-                    val dieCenter = Offset(centerX + state.diePosition.x, centerY + state.diePosition.y)
-                    val glowBase  = targetSize * 0.5f * state.dieScale
-                    for (i in 0..3) {
-                        drawCircle(
-                            color  = Color(0xFF3311BB).copy(alpha = (0.055f - i * 0.011f) * state.dieScale),
-                            radius = glowBase * (1.1f + i * 0.4f),
-                            center = dieCenter
-                        )
-                    }
-                }
-
-                // Die bitmap: alpha tied to dieScale so it materializes out of the dark liquid
                 bitmap?.let { bmp ->
-                    val alphaPaint = Paint().apply {
-                        alpha = (state.dieScale.coerceIn(0f, 1f) * 255f).toInt()
-                    }
+                    val andBmp    = bmp.asAndroidBitmap()
+                    val hw        = bmp.width  / 2f
+                    val hh        = bmp.height / 2f
+                    val baseScale = (targetSize / maxOf(bmp.width, bmp.height)) * state.dieScale
+                    val cx        = centerX + state.diePosition.x
+                    val cy        = centerY + state.diePosition.y
+
                     drawIntoCanvas { canvas ->
+                        // --- Adjacent faces: the other sides of the die dimly visible through the liquid ---
+                        // A d20 face is 60° from its neighbours; render them at slightly larger scale
+                        // and ~11% opacity to simulate seeing through the dark fluid.
+                        if (state.dieScale > 0.05f) {
+                            val faceAlpha = (state.dieScale * 28f).toInt().coerceAtMost(28)
+                            val facePaint = Paint().apply { alpha = faceAlpha }
+
+                            canvas.save()
+                            canvas.translate(cx, cy)
+                            canvas.rotate(state.dieAngle + 60f)
+                            canvas.scale(baseScale * 1.25f, baseScale * 1.25f)
+                            canvas.nativeCanvas.drawBitmap(andBmp, -hw, -hh, facePaint)
+                            canvas.restore()
+
+                            canvas.save()
+                            canvas.translate(cx, cy)
+                            canvas.rotate(state.dieAngle - 60f)
+                            canvas.scale(baseScale * 1.20f, baseScale * 1.20f)
+                            canvas.nativeCanvas.drawBitmap(andBmp, -hw, -hh, facePaint)
+                            canvas.restore()
+                        }
+
+                        // --- Main face ---
+                        val mainPaint = Paint().apply {
+                            alpha = (state.dieScale.coerceIn(0f, 1f) * 255f).toInt()
+                        }
                         canvas.save()
-                        canvas.translate(centerX + state.diePosition.x, centerY + state.diePosition.y)
+                        canvas.translate(cx, cy)
                         canvas.rotate(state.dieAngle)
-                        val scale = (targetSize / maxOf(bmp.width, bmp.height)) * state.dieScale
-                        canvas.scale(scale, scale)
-                        canvas.nativeCanvas.drawBitmap(
-                            bmp.asAndroidBitmap(),
-                            -bmp.width / 2f,
-                            -bmp.height / 2f,
-                            alphaPaint
-                        )
+                        canvas.scale(baseScale, baseScale)
+                        canvas.nativeCanvas.drawBitmap(andBmp, -hw, -hh, mainPaint)
                         canvas.restore()
                     }
                 }
