@@ -46,7 +46,7 @@ Pockets start at their ideal positions (undistorted rectangle on the captured ph
 | 3–6 | Full TPS — non-linear lens distortion characterized |
 
 **Drag behavior:**
-- While the user is dragging a pocket, a temporary TPS is solved on a background dispatcher (`Dispatchers.Default`) from all currently pinned constraints plus the current drag position. The remaining unpinned pockets update in real-time via a `StateFlow`.
+- While the user is dragging a pocket, a temporary TPS is solved on a background dispatcher (`Dispatchers.Default`) from all currently pinned constraints plus the current drag position. The remaining unpinned pockets update in real-time via a `StateFlow`. Each new drag event cancels the previous in-flight coroutine `Job` before launching a new one (replace-on-new strategy), preventing solve backlog.
 - On release, the dragged pocket becomes pinned at its final position.
 - Previously pinned pockets can be re-dragged to refine them; releasing re-pins them at the new position.
 - The temporary in-flight TPS during drag runs in the **logical → image** direction (predicting where unpinned pockets appear on the photo). This is a separate, ephemeral computation in `QuickAlignViewModel` and is distinct from the final stored `TpsWarpData` emitted at `onFinishAlign`.
@@ -68,9 +68,11 @@ Pockets start at their ideal positions (undistorted rectangle on the captured ph
 
 A pure-Kotlin TPS solver and evaluator. For N control points it solves two independent (N+3)×(N+3) linear systems — one per output axis (x and y). At N=6 this is two 9×9 solves (6 control points + 3 affine terms: constant, x-coefficient, y-coefficient).
 
-**`ThinPlateSpline` exposes two static evaluation methods:**
-- `evaluate(tps: TpsWarpData, point: PointF): PointF` — image→logical (forward, for CV)
-- `evaluateInverse(tps: TpsWarpData, point: PointF): PointF` — logical→image (for rendering), solved by swapping src/dst
+**`ThinPlateSpline` exposes two static evaluation methods (named by warp direction, not pipeline role):**
+- `applyWarp(tps: TpsWarpData, point: PointF): PointF` — maps src→dst as stored (image-space residual correction; used in CV pipeline after `inversePitchMatrix`)
+- `applyInverseWarp(tps: TpsWarpData, point: PointF): PointF` — maps dst→src (solved by swapping src/dst; used in rendering to correct logical overlay points)
+
+The CV section refers to `applyWarp` as the "forward residual TPS" and rendering uses `applyInverseWarp`. These names are directional with respect to the stored control points, not the overall image→logical pipeline direction.
 
 Weights are **not stored in `TpsWarpData`** — they are solved on first use and cached at runtime in a `WeakHashMap<TpsWarpData, SolvedTps>` inside `ThinPlateSpline`. This avoids serializing Float arrays entirely, and both directions are available from a single stored data object.
 
@@ -84,7 +86,7 @@ data class TpsWarpData(
 )
 ```
 
-Only the control points are persisted. `PointF` serialization is already handled by the project's existing Gson setup (used by `viewOffset`, `bankingAimTarget`, and other `CueDetatState` fields).
+Only the control points are persisted. Gson's default reflective serializer handles `PointF` (two public `float` fields `x` and `y`) correctly without a custom adapter — the same implicit behavior that already serializes `viewOffset`, `bankingAimTarget`, and other `PointF` fields in `CueDetatState`. No custom adapter is registered in `AppModule.kt`; this is implicit Gson behavior to be aware of if the serialization library is ever replaced.
 
 ### Output of QuickAlign (onFinishAlign)
 
@@ -133,6 +135,9 @@ fun PointF.warpedBy(tps: TpsWarpData?): PointF
 
 **Points warped in RailRenderer:**
 - Rail corner points (same logical corners as `TableRenderer`) — must also be warped to avoid visible misalignment between table felt and rail overlay.
+- Diamond positions in `RailRenderer` are currently derived from corner offsets using hardcoded axis-aligned normal vectors (`PointF(0f, -1f)` etc.). After warping the corners, these normals become incorrect. Normals must be recomputed from the warped corner positions (e.g., edge direction rotated 90°) so that diamond marks remain on the physical rail surface.
+
+**Balls** (`BallRenderer`): `BallRenderer` draws in screen space (Pass 3 in `OverlayRenderer`, outside the `withMatrix` block). Ball logical positions are already TPS-corrected before they reach the aiming/rendering pipeline (via CV integration in Section 4). No direct change to `BallRenderer` is needed — the corrected logical position flows through the existing perspective projection unchanged.
 
 **Aiming lines** (`LineRenderer`): start and end points warped; line drawn between them.
 
@@ -174,7 +179,7 @@ The forward TPS evaluation is added as a single step at the end of the coordinat
 | `MainScreenEvent.ApplyQuickAlign` | Modified | Add `tpsWarpData: TpsWarpData` parameter |
 | `ControlReducer.kt` | Modified | Store `lensWarpTps` from `ApplyQuickAlign` |
 | `TableRenderer.kt` | Modified | Warp draw points through inverse residual TPS |
-| `RailRenderer.kt` | Modified | Warp rail corner points through inverse residual TPS |
+| `RailRenderer.kt` | Modified | Warp rail corner points through inverse residual TPS; recompute diamond normals from warped corners |
 | `LineRenderer.kt` | Modified | Warp aiming line endpoints through inverse residual TPS |
 | `VisionRepository.kt` | Modified | Apply forward residual TPS after logical coordinate conversion |
 
