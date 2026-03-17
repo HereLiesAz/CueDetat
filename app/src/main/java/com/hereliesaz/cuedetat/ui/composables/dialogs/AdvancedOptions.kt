@@ -166,6 +166,19 @@ fun AdvancedOptionsDialog(
                     TextButton(onClick = { onEvent(MainScreenEvent.EnterCalibrationMode) }) {
                         Text("Calibrate Felt Color", color = MaterialTheme.colorScheme.tertiary)
                     }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // --- App Version & Update ---
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        val versionText = "v1.0" + (uiState.latestVersionName?.let { " (latest: $it)" } ?: "")
+                        Text(versionText, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { onEvent(MainScreenEvent.CheckForUpdate) }) {
+                            Text("Check for Update")
+                        }
+                    }
                 }
             },
             dismissButton = {

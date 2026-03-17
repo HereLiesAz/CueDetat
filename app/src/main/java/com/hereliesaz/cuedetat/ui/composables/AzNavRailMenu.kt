@@ -42,8 +42,6 @@ fun AzNavRailMenu(
     currentDestination: String?,
     content: AzNavHostScope.() -> Unit = {},
 ) {
-    val versionInfo = "v1.0" + (uiState.latestVersionName?.let { " (latest: $it)" } ?: "")
-
     val strAppName = stringResource(id = R.string.app_name)
     val strHideHelpers = stringResource(R.string.hide_helpers)
     val strShowHelpers = stringResource(R.string.show_helpers)
@@ -95,8 +93,8 @@ fun AzNavRailMenu(
         azRailToggle(
             id = "spin",
             isChecked = uiState.isSpinControlVisible,
-            toggleOnText = "Spin Control On",
-            toggleOffText = "Spin Control Off",
+            toggleOnText = "Spin",
+            toggleOffText = "Spin",
             onClick = { onEvent(MainScreenEvent.ToggleSpinControl) }
         )
 
@@ -104,14 +102,14 @@ fun AzNavRailMenu(
             azRailToggle(
                 id = "bank",
                 isChecked = uiState.isBankingMode,
-                toggleOnText = "Ghost Ball Aiming",
-                toggleOffText = "Calculate Bank",
+                toggleOnText = "Aim",
+                toggleOffText = "Bank",
                 onClick = { onEvent(MainScreenEvent.ToggleBankingMode) }
             )
 
             azRailItem(
                 id = "add_obstacle",
-                text = "Add Obstacle",
+                text = "Add",
                 onClick = { onEvent(MainScreenEvent.AddObstacleBall) }
             )
         }
