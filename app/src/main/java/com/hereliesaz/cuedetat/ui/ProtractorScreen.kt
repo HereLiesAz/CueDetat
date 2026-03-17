@@ -86,7 +86,7 @@ fun ProtractorScreen(
     ) {
         // --- Background layer 0: Camera ---
         background(weight = 0) {
-            if (uiState.isCameraVisible) {
+            if (uiState.cameraMode != com.hereliesaz.cuedetat.domain.CameraMode.OFF) {
                 val activeAnalyzer = when (currentRoute) {
                     ROUTE_CALIBRATION -> calibrationAnalyzer
                     ROUTE_ALIGN -> quickAlignAnalyzer

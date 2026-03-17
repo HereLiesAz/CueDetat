@@ -15,8 +15,8 @@ QuickAlign currently lets each of the six pocket drag points move independently.
 
 When the user drags any pocket during QuickAlign:
 1. The other pockets update in real-time to positions that are physically consistent with the implied lens warp.
-2. The final alignment result stores the full non-linear warp (Thin-Plate Spline), not just a homography decomposition.
-3. The overlay is rendered and CV detections are corrected using this stored warp.
+2. The final alignment result stores the non-linear residual warp (Thin-Plate Spline) on top of the existing homography-derived pose parameters.
+3. The overlay is rendered and CV detections are corrected using this stored residual warp.
 
 ---
 
@@ -25,8 +25,10 @@ When the user drags any pocket during QuickAlign:
 TPS was chosen over homography (can't express lens distortion) and full per-pixel remap (30fps remap cost). TPS warps the overlay at the point level — cheap to evaluate per frame, expressively accurate for lens distortion.
 
 The TPS is split from the coarse camera pose:
-- **Homography decomposition** (translation, rotation, scale) continues to handle camera pose and real-time sensor tilt — unchanged from today.
-- **TPS residual** captures the non-linear lens distortion that the homography cannot express. This is fixed after alignment and does not change as the device tilts.
+- **Homography decomposition** (translation, rotation, scale) continues to handle camera pose and real-time sensor tilt — unchanged from today. Applied via `canvas.withMatrix(pitchMatrix)`.
+- **TPS residual** captures the non-linear lens distortion the homography cannot express. Applied as a per-point correction *inside* the matrix context. Fixed after alignment; does not change as the device tilts.
+
+The two layers compose correctly: `pitchMatrix` handles real-time sensor tilt; the TPS residual handles the static non-linear component on top of it.
 
 ---
 
@@ -44,12 +46,16 @@ Pockets start at their ideal positions (undistorted rectangle on the captured ph
 | 3–6 | Full TPS — non-linear lens distortion characterized |
 
 **Drag behavior:**
-- While the user is dragging a pocket, the TPS is solved live from all currently pinned constraints plus the current drag position. The remaining unpinned pockets update in real-time.
+- While the user is dragging a pocket, a temporary TPS is solved on a background dispatcher (`Dispatchers.Default`) from all currently pinned constraints plus the current drag position. The remaining unpinned pockets update in real-time via a `StateFlow`.
 - On release, the dragged pocket becomes pinned at its final position.
 - Previously pinned pockets can be re-dragged to refine them; releasing re-pins them at the new position.
+- The temporary in-flight TPS during drag runs in the **logical → image** direction (predicting where unpinned pockets appear on the photo). This is a separate, ephemeral computation in `QuickAlignViewModel` and is distinct from the final stored `TpsWarpData` emitted at `onFinishAlign`.
+
+**Reset:**
+- Tapping Reset clears all pinned positions **and** the pinned-set, returning all 6 pockets to their ideal undistorted positions with no constraints.
 
 **Visual distinction:**
-- Unpinned pockets: hollow/dashed circle — indicates TPS-predicted, not user-confirmed.
+- Unpinned pockets: hollow/dashed circle — TPS-predicted, not user-confirmed.
 - Pinned pockets: solid circle — user-confirmed.
 
 **Removed constraint:** The existing side-pocket linear snap (snapping side pockets to the midpoint line between adjacent corners) is removed. All 6 pockets are fully free TPS control points.
@@ -60,34 +66,40 @@ Pockets start at their ideal positions (undistorted rectangle on the captured ph
 
 ### ThinPlateSpline.kt (new)
 
-A pure-Kotlin TPS solver and evaluator. At 6 control points it solves a 9×9 linear system (6 control points + 3 affine terms) — negligible cost, computed once at alignment time.
+A pure-Kotlin TPS solver and evaluator. For N control points it solves two independent (N+3)×(N+3) linear systems — one per output axis (x and y). At N=6 this is two 9×9 solves (6 control points + 3 affine terms: constant, x-coefficient, y-coefficient). Negligible cost, computed once at alignment time (and once per drag event on a background thread).
 
-**Direction:** Image space → logical space (natural for CV output).
+**Direction of stored TPS:** Image space → logical space (natural for CV output).
 - Source points: 6 pocket positions in image space (user-placed on the captured photo).
 - Destination points: 6 known pocket positions in logical space (inches, from selected table size).
 
-The inverse direction (logical → image, for rendering) is obtained by swapping src/dst in the same solver and stored alongside.
+For rendering (logical → image), swap src/dst in the solver. Both directions are computed and stored in `TpsWarpData`.
 
 **TpsWarpData.kt (new) — serializable state:**
 
 ```kotlin
 @Keep
 data class TpsWarpData(
-    val srcPoints: List<PointF>,   // 6 image-space positions
-    val dstPoints: List<PointF>,   // 6 logical-space positions
-    val weights: FloatArray,       // TPS kernel weights
-    val affineTerms: FloatArray    // Affine component (3 terms per axis)
+    val srcPoints: List<PointF>,      // 6 residual source positions (image-space deltas)
+    val dstPoints: List<PointF>,      // 6 residual destination positions (logical-space deltas)
+    val weightsX: List<Float>,        // N+3 TPS kernel weights for x-axis output
+    val weightsY: List<Float>,        // N+3 TPS kernel weights for y-axis output
+    val affineX: List<Float>,         // 3 affine terms for x-axis (constant, cx, cy)
+    val affineY: List<Float>          // 3 affine terms for y-axis (constant, cx, cy)
 )
 ```
 
-Stored as JSON in `CueDetatState` alongside the existing pose parameters.
+`List<Float>` is used throughout (not `FloatArray`) to ensure clean JSON serialization via Gson, consistent with the rest of `CueDetatState`.
 
 ### Output of QuickAlign (onFinishAlign)
 
-1. Fit homography to the 6 final point positions → decompose to translation, rotation, scale (existing behavior, unchanged).
-2. Compute residuals: difference between homography-predicted image positions and actual user-placed positions.
-3. Solve TPS from residuals → produce `TpsWarpData`.
+**Note:** The current `onFinishAlign` builds the homography from only 4 corner pockets. This must be changed to use all 6 points.
+
+1. Fit homography to **all 6** final point positions → decompose to translation, rotation, scale.
+2. For each of the 6 pockets, compute the residual: `actual image position − homography-predicted image position`.
+3. Solve the residual TPS: source = 6 homography-predicted positions, destination = 6 actual user-placed positions (both in image space).
 4. Emit `ApplyQuickAlign(translation, rotation, scale, tpsWarpData)`.
+
+The residual TPS encodes only the non-linear component. Applying it inside `canvas.withMatrix(pitchMatrix)` (which already encodes the linear pose) does not double-count anything.
 
 ### CueDetatState change
 
@@ -101,11 +113,11 @@ val lensWarpTps: TpsWarpData? = null
 
 ## Section 3: Rendering Integration
 
-### Approach: per-point warp correction inside existing matrix context
+### Approach: per-point residual correction inside existing matrix context
 
-The `canvas.withMatrix(pitchMatrix)` block is unchanged. Inside it, draw points pass through the inverse TPS residual before being used. If `lensWarpTps` is null (user has not aligned), points pass through unmodified.
+The `canvas.withMatrix(pitchMatrix)` block is unchanged. Inside it, draw points pass through the inverse residual TPS before being used. If `lensWarpTps` is null (no alignment), points pass through unmodified.
 
-**Helper extension:**
+**Helper extension** (lives in `view/renderer/TpsUtils.kt`):
 ```kotlin
 fun PointF.warpedBy(tps: TpsWarpData?): PointF
 ```
@@ -116,14 +128,17 @@ fun PointF.warpedBy(tps: TpsWarpData?): PointF
 - Diamond grid intersections
 - Rail line endpoints
 
+**Points warped in RailRenderer:**
+- Rail corner points (same logical corners as `TableRenderer`) — must also be warped to avoid visible misalignment between table felt and rail overlay.
+
 **Aiming lines** (`LineRenderer`): start and end points warped; line drawn between them.
 
-**Circles** (pockets, balls): only center point warped. Radius is not adjusted — pocket size does not vary meaningfully with lens position.
+**Circles** (pockets, balls): only center point warped. Radius is not adjusted — pocket size does not vary meaningfully with lens distortion.
 
 **No changes to:**
 - `OverlayRenderer` matrix setup
 - Sensor/pitch pipeline
-- Aiming calculation logic (operates in logical space, which is already TPS-corrected by the time it gets there)
+- Aiming calculation logic (operates in logical space, which is TPS-corrected before it arrives there)
 
 ---
 
@@ -134,12 +149,12 @@ fun PointF.warpedBy(tps: TpsWarpData?): PointF
 image pixel → imageToScreenMatrix → screen → inversePitchMatrix → logical
 ```
 
-**With TPS:**
+**With TPS residual:**
 ```
-image pixel → imageToScreenMatrix → screen → inversePitchMatrix → logical → forward TPS → true logical
+image pixel → imageToScreenMatrix → screen → inversePitchMatrix → logical → forward residual TPS → true logical
 ```
 
-The forward TPS evaluation is added as a single step at the end of the coordinate transform in `VisionRepository`, at the same call site where logical coordinates are currently produced. If `lensWarpTps` is null, the step is skipped.
+The forward TPS evaluation is added as a single step at the end of the coordinate transform in `VisionRepository`. If `lensWarpTps` is null, the step is skipped.
 
 ---
 
@@ -147,16 +162,18 @@ The forward TPS evaluation is added as a single step at the end of the coordinat
 
 | Component | Type | Change |
 |---|---|---|
-| `ThinPlateSpline.kt` | New | TPS solver + forward/inverse evaluator |
-| `TpsWarpData.kt` | New | Serializable TPS state (weights + affine terms) |
-| `QuickAlignViewModel.kt` | Modified | Accumulating TPS constraints on drag; emit TPS on finish |
+| `ThinPlateSpline.kt` | New | TPS solver (two N+3 systems) + forward/inverse evaluator |
+| `TpsWarpData.kt` | New | Serializable TPS state (`List<Float>` for Gson compatibility) |
+| `TpsUtils.kt` | New | `PointF.warpedBy(tps)` extension, lives in `view/renderer/` |
+| `QuickAlignViewModel.kt` | Modified | Accumulating TPS constraints on drag (background thread); residual TPS output; Reset clears pin set; homography uses all 6 points |
 | `QuickAlignScreen.kt` | Modified | Visual distinction between pinned and unpinned pockets |
 | `CueDetatState` (UiModel.kt) | Modified | Add `lensWarpTps: TpsWarpData?` |
 | `MainScreenEvent.ApplyQuickAlign` | Modified | Add `tpsWarpData: TpsWarpData` parameter |
 | `ControlReducer.kt` | Modified | Store `lensWarpTps` from `ApplyQuickAlign` |
-| `TableRenderer.kt` | Modified | Warp draw points through inverse TPS |
-| `LineRenderer.kt` | Modified | Warp aiming line endpoints through inverse TPS |
-| `VisionRepository.kt` | Modified | Apply forward TPS after logical coordinate conversion |
+| `TableRenderer.kt` | Modified | Warp draw points through inverse residual TPS |
+| `RailRenderer.kt` | Modified | Warp rail corner points through inverse residual TPS |
+| `LineRenderer.kt` | Modified | Warp aiming line endpoints through inverse residual TPS |
+| `VisionRepository.kt` | Modified | Apply forward residual TPS after logical coordinate conversion |
 
 ---
 

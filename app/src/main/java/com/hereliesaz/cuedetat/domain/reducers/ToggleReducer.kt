@@ -2,6 +2,7 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
+import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
@@ -68,8 +69,8 @@ internal fun reduceToggleAction(
             state.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)
         }
 
-        // Toggle the visibility of the camera feed (for AR vs Pure Virtual mode).
-        is MainScreenEvent.ToggleCamera -> state.copy(isCameraVisible = !state.isCameraVisible)
+        // Cycle camera mode: Off → Camera → AR → Off.
+        is MainScreenEvent.CycleCameraMode -> state.copy(cameraMode = state.cameraMode.next())
 
         // Toggle between Metric and Imperial distance units.
         is MainScreenEvent.ToggleDistanceUnit -> state.copy(

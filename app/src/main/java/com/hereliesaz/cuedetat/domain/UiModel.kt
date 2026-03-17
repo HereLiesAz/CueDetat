@@ -25,6 +25,14 @@ import kotlinx.coroutines.Job
 import org.opencv.core.Mat
 
 
+enum class CameraMode {
+    OFF, CAMERA, AR;
+    fun next(): CameraMode {
+        val nextOrdinal = (this.ordinal + 1) % values().size
+        return values()[nextOrdinal]
+    }
+}
+
 enum class ExperienceMode {
     EXPERT, BEGINNER, HATER;
     fun next(): ExperienceMode {
@@ -51,7 +59,7 @@ data class CueDetatState(
     val worldRotationDegrees: Float = 0f,
     val areHelpersVisible: Boolean = LabelConfig.showLabelsByDefault,
     val valuesChangedSinceReset: Boolean = false,
-    val isCameraVisible: Boolean = true,
+    val cameraMode: CameraMode = CameraMode.CAMERA,
     val viewOffset: PointF = PointF(0f, 0f),
     val orientationLock: OrientationLock = OrientationLock.PORTRAIT,
     @Transient val pendingOrientationLock: OrientationLock? = null,
@@ -183,7 +191,7 @@ sealed class MainScreenEvent {
     data class SetTableSize(val size: TableSize) : MainScreenEvent()
     object ToggleTableSizeDialog : MainScreenEvent()
     object ToggleForceTheme : MainScreenEvent()
-    object ToggleCamera : MainScreenEvent()
+    object CycleCameraMode : MainScreenEvent()
     object ToggleLuminanceDialog : MainScreenEvent()
     data class AdjustLuminance(val adjustment: Float) : MainScreenEvent()
     object ToggleDistanceUnit : MainScreenEvent()

@@ -136,12 +136,14 @@ fun AzNavRailMenu(
         azDivider()
         // --- Appearance Section ---
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailToggle(
+            azMenuItem(
                 id = "cam",
-                isChecked = uiState.isCameraVisible,
-                toggleOnText = "Turn Camera Off",
-                toggleOffText = "Turn Camera On",
-                onClick = { onEvent(MainScreenEvent.ToggleCamera) }
+                text = when (uiState.cameraMode) {
+                    com.hereliesaz.cuedetat.domain.CameraMode.OFF -> "Camera: Off"
+                    com.hereliesaz.cuedetat.domain.CameraMode.CAMERA -> "Camera: On"
+                    com.hereliesaz.cuedetat.domain.CameraMode.AR -> "Camera: AR"
+                },
+                onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
             )
         }
         azMenuItem(

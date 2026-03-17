@@ -105,7 +105,7 @@ fun stateReducer(
         is MainScreenEvent.ToggleSpinControl,
         is MainScreenEvent.CycleTableSize, is MainScreenEvent.SetTableSize,
         is MainScreenEvent.ToggleTableSizeDialog, is MainScreenEvent.ToggleForceTheme,
-        is MainScreenEvent.ToggleCamera, is MainScreenEvent.ToggleDistanceUnit,
+        is MainScreenEvent.CycleCameraMode, is MainScreenEvent.ToggleDistanceUnit,
         is MainScreenEvent.ToggleLuminanceDialog, is MainScreenEvent.ToggleGlowStickDialog,
         is MainScreenEvent.ToggleCvModel, is MainScreenEvent.ToggleSnapping,
         is MainScreenEvent.ToggleHelp,
