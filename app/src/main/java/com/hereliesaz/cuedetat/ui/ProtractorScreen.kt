@@ -2,11 +2,13 @@
 package com.hereliesaz.cuedetat.ui
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -178,17 +180,22 @@ fun ProtractorScreen(
         }
 
         // --- Onscreen HUD: Spin control (main route only) ---
-        onscreen(alignment = Alignment.BottomEnd) {
+        // Positioned absolutely at spinControlCenter (screen pixels). Double-tap+drag to reposition.
+        onscreen(alignment = Alignment.TopStart) {
             if (isOnMain && uiState.isSpinControlVisible && uiState.spinControlCenter != null) {
+                val center = uiState.spinControlCenter!!
                 SpinControl(
-                    centerPosition = uiState.spinControlCenter!!,
+                    centerPosition = center,
                     selectedSpinOffset = uiState.selectedSpinOffset,
                     lingeringSpinOffset = uiState.lingeringSpinOffset,
                     spinPathAlpha = uiState.spinPathsAlpha,
                     onEvent = mainViewModel::onEvent,
-                    modifier = Modifier
-                        .navigationBarsPadding()
-                        .padding(bottom = 16.dp, end = 16.dp)
+                    modifier = Modifier.absoluteOffset {
+                        IntOffset(
+                            (center.x - 60.dp.roundToPx()).toInt(),
+                            (center.y - 60.dp.roundToPx()).toInt()
+                        )
+                    }
                 )
             }
         }

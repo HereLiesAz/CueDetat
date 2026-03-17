@@ -97,8 +97,8 @@ private fun createInitialState(
     // Default center for the target ball (ProtractorUnit) is logical (0,0).
     val initialProtractorCenter = PointF(0f, 0f)
 
-    // Default position for the spin control UI element (bottom-right quadrant).
-    val initialSpinControlCenter = PointF(viewWidth / 2f, viewHeight * 0.75f)
+    // Default position for the spin control UI element (left side, 30% from bottom).
+    val initialSpinControlCenter = PointF(viewWidth * 0.15f, viewHeight * 0.70f)
 
     // Construct and return the state object.
     return CueDetatState(
