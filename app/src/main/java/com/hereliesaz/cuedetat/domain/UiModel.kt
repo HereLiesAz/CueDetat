@@ -140,6 +140,7 @@ data class CueDetatState(
     @Transient val latestVersionName: String? = null,
     val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
     @Transient val targetBallDistance: Float = 0f,
+    val lensWarpTps: TpsWarpData? = null,
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
@@ -213,8 +214,12 @@ sealed class MainScreenEvent {
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
     object ToggleCalibrationScreen : MainScreenEvent()
     object ToggleQuickAlignScreen : MainScreenEvent()
-    data class ApplyQuickAlign(val translation: Offset, val rotation: Float, val scale: Float) :
-        MainScreenEvent()
+    data class ApplyQuickAlign(
+        val translation: Offset,
+        val rotation: Float,
+        val scale: Float,
+        val tpsWarpData: TpsWarpData
+    ) : MainScreenEvent()
 
     object ToggleCvRefinementMethod : MainScreenEvent()
     data class UpdateHoughP1(val value: Float) : MainScreenEvent()

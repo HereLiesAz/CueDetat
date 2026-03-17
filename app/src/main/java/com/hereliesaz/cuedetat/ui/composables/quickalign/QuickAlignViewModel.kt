@@ -3,11 +3,13 @@
 package com.hereliesaz.cuedetat.ui.composables.quickalign
 
 import android.graphics.Bitmap
+import android.graphics.PointF
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.TpsWarpData
 import com.hereliesaz.cuedetat.view.state.TableSize
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -206,7 +208,11 @@ class QuickAlignViewModel @Inject constructor() : ViewModel() {
                     image.width.toFloat(),
                     image.height.toFloat()
                 )
-                _alignResult.emit(MainScreenEvent.ApplyQuickAlign(translation, rotation, scale))
+                // Convert Mat points to PointF lists for TpsWarpData
+                val srcPointsF = srcPointsList.map { PointF(it.x, it.y) }
+                val dstPointsF = logicalCorners.map { PointF(it.x.toFloat(), it.y.toFloat()) }
+                val tpsWarpData = TpsWarpData(srcPointsF, dstPointsF)
+                _alignResult.emit(MainScreenEvent.ApplyQuickAlign(translation, rotation, scale, tpsWarpData))
             }
             // Reset for next use.
             onResetPoints()
