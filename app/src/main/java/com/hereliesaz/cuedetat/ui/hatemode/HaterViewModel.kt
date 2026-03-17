@@ -25,10 +25,10 @@ class HaterViewModel @Inject constructor(
     private val physicsManager = HaterPhysicsManager()
     private var physicsJob: Job? = null
 
-    private var remainingResIds = mutableListOf<Int>()
+    private var remainingIndices = mutableListOf<Int>()
 
     private fun reshuffleAnswers() {
-        remainingResIds = HaterResponses.allResponses.shuffled().toMutableList()
+        remainingIndices = (0 until HaterResponses.allAnswers.size).shuffled().toMutableList()
     }
 
     init {
@@ -110,9 +110,9 @@ class HaterViewModel @Inject constructor(
 
                 delay(1500)
 
-                if (remainingResIds.isEmpty()) reshuffleAnswers()
-                val newResId = remainingResIds.removeAt(0)
-                _haterState.value = _haterState.value.copy(answerResId = newResId)
+                if (remainingIndices.isEmpty()) reshuffleAnswers()
+                val newIndex = remainingIndices.removeAt(0)
+                _haterState.value = _haterState.value.copy(answerIndex = newIndex)
 
                 physicsManager.setPhase(TriangleState.EMERGING)
                 _haterState.value = _haterState.value.copy(triangleState = TriangleState.EMERGING)

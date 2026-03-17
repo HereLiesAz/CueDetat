@@ -67,7 +67,7 @@ object HaterResponses {
         Group50, Group51, Group53, Group54, Group55, Group56, Group57
     ).flatten()
 
-    private val masterAnswerList = listOf(
+    val allAnswers = listOf(
     "Ask again, but with less hope.",
     "Outlook hazy. Try to not suck.",
     "System busy judging you. Try again later.",

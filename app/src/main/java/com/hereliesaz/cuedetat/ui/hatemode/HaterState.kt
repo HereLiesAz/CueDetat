@@ -3,7 +3,6 @@
 package com.hereliesaz.cuedetat.ui.hatemode
 
 import androidx.compose.ui.geometry.Offset
-import com.hereliesaz.cuedetat.R
 
 /**
  * State representing the animation phase of the 8-ball reveal.
@@ -21,7 +20,7 @@ enum class TriangleState {
  * @property diePosition Current (x,y) offset of the die from the screen center.
  * @property dieAngle Current rotation of the die in degrees.
  * @property dieScale Scale multiplier of the die.
- * @property answerResId The drawable resource ID of the webp image displayed on the die.
+ * @property answerIndex Index into [HaterResponses.allAnswers] for the text displayed on the die.
  * @property triangleState The current phase of the reveal animation.
  */
 data class HaterState(
@@ -30,6 +29,6 @@ data class HaterState(
     val dieScale: Float = 0f,
     val rockAngleX: Float = 0f,   // 3-D perspective tilt around X axis (degrees)
     val rockAngleY: Float = 0f,   // 3-D perspective tilt around Y axis (degrees)
-    val answerResId: Int = R.drawable.group0,
+    val answerIndex: Int = 0,
     val triangleState: TriangleState = TriangleState.IDLE,
 )
