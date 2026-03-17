@@ -66,7 +66,9 @@ fun stateReducer(
         is MainScreenEvent.ZoomSliderChanged, is MainScreenEvent.ZoomScaleChanged,
         is MainScreenEvent.TableRotationApplied, is MainScreenEvent.TableRotationChanged,
         is MainScreenEvent.AdjustLuminance, is MainScreenEvent.AdjustGlow,
-        is MainScreenEvent.PanView, is MainScreenEvent.ApplyQuickAlign ->
+        is MainScreenEvent.PanView, is MainScreenEvent.ApplyQuickAlign,
+        is MainScreenEvent.LoadTableScan, is MainScreenEvent.ClearTableScan,
+        is MainScreenEvent.UpdateArPose, is MainScreenEvent.UpdateTableScanClusters ->
             reduceControlAction(currentState, action)
 
         // --- COMPUTER VISION DATA ---
@@ -114,7 +116,7 @@ fun stateReducer(
         is MainScreenEvent.OrientationChanged, is MainScreenEvent.SetExperienceMode,
         is MainScreenEvent.UnlockBeginnerView, is MainScreenEvent.LockBeginnerView,
         is MainScreenEvent.ToggleCalibrationScreen, is MainScreenEvent.ToggleQuickAlignScreen,
-        is MainScreenEvent.ToggleBankingMode ->
+        is MainScreenEvent.ToggleBankingMode, is MainScreenEvent.ToggleTableScanScreen ->
             reduceToggleAction(currentState, action, reducerUtils)
 
         // --- ONBOARDING ---

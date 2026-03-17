@@ -70,7 +70,14 @@ internal fun reduceToggleAction(
         }
 
         // Cycle camera mode: Off → Camera → AR → Off.
-        is MainScreenEvent.CycleCameraMode -> state.copy(cameraMode = state.cameraMode.next())
+        // Skips AR mode if no table scan model exists (no AR data to display).
+        is MainScreenEvent.CycleCameraMode -> {
+            val next = state.cameraMode.next()
+            val resolved = if (next == CameraMode.AR && state.tableScanModel == null)
+                next.next()  // skip AR → OFF when no table model exists
+            else next
+            state.copy(cameraMode = resolved)
+        }
 
         // Toggle between Metric and Imperial distance units.
         is MainScreenEvent.ToggleDistanceUnit -> state.copy(
@@ -150,6 +157,10 @@ internal fun reduceToggleAction(
 
         // Toggle the quick align screen visibility.
         is MainScreenEvent.ToggleQuickAlignScreen -> state.copy(showQuickAlignScreen = !state.showQuickAlignScreen)
+
+        // Toggle the table scan screen visibility.
+        is MainScreenEvent.ToggleTableScanScreen ->
+            state.copy(showTableScanScreen = !state.showTableScanScreen)
 
         // Fallback for unhandled actions.
         else -> state

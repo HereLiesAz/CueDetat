@@ -63,6 +63,33 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             )
         }
 
+        is MainScreenEvent.LoadTableScan -> state.copy(
+            tableScanModel = action.model,
+            lensWarpTps = action.model.lensWarpTps
+        )
+
+        is MainScreenEvent.ClearTableScan -> state.copy(
+            tableScanModel = null,
+            lensWarpTps = null
+        )
+
+        is MainScreenEvent.UpdateArPose -> {
+            val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode)
+            val newZoomSliderPos = ZoomMapping.zoomToSlider(action.scale, minZoom, maxZoom)
+            state.copy(
+                viewOffset = PointF(action.translation.x, action.translation.y),
+                worldRotationDegrees = action.rotation,
+                zoomSliderPosition = newZoomSliderPos
+            )
+        }
+
+        is MainScreenEvent.UpdateTableScanClusters -> {
+            val current = state.tableScanModel ?: return state
+            state.copy(
+                tableScanModel = current.copy(pockets = action.updatedClusters)
+            )
+        }
+
         else -> state
     }
 }
