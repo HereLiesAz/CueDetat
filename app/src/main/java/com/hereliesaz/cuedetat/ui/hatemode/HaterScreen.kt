@@ -92,7 +92,7 @@ fun HaterScreen(
 
                 drawRect(color = androidx.compose.ui.graphics.Color.Black)
 
-                val targetSize = minOf(size.width, size.height) * 0.55f
+                val targetSize = minOf(size.width, size.height) * 1.10f
                 val hw        = bitmap.width  / 2f
                 val hh        = bitmap.height / 2f
                 val baseScale = (targetSize / maxOf(bitmap.width, bitmap.height)) * state.dieScale
