@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hereliesaz.cuedetat.domain.decomposeHomography
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ThinPlateSpline
 import com.hereliesaz.cuedetat.domain.TpsWarpData
@@ -29,9 +30,6 @@ import org.opencv.core.Mat
 import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
 import javax.inject.Inject
-import kotlin.math.PI
-import kotlin.math.atan2
-import kotlin.math.sqrt
 
 /** Enum defining the stages of the Quick Align wizard. */
 enum class QuickAlignStep {
@@ -264,38 +262,6 @@ class QuickAlignViewModel @Inject constructor() : ViewModel() {
             }
             onResetPoints()
         }
-    }
-
-    /**
-     * Extracts approximate T, R, S from the homography matrix.
-     * Note: This is a simplification; full pose estimation requires PnP, but for 2D alignment
-     * this approximation suffices for initial setup.
-     */
-    private fun decomposeHomography(
-        h: Mat,
-        imgWidth: Float,
-        imgHeight: Float
-    ): Triple<Offset, Float, Float> {
-        val h0 = h[0, 0][0].toFloat()
-        val h1 = h[0, 1][0].toFloat()
-        val h2 = h[0, 2][0].toFloat()
-        val h3 = h[1, 0][0].toFloat()
-        val h4 = h[1, 1][0].toFloat()
-        val h5 = h[1, 2][0].toFloat()
-
-        // Estimate scale from basis vectors.
-        val scaleX = sqrt(h0 * h0 + h3 * h3)
-        val scaleY = sqrt(h1 * h1 + h4 * h4)
-        val scale = (scaleX + scaleY) / 2.0f
-
-        // Estimate rotation from the first column vector.
-        val rotation = -atan2(h3, h0) * (180f / PI.toFloat())
-
-        // Calculate translation relative to center.
-        val canvasCenter = Offset(imgWidth / 2f, imgHeight / 2f)
-        val translation = Offset(h2, h5) - canvasCenter
-
-        return Triple(translation, rotation, 1 / scale)
     }
 
     /**
