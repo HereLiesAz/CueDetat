@@ -5,14 +5,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavHostController
 import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHostScope
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
-import com.hereliesaz.cuedetat.R
+import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
@@ -43,9 +42,6 @@ fun AzNavRailMenu(
     hasTableModel: Boolean = false,
     content: AzNavHostScope.() -> Unit = {},
 ) {
-    val strAppName = stringResource(id = R.string.app_name)
-    val strHideHelpers = stringResource(R.string.hide_helpers)
-    val strShowHelpers = stringResource(R.string.show_helpers)
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val activeColor = MaterialTheme.colorScheme.primary
 
@@ -75,15 +71,13 @@ fun AzNavRailMenu(
             onDismissHelp = {}
         )
 
-        // --- Core Controls Section ---
+        // --- Core Controls ---
 
         azRailToggle(
             id = "help",
             isChecked = uiState.areHelpersVisible,
             toggleOnText = "Help",
             toggleOffText = "Help",
-            menuToggleOnText = strHideHelpers,
-            menuToggleOffText = strShowHelpers,
             onClick = { onEvent(MainScreenEvent.ToggleHelp) }
         )
 
@@ -98,8 +92,6 @@ fun AzNavRailMenu(
             isChecked = uiState.isSpinControlVisible,
             toggleOnText = "Spin",
             toggleOffText = "Spin",
-            menuToggleOnText = "Spin Control",
-            menuToggleOffText = "Spin Control",
             onClick = { onEvent(MainScreenEvent.ToggleSpinControl) }
         )
 
@@ -109,15 +101,13 @@ fun AzNavRailMenu(
                 isChecked = uiState.isBankingMode,
                 toggleOnText = "Aim",
                 toggleOffText = "Bank",
-                menuToggleOnText = "Shot Aiming",
-                menuToggleOffText = "Bank Calculator",
                 onClick = { onEvent(MainScreenEvent.ToggleBankingMode) }
             )
 
             azRailItem(
                 id = "add_obstacle",
                 text = "Add",
-                menuText = "Add Obstacle",
+                info = "Add Obstacle Ball",
                 onClick = { onEvent(MainScreenEvent.AddObstacleBall) }
             )
         }
@@ -142,22 +132,26 @@ fun AzNavRailMenu(
         )
 
         azDivider()
-        // --- Appearance Section ---
+
+        // --- Appearance ---
+
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azRailCycler(
                 id = "cam",
                 options = listOf("Off", "Cam", "AR"),
                 selectedOption = when (uiState.cameraMode) {
-                    com.hereliesaz.cuedetat.domain.CameraMode.OFF -> "Off"
-                    com.hereliesaz.cuedetat.domain.CameraMode.CAMERA -> "Cam"
-                    com.hereliesaz.cuedetat.domain.CameraMode.AR -> "AR"
+                    CameraMode.OFF -> "Off"
+                    CameraMode.CAMERA -> "Cam"
+                    CameraMode.AR -> "AR"
                 },
+                onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
             )
         }
+
         azMenuItem(
-                id = "luminance",
-        text = "Luminance",
-        onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
+            id = "luminance",
+            text = "Luminance",
+            onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
         )
 
         azMenuItem(
@@ -165,13 +159,16 @@ fun AzNavRailMenu(
             text = "Glow Stick",
             onClick = { onEvent(MainScreenEvent.ToggleGlowStickDialog) }
         )
-        // --- Table & Units Section ---
+
+        // --- Table & Units ---
+
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azMenuItem(
                 id = "scan",
                 text = "Scan Table",
                 onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen) }
             )
+
             if (hasTableModel) {
                 azMenuItem(
                     id = "rescan",
@@ -182,20 +179,21 @@ fun AzNavRailMenu(
                     }
                 )
             }
+
             azMenuItem(
                 id = "size",
                 text = "Table Size",
                 onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) }
             )
+
             azMenuItem(
                 id = "units",
                 text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Use Imperial Units" else "Use Metric Units",
                 onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) }
             )
+
             azDivider()
         }
-
-
 
         azMenuItem(
             id = "orientation",
@@ -207,8 +205,6 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) }
         )
 
-
-
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azMenuItem(
                 id = "advanced",
@@ -219,7 +215,8 @@ fun AzNavRailMenu(
 
         azDivider()
 
-        // --- Meta/App Info Section ---
+        // --- Meta ---
+
         azMenuItem(
             id = "mode",
             text = "Mode: ${
@@ -229,7 +226,6 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) }
         )
 
-        // Caller-provided backgrounds and onscreen elements
         content()
     }
 }
