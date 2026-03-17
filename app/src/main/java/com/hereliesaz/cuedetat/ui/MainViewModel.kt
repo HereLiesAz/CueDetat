@@ -9,12 +9,14 @@ import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.SensorRepository
+import com.hereliesaz.cuedetat.data.TableScanRepository
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.data.VisionAnalyzer
 import com.hereliesaz.cuedetat.data.VisionRepository
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.TableScanModel
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.domain.UpdateType
@@ -43,6 +45,7 @@ class MainViewModel @Inject constructor(
     private val sensorRepository: SensorRepository,
     private val githubRepository: GithubRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
+    private val tableScanRepository: TableScanRepository,
     private val warningManager: WarningManager,
     @ApplicationContext private val appContext: Context,
     visionRepository: VisionRepository,
@@ -89,6 +92,14 @@ class MainViewModel @Inject constructor(
 
         viewModelScope.launch {
             onEvent(MainScreenEvent.CheckForUpdate)
+        }
+
+        viewModelScope.launch {
+            val savedModel = tableScanRepository.load()
+            if (savedModel != null) {
+                onEvent(MainScreenEvent.LoadTableScan(savedModel))
+                checkLocationAndPromptIfNeeded(savedModel)
+            }
         }
     }
 
@@ -189,6 +200,34 @@ class MainViewModel @Inject constructor(
 
             else -> UpdateType.AIMING
         }
+    }
+
+    private suspend fun checkLocationAndPromptIfNeeded(model: TableScanModel) {
+        if (model.scanLatitude == null || model.scanLongitude == null) return
+        val current = tableScanRepository.getCurrentLocation() ?: return
+        val dist = haversineDistanceMetres(
+            model.scanLatitude, model.scanLongitude,
+            current.first, current.second
+        )
+        if (dist > 100.0) {
+            warningManager.triggerWarning(
+                arrayOf("You may be at a different table. Tap Scan Table to rescan."),
+                viewModelScope
+            )
+        }
+    }
+
+    private fun haversineDistanceMetres(
+        lat1: Double, lon1: Double,
+        lat2: Double, lon2: Double
+    ): Double {
+        val r = 6_371_000.0
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = Math.sin(dLat / 2).let { it * it } +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                Math.sin(dLon / 2).let { it * it }
+        return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
     }
 
     private fun handleSingleEvents(event: MainScreenEvent) {
