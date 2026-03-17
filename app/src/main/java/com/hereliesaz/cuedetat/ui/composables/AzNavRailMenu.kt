@@ -59,8 +59,8 @@ fun AzNavRailMenu(
     ) {
         azConfig(
             dockingSide = AzDockingSide.LEFT,
-            packButtons = true,
-            showFooter = false
+            packButtons = false,
+            showFooter = true
         )
 
         azTheme(
@@ -76,20 +76,6 @@ fun AzNavRailMenu(
             onDismissHelp = {}
         )
 
-        // --- Header Section ---
-        azMenuItem(
-            id = "app_name",
-            text = strAppName,
-            disabled = true
-        )
-        azRailItem(
-            id = "version",
-            text = versionInfo,
-            onClick = { onEvent(MainScreenEvent.CheckForUpdate) }
-        )
-
-        azDivider()
-
         // --- Core Controls Section ---
 
         azRailToggle(
@@ -100,9 +86,9 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.ToggleHelp) }
         )
 
-        azRailItem(
+        azMenuItem(
             id = "tutorial",
-            text = "Show Tutorial",
+            text = "Tutorial",
             onClick = { onEvent(MainScreenEvent.StartTutorial) }
         )
 
@@ -150,7 +136,27 @@ fun AzNavRailMenu(
         )
 
         azDivider()
+        // --- Appearance Section ---
+        if (uiState.experienceMode == ExperienceMode.EXPERT) {
+            azRailToggle(
+                id = "cam",
+                isChecked = uiState.isCameraVisible,
+                toggleOnText = "Turn Camera Off",
+                toggleOffText = "Turn Camera On",
+                onClick = { onEvent(MainScreenEvent.ToggleCamera) }
+            )
+        }
+        azMenuItem(
+                id = "luminance",
+        text = "Luminance",
+        onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
+        )
 
+        azMenuItem(
+            id = "glow",
+            text = "Glow Stick",
+            onClick = { onEvent(MainScreenEvent.ToggleGlowStickDialog) }
+        )
         // --- Table & Units Section ---
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azMenuItem(
@@ -171,16 +177,7 @@ fun AzNavRailMenu(
             azDivider()
         }
 
-        // --- Appearance Section ---
-        if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailToggle(
-                id = "cam",
-                isChecked = uiState.isCameraVisible,
-                toggleOnText = "Turn Camera Off",
-                toggleOffText = "Turn Camera On",
-                onClick = { onEvent(MainScreenEvent.ToggleCamera) }
-            )
-        }
+
 
         azMenuItem(
             id = "orientation",
@@ -192,17 +189,7 @@ fun AzNavRailMenu(
             onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) }
         )
 
-        azMenuItem(
-            id = "luminance",
-            text = "Luminance",
-            onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
-        )
 
-        azMenuItem(
-            id = "glow",
-            text = "Glow Stick",
-            onClick = { onEvent(MainScreenEvent.ToggleGlowStickDialog) }
-        )
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azMenuItem(
