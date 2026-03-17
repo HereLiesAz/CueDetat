@@ -69,6 +69,10 @@ class MainViewModel @Inject constructor(
                 onEvent(MainScreenEvent.CvDataUpdated(visionData))
             }
         }
+
+        viewModelScope.launch {
+            onEvent(MainScreenEvent.CheckForUpdate)
+        }
     }
 
     fun onEvent(event: MainScreenEvent) {
@@ -165,7 +169,10 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             when (event) {
                 is MainScreenEvent.CheckForUpdate -> {
-                    githubRepository.getLatestVersionName()
+                    val versionName = githubRepository.getLatestVersionName()
+                    if (versionName != null) {
+                        _uiState.value = _uiState.value.copy(latestVersionName = versionName)
+                    }
                 }
 
                 is MainScreenEvent.ViewArt -> _singleEvent.emit(SingleEvent.OpenUrl("https://herelies.az"))

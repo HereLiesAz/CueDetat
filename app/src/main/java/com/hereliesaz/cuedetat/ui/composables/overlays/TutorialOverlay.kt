@@ -84,6 +84,7 @@ fun TutorialOverlay(
         // Canvas for drawing highlights over 3D objects.
         Canvas(
             modifier = Modifier
+                .fillMaxSize()
                 .zIndex(9f) // Ensure it draws above the GLSurfaceView/Camera.
         ) {
             val matrix = uiState.pitchMatrix
@@ -164,6 +165,7 @@ fun TutorialOverlay(
         // Bottom text box for instructions.
         Box(
             modifier = Modifier
+                .fillMaxSize()
                 .navigationBarsPadding()
                 .padding(bottom = 96.dp, start = 16.dp, end = 16.dp)
                 .zIndex(10f),

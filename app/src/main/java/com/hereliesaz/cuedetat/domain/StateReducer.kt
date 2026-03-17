@@ -57,8 +57,7 @@ fun stateReducer(
         is MainScreenEvent.EnterCalibrationMode, is MainScreenEvent.SampleColorAt,
         is MainScreenEvent.ToggleCvRefinementMethod, is MainScreenEvent.UpdateHoughP1,
         is MainScreenEvent.UpdateHoughP2, is MainScreenEvent.UpdateHoughThreshold,
-        is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2,
-        is MainScreenEvent.ToggleCvModel, is MainScreenEvent.ToggleSnapping ->
+        is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2 ->
             reduceAdvancedOptionsAction(currentState, action)
 
         // --- CONTROLS & TRANSFORMS ---
@@ -108,6 +107,7 @@ fun stateReducer(
         is MainScreenEvent.ToggleTableSizeDialog, is MainScreenEvent.ToggleForceTheme,
         is MainScreenEvent.ToggleCamera, is MainScreenEvent.ToggleDistanceUnit,
         is MainScreenEvent.ToggleLuminanceDialog, is MainScreenEvent.ToggleGlowStickDialog,
+        is MainScreenEvent.ToggleCvModel, is MainScreenEvent.ToggleSnapping,
         is MainScreenEvent.ToggleHelp,
         is MainScreenEvent.ToggleOrientationLock, is MainScreenEvent.ApplyPendingOrientationLock,
         is MainScreenEvent.ApplyPendingExperienceMode,

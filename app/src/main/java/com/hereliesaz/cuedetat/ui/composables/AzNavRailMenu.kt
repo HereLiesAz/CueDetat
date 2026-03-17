@@ -76,10 +76,10 @@ fun AzNavRailMenu(
             text = strAppName,
             disabled = true
         )
-        azMenuItem(
+        azRailItem(
             id = "version",
             text = versionInfo,
-            disabled = true
+            onClick = { onEvent(MainScreenEvent.CheckForUpdate) }
         )
 
         azDivider()
@@ -190,6 +190,12 @@ fun AzNavRailMenu(
             id = "luminance",
             text = "Luminance",
             onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
+        )
+
+        azRailItem(
+            id = "glow",
+            text = "Glow Stick",
+            onClick = { onEvent(MainScreenEvent.ToggleGlowStickDialog) }
         )
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
