@@ -160,8 +160,11 @@ class TableScanViewModel @Inject constructor(
                 return
             }
         }
-        // New cluster — key by current count as temporary identifier.
-        clusters[PocketId.values().getOrElse(clusters.size) { PocketId.TL }] = mutableListOf(pt)
+        // New cluster — only create up to 6 (one per PocketId).
+        // Discard detections beyond 6 to prevent false positives from overwriting real clusters.
+        if (clusters.size < PocketId.values().size) {
+            clusters[PocketId.values()[clusters.size]] = mutableListOf(pt)
+        }
     }
 
     private suspend fun completeScan(
@@ -202,6 +205,12 @@ class TableScanViewModel @Inject constructor(
         val homography = Calib3d.findHomography(srcMat, dstMat, Calib3d.RANSAC, 3.0)
         if (homography.empty()) return
 
+        // TODO: This homography maps logical→logical (both point sets are in logical/inch space).
+        //  decomposeHomography uses imgWidth/imgHeight to compute canvasCenter for the translation
+        //  offset, but those are pixel dimensions, not logical-space dimensions. Verify that the
+        //  resulting translation is in the coordinate space ApplyQuickAlign expects (viewOffset is
+        //  set directly from it in ControlReducer). May need to pass viewWidth/viewHeight instead,
+        //  or adjust canvasCenter to (0,0) for a logical-space homography.
         val (translation, rotation, scale) = decomposeHomography(homography, imgWidth, imgHeight)
 
         // Residual TPS: estimated logical → true logical.

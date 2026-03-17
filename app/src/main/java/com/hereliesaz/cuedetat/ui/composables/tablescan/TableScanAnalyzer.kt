@@ -37,7 +37,8 @@ class TableScanAnalyzer(
         val grayFull = Mat(originalHeight, originalWidth, CvType.CV_8UC1)
         grayFull.put(0, 0, yBytes)
 
-        image.close()
+        // Keep image open until after felt-colour sampling — yBytes is a copy, but
+        // closing early prevents any future refactor from accidentally reusing the buffer.
 
         // Downsample to target height of 480 for speed.
         val targetHeight = 480
@@ -76,8 +77,11 @@ class TableScanAnalyzer(
             onPocketsDetected(detections, originalWidth, originalHeight, rotationDegrees)
         }
 
-        // Sample felt colour from the centre 10% of the frame (full-res luma → BGR → HSV).
-        // Run every frame; the ViewModel holds the rolling value used at scan completion.
+        // Sample felt colour from the centre 10% of the frame.
+        // TODO: This currently samples from the Y (luma) plane only, so H=0 and S=0.
+        //  For accurate felt-colour detection (used in Task 12 AR edge fallback),
+        //  read the U/V chroma planes and build a proper NV21 → BGR → HSV conversion.
+        //  Until then, only the V (brightness) component is meaningful.
         try {
             val cx = originalWidth / 2; val cy = originalHeight / 2
             val hw = originalWidth / 20; val hh = originalHeight / 20
@@ -91,5 +95,7 @@ class TableScanAnalyzer(
             onFeltColorSampled(floatArrayOf(mean.`val`[0].toFloat(), mean.`val`[1].toFloat() / 255f, mean.`val`[2].toFloat() / 255f))
             crop.release(); bgr.release(); hsv.release(); yRoi.release()
         } catch (_: Exception) { /* ignore if ROI is out of bounds */ }
+
+        image.close()
     }
 }
