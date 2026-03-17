@@ -33,6 +33,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -128,6 +129,7 @@ private fun AlignmentStep(
     bitmap: android.graphics.Bitmap,
     pocketPositions: Map<DraggablePocket, Offset>
 ) {
+    val pinnedPockets by viewModel.pinnedPockets.collectAsState()
     var draggedPocket by remember { mutableStateOf<DraggablePocket?>(null) }
     val touchRadius = 60f
 
@@ -153,8 +155,14 @@ private fun AlignmentStep(
                                 ) pocket else null
                             }
                     },
-                    onDragEnd = { draggedPocket = null },
-                    onDragCancel = { draggedPocket = null },
+                    onDragEnd = {
+                        draggedPocket?.let { viewModel.onPocketReleased(it) }
+                        draggedPocket = null
+                    },
+                    onDragCancel = {
+                        draggedPocket?.let { viewModel.onPocketReleased(it) }
+                        draggedPocket = null
+                    },
                     onDrag = { change, _ ->
                         draggedPocket?.let {
                             viewModel.onPocketDrag(it, change.position)
@@ -194,14 +202,16 @@ private fun AlignmentStep(
                 val isCorner =
                     pocket != DraggablePocket.SIDE_LEFT && pocket != DraggablePocket.SIDE_RIGHT
                 val radius = if (isCorner) 30f else 20f
+                val isPinned = pocket in pinnedPockets
+                // Outer circle: solid when pinned, hollow when unpinned (TPS-predicted).
                 drawCircle(
-                    Color.Yellow,
+                    color = Color.Yellow,
                     radius = radius,
                     center = pos,
-                    style = Stroke(width = 4.dp.toPx()),
-                    alpha = 0.9f
+                    style = if (isPinned) Fill else Stroke(width = 4.dp.toPx()),
+                    alpha = if (isPinned) 0.9f else 0.5f
                 )
-                // Center dot.
+                // Center dot: always drawn.
                 drawCircle(Color.Yellow, radius = 8f, center = pos, alpha = 0.9f)
             }
         }
