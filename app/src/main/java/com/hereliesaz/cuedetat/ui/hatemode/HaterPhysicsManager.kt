@@ -2,36 +2,49 @@
 
 package com.hereliesaz.cuedetat.ui.hatemode
 
-import android.text.TextPaint
 import androidx.compose.ui.geometry.Offset
+import kotlin.math.sin
+import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
- * Encapsulates all physics simulation logic for HaterMode.
+ * Pure-Kotlin Newtonian physics simulation for HaterMode.
  *
- * This class is designed to manage a rigid body simulation (the 20-sided die) floating in fluid.
- *
- * **ARCHITECTURAL NOTE:**
- * The original KPhysics/JBox2D dependency was causing unresolved build issues in the CI environment.
- * To ensure project stability and compilation, this class has been temporarily converted into a
- * **Null Object Pattern** implementation (stub).
- *
- * The visual logic in [HaterScreen] and [HaterViewModel] still references it, ensuring that
- * the UI layer remains decoupled from the specific physics implementation.
- *
- * Future Work:
- * - Re-integrate a lightweight 2D physics engine (e.g., Dyn4j or Box2d-wasm).
- * - Implement [step], [pushDie], and [applyGravity] to restore interactivity.
+ * Manages a rigid-body die floating in a 2-D fluid of particles, responding to
+ * gravity (device tilt), user drag, and shake agitation.
  */
 class HaterPhysicsManager {
 
-    // --- Public State ---
+    // --- Boundaries ---
+    private var screenWidth  = 0f
+    private var screenHeight = 0f
+    private val dieRadius    = 150f
 
-    /** Current positions of fluid particles (currently empty). */
+    // --- Die state ---
+    private var diePos     = Offset.Zero
+    private var dieVel     = Offset.Zero
+    private var angle      = 0f
+    private var angularVel = 0f
+
+    // --- Gravity vector (set by sensor) ---
+    private var gravityVec = Offset.Zero
+
+    // --- Phase ---
+    private var phase: TriangleState = TriangleState.IDLE
+
+    // --- Particles (parallel lists to avoid per-frame allocation) ---
+    private val particlePos = mutableListOf<Offset>()
+    private val particleVel = mutableListOf<Offset>()
+
+    // --- Public state ---
+
+    /** Absolute screen positions of all fluid particles. */
     var particlePositions: List<Offset> = emptyList()
         private set
 
-    /** Current center position of the 8-ball die. */
+    /** Current center position of the die (offset from screen center). */
     var diePosition: Offset = Offset.Zero
         private set
 
@@ -39,64 +52,162 @@ class HaterPhysicsManager {
     var dieAngle: Float = 0f
         private set
 
-    /**
-     * Cleans up physics world resources.
-     */
-    fun destroy() {
-        // No-op in stub implementation.
+    // --- Constants ---
+    companion object {
+        private const val GRAVITY_SCALE    = 0.18f
+        private const val DAMPING          = 0.97f
+        private const val ANG_DAMPING      = 0.96f
+        private const val RESTITUTION      = 0.35f
+        private const val SPRING_STRENGTH  = 0.012f
+        private const val PARTICLE_COUNT   = 65
+        private const val PARTICLE_DAMPING = 0.985f
+        private const val AGITATE_FORCE    = 28f
     }
 
-    /**
-     * Advances the physics simulation by one time step.
-     */
-    fun step() {
-        // No-op: Simulation is paused/disabled.
-    }
+    private fun rng(min: Float, max: Float) = Random.nextFloat() * (max - min) + min
 
-    /**
-     * Defines the container boundaries for the simulation.
-     * @param width Width of the container in pixels.
-     * @param height Height of the container in pixels.
-     */
+    // --- API ---
+
     fun setupBoundaries(width: Float, height: Float) {
-        // No-op.
+        screenWidth  = width
+        screenHeight = height
+        // Reclamp existing particles to new bounds
+        val hw = width / 2f
+        val hh = height / 2f
+        for (i in particlePos.indices) {
+            val p = particlePos[i]
+            particlePos[i] = Offset(
+                p.x.coerceIn(-hw, hw),
+                p.y.coerceIn(-hh, hh)
+            )
+        }
     }
 
-    /**
-     * Updates the physical properties of the die based on the text length (mass/size).
-     */
-    fun updateDieAndText(text: String, textPaint: TextPaint) {
-        // No-op.
-    }
-
-    /**
-     * Initializes the fluid particle system.
-     */
     fun createParticles() {
-        // No-op.
+        particlePos.clear()
+        particleVel.clear()
+        val hw = screenWidth / 2f
+        val hh = screenHeight / 2f
+        repeat(PARTICLE_COUNT) {
+            particlePos.add(Offset(rng(-hw, hw), rng(-hh, hh)))
+            particleVel.add(Offset.Zero)
+        }
+        publishParticlePositions()
     }
 
-    /**
-     * Applies a chaotic force to simulate shaking the 8-ball.
-     * @param scope Coroutine scope for async delays (if needed).
-     * @param onAgitationComplete Callback when the shake settles.
-     */
+    fun step() {
+        if (screenWidth == 0f) return
+
+        // --- Die ---
+        dieVel += gravityVec * GRAVITY_SCALE
+
+        if (phase == TriangleState.SETTLING) {
+            dieVel += -diePos * SPRING_STRENGTH
+        }
+
+        dieVel  *= DAMPING
+        diePos  += dieVel
+        angularVel *= ANG_DAMPING
+        angle   += angularVel
+
+        // Boundary bounce X
+        val maxX = screenWidth / 2f - dieRadius
+        if (diePos.x > maxX) {
+            diePos = Offset(maxX, diePos.y)
+            dieVel = Offset(-dieVel.x * RESTITUTION, dieVel.y)
+        } else if (diePos.x < -maxX) {
+            diePos = Offset(-maxX, diePos.y)
+            dieVel = Offset(-dieVel.x * RESTITUTION, dieVel.y)
+        }
+
+        // Boundary bounce Y
+        val maxY = screenHeight / 2f - dieRadius
+        if (diePos.y > maxY) {
+            diePos = Offset(diePos.x, maxY)
+            dieVel = Offset(dieVel.x, -dieVel.y * RESTITUTION)
+        } else if (diePos.y < -maxY) {
+            diePos = Offset(diePos.x, -maxY)
+            dieVel = Offset(dieVel.x, -dieVel.y * RESTITUTION)
+        }
+
+        diePosition = diePos
+        dieAngle    = angle
+
+        // --- Particles ---
+        val hw = screenWidth / 2f
+        val hh = screenHeight / 2f
+        for (i in particlePos.indices) {
+            val nudge = Offset(rng(-0.4f, 0.4f), rng(-0.4f, 0.4f))
+            particleVel[i] = (particleVel[i] + nudge) * PARTICLE_DAMPING
+            var p = particlePos[i] + particleVel[i]
+
+            // Soft boundary wrap
+            if (p.x >  hw) p = Offset(p.x - screenWidth,  p.y)
+            if (p.x < -hw) p = Offset(p.x + screenWidth,  p.y)
+            if (p.y >  hh) p = Offset(p.x, p.y - screenHeight)
+            if (p.y < -hh) p = Offset(p.x, p.y + screenHeight)
+
+            particlePos[i] = p
+        }
+
+        publishParticlePositions()
+    }
+
+    fun setPhase(newPhase: TriangleState) {
+        phase = newPhase
+        when (newPhase) {
+            TriangleState.SUBMERGING -> {
+                dieVel     = Offset(rng(-3f, 3f), 18f)
+                angularVel = rng(-4f, 4f)
+            }
+            TriangleState.EMERGING -> {
+                diePos     = Offset(rng(-60f, 60f), screenHeight / 2f + dieRadius + 20f)
+                dieVel     = Offset(rng(-1f, 1f), -16f)
+                angularVel = rng(-2f, 2f)
+            }
+            TriangleState.SETTLING -> { /* spring activated in step() */ }
+            TriangleState.IDLE     -> { /* free float */ }
+        }
+    }
+
     fun agitateParticles(scope: CoroutineScope, onAgitationComplete: () -> Unit) {
-        // Immediately complete since no simulation runs to delay the transition.
-        onAgitationComplete()
+        // Random impulse to every particle
+        for (i in particlePos.indices) {
+            particleVel[i] = Offset(
+                rng(-AGITATE_FORCE, AGITATE_FORCE),
+                rng(-AGITATE_FORCE, AGITATE_FORCE)
+            )
+        }
+        // Send the die tumbling during the shake
+        dieVel     += Offset(rng(-12f, 12f), rng(-12f, 12f))
+        angularVel += rng(-8f, 8f)
+
+        scope.launch {
+            delay(1200)
+            onAgitationComplete()
+        }
     }
 
-    /**
-     * Applies an impulse force to the die (user drag).
-     */
     fun pushDie(delta: Offset) {
-        // No-op.
+        dieVel     += delta * 0.12f
+        angularVel += (delta.x - delta.y) * 0.04f
     }
 
-    /**
-     * Updates the gravity vector based on device orientation sensors.
-     */
     fun applyGravity(roll: Float, pitch: Float) {
-        // No-op.
+        gravityVec = Offset(
+            sin(Math.toRadians(roll.toDouble())).toFloat(),
+            sin(Math.toRadians(pitch.toDouble())).toFloat()
+        )
+    }
+
+    fun destroy() {
+        particlePos.clear()
+        particleVel.clear()
+    }
+
+    // --- Helpers ---
+
+    private fun publishParticlePositions() {
+        particlePositions = particlePos.toList()
     }
 }
