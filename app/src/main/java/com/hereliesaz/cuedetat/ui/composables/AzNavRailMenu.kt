@@ -71,7 +71,7 @@ fun AzNavRailMenu(
         azAdvanced(
             isLoading = false,
             enableRailDragging = false,
-            helpEnabled = false,
+            helpEnabled = true,
             onDismissHelp = {}
         )
 
@@ -80,8 +80,10 @@ fun AzNavRailMenu(
         azRailToggle(
             id = "help",
             isChecked = uiState.areHelpersVisible,
-            toggleOnText = strHideHelpers,
-            toggleOffText = strShowHelpers,
+            toggleOnText = "Help",
+            toggleOffText = "Help",
+            menuToggleOnText = strHideHelpers,
+            menuToggleOffText = strShowHelpers,
             onClick = { onEvent(MainScreenEvent.ToggleHelp) }
         )
 
@@ -96,6 +98,8 @@ fun AzNavRailMenu(
             isChecked = uiState.isSpinControlVisible,
             toggleOnText = "Spin",
             toggleOffText = "Spin",
+            menuToggleOnText = "Spin Control",
+            menuToggleOffText = "Spin Control",
             onClick = { onEvent(MainScreenEvent.ToggleSpinControl) }
         )
 
@@ -105,12 +109,15 @@ fun AzNavRailMenu(
                 isChecked = uiState.isBankingMode,
                 toggleOnText = "Aim",
                 toggleOffText = "Bank",
+                menuToggleOnText = "Shot Aiming",
+                menuToggleOffText = "Bank Calculator",
                 onClick = { onEvent(MainScreenEvent.ToggleBankingMode) }
             )
 
             azRailItem(
                 id = "add_obstacle",
                 text = "Add",
+                menuText = "Add Obstacle",
                 onClick = { onEvent(MainScreenEvent.AddObstacleBall) }
             )
         }
@@ -137,14 +144,14 @@ fun AzNavRailMenu(
         azDivider()
         // --- Appearance Section ---
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azMenuItem(
+            azRailCycler(
                 id = "cam",
-                text = when (uiState.cameraMode) {
-                    com.hereliesaz.cuedetat.domain.CameraMode.OFF -> "Camera: Off"
-                    com.hereliesaz.cuedetat.domain.CameraMode.CAMERA -> "Camera: On"
-                    com.hereliesaz.cuedetat.domain.CameraMode.AR -> "Camera: AR"
+                menuOptions = listOf("Off", "Cam", "AR"),
+                selectedOption = when (uiState.cameraMode) {
+                    com.hereliesaz.cuedetat.domain.CameraMode.OFF -> "Off"
+                    com.hereliesaz.cuedetat.domain.CameraMode.CAMERA -> "Cam"
+                    com.hereliesaz.cuedetat.domain.CameraMode.AR -> "AR"
                 },
-                onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
             )
         }
         azMenuItem(
