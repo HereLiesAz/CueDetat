@@ -3,6 +3,7 @@
 package com.hereliesaz.cuedetat.ui.hatemode
 
 import android.graphics.BitmapFactory
+import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.fillMaxSize
@@ -90,20 +91,24 @@ fun HaterScreen(
 
                 val targetSize = minOf(size.width, size.height) * 0.55f
 
-                // Glow: concentric purplish-blue halos around the die position, scaled with dieScale
+                // Glow: soft bioluminescent emanation — very subtle, deepens with scale
                 if (state.dieScale > 0.01f) {
                     val dieCenter = Offset(centerX + state.diePosition.x, centerY + state.diePosition.y)
                     val glowBase  = targetSize * 0.5f * state.dieScale
-                    for (i in 5 downTo 0) {
+                    for (i in 0..3) {
                         drawCircle(
-                            color  = Color(0xFF6622DD).copy(alpha = 0.07f * (6 - i)),
-                            radius = glowBase * (1f + i * 0.20f),
+                            color  = Color(0xFF3311BB).copy(alpha = (0.055f - i * 0.011f) * state.dieScale),
+                            radius = glowBase * (1.1f + i * 0.4f),
                             center = dieCenter
                         )
                     }
                 }
 
+                // Die bitmap: alpha tied to dieScale so it materializes out of the dark liquid
                 bitmap?.let { bmp ->
+                    val alphaPaint = Paint().apply {
+                        alpha = (state.dieScale.coerceIn(0f, 1f) * 255f).toInt()
+                    }
                     drawIntoCanvas { canvas ->
                         canvas.save()
                         canvas.translate(centerX + state.diePosition.x, centerY + state.diePosition.y)
@@ -114,7 +119,7 @@ fun HaterScreen(
                             bmp.asAndroidBitmap(),
                             -bmp.width / 2f,
                             -bmp.height / 2f,
-                            null
+                            alphaPaint
                         )
                         canvas.restore()
                     }
