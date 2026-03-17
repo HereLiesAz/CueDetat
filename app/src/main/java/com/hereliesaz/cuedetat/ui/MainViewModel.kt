@@ -48,7 +48,7 @@ class MainViewModel @Inject constructor(
     private val tableScanRepository: TableScanRepository,
     private val warningManager: WarningManager,
     @ApplicationContext private val appContext: Context,
-    visionRepository: VisionRepository,
+    private val visionRepository: VisionRepository,
 ) : ViewModel() {
 
     private var experienceModeUpdateJob: Job? = null
@@ -88,6 +88,10 @@ class MainViewModel @Inject constructor(
             visionRepository.visionDataFlow.collect { visionData ->
                 onEvent(MainScreenEvent.CvDataUpdated(visionData))
             }
+        }
+
+        viewModelScope.launch {
+            visionRepository.arEvents.collect { event -> onEvent(event) }
         }
 
         viewModelScope.launch {

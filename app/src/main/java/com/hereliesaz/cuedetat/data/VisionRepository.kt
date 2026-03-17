@@ -6,20 +6,30 @@ import android.annotation.SuppressLint
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.camera.core.ImageProxy
+import androidx.compose.ui.geometry.Offset
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.DetectedObject
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.hereliesaz.cuedetat.di.GenericDetector
+import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
+import com.hereliesaz.cuedetat.domain.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.PocketId
 import com.hereliesaz.cuedetat.domain.ThinPlateSpline
+import com.hereliesaz.cuedetat.domain.decomposeHomography
+import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.utils.toMat
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.CvRefinementMethod
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.opencv.calib3d.Calib3d
 import org.opencv.core.Core
 import org.opencv.core.Mat
 import org.opencv.core.MatOfDouble
@@ -32,6 +42,7 @@ import java.util.concurrent.ExecutionException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.pow
 import org.opencv.core.Rect as OCVRect
 
@@ -62,6 +73,11 @@ class VisionRepository @Inject constructor(
     // The UI collects from this flow to render debug overlays or update the game state.
     private val _visionDataFlow = MutableStateFlow(VisionData())
     val visionDataFlow = _visionDataFlow.asStateFlow()
+
+    // AR tracking events emitted to MainViewModel.
+    private var arFrameCounter = 0
+    private val _arEvents = MutableSharedFlow<MainScreenEvent>(extraBufferCapacity = 16)
+    val arEvents: SharedFlow<MainScreenEvent> = _arEvents.asSharedFlow()
 
     // FPS throttling: We track the last processing time to ensure we don't clog the pipeline
     // if processing takes longer than 33ms.
@@ -345,6 +361,14 @@ class VisionRepository @Inject constructor(
 
                 _visionDataFlow.value = finalVisionData
 
+                // AR tracking pass — only in AR mode, every 5th frame.
+                if (state.cameraMode == CameraMode.AR && state.tableScanModel != null) {
+                    arFrameCounter++
+                    if (arFrameCounter % 5 == 0) {
+                        runArTrackingPass(matToUse, state, inputImage.width, inputImage.height, rotationDegrees)
+                    }
+                }
+
                 // NOTE: We intentionally do NOT release reusable mats here. They are cleared/overwritten next frame.
 
             } catch (e: Exception) {
@@ -562,6 +586,172 @@ class VisionRepository @Inject constructor(
             }
         }
         return center
+    }
+
+    private fun emitEvent(event: MainScreenEvent) {
+        _arEvents.tryEmit(event)
+    }
+
+    /**
+     * Per-frame AR tracking:
+     * 1. Detect pocket-sized circles.
+     * 2. Match to known clusters; update cluster weights (Kalman-style).
+     * 3. If ≥2 matched: solve homography → blend pose → emit UpdateArPose.
+     * 4. If 0 matched: attempt edge-based fallback.
+     */
+    private fun runArTrackingPass(
+        mat: Mat,
+        state: CueDetatState,
+        imageWidth: Int,
+        imageHeight: Int,
+        rotationDegrees: Int
+    ) {
+        val model = state.tableScanModel ?: return
+        if (!state.hasInverseMatrix) return
+        val inverse = state.inversePitchMatrix ?: return
+
+        // Downsample for Hough.
+        val targetHeight = 480
+        val scale = targetHeight.toDouble() / imageHeight
+        val targetWidth = (imageWidth * scale).toInt()
+        val graySmall = Mat()
+        Imgproc.cvtColor(mat, graySmall, Imgproc.COLOR_BGR2GRAY)
+        val grayResized = Mat()
+        Imgproc.resize(graySmall, grayResized, Size(targetWidth.toDouble(), targetHeight.toDouble()))
+        graySmall.release()
+
+        val circles = Mat()
+        Imgproc.HoughCircles(
+            grayResized, circles, Imgproc.CV_HOUGH_GRADIENT,
+            1.5, grayResized.rows() / 5.0, 80.0, 25.0, 15, 60
+        )
+        grayResized.release()
+
+        // Project detected blobs to logical space.
+        val detectedLogical = mutableListOf<Pair<PointF, PointF>>() // (imagePoint, logicalPoint)
+        if (!circles.empty()) {
+            val imageToScreen = Matrix().apply {
+                postScale(state.viewWidth.toFloat() / imageWidth.toFloat(),
+                          state.viewHeight.toFloat() / imageHeight.toFloat())
+            }
+            for (i in 0 until circles.cols()) {
+                val data = circles.get(0, i)
+                val imgPt = PointF((data[0] / scale).toFloat(), (data[1] / scale).toFloat())
+                val screenArr = floatArrayOf(imgPt.x, imgPt.y)
+                imageToScreen.mapPoints(screenArr)
+                val logicalArr = floatArrayOf(screenArr[0], screenArr[1])
+                inverse.mapPoints(logicalArr)
+                detectedLogical.add(imgPt to PointF(logicalArr[0], logicalArr[1]))
+            }
+        }
+        circles.release()
+
+        // Match detections to known clusters (nearest within 3 logical inches).
+        val matchedPairs = mutableListOf<Triple<PocketId, PointF, PointF>>() // (id, imgPt, logicalPt)
+        val tolerance = 3.0f
+        detectedLogical.forEach { (imgPt, logPt) ->
+            val nearest = model.pockets.minByOrNull { cluster ->
+                hypot((cluster.logicalPosition.x - logPt.x).toDouble(),
+                      (cluster.logicalPosition.y - logPt.y).toDouble()).toFloat()
+            }
+            if (nearest != null) {
+                val dist = hypot((nearest.logicalPosition.x - logPt.x).toDouble(),
+                                 (nearest.logicalPosition.y - logPt.y).toDouble()).toFloat()
+                if (dist <= tolerance) matchedPairs.add(Triple(nearest.identity, imgPt, logPt))
+            }
+        }
+
+        // Cluster update (persistent point cloud refinement).
+        if (matchedPairs.isNotEmpty()) {
+            val updatedClusters = model.pockets.map { cluster ->
+                val match = matchedPairs.firstOrNull { it.first == cluster.identity }
+                if (match != null) {
+                    val n = cluster.observationCount
+                    val newX = (n * cluster.logicalPosition.x + match.third.x) / (n + 1)
+                    val newY = (n * cluster.logicalPosition.y + match.third.y) / (n + 1)
+                    cluster.copy(
+                        logicalPosition = PointF(newX, newY),
+                        observationCount = n + 1,
+                        variance = cluster.variance * 0.95f
+                    )
+                } else cluster
+            }
+            emitEvent(MainScreenEvent.UpdateTableScanClusters(updatedClusters))
+        }
+
+        // Pose update — requires ≥ 2 matched pockets.
+        if (matchedPairs.size >= 2) {
+            val srcMat = MatOfPoint2f()
+            val dstMat = MatOfPoint2f()
+            srcMat.fromList(matchedPairs.map { org.opencv.core.Point(it.second.x.toDouble(), it.second.y.toDouble()) })
+            dstMat.fromList(matchedPairs.map {
+                val cluster = model.pockets.first { c -> c.identity == it.first }
+                org.opencv.core.Point(cluster.logicalPosition.x.toDouble(), cluster.logicalPosition.y.toDouble())
+            })
+            val h = Calib3d.findHomography(srcMat, dstMat, Calib3d.RANSAC, 3.0)
+            if (!h.empty()) {
+                val (rawT, rawR, rawS) = decomposeHomography(h, imageWidth.toFloat(), imageHeight.toFloat())
+                val alpha = 0.15f
+                val current = state
+                val blendedTranslation = Offset(
+                    alpha * rawT.x + (1 - alpha) * current.viewOffset.x,
+                    alpha * rawT.y + (1 - alpha) * current.viewOffset.y
+                )
+                val blendedRotation = alpha * rawR + (1 - alpha) * current.worldRotationDegrees
+                val blendedScale = alpha * rawS + (1 - alpha) * ZoomMapping.sliderToZoom(
+                    current.zoomSliderPosition,
+                    ZoomMapping.getZoomRange(current.experienceMode).first,
+                    ZoomMapping.getZoomRange(current.experienceMode).second
+                )
+                val delta = hypot((blendedTranslation.x - current.viewOffset.x).toDouble(),
+                                  (blendedTranslation.y - current.viewOffset.y).toDouble())
+                if (delta > 0.5) {
+                    emitEvent(MainScreenEvent.UpdateArPose(blendedTranslation, blendedRotation, blendedScale))
+                }
+            }
+        } else if (matchedPairs.isEmpty()) {
+            runEdgeFallback(mat, state, inverse, imageWidth, imageHeight, rotationDegrees)
+        }
+    }
+
+    private fun runEdgeFallback(
+        mat: Mat,
+        state: CueDetatState,
+        inverse: Matrix,
+        imageWidth: Int,
+        imageHeight: Int,
+        rotationDegrees: Int
+    ) {
+        val model = state.tableScanModel ?: return
+        val hsv = floatArrayOf(model.feltColorHsv[0], model.feltColorHsv[1], model.feltColorHsv[2])
+
+        val hsvMat = Mat()
+        Imgproc.cvtColor(mat, hsvMat, Imgproc.COLOR_BGR2HSV)
+
+        val lower = Scalar(
+            maxOf(0.0, hsv[0] - 20.0), maxOf(0.0, hsv[1] * 255 - 60.0), maxOf(0.0, hsv[2] * 255 - 60.0)
+        )
+        val upper = Scalar(
+            minOf(180.0, hsv[0] + 20.0), minOf(255.0, hsv[1] * 255 + 60.0), minOf(255.0, hsv[2] * 255 + 60.0)
+        )
+        val mask = Mat()
+        Core.inRange(hsvMat, lower, upper, mask)
+        hsvMat.release()
+
+        val contours = mutableListOf<MatOfPoint>()
+        Imgproc.findContours(mask, contours, Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+        mask.release()
+
+        val largest = contours.maxByOrNull { Imgproc.contourArea(it) } ?: return
+        if (Imgproc.contourArea(largest) < mat.rows() * mat.cols() * 0.05) return
+
+        val approx = MatOfPoint2f()
+        val contour2f = MatOfPoint2f(*largest.toArray())
+        val epsilon = 0.02 * Imgproc.arcLength(contour2f, true)
+        Imgproc.approxPolyDP(contour2f, approx, epsilon, true)
+
+        if (approx.rows() != 4) return
+        // Valid quad found but corner-to-pose mapping is complex; hold pose (IMU maintains tilt).
     }
 
     private fun getTransformationMatrix(
