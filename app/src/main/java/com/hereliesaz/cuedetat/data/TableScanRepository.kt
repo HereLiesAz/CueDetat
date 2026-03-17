@@ -3,10 +3,10 @@ package com.hereliesaz.cuedetat.data
 
 import android.annotation.SuppressLint
 import android.content.Context
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.gson.Gson
-import com.google.gson.GsonBuilder
 import com.hereliesaz.cuedetat.domain.TableScanModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -17,14 +17,14 @@ import kotlin.coroutines.resume
 
 @Singleton
 class TableScanRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val gson: Gson
 ) {
-    private val gson: Gson = GsonBuilder().create()
     private val file: File get() = File(context.filesDir, "table_scan_model.json")
 
     /** Loads the saved model from disk, or null if none exists. */
     fun load(): TableScanModel? = runCatching {
-        if (!file.exists()) return null
+        if (!file.exists()) return@runCatching null
         gson.fromJson(file.readText(), TableScanModel::class.java)
     }.getOrNull()
 
@@ -46,8 +46,10 @@ class TableScanRepository @Inject constructor(
     @SuppressLint("MissingPermission")
     suspend fun getCurrentLocation(): Pair<Double, Double>? =
         suspendCancellableCoroutine { cont ->
+            val cts = CancellationTokenSource()
+            cont.invokeOnCancellation { cts.cancel() }
             val client = LocationServices.getFusedLocationProviderClient(context)
-            client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null)
+            client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
                 .addOnSuccessListener { location ->
                     cont.resume(location?.let { Pair(it.latitude, it.longitude) })
                 }
