@@ -33,7 +33,6 @@ import com.hereliesaz.cuedetat.ui.MainViewModel
 import com.hereliesaz.cuedetat.ui.ProtractorScreen
 import com.hereliesaz.cuedetat.ui.composables.SplashScreen
 import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
-import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
 import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanViewModel
 import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
 import com.hereliesaz.cuedetat.ui.hatemode.HaterScreen
@@ -51,7 +50,6 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
     private val calibrationViewModel: CalibrationViewModel by viewModels()
-    private val quickAlignViewModel: QuickAlignViewModel by viewModels()
     private val tableScanViewModel: TableScanViewModel by viewModels()
     private val haterViewModel: HaterViewModel by viewModels()
 
@@ -172,7 +170,6 @@ class MainActivity : ComponentActivity() {
                         ProtractorScreen(
                             mainViewModel = viewModel,
                             calibrationViewModel = calibrationViewModel,
-                            quickAlignViewModel = quickAlignViewModel,
                             tableScanViewModel = tableScanViewModel,
                             calibrationAnalyzer = calibrationAnalyzer
                         )

@@ -34,9 +34,6 @@ import com.hereliesaz.cuedetat.ui.composables.dialogs.LuminanceAdjustmentDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.TableSizeSelectionDialog
 import com.hereliesaz.cuedetat.ui.composables.overlays.KineticWarningOverlay
 import com.hereliesaz.cuedetat.ui.composables.overlays.TutorialOverlay
-import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignAnalyzer
-import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignScreen
-import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
 import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
 import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanAnalyzer
 import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanScreen
@@ -44,7 +41,6 @@ import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanViewModel
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
 
 private const val ROUTE_MAIN = "main"
-private const val ROUTE_ALIGN = "align"
 private const val ROUTE_CALIBRATION = "calibration"
 private const val ROUTE_SCAN = "scan"
 
@@ -52,7 +48,6 @@ private const val ROUTE_SCAN = "scan"
 fun ProtractorScreen(
     mainViewModel: MainViewModel,
     calibrationViewModel: CalibrationViewModel,
-    quickAlignViewModel: QuickAlignViewModel,
     tableScanViewModel: TableScanViewModel,
     calibrationAnalyzer: CalibrationAnalyzer
 ) {
@@ -61,17 +56,7 @@ fun ProtractorScreen(
     val navController = rememberNavController()
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
-    val quickAlignAnalyzer = remember(quickAlignViewModel) { QuickAlignAnalyzer(quickAlignViewModel) }
     val tableScanAnalyzer = remember(tableScanViewModel) { TableScanAnalyzer(tableScanViewModel::onFrame, tableScanViewModel::onFeltColorSampled) }
-
-    LaunchedEffect(uiState.showQuickAlignScreen) {
-        val route = navController.currentBackStackEntry?.destination?.route
-        if (uiState.showQuickAlignScreen && route != ROUTE_ALIGN) {
-            navController.navigate(ROUTE_ALIGN) { launchSingleTop = true }
-        } else if (!uiState.showQuickAlignScreen && route == ROUTE_ALIGN) {
-            navController.popBackStack()
-        }
-    }
 
     LaunchedEffect(uiState.showCalibrationScreen) {
         val route = navController.currentBackStackEntry?.destination?.route
@@ -105,7 +90,6 @@ fun ProtractorScreen(
             if (uiState.cameraMode != com.hereliesaz.cuedetat.domain.CameraMode.OFF) {
                 val activeAnalyzer = when (currentRoute) {
                     ROUTE_CALIBRATION -> calibrationAnalyzer
-                    ROUTE_ALIGN -> quickAlignAnalyzer
                     ROUTE_SCAN -> tableScanAnalyzer
                     else -> mainViewModel.visionAnalyzer
                 }
@@ -132,13 +116,6 @@ fun ProtractorScreen(
         background(weight = 2) {
             NavHost(navController = navController, startDestination = ROUTE_MAIN) {
                 composable(ROUTE_MAIN) { /* AR and HUD handled by background/onscreen blocks */ }
-                composable(ROUTE_ALIGN) {
-                    QuickAlignScreen(
-                        onEvent = mainViewModel::onEvent,
-                        viewModel = quickAlignViewModel,
-                        analyzer = quickAlignAnalyzer
-                    )
-                }
                 composable(ROUTE_CALIBRATION) {
                     CalibrationScreen(
                         uiState = uiState,

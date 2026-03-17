@@ -115,7 +115,7 @@ fun stateReducer(
         is MainScreenEvent.ApplyPendingExperienceMode,
         is MainScreenEvent.OrientationChanged, is MainScreenEvent.SetExperienceMode,
         is MainScreenEvent.UnlockBeginnerView, is MainScreenEvent.LockBeginnerView,
-        is MainScreenEvent.ToggleCalibrationScreen, is MainScreenEvent.ToggleQuickAlignScreen,
+        is MainScreenEvent.ToggleCalibrationScreen,
         is MainScreenEvent.ToggleBankingMode, is MainScreenEvent.ToggleTableScanScreen ->
             reduceToggleAction(currentState, action, reducerUtils)
 

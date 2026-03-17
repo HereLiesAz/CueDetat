@@ -152,8 +152,8 @@ fun AdvancedOptionsDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        TextButton(onClick = { onEvent(MainScreenEvent.ToggleQuickAlignScreen); onDismiss() }) {
-                            Text("Table Alignment", color = MaterialTheme.colorScheme.tertiary)
+                        TextButton(onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen); onDismiss() }) {
+                            Text("Scan Table", color = MaterialTheme.colorScheme.tertiary)
                         }
                         TextButton(onClick = { onEvent(MainScreenEvent.ToggleCalibrationScreen); onDismiss() }) {
                             Text("Full Calibration", color = MaterialTheme.colorScheme.tertiary)

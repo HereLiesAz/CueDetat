@@ -155,9 +155,6 @@ internal fun reduceToggleAction(
         // Toggle the calibration screen visibility.
         is MainScreenEvent.ToggleCalibrationScreen -> state.copy(showCalibrationScreen = !state.showCalibrationScreen)
 
-        // Toggle the quick align screen visibility.
-        is MainScreenEvent.ToggleQuickAlignScreen -> state.copy(showQuickAlignScreen = !state.showQuickAlignScreen)
-
         // Toggle the table scan screen visibility.
         is MainScreenEvent.ToggleTableScanScreen ->
             state.copy(showTableScanScreen = !state.showTableScanScreen)
