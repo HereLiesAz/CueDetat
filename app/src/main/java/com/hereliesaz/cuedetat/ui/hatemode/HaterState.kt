@@ -28,6 +28,8 @@ data class HaterState(
     val diePosition: Offset = Offset.Zero,
     val dieAngle: Float = 0f,
     val dieScale: Float = 0f,
+    val rockAngleX: Float = 0f,   // 3-D perspective tilt around X axis (degrees)
+    val rockAngleY: Float = 0f,   // 3-D perspective tilt around Y axis (degrees)
     val answerResId: Int = R.drawable.group0,
     val triangleState: TriangleState = TriangleState.IDLE,
 )

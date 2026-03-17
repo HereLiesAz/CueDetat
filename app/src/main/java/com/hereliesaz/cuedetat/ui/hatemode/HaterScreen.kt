@@ -3,7 +3,11 @@
 package com.hereliesaz.cuedetat.ui.hatemode
 
 import android.graphics.BitmapFactory
+import android.graphics.Camera
+import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Shader
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.fillMaxSize
@@ -97,39 +101,90 @@ fun HaterScreen(
                     val cx        = centerX + state.diePosition.x
                     val cy        = centerY + state.diePosition.y
 
+                    // Build a Camera perspective matrix for the current rock tilt.
+                    // Camera.rotateX(+deg) tilts the top away from viewer (top dips into liquid).
+                    // Camera.rotateY(+deg) tilts the right side away from viewer (right dips).
+                    val cam = Camera()
+                    cam.setLocation(0f, 0f, -6f) // closer camera = more pronounced perspective
+                    cam.rotateX(state.rockAngleX)
+                    cam.rotateY(state.rockAngleY)
+                    val perspMatrix = Matrix()
+                    cam.getMatrix(perspMatrix)
+                    // pivot the perspective around the bitmap centre
+                    perspMatrix.preTranslate(-hw, -hh)
+                    perspMatrix.postTranslate(hw, hh)
+
+                    // Directional shading: dipping edge darkens (into black liquid),
+                    // rising edge brightens (emerging from it).
+                    // rockAngleX > 0 → top dips → dark at -Y (top) in bitmap space
+                    // rockAngleY > 0 → right dips → dark at +X (right) in bitmap space
+                    val tiltMag = kotlin.math.sqrt(
+                        (state.rockAngleX * state.rockAngleX + state.rockAngleY * state.rockAngleY).toDouble()
+                    ).toFloat()
+                    val shadeStrength = (tiltMag / 12f).coerceIn(0f, 1f)
+                    val darkAlpha   = (shadeStrength * 100).toInt()   // max ~39% darken
+                    val brightAlpha = (shadeStrength * 50).toInt()    // max ~20% lighten
+                    // Gradient goes from bright (rising) side to dark (dipping) side
+                    val gx = (state.rockAngleY / 12f) * hw   // +x = right side dips
+                    val gy = -(state.rockAngleX / 12f) * hh  // positive X-tilt = top dips = -y direction
+
                     drawIntoCanvas { canvas ->
-                        // --- Adjacent faces: the other sides of the die dimly visible through the liquid ---
-                        // A d20 face is 60° from its neighbours; render them at slightly larger scale
-                        // and ~11% opacity to simulate seeing through the dark fluid.
-                        if (state.dieScale > 0.05f) {
-                            val faceAlpha = (state.dieScale * 28f).toInt().coerceAtMost(28)
-                            val facePaint = Paint().apply { alpha = faceAlpha }
 
-                            canvas.save()
-                            canvas.translate(cx, cy)
-                            canvas.rotate(state.dieAngle + 60f)
-                            canvas.scale(baseScale * 1.25f, baseScale * 1.25f)
-                            canvas.nativeCanvas.drawBitmap(andBmp, -hw, -hh, facePaint)
-                            canvas.restore()
+                        // --- Adjacent faces: other sides of the d20 dimly visible through the liquid ---
+                        // Most visible at mid-emergence (die half-submerged); fades when fully surfaced.
+                        val t          = state.dieScale.coerceIn(0f, 1f)
+                        val ghostAlpha = (t * (1f - t) * 4f * 55f).toInt().coerceAtMost(55)
+                        if (ghostAlpha > 0) {
+                            val ghostPaint = Paint().apply { alpha = ghostAlpha }
+                            canvas.nativeCanvas.save()
+                            canvas.nativeCanvas.translate(cx, cy)
+                            canvas.nativeCanvas.rotate(state.dieAngle + 60f)
+                            canvas.nativeCanvas.scale(baseScale * 1.25f, baseScale * 1.25f)
+                            canvas.nativeCanvas.concat(perspMatrix)
+                            canvas.nativeCanvas.drawBitmap(andBmp, -hw, -hh, ghostPaint)
+                            canvas.nativeCanvas.restore()
 
-                            canvas.save()
-                            canvas.translate(cx, cy)
-                            canvas.rotate(state.dieAngle - 60f)
-                            canvas.scale(baseScale * 1.20f, baseScale * 1.20f)
-                            canvas.nativeCanvas.drawBitmap(andBmp, -hw, -hh, facePaint)
-                            canvas.restore()
+                            canvas.nativeCanvas.save()
+                            canvas.nativeCanvas.translate(cx, cy)
+                            canvas.nativeCanvas.rotate(state.dieAngle - 60f)
+                            canvas.nativeCanvas.scale(baseScale * 1.20f, baseScale * 1.20f)
+                            canvas.nativeCanvas.concat(perspMatrix)
+                            canvas.nativeCanvas.drawBitmap(andBmp, -hw, -hh, ghostPaint)
+                            canvas.nativeCanvas.restore()
                         }
 
                         // --- Main face ---
                         val mainPaint = Paint().apply {
                             alpha = (state.dieScale.coerceIn(0f, 1f) * 255f).toInt()
                         }
-                        canvas.save()
-                        canvas.translate(cx, cy)
-                        canvas.rotate(state.dieAngle)
-                        canvas.scale(baseScale, baseScale)
+                        canvas.nativeCanvas.save()
+                        canvas.nativeCanvas.translate(cx, cy)
+                        canvas.nativeCanvas.rotate(state.dieAngle)
+                        canvas.nativeCanvas.scale(baseScale, baseScale)
+                        canvas.nativeCanvas.concat(perspMatrix)
                         canvas.nativeCanvas.drawBitmap(andBmp, -hw, -hh, mainPaint)
-                        canvas.restore()
+
+                        // --- Directional liquid shading (drawn in bitmap space, after perspective) ---
+                        // Dipping edge: dark gradient merging into the black liquid.
+                        // Rising edge: slight brightening as the face lifts clear of the surface.
+                        if (darkAlpha > 0) {
+                            val shadePaint = Paint().apply {
+                                shader = LinearGradient(
+                                    -gx, -gy,   // bright / rising side
+                                    gx, gy,     // dark / dipping side
+                                    intArrayOf(
+                                        android.graphics.Color.argb(brightAlpha, 255, 255, 255),
+                                        android.graphics.Color.argb(0, 0, 0, 0),
+                                        android.graphics.Color.argb(darkAlpha, 0, 0, 0)
+                                    ),
+                                    floatArrayOf(0f, 0.5f, 1f),
+                                    Shader.TileMode.CLAMP
+                                )
+                            }
+                            canvas.nativeCanvas.drawRect(-hw, -hh, hw, hh, shadePaint)
+                        }
+
+                        canvas.nativeCanvas.restore()
                     }
                 }
             }

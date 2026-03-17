@@ -10,11 +10,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Pure-Kotlin physics simulation for Hater Mode.
+ * Physics simulation for Hater Mode.
  *
- * Die floats in viscous liquid: gravity-driven XY drift with curved deceleration,
- * no spring back to center, Z-scale spring for emergence/submergence, and a combined
- * scale + Y-position bob while settling.
+ * The phone is held FLAT (face up). The die floats on the liquid surface in the screen's
+ * XY plane. Gravity from tilting the phone moves the die across that surface. "Upward"
+ * is the Z-axis — emergence is purely scale growth (die rising toward the camera), with
+ * no screen-space Y movement. Settling produces a combined scale + perspective rock bob
+ * that makes different edges of the die appear to dip into and rise from the liquid.
  */
 class HaterPhysicsManager {
 
@@ -48,18 +50,22 @@ class HaterPhysicsManager {
         private set
     var currentDieScale: Float = 0f
         private set
+    var currentRockX: Float = 0f   // perspective tilt degrees, X-axis
+        private set
+    var currentRockY: Float = 0f   // perspective tilt degrees, Y-axis
+        private set
 
     companion object {
-        private const val GRAVITY_SCALE = 0.06f   // slow, deliberate gravity drift
-        private const val DAMPING       = 0.97f   // graceful curved deceleration (~380ms to half-speed)
+        private const val GRAVITY_SCALE = 0.06f   // slow, deliberate gravity drift across surface
+        private const val DAMPING       = 0.97f   // graceful curved deceleration (~380 ms to half-speed)
         private const val ANG_DAMPING   = 0.98f
         private const val RESTITUTION   = 0.05f   // near-dead stop at walls
-        private const val BUOYANCY      = 0.30f   // upward lift applied only during EMERGING
         private const val SCALE_SPRING  = 0.018f  // slow, deliberate Z-scale rise
-        private const val SCALE_DAMPING = 0.96f   // smooth, overdamped approach
+        private const val SCALE_DAMPING = 0.96f   // smooth overdamped approach
         private const val BOB_SPEED     = 0.018f  // slow hypnotic cycle
         private const val BOB_SCALE_AMP = 0.07f   // ±7% scale oscillation
-        private const val BOB_Y_AMP     = 14f     // ±14 px vertical bob (surface float)
+        private const val MAX_ROCK_X    = 12f     // peak X-axis perspective tilt (degrees)
+        private const val MAX_ROCK_Y    = 8f      // peak Y-axis perspective tilt (degrees)
     }
 
     private fun rng(min: Float, max: Float) = Random.nextFloat() * (max - min) + min
@@ -72,20 +78,15 @@ class HaterPhysicsManager {
     fun step() {
         if (screenWidth == 0f) return
 
-        // --- XY physics ---
+        // --- XY physics: gravity tilts the phone → die drifts across the liquid surface ---
         dieVel += gravityVec * GRAVITY_SCALE
+        dieVel *= DAMPING
+        diePos += dieVel
 
-        // Buoyancy: constant upward force while die is rising through liquid
-        if (phase == TriangleState.EMERGING) {
-            dieVel = Offset(dieVel.x, dieVel.y - BUOYANCY)
-        }
-
-        dieVel     *= DAMPING
-        diePos     += dieVel
         angularVel *= ANG_DAMPING
         angle      += angularVel
 
-        // Boundary: near-dead stop at walls (box of thick liquid)
+        // Boundary: near-dead stop at walls (die contained inside the liquid box)
         val maxX = screenWidth / 2f - dieRadius
         if (diePos.x > maxX) {
             diePos = Offset(maxX, diePos.y)
@@ -104,22 +105,29 @@ class HaterPhysicsManager {
             dieVel = Offset(dieVel.x, -dieVel.y * RESTITUTION)
         }
 
-        // --- Z-scale spring ---
+        // --- Z-scale spring (emergence/submergence along the axis into the screen) ---
         scaleVel += (targetScale - dieScale) * SCALE_SPRING
         scaleVel *= SCALE_DAMPING
         dieScale = (dieScale + scaleVel).coerceIn(0f, 1.05f)
 
-        // --- Bob: sinusoidal Z-scale AND Y-position oscillation while settling ---
+        // --- Bob: scale oscillation + perspective rock while settling ---
+        // Scale bob: die rises toward camera (grows) and sinks (shrinks) cyclically.
+        // Rock: two slightly out-of-phase tilts make different triangle edges dip into
+        // and rise from the liquid surface, with independent darkening handled by the renderer.
         var publicScale = dieScale
-        var bobOffsetY  = 0f
         if (phase == TriangleState.SETTLING) {
-            bobPhase   += BOB_SPEED
-            val sinVal  = sin(bobPhase.toDouble()).toFloat()
-            publicScale += BOB_SCALE_AMP * sinVal  // scale grows as die bobs toward surface
-            bobOffsetY  = -BOB_Y_AMP * sinVal      // rises in Y when scale is at peak
+            bobPhase += BOB_SPEED
+            val s1 = sin(bobPhase.toDouble()).toFloat()
+            val s2 = sin(bobPhase * 0.65 + 1.3).toFloat() // different freq for Y-axis rock
+            publicScale  += BOB_SCALE_AMP * s1
+            currentRockX  = MAX_ROCK_X * s1
+            currentRockY  = MAX_ROCK_Y * s2
+        } else {
+            currentRockX = 0f
+            currentRockY = 0f
         }
 
-        diePosition     = Offset(diePos.x, diePos.y + bobOffsetY)
+        diePosition     = diePos   // no screen-Y offset: upward is Z only
         dieAngle        = angle
         currentDieScale = publicScale.coerceAtLeast(0f)
     }
@@ -129,18 +137,16 @@ class HaterPhysicsManager {
         when (newPhase) {
             TriangleState.SUBMERGING -> {
                 targetScale = 0f
-                // Slow downward tumble — sinking in thick liquid
-                dieVel     = Offset(rng(-1.5f, 1.5f), rng(1.5f, 3.5f))
+                dieVel     = Offset(rng(-1.5f, 1.5f), rng(-1.5f, 1.5f))
                 angularVel = rng(-2f, 2f)
             }
             TriangleState.EMERGING -> {
                 dieScale    = 0f
                 scaleVel    = 0f
                 targetScale = 1f
-                // Start near the bottom edge — buoyancy will float it up through the liquid
-                val startY = if (screenHeight > 0f) screenHeight / 2f - dieRadius else 400f
-                diePos     = Offset(rng(-40f, 40f), startY)
-                dieVel     = Offset(rng(-0.3f, 0.3f), 0f)
+                // Emerge at the current position (or near center): Z-only, no XY jump
+                diePos     = Offset(rng(-60f, 60f), rng(-60f, 60f))
+                dieVel     = Offset.Zero
                 angularVel = rng(-1.5f, 1.5f)
                 bobPhase   = 0f
             }

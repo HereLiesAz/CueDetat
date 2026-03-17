@@ -78,7 +78,9 @@ class HaterViewModel @Inject constructor(
                 _haterState.value = _haterState.value.copy(
                     diePosition = physicsManager.diePosition,
                     dieAngle    = physicsManager.dieAngle,
-                    dieScale    = physicsManager.currentDieScale
+                    dieScale    = physicsManager.currentDieScale,
+                    rockAngleX  = physicsManager.currentRockX,
+                    rockAngleY  = physicsManager.currentRockY,
                 )
                 delay(16L) // ~60 FPS
             }
