@@ -12,75 +12,73 @@ import kotlin.math.hypot
  * A billiards table has 4 corner pockets forming a 2:1 rectangle, plus 2 side
  * pockets at the midpoints of the long sides. All standard sizes (7ft, 8ft, 9ft)
  * are exactly 2:1.
+ *
+ * Internally uses [Pt] rather than [android.graphics.PointF] so the algorithm
+ * can be exercised in plain JVM unit tests without Robolectric.
  */
 object TableGeometryFitter {
+
+    /** Lightweight coordinate pair, usable in both Android and plain-JVM tests. */
+    data class Pt(val x: Float, val y: Float)
 
     private const val ASPECT_RATIO = 2.0f
     private const val ASPECT_TOLERANCE = 0.25f  // ±25% tolerance on 2:1 ratio
 
+    // ── Public surface ────────────────────────────────────────────────────────
+
     /**
-     * Attempts to identify the 6 pockets.
+     * Attempts to identify the 6 pockets from [android.graphics.PointF] inputs.
      *
      * @param points 6 unordered PointF positions in logical space
      * @return List of (PocketId, PointF) pairs if fit succeeded, null otherwise.
-     *         Requires exactly 6 input points.
      */
     fun fit(points: List<PointF>): List<Pair<PocketId, PointF>>? {
+        val pts = points.map { Pt(it.x, it.y) }
+        return fitPt(pts)?.map { (id, pt) -> id to PointF(pt.x, pt.y) }
+    }
+
+    /**
+     * Variant that accepts [Pt] directly — used by unit tests to avoid
+     * dependency on the Android framework mock.
+     */
+    fun fitPt(points: List<Pt>): List<Pair<PocketId, Pt>>? {
         if (points.size != 6) return null
 
         var bestScore = Float.MAX_VALUE
-        var bestResult: List<Pair<PocketId, PointF>>? = null
+        var bestResult: List<Pair<PocketId, Pt>>? = null
 
         // Try all C(6,4) = 15 combinations of 4 points as corner candidates.
         val indices = points.indices.toList()
         for (i in 0 until 6) for (j in i+1 until 6) for (k in j+1 until 6) for (l in k+1 until 6) {
-            val corners = listOf(points[i], points[j], points[k], points[l])
-            val sideIndices = indices.filter { it !in listOf(i, j, k, l) }
-            val sides = sideIndices.map { points[it] }
+            val cornerIdx = listOf(i, j, k, l)
+            val corners = cornerIdx.map { points[it] }
+            val sides   = indices.filter { it !in cornerIdx }.map { points[it] }
 
             val result = tryFitCorners(corners, sides) ?: continue
-            val score = rectResidual(result)
-            if (score < bestScore) {
-                bestScore = score
-                bestResult = result
-            }
+            val score  = rectResidual(result)
+            if (score < bestScore) { bestScore = score; bestResult = result }
         }
         return bestResult
     }
 
-    /**
-     * Tries to interpret 4 points as rectangle corners and 2 points as side pockets.
-     * Returns null if the 4 points don't form a valid 2:1 rectangle.
-     */
-    private fun tryFitCorners(
-        corners: List<PointF>,
-        sides: List<PointF>
-    ): List<Pair<PocketId, PointF>>? {
-        // Order the 4 corners as a convex hull (clockwise: TL, TR, BR, BL).
+    // ── Internal helpers ──────────────────────────────────────────────────────
+
+    private fun tryFitCorners(corners: List<Pt>, sides: List<Pt>): List<Pair<PocketId, Pt>>? {
         val ordered = orderRectangle(corners) ?: return null
 
         // Check aspect ratio: long / short should be ~2:1.
-        val width = hypot(
-            (ordered[1].x - ordered[0].x).toDouble(),
-            (ordered[1].y - ordered[0].y).toDouble()
-        ).toFloat()
-        val height = hypot(
-            (ordered[3].x - ordered[0].x).toDouble(),
-            (ordered[3].y - ordered[0].y).toDouble()
-        ).toFloat()
-        val (longSide, shortSide) = if (width >= height) Pair(width, height) else Pair(height, width)
+        val width  = dist(ordered[0], ordered[1])
+        val height = dist(ordered[0], ordered[3])
+        val (longSide, shortSide) = if (width >= height) width to height else height to width
         if (shortSide < 1f) return null
         val ratio = longSide / shortSide
         if (abs(ratio - ASPECT_RATIO) > ASPECT_TOLERANCE) return null
 
-        // Assign TL/TR/BR/BL based on convex-hull ordering (topmost-leftmost = TL).
-        // `orderRectangle` guarantees: [0]=TL, [1]=TR, [2]=BR, [3]=BL.
         val tl = ordered[0]; val tr = ordered[1]
         val br = ordered[2]; val bl = ordered[3]
 
-        // Assign side pockets: each must be near a long-side midpoint.
-        val leftMid  = PointF((tl.x + bl.x) / 2f, (tl.y + bl.y) / 2f)
-        val rightMid = PointF((tr.x + br.x) / 2f, (tr.y + br.y) / 2f)
+        val leftMid  = Pt((tl.x + bl.x) / 2f, (tl.y + bl.y) / 2f)
+        val rightMid = Pt((tr.x + br.x) / 2f, (tr.y + br.y) / 2f)
 
         val (sl, sr) = assignSides(sides, leftMid, rightMid) ?: return null
 
@@ -91,45 +89,31 @@ object TableGeometryFitter {
         )
     }
 
-    /**
-     * Orders 4 points as a clockwise rectangle [TL, TR, BR, BL].
-     * Returns null if the points don't form a roughly convex quadrilateral.
-     */
-    private fun orderRectangle(pts: List<PointF>): List<PointF>? {
-        // Sort by y then x to find TL candidate.
-        val centroid = PointF(pts.sumOf { it.x.toDouble() }.toFloat() / 4,
-                              pts.sumOf { it.y.toDouble() }.toFloat() / 4)
-        // Classify by quadrant relative to centroid.
-        val tl = pts.minByOrNull {  (it.x - centroid.x) + (it.y - centroid.y) } ?: return null
-        val br = pts.maxByOrNull {  (it.x - centroid.x) + (it.y - centroid.y) } ?: return null
-        val tr = pts.minByOrNull { -(it.x - centroid.x) + (it.y - centroid.y) } ?: return null
-        val bl = pts.maxByOrNull { -(it.x - centroid.x) + (it.y - centroid.y) } ?: return null
+    /** Orders 4 points as [TL, TR, BR, BL] by projecting onto ±45° axes. */
+    private fun orderRectangle(pts: List<Pt>): List<Pt>? {
+        val cx = pts.sumOf { it.x.toDouble() }.toFloat() / 4
+        val cy = pts.sumOf { it.y.toDouble() }.toFloat() / 4
+        val tl = pts.minByOrNull {  (it.x - cx) + (it.y - cy) } ?: return null
+        val br = pts.maxByOrNull {  (it.x - cx) + (it.y - cy) } ?: return null
+        val tr = pts.minByOrNull { -(it.x - cx) + (it.y - cy) } ?: return null
+        val bl = pts.maxByOrNull { -(it.x - cx) + (it.y - cy) } ?: return null
         if (setOf(tl, tr, br, bl).size != 4) return null
         return listOf(tl, tr, br, bl)
     }
 
-    /** Assigns the two side points to SL (nearest leftMid) and SR (nearest rightMid). */
-    private fun assignSides(
-        sides: List<PointF>,
-        leftMid: PointF,
-        rightMid: PointF
-    ): Pair<PointF, PointF>? {
+    private fun assignSides(sides: List<Pt>, leftMid: Pt, rightMid: Pt): Pair<Pt, Pt>? {
         if (sides.size != 2) return null
-        val d0toLeft  = dist(sides[0], leftMid)
-        val d0toRight = dist(sides[0], rightMid)
-        return if (d0toLeft <= d0toRight) Pair(sides[0], sides[1])
-               else Pair(sides[1], sides[0])
+        return if (dist(sides[0], leftMid) <= dist(sides[0], rightMid))
+            sides[0] to sides[1] else sides[1] to sides[0]
     }
 
-    /** Sum of squared deviations from ideal rectangle for the 4 corners. */
-    private fun rectResidual(result: List<Pair<PocketId, PointF>>): Float {
-        val byId = result.associate { it.first to it.second }
-        val tl = byId[PocketId.TL]!!; val tr = byId[PocketId.TR]!!
-        val bl = byId[PocketId.BL]!!; val br = byId[PocketId.BR]!!
-        // Diagonals should be equal length for a rectangle.
-        val d1 = dist(tl, br); val d2 = dist(tr, bl)
+    private fun rectResidual(result: List<Pair<PocketId, Pt>>): Float {
+        val m = result.associate { it.first to it.second }
+        val d1 = dist(m[PocketId.TL]!!, m[PocketId.BR]!!)
+        val d2 = dist(m[PocketId.TR]!!, m[PocketId.BL]!!)
         return (d1 - d2) * (d1 - d2)
     }
 
-    private fun dist(a: PointF, b: PointF) = hypot((a.x - b.x).toDouble(), (a.y - b.y).toDouble()).toFloat()
+    private fun dist(a: Pt, b: Pt) =
+        hypot((a.x - b.x).toDouble(), (a.y - b.y).toDouble()).toFloat()
 }
