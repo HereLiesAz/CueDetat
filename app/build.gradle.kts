@@ -1,7 +1,5 @@
-@Suppress("DSL_SCOPE_VIOLATION") // TODO: Remove once KTIJ-19369 is fixed
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
@@ -15,8 +13,8 @@ android {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 26
         targetSdk = 36
-        versionCode = project.findProperty("versionCode")?.toString()?.toInt() ?: 2
-        versionName = project.findProperty("versionName")?.toString() ?: "1.1"
+        versionCode = project.findProperty("versionCode")?.toString()?.toInt() ?: 3
+        versionName = project.findProperty("versionName")?.toString() ?: "1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

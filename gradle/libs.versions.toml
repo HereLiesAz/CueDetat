@@ -58,7 +58,7 @@ kphysics = "master-SNAPSHOT"
 # Plugins
 androidApplication = "9.1.0" # Example, use your actual AGP version
 kotlinAndroid = "2.3.10"
-kotlinCompose = "2.3.20"
+kotlinCompose = "2.3.10"
 ksp = "2.3.6"
 benchmarkCommon = "1.4.1"
 composeMaterial3 = "1.5.6"
