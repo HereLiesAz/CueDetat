@@ -54,6 +54,7 @@ import com.hereliesaz.cuedetat.ui.composables.dialogs.GlowStickDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.LuminanceAdjustmentDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.TableSizeSelectionDialog
 import com.hereliesaz.cuedetat.domain.CameraMode
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.ui.composables.overlays.ArSetupPrompt
 import com.hereliesaz.cuedetat.ui.composables.overlays.ArTrackingBadge
 import com.hereliesaz.cuedetat.ui.composables.overlays.KineticWarningOverlay
