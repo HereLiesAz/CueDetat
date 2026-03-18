@@ -107,24 +107,65 @@ class UpdateStateUseCase @Inject constructor(
      * Rebuilds the transformation matrices that map Logical Space (Inches) to Screen Space (Pixels).
      */
     private fun updateMatricesAndTransforms(state: CueDetatState): CueDetatState {
-        // 1. Zoom Calculation.
+        // 1. Target and Cue Ball points for view calculation (logical inches).
+        val targetPoint = state.protractorUnit.center
+        // If the cue ball (onPlaneBall) is detected, use it. Otherwise, use a logic-appropriate
+        // fallback (e.g. 30 inches south of target).
+        val cuePoint = state.onPlaneBall?.center ?: PointF(targetPoint.x, targetPoint.y + 30f)
+
+        // 2. Zoom Calculation.
         // Map the linear slider (0.0 - 1.0) to a logarithmic zoom factor.
         val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
             state.experienceMode,
             state.isBeginnerViewLocked
         )
-        val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom)
 
-        // 2. Pitch/Tilt Logic.
+        var zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom)
+        var coercedViewOffset = state.viewOffset
+
+        // Beginner Mode View Locking logic:
+        // Automatically set zoom and pan to keep BOTH cue and target balls on screen
+        // with a generous padding (50dp).
+        if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
+            val paddingPx = 50f * state.screenDensity
+            val availWidth = state.viewWidth - (paddingPx * 2)
+            val availHeight = state.viewHeight - (paddingPx * 2)
+
+            if (availWidth > 0 && availHeight > 0) {
+                // Calculate distance between points in logical space (inches).
+                val dx = abs(targetPoint.x - cuePoint.x)
+                val dy = abs(targetPoint.y - cuePoint.y)
+
+                // Required zoom factor to fit these points (plus some ball radius margin).
+                val requiredZoomX = availWidth / (dx + (LOGICAL_BALL_RADIUS * 4))
+                val requiredZoomY = availHeight / (dy + (LOGICAL_BALL_RADIUS * 4))
+
+                // Use the more restrictive (smaller) zoom factor.
+                zoomFactor = minOf(requiredZoomX, requiredZoomY).coerceIn(minZoom, maxZoom)
+
+                // Centering: ViewOffset should place the midpoint of the balls at screen center.
+                val midX = (targetPoint.x + cuePoint.x) / 2f
+                val midY = (targetPoint.y + cuePoint.y) / 2f
+
+                val midPointLogical = PointF(midX, midY)
+                val rotMatrix = Matrix().apply { postRotate(state.worldRotationDegrees) }
+                val rotatedMid = floatArrayOf(midPointLogical.x * zoomFactor, midPointLogical.y * zoomFactor)
+                rotMatrix.mapPoints(rotatedMid)
+
+                coercedViewOffset = PointF(-rotatedMid[0], -rotatedMid[1])
+            }
+        } else {
+            // Standard Pan Coercion (only for non-locked views).
+            val screenSpaceLimit = (state.table.logicalHeight / 2f) * zoomFactor
+            val coercedOffsetY = state.viewOffset.y.coerceIn(-screenSpaceLimit, screenSpaceLimit)
+            coercedViewOffset = PointF(state.viewOffset.x, coercedOffsetY)
+        }
+
+        // 3. Pitch/Tilt Logic.
         // Beginners usually get a locked top-down view (Pitch disabled).
         val isPitchApplied =
             state.experienceMode != ExperienceMode.BEGINNER || !state.isBeginnerViewLocked
 
-        // 3. Pan Coercion.
-        // Prevent the user from panning the table completely off-screen.
-        val screenSpaceLimit = (state.table.logicalHeight / 2f) * zoomFactor
-        val coercedOffsetY = state.viewOffset.y.coerceIn(-screenSpaceLimit, screenSpaceLimit)
-        val coercedViewOffset = PointF(state.viewOffset.x, coercedOffsetY)
         val stateWithCoercedPan = state.copy(viewOffset = coercedViewOffset)
 
         // 4. Create the Perspective Matrix.

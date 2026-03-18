@@ -57,26 +57,28 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                         // MULTI-TOUCH DETECTED (2+ fingers)
 
                         // 1. Zoom (Pinch)
-                        // Allowed in all modes.
-                        val zoom = event.calculateZoom()
-                        if (zoom != 1f) {
-                            onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
+                        // Blocked only in Static (Locked) Beginner Mode.
+                        if (uiState.experienceMode != ExperienceMode.BEGINNER || !uiState.isBeginnerViewLocked) {
+                            val zoom = event.calculateZoom()
+                            if (zoom != 1f) {
+                                onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
+                            }
                         }
 
                         // 2. Rotation & Pan (Two-finger drag)
-                        // Only allowed when the Table is visible (Expert mode/Banking).
-                        // In Beginner mode, the view is simplified/locked.
-                        if (uiState.table.isVisible) {
-                            // Rotation
-                            val rotation = event.calculateRotation()
-                            if (rotation != 0f) {
-                                onEvent(MainScreenEvent.TableRotationApplied(rotation))
+                        // Allowed when Table is visible (Expert/Bank) OR in Dynamic Beginner Mode.
+                        if (uiState.table.isVisible || (uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked)) {
+                            // Rotation: Only for Expert/Banking (where table is visible).
+                            if (uiState.table.isVisible) {
+                                val rotation = event.calculateRotation()
+                                if (rotation != 0f) {
+                                    onEvent(MainScreenEvent.TableRotationApplied(rotation))
+                                }
                             }
                             // Pan (using two fingers to move the camera view)
                             val pan = event.calculatePan()
-                            if (abs(pan.y) > 0.1f) {
-                                // Dispatch pan event. Note: implementation might only use Y or X/Y depending on needs.
-                                onEvent(MainScreenEvent.PanView(PointF(0f, pan.y)))
+                            if (abs(pan.y) > 0.1f || abs(pan.x) > 0.1f) {
+                                onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
                             }
                         }
                     } else if (event.changes.size == 1) {

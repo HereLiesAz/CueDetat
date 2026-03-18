@@ -48,6 +48,7 @@ data class CueDetatState(
     val haterState: HaterState = HaterState(),
     val viewWidth: Int = 0,
     val viewHeight: Int = 0,
+    val screenDensity: Float = 1.0f,
     val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), LOGICAL_BALL_RADIUS, 0f),
     val onPlaneBall: OnPlaneBall? = null,
     val obstacleBalls: List<OnPlaneBall> = emptyList(),
@@ -167,7 +168,7 @@ sealed class MainScreenEvent {
     data class ScreenGestureStarted(val position: PointF) : MainScreenEvent()
     data class Drag(val previousPosition: PointF, val currentPosition: PointF) : MainScreenEvent()
     object GestureEnded : MainScreenEvent()
-    data class SizeChanged(val width: Int, val height: Int) : MainScreenEvent()
+    data class SizeChanged(val width: Int, val height: Int, val density: Float) : MainScreenEvent()
     data class ZoomScaleChanged(val scaleFactor: Float) : MainScreenEvent()
     data class TableRotationApplied(val degrees: Float) : MainScreenEvent()
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()

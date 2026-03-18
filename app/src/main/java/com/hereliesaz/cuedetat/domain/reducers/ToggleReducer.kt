@@ -142,8 +142,14 @@ internal fun reduceToggleAction(
                     LOGICAL_BALL_RADIUS,
                     0f
                 ),
-                // Set a fixed zoom level for beginner mode.
-                zoomSliderPosition = 50f
+                // Clear any manual ball placements or obstacles.
+                onPlaneBall = null,
+                obstacleBalls = emptyList(),
+                // Reset view transforms.
+                zoomSliderPosition = 50f,
+                viewOffset = PointF(0f, 0f),
+                worldRotationDegrees = 0f,
+                valuesChangedSinceReset = false
             )
         }
 

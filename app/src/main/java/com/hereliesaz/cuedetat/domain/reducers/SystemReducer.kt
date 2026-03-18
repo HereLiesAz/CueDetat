@@ -66,6 +66,7 @@ private fun handleSizeChanged(
         return createInitialState(
             action.width,
             action.height,
+            action.density,
             state.appControlColorScheme ?: darkColorScheme() // Use existing scheme or default dark.
         )
     }
@@ -81,6 +82,7 @@ private fun handleSizeChanged(
     return state.copy(
         viewWidth = action.width,
         viewHeight = action.height,
+        screenDensity = action.density,
         spinControlCenter = newSpinCenter
     )
 }
@@ -92,12 +94,14 @@ private fun handleSizeChanged(
  *
  * @param viewWidth The width of the view in pixels.
  * @param viewHeight The height of the view in pixels.
+ * @param density Screen pixel density.
  * @param appColorScheme The color scheme to use.
  * @return A fresh [CueDetatState] instance.
  */
 private fun createInitialState(
     viewWidth: Int,
     viewHeight: Int,
+    density: Float,
     appColorScheme: ColorScheme
 ): CueDetatState {
     // Default zoom slider position (0.0 means unzoomed/default).
@@ -114,6 +118,7 @@ private fun createInitialState(
     return CueDetatState(
         viewWidth = viewWidth,
         viewHeight = viewHeight,
+        screenDensity = density,
         protractorUnit = ProtractorUnit(
             center = initialProtractorCenter,
             radius = LOGICAL_BALL_RADIUS,

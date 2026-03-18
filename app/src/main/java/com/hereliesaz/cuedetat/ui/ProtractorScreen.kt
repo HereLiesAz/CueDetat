@@ -2,19 +2,36 @@
 package com.hereliesaz.cuedetat.ui
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
@@ -26,6 +43,7 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.AzNavRailMenu
 import com.hereliesaz.cuedetat.ui.composables.ArCoreBackground
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
+import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
 import com.hereliesaz.cuedetat.ui.composables.SpinControl
 import com.hereliesaz.cuedetat.ui.composables.TopControls
 import com.hereliesaz.cuedetat.ui.composables.ZoomControls
@@ -83,12 +101,16 @@ fun ProtractorScreen(
     }
 
     val isOnMain = currentRoute == ROUTE_MAIN || currentRoute == null
+    val isOnCalibration = currentRoute == ROUTE_CALIBRATION
+    val isOnScan = currentRoute == ROUTE_SCAN
 
     AzNavRailMenu(
         uiState = uiState,
         onEvent = mainViewModel::onEvent,
         navController = navController,
-        currentDestination = currentRoute,
+        currentDestination = if (uiState.experienceMode == ExperienceMode.BEGINNER && isOnMain) {
+            if (uiState.isBeginnerViewLocked) "static" else "dynamic"
+        } else currentRoute,
         hasTableModel = uiState.tableScanModel != null
     ) {
         // --- Background layer 0: Camera ---
@@ -215,6 +237,102 @@ fun ProtractorScreen(
                         )
                     }
                 )
+            }
+        }
+
+        // --- Onscreen HUD: Calibration Controls ---
+        onscreen(alignment = Alignment.TopCenter) {
+            if (isOnCalibration) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp)
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "Camera Calibration",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Show the camera a 4x11 circle grid pattern from various angles. " +
+                                "Capture at least 10-15 images for an accurate calibration. " +
+                                "A green overlay will indicate a successful pattern detection.",
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        onscreen(alignment = Alignment.BottomCenter) {
+            if (isOnCalibration) {
+                val capturedImageCount by calibrationViewModel.capturedImageCount.collectAsState()
+                val detectedPattern by calibrationViewModel.detectedPattern.collectAsState()
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Images: $capturedImageCount/15",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    CuedetatButton(
+                        onClick = { calibrationViewModel.capturePattern() },
+                        text = "Capture",
+                        color = if (detectedPattern != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(
+                            alpha = 0.5f
+                        )
+                    )
+
+                    TextButton(onClick = { calibrationViewModel.onCalibrationFinished() }) {
+                        Text("Finish", color = Color.White)
+                    }
+                }
+            }
+        }
+
+        // --- Onscreen HUD: Table Scan Controls ---
+        onscreen(alignment = Alignment.BottomCenter) {
+            if (isOnScan) {
+                val scanProgress by tableScanViewModel.scanProgress.collectAsState()
+                val foundCount = scanProgress.count { it.value }
+                val allFound = foundCount >= 6
+
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "$foundCount / 6 pockets found — pan across the table",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(onClick = {
+                            tableScanViewModel.resetScan()
+                        }) { Text("Reset") }
+                        Button(
+                            onClick = { mainViewModel.onEvent(MainScreenEvent.ToggleTableScanScreen) },
+                            enabled = allFound
+                        ) { Text("Done") }
+                    }
+                }
             }
         }
 

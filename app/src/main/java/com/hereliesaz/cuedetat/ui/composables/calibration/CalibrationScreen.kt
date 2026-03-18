@@ -3,18 +3,9 @@
 package com.hereliesaz.cuedetat.ui.composables.calibration
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -58,7 +49,6 @@ fun CalibrationScreen(
 ) {
     // Observe ViewModel state.
     val detectedPattern by viewModel.detectedPattern.collectAsState()
-    val capturedImageCount by viewModel.capturedImageCount.collectAsState()
     val showSubmissionDialog by viewModel.showSubmissionDialog.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
     val context = LocalContext.current
@@ -80,13 +70,8 @@ fun CalibrationScreen(
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+        modifier = Modifier.fillMaxSize()
     ) {
-        // Live camera feed.
-        CameraBackground(modifier = Modifier.fillMaxSize(), analyzer = analyzer)
-
         // Overlay canvas to draw the detected pattern grid.
         Canvas(modifier = Modifier.fillMaxSize()) {
             detectedPattern?.let { points ->
@@ -116,73 +101,6 @@ fun CalibrationScreen(
                             alpha = 0.8f
                         )
                     }
-                }
-            }
-        }
-
-        // UI Controls and Instructions.
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Top Instructions Panel.
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(32.dp)
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
-                        RoundedCornerShape(12.dp)
-                    )
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    "Camera Calibration",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "Show the camera a 4x11 circle grid pattern from various angles. " +
-                            "Capture at least 10-15 images for an accurate calibration. " +
-                            "A green overlay will indicate a successful pattern detection.",
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // Bottom Control Bar.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceAround,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Progress counter.
-                Text(
-                    text = "Images: $capturedImageCount/15",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                // Capture button.
-                CuedetatButton(
-                    onClick = { viewModel.capturePattern() },
-                    text = "Capture",
-                    // Enable button only when a pattern is currently detected in the frame.
-                    color = if (detectedPattern != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(
-                        alpha = 0.5f
-                    )
-                )
-
-                // Finish button to compute calibration.
-                TextButton(onClick = { viewModel.onCalibrationFinished() }) {
-                    Text("Finish")
                 }
             }
         }

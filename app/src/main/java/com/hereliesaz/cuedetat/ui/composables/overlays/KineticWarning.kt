@@ -131,8 +131,8 @@ fun KineticWarningOverlay(text: String?, modifier: Modifier = Modifier) {
  */
 @Composable
 private fun KineticLine(text: String, style: TextStyle, screenWidthPx: Float, baseFontSize: Float) {
-    var readyToDraw by remember { mutableStateOf(false) }
-    var dynamicFontSize by remember { mutableStateOf(baseFontSize.sp) }
+    var readyToDraw by remember(text) { mutableStateOf(false) }
+    var dynamicFontSize by remember(text) { mutableStateOf(baseFontSize.sp) }
 
     Text(
         text = text,
@@ -141,12 +141,17 @@ private fun KineticLine(text: String, style: TextStyle, screenWidthPx: Float, ba
             .padding(vertical = 2.dp),
         style = style.copy(fontSize = dynamicFontSize),
         maxLines = 1,
+        softWrap = false,
         // Callback to adjust font size if the text doesn't fit.
         onTextLayout = { result: TextLayoutResult ->
             if (result.hasVisualOverflow && !readyToDraw) {
-                val scaleFactor = screenWidthPx / result.size.width
-                dynamicFontSize = (dynamicFontSize.value * scaleFactor * 0.95f).sp
-                // Force recompose with new size.
+                // Use the unconstrained width of the text to calculate scale factor.
+                // multiParagraph.width gives the actual width needed for the text.
+                val textWidth = result.multiParagraph.width
+                if (textWidth > 0) {
+                    val scaleFactor = screenWidthPx / textWidth
+                    dynamicFontSize = (dynamicFontSize.value * scaleFactor * 0.95f).sp
+                }
             } else {
                 readyToDraw = true
             }

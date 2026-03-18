@@ -5,16 +5,9 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -82,8 +75,6 @@ fun TableScanScreen(
         }
     }
 
-    val foundCount = scanProgress.count { it.value }
-    val allFound = foundCount >= 6
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Pocket progress overlay.
@@ -111,30 +102,6 @@ fun TableScanScreen(
                     style = if (isFound) Fill else Stroke(width = 3.dp.toPx()),
                     alpha = if (isFound) 0.9f else 0.5f
                 )
-            }
-        }
-
-        // Controls overlay.
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "$foundCount / 6 pockets found — pan across the table",
-                color = Color.White,
-                style = MaterialTheme.typography.bodyLarge
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = {
-                    viewModel.resetScan()
-                }) { Text("Reset") }
-                Button(
-                    onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen) },
-                    enabled = allFound
-                ) { Text("Done") }
             }
         }
     }

@@ -99,13 +99,15 @@ fun AzNavRailMenu(
             )
         }
         azDivider()
-        azRailToggle(
-            id = "spin",
-            isChecked = uiState.isSpinControlVisible,
-            toggleOnText = "Spin",
-            toggleOffText = "Spin",
-            onClick = { onEvent(MainScreenEvent.ToggleSpinControl) }
-        )
+        if (uiState.experienceMode != ExperienceMode.BEGINNER) {
+            azRailToggle(
+                id = "spin",
+                isChecked = uiState.isSpinControlVisible,
+                toggleOnText = "Spin",
+                toggleOffText = "Spin",
+                onClick = { onEvent(MainScreenEvent.ToggleSpinControl) }
+            )
+        }
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azRailToggle(
@@ -124,24 +126,26 @@ fun AzNavRailMenu(
             )
         }
 
-        val lockResetText = when {
-            uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> "Unlock View"
-            uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked -> "Lock View"
-            else -> "Reset"
+        if (uiState.experienceMode == ExperienceMode.BEGINNER) {
+            azRailItem(
+                id = "static",
+                text = "Static",
+                route = "static",
+                onClick = { onEvent(MainScreenEvent.LockBeginnerView) }
+            )
+            azRailItem(
+                id = "dynamic",
+                text = "Dynamic",
+                route = "dynamic",
+                onClick = { onEvent(MainScreenEvent.UnlockBeginnerView) }
+            )
+        } else {
+            azRailItem(
+                id = "reset",
+                text = "Reset",
+                onClick = { onEvent(MainScreenEvent.Reset) }
+            )
         }
-
-        azRailItem(
-            id = "reset",
-            text = lockResetText,
-            onClick = {
-                val event = when {
-                    uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> MainScreenEvent.UnlockBeginnerView
-                    uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked -> MainScreenEvent.LockBeginnerView
-                    else -> MainScreenEvent.Reset
-                }
-                onEvent(event)
-            }
-        )
 
         azDivider()
 
