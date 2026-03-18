@@ -145,13 +145,11 @@ fun AzNavRailMenu(
             azRailItem(
                 id = "static",
                 text = "Static",
-                route = "static",
                 onClick = { onEvent(MainScreenEvent.LockBeginnerView) }
             )
             azRailItem(
                 id = "dynamic",
                 text = "Dynamic",
-                route = "dynamic",
                 onClick = { onEvent(MainScreenEvent.UnlockBeginnerView) }
             )
         } else {
