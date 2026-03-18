@@ -2909,5 +2909,5 @@ Android/
 /project_backup_full_*.txt
 app-*-release.dm
 app-*-release.apk
-
+/app/release/*
 /app/release/CueDetat-v1.2.apk

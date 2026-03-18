@@ -34,6 +34,9 @@ import com.hereliesaz.cuedetat.ui.composables.dialogs.AdvancedOptionsDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.GlowStickDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.LuminanceAdjustmentDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.TableSizeSelectionDialog
+import com.hereliesaz.cuedetat.domain.CameraMode
+import com.hereliesaz.cuedetat.ui.composables.overlays.ArSetupPrompt
+import com.hereliesaz.cuedetat.ui.composables.overlays.ArTrackingBadge
 import com.hereliesaz.cuedetat.ui.composables.overlays.KineticWarningOverlay
 import com.hereliesaz.cuedetat.ui.composables.overlays.TutorialOverlay
 import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
@@ -89,7 +92,7 @@ fun ProtractorScreen(
     ) {
         // --- Background layer 0: Camera ---
         background(weight = 0) {
-            if (uiState.cameraMode != com.hereliesaz.cuedetat.domain.CameraMode.OFF) {
+            if (uiState.cameraMode != CameraMode.OFF) {
                 val activeAnalyzer = when (currentRoute) {
                     ROUTE_CALIBRATION -> calibrationAnalyzer
                     ROUTE_SCAN -> tableScanAnalyzer
@@ -209,6 +212,24 @@ fun ProtractorScreen(
         onscreen(alignment = Alignment.Center) {
             if (isOnMain) {
                 TutorialOverlay(uiState = uiState, onEvent = mainViewModel::onEvent)
+            }
+        }
+
+        // --- Onscreen: AR setup prompt (center, when AR active but no scan) ---
+        onscreen(alignment = Alignment.Center) {
+            if (isOnMain) {
+                ArSetupPrompt(
+                    visible = uiState.cameraMode == CameraMode.AR && uiState.tableScanModel == null
+                )
+            }
+        }
+
+        // --- Onscreen: AR tracking badge (bottom-start, when AR is actively tracking) ---
+        onscreen(alignment = Alignment.BottomStart) {
+            if (isOnMain && uiState.cameraMode == CameraMode.AR && uiState.tableScanModel != null) {
+                ArTrackingBadge(
+                    modifier = Modifier.padding(start = 16.dp, bottom = 72.dp)
+                )
             }
         }
 
