@@ -33,8 +33,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.compose.rememberNavController
-import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import kotlinx.coroutines.delay
@@ -50,7 +48,6 @@ import kotlinx.coroutines.delay
 fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
     // State to trigger the appearance of the question/buttons after delay.
     var showQuestion by remember { mutableStateOf(false) }
-    val navController = rememberNavController()
 
     // Start a timer on launch.
     LaunchedEffect(Unit) {
@@ -58,81 +55,71 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
         showQuestion = true // Reveal UI.
     }
 
-    AzHostActivityLayout(
-        navController = navController,
-        modifier = Modifier.fillMaxSize(),
-        isLandscape = false, // Splash is usually portrait-focused or auto.
-        initiallyExpanded = false
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black) // Black background for cinematic feel.
     ) {
-        azConfig(noMenu = true)
-
         // Logo and Tagline container, always centered in the screen.
-        background(weight = 0) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black), // Black background for cinematic feel.
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.logo_cue_detat),
-                        contentDescription = "Application Logo",
-                        modifier = Modifier.size(256.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.logo_cue_detat),
+                contentDescription = "Application Logo",
+                modifier = Modifier.size(256.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
 
-                    // Tagline fades out when the question appears to reduce clutter.
-                    AnimatedVisibility(
-                        visible = !showQuestion,
-                        exit = fadeOut(animationSpec = tween(durationMillis = 500))
-                    ) {
-                        Text(
-                            text = stringResource(id = R.string.tagline),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
+            // Tagline fades out when the question appears to reduce clutter.
+            AnimatedVisibility(
+                visible = !showQuestion,
+                exit = fadeOut(animationSpec = tween(durationMillis = 500))
+            ) {
+                Text(
+                    text = stringResource(id = R.string.tagline),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
             }
         }
 
         // Question and buttons container.
         // Slides in from the bottom while fading in.
-        onscreen(alignment = Alignment.BottomCenter) {
-            AnimatedVisibility(
-                visible = showQuestion,
-                enter = fadeIn(animationSpec = tween(durationMillis = 500, delayMillis = 200)) +
-                        slideInVertically(
-                            animationSpec = tween(durationMillis = 500, delayMillis = 200),
-                            initialOffsetY = { it / 2 } // Start from halfway down.
-                        )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(bottom = 64.dp),
-                    verticalArrangement = Arrangement.Bottom,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "What's your relationship to pool?",
-                        fontSize = 20.sp,
-                        color = Color.White,
-                        modifier = Modifier.padding(16.dp)
+        AnimatedVisibility(
+            visible = showQuestion,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 64.dp),
+            enter = fadeIn(animationSpec = tween(durationMillis = 500, delayMillis = 200)) +
+                    slideInVertically(
+                        animationSpec = tween(durationMillis = 500, delayMillis = 200),
+                        initialOffsetY = { it / 2 } // Start from halfway down.
                     )
-                    // Vertical list of choice buttons.
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.padding(8.dp)
-                    ) {
-                        QuestionButton("Beginner") { onRoleSelected(ExperienceMode.BEGINNER) }
-                        QuestionButton("Expert") { onRoleSelected(ExperienceMode.EXPERT) }
-                        QuestionButton("Hater") { onRoleSelected(ExperienceMode.HATER) }
-                    }
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Bottom,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "What's your relationship to pool?",
+                    fontSize = 20.sp,
+                    color = Color.White,
+                    modifier = Modifier.padding(16.dp)
+                )
+                // Vertical list of choice buttons.
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(8.dp)
+                ) {
+                    QuestionButton("Beginner") { onRoleSelected(ExperienceMode.BEGINNER) }
+                    QuestionButton("Expert") { onRoleSelected(ExperienceMode.EXPERT) }
+                    QuestionButton("Hater") { onRoleSelected(ExperienceMode.HATER) }
                 }
             }
         }

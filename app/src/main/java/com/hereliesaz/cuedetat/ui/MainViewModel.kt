@@ -290,6 +290,8 @@ class MainViewModel @Inject constructor(
                     }
                 }
 
+                is MainScreenEvent.Shake -> _singleEvent.emit(SingleEvent.HaterShake)
+
                 else -> { /* Do nothing for state-changing events */ }
             }
         }

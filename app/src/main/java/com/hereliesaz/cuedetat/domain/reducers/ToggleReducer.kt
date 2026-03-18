@@ -160,6 +160,8 @@ internal fun reduceToggleAction(
         is MainScreenEvent.ToggleTableScanScreen ->
             state.copy(showTableScanScreen = !state.showTableScanScreen)
 
+        is MainScreenEvent.ExitToSplash -> state.copy(experienceMode = null)
+
         // Fallback for unhandled actions.
         else -> state
     }

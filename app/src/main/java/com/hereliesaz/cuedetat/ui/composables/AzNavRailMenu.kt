@@ -71,6 +71,21 @@ fun AzNavRailMenu(
             onDismissHelp = {}
         )
 
+        if (uiState.experienceMode == ExperienceMode.HATER) {
+            azRailItem(
+                id = "shake",
+                text = "Shake",
+                onClick = { onEvent(MainScreenEvent.Shake) }
+            )
+            azRailItem(
+                id = "exit",
+                text = "Exit",
+                onClick = { onEvent(MainScreenEvent.ExitToSplash) }
+            )
+            content()
+            return@AzHostActivityLayout
+        }
+
         // --- Core Controls ---
 
         azRailToggle(

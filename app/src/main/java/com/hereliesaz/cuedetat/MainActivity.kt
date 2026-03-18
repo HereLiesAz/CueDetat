@@ -119,6 +119,10 @@ class MainActivity : ComponentActivity() {
                     haterViewModel.onEvent(HaterEvent.EnterHaterMode)
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
+                is SingleEvent.HaterShake -> {
+                    haterViewModel.onEvent(HaterEvent.ShakeDetected)
+                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
+                }
                 null -> { /* Do nothing */ }
             }
         }.launchIn(lifecycleScope)

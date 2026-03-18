@@ -246,6 +246,8 @@ sealed class MainScreenEvent {
     object ViewAboutPage : MainScreenEvent()
     object SendFeedback : MainScreenEvent()
     object SingleEventConsumed : MainScreenEvent()
+    object Shake : MainScreenEvent()
+    object ExitToSplash : MainScreenEvent()
     data class RestoreState(val state: CueDetatState) : MainScreenEvent()
 
     // Table scan events
