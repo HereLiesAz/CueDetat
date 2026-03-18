@@ -2,7 +2,6 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
-import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
@@ -70,13 +69,9 @@ internal fun reduceToggleAction(
         }
 
         // Cycle camera mode: Off → Camera → AR → Off.
-        // Skips AR mode if no table scan model exists (no AR data to display).
         is MainScreenEvent.CycleCameraMode -> {
             val next = state.cameraMode.next()
-            val resolved = if (next == CameraMode.AR && state.tableScanModel == null)
-                next.next()  // skip AR → OFF when no table model exists
-            else next
-            state.copy(cameraMode = resolved)
+            state.copy(cameraMode = next)
         }
 
         // Toggle between Metric and Imperial distance units.
@@ -111,7 +106,7 @@ internal fun reduceToggleAction(
         // Apply the pending orientation lock choice.
         is MainScreenEvent.ApplyPendingOrientationLock -> {
             if (state.pendingOrientationLock == null) return state
-            return state.copy(
+            state.copy(
                 orientationLock = state.pendingOrientationLock,
                 pendingOrientationLock = null
             )
@@ -175,7 +170,7 @@ private fun handleSetExperienceMode(
     reducerUtils: ReducerUtils
 ): CueDetatState {
     // Create a base new state with common resets.
-    var newState = state.copy(
+    val newState = state.copy(
         experienceMode = mode,
         // Reset target ball.
         protractorUnit = ProtractorUnit(
