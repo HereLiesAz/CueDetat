@@ -2900,7 +2900,6 @@ project_context_for_ai_20250711_185947.txt
 /2809555_0.webp
 /977236216-40026112-screenshot-watch-2.jpg
 /Acacbd0098d95c9f35d5c8411a800729.webp
-local.properties
 /app/release/app-release.aab
 Android/
 /project_backup_full_2025-08-23_02-08-35.txt
@@ -2908,3 +2907,7 @@ Android/
 /.superpowers/brainstorm/2856522-1773751075/.server.log
 /.superpowers/brainstorm/2856522-1773751075/.server.pid
 /project_backup_full_*.txt
+*/app-*.dm
+*/app-*.apk
+
+/app/release/CueDetat-v1.2.apk
