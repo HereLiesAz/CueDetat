@@ -86,7 +86,19 @@ fun AzNavRailMenu(
             text = "Tutorial",
             onClick = { onEvent(MainScreenEvent.StartTutorial) }
         )
-
+        if (uiState.experienceMode == ExperienceMode.EXPERT) {
+            azRailCycler(
+                id = "cam",
+                options = listOf("Off", "Cam", "ar"),
+                selectedOption = when (uiState.cameraMode) {
+                    CameraMode.OFF -> "Off"
+                    CameraMode.CAMERA -> "Cam"
+                    CameraMode.AR -> "ar"
+                },
+                onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
+            )
+        }
+        azDivider()
         azRailToggle(
             id = "spin",
             isChecked = uiState.isSpinControlVisible,
@@ -135,18 +147,7 @@ fun AzNavRailMenu(
 
         // --- Appearance ---
 
-        if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailCycler(
-                id = "cam",
-                options = listOf("Off", "Cam", "AR"),
-                selectedOption = when (uiState.cameraMode) {
-                    CameraMode.OFF -> "Off"
-                    CameraMode.CAMERA -> "Cam"
-                    CameraMode.AR -> "AR"
-                },
-                onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
-            )
-        }
+
 
         azMenuItem(
             id = "luminance",
