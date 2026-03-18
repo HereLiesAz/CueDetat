@@ -110,6 +110,9 @@ dependencies {
     implementation(libs.mlkit)
     implementation(libs.opencv)
 
+    // ARCore — Depth API (optional; app degrades gracefully on unsupported devices)
+    implementation("com.google.ar:core:1.44.0")
+
     // Physics
     // implementation(libs.google.liquidfun)
 

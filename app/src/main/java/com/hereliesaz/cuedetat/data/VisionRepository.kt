@@ -21,6 +21,7 @@ import com.hereliesaz.cuedetat.domain.ThinPlateSpline
 import com.hereliesaz.cuedetat.domain.decomposeHomography
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.utils.toMat
+import android.media.Image as MediaImage
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.CvRefinementMethod
@@ -361,8 +362,10 @@ class VisionRepository @Inject constructor(
 
                 _visionDataFlow.value = finalVisionData
 
-                // AR tracking pass — only in AR mode, every 5th frame.
-                if (state.cameraMode == CameraMode.AR && state.tableScanModel != null) {
+                // AR tracking pass — only when using CameraX (not ARCore).
+                // When cameraMode == AR and ArCoreBackground is active, depth handles tracking.
+                if (state.cameraMode == CameraMode.AR && state.tableScanModel != null
+                    && state.depthCapability == com.hereliesaz.cuedetat.domain.DepthCapability.NONE) {
                     arFrameCounter++
                     if (arFrameCounter % 5 == 0) {
                         runArTrackingPass(matToUse, state, inputImage.width, inputImage.height, rotationDegrees)
@@ -586,6 +589,127 @@ class VisionRepository @Inject constructor(
             }
         }
         return center
+    }
+
+    /**
+     * Processes a camera frame delivered by ARCore (as [android.media.Image]) through the
+     * same ball-detection pipeline as [processImage], but skips the pocket-based AR pose
+     * update — ARCore's Depth API handles pose tracking instead.
+     *
+     * Called from the GL thread; all operations here are synchronous and blocking.
+     */
+    @SuppressLint("UnsafeOptInUsageError")
+    fun processArCpuImage(image: MediaImage, rotationDegrees: Int, state: CueDetatState) {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastFrameTime < 33) return
+        lastFrameTime = currentTime
+
+        try {
+            val imageToScreenMatrix = getTransformationMatrix(
+                image.width, image.height,
+                state.viewWidth, state.viewHeight
+            )
+
+            val inputImage = com.google.mlkit.vision.common.InputImage
+                .fromMediaImage(image, rotationDegrees)
+            val detectedObjects = com.google.android.gms.tasks.Tasks
+                .await(genericObjectDetector.process(inputImage))
+
+            val originalMat = image.toMat(reusableFrameMat)
+
+            var matToUse: Mat = originalMat
+            when (rotationDegrees) {
+                90  -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_CLOCKWISE);        matToUse = reusableRotatedMat }
+                180 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_180);               matToUse = reusableRotatedMat }
+                270 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_COUNTERCLOCKWISE); matToUse = reusableRotatedMat }
+            }
+
+            Imgproc.cvtColor(matToUse, reusableHsvMat, Imgproc.COLOR_BGR2HSV)
+            val hsv = state.lockedHsvColor ?: run {
+                val roiX = (reusableHsvMat.cols() - 50) / 2
+                val roiY = (reusableHsvMat.rows() - 50) / 2
+                val center = reusableHsvMat.submat(OCVRect(roiX, roiY, 50, 50))
+                val mean = Core.mean(center)
+                center.release()
+                floatArrayOf(mean.`val`[0].toFloat(), mean.`val`[1].toFloat(), mean.`val`[2].toFloat())
+            }
+
+            val filteredObjects = detectedObjects.filter {
+                val box = it.boundingBox
+                val er = getExpectedRadiusAtImageY(box.centerY().toFloat(), state, imageToScreenMatrix)
+                (box.width() * box.height()) <= 2 * Math.PI * er * er
+            }
+
+            val refinedScreenPoints = filteredObjects.mapNotNull { obj ->
+                refineBallCenter(obj, matToUse, state, imageToScreenMatrix)
+            }.map { pt ->
+                val arr = floatArrayOf(pt.x, pt.y)
+                imageToScreenMatrix.mapPoints(arr)
+                android.graphics.PointF(arr[0], arr[1])
+            }
+
+            val logicalPoints = if (state.hasInverseMatrix) {
+                val inv = state.inversePitchMatrix ?: android.graphics.Matrix()
+                val tps = state.lensWarpTps
+                refinedScreenPoints.map { sp ->
+                    val lp = com.hereliesaz.cuedetat.view.model.Perspective.screenToLogical(sp, inv)
+                    if (tps != null) com.hereliesaz.cuedetat.domain.ThinPlateSpline.applyWarp(tps, lp) else lp
+                }
+            } else emptyList()
+
+            val filteredBalls = if (state.table.isVisible) logicalPoints.filter { state.table.isPointInside(it) }
+                                else logicalPoints
+
+            _visionDataFlow.value = VisionData(
+                genericBalls = filteredBalls,
+                detectedHsvColor = hsv,
+                detectedBoundingBoxes = filteredObjects.map { it.boundingBox },
+                sourceImageWidth = image.width,
+                sourceImageHeight = image.height,
+                sourceImageRotation = rotationDegrees,
+            )
+
+            // In AR mode, depth provides table-plane scale. If depth is confident but no
+            // scan exists, emit a scale-only pose update so the protractor is correctly sized.
+            val depth = state.depthPlane
+            if (depth != null && depth.confidence > 0.6f && state.tableScanModel == null) {
+                runDepthOnlyScaleUpdate(depth, state)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /**
+     * When no table scan exists but depth is confident, nudge the zoom slider so the
+     * protractor renders at the correct physical scale for the detected table distance.
+     *
+     * Billiard ball physical radius: 28.575 mm = 0.028575 m.
+     * [LOGICAL_BALL_RADIUS] = 25 logical units.
+     * ARCore reports focal length in pixels via camera intrinsics.
+     */
+    private fun runDepthOnlyScaleUpdate(
+        depth: com.hereliesaz.cuedetat.domain.DepthPlane,
+        state: CueDetatState,
+    ) {
+        // Map: further away → zoom out (negative slider); closer → zoom in (positive)
+        val clampedDist = depth.distanceMeters.coerceIn(0.5f, 3.0f)
+        val normalised = (clampedDist - 0.5f) / 2.5f   // 0 (close) … 1 (far)
+        val targetSlider = 50f * (1f - normalised) - 25f  // +25 (0.5m) … -25 (3m)
+
+        val currentSlider = state.zoomSliderPosition
+        val delta = abs(targetSlider - currentSlider)
+        if (delta > 3f) {   // Only update if meaningfully different to avoid jitter
+            emitEvent(MainScreenEvent.UpdateArPose(
+                translation = androidx.compose.ui.geometry.Offset(state.viewOffset.x, state.viewOffset.y),
+                rotation = state.worldRotationDegrees,
+                scale = com.hereliesaz.cuedetat.ui.ZoomMapping.sliderToZoom(
+                    targetSlider,
+                    com.hereliesaz.cuedetat.ui.ZoomMapping.getZoomRange(state.experienceMode).first,
+                    com.hereliesaz.cuedetat.ui.ZoomMapping.getZoomRange(state.experienceMode).second,
+                ),
+            ))
+        }
     }
 
     private fun emitEvent(event: MainScreenEvent) {

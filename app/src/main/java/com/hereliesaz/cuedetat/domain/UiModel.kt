@@ -96,6 +96,8 @@ data class CueDetatState(
     @Transient val visionData: VisionData? = null,
     @Transient val snapCandidates: List<SnapCandidate>? = null,
     @Transient val tableScanModel: TableScanModel? = null,
+    @Transient val depthPlane: DepthPlane? = null,
+    val depthCapability: DepthCapability = DepthCapability.NONE,
     val lockedHsvColor: FloatArray? = null,
     val lockedHsvStdDev: FloatArray? = null,
     val showAdvancedOptionsDialog: Boolean = false,
@@ -257,4 +259,8 @@ sealed class MainScreenEvent {
         val updatedClusters: List<PocketCluster>
     ) : MainScreenEvent()
     object ToggleTableScanScreen : MainScreenEvent()
+
+    // Depth / ARCore events
+    data class DepthPlaneUpdated(val plane: DepthPlane) : MainScreenEvent()
+    data class DepthCapabilityDetected(val capability: DepthCapability) : MainScreenEvent()
 }

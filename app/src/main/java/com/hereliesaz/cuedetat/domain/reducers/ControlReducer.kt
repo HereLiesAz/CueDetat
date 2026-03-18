@@ -92,6 +92,12 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             )
         }
 
+        is MainScreenEvent.DepthPlaneUpdated ->
+            state.copy(depthPlane = action.plane)
+
+        is MainScreenEvent.DepthCapabilityDetected ->
+            state.copy(depthCapability = action.capability)
+
         else -> state
     }
 }

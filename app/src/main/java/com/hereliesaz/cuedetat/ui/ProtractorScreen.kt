@@ -24,6 +24,7 @@ import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.AzNavRailMenu
+import com.hereliesaz.cuedetat.ui.composables.ArCoreBackground
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
 import com.hereliesaz.cuedetat.ui.composables.SpinControl
 import com.hereliesaz.cuedetat.ui.composables.TopControls
@@ -91,17 +92,31 @@ fun ProtractorScreen(
         hasTableModel = uiState.tableScanModel != null
     ) {
         // --- Background layer 0: Camera ---
+        // AR mode with ARCore depth uses ArCoreBackground (manages its own GL + session).
+        // All other camera modes use the standard CameraX-backed CameraBackground.
         background(weight = 0) {
-            if (uiState.cameraMode != CameraMode.OFF) {
-                val activeAnalyzer = when (currentRoute) {
-                    ROUTE_CALIBRATION -> calibrationAnalyzer
-                    ROUTE_SCAN -> tableScanAnalyzer
-                    else -> mainViewModel.visionAnalyzer
+            when {
+                uiState.cameraMode == CameraMode.AR
+                        && uiState.depthCapability == com.hereliesaz.cuedetat.domain.DepthCapability.DEPTH_API
+                        && isOnMain -> {
+                    ArCoreBackground(
+                        modifier = Modifier.fillMaxSize(),
+                        arDepthSession = mainViewModel.arDepthSession,
+                        arFrameProcessor = mainViewModel.arFrameProcessor,
+                        onEvent = mainViewModel::onEvent,
+                    )
                 }
-                CameraBackground(
-                    modifier = Modifier.fillMaxSize(),
-                    analyzer = activeAnalyzer
-                )
+                uiState.cameraMode != CameraMode.OFF -> {
+                    val activeAnalyzer = when (currentRoute) {
+                        ROUTE_CALIBRATION -> calibrationAnalyzer
+                        ROUTE_SCAN -> tableScanAnalyzer
+                        else -> mainViewModel.visionAnalyzer
+                    }
+                    CameraBackground(
+                        modifier = Modifier.fillMaxSize(),
+                        analyzer = activeAnalyzer,
+                    )
+                }
             }
         }
 
@@ -226,9 +241,12 @@ fun ProtractorScreen(
 
         // --- Onscreen: AR tracking badge (bottom-start, when AR is actively tracking) ---
         onscreen(alignment = Alignment.BottomStart) {
-            if (isOnMain && uiState.cameraMode == CameraMode.AR && uiState.tableScanModel != null) {
+            if (isOnMain && uiState.cameraMode == CameraMode.AR
+                && (uiState.tableScanModel != null || uiState.depthPlane != null)) {
                 ArTrackingBadge(
-                    modifier = Modifier.padding(start = 16.dp, bottom = 72.dp)
+                    modifier = Modifier.padding(start = 16.dp, bottom = 72.dp),
+                    hasDepth = uiState.depthCapability == com.hereliesaz.cuedetat.domain.DepthCapability.DEPTH_API,
+                    distanceMeters = uiState.depthPlane?.distanceMeters,
                 )
             }
         }

@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera.any" />
 
+    <!-- ARCore optional — depth sensing enhances AR mode but app works without it -->
+    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
+
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
@@ -22,6 +25,8 @@
         android:theme="@style/Theme.CueDetat"
 
         tools:targetApi="36">
+        <!-- ARCore optional: Play Store will offer ARCore install on supported devices -->
+        <meta-data android:name="com.google.ar.core" android:value="optional" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

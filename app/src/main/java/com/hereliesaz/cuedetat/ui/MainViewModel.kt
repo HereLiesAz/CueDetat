@@ -7,6 +7,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.R
+import com.hereliesaz.cuedetat.data.ArDepthSession
+import com.hereliesaz.cuedetat.data.ArFrameProcessor
 import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.TableScanRepository
@@ -50,6 +52,8 @@ class MainViewModel @Inject constructor(
     private val warningManager: WarningManager,
     @ApplicationContext private val appContext: Context,
     private val visionRepository: VisionRepository,
+    val arDepthSession: ArDepthSession,
+    val arFrameProcessor: ArFrameProcessor,
 ) : ViewModel() {
 
     private var experienceModeUpdateJob: Job? = null
@@ -97,6 +101,23 @@ class MainViewModel @Inject constructor(
 
         viewModelScope.launch {
             onEvent(MainScreenEvent.CheckForUpdate)
+        }
+
+        // Detect ARCore depth capability and store in state
+        viewModelScope.launch {
+            val capability = if (arDepthSession.isArCoreAvailable()) {
+                // Probe depth support by creating (and immediately closing) a test session
+                val testSession = arDepthSession.createSession()
+                val cap = arDepthSession.capability
+                if (testSession == null) arDepthSession.capability
+                else {
+                    arDepthSession.close()
+                    cap
+                }
+            } else {
+                com.hereliesaz.cuedetat.domain.DepthCapability.NONE
+            }
+            onEvent(MainScreenEvent.DepthCapabilityDetected(capability))
         }
 
         viewModelScope.launch {
@@ -186,6 +207,7 @@ class MainViewModel @Inject constructor(
 
         _uiState.value = derivedState
         visionAnalyzer.updateUiState(derivedState)
+        arFrameProcessor.updateUiState(derivedState)
 
         if (type != UpdateType.SPIN_ONLY) {
             viewModelScope.launch {

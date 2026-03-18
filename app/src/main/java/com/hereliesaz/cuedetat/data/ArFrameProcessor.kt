@@ -33,7 +33,9 @@ class ArFrameProcessor @Inject constructor(
         val state = stateRef.get() ?: return
         try {
             val cpuImage = frame.acquireCameraImage()
-            val rotation = frame.imageMetadata.rotationDegrees
+            // ARCore's CPU image sensor orientation matches the display orientation configured
+            // via session.setDisplayGeometry(); for portrait-primary Android apps this is 90°.
+            val rotation = 90
             visionRepository.processArCpuImage(cpuImage, rotation, state)
             cpuImage.close()
         } catch (_: Exception) {

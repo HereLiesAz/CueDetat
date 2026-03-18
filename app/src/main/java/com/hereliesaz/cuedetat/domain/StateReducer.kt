@@ -68,7 +68,8 @@ fun stateReducer(
         is MainScreenEvent.AdjustLuminance, is MainScreenEvent.AdjustGlow,
         is MainScreenEvent.PanView, is MainScreenEvent.ApplyQuickAlign,
         is MainScreenEvent.LoadTableScan, is MainScreenEvent.ClearTableScan,
-        is MainScreenEvent.UpdateArPose, is MainScreenEvent.UpdateTableScanClusters ->
+        is MainScreenEvent.UpdateArPose, is MainScreenEvent.UpdateTableScanClusters,
+        is MainScreenEvent.DepthPlaneUpdated, is MainScreenEvent.DepthCapabilityDetected ->
             reduceControlAction(currentState, action)
 
         // --- COMPUTER VISION DATA ---

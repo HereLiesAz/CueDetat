@@ -38,9 +38,16 @@ import androidx.compose.ui.unit.sp
 /**
  * Shown in the bottom-start corner when AR mode is active and a table scan exists.
  * Pulses to indicate the tracking pipeline is running.
+ *
+ * @param hasDepth  True when ARCore Depth API is providing real depth data.
+ * @param distanceMeters  Table distance from the most recent depth plane, or null.
  */
 @Composable
-fun ArTrackingBadge(modifier: Modifier = Modifier) {
+fun ArTrackingBadge(
+    modifier: Modifier = Modifier,
+    hasDepth: Boolean = false,
+    distanceMeters: Float? = null,
+) {
     val infiniteTransition = rememberInfiniteTransition(label = "ar_pulse")
     val dotAlpha by infiniteTransition.animateFloat(
         initialValue = 1f,
@@ -67,8 +74,15 @@ fun ArTrackingBadge(modifier: Modifier = Modifier) {
                 .background(Color(0xFF4CAF50).copy(alpha = dotAlpha))
         )
         Spacer(modifier = Modifier.width(6.dp))
+        val label = buildString {
+            append("AR Tracking")
+            if (hasDepth) {
+                append(" · Depth")
+                if (distanceMeters != null) append(" %.1fm".format(distanceMeters))
+            }
+        }
         Text(
-            text = "AR Tracking",
+            text = label,
             color = Color.White,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium
