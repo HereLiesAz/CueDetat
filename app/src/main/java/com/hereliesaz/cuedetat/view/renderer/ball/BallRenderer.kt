@@ -97,8 +97,6 @@ class BallRenderer {
         val canvasWidth = canvas.width.toFloat()
         val canvasHeight = canvas.height.toFloat()
 
-        // This matrix correctly transforms coordinates from the camera's coordinate space
-        // to the screen's, accounting for rotation and FILL_CENTER scaling.
         val matrix = Matrix()
         val srcRect = RectF(0f, 0f, srcWidth, srcHeight)
         val destRect = RectF(0f, 0f, canvasWidth, canvasHeight)
@@ -108,7 +106,7 @@ class BallRenderer {
 
         visionData.detectedBoundingBoxes.forEach { box ->
             val boxRect = RectF(box)
-            matrix.mapRect(boxRect) // Apply the full transformation to the box
+            matrix.mapRect(boxRect)
             canvas.drawRect(boxRect, paint)
         }
     }
@@ -136,7 +134,6 @@ class BallRenderer {
         state: CueDetatState,
         paints: PaintCache
     ) {
-        // Shared paint setup
         val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
             state.experienceMode,
             state.isBeginnerViewLocked
@@ -151,23 +148,19 @@ class BallRenderer {
         val dotRadius = ball.radius * 0.1f
 
         if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
-            // --- BUBBLE LEVEL LOGIC ---
-            val logicalBallMatrix = state.logicalPlaneMatrix ?: return // This matrix is now flat
+            val logicalBallMatrix = state.logicalPlaneMatrix ?: return
             val logicalScreenPos = DrawingUtils.mapPoint(ball.center, logicalBallMatrix)
 
-            // Draw 2D component (immobile on the flat plane)
             canvas.withMatrix(logicalBallMatrix) {
                 drawCircle(ball.center.x, ball.center.y, ball.radius, logicalStrokePaint)
                 drawCircle(ball.center.x, ball.center.y, dotRadius, dotPaint)
             }
 
-            // Calculate bubble offset
-            val sensitivity = 2.5f // Pixels of offset per degree of tilt
+            val sensitivity = 2.5f
             val screenOffsetX = state.currentOrientation.roll * sensitivity
             val screenOffsetY = -state.currentOrientation.pitch * sensitivity
-            val bubbleRadius = ball.radius * zoomFactor // Radius on screen for clamping
+            val bubbleRadius = ball.radius * zoomFactor
 
-            // Clamp the offset to the radius of the ball
             val offsetDistance = hypot(screenOffsetX, screenOffsetY)
             val finalOffsetX: Float
             val finalOffsetY: Float
@@ -184,8 +177,6 @@ class BallRenderer {
             val bubbleCenter =
                 PointF(logicalScreenPos.x + finalOffsetX, logicalScreenPos.y + finalOffsetY)
 
-
-            // Draw 3D component at the new bubble position
             val strokePaint = Paint(paints.targetCirclePaint).apply {
                 color = config.strokeColor.toArgb()
                 strokeWidth = config.strokeWidth
@@ -196,7 +187,6 @@ class BallRenderer {
             canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, bubbleRadius, strokePaint)
 
         } else {
-            // --- PERSPECTIVE LIFT LOGIC ---
             val positionMatrix = state.pitchMatrix ?: return
             val sizeMatrix = state.sizeCalculationMatrix ?: positionMatrix
             val logicalBallMatrix = positionMatrix
@@ -224,20 +214,18 @@ class BallRenderer {
                 paints = paints
             )
 
-            // Draw 2D logical ball
             canvas.save()
             canvas.concat(logicalBallMatrix)
             canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, logicalStrokePaint)
             canvas.drawCircle(ball.center.x, ball.center.y, dotRadius, dotPaint)
             canvas.restore()
 
-            // Draw 3D ghost ball, anchored to the 2D ball's screen position
             canvas.drawCircle(
                 logicalScreenPos.x,
                 yPosLifted,
                 radiusInfo.radius,
                 glowPaint
-            ) // Glow is centered on original radius
+            )
             canvas.drawCircle(logicalScreenPos.x, yPosLifted, radiusInfo.radius, strokePaint)
 
             val centerPaint = Paint(paints.fillPaint).apply { color = config.centerColor.toArgb() }
@@ -321,7 +309,7 @@ class BallRenderer {
 
             val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
             val ghostCueText = if (isBeginnerLocked) {
-                "Aim the cue ball at the center of the blue circle."
+                "Aim the cue ball at\nthe center of the blue circle."
             } else {
                 "Ghost Cue Ball"
             }

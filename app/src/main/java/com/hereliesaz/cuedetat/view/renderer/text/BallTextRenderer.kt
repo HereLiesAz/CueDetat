@@ -44,7 +44,7 @@ class BallTextRenderer {
 
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
         paint.color = if (isBeginnerLocked) {
-            android.graphics.Color.parseColor("#00E5FF") // Cyan highlight color
+            android.graphics.Color.parseColor("#00E5FF")
         } else {
             config.color.copy(alpha = config.opacity).toArgb()
         }

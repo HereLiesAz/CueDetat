@@ -45,16 +45,14 @@ class OverlayRenderer {
                 pitchMatrix
             }
 
-        // Pass 1: Draw elements on the logical plane
+        // Pass 1: Draw elements on the logical plane (Lines drawn UNDER balls)
         canvas.withMatrix(matrixFor2DPlane) {
             if (state.table.isVisible) {
                 tableRenderer.drawSurface(this, state, paints)
                 tableRenderer.drawPockets(this, state, paints)
             }
-            // Pass the active matrix to the LineRenderer so it can invert it for screen-space distortion
             lineRenderer.drawLogicalLines(this, state, paints, typeface, matrixFor2DPlane)
         }
-
 
         // Pass 2: Draw the "lifted" table rails
         canvas.withMatrix(railPitchMatrix) {
@@ -64,8 +62,12 @@ class OverlayRenderer {
             }
         }
 
-
-        // Pass 3: Draw all balls
+        // Pass 3: Draw all balls and their associated text
         ballRenderer.draw(canvas, state, paints, typeface)
+
+        // Pass 4: Draw absolute foreground elements OUTSIDE of the matrix to prevent double projection!
+        if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
+            lineRenderer.drawBeginnerForeground(canvas, state, typeface, matrixFor2DPlane)
+        }
     }
 }

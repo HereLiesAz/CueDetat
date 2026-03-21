@@ -2,11 +2,13 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
+import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ReducerUtils
+import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
@@ -55,13 +57,38 @@ internal fun reduceToggleAction(
         }
         is MainScreenEvent.UnlockBeginnerView -> state.copy(isBeginnerViewLocked = false)
         is MainScreenEvent.LockBeginnerView -> {
+
+            // DYNAMIC ZOOM: Calculate slider value to fit 4 radii within screen width minus 100dp margin
+            var autoZoomSlider = 50f
+            state.logicalPlaneMatrix?.let { mat ->
+                val logicalWidth = 4f * LOGICAL_BALL_RADIUS
+                val pts = floatArrayOf(0f, 0f, logicalWidth, 0f)
+                mat.mapPoints(pts)
+                val currentPx = kotlin.math.hypot((pts[2] - pts[0]).toDouble(), (pts[3] - pts[1]).toDouble()).toFloat()
+
+                if (currentPx > 0 && state.viewWidth > 0) {
+                    val (currMin, currMax) = ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked)
+                    val currentZoom = ZoomMapping.sliderToZoom(state.zoomSliderPosition, currMin, currMax)
+
+                    val totalMarginPx = 100f * state.screenDensity
+                    val targetPx = state.viewWidth - totalMarginPx
+
+                    if (targetPx > 0) {
+                        val targetZoom = currentZoom * (targetPx / currentPx)
+                        val (newMin, newMax) = ZoomMapping.getZoomRange(ExperienceMode.BEGINNER, true)
+                        autoZoomSlider = ZoomMapping.zoomToSlider(targetZoom, newMin, newMax)
+                    }
+                }
+            }
+
             state.copy(
                 isBeginnerViewLocked = true,
-                areHelpersVisible = true, // Help is now enabled by default when locking
+                areHelpersVisible = true, // Force help on
+                cameraMode = if (state.cameraMode == CameraMode.OFF) CameraMode.CAMERA else state.cameraMode, // Force camera on
                 protractorUnit = ProtractorUnit(reducerUtils.getDefaultTargetBallPosition(), LOGICAL_BALL_RADIUS, 0f),
                 onPlaneBall = null,
                 obstacleBalls = emptyList(),
-                zoomSliderPosition = 50f, // Restored to max slider position
+                zoomSliderPosition = autoZoomSlider,
                 viewOffset = PointF(0f, 0f),
                 worldRotationDegrees = 0f,
                 valuesChangedSinceReset = false
@@ -106,7 +133,7 @@ private fun handleSetExperienceMode(
                 isBankingMode = false,
                 areHelpersVisible = true,
                 isBeginnerViewLocked = true,
-                zoomSliderPosition = 50f // Restored to max slider position
+                zoomSliderPosition = 50f
             )
         }
         ExperienceMode.HATER -> newState
