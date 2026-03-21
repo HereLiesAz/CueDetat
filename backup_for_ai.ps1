@@ -1,3 +1,6 @@
+====================================================================
+FILE: ./backup_for_ai.ps1
+====================================================================
 <#
 .SYNOPSIS
     A PowerShell script to back up all project files into a single text document,
@@ -37,7 +40,7 @@ $excludeFiles = @(
     "package-lock.json", # NPM lock file
     "yarn.lock", # Yarn lock file
     # Common binary/media file types that waste tokens
-    "*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.ico",
+    "*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.ico", "*.webp",
     "*.woff", "*.woff2", "*.ttf", "*.eot",
     # OS-specific files
     ".DS_Store", # macOS system files
