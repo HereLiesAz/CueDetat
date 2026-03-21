@@ -58,14 +58,14 @@ internal fun reduceToggleAction(
         is MainScreenEvent.UnlockBeginnerView -> state.copy(isBeginnerViewLocked = false)
         is MainScreenEvent.LockBeginnerView -> {
 
-            // DYNAMIC DEVICE-AGNOSTIC ZOOM: Calculate slider value to fit 4 radii within screen width minus 200dp total margin
-            var autoZoomSlider = 0f
+            // DYNAMIC DEVICE-AGNOSTIC ZOOM: Calculate slider value to fit within screen width minus 200dp total margin
+            var autoZoomSlider = 50f
             state.logicalPlaneMatrix?.let { mat ->
                 val logicalWidth = 4f * LOGICAL_BALL_RADIUS
                 val pts = floatArrayOf(0f, 0f, logicalWidth, 0f)
                 mat.mapPoints(pts)
 
-                // Get current pixel width of the 4 radii at current zoom
+                // Get current pixel width at current zoom
                 val currentPx = kotlin.math.hypot((pts[2] - pts[0]).toDouble(), (pts[3] - pts[1]).toDouble()).toFloat()
 
                 if (currentPx > 0 && state.viewWidth > 0) {

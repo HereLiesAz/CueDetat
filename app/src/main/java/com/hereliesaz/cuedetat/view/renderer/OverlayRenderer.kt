@@ -67,7 +67,7 @@ class OverlayRenderer {
 
         // Pass 4: Draw absolute foreground elements OUTSIDE of the matrix to prevent double projection!
         if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
-            lineRenderer.drawBeginnerForeground(canvas, state, typeface, matrixFor2DPlane)
+            lineRenderer.drawBeginnerForeground(canvas, state, paints, typeface, matrixFor2DPlane)
         }
     }
 }
