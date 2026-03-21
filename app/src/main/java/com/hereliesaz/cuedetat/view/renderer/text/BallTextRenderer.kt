@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.config.ui.LabelProperties
 import com.hereliesaz.cuedetat.view.model.LogicalCircular
@@ -38,18 +39,24 @@ class BallTextRenderer {
             minZoom,
             maxZoom
         ) / ZoomMapping.DEFAULT_ZOOM
-        val currentTextSize = (baseFontSize * zoomFactor).coerceIn(minFontSize, maxFontSize)
-        paint.textSize = currentTextSize
-        paint.color = config.color.copy(alpha = config.opacity).toArgb()
 
-        val radiusInfo =
-            DrawingUtils.getPerspectiveRadiusAndLift(ball.center, ball.radius, state, matrix)
+        paint.textSize = (baseFontSize * zoomFactor).coerceIn(minFontSize, maxFontSize)
+
+        val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
+        paint.color = if (isBeginnerLocked) {
+            android.graphics.Color.parseColor("#00E5FF") // Cyan highlight color
+        } else {
+            config.color.copy(alpha = config.opacity).toArgb()
+        }
+
+        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ball.center, ball.radius, state, matrix)
         val screenPos = DrawingUtils.mapPoint(ball.center, matrix)
 
         val textMetrics = paint.fontMetrics
         val textPadding = 5f * zoomFactor.coerceAtLeast(0.5f)
+        val lineHeight = textMetrics.descent - textMetrics.ascent
 
-        val baseline = if (drawBelow) {
+        var currentBaseline = if (drawBelow) {
             val visualBottom = screenPos.y - radiusInfo.lift + radiusInfo.radius
             visualBottom + textPadding - textMetrics.ascent + config.yOffset
         } else {
@@ -57,6 +64,10 @@ class BallTextRenderer {
             visualTop - textPadding - textMetrics.descent + config.yOffset
         }
 
-        canvas.drawText(text, screenPos.x + config.xOffset, baseline, paint)
+        val lines = text.split("\n")
+        for (line in lines) {
+            canvas.drawText(line, screenPos.x + config.xOffset, currentBaseline, paint)
+            currentBaseline += lineHeight
+        }
     }
 }

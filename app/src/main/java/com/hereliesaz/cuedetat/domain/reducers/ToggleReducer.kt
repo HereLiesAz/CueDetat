@@ -7,7 +7,6 @@ import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ReducerUtils
-import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
@@ -56,15 +55,13 @@ internal fun reduceToggleAction(
         }
         is MainScreenEvent.UnlockBeginnerView -> state.copy(isBeginnerViewLocked = false)
         is MainScreenEvent.LockBeginnerView -> {
-            val (minZ, maxZ) = ZoomMapping.getZoomRange(ExperienceMode.BEGINNER, true)
-            val doubleZoomSlider = ZoomMapping.zoomToSlider(2.0f, minZ, maxZ)
             state.copy(
                 isBeginnerViewLocked = true,
-                areHelpersVisible = true,
+                areHelpersVisible = true, // Help is now enabled by default when locking
                 protractorUnit = ProtractorUnit(reducerUtils.getDefaultTargetBallPosition(), LOGICAL_BALL_RADIUS, 0f),
                 onPlaneBall = null,
                 obstacleBalls = emptyList(),
-                zoomSliderPosition = doubleZoomSlider,
+                zoomSliderPosition = 50f, // Restored to max slider position
                 viewOffset = PointF(0f, 0f),
                 worldRotationDegrees = 0f,
                 valuesChangedSinceReset = false
@@ -103,15 +100,13 @@ private fun handleSetExperienceMode(
             )
         }
         ExperienceMode.BEGINNER -> {
-            val (minZ, maxZ) = ZoomMapping.getZoomRange(ExperienceMode.BEGINNER, true)
-            val doubleZoomSlider = ZoomMapping.zoomToSlider(2.0f, minZ, maxZ)
             newState.copy(
                 table = newState.table.copy(isVisible = false),
                 onPlaneBall = null,
                 isBankingMode = false,
                 areHelpersVisible = true,
                 isBeginnerViewLocked = true,
-                zoomSliderPosition = doubleZoomSlider
+                zoomSliderPosition = 50f // Restored to max slider position
             )
         }
         ExperienceMode.HATER -> newState

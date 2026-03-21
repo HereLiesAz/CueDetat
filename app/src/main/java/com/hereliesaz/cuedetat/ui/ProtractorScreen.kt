@@ -114,9 +114,6 @@ fun ProtractorScreen(
         } else currentRoute,
         hasTableModel = uiState.tableScanModel != null
     ) {
-        // --- Background layer 0: Camera ---
-        // AR mode with ARCore depth uses ArCoreBackground (manages its own GL + session).
-        // All other camera modes use the standard CameraX-backed CameraBackground.
         background(weight = 0) {
             when {
                 uiState.cameraMode == CameraMode.AR
@@ -143,7 +140,6 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Background layer 1: AR protractor overlay (main route only) ---
         background(weight = 1) {
             if (isOnMain) {
                 ProtractorOverlay(
@@ -155,7 +151,6 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Background layer 2: Navigation host (full-screen screens) ---
         background(weight = 2) {
             NavHost(navController = navController, startDestination = ROUTE_MAIN) {
                 composable(ROUTE_MAIN) { /* AR and HUD handled by background/onscreen blocks */ }
@@ -177,7 +172,6 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen HUD: Top status bar (main route only) ---
         onscreen(alignment = Alignment.TopEnd) {
             if (isOnMain) {
                 TopControls(
@@ -192,9 +186,9 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen HUD: Zoom slider (main route only) ---
         onscreen(alignment = Alignment.CenterEnd) {
-            if (isOnMain) {
+            val isBeginnerLocked = uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked
+            if (isOnMain && !isBeginnerLocked) {
                 ZoomControls(
                     zoomSliderPosition = uiState.zoomSliderPosition,
                     onZoomChange = { mainViewModel.onEvent(MainScreenEvent.ZoomSliderChanged(it)) },
@@ -206,7 +200,6 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen HUD: Table rotation slider (main route only) ---
         onscreen(alignment = Alignment.BottomCenter) {
             if (isOnMain) {
                 TableRotationSlider(
@@ -220,8 +213,6 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen HUD: Spin control (main route only) ---
-        // Positioned absolutely at spinControlCenter (screen pixels). Double-tap+drag to reposition.
         onscreen(alignment = Alignment.TopStart) {
             if (isOnMain && uiState.isSpinControlVisible && uiState.spinControlCenter != null) {
                 val center = uiState.spinControlCenter!!
@@ -241,7 +232,6 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen HUD: Calibration Controls ---
         onscreen(alignment = Alignment.TopCenter) {
             if (isOnCalibration) {
                 Column(
@@ -307,7 +297,6 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen HUD: Table Scan Controls ---
         onscreen(alignment = Alignment.BottomCenter) {
             if (isOnScan) {
                 val scanProgress by tableScanViewModel.scanProgress.collectAsState()
@@ -337,19 +326,16 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen: Kinetic warning overlay ---
         onscreen(alignment = Alignment.Center) {
             KineticWarningOverlay(text = uiState.warningText)
         }
 
-        // --- Onscreen: Tutorial overlay (main route only) ---
         onscreen(alignment = Alignment.Center) {
             if (isOnMain) {
                 TutorialOverlay(uiState = uiState, onEvent = mainViewModel::onEvent)
             }
         }
 
-        // --- Onscreen: AR setup prompt (center, when AR active but no scan) ---
         onscreen(alignment = Alignment.Center) {
             if (isOnMain) {
                 ArSetupPrompt(
@@ -358,7 +344,6 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen: AR tracking badge (bottom-start, when AR is actively tracking) ---
         onscreen(alignment = Alignment.BottomStart) {
             if (isOnMain && uiState.cameraMode == CameraMode.AR
                 && (uiState.tableScanModel != null || uiState.depthPlane != null)) {
@@ -370,7 +355,6 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen: Dialogs ---
         onscreen(alignment = Alignment.Center) {
             AdvancedOptionsDialog(
                 uiState = uiState,

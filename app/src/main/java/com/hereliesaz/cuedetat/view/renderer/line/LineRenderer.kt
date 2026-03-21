@@ -462,13 +462,16 @@ class LineRenderer {
                 // FORCE SCREEN BOUNDS: Ensure calculations do not exceed 70% of the screen width
                 val maxVisibleLength = length.coerceAtMost(state.viewWidth * 0.7f)
 
+                val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
+                val highlightColor = android.graphics.Color.parseColor("#00E5FF") // Cyan
+
                 if (textToDraw != null && state.areHelpersVisible && maxVisibleLength > 0) {
                     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         this.typeface = typeface
                         textSize = 55f
-                        color = paint.color
+                        color = if (isBeginnerLocked) highlightColor else paint.color
                         textAlign = Paint.Align.CENTER
-                        setShadowLayer(10f, 0f, 0f, Color.Black.toArgb())
+                        setShadowLayer(10f, 0f, 0f, android.graphics.Color.BLACK)
                     }
                     val pos = FloatArray(2)
                     val tan = FloatArray(2)
@@ -497,6 +500,7 @@ class LineRenderer {
                     val trianglePaint = Paint(paint).apply {
                         style = Paint.Style.FILL
                         strokeWidth = 0f
+                        if (isBeginnerLocked) color = highlightColor
                     }
                     val pos = FloatArray(2)
                     val tan = FloatArray(2)
