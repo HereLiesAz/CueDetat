@@ -6,6 +6,7 @@ import android.graphics.PointF
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.data.TableScanRepository
+import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.PocketCluster
 import com.hereliesaz.cuedetat.domain.PocketId
@@ -26,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.opencv.calib3d.Calib3d
 import org.opencv.core.Core
+import org.opencv.core.Mat
 import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
 import javax.inject.Inject
@@ -38,7 +40,8 @@ private const val CLUSTER_MERGE_DISTANCE = 3.0f
 
 @HiltViewModel
 class TableScanViewModel @Inject constructor(
-    private val tableScanRepository: TableScanRepository
+    private val tableScanRepository: TableScanRepository,
+    private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
 
     private val _scanProgress = MutableStateFlow<Map<PocketId, Boolean>>(emptyMap())
@@ -71,6 +74,19 @@ class TableScanViewModel @Inject constructor(
     @Volatile private var hasInverseMatrix: Boolean = false
     @Volatile private var viewWidth: Int = 0
     @Volatile private var viewHeight: Int = 0
+
+    // Cached calibration data
+    @Volatile private var cameraMatrix: Mat? = null
+    @Volatile private var distCoeffs: Mat? = null
+
+    init {
+        viewModelScope.launch {
+            userPreferencesRepository.calibrationDataFlow.collect { data ->
+                cameraMatrix = data.first
+                distCoeffs = data.second
+            }
+        }
+    }
 
     fun updateStateSnapshot(inverse: Matrix?, hasInverse: Boolean, vw: Int, vh: Int) {
         inversePitchMatrix = inverse
@@ -109,11 +125,30 @@ class TableScanViewModel @Inject constructor(
             }
 
             // Step 2: Project image → screen → logical for each detection.
-            val screenPts = FloatArray(imagePoints.size * 2)
-            imagePoints.forEachIndexed { i, p -> screenPts[i * 2] = p.x; screenPts[i * 2 + 1] = p.y }
+            // Use your calibration matrix to undistort the raw image points first!
+            val rawPointsMat = MatOfPoint2f(*imagePoints.map { Point(it.x.toDouble(), it.y.toDouble()) }.toTypedArray())
+            val undistortedPointsMat = MatOfPoint2f()
+
+            val camMat = cameraMatrix
+            val distMat = distCoeffs
+            if (camMat != null && distMat != null && !camMat.empty() && !distMat.empty()) {
+                // We pass cameraMatrix as the 'P' (newCameraMatrix) parameter as well,
+                // otherwise OpenCV returns normalized coordinates instead of pixel coordinates!
+                Calib3d.undistortImagePoints(rawPointsMat, undistortedPointsMat, camMat, distMat, Mat(), camMat)
+            } else {
+                rawPointsMat.copyTo(undistortedPointsMat) // Fallback to pinhole if no calibration exists
+            }
+
+            val undistortedList = undistortedPointsMat.toList()
+            val screenPts = FloatArray(undistortedList.size * 2)
+
+            undistortedList.forEachIndexed { i, p ->
+                screenPts[i * 2] = p.x.toFloat()
+                screenPts[i * 2 + 1] = p.y.toFloat()
+            }
             imageToScreen.mapPoints(screenPts)
 
-            val logicalPts = imagePoints.indices.map { i ->
+            val logicalPts = undistortedList.indices.map { i ->
                 val screenPt = PointF(screenPts[i * 2], screenPts[i * 2 + 1])
                 screenToLogical(screenPt, inverse)
             }
@@ -205,13 +240,12 @@ class TableScanViewModel @Inject constructor(
         val homography = Calib3d.findHomography(srcMat, dstMat, Calib3d.RANSAC, 3.0)
         if (homography.empty()) return
 
-        // TODO: This homography maps logical→logical (both point sets are in logical/inch space).
-        //  decomposeHomography uses imgWidth/imgHeight to compute canvasCenter for the translation
-        //  offset, but those are pixel dimensions, not logical-space dimensions. Verify that the
-        //  resulting translation is in the coordinate space ApplyQuickAlign expects (viewOffset is
-        //  set directly from it in ControlReducer). May need to pass viewWidth/viewHeight instead,
-        //  or adjust canvasCenter to (0,0) for a logical-space homography.
-        val (translation, rotation, scale) = decomposeHomography(homography, imgWidth, imgHeight)
+        // Calculate physical dimensions in logical space (inches)
+        val logicalWidth = logicalTable.pockets[1].x - logicalTable.pockets[0].x // TR.x - TL.x
+        val logicalHeight = logicalTable.pockets[2].y - logicalTable.pockets[0].y // BL.y - TL.y
+
+        // Pass the logical dimensions so the translation vector scales correctly
+        val (translation, rotation, scale) = decomposeHomography(homography, logicalWidth, logicalHeight)
 
         // Residual TPS: estimated logical → true logical.
         val estimatedDst = MatOfPoint2f()

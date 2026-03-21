@@ -15,8 +15,8 @@ import org.opencv.imgproc.Imgproc
  * in each frame and forwards detected image-space positions to the ViewModel.
  *
  * Pockets are larger and darker than billiard balls. Tuned parameters:
- *   minRadius = 15 px (at 480p scale), maxRadius = 60 px
- *   param1 (Canny threshold) = 80, param2 (accumulator threshold) = 25
+ * minRadius = 15 px (at 480p scale), maxRadius = 60 px
+ * param1 (Canny threshold) = 80, param2 (accumulator threshold) = 25
  *
  * Frames are downsampled to 480p height before processing to limit CPU cost.
  */
@@ -36,9 +36,6 @@ class TableScanAnalyzer(
         val yBytes = ByteArray(yBuffer.remaining()).also { yBuffer.get(it) }
         val grayFull = Mat(originalHeight, originalWidth, CvType.CV_8UC1)
         grayFull.put(0, 0, yBytes)
-
-        // Keep image open until after felt-colour sampling — yBytes is a copy, but
-        // closing early prevents any future refactor from accidentally reusing the buffer.
 
         // Downsample to target height of 480 for speed.
         val targetHeight = 480
@@ -78,22 +75,34 @@ class TableScanAnalyzer(
         }
 
         // Sample felt colour from the centre 10% of the frame.
-        // TODO: This currently samples from the Y (luma) plane only, so H=0 and S=0.
-        //  For accurate felt-colour detection (used in Task 12 AR edge fallback),
-        //  read the U/V chroma planes and build a proper NV21 → BGR → HSV conversion.
-        //  Until then, only the V (brightness) component is meaningful.
         try {
-            val cx = originalWidth / 2; val cy = originalHeight / 2
-            val hw = originalWidth / 20; val hh = originalHeight / 20
-            val roi = org.opencv.core.Rect(cx - hw, cy - hh, hw * 2, hh * 2)
-            val yRoi = Mat(originalHeight, originalWidth, CvType.CV_8UC1)
-            yRoi.put(0, 0, yBytes)
-            val crop = Mat(yRoi, roi)
-            val bgr = Mat(); Imgproc.cvtColor(crop, bgr, Imgproc.COLOR_GRAY2BGR)
-            val hsv = Mat(); Imgproc.cvtColor(bgr, hsv, Imgproc.COLOR_BGR2HSV)
+            // Let CameraX handle the YUV_420_888 to ARGB_8888 conversion securely
+            val bitmap = image.toBitmap()
+            val cx = bitmap.width / 2
+            val cy = bitmap.height / 2
+            val hw = bitmap.width / 20
+            val hh = bitmap.height / 20
+
+            // Crop exactly the center 10%
+            val croppedBitmap = android.graphics.Bitmap.createBitmap(bitmap, cx - hw, cy - hh, hw * 2, hh * 2)
+            val bgrMat = Mat()
+            org.opencv.android.Utils.bitmapToMat(croppedBitmap, bgrMat)
+
+            val hsv = Mat()
+            // bitmapToMat usually produces RGBA, so we convert from RGB to HSV
+            Imgproc.cvtColor(bgrMat, hsv, Imgproc.COLOR_RGB2HSV)
+
             val mean = Core.mean(hsv)
-            onFeltColorSampled(floatArrayOf(mean.`val`[0].toFloat(), mean.`val`[1].toFloat() / 255f, mean.`val`[2].toFloat() / 255f))
-            crop.release(); bgr.release(); hsv.release(); yRoi.release()
+            // OpenCV Hue is 0-180. Saturation and Value are 0-255. Let's normalize them to 0.0-1.0
+            onFeltColorSampled(floatArrayOf(
+                mean.`val`[0].toFloat(),
+                mean.`val`[1].toFloat() / 255f,
+                mean.`val`[2].toFloat() / 255f
+            ))
+
+            croppedBitmap.recycle()
+            bgrMat.release()
+            hsv.release()
         } catch (_: Exception) { /* ignore if ROI is out of bounds */ }
 
         image.close()

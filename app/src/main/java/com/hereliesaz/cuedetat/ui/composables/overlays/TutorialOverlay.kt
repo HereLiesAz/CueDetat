@@ -165,7 +165,7 @@ fun TutorialOverlay(
         // Bottom text box for instructions.
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth() // Changed from fillMaxSize()
                 .navigationBarsPadding()
                 .padding(bottom = 96.dp, start = 16.dp, end = 16.dp)
                 .zIndex(10f),
