@@ -42,6 +42,11 @@ class LineRenderer {
     private val textRenderer = LineTextRenderer()
     private val protractorAngles = floatArrayOf(10f, 20f, 30f, 40f, 50f, 60f, 70f, 80f)
 
+    // Pre-allocated buffers to prevent catastrophic GC thrashing in the render loop
+    private val visiblePtsBuffer = FloatArray(4000)
+    private val posBuffer = FloatArray(2)
+    private val tanBuffer = FloatArray(2)
+
     fun drawLogicalLines(
         canvas: Canvas,
         state: CueDetatState,
@@ -88,10 +93,7 @@ class LineRenderer {
             distMat.get(0, 0, distArray)
         }
 
-        // IMPORTANT: We must wrap these in a matrix block because LineRenderer's
-        // internal methods (drawFadingLine, drawBankablePath) assume the canvas
-        // is ALREADY transformed by activeMatrix so they can concat the inverse
-        // and draw in screen space without double projection.
+        // IMPORTANT: Wrap in matrix block because tangent/aiming internally map points
         canvas.save()
         canvas.concat(activeMatrix)
         drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
@@ -306,14 +308,16 @@ class LineRenderer {
             for (i in 0 until finalSegmentIndex) {
                 val start = path[i]
                 val rawEnd = path[i + 1]
-                val end = getSafeLogicalPoint(start, rawEnd, activeMatrix) ?: continue
+
+                val clipped = getClippedSegment(start, rawEnd, state) ?: continue
+                val end = getSafeLogicalPoint(clipped.first, clipped.second, activeMatrix) ?: continue
 
                 val config = bankLineConfigs.getOrElse(i) { bankLineConfigs.last() }
 
                 val linePaint = Paint(paints.bankLine1Paint).apply { color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
                 val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints)
 
-                val segmentPath = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
+                val segmentPath = DrawingUtils.buildDistortedLinePath(clipped.first, end, activeMatrix, camArray, distArray)
                 canvas.drawPath(segmentPath, glowPaint)
                 canvas.drawPath(segmentPath, linePaint)
             }
@@ -337,7 +341,6 @@ class LineRenderer {
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
         val targetCenter = state.protractorUnit.center
         val config = ProtractorGuides()
-        val labelConfig = LabelConfig.angleGuide
 
         val guidePaint = Paint(paints.angleGuidePaint).apply {
             color = config.strokeColor.toArgb()
@@ -387,8 +390,10 @@ class LineRenderer {
                 val direction = normalize(PointF(rawEnd.x - start.x, rawEnd.y - start.y))
                 drawFadingLine(canvas, start, direction, primaryPaint, glowPaint, state, paints, activeMatrix, camArray, distArray, drawTriangles, textToDraw, typeface)
             } else {
-                val end = getSafeLogicalPoint(start, rawEnd, activeMatrix) ?: continue
-                val segmentPath = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
+                val clipped = getClippedSegment(start, rawEnd, state) ?: continue
+                val end = getSafeLogicalPoint(clipped.first, clipped.second, activeMatrix) ?: continue
+
+                val segmentPath = DrawingUtils.buildDistortedLinePath(clipped.first, end, activeMatrix, camArray, distArray)
                 canvas.save()
                 canvas.concat(inverseMatrix)
                 glowPaint?.let { canvas.drawPath(segmentPath, it) }
@@ -407,9 +412,11 @@ class LineRenderer {
         for (i in 0 until path.size - 1) {
             val start = path[i]
             val rawEnd = path[i + 1]
-            val end = getSafeLogicalPoint(start, rawEnd, activeMatrix) ?: continue
 
-            val segmentPath = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
+            val clipped = getClippedSegment(start, rawEnd, state) ?: continue
+            val end = getSafeLogicalPoint(clipped.first, clipped.second, activeMatrix) ?: continue
+
+            val segmentPath = DrawingUtils.buildDistortedLinePath(clipped.first, end, activeMatrix, camArray, distArray)
             glowPaint?.let { canvas.drawPath(segmentPath, it) }
             canvas.drawPath(segmentPath, paint)
         }
@@ -456,14 +463,21 @@ class LineRenderer {
         val fadeStartDistance = tableLength * 1.2f
 
         val rawEnd = PointF(start.x + direction.x * totalLength, start.y + direction.y * totalLength)
+
+        // Mathematically decapitate the segment in logical space
+        val clipped = getClippedSegment(start, rawEnd, state) ?: return
+        val clipStart = clipped.first
+        val clipEnd = clipped.second
+
+        val end = getSafeLogicalPoint(clipStart, clipEnd, activeMatrix) ?: return
+
+        // Preserve original fade distance anchoring
         val rawFadeStart = PointF(start.x + direction.x * fadeStartDistance, start.y + direction.y * fadeStartDistance)
+        val fadeStartLogical = getSafeLogicalPoint(start, rawFadeStart, activeMatrix) ?: end
 
-        val end = getSafeLogicalPoint(start, rawEnd, activeMatrix) ?: return
-        val fadeStart = getSafeLogicalPoint(start, rawFadeStart, activeMatrix) ?: end
+        val path = DrawingUtils.buildDistortedLinePath(clipStart, end, activeMatrix, camArray, distArray)
 
-        val path = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
-
-        val screenFadeStart = DrawingUtils.mapPoint(fadeStart, activeMatrix)
+        val screenFadeStart = DrawingUtils.mapPoint(fadeStartLogical, activeMatrix)
         val screenEnd = DrawingUtils.mapPoint(end, activeMatrix)
 
         val finalFadeStart = if (camArray != null && distArray != null && camArray.size == 9) {
@@ -482,41 +496,45 @@ class LineRenderer {
             val measure = android.graphics.PathMeasure(path, false)
             val pathLen = measure.length
 
-            // 1. Walk the line and collect ONLY coordinates that are physically visible onscreen
-            val visiblePts = mutableListOf<FloatArray>()
+            var visibleCount = 0
             var d = 0f
-            val pos = FloatArray(2)
-            val tan = FloatArray(2)
 
-            while (d <= pathLen) {
-                if (measure.getPosTan(d, pos, tan)) {
+            // Zero-allocation loop to sample visible coordinates
+            while (d <= pathLen && visibleCount < 1000) {
+                if (measure.getPosTan(d, posBuffer, tanBuffer)) {
                     val margin = 20f
-                    if (pos[0] in margin..(state.viewWidth - margin) && pos[1] in margin..(state.viewHeight - margin)) {
-                        visiblePts.add(floatArrayOf(pos[0], pos[1], tan[0], tan[1]))
-                    } else if (visiblePts.isNotEmpty()) {
-                        // We reached the edge of the screen. Stop collecting.
+                    if (posBuffer[0] in margin..(state.viewWidth - margin) && posBuffer[1] in margin..(state.viewHeight - margin)) {
+                        val idx = visibleCount * 4
+                        visiblePtsBuffer[idx] = posBuffer[0]
+                        visiblePtsBuffer[idx + 1] = posBuffer[1]
+                        visiblePtsBuffer[idx + 2] = tanBuffer[0]
+                        visiblePtsBuffer[idx + 3] = tanBuffer[1]
+                        visibleCount++
+                    } else if (visibleCount > 0) {
                         break
                     }
                 }
                 d += 15f
             }
 
-            // 2. DRAW REAL TRIANGLES FIRST (Rendered BELOW the line, Exact same color)
-            if (drawTriangles && visiblePts.size > 5) {
+            // DRAW REAL TRIANGLES FIRST
+            if (drawTriangles && visibleCount > 5) {
                 val trianglePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     style = Paint.Style.FILL
                     color = paint.color
                 }
 
-                // Space exactly 3 triangles uniformly across the onscreen segment
-                val spacing = visiblePts.size / 4
+                val spacing = visibleCount / 4
                 for (i in 1..3) {
-                    val idx = (i * spacing).coerceIn(0, visiblePts.size - 1)
-                    val pt = visiblePts[idx]
-                    val angle = Math.toDegrees(atan2(pt[3].toDouble(), pt[2].toDouble())).toFloat()
+                    val ptIdx = (i * spacing).coerceIn(0, visibleCount - 1) * 4
+                    val x = visiblePtsBuffer[ptIdx]
+                    val y = visiblePtsBuffer[ptIdx + 1]
+                    val tx = visiblePtsBuffer[ptIdx + 2]
+                    val ty = visiblePtsBuffer[ptIdx + 3]
+                    val angle = Math.toDegrees(atan2(ty.toDouble(), tx.toDouble())).toFloat()
 
                     canvas.save()
-                    canvas.translate(pt[0], pt[1])
+                    canvas.translate(x, y)
                     canvas.rotate(angle)
 
                     val triPath = Path().apply {
@@ -530,16 +548,20 @@ class LineRenderer {
                 }
             }
 
-            // 3. DRAW THE LINE OVER THE TRIANGLES
+            // DRAW THE LINE OVER THE TRIANGLES
             glowPaint?.let { canvas.drawPath(path, it) }
             canvas.drawPath(path, paint)
 
-            // 4. DRAW THE CYAN TEXT ON TOP (Exactly halfway down the visible line)
-            if (textToDraw != null && state.areHelpersVisible && visiblePts.isNotEmpty()) {
-                val midPt = visiblePts[visiblePts.size / 2]
-                var angle = Math.toDegrees(atan2(midPt[3].toDouble(), midPt[2].toDouble())).toFloat()
+            // DRAW THE CYAN TEXT ON TOP
+            if (textToDraw != null && state.areHelpersVisible && visibleCount > 0) {
+                val midPtIdx = (visibleCount / 2) * 4
+                val x = visiblePtsBuffer[midPtIdx]
+                val y = visiblePtsBuffer[midPtIdx + 1]
+                val tx = visiblePtsBuffer[midPtIdx + 2]
+                val ty = visiblePtsBuffer[midPtIdx + 3]
+                var angle = Math.toDegrees(atan2(ty.toDouble(), tx.toDouble())).toFloat()
                 var yOffset = -35f
-                if (midPt[2] < 0) {
+                if (tx < 0) {
                     angle += 180f
                     yOffset = 45f
                 }
@@ -553,7 +575,7 @@ class LineRenderer {
                 }
 
                 canvas.save()
-                canvas.translate(midPt[0], midPt[1])
+                canvas.translate(x, y)
                 canvas.rotate(angle)
                 canvas.drawText(textToDraw, 0f, yOffset, textPaint)
                 canvas.restore()
@@ -614,5 +636,70 @@ class LineRenderer {
         }
 
         return null
+    }
+
+    private fun getClippedSegment(start: PointF, end: PointF, state: CueDetatState): Pair<PointF, PointF>? {
+        val halfW = state.table.logicalWidth / 2f
+        val halfH = state.table.logicalHeight / 2f
+        val left = -halfW
+        val right = halfW
+        val top = -halfH
+        val bottom = halfH
+
+        var x0 = start.x
+        var y0 = start.y
+        var x1 = end.x
+        var y1 = end.y
+
+        var outcode0 = computeOutCode(x0, y0, left, right, top, bottom)
+        var outcode1 = computeOutCode(x1, y1, left, right, top, bottom)
+        var accept = false
+
+        while (true) {
+            if ((outcode0 or outcode1) == 0) {
+                accept = true
+                break
+            } else if ((outcode0 and outcode1) != 0) {
+                break
+            } else {
+                var x = 0f
+                var y = 0f
+                val outcodeOut = if (outcode0 != 0) outcode0 else outcode1
+
+                if ((outcodeOut and 8) != 0) {
+                    x = x0 + (x1 - x0) * (bottom - y0) / (y1 - y0)
+                    y = bottom
+                } else if ((outcodeOut and 4) != 0) {
+                    x = x0 + (x1 - x0) * (top - y0) / (y1 - y0)
+                    y = top
+                } else if ((outcodeOut and 2) != 0) {
+                    y = y0 + (y1 - y0) * (right - x0) / (x1 - x0)
+                    x = right
+                } else if ((outcodeOut and 1) != 0) {
+                    y = y0 + (y1 - y0) * (left - x0) / (x1 - x0)
+                    x = left
+                }
+
+                if (outcodeOut == outcode0) {
+                    x0 = x
+                    y0 = y
+                    outcode0 = computeOutCode(x0, y0, left, right, top, bottom)
+                } else {
+                    x1 = x
+                    y1 = y
+                    outcode1 = computeOutCode(x1, y1, left, right, top, bottom)
+                }
+            }
+        }
+        return if (accept) Pair(PointF(x0, y0), PointF(x1, y1)) else null
+    }
+
+    private fun computeOutCode(x: Float, y: Float, left: Float, right: Float, top: Float, bottom: Float): Int {
+        var code = 0
+        if (x < left) code = code or 1
+        else if (x > right) code = code or 2
+        if (y < top) code = code or 4
+        else if (y > bottom) code = code or 8
+        return code
     }
 }
