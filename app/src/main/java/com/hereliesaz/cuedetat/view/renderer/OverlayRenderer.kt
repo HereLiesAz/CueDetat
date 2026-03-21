@@ -65,9 +65,7 @@ class OverlayRenderer {
         // Pass 3: Draw all balls and their associated text
         ballRenderer.draw(canvas, state, paints, typeface)
 
-        // Pass 4: Draw absolute foreground elements (Static Beginner texts & arrows)
-        // NOTICE: This is called OUTSIDE of the withMatrix block to ensure
-        // raw screen-space drawing without double-projection bugs.
+        // Pass 4: Draw absolute foreground elements OUTSIDE of the matrix to prevent double projection!
         if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
             lineRenderer.drawBeginnerForeground(canvas, state, typeface, matrixFor2DPlane)
         }

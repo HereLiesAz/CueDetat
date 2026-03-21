@@ -46,7 +46,7 @@ class BallTextRenderer {
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
         if (isBeginnerLocked) {
             paint.color = android.graphics.Color.parseColor("#00E5FF")
-            paint.setShadowLayer(10f, 0f, 0f, android.graphics.Color.BLACK)
+            paint.setShadowLayer(15f, 0f, 0f, android.graphics.Color.BLACK)
         } else {
             paint.color = config.color.copy(alpha = config.opacity).toArgb()
             paint.clearShadowLayer()
@@ -69,11 +69,9 @@ class BallTextRenderer {
 
         val lines = text.split("\n")
 
-        // Clamp X firmly into the screen so no text is ever rendered off the edges
-        val safeX = (screenPos.x + config.xOffset).coerceIn(
-            150f * state.screenDensity,
-            state.viewWidth - (150f * state.screenDensity)
-        )
+        // Force the text entirely onscreen
+        val paddingPx = 150f * state.screenDensity
+        val safeX = (screenPos.x + config.xOffset).coerceIn(paddingPx, state.viewWidth - paddingPx)
 
         for (line in lines) {
             canvas.drawText(line, safeX, currentBaseline, paint)
