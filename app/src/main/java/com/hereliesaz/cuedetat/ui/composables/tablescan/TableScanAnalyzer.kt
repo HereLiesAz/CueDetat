@@ -30,7 +30,6 @@ class TableScanAnalyzer(
         val originalWidth = image.width
         val originalHeight = image.height
 
-        // Simplified: work on the Y (luma) plane only — sufficient for Hough circles.
         val planes = image.planes
         val yBuffer = planes[0].buffer
         val yBytes = ByteArray(yBuffer.remaining()).also { yBuffer.get(it) }
@@ -75,34 +74,38 @@ class TableScanAnalyzer(
         }
 
         // Sample felt colour from the centre 10% of the frame.
+        // We actually extract the U and V planes now, leaving 1950s television broadcasts in the past.
         try {
-            // Let CameraX handle the YUV_420_888 to ARGB_8888 conversion securely
-            val bitmap = image.toBitmap()
-            val cx = bitmap.width / 2
-            val cy = bitmap.height / 2
-            val hw = bitmap.width / 20
-            val hh = bitmap.height / 20
+            val uBuffer = planes[1].buffer
+            val vBuffer = planes[2].buffer
+            val ySize = yBytes.size
+            val vSize = vBuffer.remaining()
+            val uSize = uBuffer.remaining()
 
-            // Crop exactly the center 10%
-            val croppedBitmap = android.graphics.Bitmap.createBitmap(bitmap, cx - hw, cy - hh, hw * 2, hh * 2)
-            val bgrMat = Mat()
-            org.opencv.android.Utils.bitmapToMat(croppedBitmap, bgrMat)
+            val nv21 = ByteArray(ySize + vSize + uSize)
+            System.arraycopy(yBytes, 0, nv21, 0, ySize)
+            vBuffer.get(nv21, ySize, vSize)
+            uBuffer.get(nv21, ySize + vSize, uSize)
+
+            val yuvMat = Mat(originalHeight + originalHeight / 2, originalWidth, CvType.CV_8UC1)
+            yuvMat.put(0, 0, nv21)
+            val bgr = Mat()
+            Imgproc.cvtColor(yuvMat, bgr, Imgproc.COLOR_YUV2BGR_NV21)
+
+            val cx = originalWidth / 2; val cy = originalHeight / 2
+            val hw = originalWidth / 20; val hh = originalHeight / 20
+            val roi = org.opencv.core.Rect(cx - hw, cy - hh, hw * 2, hh * 2)
+            val crop = Mat(bgr, roi)
 
             val hsv = Mat()
-            // bitmapToMat usually produces RGBA, so we convert from RGB to HSV
-            Imgproc.cvtColor(bgrMat, hsv, Imgproc.COLOR_RGB2HSV)
-
+            Imgproc.cvtColor(crop, hsv, Imgproc.COLOR_BGR2HSV)
             val mean = Core.mean(hsv)
-            // OpenCV Hue is 0-180. Saturation and Value are 0-255. Let's normalize them to 0.0-1.0
-            onFeltColorSampled(floatArrayOf(
-                mean.`val`[0].toFloat(),
-                mean.`val`[1].toFloat() / 255f,
-                mean.`val`[2].toFloat() / 255f
-            ))
+            onFeltColorSampled(floatArrayOf(mean.`val`[0].toFloat(), mean.`val`[1].toFloat() / 255f, mean.`val`[2].toFloat() / 255f))
 
-            croppedBitmap.recycle()
-            bgrMat.release()
+            crop.release()
+            bgr.release()
             hsv.release()
+            yuvMat.release()
         } catch (_: Exception) { /* ignore if ROI is out of bounds */ }
 
         image.close()

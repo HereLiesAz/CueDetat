@@ -1,5 +1,4 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/SpinControl.kt
-
+// app/src/main/java/com/hereliesaz/cuedetat/ui/composables/SpinControl.kt
 package com.hereliesaz.cuedetat.ui.composables
 
 import android.graphics.PointF
@@ -47,7 +46,6 @@ import kotlin.math.sin
  * 2. **Move Control:** Double-tap and drag moves the control widget itself around the screen.
  *
  * @param modifier Styling modifier.
- * @param centerPosition The current screen coordinates of the control center.
  * @param selectedSpinOffset The active spin vector being applied (dragging).
  * @param lingeringSpinOffset The last applied spin vector (released).
  * @param spinPathAlpha Opacity multiplier for the spin visualization.
@@ -56,7 +54,6 @@ import kotlin.math.sin
 @Composable
 fun SpinControl(
     modifier: Modifier = Modifier,
-    centerPosition: PointF, // Note: Passed but used by parent layout, logical here is stateless position-wise except via modifier/event.
     selectedSpinOffset: PointF?,
     lingeringSpinOffset: PointF?,
     spinPathAlpha: Float,
