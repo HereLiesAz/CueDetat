@@ -149,43 +149,27 @@ class BallRenderer {
 
         if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
             val logicalBallMatrix = state.logicalPlaneMatrix ?: return
-            val logicalScreenPos = DrawingUtils.mapPoint(ball.center, logicalBallMatrix)
 
-            canvas.withMatrix(logicalBallMatrix) {
-                drawCircle(ball.center.x, ball.center.y, ball.radius, logicalStrokePaint)
-                drawCircle(ball.center.x, ball.center.y, dotRadius, dotPaint)
-            }
-
-            val sensitivity = 2.5f
-            val screenOffsetX = state.currentOrientation.roll * sensitivity
-            val screenOffsetY = -state.currentOrientation.pitch * sensitivity
-            val bubbleRadius = ball.radius * zoomFactor
-
-            val offsetDistance = hypot(screenOffsetX, screenOffsetY)
-            val finalOffsetX: Float
-            val finalOffsetY: Float
-
-            if (offsetDistance > bubbleRadius) {
-                val scale = bubbleRadius / offsetDistance
-                finalOffsetX = screenOffsetX * scale
-                finalOffsetY = screenOffsetY * scale
-            } else {
-                finalOffsetX = screenOffsetX
-                finalOffsetY = screenOffsetY
-            }
-
-            val bubbleCenter =
-                PointF(logicalScreenPos.x + finalOffsetX, logicalScreenPos.y + finalOffsetY)
+            // EXACT SIZE MATCH: By drawing inside the matrix, Android guarantees
+            // the scale of the stroke and the bubble are mathematically identical.
+            canvas.save()
+            canvas.concat(logicalBallMatrix)
 
             val strokePaint = Paint(paints.targetCirclePaint).apply {
                 color = config.strokeColor.toArgb()
-                strokeWidth = config.strokeWidth
+                strokeWidth = config.strokeWidth / zoomFactor
                 alpha = (config.opacity * 255).toInt()
             }
-            val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints)
-            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, bubbleRadius, glowPaint)
-            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, bubbleRadius, strokePaint)
 
+            val glowPaint = createGlowPaint(config.glowColor, config.glowWidth / zoomFactor, state, paints)
+
+            // Draw all components purely logically
+            canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, glowPaint)
+            canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, strokePaint)
+            canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, logicalStrokePaint)
+            canvas.drawCircle(ball.center.x, ball.center.y, dotRadius, dotPaint)
+
+            canvas.restore()
         } else {
             val positionMatrix = state.pitchMatrix ?: return
             val sizeMatrix = state.sizeCalculationMatrix ?: positionMatrix

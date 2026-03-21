@@ -30,33 +30,28 @@ class BallTextRenderer {
         if (!state.areHelpersVisible && !config.isPersistentlyVisible) return
         val matrix = state.pitchMatrix ?: return
 
-        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
-            state.experienceMode,
-            state.isBeginnerViewLocked
-        )
-        val zoomFactor = ZoomMapping.sliderToZoom(
-            state.zoomSliderPosition,
-            minZoom,
-            maxZoom
-        ) / ZoomMapping.DEFAULT_ZOOM
-
-        paint.textSize = (baseFontSize * zoomFactor).coerceIn(minFontSize, maxFontSize)
-        paint.textAlign = Paint.Align.CENTER
-
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
+
         if (isBeginnerLocked) {
             paint.color = android.graphics.Color.parseColor("#00E5FF")
-            paint.setShadowLayer(15f, 0f, 0f, android.graphics.Color.BLACK)
+            paint.setShadowLayer(10f, 0f, 0f, android.graphics.Color.BLACK)
+            paint.textSize = 50f // Hardcoded readable size
         } else {
+            val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked)
+            val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom) / ZoomMapping.DEFAULT_ZOOM
+
             paint.color = config.color.copy(alpha = config.opacity).toArgb()
             paint.clearShadowLayer()
+            paint.textSize = (baseFontSize * zoomFactor).coerceIn(minFontSize, maxFontSize)
         }
+
+        paint.textAlign = Paint.Align.CENTER
 
         val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ball.center, ball.radius, state, matrix)
         val screenPos = DrawingUtils.mapPoint(ball.center, matrix)
 
         val textMetrics = paint.fontMetrics
-        val textPadding = 10f * zoomFactor.coerceAtLeast(0.5f)
+        val textPadding = 15f
         val lineHeight = textMetrics.descent - textMetrics.ascent
 
         var currentBaseline = if (drawBelow) {
@@ -69,8 +64,8 @@ class BallTextRenderer {
 
         val lines = text.split("\n")
 
-        // Force the text entirely onscreen
-        val paddingPx = 150f * state.screenDensity
+        // Strict boundary clamp to ensure the text is 100% onscreen
+        val paddingPx = 150f
         val safeX = (screenPos.x + config.xOffset).coerceIn(paddingPx, state.viewWidth - paddingPx)
 
         for (line in lines) {

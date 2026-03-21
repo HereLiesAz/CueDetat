@@ -16,7 +16,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
-import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.ui.theme.SulfurDust
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.PaintCache
@@ -99,18 +98,18 @@ class LineRenderer {
             if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
                 // Skip pathways in locked
             } else {
-                drawFadingLine(canvas, shotLineAnchor, shotGuideDirection, obstructionPaint, null, state, paints, activeMatrix, camArray, distArray)
+                drawFadingLine(canvas, shotLineAnchor, shotGuideDirection, obstructionPaint, null, state, paints, activeMatrix, camArray, distArray, false)
             }
 
             state.aimingLineBankPath?.let {
-                drawBankablePath(canvas, it, obstructionPaint, null, isPocketed = false, state, paints, activeMatrix, camArray, distArray)
+                drawBankablePath(canvas, it, obstructionPaint, null, isPocketed = false, state, paints, activeMatrix, camArray, distArray, false)
             }
         }
 
         if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
             // Skip inner line
         } else {
-            drawFadingLine(canvas, shotLineAnchor, shotGuideDirection, shotLinePaint, shotLineGlow, state, paints, activeMatrix, camArray, distArray)
+            drawFadingLine(canvas, shotLineAnchor, shotGuideDirection, shotLinePaint, shotLineGlow, state, paints, activeMatrix, camArray, distArray, false)
         }
         drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray)
         drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray)
@@ -152,10 +151,10 @@ class LineRenderer {
         val path = rawPath.map { it.warpedBy(tps) }
 
         if (state.table.isVisible || state.obstacleBalls.isNotEmpty()) {
-            drawBankablePath(canvas, path, obstructionPaint, null, isPocketed = false, state, paints, activeMatrix, camArray, distArray)
+            drawBankablePath(canvas, path, obstructionPaint, null, isPocketed = false, state, paints, activeMatrix, camArray, distArray, false)
         }
 
-        drawBankablePath(canvas, path, aimingLinePaint, aimingLineGlow, isPocketed, state, paints, activeMatrix, camArray, distArray)
+        drawBankablePath(canvas, path, aimingLinePaint, aimingLineGlow, isPocketed, state, paints, activeMatrix, camArray, distArray, isBeginnerLocked)
     }
 
     private fun drawTangentLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
@@ -197,21 +196,21 @@ class LineRenderer {
         val start = rawStart.warpedBy(tps)
 
         if (isBeginnerLocked) {
-            drawFadingLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray)
-            drawFadingLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray)
+            drawFadingLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, true)
+            drawFadingLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, true)
             return
         }
 
         if (state.isStraightShot) {
-            drawFadingLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray)
-            drawFadingLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray)
+            drawFadingLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, false)
+            drawFadingLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, false)
         } else {
             val rawActivePath = state.tangentLineBankPath ?: listOf(rawStart, PointF(rawStart.x + tangentDx * 5000f * state.tangentDirection, rawStart.y + tangentDy * 5000f * state.tangentDirection))
             val activePath = rawActivePath.map { it.warpedBy(tps) }
-            drawBankablePath(canvas, activePath, tangentSolidPaint, tangentGlow, isPocketed, state, paints, activeMatrix, camArray, distArray)
+            drawBankablePath(canvas, activePath, tangentSolidPaint, tangentGlow, isPocketed, state, paints, activeMatrix, camArray, distArray, false)
 
             val inactiveDirection = normalize(PointF(tangentDx * -state.tangentDirection, tangentDy * -state.tangentDirection))
-            drawFadingLine(canvas, start, inactiveDirection, tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray)
+            drawFadingLine(canvas, start, inactiveDirection, tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, false)
         }
     }
 
@@ -297,7 +296,7 @@ class LineRenderer {
                 val linePaint = Paint(paints.bankLine1Paint).apply { color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
                 val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints)
 
-                drawFadingLine(canvas, start, direction, linePaint, glowPaint, state, paints, activeMatrix, camArray, distArray)
+                drawFadingLine(canvas, start, direction, linePaint, glowPaint, state, paints, activeMatrix, camArray, distArray, false)
             }
         }
     }
@@ -338,7 +337,8 @@ class LineRenderer {
         paints: PaintCache,
         activeMatrix: Matrix,
         camArray: DoubleArray?,
-        distArray: DoubleArray?
+        distArray: DoubleArray?,
+        drawTriangles: Boolean
     ) {
         if (path.size < 2) return
         val finalSegmentIndex = path.size - 2
@@ -351,7 +351,7 @@ class LineRenderer {
 
             if (isLastSegment) {
                 val direction = normalize(PointF(rawEnd.x - start.x, rawEnd.y - start.y))
-                drawFadingLine(canvas, start, direction, primaryPaint, glowPaint, state, paints, activeMatrix, camArray, distArray)
+                drawFadingLine(canvas, start, direction, primaryPaint, glowPaint, state, paints, activeMatrix, camArray, distArray, drawTriangles)
             } else {
                 val end = getSafeLogicalPoint(start, rawEnd, activeMatrix) ?: continue
                 val segmentPath = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
@@ -397,7 +397,7 @@ class LineRenderer {
         val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)
         val finalAngleRad = initialAngleRad + Math.toRadians(angleDegrees.toDouble())
         val direction = normalize(PointF(cos(finalAngleRad).toFloat(), sin(finalAngleRad).toFloat()))
-        drawFadingLine(canvas, center, direction, paint, null, state, paints, activeMatrix, camArray, distArray)
+        drawFadingLine(canvas, center, direction, paint, null, state, paints, activeMatrix, camArray, distArray, false)
     }
 
     private fun drawFadingLine(
@@ -410,7 +410,8 @@ class LineRenderer {
         paints: PaintCache,
         activeMatrix: Matrix,
         camArray: DoubleArray?,
-        distArray: DoubleArray?
+        distArray: DoubleArray?,
+        drawTriangles: Boolean
     ) {
         val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
 
@@ -442,6 +443,60 @@ class LineRenderer {
 
         val layer = canvas.saveLayer(null, null)
         try {
+            // DRAW TRIANGLES FIRST SO THEY RENDER UNDER THE LINE
+            if (drawTriangles) {
+                val measure = android.graphics.PathMeasure(path, false)
+                val length = measure.length
+
+                // Step along the line to find all points that are physically on the screen
+                val step = length / 100f
+                val visiblePoints = mutableListOf<FloatArray>()
+                val pos = FloatArray(2)
+                val tan = FloatArray(2)
+
+                val margin = 50f
+                for (i in 0..100) {
+                    if (measure.getPosTan(i * step, pos, tan)) {
+                        if (pos[0] in margin..(state.viewWidth - margin) && pos[1] in margin..(state.viewHeight - margin)) {
+                            visiblePoints.add(floatArrayOf(pos[0], pos[1], tan[0], tan[1]))
+                        }
+                    }
+                }
+
+                if (visiblePoints.isNotEmpty()) {
+                    val trianglePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        style = Paint.Style.FILL
+                        color = paint.color // EXACT SAME COLOR AS THE LINE
+                    }
+
+                    val numTriangles = 3
+                    val spacing = visiblePoints.size / (numTriangles + 1)
+
+                    for (i in 1..numTriangles) {
+                        val idx = i * spacing
+                        if (idx < visiblePoints.size) {
+                            val pt = visiblePoints[idx]
+                            val angle = Math.toDegrees(atan2(pt[3].toDouble(), pt[2].toDouble())).toFloat()
+
+                            canvas.save()
+                            canvas.translate(pt[0], pt[1])
+                            canvas.rotate(angle)
+
+                            // REAL, solid triangle pointing right
+                            val triPath = Path().apply {
+                                moveTo(30f, 0f)
+                                lineTo(-20f, 20f)
+                                lineTo(-20f, -20f)
+                                close()
+                            }
+                            canvas.drawPath(triPath, trianglePaint)
+                            canvas.restore()
+                        }
+                    }
+                }
+            }
+
+            // DRAW LINE ON TOP OF TRIANGLES
             glowPaint?.let { canvas.drawPath(path, it) }
             canvas.drawPath(path, paint)
 
@@ -464,7 +519,7 @@ class LineRenderer {
         }
     }
 
-    // --- PASS 4: DYNAMIC SCREEN OVERLAYS ---
+    // --- PASS 4: STATIC BEGINNER MODE TEXT OVERLAYS ---
     fun drawBeginnerForeground(
         canvas: Canvas, state: CueDetatState, typeface: Typeface?, activeMatrix: Matrix
     ) {
@@ -476,8 +531,7 @@ class LineRenderer {
 
         val shotGuideDirection = normalize(PointF(ghostCueCenter.x - shotLineAnchor.x, ghostCueCenter.y - shotLineAnchor.y))
 
-        // Target text exactly 2.5 radii away, firmly anchoring it next to the ball
-        drawDynamicScreenOverlay(canvas, state, ghostCueCenter, shotGuideDirection, "Aim this line at the pocket.", typeface, activeMatrix)
+        drawDynamicScreenText(canvas, state, ghostCueCenter, shotGuideDirection, "Aim this line at the pocket.", typeface, activeMatrix)
 
         val dxToTarget = targetCenter.x - ghostCueCenter.x
         val dyToTarget = targetCenter.y - ghostCueCenter.y
@@ -487,16 +541,15 @@ class LineRenderer {
             val tangentDy = dxToTarget / magToTarget
             val start = ghostCueCenter.warpedBy(state.lensWarpTps)
 
-            drawDynamicScreenOverlay(canvas, state, start, normalize(PointF(tangentDx, tangentDy)), "Tangent Line", typeface, activeMatrix)
-            drawDynamicScreenOverlay(canvas, state, start, normalize(PointF(-tangentDx, -tangentDy)), "Tangent Line", typeface, activeMatrix)
+            drawDynamicScreenText(canvas, state, start, normalize(PointF(tangentDx, tangentDy)), "Tangent Line", typeface, activeMatrix)
+            drawDynamicScreenText(canvas, state, start, normalize(PointF(-tangentDx, -tangentDy)), "Tangent Line", typeface, activeMatrix)
         }
     }
 
-    private fun drawDynamicScreenOverlay(
+    private fun drawDynamicScreenText(
         canvas: Canvas, state: CueDetatState, logicalStart: PointF, logicalDir: PointF,
         text: String, typeface: Typeface?, activeMatrix: Matrix
     ) {
-        // Map line to pure screen pixels
         val screenStart = DrawingUtils.mapPoint(logicalStart, activeMatrix)
         val logicalEnd = PointF(logicalStart.x + logicalDir.x * 100f, logicalStart.y + logicalDir.y * 100f)
         val screenEnd = DrawingUtils.mapPoint(logicalEnd, activeMatrix)
@@ -508,74 +561,35 @@ class LineRenderer {
         val sDirX = sDx / sMag
         val sDirY = sDy / sMag
 
-        // Measure dynamic size of the ball right now
-        val ballRadius = DrawingUtils.getPerspectiveRadiusAndLift(logicalStart, LOGICAL_BALL_RADIUS, state, activeMatrix).radius
-
-        val angle = Math.toDegrees(atan2(sDirY.toDouble(), sDirX.toDouble())).toFloat()
-        var textAngle = angle
-        var yOffset = -ballRadius * 0.4f
+        var textAngle = Math.toDegrees(atan2(sDirY.toDouble(), sDirX.toDouble())).toFloat()
+        var yOffset = -45f
         if (sDirX < 0) {
             textAngle += 180f
-            yOffset = ballRadius * 0.6f
+            yOffset = 55f
         }
-
-        val highlightColor = android.graphics.Color.parseColor("#00E5FF")
-        val textSizeDyn = ballRadius * 0.6f // Font size scales exactly with the ball
 
         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.typeface = typeface
-            textSize = textSizeDyn
-            color = highlightColor
+            textSize = 50f // HARDCODED fixed readable size
+            color = android.graphics.Color.parseColor("#00E5FF")
             textAlign = Paint.Align.CENTER
-            setShadowLayer(ballRadius * 0.2f, 0f, 0f, android.graphics.Color.BLACK)
+            setShadowLayer(15f, 0f, 0f, android.graphics.Color.BLACK)
         }
 
-        // Place text exactly 2.8 dynamic radii away
-        val textDist = ballRadius * 2.8f
+        val textDist = 200f * state.screenDensity
         val textX = screenStart.x + sDirX * textDist
         val textY = screenStart.y + sDirY * textDist
 
-        // Absolute bound clamping
-        val safeX = textX.coerceIn(100f, state.viewWidth.toFloat() - 100f)
-        val safeY = textY.coerceIn(100f, state.viewHeight.toFloat() - 100f)
+        // HARD BOUND CLAMPING: Text will ALWAYS be physically on your screen
+        val padding = 150f
+        val safeX = textX.coerceIn(padding, state.viewWidth.toFloat() - padding)
+        val safeY = textY.coerceIn(padding, state.viewHeight.toFloat() - padding)
 
         canvas.save()
         canvas.translate(safeX, safeY)
         canvas.rotate(textAngle)
         canvas.drawText(text, 0f, yOffset, textPaint)
         canvas.restore()
-
-        // Draw HUGE Dynamic Triangles based directly on the ball's radius
-        val trianglePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-            color = highlightColor
-            setShadowLayer(ballRadius * 0.1f, 0f, 0f, android.graphics.Color.BLACK)
-        }
-
-        val triSize = ballRadius * 0.5f
-
-        for (i in 1..3) {
-            val triDist = ballRadius * (3f + i * 2f)
-            val triX = screenStart.x + sDirX * triDist
-            val triY = screenStart.y + sDirY * triDist
-
-            // Only draw if inside screen bounds
-            if (triX in 0f..state.viewWidth.toFloat() && triY in 0f..state.viewHeight.toFloat()) {
-                canvas.save()
-                canvas.translate(triX, triY)
-                canvas.rotate(angle) // Note: original angle so arrows point correctly
-
-                val triPath = Path().apply {
-                    moveTo(triSize, 0f)
-                    lineTo(-triSize * 0.8f, triSize * 0.6f)
-                    lineTo(-triSize * 0.2f, 0f)
-                    lineTo(-triSize * 0.8f, -triSize * 0.6f)
-                    close()
-                }
-                canvas.drawPath(triPath, trianglePaint)
-                canvas.restore()
-            }
-        }
     }
 
     private fun normalize(p: PointF): PointF {
