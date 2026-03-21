@@ -54,7 +54,7 @@ class BallRenderer {
                 ?: emptyList())
         val snappedPaint = Paint(paints.targetCirclePaint).apply {
             color = SulfurDust.toArgb()
-            style = Paint.Style.FILL
+            style = Paint.Style.STROKE
             alpha = 150
         }
 
@@ -166,7 +166,7 @@ class BallRenderer {
 
             val bubbleCenter = PointF(logicalScreenPos.x + finalOffsetX, logicalScreenPos.y + finalOffsetY)
 
-            // 2. DRAW THE BUBBLE (Moves with tilt)
+            // 2. PAINTS
             val translucentFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = config.strokeColor.toArgb()
                 alpha = (config.opacity * 255 * 0.4f).toInt() // Ensure it is distinctly translucent
@@ -178,10 +178,6 @@ class BallRenderer {
             }
             val dotRadius = exactScreenRadius * 0.1f
 
-            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, exactScreenRadius, translucentFillPaint)
-            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, dotRadius, dotPaint)
-
-            // 3. DRAW THE OUTLINE (Locked in place on the table)
             val effectiveStrokeWidth = if (config is TargetBall) {
                 GhostCueBall().strokeWidth // Force Target Ball to match Ghost Ball's stroke
             } else {
@@ -192,15 +188,20 @@ class BallRenderer {
                 color = config.strokeColor.toArgb()
                 strokeWidth = effectiveStrokeWidth
                 alpha = (config.opacity * 255).toInt()
-                style = Paint.Style.STROKE
+                style = Paint.Style.STROKE // Outline stroke, no fill
             }
             val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints)
-
-            // Render stroke strictly on the INSIDE of the circle
             val screenInnerRadius = exactScreenRadius - (effectiveStrokeWidth / 2f)
 
+            // 3. DRAW THE BUBBLE (Moves with tilt) - TRANSLUCENT FILL, NO DOT
+            // Drawn first so it renders beneath the stationary outline
+            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, exactScreenRadius, translucentFillPaint)
+
+            // 4. DRAW THE STATIONARY OUTLINE (Locked in place on the table) - STROKE, NO FILL, HAS DOT
+            // Drawn last so it renders on top of the bubble.
             canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, exactScreenRadius, glowPaint)
             canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, screenInnerRadius, strokePaint)
+            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, dotRadius, dotPaint)
 
         } else {
             // EXPERT MODE LOGIC
