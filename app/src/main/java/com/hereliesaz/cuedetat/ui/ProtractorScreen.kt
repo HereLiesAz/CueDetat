@@ -188,7 +188,7 @@ fun ProtractorScreen(
 
         onscreen(alignment = Alignment.CenterEnd) {
             val isBeginnerLocked = uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked
-            // HIDES THE SLIDER WHEN BEGINNER MODE IS LOCKED
+            // HIDDEN: The ZoomControls will not render at all if Beginner Mode is locked
             if (isOnMain && !isBeginnerLocked) {
                 ZoomControls(
                     zoomSliderPosition = uiState.zoomSliderPosition,
@@ -233,6 +233,7 @@ fun ProtractorScreen(
             }
         }
 
+        // [Remaining screens/dialogs unchanged...]
         onscreen(alignment = Alignment.TopCenter) {
             if (isOnCalibration) {
                 Column(

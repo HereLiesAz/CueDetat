@@ -8,7 +8,6 @@ import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ReducerUtils
-import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
@@ -57,15 +56,14 @@ internal fun reduceToggleAction(
         }
         is MainScreenEvent.UnlockBeginnerView -> state.copy(isBeginnerViewLocked = false)
         is MainScreenEvent.LockBeginnerView -> {
-            val autoSlider = calculateAutoZoomSlider(state)
             state.copy(
                 isBeginnerViewLocked = true,
-                areHelpersVisible = true,
-                cameraMode = if (state.cameraMode == CameraMode.OFF) CameraMode.CAMERA else state.cameraMode,
+                areHelpersVisible = true, // Force helpers ON
+                cameraMode = if (state.cameraMode == CameraMode.OFF) CameraMode.CAMERA else state.cameraMode, // Force camera ON
                 protractorUnit = ProtractorUnit(reducerUtils.getDefaultTargetBallPosition(), LOGICAL_BALL_RADIUS, 0f),
                 onPlaneBall = null,
                 obstacleBalls = emptyList(),
-                zoomSliderPosition = autoSlider,
+                zoomSliderPosition = 50f, // Force zoom slider to absolute maximum
                 viewOffset = PointF(0f, 0f),
                 worldRotationDegrees = 0f,
                 valuesChangedSinceReset = false
@@ -76,32 +74,6 @@ internal fun reduceToggleAction(
         is MainScreenEvent.ExitToSplash -> state.copy(experienceMode = null)
         else -> state
     }
-}
-
-private fun calculateAutoZoomSlider(state: CueDetatState): Float {
-    var autoZoomSlider = 0f
-    state.logicalPlaneMatrix?.let { mat ->
-        // Total width of Target Ball + Ghost Ball is 4 radii logically
-        val pts = floatArrayOf(0f, 0f, 4f * LOGICAL_BALL_RADIUS, 0f)
-        mat.mapPoints(pts)
-        val currentPx = kotlin.math.hypot((pts[2] - pts[0]).toDouble(), (pts[3] - pts[1]).toDouble()).toFloat()
-
-        if (currentPx > 0 && state.viewWidth > 0) {
-            val (currMin, currMax) = ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked)
-            val currentZoom = ZoomMapping.sliderToZoom(state.zoomSliderPosition, currMin, currMax)
-
-            // Ensure 100dp total margin (50dp on each side)
-            val marginPx = 100f * state.screenDensity
-            val targetPx = state.viewWidth - marginPx
-
-            if (targetPx > 0) {
-                val targetZoom = currentZoom * (targetPx / currentPx)
-                val (newMin, newMax) = ZoomMapping.getZoomRange(ExperienceMode.BEGINNER, true)
-                autoZoomSlider = ZoomMapping.zoomToSlider(targetZoom, newMin, newMax)
-            }
-        }
-    }
-    return autoZoomSlider
 }
 
 private fun handleSetExperienceMode(
@@ -130,7 +102,6 @@ private fun handleSetExperienceMode(
             )
         }
         ExperienceMode.BEGINNER -> {
-            val autoSlider = calculateAutoZoomSlider(state)
             newState.copy(
                 table = newState.table.copy(isVisible = false),
                 onPlaneBall = null,
@@ -138,7 +109,7 @@ private fun handleSetExperienceMode(
                 areHelpersVisible = true,
                 isBeginnerViewLocked = true,
                 cameraMode = if (state.cameraMode == CameraMode.OFF) CameraMode.CAMERA else state.cameraMode,
-                zoomSliderPosition = autoSlider
+                zoomSliderPosition = 50f // Force zoom slider to absolute maximum
             )
         }
         ExperienceMode.HATER -> newState

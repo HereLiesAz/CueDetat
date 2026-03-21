@@ -12,8 +12,8 @@ internal object ZoomMapping {
     private const val STANDARD_MAX_ZOOM = 4.0f
 
     private const val BEGINNER_MIN_ZOOM = 0.5f
-    // Increased the cap significantly so the balls draw much larger
-    private const val BEGINNER_LOCKED_MAX_ZOOM = 20.0f
+    // Massively increased max zoom so slider position 50f gets extremely close
+    private const val BEGINNER_LOCKED_MAX_ZOOM = 40.0f
 
     private const val SLIDER_RANGE = 100f
 
