@@ -3,6 +3,7 @@
 package com.hereliesaz.cuedetat.view.renderer
 
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Typeface
 import androidx.core.graphics.withMatrix
 import com.hereliesaz.cuedetat.domain.CueDetatState
@@ -50,7 +51,8 @@ class OverlayRenderer {
                 tableRenderer.drawSurface(this, state, paints)
                 tableRenderer.drawPockets(this, state, paints)
             }
-            lineRenderer.drawLogicalLines(this, state, paints, typeface)
+            // Pass the active matrix to the LineRenderer so it can invert it for screen-space distortion
+            lineRenderer.drawLogicalLines(this, state, paints, typeface, matrixFor2DPlane)
         }
 
 

@@ -100,7 +100,13 @@ class MainActivity : ComponentActivity() {
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
                         startActivity(intent)
                     } else {
-                        // Log suspicious URL attempt or handle gracefully
+                        // Notify the user instead of failing silently
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Link blocked for security.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        android.util.Log.w("MainActivity", "Suspicious URL blocked: ${event.url}")
                     }
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }

@@ -4,6 +4,7 @@ package com.hereliesaz.cuedetat.view.renderer.line
 
 import android.graphics.Canvas
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
@@ -29,6 +30,7 @@ import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.config.ui.ProtractorGuides
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.warpedBy
+import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -43,19 +45,35 @@ class LineRenderer {
         canvas: Canvas,
         state: CueDetatState,
         paints: PaintCache,
-        typeface: Typeface?
+        typeface: Typeface?,
+        activeMatrix: Matrix
     ) {
+        // PERFORMANCE OPTIMIZATION: Extract OpenCV Mat to DoubleArray ONCE per frame
+        // to avoid heavy JNI calls during segmented path generation.
+        var camArray: DoubleArray? = null
+        var distArray: DoubleArray? = null
+
+        val camMat = state.cameraMatrix
+        val distMat = state.distCoeffs
+        if (camMat != null && !camMat.empty() && distMat != null && !distMat.empty()) {
+            camArray = DoubleArray(camMat.total().toInt())
+            camMat.get(0, 0, camArray)
+            distArray = DoubleArray(distMat.total().toInt())
+            distMat.get(0, 0, distArray)
+        }
+
         if (state.isBankingMode) {
-            drawBankingLines(canvas, state, paints)
+            drawBankingLines(canvas, state, paints, activeMatrix, camArray, distArray)
         } else {
-            drawProtractorLines(canvas, state, paints, typeface)
-            drawProtractorGuides(canvas, state, paints)
+            drawProtractorLines(canvas, state, paints, typeface, activeMatrix, camArray, distArray)
+            drawProtractorGuides(canvas, state, paints, activeMatrix, camArray, distArray)
         }
     }
 
     private fun drawProtractorLines(
         canvas: Canvas, state: CueDetatState,
-        paints: PaintCache, typeface: Typeface?
+        paints: PaintCache, typeface: Typeface?, activeMatrix: Matrix,
+        camArray: DoubleArray?, distArray: DoubleArray?
     ) {
         val shotLineAnchor = state.shotLineAnchor ?: return
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
@@ -63,8 +81,7 @@ class LineRenderer {
 
         val shotLineIsWarning = state.isGeometricallyImpossible || state.isTiltBeyondLimit || state.isObstructed
         val shotLinePaint = Paint(paints.shotLinePaint).apply {
-            color =
-                if (shotLineIsWarning) paints.warningPaint.color else shotGuideLineConfig.strokeColor.toArgb()
+            color = if (shotLineIsWarning) paints.warningPaint.color else shotGuideLineConfig.strokeColor.toArgb()
             strokeWidth = shotGuideLineConfig.strokeWidth
         }
         val shotLineGlow = createGlowPaint(
@@ -83,53 +100,29 @@ class LineRenderer {
             if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
                 // Do not draw shot guide line pathway in locked beginner mode
             } else {
-                drawFadingLine(
-                    canvas,
-                    shotLineAnchor,
-                    shotGuideDirection,
-                    obstructionPaint,
-                    null, // No glow for pathway
-                    state,
-                    paints
-                )
+                drawFadingLine(canvas, shotLineAnchor, shotGuideDirection, obstructionPaint, null, state, paints, activeMatrix, camArray, distArray)
             }
 
             state.aimingLineBankPath?.let {
-                drawBankablePath(
-                    canvas,
-                    it,
-                    obstructionPaint,
-                    null, // No glow for pathway
-                    isPocketed = false,
-                    state,
-                    paints
-                )
+                drawBankablePath(canvas, it, obstructionPaint, null, isPocketed = false, state, paints, activeMatrix, camArray, distArray)
             }
         }
 
         if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
             // Do not draw shot guide line in locked beginner mode
         } else {
-            drawFadingLine(
-                canvas,
-                shotLineAnchor,
-                shotGuideDirection,
-                shotLinePaint,
-                shotLineGlow,
-                state,
-                paints
-            )
+            drawFadingLine(canvas, shotLineAnchor, shotGuideDirection, shotLinePaint, shotLineGlow, state, paints, activeMatrix, camArray, distArray)
         }
-        drawTangentLines(canvas, state, paints)
-        drawAimingLines(canvas, state, paints)
-        drawSpinPaths(canvas, state, paints)
+        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray)
+        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray)
+        drawSpinPaths(canvas, state, paints, activeMatrix, camArray, distArray)
 
         if (state.areHelpersVisible) {
             textRenderer.drawProtractorLabels(canvas, state, paints, typeface)
         }
     }
 
-    private fun drawAimingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
+    private fun drawAimingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
         val aimingLineConfig = AimingLine()
         val isPocketed = state.aimedPocketIndex != null
 
@@ -154,36 +147,17 @@ class LineRenderer {
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
         val targetCenter = state.protractorUnit.center
 
-        // Always draw the pathway and core line.
-        // Use bank path if available, otherwise draw a straight extended line.
         val rawPath = state.aimingLineBankPath ?: listOf(ghostCueCenter, targetCenter)
         val path = rawPath.map { it.warpedBy(tps) }
 
         if (state.table.isVisible || state.obstacleBalls.isNotEmpty()) {
-            drawBankablePath(
-                canvas,
-                path,
-                obstructionPaint,
-                null, // No glow for pathway
-                isPocketed = false,
-                state,
-                paints
-            )
+            drawBankablePath(canvas, path, obstructionPaint, null, isPocketed = false, state, paints, activeMatrix, camArray, distArray)
         }
 
-        drawBankablePath(
-            canvas,
-            path,
-            aimingLinePaint,
-            aimingLineGlow,
-            isPocketed,
-            state,
-            paints
-        )
+        drawBankablePath(canvas, path, aimingLinePaint, aimingLineGlow, isPocketed, state, paints, activeMatrix, camArray, distArray)
     }
 
-
-    private fun drawTangentLines(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
+    private fun drawTangentLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
         val tangentLineConfig = TangentLine()
         val isPocketed = state.tangentAimedPocketIndex != null
         val baseTangentColor = if (isPocketed) WarningRed else tangentLineConfig.strokeColor
@@ -219,125 +193,96 @@ class LineRenderer {
         val start = rawStart.warpedBy(tps)
 
         if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
-            val direction1 = normalize(PointF(tangentDx, tangentDy))
-            drawFadingLine(canvas, start, direction1, tangentSolidPaint, tangentGlow, state, paints)
-
-            val direction2 = normalize(PointF(-tangentDx, -tangentDy))
-            drawFadingLine(canvas, start, direction2, tangentSolidPaint, tangentGlow, state, paints)
+            drawFadingLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray)
+            drawFadingLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray)
             return
         }
 
         if (state.isStraightShot) {
-            val direction1 = normalize(PointF(tangentDx, tangentDy))
-            drawFadingLine(
-                canvas,
-                start,
-                direction1,
-                tangentDottedPaint,
-                tangentGlow,
-                state,
-                paints
-            )
-
-            val direction2 = normalize(PointF(-tangentDx, -tangentDy))
-            drawFadingLine(
-                canvas,
-                start,
-                direction2,
-                tangentDottedPaint,
-                tangentGlow,
-                state,
-                paints
-            )
+            drawFadingLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray)
+            drawFadingLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray)
         } else {
-            // Active side (usually solid)
             val rawActivePath = state.tangentLineBankPath ?: listOf(rawStart, PointF(rawStart.x + tangentDx * 5000f * state.tangentDirection, rawStart.y + tangentDy * 5000f * state.tangentDirection))
             val activePath = rawActivePath.map { it.warpedBy(tps) }
-            drawBankablePath(canvas, activePath, tangentSolidPaint, tangentGlow, isPocketed, state, paints)
+            drawBankablePath(canvas, activePath, tangentSolidPaint, tangentGlow, isPocketed, state, paints, activeMatrix, camArray, distArray)
 
-            // Inactive side (always dotted/fading)
             val inactiveDirection = normalize(PointF(tangentDx * -state.tangentDirection, tangentDy * -state.tangentDirection))
-            drawFadingLine(
-                canvas,
-                start,
-                inactiveDirection,
-                tangentDottedPaint,
-                tangentGlow,
-                state,
-                paints
-            )
+            drawFadingLine(canvas, start, inactiveDirection, tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray)
         }
     }
 
-
-    private fun drawSpinPaths(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
+    private fun drawSpinPaths(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
         val paths = state.spinPaths ?: return
         if (paths.isEmpty()) return
 
-        val alpha = (255 * state.spinPathsAlpha).toInt()
-        val spinPathPaint = Paint(paints.shotLinePaint).apply {
-            strokeWidth = 4f
-        }
+        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
 
-        val spinGlowPaint = Paint().apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 8f
-        }
+        val alpha = (255 * state.spinPathsAlpha).toInt()
+        val spinPathPaint = Paint(paints.shotLinePaint).apply { strokeWidth = 4f }
+        val spinGlowPaint = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 8f }
+
+        canvas.save()
+        canvas.concat(inverseMatrix) // Draw spin paths in Screen Space
 
         paths.forEach { (color, points) ->
             if (points.size < 2) return@forEach
 
-            val path = Path()
-            path.moveTo(points.first().x, points.first().y)
-            for (i in 1 until points.size) {
-                path.lineTo(points[i].x, points[i].y)
+            val screenPath = Path()
+            points.forEachIndexed { index, pt ->
+                val screenPt = DrawingUtils.mapPoint(pt, activeMatrix)
+                val finalPt = if (camArray != null && distArray != null && camArray.size == 9) {
+                    DrawingUtils.applyBarrelDistortion(screenPt.x, screenPt.y, camArray, distArray)
+                } else screenPt
+
+                if (index == 0) screenPath.moveTo(finalPt.x, finalPt.y)
+                else screenPath.lineTo(finalPt.x, finalPt.y)
             }
 
             spinPathPaint.color = color.toArgb()
             spinPathPaint.alpha = alpha
             spinGlowPaint.color = color.toArgb()
-            spinGlowPaint.alpha =
-                (color.alpha * 100 * state.spinPathsAlpha).toInt().coerceIn(0, 255)
+            spinGlowPaint.alpha = (color.alpha * 100 * state.spinPathsAlpha).toInt().coerceIn(0, 255)
 
-            canvas.drawPath(path, spinGlowPaint)
-            canvas.drawPath(path, spinPathPaint)
+            canvas.drawPath(screenPath, spinGlowPaint)
+            canvas.drawPath(screenPath, spinPathPaint)
         }
+        canvas.restore()
     }
 
-    private fun drawBankingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
+    private fun drawBankingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
         val rawPath = state.bankShotPath ?: return
         if (rawPath.size < 2) return
 
         val tps = state.lensWarpTps
         val path = rawPath.map { it.warpedBy(tps) }
+        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
 
         val isPocketed = state.pocketedBankShotPocketIndex != null
 
         if (isPocketed) {
             val whitePaint = Paint(paints.shotLinePaint).apply { color = Color.White.toArgb() }
             val whiteGlowPaint = createGlowPaint(Color.White, 12f, state, paints)
-            drawPath(canvas, path, whiteGlowPaint)
-            drawPath(canvas, path, whitePaint)
+            drawPath(canvas, path, whitePaint, whiteGlowPaint, activeMatrix, camArray, distArray)
         } else {
             val bankLineConfigs = listOf(BankLine1(), BankLine2(), BankLine3(), BankLine4())
             val finalSegmentIndex = path.size - 2
 
-            // Draw intermediate solid segments
+            // Draw intermediate solid segments in Screen Space
+            canvas.save()
+            canvas.concat(inverseMatrix)
             for (i in 0 until finalSegmentIndex) {
                 val start = path[i]
                 val end = path[i + 1]
                 val config = bankLineConfigs.getOrElse(i) { bankLineConfigs.last() }
 
                 val linePaint = Paint(paints.bankLine1Paint).apply { color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
-                val glowPaint = createGlowPaint(
-                    baseGlowColor = config.glowColor,
-                    baseGlowWidth = config.glowWidth,
-                    state = state,
-                    paints = paints
-                )
-                canvas.drawLine(start.x, start.y, end.x, end.y, glowPaint)
-                canvas.drawLine(start.x, start.y, end.x, end.y, linePaint)
+                val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints)
+
+                val segmentPath = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
+                canvas.drawPath(segmentPath, glowPaint)
+                canvas.drawPath(segmentPath, linePaint)
             }
+            canvas.restore()
 
             // Draw the final segment with fading
             if (path.size > 1) {
@@ -346,23 +291,15 @@ class LineRenderer {
                 val direction = normalize(PointF(end.x - start.x, end.y - start.y))
                 val config = bankLineConfigs.getOrElse(finalSegmentIndex) { bankLineConfigs.last() }
 
-                val linePaint = Paint(paints.bankLine1Paint).apply {
-                    color = config.strokeColor.toArgb()
-                    strokeWidth = config.strokeWidth
-                }
-                val glowPaint = createGlowPaint(
-                    baseGlowColor = config.glowColor,
-                    baseGlowWidth = config.glowWidth,
-                    state = state,
-                    paints = paints
-                )
+                val linePaint = Paint(paints.bankLine1Paint).apply { color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
+                val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints)
 
-                drawFadingLine(canvas, start, direction, linePaint, glowPaint, state, paints)
+                drawFadingLine(canvas, start, direction, linePaint, glowPaint, state, paints, activeMatrix, camArray, distArray)
             }
         }
     }
 
-    private fun drawProtractorGuides(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
+    private fun drawProtractorGuides(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
         val targetCenter = state.protractorUnit.center
         val config = ProtractorGuides()
@@ -379,8 +316,8 @@ class LineRenderer {
         }
 
         protractorAngles.forEach { angle ->
-            drawAngleGuide(canvas, ghostCueCenter, targetCenter, angle, guidePaint, state, paints)
-            drawAngleGuide(canvas, ghostCueCenter, targetCenter, -angle, guidePaint, state, paints)
+            drawAngleGuide(canvas, ghostCueCenter, targetCenter, angle, guidePaint, state, paints, activeMatrix, camArray, distArray)
+            drawAngleGuide(canvas, ghostCueCenter, targetCenter, -angle, guidePaint, state, paints, activeMatrix, camArray, distArray)
             if (state.areHelpersVisible || labelConfig.isPersistentlyVisible) {
                 textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, angle, textPaint, state.protractorUnit.radius)
                 textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, -angle, textPaint, state.protractorUnit.radius)
@@ -395,11 +332,14 @@ class LineRenderer {
         glowPaint: Paint?,
         isPocketed: Boolean,
         state: CueDetatState,
-        paints: PaintCache
+        paints: PaintCache,
+        activeMatrix: Matrix,
+        camArray: DoubleArray?,
+        distArray: DoubleArray?
     ) {
         if (path.size < 2) return
-
         val finalSegmentIndex = path.size - 2
+        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
 
         for (i in 0..finalSegmentIndex) {
             val start = path[i]
@@ -408,23 +348,31 @@ class LineRenderer {
 
             if (isLastSegment) {
                 val direction = normalize(PointF(end.x - start.x, end.y - start.y))
-                drawFadingLine(canvas, start, direction, primaryPaint, glowPaint, state, paints)
-            } else { // For intermediate banked segments
-                glowPaint?.let { canvas.drawLine(start.x, start.y, end.x, end.y, it) }
-                canvas.drawLine(start.x, start.y, end.x, end.y, primaryPaint)
+                drawFadingLine(canvas, start, direction, primaryPaint, glowPaint, state, paints, activeMatrix, camArray, distArray)
+            } else {
+                val segmentPath = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
+                canvas.save()
+                canvas.concat(inverseMatrix) // Pop out to screen space just for this path
+                glowPaint?.let { canvas.drawPath(segmentPath, it) }
+                canvas.drawPath(segmentPath, primaryPaint)
+                canvas.restore()
             }
         }
     }
 
-    private fun drawPath(canvas: Canvas, path: List<PointF>, paint: Paint) {
+    private fun drawPath(canvas: Canvas, path: List<PointF>, paint: Paint, glowPaint: Paint? = null, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
         if (path.size < 2) return
-        for (i in 0 until path.size - 1) {
-            val start = path[i]
-            val end = path[i + 1]
-            canvas.drawLine(start.x, start.y, end.x, end.y, paint)
-        }
-    }
+        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
 
+        canvas.save()
+        canvas.concat(inverseMatrix) // Draw in screen space
+        for (i in 0 until path.size - 1) {
+            val segmentPath = DrawingUtils.buildDistortedLinePath(path[i], path[i + 1], activeMatrix, camArray, distArray)
+            glowPaint?.let { canvas.drawPath(segmentPath, it) }
+            canvas.drawPath(segmentPath, paint)
+        }
+        canvas.restore()
+    }
 
     private fun drawAngleGuide(
         canvas: Canvas,
@@ -433,13 +381,15 @@ class LineRenderer {
         angleDegrees: Float,
         paint: Paint,
         state: CueDetatState,
-        paints: PaintCache
+        paints: PaintCache,
+        activeMatrix: Matrix,
+        camArray: DoubleArray?,
+        distArray: DoubleArray?
     ) {
         val initialAngleRad = atan2(referencePoint.y - center.y, referencePoint.x - center.x)
         val finalAngleRad = initialAngleRad + Math.toRadians(angleDegrees.toDouble())
-
         val direction = normalize(PointF(cos(finalAngleRad).toFloat(), sin(finalAngleRad).toFloat()))
-        drawFadingLine(canvas, center, direction, paint, null, state, paints)
+        drawFadingLine(canvas, center, direction, paint, null, state, paints, activeMatrix, camArray, distArray)
     }
 
     private fun drawFadingLine(
@@ -449,28 +399,46 @@ class LineRenderer {
         paint: Paint,
         glowPaint: Paint?,
         state: CueDetatState,
-        paints: PaintCache
+        paints: PaintCache,
+        activeMatrix: Matrix,
+        camArray: DoubleArray?,
+        distArray: DoubleArray?
     ) {
+        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
+
         val tableLength = state.table.logicalHeight
-        val totalLength = tableLength * 4.0f // Ensure it reaches well off-screen
+        val totalLength = tableLength * 4.0f
         val fadeStartDistance = tableLength * 1.2f
 
         val end = PointF(start.x + direction.x * totalLength, start.y + direction.y * totalLength)
         val fadeStart = PointF(start.x + direction.x * fadeStartDistance, start.y + direction.y * fadeStartDistance)
 
-        // Save layer for off-screen compositing (needed for DST_IN xfermode)
+        // 1. Build the screen-space curved path
+        val path = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
+
+        // 2. Map gradient points to screen space for the fading mask
+        val screenFadeStart = DrawingUtils.mapPoint(fadeStart, activeMatrix)
+        val screenEnd = DrawingUtils.mapPoint(end, activeMatrix)
+
+        val finalFadeStart = if (camArray != null && distArray != null && camArray.size == 9) {
+            DrawingUtils.applyBarrelDistortion(screenFadeStart.x, screenFadeStart.y, camArray, distArray)
+        } else screenFadeStart
+
+        val finalEnd = if (camArray != null && distArray != null && camArray.size == 9) {
+            DrawingUtils.applyBarrelDistortion(screenEnd.x, screenEnd.y, camArray, distArray)
+        } else screenEnd
+
+        canvas.save()
+        canvas.concat(inverseMatrix) // Enter Screen Space!
+
         val layer = canvas.saveLayer(null, null)
         try {
-            // 1. Draw the full, opaque line and its glow.
-            glowPaint?.let { canvas.drawLine(start.x, start.y, end.x, end.y, it) }
-            canvas.drawLine(start.x, start.y, end.x, end.y, paint)
+            glowPaint?.let { canvas.drawPath(path, it) }
+            canvas.drawPath(path, paint)
 
-            // 2. Apply a gradient mask to fade the tail of the line.
-            // DST_IN mode keeps the destination (the line) only where the source (the mask) is drawn,
-            // with transparency from the source multiplied into the destination.
             val gradient = LinearGradient(
-                fadeStart.x, fadeStart.y,
-                end.x, end.y,
+                finalFadeStart.x, finalFadeStart.y,
+                finalEnd.x, finalEnd.y,
                 intArrayOf(Color.White.toArgb(), Color.Transparent.toArgb()),
                 null,
                 Shader.TileMode.CLAMP
@@ -478,13 +446,13 @@ class LineRenderer {
             paints.gradientMaskPaint.shader = gradient
             paints.gradientMaskPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
 
-            // Cover the entire potential logical coordinate space to ensure no artifacts.
-            canvas.drawRect(-10000f, -10000f, 10000f, 10000f, paints.gradientMaskPaint)
+            // Huge rect in screen space to apply the mask
+            canvas.drawRect(-5000f, -5000f, 10000f, 10000f, paints.gradientMaskPaint)
         } finally {
-            // Reset paint properties for reuse.
             paints.gradientMaskPaint.shader = null
             paints.gradientMaskPaint.xfermode = null
             canvas.restoreToCount(layer)
+            canvas.restore() // Exit Screen Space back to Logical Space
         }
     }
 
