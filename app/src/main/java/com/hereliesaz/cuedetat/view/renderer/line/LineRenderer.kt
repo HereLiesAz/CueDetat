@@ -49,7 +49,6 @@ class LineRenderer {
         activeMatrix: Matrix
     ) {
         // PERFORMANCE OPTIMIZATION: Extract OpenCV Mat to DoubleArray ONCE per frame
-        // to avoid heavy JNI calls during segmented path generation.
         var camArray: DoubleArray? = null
         var distArray: DoubleArray? = null
 
@@ -272,7 +271,9 @@ class LineRenderer {
             canvas.concat(inverseMatrix)
             for (i in 0 until finalSegmentIndex) {
                 val start = path[i]
-                val end = path[i + 1]
+                val rawEnd = path[i + 1]
+                val end = getSafeLogicalPoint(start, rawEnd, activeMatrix) ?: continue
+
                 val config = bankLineConfigs.getOrElse(i) { bankLineConfigs.last() }
 
                 val linePaint = Paint(paints.bankLine1Paint).apply { color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
@@ -343,13 +344,14 @@ class LineRenderer {
 
         for (i in 0..finalSegmentIndex) {
             val start = path[i]
-            val end = path[i + 1]
+            val rawEnd = path[i + 1]
             val isLastSegment = i == finalSegmentIndex
 
             if (isLastSegment) {
-                val direction = normalize(PointF(end.x - start.x, end.y - start.y))
+                val direction = normalize(PointF(rawEnd.x - start.x, rawEnd.y - start.y))
                 drawFadingLine(canvas, start, direction, primaryPaint, glowPaint, state, paints, activeMatrix, camArray, distArray)
             } else {
+                val end = getSafeLogicalPoint(start, rawEnd, activeMatrix) ?: continue
                 val segmentPath = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
                 canvas.save()
                 canvas.concat(inverseMatrix) // Pop out to screen space just for this path
@@ -367,7 +369,11 @@ class LineRenderer {
         canvas.save()
         canvas.concat(inverseMatrix) // Draw in screen space
         for (i in 0 until path.size - 1) {
-            val segmentPath = DrawingUtils.buildDistortedLinePath(path[i], path[i + 1], activeMatrix, camArray, distArray)
+            val start = path[i]
+            val rawEnd = path[i + 1]
+            val end = getSafeLogicalPoint(start, rawEnd, activeMatrix) ?: continue
+
+            val segmentPath = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
             glowPaint?.let { canvas.drawPath(segmentPath, it) }
             canvas.drawPath(segmentPath, paint)
         }
@@ -410,10 +416,14 @@ class LineRenderer {
         val totalLength = tableLength * 4.0f
         val fadeStartDistance = tableLength * 1.2f
 
-        val end = PointF(start.x + direction.x * totalLength, start.y + direction.y * totalLength)
-        val fadeStart = PointF(start.x + direction.x * fadeStartDistance, start.y + direction.y * fadeStartDistance)
+        val rawEnd = PointF(start.x + direction.x * totalLength, start.y + direction.y * totalLength)
+        val rawFadeStart = PointF(start.x + direction.x * fadeStartDistance, start.y + direction.y * fadeStartDistance)
 
-        // 1. Build the screen-space curved path
+        // CLIP THE LOGICAL POINTS SO THEY NEVER GO BEHIND THE CAMERA HORIZON
+        val end = getSafeLogicalPoint(start, rawEnd, activeMatrix) ?: return
+        val fadeStart = getSafeLogicalPoint(start, rawFadeStart, activeMatrix) ?: end
+
+        // 1. Build the screen-space curved path using safely clipped coordinates
         val path = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
 
         // 2. Map gradient points to screen space for the fading mask
@@ -459,5 +469,46 @@ class LineRenderer {
     private fun normalize(p: PointF): PointF {
         val mag = kotlin.math.hypot(p.x.toDouble(), p.y.toDouble()).toFloat()
         return if (mag > 0.001f) PointF(p.x / mag, p.y / mag) else PointF(0f, 0f)
+    }
+
+    /**
+     * Mathematically intersects a 2D line segment with the 3D perspective camera's "horizon plane".
+     * Prevents lines from projecting "behind the camera" and flipping to the wrong side of the screen.
+     */
+    private fun getSafeLogicalPoint(start: PointF, end: PointF, matrix: Matrix): PointF? {
+        val v = FloatArray(9)
+        matrix.getValues(v)
+        val g = v[Matrix.MPERSP_0]
+        val h = v[Matrix.MPERSP_1]
+        val i = v[Matrix.MPERSP_2]
+
+        // Calculate the 'W' depth component for the start and end points
+        val w1 = g * start.x + h * start.y + i
+        val w2 = g * end.x + h * end.y + i
+
+        val epsilon = 0.0001f // A tiny distance just above the actual horizon
+
+        if (w1 > epsilon && w2 > epsilon) {
+            return end // Both points are safely in front of the camera. No clipping needed.
+        }
+
+        if (w1 <= epsilon && w2 <= epsilon) {
+            return null // The entire line segment is invisible (behind the camera).
+        }
+
+        if (w1 > epsilon && w2 <= epsilon) {
+            // The start point is visible, but the end point extends behind the camera.
+            // Calculate 't' along the line segment where it exactly hits the horizon (w = epsilon).
+            val t = (epsilon - w1) / (w2 - w1)
+
+            // Return the clipped coordinate.
+            return PointF(
+                start.x + t * (end.x - start.x),
+                start.y + t * (end.y - start.y)
+            )
+        }
+
+        // We assume 'start' (usually the cue ball or a pocket) is always mathematically visible.
+        return null
     }
 }
