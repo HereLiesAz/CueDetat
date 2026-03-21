@@ -57,38 +57,15 @@ internal fun reduceToggleAction(
         }
         is MainScreenEvent.UnlockBeginnerView -> state.copy(isBeginnerViewLocked = false)
         is MainScreenEvent.LockBeginnerView -> {
-
-            // DYNAMIC ZOOM: Calculate slider value to fit 4 radii within screen width minus 100dp margin
-            var autoZoomSlider = 50f
-            state.logicalPlaneMatrix?.let { mat ->
-                val logicalWidth = 4f * LOGICAL_BALL_RADIUS
-                val pts = floatArrayOf(0f, 0f, logicalWidth, 0f)
-                mat.mapPoints(pts)
-                val currentPx = kotlin.math.hypot((pts[2] - pts[0]).toDouble(), (pts[3] - pts[1]).toDouble()).toFloat()
-
-                if (currentPx > 0 && state.viewWidth > 0) {
-                    val (currMin, currMax) = ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked)
-                    val currentZoom = ZoomMapping.sliderToZoom(state.zoomSliderPosition, currMin, currMax)
-
-                    val totalMarginPx = 100f * state.screenDensity
-                    val targetPx = state.viewWidth - totalMarginPx
-
-                    if (targetPx > 0) {
-                        val targetZoom = currentZoom * (targetPx / currentPx)
-                        val (newMin, newMax) = ZoomMapping.getZoomRange(ExperienceMode.BEGINNER, true)
-                        autoZoomSlider = ZoomMapping.zoomToSlider(targetZoom, newMin, newMax)
-                    }
-                }
-            }
-
+            val autoSlider = calculateAutoZoomSlider(state)
             state.copy(
                 isBeginnerViewLocked = true,
-                areHelpersVisible = true, // Force help on
-                cameraMode = if (state.cameraMode == CameraMode.OFF) CameraMode.CAMERA else state.cameraMode, // Force camera on
+                areHelpersVisible = true,
+                cameraMode = if (state.cameraMode == CameraMode.OFF) CameraMode.CAMERA else state.cameraMode,
                 protractorUnit = ProtractorUnit(reducerUtils.getDefaultTargetBallPosition(), LOGICAL_BALL_RADIUS, 0f),
                 onPlaneBall = null,
                 obstacleBalls = emptyList(),
-                zoomSliderPosition = autoZoomSlider,
+                zoomSliderPosition = autoSlider,
                 viewOffset = PointF(0f, 0f),
                 worldRotationDegrees = 0f,
                 valuesChangedSinceReset = false
@@ -99,6 +76,32 @@ internal fun reduceToggleAction(
         is MainScreenEvent.ExitToSplash -> state.copy(experienceMode = null)
         else -> state
     }
+}
+
+private fun calculateAutoZoomSlider(state: CueDetatState): Float {
+    var autoZoomSlider = 0f
+    state.logicalPlaneMatrix?.let { mat ->
+        // Total width of Target Ball + Ghost Ball is 4 radii logically
+        val pts = floatArrayOf(0f, 0f, 4f * LOGICAL_BALL_RADIUS, 0f)
+        mat.mapPoints(pts)
+        val currentPx = kotlin.math.hypot((pts[2] - pts[0]).toDouble(), (pts[3] - pts[1]).toDouble()).toFloat()
+
+        if (currentPx > 0 && state.viewWidth > 0) {
+            val (currMin, currMax) = ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked)
+            val currentZoom = ZoomMapping.sliderToZoom(state.zoomSliderPosition, currMin, currMax)
+
+            // Ensure 100dp total margin (50dp on each side)
+            val marginPx = 100f * state.screenDensity
+            val targetPx = state.viewWidth - marginPx
+
+            if (targetPx > 0) {
+                val targetZoom = currentZoom * (targetPx / currentPx)
+                val (newMin, newMax) = ZoomMapping.getZoomRange(ExperienceMode.BEGINNER, true)
+                autoZoomSlider = ZoomMapping.zoomToSlider(targetZoom, newMin, newMax)
+            }
+        }
+    }
+    return autoZoomSlider
 }
 
 private fun handleSetExperienceMode(
@@ -127,13 +130,15 @@ private fun handleSetExperienceMode(
             )
         }
         ExperienceMode.BEGINNER -> {
+            val autoSlider = calculateAutoZoomSlider(state)
             newState.copy(
                 table = newState.table.copy(isVisible = false),
                 onPlaneBall = null,
                 isBankingMode = false,
                 areHelpersVisible = true,
                 isBeginnerViewLocked = true,
-                zoomSliderPosition = 50f
+                cameraMode = if (state.cameraMode == CameraMode.OFF) CameraMode.CAMERA else state.cameraMode,
+                zoomSliderPosition = autoSlider
             )
         }
         ExperienceMode.HATER -> newState

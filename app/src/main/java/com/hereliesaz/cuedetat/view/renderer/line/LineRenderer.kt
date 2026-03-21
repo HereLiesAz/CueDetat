@@ -486,7 +486,7 @@ class LineRenderer {
         val shotLineAnchor = state.shotLineAnchor ?: return
 
         val shotGuideDirection = normalize(PointF(ghostCueCenter.x - shotLineAnchor.x, ghostCueCenter.y - shotLineAnchor.y))
-        drawFixedForegroundLabel(canvas, ghostCueCenter, shotGuideDirection, activeMatrix, camArray, distArray, "Aim this line at the pocket.", typeface, state)
+        drawForegroundElements(canvas, ghostCueCenter, shotGuideDirection, activeMatrix, camArray, distArray, "Aim this line at the pocket.", typeface, state)
 
         val dxToTarget = targetCenter.x - ghostCueCenter.x
         val dyToTarget = targetCenter.y - ghostCueCenter.y
@@ -496,80 +496,99 @@ class LineRenderer {
             val tangentDy = dxToTarget / magToTarget
             val start = ghostCueCenter.warpedBy(state.lensWarpTps)
 
-            drawFixedForegroundLabel(canvas, start, normalize(PointF(tangentDx, tangentDy)), activeMatrix, camArray, distArray, "Tangent Line", typeface, state)
-            drawFixedForegroundLabel(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), activeMatrix, camArray, distArray, "Tangent Line", typeface, state)
+            drawForegroundElements(canvas, start, normalize(PointF(tangentDx, tangentDy)), activeMatrix, camArray, distArray, "Tangent Line", typeface, state)
+            drawForegroundElements(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), activeMatrix, camArray, distArray, "Tangent Line", typeface, state)
         }
     }
 
-    private fun drawFixedForegroundLabel(
-        canvas: Canvas, origin: PointF, direction: PointF, activeMatrix: Matrix,
+    private fun drawForegroundElements(
+        canvas: Canvas, start: PointF, direction: PointF, activeMatrix: Matrix,
         camArray: DoubleArray?, distArray: DoubleArray?, textToDraw: String,
         typeface: Typeface?, state: CueDetatState
     ) {
-        val highlightColor = android.graphics.Color.parseColor("#00E5FF")
+        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
+        val tableLength = state.table.logicalHeight
+        val totalLength = tableLength * 4.0f
+        val rawEnd = PointF(start.x + direction.x * totalLength, start.y + direction.y * totalLength)
+        val end = getSafeLogicalPoint(start, rawEnd, activeMatrix) ?: return
 
-        // 1. Calculate Screen-Space Angle using two close points to ensure correct text rotation
-        val p1 = DrawingUtils.mapPoint(origin, activeMatrix)
-        val p2 = DrawingUtils.mapPoint(PointF(origin.x + direction.x * 10f, origin.y + direction.y * 10f), activeMatrix)
-        val sp1 = if (camArray != null && distArray != null && camArray.size == 9) DrawingUtils.applyBarrelDistortion(p1.x, p1.y, camArray, distArray) else p1
-        val sp2 = if (camArray != null && distArray != null && camArray.size == 9) DrawingUtils.applyBarrelDistortion(p2.x, p2.y, camArray, distArray) else p2
-
-        var angle = Math.toDegrees(atan2((sp2.y - sp1.y).toDouble(), (sp2.x - sp1.x).toDouble())).toFloat()
-        var yOffset = -35f
-        if (sp2.x < sp1.x) {
-            angle += 180f
-            yOffset = 45f
-        }
-
-        // 2. Map fixed logical distance to place the text securely outside the balls
-        val textDist = 2.8f * LOGICAL_BALL_RADIUS
-        val logicalTextPt = PointF(origin.x + direction.x * textDist, origin.y + direction.y * textDist)
-        val screenTextPt = DrawingUtils.mapPoint(logicalTextPt, activeMatrix)
-        val finalScreenTextPt = if (camArray != null && distArray != null && camArray.size == 9) DrawingUtils.applyBarrelDistortion(screenTextPt.x, screenTextPt.y, camArray, distArray) else screenTextPt
-
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.typeface = typeface
-            textSize = 55f
-            color = highlightColor
-            textAlign = Paint.Align.CENTER
-            setShadowLayer(15f, 0f, 0f, android.graphics.Color.BLACK)
-        }
+        val path = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
 
         canvas.save()
-        canvas.translate(finalScreenTextPt.x, finalScreenTextPt.y)
-        canvas.rotate(angle)
-        canvas.drawText(textToDraw, 0f, yOffset, textPaint)
-        canvas.restore()
+        canvas.concat(inverseMatrix) // Draw purely in screen space without clipping
 
-        // 3. Draw Triangles cleanly inside the screen margins
-        val trianglePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-            color = highlightColor
-            setShadowLayer(10f, 0f, 0f, android.graphics.Color.BLACK)
-        }
+        val measure = android.graphics.PathMeasure(path, false)
+        val pathLength = measure.length
 
-        val triangleDistances = listOf(1.5f * LOGICAL_BALL_RADIUS, 4.2f * LOGICAL_BALL_RADIUS, 5.6f * LOGICAL_BALL_RADIUS)
-        for (d in triangleDistances) {
-            val logicalTriPt = PointF(origin.x + direction.x * d, origin.y + direction.y * d)
-            val screenTriPt = DrawingUtils.mapPoint(logicalTriPt, activeMatrix)
-            val finalScreenTriPt = if (camArray != null && distArray != null && camArray.size == 9) DrawingUtils.applyBarrelDistortion(screenTriPt.x, screenTriPt.y, camArray, distArray) else screenTriPt
+        // We calculate distance based on SCREEN DENSITY so it works on any device and zoom
+        val textOffsetPx = 110f * state.screenDensity
+        val triangleSpacingPx = 50f * state.screenDensity
+        val highlightColor = android.graphics.Color.parseColor("#00E5FF")
 
-            // Ensure triangles do not draw if they are somehow forced off screen
-            if (finalScreenTriPt.x in 0f..state.viewWidth.toFloat() && finalScreenTriPt.y in 0f..state.viewHeight.toFloat()) {
-                canvas.save()
-                canvas.translate(finalScreenTriPt.x, finalScreenTriPt.y)
-                canvas.rotate(angle)
-                val triPath = Path().apply {
-                    moveTo(30f, 0f)
-                    lineTo(-25f, 20f)
-                    lineTo(-5f, 0f)
-                    lineTo(-25f, -20f)
-                    close()
+        if (pathLength > textOffsetPx) {
+            val pos = FloatArray(2)
+            val tan = FloatArray(2)
+
+            // DRAW CLAMPED TEXT
+            if (measure.getPosTan(textOffsetPx, pos, tan)) {
+                var angle = Math.toDegrees(atan2(tan[1].toDouble(), tan[0].toDouble())).toFloat()
+                var yOffset = -35f
+                if (tan[0] < 0) {
+                    angle += 180f
+                    yOffset = 45f
                 }
-                canvas.drawPath(triPath, trianglePaint)
+
+                val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    this.typeface = typeface
+                    textSize = 55f
+                    color = highlightColor
+                    textAlign = Paint.Align.CENTER
+                    setShadowLayer(15f, 0f, 0f, android.graphics.Color.BLACK)
+                }
+
+                // Absolute guarantee the text never leaves the screen
+                val clampedX = pos[0].coerceIn(120f, state.viewWidth - 120f)
+                val clampedY = pos[1].coerceIn(120f, state.viewHeight - 120f)
+
+                canvas.save()
+                canvas.translate(clampedX, clampedY)
+                canvas.rotate(angle)
+                canvas.drawText(textToDraw, 0f, yOffset, textPaint)
                 canvas.restore()
             }
+
+            // DRAW TRIANGLES
+            val trianglePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.FILL
+                color = highlightColor
+                setShadowLayer(10f, 0f, 0f, android.graphics.Color.BLACK)
+            }
+
+            var dist = textOffsetPx + triangleSpacingPx
+            while (dist < pathLength && dist < state.viewWidth) {
+                if (measure.getPosTan(dist, pos, tan)) {
+                    val angle = Math.toDegrees(atan2(tan[1].toDouble(), tan[0].toDouble())).toFloat()
+
+                    // Only draw triangles if they are inside screen bounds
+                    if (pos[0] in 0f..state.viewWidth.toFloat() && pos[1] in 0f..state.viewHeight.toFloat()) {
+                        canvas.save()
+                        canvas.translate(pos[0], pos[1])
+                        canvas.rotate(angle)
+                        val triPath = Path().apply {
+                            moveTo(30f, 0f)
+                            lineTo(-25f, 20f)
+                            lineTo(-5f, 0f)
+                            lineTo(-25f, -20f)
+                            close()
+                        }
+                        canvas.drawPath(triPath, trianglePaint)
+                        canvas.restore()
+                    }
+                }
+                dist += triangleSpacingPx
+            }
         }
+        canvas.restore()
     }
 
     private fun normalize(p: PointF): PointF {

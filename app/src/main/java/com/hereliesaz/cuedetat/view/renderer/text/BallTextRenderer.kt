@@ -41,19 +41,22 @@ class BallTextRenderer {
         ) / ZoomMapping.DEFAULT_ZOOM
 
         paint.textSize = (baseFontSize * zoomFactor).coerceIn(minFontSize, maxFontSize)
+        paint.textAlign = Paint.Align.CENTER
 
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
-        paint.color = if (isBeginnerLocked) {
-            android.graphics.Color.parseColor("#00E5FF")
+        if (isBeginnerLocked) {
+            paint.color = android.graphics.Color.parseColor("#00E5FF")
+            paint.setShadowLayer(10f, 0f, 0f, android.graphics.Color.BLACK)
         } else {
-            config.color.copy(alpha = config.opacity).toArgb()
+            paint.color = config.color.copy(alpha = config.opacity).toArgb()
+            paint.clearShadowLayer()
         }
 
         val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ball.center, ball.radius, state, matrix)
         val screenPos = DrawingUtils.mapPoint(ball.center, matrix)
 
         val textMetrics = paint.fontMetrics
-        val textPadding = 5f * zoomFactor.coerceAtLeast(0.5f)
+        val textPadding = 10f * zoomFactor.coerceAtLeast(0.5f)
         val lineHeight = textMetrics.descent - textMetrics.ascent
 
         var currentBaseline = if (drawBelow) {
@@ -65,8 +68,15 @@ class BallTextRenderer {
         }
 
         val lines = text.split("\n")
+
+        // Clamp X firmly into the screen so no text is ever rendered off the edges
+        val safeX = (screenPos.x + config.xOffset).coerceIn(
+            150f * state.screenDensity,
+            state.viewWidth - (150f * state.screenDensity)
+        )
+
         for (line in lines) {
-            canvas.drawText(line, screenPos.x + config.xOffset, currentBaseline, paint)
+            canvas.drawText(line, safeX, currentBaseline, paint)
             currentBaseline += lineHeight
         }
     }

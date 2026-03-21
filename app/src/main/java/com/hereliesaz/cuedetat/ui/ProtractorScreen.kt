@@ -188,6 +188,7 @@ fun ProtractorScreen(
 
         onscreen(alignment = Alignment.CenterEnd) {
             val isBeginnerLocked = uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked
+            // HIDES THE SLIDER WHEN BEGINNER MODE IS LOCKED
             if (isOnMain && !isBeginnerLocked) {
                 ZoomControls(
                     zoomSliderPosition = uiState.zoomSliderPosition,
