@@ -136,50 +136,17 @@ class BallRenderer {
     ) {
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
 
-        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
-            state.experienceMode,
-            state.isBeginnerViewLocked
-        )
-        val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom)
-
-        // ONLY in Static Beginner Mode, force TargetBall to match GhostCueBall's exact stroke width
-        val effectiveStrokeWidth = if (isBeginnerLocked && config is TargetBall) {
-            GhostCueBall().strokeWidth
-        } else {
-            config.strokeWidth
-        }
-
-        val logicalStrokePaint = Paint(paints.targetCirclePaint).apply {
-            strokeWidth = effectiveStrokeWidth / zoomFactor
-            color = config.strokeColor.toArgb()
-            alpha = (config.opacity * 255).toInt()
-            style = Paint.Style.STROKE
-        }
-        val dotPaint = Paint(paints.fillPaint).apply { color = android.graphics.Color.WHITE }
-        val dotRadius = ball.radius * 0.1f
-
         if (isBeginnerLocked) {
             val logicalBallMatrix = state.logicalPlaneMatrix ?: return
             val logicalScreenPos = DrawingUtils.mapPoint(ball.center, logicalBallMatrix)
 
-            // EXACT SIZE MATCH: Calculate on-screen radius identically to keep bubble and stroke perfectly synchronized
+            // Calculate exact on-screen radius to keep everything perfectly synchronized
             val mappedEdge = DrawingUtils.mapPoint(PointF(ball.center.x + ball.radius, ball.center.y), logicalBallMatrix)
             val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
 
-            // To draw the stroke on the INSIDE of the target ball, subtract half the stroke width from the radius
-            val logicalInnerRadius = if (config is TargetBall) {
-                ball.radius - (effectiveStrokeWidth / zoomFactor / 2f)
-            } else {
-                ball.radius
-            }
-
-            canvas.withMatrix(logicalBallMatrix) {
-                drawCircle(ball.center.x, ball.center.y, logicalInnerRadius, logicalStrokePaint)
-                drawCircle(ball.center.x, ball.center.y, dotRadius, dotPaint)
-            }
-
+            // 1. CALCULATE BUBBLE PHYSICS
             val sensitivity = 2.5f
-            // INVERTED math: negative roll and positive pitch so it floats upward against gravity like an air bubble
+            // INVERTED MATH: Bubble fights gravity and floats UP to the highest point of the phone
             val screenOffsetX = -state.currentOrientation.roll * sensitivity
             val screenOffsetY = state.currentOrientation.pitch * sensitivity
 
@@ -187,7 +154,7 @@ class BallRenderer {
             val finalOffsetX: Float
             val finalOffsetY: Float
 
-            // Clamp bubble to the EXACT matched screen radius
+            // Clamp bubble so it never leaves the inside of the circle
             if (offsetDistance > exactScreenRadius) {
                 val scale = exactScreenRadius / offsetDistance
                 finalOffsetX = screenOffsetX * scale
@@ -199,7 +166,29 @@ class BallRenderer {
 
             val bubbleCenter = PointF(logicalScreenPos.x + finalOffsetX, logicalScreenPos.y + finalOffsetY)
 
-            val strokePaint = Paint(paints.targetCirclePaint).apply {
+            // 2. DRAW THE BUBBLE (Moves with tilt)
+            val translucentFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = config.strokeColor.toArgb()
+                alpha = (config.opacity * 255 * 0.4f).toInt() // Ensure it is distinctly translucent
+                style = Paint.Style.FILL
+            }
+            val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                style = Paint.Style.FILL
+            }
+            val dotRadius = exactScreenRadius * 0.1f
+
+            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, exactScreenRadius, translucentFillPaint)
+            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, dotRadius, dotPaint)
+
+            // 3. DRAW THE OUTLINE (Locked in place on the table)
+            val effectiveStrokeWidth = if (config is TargetBall) {
+                GhostCueBall().strokeWidth // Force Target Ball to match Ghost Ball's stroke
+            } else {
+                config.strokeWidth
+            }
+
+            val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = config.strokeColor.toArgb()
                 strokeWidth = effectiveStrokeWidth
                 alpha = (config.opacity * 255).toInt()
@@ -207,17 +196,25 @@ class BallRenderer {
             }
             val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints)
 
-            // To draw the stroke on the INSIDE of the target ball in screen space, offset the screen radius
-            val screenInnerRadius = if (config is TargetBall) {
-                exactScreenRadius - (effectiveStrokeWidth / 2f)
-            } else {
-                exactScreenRadius
-            }
+            // Render stroke strictly on the INSIDE of the circle
+            val screenInnerRadius = exactScreenRadius - (effectiveStrokeWidth / 2f)
 
-            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, exactScreenRadius, glowPaint) // Keep glow bleeding outward from the true edge
-            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, screenInnerRadius, strokePaint)
+            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, exactScreenRadius, glowPaint)
+            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, screenInnerRadius, strokePaint)
 
         } else {
+            // EXPERT MODE LOGIC
+            val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode, false)
+            val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom)
+
+            val logicalStrokePaint = Paint(paints.targetCirclePaint).apply {
+                strokeWidth = config.strokeWidth / zoomFactor
+                color = config.strokeColor.toArgb()
+                alpha = (config.opacity * 255).toInt()
+            }
+            val dotPaint = Paint(paints.fillPaint).apply { color = android.graphics.Color.WHITE }
+            val dotRadius = ball.radius * 0.1f
+
             val positionMatrix = state.pitchMatrix ?: return
             val sizeMatrix = state.sizeCalculationMatrix ?: positionMatrix
             val logicalBallMatrix = positionMatrix

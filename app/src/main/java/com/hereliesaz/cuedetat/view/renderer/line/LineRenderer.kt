@@ -125,10 +125,8 @@ class LineRenderer {
 
         val shotGuideDirection = normalize(PointF(ghostCueCenter.x - shotLineAnchor.x, ghostCueCenter.y - shotLineAnchor.y))
 
-        val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
-
         if (state.table.isVisible || state.obstacleBalls.isNotEmpty()) {
-            if (isBeginnerLocked) {
+            if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
                 // Skip pathways in locked
             } else {
                 drawFadingLine(canvas, shotLineAnchor, shotGuideDirection, obstructionPaint, null, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
@@ -139,14 +137,13 @@ class LineRenderer {
             }
         }
 
-        if (isBeginnerLocked) {
-            // Skip inner lines in Pass 1; they will be drawn in drawBeginnerForeground in Pass 4
+        if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
+            // Skip inner line in Pass 1; it will be drawn in drawBeginnerForeground in Pass 4
         } else {
             drawFadingLine(canvas, shotLineAnchor, shotGuideDirection, shotLinePaint, shotLineGlow, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
             drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
             drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
         }
-
         drawSpinPaths(canvas, state, paints, activeMatrix, camArray, distArray)
 
         if (state.areHelpersVisible && state.experienceMode != ExperienceMode.BEGINNER) {
@@ -485,66 +482,59 @@ class LineRenderer {
             val measure = android.graphics.PathMeasure(path, false)
             val pathLen = measure.length
 
-            // Collect all points on the path that are physically inside the screen view
+            // 1. Walk the line and collect ONLY coordinates that are physically visible onscreen
             val visiblePts = mutableListOf<FloatArray>()
             var d = 0f
             val pos = FloatArray(2)
             val tan = FloatArray(2)
 
-            val margin = 80f
-            while(d <= pathLen) {
+            while (d <= pathLen) {
                 if (measure.getPosTan(d, pos, tan)) {
+                    val margin = 20f
                     if (pos[0] in margin..(state.viewWidth - margin) && pos[1] in margin..(state.viewHeight - margin)) {
-                        visiblePts.add(floatArrayOf(pos[0], pos[1], tan[0], tan[1], d))
+                        visiblePts.add(floatArrayOf(pos[0], pos[1], tan[0], tan[1]))
+                    } else if (visiblePts.isNotEmpty()) {
+                        // We reached the edge of the screen. Stop collecting.
+                        break
                     }
                 }
-                d += 10f
+                d += 15f
             }
 
-            // DRAW TRIANGLES FIRST (Rendered BELOW the line)
-            if (drawTriangles && visiblePts.isNotEmpty()) {
+            // 2. DRAW REAL TRIANGLES FIRST (Rendered BELOW the line, Exact same color)
+            if (drawTriangles && visiblePts.size > 5) {
                 val trianglePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     style = Paint.Style.FILL
-                    color = paint.color // EXACT SAME COLOR AS THE LINE
-                    setShadowLayer(8f, 0f, 0f, android.graphics.Color.BLACK)
+                    color = paint.color
                 }
 
-                // Pick 3 evenly spaced points strictly from the visible segment
-                val startIdx = (visiblePts.size * 0.2f).toInt().coerceAtMost(visiblePts.size - 1)
-                val endIdx = (visiblePts.size * 0.8f).toInt().coerceAtMost(visiblePts.size - 1)
-                val validPts = visiblePts.subList(startIdx, endIdx + 1)
+                // Space exactly 3 triangles uniformly across the onscreen segment
+                val spacing = visiblePts.size / 4
+                for (i in 1..3) {
+                    val idx = (i * spacing).coerceIn(0, visiblePts.size - 1)
+                    val pt = visiblePts[idx]
+                    val angle = Math.toDegrees(atan2(pt[3].toDouble(), pt[2].toDouble())).toFloat()
 
-                if (validPts.isNotEmpty()) {
-                    val step = (validPts.size / 3).coerceAtLeast(1)
-                    var drawn = 0
-                    for (i in 0 until validPts.size step step) {
-                        if (drawn >= 3) break
-                        val pt = validPts[i]
-                        val angle = Math.toDegrees(atan2(pt[3].toDouble(), pt[2].toDouble())).toFloat()
+                    canvas.save()
+                    canvas.translate(pt[0], pt[1])
+                    canvas.rotate(angle)
 
-                        canvas.save()
-                        canvas.translate(pt[0], pt[1])
-                        canvas.rotate(angle)
-
-                        // Real, solid triangle pointing exactly down the path
-                        val triPath = Path().apply {
-                            moveTo(35f, 0f)
-                            lineTo(-25f, 25f)
-                            lineTo(-25f, -25f)
-                            close()
-                        }
-                        canvas.drawPath(triPath, trianglePaint)
-                        canvas.restore()
-                        drawn++
+                    val triPath = Path().apply {
+                        moveTo(20f, 0f)
+                        lineTo(-15f, 15f)
+                        lineTo(-15f, -15f)
+                        close()
                     }
+                    canvas.drawPath(triPath, trianglePaint)
+                    canvas.restore()
                 }
             }
 
-            // DRAW THE LINE OVER THE TRIANGLES
+            // 3. DRAW THE LINE OVER THE TRIANGLES
             glowPaint?.let { canvas.drawPath(path, it) }
             canvas.drawPath(path, paint)
 
-            // DRAW THE CYAN TEXT ON TOP
+            // 4. DRAW THE CYAN TEXT ON TOP (Exactly halfway down the visible line)
             if (textToDraw != null && state.areHelpersVisible && visiblePts.isNotEmpty()) {
                 val midPt = visiblePts[visiblePts.size / 2]
                 var angle = Math.toDegrees(atan2(midPt[3].toDouble(), midPt[2].toDouble())).toFloat()
@@ -556,7 +546,7 @@ class LineRenderer {
 
                 val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     this.typeface = typeface
-                    textSize = 50f // FIXED SIZE
+                    textSize = 50f
                     color = android.graphics.Color.parseColor("#00E5FF") // Cyan
                     textAlign = Paint.Align.CENTER
                     setShadowLayer(10f, 0f, 0f, android.graphics.Color.BLACK)
