@@ -134,7 +134,7 @@ class TableScanViewModel @Inject constructor(
             if (camMat != null && distMat != null && !camMat.empty() && !distMat.empty()) {
                 // We pass cameraMatrix as the 'P' (newCameraMatrix) parameter as well,
                 // otherwise OpenCV returns normalized coordinates instead of pixel coordinates!
-                Calib3d.undistortImagePoints(rawPointsMat, undistortedPointsMat, camMat, distMat, Mat(), camMat)
+                Calib3d.undistortPoints(rawPointsMat, undistortedPointsMat, camMat, distMat, Mat(), camMat)
             } else {
                 rawPointsMat.copyTo(undistortedPointsMat) // Fallback to pinhole if no calibration exists
             }
