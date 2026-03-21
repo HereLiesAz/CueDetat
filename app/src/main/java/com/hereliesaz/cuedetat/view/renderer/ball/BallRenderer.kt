@@ -318,10 +318,18 @@ class BallRenderer {
                 LabelConfig.targetBall,
                 state
             )
+
+            val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
+            val ghostCueText = if (isBeginnerLocked) {
+                "Aim the cue ball at the center of the blue circle."
+            } else {
+                "Ghost Cue Ball"
+            }
+
             textRenderer.draw(canvas, textPaint, object : LogicalCircular {
                 override val center = state.protractorUnit.ghostCueBallCenter
                 override val radius = state.protractorUnit.radius
-            }, "Ghost Cue Ball", LabelConfig.ghostCueBall, state)
+            }, ghostCueText, LabelConfig.ghostCueBall, state, drawBelow = true)
         }
 
         state.obstacleBalls.forEachIndexed { index, obstacle ->

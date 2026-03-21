@@ -23,7 +23,8 @@ class BallTextRenderer {
         ball: LogicalCircular,
         text: String,
         config: LabelProperties,
-        state: CueDetatState
+        state: CueDetatState,
+        drawBelow: Boolean = false
     ) {
         if (!state.areHelpersVisible && !config.isPersistentlyVisible) return
         val matrix = state.pitchMatrix ?: return
@@ -47,8 +48,14 @@ class BallTextRenderer {
 
         val textMetrics = paint.fontMetrics
         val textPadding = 5f * zoomFactor.coerceAtLeast(0.5f)
-        val visualTop = screenPos.y - radiusInfo.lift - radiusInfo.radius
-        val baseline = visualTop - textPadding - textMetrics.descent + config.yOffset
+
+        val baseline = if (drawBelow) {
+            val visualBottom = screenPos.y - radiusInfo.lift + radiusInfo.radius
+            visualBottom + textPadding - textMetrics.ascent + config.yOffset
+        } else {
+            val visualTop = screenPos.y - radiusInfo.lift - radiusInfo.radius
+            visualTop - textPadding - textMetrics.descent + config.yOffset
+        }
 
         canvas.drawText(text, screenPos.x + config.xOffset, baseline, paint)
     }

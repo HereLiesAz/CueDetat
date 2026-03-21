@@ -48,7 +48,6 @@ class LineRenderer {
         typeface: Typeface?,
         activeMatrix: Matrix
     ) {
-        // PERFORMANCE OPTIMIZATION: Extract OpenCV Mat to DoubleArray ONCE per frame
         var camArray: DoubleArray? = null
         var distArray: DoubleArray? = null
 
@@ -112,8 +111,8 @@ class LineRenderer {
         } else {
             drawFadingLine(canvas, shotLineAnchor, shotGuideDirection, shotLinePaint, shotLineGlow, state, paints, activeMatrix, camArray, distArray)
         }
-        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray)
-        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray)
+        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
+        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
         drawSpinPaths(canvas, state, paints, activeMatrix, camArray, distArray)
 
         if (state.areHelpersVisible) {
@@ -121,19 +120,22 @@ class LineRenderer {
         }
     }
 
-    private fun drawAimingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
+    private fun drawAimingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?) {
         val aimingLineConfig = AimingLine()
         val isPocketed = state.aimedPocketIndex != null
+        val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
 
         val baseAimingColor = if (isPocketed) SulfurDust else aimingLineConfig.strokeColor
 
+        val aimingStrokeWidth = if (isBeginnerLocked) aimingLineConfig.strokeWidth * 4f else aimingLineConfig.strokeWidth
+
         val aimingLinePaint = Paint(paints.targetCirclePaint).apply {
             color = baseAimingColor.toArgb()
-            strokeWidth = aimingLineConfig.strokeWidth
+            strokeWidth = aimingStrokeWidth
         }
         val aimingLineGlow = createGlowPaint(
             baseGlowColor = aimingLineConfig.glowColor,
-            baseGlowWidth = aimingLineConfig.glowWidth,
+            baseGlowWidth = if (isBeginnerLocked) aimingLineConfig.glowWidth * 2f else aimingLineConfig.glowWidth,
             state = state,
             paints = paints
         )
@@ -153,26 +155,31 @@ class LineRenderer {
             drawBankablePath(canvas, path, obstructionPaint, null, isPocketed = false, state, paints, activeMatrix, camArray, distArray)
         }
 
-        drawBankablePath(canvas, path, aimingLinePaint, aimingLineGlow, isPocketed, state, paints, activeMatrix, camArray, distArray)
+        val textToDraw = if (isBeginnerLocked) "Aim this line at the pocket." else null
+        drawBankablePath(canvas, path, aimingLinePaint, aimingLineGlow, isPocketed, state, paints, activeMatrix, camArray, distArray, textToDraw, isBeginnerLocked, typeface)
     }
 
-    private fun drawTangentLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
+    private fun drawTangentLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?) {
         val tangentLineConfig = TangentLine()
         val isPocketed = state.tangentAimedPocketIndex != null
+        val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
+
         val baseTangentColor = if (isPocketed) WarningRed else tangentLineConfig.strokeColor
+
+        val tangentStrokeWidth = if (isBeginnerLocked) tangentLineConfig.strokeWidth * 4f else tangentLineConfig.strokeWidth
 
         val tangentSolidPaint = Paint(paints.tangentLineSolidPaint).apply {
             color = baseTangentColor.toArgb()
-            strokeWidth = tangentLineConfig.strokeWidth
+            strokeWidth = tangentStrokeWidth
         }
         val tangentDottedPaint = Paint(paints.tangentLineDottedPaint).apply {
             color = tangentLineConfig.strokeColor.toArgb()
-            strokeWidth = tangentLineConfig.strokeWidth
+            strokeWidth = tangentStrokeWidth
             alpha = (tangentLineConfig.opacity * 255).toInt()
         }
         val tangentGlow = createGlowPaint(
             baseGlowColor = tangentLineConfig.glowColor,
-            baseGlowWidth = tangentLineConfig.glowWidth,
+            baseGlowWidth = if (isBeginnerLocked) tangentLineConfig.glowWidth * 2f else tangentLineConfig.glowWidth,
             state = state,
             paints = paints
         )
@@ -191,9 +198,9 @@ class LineRenderer {
 
         val start = rawStart.warpedBy(tps)
 
-        if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
-            drawFadingLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray)
-            drawFadingLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray)
+        if (isBeginnerLocked) {
+            drawFadingLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, "Tangent Line", true, typeface)
+            drawFadingLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, "Tangent Line", true, typeface)
             return
         }
 
@@ -266,7 +273,6 @@ class LineRenderer {
             val bankLineConfigs = listOf(BankLine1(), BankLine2(), BankLine3(), BankLine4())
             val finalSegmentIndex = path.size - 2
 
-            // Draw intermediate solid segments in Screen Space
             canvas.save()
             canvas.concat(inverseMatrix)
             for (i in 0 until finalSegmentIndex) {
@@ -285,7 +291,6 @@ class LineRenderer {
             }
             canvas.restore()
 
-            // Draw the final segment with fading
             if (path.size > 1) {
                 val start = path[finalSegmentIndex]
                 val end = path.last()
@@ -336,7 +341,10 @@ class LineRenderer {
         paints: PaintCache,
         activeMatrix: Matrix,
         camArray: DoubleArray?,
-        distArray: DoubleArray?
+        distArray: DoubleArray?,
+        textToDraw: String? = null,
+        drawTriangles: Boolean = false,
+        typeface: Typeface? = null
     ) {
         if (path.size < 2) return
         val finalSegmentIndex = path.size - 2
@@ -349,7 +357,7 @@ class LineRenderer {
 
             if (isLastSegment) {
                 val direction = normalize(PointF(rawEnd.x - start.x, rawEnd.y - start.y))
-                drawFadingLine(canvas, start, direction, primaryPaint, glowPaint, state, paints, activeMatrix, camArray, distArray)
+                drawFadingLine(canvas, start, direction, primaryPaint, glowPaint, state, paints, activeMatrix, camArray, distArray, textToDraw, drawTriangles, typeface)
             } else {
                 val end = getSafeLogicalPoint(start, rawEnd, activeMatrix) ?: continue
                 val segmentPath = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
@@ -408,7 +416,10 @@ class LineRenderer {
         paints: PaintCache,
         activeMatrix: Matrix,
         camArray: DoubleArray?,
-        distArray: DoubleArray?
+        distArray: DoubleArray?,
+        textToDraw: String? = null,
+        drawTriangles: Boolean = false,
+        typeface: Typeface? = null
     ) {
         val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
 
@@ -423,10 +434,8 @@ class LineRenderer {
         val end = getSafeLogicalPoint(start, rawEnd, activeMatrix) ?: return
         val fadeStart = getSafeLogicalPoint(start, rawFadeStart, activeMatrix) ?: end
 
-        // 1. Build the screen-space curved path using safely clipped coordinates
         val path = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
 
-        // 2. Map gradient points to screen space for the fading mask
         val screenFadeStart = DrawingUtils.mapPoint(fadeStart, activeMatrix)
         val screenEnd = DrawingUtils.mapPoint(end, activeMatrix)
 
@@ -446,6 +455,78 @@ class LineRenderer {
             glowPaint?.let { canvas.drawPath(path, it) }
             canvas.drawPath(path, paint)
 
+            if ((textToDraw != null && state.areHelpersVisible) || drawTriangles) {
+                val measure = android.graphics.PathMeasure(path, false)
+                val length = measure.length
+
+                // FORCE SCREEN BOUNDS: Ensure calculations do not exceed 70% of the screen width
+                val maxVisibleLength = length.coerceAtMost(state.viewWidth * 0.7f)
+
+                if (textToDraw != null && state.areHelpersVisible && maxVisibleLength > 0) {
+                    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        this.typeface = typeface
+                        textSize = 55f
+                        color = paint.color
+                        textAlign = Paint.Align.CENTER
+                        setShadowLayer(10f, 0f, 0f, Color.Black.toArgb())
+                    }
+                    val pos = FloatArray(2)
+                    val tan = FloatArray(2)
+
+                    // Anchor text halfway along the *visible* line (not the 5000 inch logical line)
+                    val textDistance = maxVisibleLength * 0.5f
+                    if (measure.getPosTan(textDistance, pos, tan)) {
+                        var angle = Math.toDegrees(atan2(tan[1].toDouble(), tan[0].toDouble())).toFloat()
+                        var yOffset = -30f
+
+                        // Keep text right-side up and physically above the line regardless of draw direction
+                        if (tan[0] < 0) {
+                            angle += 180f
+                            yOffset = 30f
+                        }
+
+                        canvas.save()
+                        canvas.translate(pos[0], pos[1])
+                        canvas.rotate(angle)
+                        canvas.drawText(textToDraw, 0f, yOffset, textPaint)
+                        canvas.restore()
+                    }
+                }
+
+                if (drawTriangles && maxVisibleLength > 0) {
+                    val trianglePaint = Paint(paint).apply {
+                        style = Paint.Style.FILL
+                        strokeWidth = 0f
+                    }
+                    val pos = FloatArray(2)
+                    val tan = FloatArray(2)
+
+                    // Space arrowheads out every 15% of screen width, stopping before edge
+                    val spacing = state.viewWidth * 0.15f
+                    var distance = spacing
+                    while (distance < maxVisibleLength) {
+                        if (measure.getPosTan(distance, pos, tan)) {
+                            val angle = Math.toDegrees(atan2(tan[1].toDouble(), tan[0].toDouble())).toFloat()
+
+                            canvas.save()
+                            canvas.translate(pos[0], pos[1])
+                            canvas.rotate(angle)
+
+                            val triPath = Path().apply {
+                                moveTo(25f, 0f)
+                                lineTo(-20f, 15f)
+                                lineTo(-5f, 0f)
+                                lineTo(-20f, -15f)
+                                close()
+                            }
+                            canvas.drawPath(triPath, trianglePaint)
+                            canvas.restore()
+                        }
+                        distance += spacing
+                    }
+                }
+            }
+
             val gradient = LinearGradient(
                 finalFadeStart.x, finalFadeStart.y,
                 finalEnd.x, finalEnd.y,
@@ -456,13 +537,12 @@ class LineRenderer {
             paints.gradientMaskPaint.shader = gradient
             paints.gradientMaskPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
 
-            // Huge rect in screen space to apply the mask
             canvas.drawRect(-5000f, -5000f, 10000f, 10000f, paints.gradientMaskPaint)
         } finally {
             paints.gradientMaskPaint.shader = null
             paints.gradientMaskPaint.xfermode = null
             canvas.restoreToCount(layer)
-            canvas.restore() // Exit Screen Space back to Logical Space
+            canvas.restore()
         }
     }
 
@@ -471,10 +551,6 @@ class LineRenderer {
         return if (mag > 0.001f) PointF(p.x / mag, p.y / mag) else PointF(0f, 0f)
     }
 
-    /**
-     * Mathematically intersects a 2D line segment with the 3D perspective camera's "horizon plane".
-     * Prevents lines from projecting "behind the camera" and flipping to the wrong side of the screen.
-     */
     private fun getSafeLogicalPoint(start: PointF, end: PointF, matrix: Matrix): PointF? {
         val v = FloatArray(9)
         matrix.getValues(v)
@@ -482,33 +558,28 @@ class LineRenderer {
         val h = v[Matrix.MPERSP_1]
         val i = v[Matrix.MPERSP_2]
 
-        // Calculate the 'W' depth component for the start and end points
         val w1 = g * start.x + h * start.y + i
         val w2 = g * end.x + h * end.y + i
 
-        val epsilon = 0.0001f // A tiny distance just above the actual horizon
+        val epsilon = 0.0001f
 
         if (w1 > epsilon && w2 > epsilon) {
-            return end // Both points are safely in front of the camera. No clipping needed.
+            return end
         }
 
         if (w1 <= epsilon && w2 <= epsilon) {
-            return null // The entire line segment is invisible (behind the camera).
+            return null
         }
 
         if (w1 > epsilon && w2 <= epsilon) {
-            // The start point is visible, but the end point extends behind the camera.
-            // Calculate 't' along the line segment where it exactly hits the horizon (w = epsilon).
             val t = (epsilon - w1) / (w2 - w1)
 
-            // Return the clipped coordinate.
             return PointF(
                 start.x + t * (end.x - start.x),
                 start.y + t * (end.y - start.y)
             )
         }
 
-        // We assume 'start' (usually the cue ball or a pocket) is always mathematically visible.
         return null
     }
 }
