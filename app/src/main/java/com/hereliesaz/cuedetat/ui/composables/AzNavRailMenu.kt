@@ -122,18 +122,6 @@ fun AzNavRailMenu(
         azDivider()
         azMenuItem(id = "mode", text = "Mode: ${uiState.experienceMode?.name}", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) })
 
-        onscreen(alignment = Alignment.CenterStart) {
-            if (uiState.isMasseModeActive) {
-                MasseControl(
-                    elevationAngle = uiState.pitchAngle,
-                    selectedSpinOffset = uiState.selectedSpinOffset,
-                    lingeringSpinOffset = uiState.lingeringSpinOffset,
-                    spinPathAlpha = uiState.spinPathsAlpha,
-                    onEvent = onEvent
-                )
-            }
-        }
-
         content()
     }
 }

@@ -3,6 +3,8 @@ name: Jules Issue Handler
 on:
   issues:
     types: [opened]
+  workflow_dispatch:
+
 
 jobs:
   handle_issue:
@@ -11,7 +13,7 @@ jobs:
       contents: read
     steps:
       - name: Invoke Jules
-        uses: google-labs-code/jules-invoke@v1
+        uses: google-labs-code/jules-invoke@main
         with:
           jules_api_key: ${{ secrets.JULES_API_KEY }}
           prompt: |
