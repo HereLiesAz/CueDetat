@@ -94,8 +94,7 @@ fun MasseControl(
                         onDragEnd = { onEvent(MainScreenEvent.SpinSelectionEnded) },
                         onDragCancel = { onEvent(MainScreenEvent.SpinSelectionEnded) }
                     ) { change, _ ->
-                        val pos = change.position
-                        onEvent(MainScreenEvent.SpinApplied(PointF(pos.x, pos.y)))
+                        onEvent(MainScreenEvent.SpinApplied(PointF(change.position.x, change.position.y)))
                         change.consume()
                     }
                 }
@@ -109,7 +108,7 @@ fun MasseControl(
                     drawCircle(color = Color.White.copy(alpha = 0.2f), radius = radius, center = center)
                 }
 
-                // Draw the color wheel
+                // Color Wheel
                 val numArcs = 72
                 val arcAngle = 360f / numArcs
                 for (i in 0 until numArcs) {
@@ -121,38 +120,33 @@ fun MasseControl(
                 drawCircle(brush = Brush.radialGradient(colors = listOf(Color.White, Color.Transparent), center = center, radius = radius), radius = radius, center = center, alpha = spinPathAlpha)
                 drawCircle(color = Color.White.copy(alpha = 0.5f * spinPathAlpha), radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
 
-                // Draw the indicators (dots)
-                lingeringSpinOffset?.let { drawLogicalIndicator(it, center, radius, Color.White.copy(alpha = 0.6f * spinPathAlpha)) }
+                // Indicators
+                lingeringSpinOffset?.let { drawLogicalIndicator(it, color = Color.White.copy(alpha = 0.6f * spinPathAlpha)) }
 
-                selectedSpinOffset?.let { activeOffset ->
-                    drawLogicalIndicator(activeOffset, center, radius, Color.White)
+                selectedSpinOffset?.let { activePos ->
+                    drawLogicalIndicator(activePos, color = Color.White)
 
-                    // --- THE POOL STICK ANGLE (MASSE STICK) ---
-                    // The stick is drawn as a foreshortened line based on phone tilt (elevationAngle).
-                    // If elevation is 90 (vertical), the stick is a short tip. If 0 (flat), it is full length.
-                    val stickBaseLen = radius * 1.5f
-                    val stickWidth = 6.dp.toPx()
-                    val foreshortenedLen = stickBaseLen * cos(Math.toRadians(elevationAngle.toDouble())).toFloat()
+                    // --- CUE STICK ANGLE GUIDE ---
+                    // Foreshorten based on phone tilt (0 vertical, 90 flat)
+                    val stickBaseLen = radius * 2.5f
+                    val stickWidth = 8.dp.toPx()
+                    val tiltRad = Math.toRadians(elevationAngle.toDouble())
+                    val foreshortenedLen = (stickBaseLen * Math.sin(tiltRad)).toFloat().coerceAtLeast(10f)
 
-                    val angleToCenter = atan2(activeOffset.y - center.y, activeOffset.x - center.x)
+                    val angleToCenter = atan2(activePos.y - center.y, activePos.x - center.x)
 
                     withTransform({
-                        // Rotate stick to align with the vector from the wheel center to the impact point
-                        rotate(Math.toDegrees(angleToCenter.toDouble()).toFloat(), pivot = Offset(activeOffset.x, activeOffset.y))
+                        rotate(Math.toDegrees(angleToCenter.toDouble()).toFloat(), pivot = Offset(activePos.x, activePos.y))
                     }) {
-                        // Draw the cue stick body (tapered line)
+                        // Tapered stick body
                         drawLine(
-                            color = Color.White.copy(alpha = 0.8f),
-                            start = Offset(activeOffset.x, activeOffset.y),
-                            end = Offset(activeOffset.x + foreshortenedLen, activeOffset.y),
+                            brush = Brush.horizontalGradient(listOf(Color.White, Color.Transparent)),
+                            start = Offset(activePos.x, activePos.y),
+                            end = Offset(activePos.x + foreshortenedLen, activePos.y),
                             strokeWidth = stickWidth
                         )
-                        // Draw the cue tip
-                        drawCircle(
-                            color = Color.Black,
-                            radius = stickWidth / 2f,
-                            center = Offset(activeOffset.x, activeOffset.y)
-                        )
+                        // Cue Tip
+                        drawCircle(color = Color.Black, radius = stickWidth / 2.5f, center = Offset(activePos.x, activePos.y))
                     }
                 }
 
@@ -168,7 +162,7 @@ fun MasseControl(
     }
 }
 
-private fun DrawScope.drawLogicalIndicator(offset: PointF, center: Offset, radius: Float, color: Color) {
-    drawCircle(color = color, radius = 5.dp.toPx(), center = Offset(offset.x, offset.y))
-    drawCircle(color = color, radius = 5.dp.toPx(), center = Offset(offset.x, offset.y), style = Stroke(width = 2.dp.toPx()))
+private fun DrawScope.drawLogicalIndicator(pos: PointF, color: Color) {
+    drawCircle(color = color, radius = 5.dp.toPx(), center = Offset(pos.x, pos.y))
+    drawCircle(color = color, radius = 5.dp.toPx(), center = Offset(pos.x, pos.y), style = Stroke(width = 2.dp.toPx()))
 }

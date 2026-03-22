@@ -7,16 +7,12 @@ import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.view.state.InteractionMode
-import com.hereliesaz.cuedetat.view.state.SnapCandidate
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.atan2
 import kotlin.math.pow
 import kotlin.math.sqrt
 
-/**
- * Reducer for complex screen-space gestures.
- */
 @Singleton
 class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils) {
     fun reduce(currentState: CueDetatState, event: MainScreenEvent): CueDetatState {
@@ -36,18 +32,15 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             return currentState
         }
 
-        val logicalPoint = event.logicalPoint
         val spinControlCenter = currentState.spinControlCenter
         val onPlaneBall = currentState.onPlaneBall
         val protractorUnit = currentState.protractorUnit
-
-        // A generous grace area: 4x the logical radius to prevent finger-fumbling.
         val touchRadius = 25f * 4.0f
 
-        // 1. Relocate UI Widget (Double Tap + Drag)
+        // 1. Relocate UI Widget (Double Tap + Drag on Center)
         if (currentState.isSpinControlVisible || currentState.isMasseModeActive) {
             val distToControl = spinControlCenter?.let { getDistance(event.screenOffset, it) } ?: Float.MAX_VALUE
-            if (event.isDoubleTap && distToControl < touchRadius * currentState.screenDensity) {
+            if (event.isDoubleTap && distToControl < (60f * currentState.screenDensity)) {
                 return currentState.copy(
                     interactionMode = InteractionMode.MOVING_SPIN_CONTROL,
                     isMagnifierVisible = true,
@@ -56,19 +49,10 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             }
         }
 
-        // 2. Bank Mode Aiming
-        if (currentState.isBankingMode) {
-            return if (onPlaneBall != null && getDistance(logicalPoint, onPlaneBall.center) < touchRadius) {
-                currentState.copy(interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
-            } else {
-                currentState.copy(interactionMode = InteractionMode.AIMING_BANK_SHOT)
-            }
-        }
-
-        // 3. Move Ball (Includes Target Ball and its Ghost counterpart)
+        // 2. Ball Movement (Priority check for Cue Ball and Ghost Ball area)
         val ghostPos = currentState.shotGuideImpactPoint
-        val isHitOnBall = onPlaneBall != null && getDistance(logicalPoint, onPlaneBall.center) < touchRadius
-        val isHitOnGhost = ghostPos != null && getDistance(logicalPoint, ghostPos) < touchRadius
+        val isHitOnBall = onPlaneBall != null && getDistance(event.logicalPoint, onPlaneBall.center) < touchRadius
+        val isHitOnGhost = ghostPos != null && getDistance(event.logicalPoint, ghostPos) < touchRadius
 
         if (isHitOnBall || isHitOnGhost) {
             return currentState.copy(
@@ -78,14 +62,15 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             )
         }
 
-        // 4. Default: Rotate the shot line
-        return currentState.copy(interactionMode = InteractionMode.ROTATING_PROTRACTOR)
+        // 3. Bank Mode or Default Shot Line Rotation
+        return if (currentState.isBankingMode) {
+            currentState.copy(interactionMode = InteractionMode.AIMING_BANK_SHOT)
+        } else {
+            currentState.copy(interactionMode = InteractionMode.ROTATING_PROTRACTOR)
+        }
     }
 
-    private fun handleLogicalDragApplied(
-        currentState: CueDetatState,
-        event: MainScreenEvent.LogicalDragApplied
-    ): CueDetatState {
+    private fun handleLogicalDragApplied(currentState: CueDetatState, event: MainScreenEvent.LogicalDragApplied): CueDetatState {
         return when (currentState.interactionMode) {
             InteractionMode.MOVING_SPIN_CONTROL -> {
                 val currentCenter = currentState.spinControlCenter ?: return currentState
@@ -95,17 +80,11 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                 currentState.onPlaneBall?.let {
                     val dx = event.currentLogicalPoint.x - event.previousLogicalPoint.x
                     val dy = event.currentLogicalPoint.y - event.previousLogicalPoint.y
-                    currentState.copy(
-                        onPlaneBall = it.copy(center = PointF(it.center.x + dx, it.center.y + dy)),
-                        valuesChangedSinceReset = true
-                    )
+                    currentState.copy(onPlaneBall = it.copy(center = PointF(it.center.x + dx, it.center.y + dy)), valuesChangedSinceReset = true)
                 } ?: currentState
             }
             InteractionMode.AIMING_BANK_SHOT -> {
-                currentState.copy(
-                    bankingAimTarget = event.currentLogicalPoint,
-                    valuesChangedSinceReset = true
-                )
+                currentState.copy(bankingAimTarget = event.currentLogicalPoint, valuesChangedSinceReset = true)
             }
             InteractionMode.ROTATING_PROTRACTOR -> {
                 val center = currentState.protractorUnit.center
@@ -113,9 +92,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                 val currAngle = atan2(event.currentLogicalPoint.y - center.y, event.currentLogicalPoint.x - center.x)
                 val angleDelta = Math.toDegrees(currAngle.toDouble() - prevAngle.toDouble()).toFloat()
                 currentState.copy(
-                    protractorUnit = currentState.protractorUnit.copy(
-                        rotationDegrees = currentState.protractorUnit.rotationDegrees + angleDelta
-                    ),
+                    protractorUnit = currentState.protractorUnit.copy(rotationDegrees = currentState.protractorUnit.rotationDegrees + angleDelta),
                     valuesChangedSinceReset = true
                 )
             }

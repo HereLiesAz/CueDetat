@@ -3,9 +3,6 @@ package com.hereliesaz.cuedetat.domain.reducers
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 
-/**
- * Reducer for Computer Vision interactions.
- */
 internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueDetatState {
     return when (action) {
         is MainScreenEvent.AutoCalibrateCv -> {
@@ -17,7 +14,7 @@ internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueD
             var nextState = state.copy(visionData = action.visionData)
 
             if (state.isAutoCalibrating) {
-                // Use bounding boxes as a proxy for signal detection.
+                // Low-light feedback loop: lower thresholds until bounding boxes appear.
                 val detectionCount = action.visionData.detectedBoundingBoxes.size
 
                 if (detectionCount < 1) {
@@ -32,7 +29,10 @@ internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueD
                     )
 
                     if (newT1 <= 10f && newT2 <= 20f) {
-                        nextState = nextState.copy(isAutoCalibrating = false, warningText = "Auto-calibration failed.")
+                        nextState = nextState.copy(
+                            isAutoCalibrating = false,
+                            warningText = "Auto-calibration failed: Too dark."
+                        )
                     }
                 } else {
                     nextState = nextState.copy(isAutoCalibrating = false)
