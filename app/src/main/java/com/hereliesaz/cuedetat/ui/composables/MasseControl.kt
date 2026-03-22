@@ -139,21 +139,27 @@ fun MasseControl(
             }
         }
 
+        // Layout Constants
+        val stickCanvasWidth = 200.dp
+        val stickCanvasHeight = 150.dp
+        val tetherOffsetY = 144.dp
+
         // Side-view Pool Stick for Elevation
         Canvas(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .offset(y = 144.dp)
-                .size(width = 200.dp, height = 150.dp)
+                .offset(y = tetherOffsetY)
+                .size(width = stickCanvasWidth, height = stickCanvasHeight)
         ) {
-            val tipX = 20.dp.toPx()
-            val tipY = size.height - 20.dp.toPx()
+            val tipMargin = 20.dp.toPx()
+            val tipX = tipMargin
+            val tipY = size.height - tipMargin
             val stickLength = 160.dp.toPx()
 
             // Draw a baseline for reference (the table surface)
             drawLine(
                 color = Color.White.copy(alpha = 0.3f),
-                start = Offset(tipX - 20f, tipY),
+                start = Offset(tipX - tipMargin, tipY),
                 end = Offset(tipX + stickLength, tipY),
                 strokeWidth = 2.dp.toPx()
             )
@@ -163,11 +169,14 @@ fun MasseControl(
                 translate(left = tipX, top = tipY)
                 rotate(degrees = -elevationAngle, pivot = Offset.Zero) // Negative visual rotation points it up
             }) {
+                val tipHalfThicknessPx = 2.dp.toPx()
+                val buttHalfThicknessPx = 6.dp.toPx()
+
                 val stickPath = Path().apply {
-                    moveTo(0f, -2f) // Tip top
-                    lineTo(stickLength, -6f) // Butt top
-                    lineTo(stickLength, 6f) // Butt bottom
-                    lineTo(0f, 2f) // Tip bottom
+                    moveTo(0f, -tipHalfThicknessPx) // Tip top
+                    lineTo(stickLength, -buttHalfThicknessPx) // Butt top
+                    lineTo(stickLength, buttHalfThicknessPx) // Butt bottom
+                    lineTo(0f, tipHalfThicknessPx) // Tip bottom
                     close()
                 }
                 drawPath(path = stickPath, color = Color.White)
@@ -175,8 +184,8 @@ fun MasseControl(
                 // Ferrule/Tip detail
                 drawRect(
                     color = Color.Blue,
-                    topLeft = Offset(0f, -2f),
-                    size = androidx.compose.ui.geometry.Size(4.dp.toPx(), 4f)
+                    topLeft = Offset(0f, -tipHalfThicknessPx),
+                    size = androidx.compose.ui.geometry.Size(4.dp.toPx(), tipHalfThicknessPx * 2f)
                 )
             }
 
