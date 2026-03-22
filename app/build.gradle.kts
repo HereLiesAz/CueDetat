@@ -126,4 +126,15 @@ dependencies {
     // implementation("cljsjs:liquidfun:1.1.0-0")
     implementation(libs.kotlin.metadata.jvm)
 
+    constraints {
+        implementation("io.netty:netty-codec-http2:4.1.124.Final") {
+            because("Transitive dependency vulnerabilities in testing/grpc")
+        }
+        implementation("com.google.guava:guava:32.0.0-android") {
+            because("Transitive dependency vulnerabilities in various plugins")
+        }
+        implementation("org.bitbucket.b_c:jose4j:0.9.6") {
+            because("Transitive dependency vulnerability")
+        }
+    }
 }
