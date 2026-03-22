@@ -3,6 +3,8 @@ name: Jules Issue Handler
 on:
   issues:
     types: [opened]
+  workflow_dispatch:
+
 
 jobs:
   handle_issue:
