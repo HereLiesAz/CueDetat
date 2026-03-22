@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.runtime.Composable
@@ -16,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -24,17 +26,16 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
+import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
 
 @Composable
 fun MasseControl(
@@ -51,6 +52,7 @@ fun MasseControl(
 
     Box(
         modifier = modifier
+            .size(120.dp)
             .pointerInput(Unit) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
@@ -125,29 +127,6 @@ fun MasseControl(
 
                 selectedSpinOffset?.let { activePos ->
                     drawLogicalIndicator(activePos, color = Color.White)
-
-                    // --- CUE STICK ANGLE GUIDE ---
-                    // Foreshorten based on phone tilt (0 vertical, 90 flat)
-                    val stickBaseLen = radius * 2.5f
-                    val stickWidth = 8.dp.toPx()
-                    val tiltRad = Math.toRadians(elevationAngle.toDouble())
-                    val foreshortenedLen = (stickBaseLen * Math.sin(tiltRad)).toFloat().coerceAtLeast(10f)
-
-                    val angleToCenter = atan2(activePos.y - center.y, activePos.x - center.x)
-
-                    withTransform({
-                        rotate(Math.toDegrees(angleToCenter.toDouble()).toFloat(), pivot = Offset(activePos.x, activePos.y))
-                    }) {
-                        // Tapered stick body
-                        drawLine(
-                            brush = Brush.horizontalGradient(listOf(Color.White, Color.Transparent)),
-                            start = Offset(activePos.x, activePos.y),
-                            end = Offset(activePos.x + foreshortenedLen, activePos.y),
-                            strokeWidth = stickWidth
-                        )
-                        // Cue Tip
-                        drawCircle(color = Color.Black, radius = stickWidth / 2.5f, center = Offset(activePos.x, activePos.y))
-                    }
                 }
 
                 if (isMoveModeActive) {
@@ -158,6 +137,55 @@ fun MasseControl(
                     }
                 }
             }
+        }
+
+        // Side-view Pool Stick for Elevation
+        Canvas(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = 144.dp)
+                .size(width = 200.dp, height = 150.dp)
+        ) {
+            val tipX = 20.dp.toPx()
+            val tipY = size.height - 20.dp.toPx()
+            val stickLength = 160.dp.toPx()
+
+            // Draw a baseline for reference (the table surface)
+            drawLine(
+                color = Color.White.copy(alpha = 0.3f),
+                start = Offset(tipX - 20f, tipY),
+                end = Offset(tipX + stickLength, tipY),
+                strokeWidth = 2.dp.toPx()
+            )
+
+            // Draw the cue stick
+            withTransform({
+                translate(left = tipX, top = tipY)
+                rotate(degrees = -elevationAngle, pivot = Offset.Zero) // Negative visual rotation points it up
+            }) {
+                val stickPath = Path().apply {
+                    moveTo(0f, -2f) // Tip top
+                    lineTo(stickLength, -6f) // Butt top
+                    lineTo(stickLength, 6f) // Butt bottom
+                    lineTo(0f, 2f) // Tip bottom
+                    close()
+                }
+                drawPath(path = stickPath, color = Color.White)
+
+                // Ferrule/Tip detail
+                drawRect(
+                    color = Color.Blue,
+                    topLeft = Offset(0f, -2f),
+                    size = androidx.compose.ui.geometry.Size(4.dp.toPx(), 4f)
+                )
+            }
+
+            // Draw pivot point indicator
+            drawCircle(
+                color = WarningRed,
+                radius = 4.dp.toPx(),
+                center = Offset(tipX, tipY)
+            )
         }
     }
 }
