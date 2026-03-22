@@ -5,6 +5,13 @@ This document tracks notable changes and known issues for the project.
 The format is based on [Keep a Changelog](httpshttps://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2026-03-22
+
+### Changed
+
+- Reverted MasseControl back to the side-view stick graphic tethered to the color wheel.
+- Made the MasseControl widget relocatable around the screen exactly like the SpinControl widget by using the double-tap to drag gesture and updating its positioning in ProtractorScreen.
+
 ## [0.9.1] - 2025-08-21
 
 ### Fixed
