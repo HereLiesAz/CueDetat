@@ -17,20 +17,12 @@ import com.hereliesaz.aznavrail.AzNavHostScope
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
-import com.hereliesaz.aznavrail.model.AzNestedRailAlignment
 import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 
-/**
- * AZNAVRAIL Menu for CueDetat.
- * * Implements strict mode isolation:
- * - Expert features (Scanning/Geometry) are gated by ExperienceMode and felt-locking.
- * - Rail item colors are mapped to the standard 1-15 billiard ball sequence.
- * - Horizontal nested rail handles Masse interaction logic.
- */
 @Composable
 fun AzNavRailMenu(
     uiState: CueDetatState,
@@ -41,23 +33,11 @@ fun AzNavRailMenu(
     content: AzNavHostScope.() -> Unit = {},
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    // Billiard Ball Palette for Rail Items
-    val ball1Yellow = Color(0xFFFFEB3B)
-    val ball2Blue = Color(0xFF2196F3)
-    val ball3Red = Color(0xFFF44336)
-    val ball4Purple = Color(0xFF9C27B0)
-    val ball5Orange = Color(0xFFFF9800)
-    val ball6Green = Color(0xFF4CAF50)
-    val ball7Maroon = Color(0xFFE91E63)
-    val ball8Black = Color(0xFF212121)
-    val ball9YellowStripe = Color(0xFFFFF59D)
-    val ball10BlueStripe = Color(0xFF64B5F6)
-    val ball11RedStripe = Color(0xFFE57373)
-    val ball12PurpleStripe = Color(0xFFBA68C8)
-    val ball13OrangeStripe = Color(0xFFFFB74D)
-    val ball14GreenStripe = Color(0xFF81C784)
-    val ball15MaroonStripe = Color(0xFFF06292)
+    val b1Y = Color(0xFFFFEB3B); val b2B = Color(0xFF2196F3); val b3R = Color(0xFFF44336)
+    val b4P = Color(0xFF9C27B0); val b5O = Color(0xFFFF9800); val b6G = Color(0xFF4CAF50)
+    val b7M = Color(0xFFE91E63); val b8K = Color(0xFF212121); val b9Y = Color(0xFFFFF59D)
+    val b10B = Color(0xFF64B5F6); val b11R = Color(0xFFE57373); val b12P = Color(0xFFBA68C8)
+    val b13O = Color(0xFFFFB74D); val b14G = Color(0xFF81C784); val b15M = Color(0xFFF06292)
 
     AzHostActivityLayout(
         navController = navController,
@@ -66,7 +46,6 @@ fun AzNavRailMenu(
         isLandscape = isLandscape,
         initiallyExpanded = false
     ) {
-        // --- Trajectory Rendering (Background Layer) ---
         background(weight = 0) {
             val cueBallPos = uiState.onPlaneBall?.center
             if (cueBallPos != null && !uiState.spinPaths.isNullOrEmpty()) {
@@ -75,267 +54,82 @@ fun AzNavRailMenu(
                         if (points.size > 1) {
                             val path = Path().apply {
                                 moveTo(cueBallPos.x + points[0].x, cueBallPos.y + points[0].y)
-                                for (i in 1 until points.size) {
-                                    lineTo(cueBallPos.x + points[i].x, cueBallPos.y + points[i].y)
-                                }
+                                points.forEach { lineTo(cueBallPos.x + it.x, cueBallPos.y + it.y) }
                             }
-                            drawPath(
-                                path = path,
-                                color = color.copy(alpha = uiState.spinPathsAlpha),
-                                style = Stroke(width = 3f)
-                            )
+                            drawPath(path = path, color = color.copy(alpha = uiState.spinPathsAlpha), style = Stroke(width = 4f))
                         }
                     }
                 }
             }
         }
 
-        azConfig(
-            dockingSide = AzDockingSide.LEFT,
-            packButtons = false,
-            showFooter = true
-        )
+        azConfig(dockingSide = AzDockingSide.LEFT, packButtons = false, showFooter = true)
+        azTheme(defaultShape = AzButtonShape.CIRCLE, activeColor = Color.White)
+        azAdvanced(isLoading = false, helpEnabled = true, onDismissHelp = {})
 
-        azTheme(
-            defaultShape = AzButtonShape.CIRCLE,
-            activeColor = Color.White,
-            headerIconShape = if (uiState.areHelpersVisible) AzHeaderIconShape.NONE else AzHeaderIconShape.CIRCLE
-        )
-
-        azAdvanced(
-            isLoading = false,
-            enableRailDragging = false,
-            helpEnabled = true,
-            onDismissHelp = {}
-        )
-
-        // --- Hater Mode: A monochromatic prison of utility ---
         if (uiState.experienceMode == ExperienceMode.HATER) {
-            azRailItem(
-                id = "shake",
-                text = "Shake",
-                fillColor = ball1Yellow,
-                textColor = Color.Black,
-                onClick = { onEvent(MainScreenEvent.Shake) }
-            )
-            azRailItem(
-                id = "exit",
-                text = "Exit",
-                fillColor = ball2Blue,
-                textColor = Color.White,
-                onClick = { onEvent(MainScreenEvent.ExitToSplash) }
-            )
-            content()
-            return@AzHostActivityLayout
+            azRailItem(id = "shake", text = "Shake", fillColor = b1Y, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.Shake) })
+            azRailItem(id = "exit", text = "Exit", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ExitToSplash) })
+            content(); return@AzHostActivityLayout
         }
 
-        // --- Core Navigation ---
-        azRailToggle(
-            id = "help",
-            isChecked = uiState.areHelpersVisible,
-            toggleOnText = "Help",
-            toggleOffText = "Help",
-            fillColor = ball1Yellow,
-            textColor = Color.Black,
-            onClick = { onEvent(MainScreenEvent.ToggleHelp) }
-        )
-
-        azMenuItem(
-            id = "tutorial",
-            text = "Tutorial",
-            fillColor = ball2Blue,
-            textColor = Color.White,
-            onClick = { onEvent(MainScreenEvent.StartTutorial) }
-        )
+        azRailToggle(id = "help", isChecked = uiState.areHelpersVisible, toggleOnText = "Help", toggleOffText = "Help", fillColor = b1Y, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.ToggleHelp) })
+        azMenuItem(id = "tutorial", text = "Tutorial", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.StartTutorial) })
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailCycler(
-                id = "cam",
-                options = listOf("Off", "Cam", "ar"),
-                selectedOption = when (uiState.cameraMode) {
-                    CameraMode.OFF -> "Off"
-                    CameraMode.CAMERA -> "Cam"
-                    CameraMode.AR -> "ar"
-                },
-                fillColor = ball3Red,
-                textColor = Color.White,
-                onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
-            )
+            azRailCycler(id = "cam", options = listOf("Off", "Cam", "ar"), selectedOption = when (uiState.cameraMode) { CameraMode.OFF -> "Off"; CameraMode.CAMERA -> "Cam"; CameraMode.AR -> "ar" }, fillColor = b3R, textColor = Color.White, onClick = { onEvent(MainScreenEvent.CycleCameraMode) })
         }
         azDivider()
 
-        // Spin and Masse Isolation
         if (uiState.experienceMode != ExperienceMode.BEGINNER) {
-            azRailToggle(
-                id = "spin",
-                isChecked = uiState.isSpinControlVisible,
-                toggleOnText = "Spin",
-                toggleOffText = "Spin",
-                fillColor = ball4Purple,
-                textColor = Color.White,
-                onClick = { onEvent(MainScreenEvent.ToggleSpinControl) }
-            )
-
-            azNestedRail(
-                id = "masse_rail",
-                text = "Massé",
-                alignment = AzNestedRailAlignment.HORIZONTAL
-            ) {
-                azRailToggle(
-                    id = "masse_toggle",
-                    isChecked = uiState.isMasseModeActive,
-                    toggleOnText = "Done",
-                    toggleOffText = "Set",
-                    fillColor = ball5Orange,
-                    textColor = Color.Black,
-                    onClick = { onEvent(MainScreenEvent.ToggleMasseMode) }
-                )
-            }
+            azRailToggle(id = "spin", isChecked = uiState.isSpinControlVisible, toggleOnText = "Spin", toggleOffText = "Spin", fillColor = b4P, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleSpinControl) })
+            azRailToggle(id = "masse", isChecked = uiState.isMasseModeActive, toggleOnText = "Massé", toggleOffText = "Massé", fillColor = b5O, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.ToggleMasseMode) })
         }
 
-        // Action controls
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailToggle(
-                id = "bank",
-                isChecked = uiState.isBankingMode,
-                toggleOnText = "Aim",
-                toggleOffText = "Bank",
-                fillColor = ball6Green,
-                textColor = Color.White,
-                onClick = { onEvent(MainScreenEvent.ToggleBankingMode) }
-            )
-
-            azRailItem(
-                id = "add_obstacle",
-                text = "Add",
-                fillColor = ball7Maroon,
-                textColor = Color.White,
-                onClick = { onEvent(MainScreenEvent.AddObstacleBall) }
-            )
+            azRailToggle(id = "bank", isChecked = uiState.isBankingMode, toggleOnText = "Aim", toggleOffText = "Bank", fillColor = b6G, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleBankingMode) })
+            azRailItem(id = "add_obstacle", text = "Add", fillColor = b7M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.AddObstacleBall) })
         }
 
         if (uiState.experienceMode == ExperienceMode.BEGINNER) {
-            azRailItem(
-                id = "static",
-                text = "Static",
-                fillColor = ball6Green,
-                textColor = Color.White,
-                onClick = { onEvent(MainScreenEvent.LockBeginnerView) }
-            )
-            azRailItem(
-                id = "dynamic",
-                text = "Dynamic",
-                fillColor = ball7Maroon,
-                textColor = Color.White,
-                onClick = { onEvent(MainScreenEvent.UnlockBeginnerView) }
-            )
+            azRailItem(id = "static", text = "Static", fillColor = b6G, textColor = Color.White, onClick = { onEvent(MainScreenEvent.LockBeginnerView) })
+            azRailItem(id = "dynamic", text = "Dynamic", fillColor = b7M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.UnlockBeginnerView) })
         } else {
-            azRailItem(
-                id = "reset",
-                text = "Reset",
-                fillColor = ball8Black,
-                textColor = Color.White,
-                onClick = { onEvent(MainScreenEvent.Reset) }
-            )
+            azRailItem(id = "reset", text = "Reset", fillColor = b8K, textColor = Color.White, onClick = { onEvent(MainScreenEvent.Reset) })
         }
 
         azDivider()
 
-        // --- Expert Alignment (Gated by Prerequisite) ---
-        if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            if (uiState.lockedHsvColor != null) {
-                azMenuItem(
-                    id = "scan",
-                    text = "Scan Table",
-                    fillColor = ball11RedStripe,
-                    textColor = Color.Black,
-                    onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen) }
-                )
-
-                if (hasTableModel) {
-                    azMenuItem(
-                        id = "rescan",
-                        text = "Rescan Table",
-                        fillColor = ball12PurpleStripe,
-                        textColor = Color.White,
-                        onClick = {
-                            onEvent(MainScreenEvent.ClearTableScan)
-                            onEvent(MainScreenEvent.ToggleTableScanScreen)
-                        }
-                    )
-                }
+        if (uiState.experienceMode == ExperienceMode.EXPERT && uiState.lockedHsvColor != null) {
+            azMenuItem(id = "scan", text = "Scan Table", fillColor = b11R, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen) })
+            if (hasTableModel) {
+                azMenuItem(id = "rescan", text = "Rescan Table", fillColor = b12P, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ClearTableScan); onEvent(MainScreenEvent.ToggleTableScanScreen) })
             }
+        }
 
-            azMenuItem(
-                id = "luminance",
-                text = "Luminance",
-                fillColor = ball9YellowStripe,
-                textColor = Color.Black,
-                onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog) }
-            )
-
-            azMenuItem(
-                id = "glow",
-                text = "Glow Stick",
-                fillColor = ball10BlueStripe,
-                textColor = Color.Black,
-                onClick = { onEvent(MainScreenEvent.ToggleGlowStickDialog) }
-            )
-
-            azMenuItem(
-                id = "size",
-                text = "Table Size",
-                fillColor = ball13OrangeStripe,
-                textColor = Color.Black,
-                onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) }
-            )
-
-            azMenuItem(
-                id = "units",
-                text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Metric" else "Imperial",
-                fillColor = ball14GreenStripe,
-                textColor = Color.Black,
-                onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) }
-            )
+        if (uiState.experienceMode == ExperienceMode.EXPERT) {
+            azMenuItem(id = "size", text = "Table Size", fillColor = b13O, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) })
+            azMenuItem(id = "units", text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Metric" else "Imperial", fillColor = b14G, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) })
             azDivider()
         }
 
-        azMenuItem(
-            id = "orientation",
-            text = "Orientation",
-            fillColor = ball15MaroonStripe,
-            textColor = Color.Black,
-            onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) }
-        )
+        azMenuItem(id = "orientation", text = "Orientation", fillColor = b15M, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) })
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azMenuItem(
-                id = "advanced",
-                text = "Advanced",
-                fillColor = ball1Yellow,
-                textColor = Color.Black,
-                onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }
-            )
+            azMenuItem(id = "advanced", text = "Advanced", fillColor = b1Y, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) })
         }
 
         azDivider()
-        azMenuItem(
-            id = "mode",
-            text = "Mode: ${uiState.experienceMode?.name}",
-            fillColor = ball2Blue,
-            textColor = Color.White,
-            onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) }
-        )
+        azMenuItem(id = "mode", text = "Mode: ${uiState.experienceMode?.name}", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) })
 
-        // --- Onscreen Content Layer ---
         onscreen(alignment = Alignment.CenterStart) {
             if (uiState.isMasseModeActive) {
                 MasseControl(
                     elevationAngle = uiState.pitchAngle,
-                    impactOffset = uiState.selectedSpinOffset,
-                    onElevationChanged = { },
-                    onImpactChanged = { onEvent(MainScreenEvent.SpinApplied(it)) },
-                    onImpactEnded = { onEvent(MainScreenEvent.SpinSelectionEnded) }
+                    selectedSpinOffset = uiState.selectedSpinOffset,
+                    lingeringSpinOffset = uiState.lingeringSpinOffset,
+                    spinPathAlpha = uiState.spinPathsAlpha,
+                    onEvent = onEvent
                 )
             }
         }

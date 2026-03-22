@@ -5,9 +5,6 @@ import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.view.state.TableSize
 import kotlin.math.pow
 
-/**
- * Geometry model for the pool table.
- */
 data class Table(
     val size: TableSize,
     val isVisible: Boolean,
@@ -104,8 +101,8 @@ data class Table(
     }
 
     /**
-     * Reflects a vector across a normal with an optional spin adjustment.
-     * @param spin The normalized side-spin. Defaults to 0f for binary compatibility.
+     * Reflects a vector with an optional spin value.
+     * Default spin=0f maintains behavior for legacy calls.
      */
     fun reflect(v: PointF, n: PointF, spin: Float = 0f): PointF {
         val dot = v.x * n.x + v.y * n.y

@@ -1,5 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/GestureReducer.kt
-
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
@@ -17,12 +15,10 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 
 /**
- * Reducer responsible for world-space gestures.
- * Adheres to the AZNAVRAIL protocol by isolating table interactions during Masse/Spin modes.
+ * Reducer for complex screen-space gestures.
  */
 @Singleton
 class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils) {
-
     fun reduce(currentState: CueDetatState, event: MainScreenEvent): CueDetatState {
         return when(event) {
             is MainScreenEvent.LogicalGestureStarted -> handleLogicalGestureStarted(currentState, event)
@@ -41,153 +37,69 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         }
 
         val logicalPoint = event.logicalPoint
-        val onPlaneBall = currentState.onPlaneBall
         val spinControlCenter = currentState.spinControlCenter
+        val onPlaneBall = currentState.onPlaneBall
         val protractorUnit = currentState.protractorUnit
 
-        // 1. AZNAVRAIL Interaction Lock:
-        // If Spin or Masse modes are active, we intercept the gesture early.
-        // We ONLY allow interaction with the Spin Control widget itself in this state.
-        if (currentState.isSpinControlVisible || currentState.isMasseModeActive) {
-            val spinControlTouchRadius = (onPlaneBall?.radius ?: protractorUnit.radius) * 1.5f
+        // A generous grace area: 4x the logical radius to prevent finger-fumbling.
+        val touchRadius = 25f * 4.0f
 
-            return if (currentState.isSpinControlVisible &&
-                spinControlCenter != null &&
-                getDistance(event.screenOffset, spinControlCenter) < spinControlTouchRadius
-            ) {
-                currentState.copy(
+        // 1. Relocate UI Widget (Double Tap + Drag)
+        if (currentState.isSpinControlVisible || currentState.isMasseModeActive) {
+            val distToControl = spinControlCenter?.let { getDistance(event.screenOffset, it) } ?: Float.MAX_VALUE
+            if (event.isDoubleTap && distToControl < touchRadius * currentState.screenDensity) {
+                return currentState.copy(
                     interactionMode = InteractionMode.MOVING_SPIN_CONTROL,
                     isMagnifierVisible = true,
                     magnifierSourceCenter = event.screenOffset
                 )
-            } else {
-                // Ignore all other table/ball interactions while Masse/Spin is engaged.
-                currentState
             }
         }
 
-        val logicalTouchRadius = (onPlaneBall?.radius ?: protractorUnit.radius) * 3.5f
-
-        // Banking Mode Logic
+        // 2. Bank Mode Aiming
         if (currentState.isBankingMode) {
-            return if (onPlaneBall != null && getDistance(logicalPoint, onPlaneBall.center) < logicalTouchRadius) {
-                currentState.copy(
-                    interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL,
-                    hasCueBallBeenMoved = true,
-                    isMagnifierVisible = true,
-                    magnifierSourceCenter = event.screenOffset,
-                    isWorldLocked = false
-                )
+            return if (onPlaneBall != null && getDistance(logicalPoint, onPlaneBall.center) < touchRadius) {
+                currentState.copy(interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
             } else {
                 currentState.copy(interactionMode = InteractionMode.AIMING_BANK_SHOT)
             }
         }
 
-        // Standard Obstacle Ball Logic
-        currentState.obstacleBalls.forEachIndexed { index, obstacle ->
-            if (getDistance(logicalPoint, obstacle.center) < logicalTouchRadius) {
-                return currentState.copy(
-                    interactionMode = InteractionMode.MOVING_OBSTACLE_BALL,
-                    movingObstacleBallIndex = index,
-                    isMagnifierVisible = true,
-                    magnifierSourceCenter = event.screenOffset,
-                    isWorldLocked = false
-                )
-            }
-        }
+        // 3. Move Ball (Includes Target Ball and its Ghost counterpart)
+        val ghostPos = currentState.shotGuideImpactPoint
+        val isHitOnBall = onPlaneBall != null && getDistance(logicalPoint, onPlaneBall.center) < touchRadius
+        val isHitOnGhost = ghostPos != null && getDistance(logicalPoint, ghostPos) < touchRadius
 
-        // Cue Ball Logic
-        if (onPlaneBall != null && getDistance(logicalPoint, onPlaneBall.center) < logicalTouchRadius) {
+        if (isHitOnBall || isHitOnGhost) {
             return currentState.copy(
                 interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL,
-                hasCueBallBeenMoved = true,
                 isMagnifierVisible = true,
-                magnifierSourceCenter = event.screenOffset,
-                isWorldLocked = false
+                magnifierSourceCenter = event.screenOffset
             )
         }
 
-        // Protractor Unit Logic
-        val distToTargetBall = getDistance(logicalPoint, protractorUnit.center)
-        if (distToTargetBall < logicalTouchRadius) {
-            return currentState.copy(
-                interactionMode = InteractionMode.MOVING_PROTRACTOR_UNIT,
-                hasTargetBallBeenMoved = true,
-                isMagnifierVisible = true,
-                magnifierSourceCenter = event.screenOffset,
-                isWorldLocked = false
-            )
-        }
-
-        val distToGhostBall = getDistance(logicalPoint, protractorUnit.ghostCueBallCenter)
-        if (distToGhostBall < logicalTouchRadius) {
-            return currentState.copy(
-                interactionMode = InteractionMode.MOVING_PROTRACTOR_UNIT,
-                hasTargetBallBeenMoved = true,
-                isMagnifierVisible = true,
-                magnifierSourceCenter = event.screenOffset,
-                isWorldLocked = false
-            )
-        }
-
-        return currentState.copy(interactionMode = InteractionMode.ROTATING_PROTRACTOR, isMagnifierVisible = false)
+        // 4. Default: Rotate the shot line
+        return currentState.copy(interactionMode = InteractionMode.ROTATING_PROTRACTOR)
     }
 
     private fun handleLogicalDragApplied(
         currentState: CueDetatState,
         event: MainScreenEvent.LogicalDragApplied
     ): CueDetatState {
-        // Double-check isolation: No world-space dragging allowed during Masse/Spin modes.
-        if (currentState.isMasseModeActive && currentState.interactionMode != InteractionMode.MOVING_SPIN_CONTROL) {
-            return currentState
-        }
-
-        val newState = when (currentState.interactionMode) {
-            InteractionMode.MOVING_PROTRACTOR_UNIT -> {
-                val dx = event.currentLogicalPoint.x - event.previousLogicalPoint.x
-                val dy = event.currentLogicalPoint.y - event.previousLogicalPoint.y
-                val newCenter = PointF(currentState.protractorUnit.center.x + dx, currentState.protractorUnit.center.y + dy)
-                currentState.copy(protractorUnit = currentState.protractorUnit.copy(center = newCenter), valuesChangedSinceReset = true)
-            }
-            InteractionMode.ROTATING_PROTRACTOR -> {
-                val center = currentState.protractorUnit.center
-                val prevAngle = atan2(event.previousLogicalPoint.y - center.y, event.previousLogicalPoint.x - center.x)
-                val currAngle = atan2(event.currentLogicalPoint.y - center.y, event.currentLogicalPoint.x - center.x)
-                val angleDelta = Math.toDegrees(currAngle.toDouble() - prevAngle.toDouble()).toFloat()
-
-                val newRotation = currentState.protractorUnit.rotationDegrees + angleDelta
-                currentState.copy(
-                    protractorUnit = currentState.protractorUnit.copy(rotationDegrees = newRotation),
-                    valuesChangedSinceReset = true
-                )
+        return when (currentState.interactionMode) {
+            InteractionMode.MOVING_SPIN_CONTROL -> {
+                val currentCenter = currentState.spinControlCenter ?: return currentState
+                currentState.copy(spinControlCenter = PointF(currentCenter.x + event.screenDelta.x, currentCenter.y + event.screenDelta.y))
             }
             InteractionMode.MOVING_ACTUAL_CUE_BALL -> {
                 currentState.onPlaneBall?.let {
                     val dx = event.currentLogicalPoint.x - event.previousLogicalPoint.x
                     val dy = event.currentLogicalPoint.y - event.previousLogicalPoint.y
-                    val newCenter = PointF(it.center.x + dx, it.center.y + dy)
-                    currentState.copy(onPlaneBall = it.copy(center = newCenter), valuesChangedSinceReset = true)
+                    currentState.copy(
+                        onPlaneBall = it.copy(center = PointF(it.center.x + dx, it.center.y + dy)),
+                        valuesChangedSinceReset = true
+                    )
                 } ?: currentState
-            }
-            InteractionMode.MOVING_SPIN_CONTROL -> {
-                currentState.spinControlCenter?.let {
-                    val newCenter = PointF(it.x + event.screenDelta.x, it.y + event.screenDelta.y)
-                    currentState.copy(spinControlCenter = newCenter)
-                } ?: currentState
-            }
-            InteractionMode.MOVING_OBSTACLE_BALL -> {
-                val index = currentState.movingObstacleBallIndex
-                if (index != null && index < currentState.obstacleBalls.size) {
-                    val obstacle = currentState.obstacleBalls[index]
-                    val dx = event.currentLogicalPoint.x - event.previousLogicalPoint.x
-                    val dy = event.currentLogicalPoint.y - event.previousLogicalPoint.y
-                    val newCenter = PointF(obstacle.center.x + dx, obstacle.center.y + dy)
-                    val newObstacles = currentState.obstacleBalls.toMutableList()
-                    newObstacles[index] = obstacle.copy(center = newCenter)
-                    currentState.copy(obstacleBalls = newObstacles, valuesChangedSinceReset = true)
-                } else {
-                    currentState
-                }
             }
             InteractionMode.AIMING_BANK_SHOT -> {
                 currentState.copy(
@@ -195,63 +107,26 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                     valuesChangedSinceReset = true
                 )
             }
+            InteractionMode.ROTATING_PROTRACTOR -> {
+                val center = currentState.protractorUnit.center
+                val prevAngle = atan2(event.previousLogicalPoint.y - center.y, event.previousLogicalPoint.x - center.x)
+                val currAngle = atan2(event.currentLogicalPoint.y - center.y, event.currentLogicalPoint.x - center.x)
+                val angleDelta = Math.toDegrees(currAngle.toDouble() - prevAngle.toDouble()).toFloat()
+                currentState.copy(
+                    protractorUnit = currentState.protractorUnit.copy(
+                        rotationDegrees = currentState.protractorUnit.rotationDegrees + angleDelta
+                    ),
+                    valuesChangedSinceReset = true
+                )
+            }
             else -> currentState
-        }
-
-        return if (currentState.isMagnifierVisible) {
-            newState.copy(magnifierSourceCenter = event.screenDelta + (currentState.magnifierSourceCenter ?: event.screenDelta))
-        } else {
-            newState
         }
     }
 
     private fun handleGestureEnded(currentState: CueDetatState): CueDetatState {
-        var finalState = currentState.copy(interactionMode = InteractionMode.NONE, movingObstacleBallIndex = null, isMagnifierVisible = false)
-
-        // If a snap occurred while Masse mode was active, it was likely an error in logic flow.
-        if (finalState.isMasseModeActive) return finalState
-
-        if (finalState.isSnappingEnabled) {
-            val closestCandidate = findClosestSnapCandidate(finalState)
-            if (closestCandidate != null) {
-                finalState = when (currentState.interactionMode) {
-                    InteractionMode.MOVING_PROTRACTOR_UNIT -> {
-                        finalState.copy(protractorUnit = finalState.protractorUnit.copy(center = closestCandidate.detectedPoint))
-                    }
-                    InteractionMode.MOVING_ACTUAL_CUE_BALL -> {
-                        finalState.onPlaneBall?.let {
-                            finalState.copy(onPlaneBall = it.copy(center = closestCandidate.detectedPoint))
-                        } ?: finalState
-                    }
-                    else -> finalState
-                }
-                finalState = finalState.copy(isWorldLocked = true)
-            }
-        }
-
-        return reducerUtils.snapViolatingBalls(finalState)
+        return currentState.copy(interactionMode = InteractionMode.NONE, isMagnifierVisible = false)
     }
 
-    private fun findClosestSnapCandidate(state: CueDetatState): SnapCandidate? {
-        val referencePoint = when (state.interactionMode) {
-            InteractionMode.MOVING_PROTRACTOR_UNIT -> state.protractorUnit.center
-            InteractionMode.MOVING_ACTUAL_CUE_BALL -> state.onPlaneBall?.center
-            else -> null
-        } ?: return null
-
-        val snapRadius = (state.onPlaneBall?.radius ?: state.protractorUnit.radius) * 1.5f
-
-        return (state.snapCandidates ?: emptyList())
-            .filter { getDistance(referencePoint, it.detectedPoint) < snapRadius }
-            .minByOrNull { getDistance(referencePoint, it.detectedPoint) }
-    }
-
-
-    private fun getDistance(p1: PointF, p2: PointF): Float {
-        return sqrt((p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2))
-    }
-
-    private fun getDistance(p1: Offset, p2: PointF): Float {
-        return sqrt((p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2))
-    }
+    private fun getDistance(p1: Offset, p2: PointF) = sqrt((p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2))
+    private fun getDistance(p1: PointF, p2: PointF) = sqrt((p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2))
 }

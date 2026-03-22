@@ -34,20 +34,20 @@ import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.atan2
 import kotlin.math.cos
-import kotlin.math.hypot
 import kotlin.math.sin
 
 @Composable
-fun SpinControl(
+fun MasseControl(
     modifier: Modifier = Modifier,
     selectedSpinOffset: PointF?,
     lingeringSpinOffset: PointF?,
     spinPathAlpha: Float,
+    elevationAngle: Float,
     onEvent: (MainScreenEvent) -> Unit
 ) {
     var isMoveModeActive by remember { mutableStateOf(false) }
     val moveIconPainter = rememberVectorPainter(image = Icons.Default.OpenWith)
-    val viewConfiguration = LocalViewConfiguration.current
+    val viewConfig = LocalViewConfiguration.current
 
     Box(
         modifier = modifier
@@ -57,7 +57,7 @@ fun SpinControl(
                     val firstUp = waitForUpOrCancellation()
                     if (firstUp != null) {
                         firstUp.consume()
-                        val secondDown = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
+                        val secondDown = withTimeoutOrNull(viewConfig.doubleTapTimeoutMillis) {
                             awaitFirstDown(requireUnconsumed = false)
                         }
                         if (secondDown != null) {
@@ -87,18 +87,15 @@ fun SpinControl(
             modifier = Modifier
                 .size(120.dp)
                 .pointerInput(Unit) {
-                    val radiusPx = size.width / 2f
                     detectDragGestures(
                         onDragStart = { offset ->
-                            val normalized = PointF((offset.x - radiusPx) / radiusPx, (offset.y - radiusPx) / radiusPx)
-                            onEvent(MainScreenEvent.SpinApplied(normalized))
+                            onEvent(MainScreenEvent.SpinApplied(PointF(offset.x, offset.y)))
                         },
                         onDragEnd = { onEvent(MainScreenEvent.SpinSelectionEnded) },
                         onDragCancel = { onEvent(MainScreenEvent.SpinSelectionEnded) }
                     ) { change, _ ->
                         val pos = change.position
-                        val normalized = PointF((pos.x - radiusPx) / radiusPx, (pos.y - radiusPx) / radiusPx)
-                        onEvent(MainScreenEvent.SpinApplied(normalized))
+                        onEvent(MainScreenEvent.SpinApplied(PointF(pos.x, pos.y)))
                         change.consume()
                     }
                 }
@@ -112,6 +109,7 @@ fun SpinControl(
                     drawCircle(color = Color.White.copy(alpha = 0.2f), radius = radius, center = center)
                 }
 
+                // Draw the color wheel
                 val numArcs = 72
                 val arcAngle = 360f / numArcs
                 for (i in 0 until numArcs) {
@@ -121,11 +119,42 @@ fun SpinControl(
                 }
 
                 drawCircle(brush = Brush.radialGradient(colors = listOf(Color.White, Color.Transparent), center = center, radius = radius), radius = radius, center = center, alpha = spinPathAlpha)
-
                 drawCircle(color = Color.White.copy(alpha = 0.5f * spinPathAlpha), radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
 
+                // Draw the indicators (dots)
                 lingeringSpinOffset?.let { drawLogicalIndicator(it, center, radius, Color.White.copy(alpha = 0.6f * spinPathAlpha)) }
-                selectedSpinOffset?.let { drawLogicalIndicator(it, center, radius, Color.White) }
+
+                selectedSpinOffset?.let { activeOffset ->
+                    drawLogicalIndicator(activeOffset, center, radius, Color.White)
+
+                    // --- THE POOL STICK ANGLE (MASSE STICK) ---
+                    // The stick is drawn as a foreshortened line based on phone tilt (elevationAngle).
+                    // If elevation is 90 (vertical), the stick is a short tip. If 0 (flat), it is full length.
+                    val stickBaseLen = radius * 1.5f
+                    val stickWidth = 6.dp.toPx()
+                    val foreshortenedLen = stickBaseLen * cos(Math.toRadians(elevationAngle.toDouble())).toFloat()
+
+                    val angleToCenter = atan2(activeOffset.y - center.y, activeOffset.x - center.x)
+
+                    withTransform({
+                        // Rotate stick to align with the vector from the wheel center to the impact point
+                        rotate(Math.toDegrees(angleToCenter.toDouble()).toFloat(), pivot = Offset(activeOffset.x, activeOffset.y))
+                    }) {
+                        // Draw the cue stick body (tapered line)
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.8f),
+                            start = Offset(activeOffset.x, activeOffset.y),
+                            end = Offset(activeOffset.x + foreshortenedLen, activeOffset.y),
+                            strokeWidth = stickWidth
+                        )
+                        // Draw the cue tip
+                        drawCircle(
+                            color = Color.Black,
+                            radius = stickWidth / 2f,
+                            center = Offset(activeOffset.x, activeOffset.y)
+                        )
+                    }
+                }
 
                 if (isMoveModeActive) {
                     with(moveIconPainter) {
@@ -140,8 +169,6 @@ fun SpinControl(
 }
 
 private fun DrawScope.drawLogicalIndicator(offset: PointF, center: Offset, radius: Float, color: Color) {
-    val indicatorX = center.x + (offset.x * radius)
-    val indicatorY = center.y + (offset.y * radius)
-    drawCircle(color = color, radius = 5.dp.toPx(), center = Offset(indicatorX, indicatorY))
-    drawCircle(color = color, radius = 5.dp.toPx(), center = Offset(indicatorX, indicatorY), style = Stroke(width = 2.dp.toPx()))
+    drawCircle(color = color, radius = 5.dp.toPx(), center = Offset(offset.x, offset.y))
+    drawCircle(color = color, radius = 5.dp.toPx(), center = Offset(offset.x, offset.y), style = Stroke(width = 2.dp.toPx()))
 }

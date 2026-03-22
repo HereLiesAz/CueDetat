@@ -1,3 +1,7 @@
+/**
+ * The central state definition for CueDetat.
+ * Added isAutoCalibrating for low-light CV feedback loops.
+ */
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.Matrix
@@ -19,9 +23,7 @@ import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
 import com.hereliesaz.cuedetat.view.state.TableSize
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
-import kotlinx.coroutines.Job
 import org.opencv.core.Mat
-
 
 enum class CameraMode {
     OFF, CAMERA, AR;
@@ -180,7 +182,7 @@ sealed class MainScreenEvent {
     data class DragSpinControl(val delta: PointF) : MainScreenEvent()
     object ClearSpinState : MainScreenEvent()
     object SpinPathTick : MainScreenEvent()
-    internal data class LogicalGestureStarted(val logicalPoint: PointF, val screenOffset: Offset) :
+    internal data class LogicalGestureStarted(val logicalPoint: PointF, val screenOffset: Offset, val isDoubleTap: Boolean = false) :
         MainScreenEvent()
 
     internal data class LogicalDragApplied(
