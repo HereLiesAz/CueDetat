@@ -52,7 +52,7 @@ jobs:
         id: versioning
         run: |
           # Base version for pre-releases
-          BASE_VERSION_NAME="1.2.0"
+          BASE_VERSION_NAME="1.3.0"
 
           # Create unique version using run number
           NEW_VERSION_NAME="${BASE_VERSION_NAME}.${{ github.run_number }}"
@@ -100,7 +100,7 @@ jobs:
           APK_DIR=$(dirname "$APK_PATH")
           
           # Create the new filename
-          NEW_APK_NAME="app-release-v${{ steps.versioning.outputs.new_version_name }}.apk"
+          NEW_APK_NAME="Cue-Detat-v${{ steps.versioning.outputs.new_version_name }}.apk"
           
           # Rename the file
           mv "$APK_PATH" "$APK_DIR/$NEW_APK_NAME"
@@ -112,9 +112,9 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           # The name of the tag for this release
-          tag_name: v1.2-debug
+          tag_name: v1.3-debug
           # The name of the release
-          name: 1.2 Debug Builds
+          name: 1.3 Debug Builds
           # Mark this release as a pre-release
           prerelease: true
           # A list of files to upload as assets to the release
