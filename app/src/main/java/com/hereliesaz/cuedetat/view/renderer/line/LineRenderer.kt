@@ -3,15 +3,20 @@
 package com.hereliesaz.cuedetat.view.renderer.line
 
 import android.graphics.Canvas
+import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.Shader
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
+import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.ui.theme.SulfurDust
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.PaintCache
@@ -88,11 +93,31 @@ class LineRenderer {
             distMat.get(0, 0, distArray)
         }
 
+        // IMPORTANT: Wrap in matrix block because tangent/aiming internally map points
         canvas.save()
         canvas.concat(activeMatrix)
         drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
         drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
         canvas.restore()
+    }
+
+    private fun applyTableMask(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix) {
+        paints.gradientMaskPaint.shader = null
+        paints.gradientMaskPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+
+        val maskPath = Path()
+        maskPath.fillType = Path.FillType.INVERSE_WINDING
+        val halfW = state.table.logicalWidth / 2f
+        val halfH = state.table.logicalHeight / 2f
+        maskPath.moveTo(-halfW, -halfH)
+        maskPath.lineTo(halfW, -halfH)
+        maskPath.lineTo(halfW, halfH)
+        maskPath.lineTo(-halfW, halfH)
+        maskPath.close()
+        maskPath.transform(activeMatrix)
+
+        canvas.drawPath(maskPath, paints.gradientMaskPaint)
+        paints.gradientMaskPaint.xfermode = null
     }
 
     private fun drawProtractorLines(
@@ -122,6 +147,8 @@ class LineRenderer {
         val shotGuideDirection = normalize(PointF(ghostCueCenter.x - shotLineAnchor.x, ghostCueCenter.y - shotLineAnchor.y))
 
         if (state.table.isVisible || state.obstacleBalls.isNotEmpty()) {
+            val layer = canvas.saveLayer(null, null)
+
             if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
                 // Skip pathways in locked
             } else {
@@ -131,6 +158,9 @@ class LineRenderer {
             state.aimingLineBankPath?.let {
                 drawBankablePath(canvas, it, obstructionPaint, null, isPocketed = false, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
             }
+
+            applyTableMask(canvas, state, paints, activeMatrix)
+            canvas.restoreToCount(layer)
         }
 
         if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
@@ -178,7 +208,10 @@ class LineRenderer {
         val path = rawPath.map { it.warpedBy(tps) }
 
         if (state.table.isVisible || state.obstacleBalls.isNotEmpty()) {
+            val layer = canvas.saveLayer(null, null)
             drawBankablePath(canvas, path, obstructionPaint, null, isPocketed = false, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
+            applyTableMask(canvas, state, paints, activeMatrix)
+            canvas.restoreToCount(layer)
         }
 
         val textToDraw = if (isBeginnerLocked) "Aim this line at the pocket." else null
