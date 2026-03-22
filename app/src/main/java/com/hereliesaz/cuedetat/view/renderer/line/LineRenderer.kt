@@ -298,7 +298,7 @@ class LineRenderer {
         if (isPocketed) {
             val whitePaint = Paint(paints.shotLinePaint).apply { color = Color.White.toArgb() }
             val whiteGlowPaint = createGlowPaint(Color.White, 12f, state, paints)
-            drawPath(canvas, path, whitePaint, whiteGlowPaint, activeMatrix, camArray, distArray)
+            drawPath(canvas, path, whitePaint, whiteGlowPaint, state, activeMatrix, camArray, distArray)
         } else {
             val bankLineConfigs = listOf(BankLine1(), BankLine2(), BankLine3(), BankLine4())
             val finalSegmentIndex = path.size - 2
@@ -403,7 +403,7 @@ class LineRenderer {
         }
     }
 
-    private fun drawPath(canvas: Canvas, path: List<PointF>, paint: Paint, glowPaint: Paint? = null, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
+    private fun drawPath(canvas: Canvas, path: List<PointF>, paint: Paint, glowPaint: Paint? = null, state: CueDetatState, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
         if (path.size < 2) return
         val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
 
