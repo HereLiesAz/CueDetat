@@ -4,7 +4,15 @@ on:
   issues:
     types: [opened]
   workflow_dispatch:
-
+    inputs:
+      title:
+        description: 'Issue Title'
+        required: true
+        type: string
+      body:
+        description: 'Issue Body'
+        required: true
+        type: string
 
 jobs:
   handle_issue:
@@ -20,10 +28,10 @@ jobs:
             You are an expert software engineer and security agent named Jules.
             You have been assigned to handle the following issue:
 
-            Title: ${{ github.event.issue.title }}
+            Title: ${{ github.event.issue.title || github.event.inputs.title }}
 
             Body:
-            ${{ github.event.issue.body }}
+            ${{ github.event.issue.body || github.event.inputs.body }}
 
             Your goal is to resolve this issue efficiently and correctly.
             - If this is a bug report, analyze the codebase, reproduce the issue if possible, and fix it.
@@ -33,5 +41,5 @@ jobs:
 
             IMPORTANT:
             When you have completed the task, you MUST ensure the issue is closed.
-            - If you create a Pull Request to fix the issue, include "Fixes #${{ github.event.issue.number }}" in the Pull Request description so that the issue is automatically closed when the PR is merged.
+            - If you create a Pull Request to fix the issue, include "Fixes #${{ github.event.issue.number || '0' }}" in the Pull Request description so that the issue is automatically closed when the PR is merged.
             - If no code change is required (e.g., answering a question), you should close the issue yourself or instruct on how to close it.
