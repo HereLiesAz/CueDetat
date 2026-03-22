@@ -1,5 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/UiModel.kt
-
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.Matrix
@@ -84,8 +82,8 @@ data class CueDetatState(
     val showTutorialOverlay: Boolean = false,
     val currentTutorialStep: Int = 0,
     @Transient val tutorialHighlight: TutorialHighlightElement? = TutorialHighlightElement.NONE,
-@Transient val flashingTutorialElement: TutorialHighlightElement? = null,
-@Transient val highlightAlpha: Float = 0f,
+    @Transient val flashingTutorialElement: TutorialHighlightElement? = null,
+    @Transient val highlightAlpha: Float = 0f,
     val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f),
     @Transient val pitchMatrix: Matrix? = null,
     @Transient val railPitchMatrix: Matrix? = null,
@@ -178,6 +176,7 @@ sealed class MainScreenEvent {
     object SpinSelectionEnded : MainScreenEvent()
     data class DragSpinControl(val delta: PointF) : MainScreenEvent()
     object ClearSpinState : MainScreenEvent()
+    object SpinPathTick : MainScreenEvent()
     internal data class LogicalGestureStarted(val logicalPoint: PointF, val screenOffset: Offset) :
         MainScreenEvent()
 
