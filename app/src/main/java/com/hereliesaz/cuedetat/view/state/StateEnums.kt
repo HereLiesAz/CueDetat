@@ -28,7 +28,15 @@ enum class CvRefinementMethod {
 }
 
 enum class TutorialHighlightElement {
-    NONE, TARGET_BALL, GHOST_BALL, CUE_BALL, ZOOM_SLIDER, BANK_BUTTON
+    NONE,
+    CUE_BALL,
+    TARGET_BALL,
+    GHOST_BALL,
+    SPIN_CONTROL,
+    POWER_METER,
+    ZOOM_SLIDER,
+    SCAN_TABLE,
+    RESET_BUTTON
 }
 
 enum class InteractionMode {

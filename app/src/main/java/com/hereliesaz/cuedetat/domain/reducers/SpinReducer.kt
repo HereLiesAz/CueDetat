@@ -12,23 +12,41 @@ import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
- * Reducer function responsible for handling Spin (English) related events.
- *
- * This manages the physics of failure:
- * - Dragging/Applying spin.
- * - Calculating non-linear trajectories (masse, squirt) with cloth jitter.
- * - Truncating paths on ball collisions and pocket entries.
- * - Reflecting paths on cushion collisions (rebounds) with speed loss.
- * - Fading the path visibility over time via a decay alpha.
+ * Data class to hold the results of a trajectory calculation.
  */
+private data class MasseResult(
+    val points: List<PointF>,
+    val pocketIndex: Int?
+)
+
 internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): CueDetatState {
     return when (action) {
-        is MainScreenEvent.SpinApplied -> {
+        is MainScreenEvent.ToggleMasseMode -> {
+            val nextActive = !state.isMasseModeActive
             state.copy(
-                selectedSpinOffset = action.offset,
+                isMasseModeActive = nextActive,
+                // Clear highlights and paths when exiting the mode.
+                spinPaths = if (!nextActive) emptyMap() else state.spinPaths,
+                aimedPocketIndex = if (!nextActive) null else state.aimedPocketIndex
+            )
+        }
+
+        is MainScreenEvent.SpinApplied -> {
+            val rawOffset = action.offset
+            val distance = sqrt(rawOffset.x.pow(2) + rawOffset.y.pow(2))
+            val clampedOffset = if (distance > 1f) {
+                PointF(rawOffset.x / distance, rawOffset.y / distance)
+            } else {
+                rawOffset
+            }
+
+            val result = generateMassePath(clampedOffset, state)
+            state.copy(
+                selectedSpinOffset = clampedOffset,
                 valuesChangedSinceReset = true,
                 lingeringSpinOffset = null,
-                spinPaths = mapOf(Color.White to generateMassePath(action.offset, state)),
+                spinPaths = mapOf(Color.White to result.points),
+                aimedPocketIndex = result.pocketIndex,
                 spinPathsAlpha = 1.0f
             )
         }
@@ -37,7 +55,9 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
             val nextAlpha = (state.spinPathsAlpha - 0.05f).coerceAtLeast(0f)
             state.copy(
                 spinPathsAlpha = nextAlpha,
-                spinPaths = if (nextAlpha <= 0f) emptyMap() else state.spinPaths
+                spinPaths = if (nextAlpha <= 0f) emptyMap() else state.spinPaths,
+                // Extinguish the pocket highlight when the path evaporates.
+                aimedPocketIndex = if (nextAlpha <= 0f) null else state.aimedPocketIndex
             )
         }
 
@@ -61,7 +81,8 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
             state.copy(
                 lingeringSpinOffset = null,
                 spinPaths = emptyMap(),
-                spinPathsAlpha = 0f
+                spinPathsAlpha = 0f,
+                aimedPocketIndex = null
             )
         }
 
@@ -70,54 +91,36 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
 }
 
 /**
- * Calculates a trajectory that respects the laws of friction, deflection, and pockets.
- *
- * @param offset The normalized PointF representing cue tip contact.
- * @param state The current application state.
- * @return A list of [PointF] coordinates tracing the path relative to the cue ball.
+ * Calculates a trajectory and identifies any pocket intersections.
  */
-private fun generateMassePath(offset: PointF, state: CueDetatState): List<PointF> {
+private fun generateMassePath(offset: PointF, state: CueDetatState): MasseResult {
     val points = mutableListOf<PointF>()
     val steps = 60
     val mu = 1.8f
     val random = Random(42)
 
-    // Physics Constants
-    val compression = if (offset.y < 0) {
-        (1.0f - (abs(offset.y) * 0.45f)).coerceAtLeast(0.4f)
-    } else {
-        1.0f + (offset.y * 0.2f)
-    }
-
-    val baseDeflection = 40f
-    val dynamicDeflection = baseDeflection + (abs(offset.y) * 55f)
-    val masseIntensity = 220f
+    val compression = if (offset.y < 0) (1.0f - (abs(offset.y) * 0.45f)).coerceAtLeast(0.4f) else 1.0f + (offset.y * 0.2f)
+    val dynamicDeflection = 40f + (abs(offset.y) * 55f)
     val velocityBase = 350f
-
-    val energyRestitution = 0.75f
-    var currentVelocityScale = 1.0f
 
     val cuePos = state.onPlaneBall?.center ?: PointF(0f, 0f)
     val obstacles = state.obstacleBalls
     val table = state.table
-
-    // Pocket drop threshold: slightly larger than ball radius to account for gravity grab.
     val pocketThreshold = LOGICAL_BALL_RADIUS * 1.3f
 
     var reflectionXMultiplier = 1f
     var reflectionYMultiplier = 1f
-
+    var currentVelocityScale = 1.0f
     var lastRawX = 0f
     var lastRawY = 0f
+    var hitPocketIndex: Int? = null
 
     points.add(PointF(0f, 0f))
 
     for (i in 1..steps) {
         val t = i.toFloat() / steps
-
-        val rawX = (-offset.x * dynamicDeflection * t) + ((offset.x * masseIntensity) * mu * t.pow(2.2f))
+        val rawX = (-offset.x * dynamicDeflection * t) + ((offset.x * 220f) * mu * t.pow(2.2f))
         val rawY = -(t * velocityBase * compression)
-
         val jitter = (random.nextFloat() - 0.5f) * 1.2f * t
 
         val dRawX = (rawX - lastRawX) + jitter
@@ -126,61 +129,53 @@ private fun generateMassePath(offset: PointF, state: CueDetatState): List<PointF
         var dx = dRawX * reflectionXMultiplier * currentVelocityScale
         var dy = dRawY * reflectionYMultiplier * currentVelocityScale
 
-        val currentPoint = points.last()
-        val nextLocalPoint = PointF(currentPoint.x + dx, currentPoint.y + dy)
+        val currentLocalPoint = points.last()
+        val nextLocalPoint = PointF(currentLocalPoint.x + dx, currentLocalPoint.y + dy)
         val worldNext = PointF(cuePos.x + nextLocalPoint.x, cuePos.y + nextLocalPoint.y)
 
-        // 1. Pocket Check: If the ball hits a pocket, it stops existing.
+        // 1. Pocket Check: If the trajectory finds a home, we record the index and stop.
         var fellInPocket = false
-        for (pocket in table.pockets) {
+        for (idx in table.pockets.indices) {
+            val pocket = table.pockets[idx]
             val distToPocket = sqrt((worldNext.x - pocket.x).pow(2) + (worldNext.y - pocket.y).pow(2))
             if (distToPocket < pocketThreshold) {
                 fellInPocket = true
+                hitPocketIndex = idx
                 break
             }
         }
         if (fellInPocket) break
 
-        // 2. Cushion Collision using Table's geometry.
-        val intersection = table.findRailIntersectionAndNormal(
-            PointF(cuePos.x + currentPoint.x, cuePos.y + currentPoint.y),
-            worldNext
-        )
-
+        // 2. Cushion Collision
+        val worldCurrent = PointF(cuePos.x + currentLocalPoint.x, cuePos.y + currentLocalPoint.y)
+        val intersection = table.findRailIntersectionAndNormal(worldCurrent, worldNext)
         if (intersection != null) {
             val (_, normal) = intersection
             val reflectedVelocity = table.reflect(PointF(dx, dy), normal, offset.x)
-
-            dx = reflectedVelocity.x * energyRestitution
-            dy = reflectedVelocity.y * energyRestitution
-
+            dx = reflectedVelocity.x * 0.75f
+            dy = reflectedVelocity.y * 0.75f
             if (abs(normal.x) > 0.5f) reflectionXMultiplier *= -1f
             if (abs(normal.y) > 0.5f) reflectionYMultiplier *= -1f
-
-            currentVelocityScale *= energyRestitution
+            currentVelocityScale *= 0.75f
         }
 
-        // 3. Ball Collision (Terminal).
-        val finalNextPoint = PointF(currentPoint.x + dx, currentPoint.y + dy)
+        // 3. Ball Collision
+        val finalNextPoint = PointF(currentLocalPoint.x + dx, currentLocalPoint.y + dy)
         val finalWorldPoint = PointF(cuePos.x + finalNextPoint.x, cuePos.y + finalNextPoint.y)
-
         var hitBall = false
         for (obstacle in obstacles) {
-            val dist = sqrt((finalWorldPoint.x - obstacle.center.x).pow(2) + (finalWorldPoint.y - obstacle.center.y).pow(2))
-            if (dist < LOGICAL_BALL_RADIUS * 2) {
+            if (sqrt((finalWorldPoint.x - obstacle.center.x).pow(2) + (finalWorldPoint.y - obstacle.center.y).pow(2)) < LOGICAL_BALL_RADIUS * 2) {
                 hitBall = true
                 break
             }
         }
-
         if (hitBall) break
 
         points.add(finalNextPoint)
         lastRawX = rawX
         lastRawY = rawY
-
         if (currentVelocityScale < 0.1f) break
     }
 
-    return points
+    return MasseResult(points, hitPocketIndex)
 }

@@ -88,11 +88,14 @@ fun stateReducer(
             reducerUtils
         )
 
-        // --- SPIN CONTROL ---
+        // --- SPIN & MASSE CONTROL ---
         // Handled by [SpinReducer].
-        // Interactions with the cue ball spin selector.
+        // Interactions with the cue ball spin selector and Masse trajectory calculations.
+        // ToggleMasseMode and SpinPathTick are included here to manage interaction isolation
+        // and visual path decay.
         is MainScreenEvent.SpinApplied, is MainScreenEvent.SpinSelectionEnded,
-        is MainScreenEvent.DragSpinControl, is MainScreenEvent.ClearSpinState ->
+        is MainScreenEvent.DragSpinControl, is MainScreenEvent.ClearSpinState,
+        is MainScreenEvent.ToggleMasseMode, is MainScreenEvent.SpinPathTick ->
             reduceSpinAction(currentState, action)
 
         // --- SYSTEM EVENTS ---

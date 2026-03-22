@@ -74,6 +74,7 @@ data class CueDetatState(
     val glowStickValue: Float = 0f,
     val showGlowStickDialog: Boolean = false,
     val isSpinControlVisible: Boolean = false,
+    val isMasseModeActive: Boolean = false,
     val selectedSpinOffset: PointF? = null,
     @Transient val spinPaths: Map<Color, List<PointF>>? = null,
     val spinControlCenter: PointF? = null,
@@ -109,9 +110,10 @@ data class CueDetatState(
     val hasCueBallBeenMoved: Boolean = false,
     val houghP1: Float = 100f,
     val houghP2: Float = 20f,
-    val houghThreshold: Int = 50,
-    val cannyThreshold1: Float = 50f,
-    val cannyThreshold2: Float = 150f,
+    val houghThreshold: Int = 40,
+    val cannyThreshold1: Float = 40f,
+    val cannyThreshold2: Float = 120f,
+    val isAutoCalibrating: Boolean = false,
     val showCvMask: Boolean = false,
     val isTestingCvMask: Boolean = false,
     val isCalibratingColor: Boolean = false,
@@ -126,10 +128,10 @@ data class CueDetatState(
     @Transient val isTiltBeyondLimit: Boolean = false,
     @Transient val warningText: String? = null,
     @Transient val shotGuideImpactPoint: PointF? = null,
+    @Transient val aimedPocketIndex: Int? = null,
     @Transient val aimingLineBankPath: List<PointF>? = null,
     @Transient val tangentLineBankPath: List<PointF>? = null,
     @Transient val inactiveTangentLineBankPath: List<PointF>? = null,
-    @Transient val aimedPocketIndex: Int? = null,
     @Transient val tangentAimedPocketIndex: Int? = null,
     @Transient val aimingLineEndPoint: PointF? = null,
     @Transient val appControlColorScheme: ColorScheme? = null,
@@ -172,6 +174,7 @@ sealed class MainScreenEvent {
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
     data class PanView(val delta: PointF) : MainScreenEvent()
     object ToggleSpinControl : MainScreenEvent()
+    object ToggleMasseMode : MainScreenEvent()
     data class SpinApplied(val offset: PointF) : MainScreenEvent()
     object SpinSelectionEnded : MainScreenEvent()
     data class DragSpinControl(val delta: PointF) : MainScreenEvent()
@@ -211,6 +214,7 @@ sealed class MainScreenEvent {
     object LockBeginnerView : MainScreenEvent()
     object AddObstacleBall : MainScreenEvent()
     data class CvDataUpdated(val visionData: VisionData) : MainScreenEvent()
+    object AutoCalibrateCv : MainScreenEvent()
     object LockOrUnlockColor : MainScreenEvent()
     data class LockColor(val hsvMean: FloatArray, val hsvStdDev: FloatArray) : MainScreenEvent()
     object ClearSamplePoint : MainScreenEvent()

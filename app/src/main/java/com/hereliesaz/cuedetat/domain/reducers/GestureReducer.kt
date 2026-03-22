@@ -16,8 +16,13 @@ import kotlin.math.atan2
 import kotlin.math.pow
 import kotlin.math.sqrt
 
+/**
+ * Reducer responsible for world-space gestures.
+ * Adheres to the AZNAVRAIL protocol by isolating table interactions during Masse/Spin modes.
+ */
 @Singleton
 class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils) {
+
     fun reduce(currentState: CueDetatState, event: MainScreenEvent): CueDetatState {
         return when(event) {
             is MainScreenEvent.LogicalGestureStarted -> handleLogicalGestureStarted(currentState, event)
@@ -32,7 +37,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         event: MainScreenEvent.LogicalGestureStarted
     ): CueDetatState {
         if (currentState.experienceMode == ExperienceMode.BEGINNER && currentState.isBeginnerViewLocked) {
-            return currentState // Do not allow any interaction in locked beginner mode
+            return currentState
         }
 
         val logicalPoint = event.logicalPoint
@@ -40,18 +45,32 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         val spinControlCenter = currentState.spinControlCenter
         val protractorUnit = currentState.protractorUnit
 
+        // 1. AZNAVRAIL Interaction Lock:
+        // If Spin or Masse modes are active, we intercept the gesture early.
+        // We ONLY allow interaction with the Spin Control widget itself in this state.
+        if (currentState.isSpinControlVisible || currentState.isMasseModeActive) {
+            val spinControlTouchRadius = (onPlaneBall?.radius ?: protractorUnit.radius) * 1.5f
 
-        // Per doctrine, the touch target for logical balls is a generous, constant logical radius.
+            return if (currentState.isSpinControlVisible &&
+                spinControlCenter != null &&
+                getDistance(event.screenOffset, spinControlCenter) < spinControlTouchRadius
+            ) {
+                currentState.copy(
+                    interactionMode = InteractionMode.MOVING_SPIN_CONTROL,
+                    isMagnifierVisible = true,
+                    magnifierSourceCenter = event.screenOffset
+                )
+            } else {
+                // Ignore all other table/ball interactions while Masse/Spin is engaged.
+                currentState
+            }
+        }
+
         val logicalTouchRadius = (onPlaneBall?.radius ?: protractorUnit.radius) * 3.5f
-
 
         // Banking Mode Logic
         if (currentState.isBankingMode) {
-            return if (onPlaneBall != null && getDistance(
-                    logicalPoint,
-                    onPlaneBall.center
-                ) < logicalTouchRadius
-            ) {
+            return if (onPlaneBall != null && getDistance(logicalPoint, onPlaneBall.center) < logicalTouchRadius) {
                 currentState.copy(
                     interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL,
                     hasCueBallBeenMoved = true,
@@ -64,12 +83,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             }
         }
 
-        // Protractor Mode Logic
-        val spinControlTouchRadius = (onPlaneBall?.radius ?: protractorUnit.radius) * 1.5f
-        if (currentState.isSpinControlVisible && spinControlCenter != null && getDistance(event.screenOffset, spinControlCenter) < spinControlTouchRadius) {
-            return currentState.copy(interactionMode = InteractionMode.MOVING_SPIN_CONTROL, isMagnifierVisible = true, magnifierSourceCenter = event.screenOffset)
-        }
-
+        // Standard Obstacle Ball Logic
         currentState.obstacleBalls.forEachIndexed { index, obstacle ->
             if (getDistance(logicalPoint, obstacle.center) < logicalTouchRadius) {
                 return currentState.copy(
@@ -82,11 +96,8 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             }
         }
 
-        if (onPlaneBall != null && getDistance(
-                logicalPoint,
-                onPlaneBall.center
-            ) < logicalTouchRadius
-        ) {
+        // Cue Ball Logic
+        if (onPlaneBall != null && getDistance(logicalPoint, onPlaneBall.center) < logicalTouchRadius) {
             return currentState.copy(
                 interactionMode = InteractionMode.MOVING_ACTUAL_CUE_BALL,
                 hasCueBallBeenMoved = true,
@@ -96,6 +107,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             )
         }
 
+        // Protractor Unit Logic
         val distToTargetBall = getDistance(logicalPoint, protractorUnit.center)
         if (distToTargetBall < logicalTouchRadius) {
             return currentState.copy(
@@ -125,6 +137,11 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         currentState: CueDetatState,
         event: MainScreenEvent.LogicalDragApplied
     ): CueDetatState {
+        // Double-check isolation: No world-space dragging allowed during Masse/Spin modes.
+        if (currentState.isMasseModeActive && currentState.interactionMode != InteractionMode.MOVING_SPIN_CONTROL) {
+            return currentState
+        }
+
         val newState = when (currentState.interactionMode) {
             InteractionMode.MOVING_PROTRACTOR_UNIT -> {
                 val dx = event.currentLogicalPoint.x - event.previousLogicalPoint.x
@@ -133,8 +150,6 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                 currentState.copy(protractorUnit = currentState.protractorUnit.copy(center = newCenter), valuesChangedSinceReset = true)
             }
             InteractionMode.ROTATING_PROTRACTOR -> {
-                // HERESY CORRECTED: Reverted to relative angle calculation.
-                // This provides a smooth rotation that "picks up where it left off."
                 val center = currentState.protractorUnit.center
                 val prevAngle = atan2(event.previousLogicalPoint.y - center.y, event.previousLogicalPoint.x - center.x)
                 val currAngle = atan2(event.currentLogicalPoint.y - center.y, event.currentLogicalPoint.x - center.x)
@@ -193,6 +208,9 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
     private fun handleGestureEnded(currentState: CueDetatState): CueDetatState {
         var finalState = currentState.copy(interactionMode = InteractionMode.NONE, movingObstacleBallIndex = null, isMagnifierVisible = false)
 
+        // If a snap occurred while Masse mode was active, it was likely an error in logic flow.
+        if (finalState.isMasseModeActive) return finalState
+
         if (finalState.isSnappingEnabled) {
             val closestCandidate = findClosestSnapCandidate(finalState)
             if (closestCandidate != null) {
@@ -207,7 +225,6 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                     }
                     else -> finalState
                 }
-                // A snap occurred, so automatically lock the world.
                 finalState = finalState.copy(isWorldLocked = true)
             }
         }
