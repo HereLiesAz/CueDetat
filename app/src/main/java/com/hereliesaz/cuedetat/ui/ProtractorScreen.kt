@@ -56,6 +56,7 @@ import com.hereliesaz.cuedetat.ui.composables.dialogs.TableSizeSelectionDialog
 import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.ui.composables.overlays.ArSetupPrompt
+import com.hereliesaz.cuedetat.ui.composables.MasseControl
 import com.hereliesaz.cuedetat.ui.composables.overlays.ArTrackingBadge
 import com.hereliesaz.cuedetat.ui.composables.overlays.KineticWarningOverlay
 import com.hereliesaz.cuedetat.ui.composables.overlays.TutorialOverlay
@@ -226,6 +227,27 @@ fun ProtractorScreen(
             if (isOnMain && uiState.isSpinControlVisible && uiState.spinControlCenter != null) {
                 val center = uiState.spinControlCenter!!
                 SpinControl(
+                    selectedSpinOffset = uiState.selectedSpinOffset,
+                    lingeringSpinOffset = uiState.lingeringSpinOffset,
+                    spinPathAlpha = uiState.spinPathsAlpha,
+                    onEvent = mainViewModel::onEvent,
+                    modifier = Modifier.absoluteOffset {
+                        IntOffset(
+                            (center.x - 60.dp.roundToPx()).toInt(),
+                            (center.y - 60.dp.roundToPx()).toInt()
+                        )
+                    }
+                )
+            }
+        }
+
+        // --- Onscreen HUD: Masse control (main route only) ---
+        // Positioned absolutely at spinControlCenter (screen pixels). Double-tap+drag to reposition.
+        onscreen(alignment = Alignment.TopStart) {
+            if (isOnMain && uiState.isMasseModeActive && uiState.spinControlCenter != null) {
+                val center = uiState.spinControlCenter!!
+                MasseControl(
+                    elevationAngle = uiState.pitchAngle,
                     selectedSpinOffset = uiState.selectedSpinOffset,
                     lingeringSpinOffset = uiState.lingeringSpinOffset,
                     spinPathAlpha = uiState.spinPathsAlpha,
