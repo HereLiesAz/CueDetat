@@ -13,7 +13,7 @@ jobs:
       issues: write
     steps:
       - name: Invoke Jules
-        uses: google-labs-code/jules-invoke@v1
+        uses: google-labs-code/jules-invoke@main
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
