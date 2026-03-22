@@ -18,7 +18,7 @@ pluginManagement {
     plugins {
         id("com.android.application") version "9.1.0"
         id("com.android.library") version "9.1.0"
-        id("com.github.triplet.play") version "3.13.0"
+        id("com.github.triplet.play") version "4.0.0"
 
     }
 }
