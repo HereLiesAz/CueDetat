@@ -157,7 +157,6 @@ private fun generateMassePath(offset: PointF, state: CueDetatState): MasseResult
         if (vScale < 0.1f) break
     }
     // Rotate path so -Y direction aligns with cue ball → target ball direction
-    val cuePos = state.onPlaneBall?.center ?: PointF(0f, 0f)
     val ghostCuePos = state.protractorUnit.ghostCueBallCenter
     val aimAngle = atan2((ghostCuePos.y - cuePos.y).toDouble(), (ghostCuePos.x - cuePos.x).toDouble()).toFloat()
     // Simulation goes in -Y (angle = -PI/2), so rotate by aimAngle - (-PI/2) = aimAngle + PI/2
