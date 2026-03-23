@@ -301,27 +301,32 @@ class LineRenderer {
             }
 
             if (state.isMasseModeActive) {
-                // Segment-by-segment draw with alpha fading to zero at the tail.
-                val n = screenPoints.size
-                for (i in 0 until n - 1) {
-                    val t = i.toFloat() / (n - 1).coerceAtLeast(1).toFloat()
-                    val segAlpha = (alpha * (1f - t)).toInt().coerceIn(0, 255)
-                    if (segAlpha == 0) break
-                    spinPathPaint.color = color.toArgb()
-                    spinPathPaint.alpha = segAlpha
-                    spinGlowPaint.color = color.toArgb()
-                    spinGlowPaint.alpha = (segAlpha * 0.4f).toInt().coerceIn(0, 255)
-                    canvas.drawLine(
-                        screenPoints[i].x, screenPoints[i].y,
-                        screenPoints[i + 1].x, screenPoints[i + 1].y,
-                        spinPathPaint
-                    )
-                    canvas.drawLine(
-                        screenPoints[i].x, screenPoints[i].y,
-                        screenPoints[i + 1].x, screenPoints[i + 1].y,
-                        spinGlowPaint
-                    )
+                // Single path with LinearGradient fade — full opacity at the cue ball,
+                // transparent at the tail. Far fewer draw calls than per-segment.
+                val start = screenPoints.first()
+                val end = screenPoints.last()
+                val fadeShader = LinearGradient(
+                    start.x, start.y, end.x, end.y,
+                    intArrayOf(
+                        android.graphics.Color.argb(alpha, 255, 255, 255),
+                        android.graphics.Color.argb(0, 255, 255, 255)
+                    ),
+                    null,
+                    Shader.TileMode.CLAMP
+                )
+                val massePath = Path()
+                screenPoints.forEachIndexed { index, pt ->
+                    if (index == 0) massePath.moveTo(pt.x, pt.y)
+                    else massePath.lineTo(pt.x, pt.y)
                 }
+                spinGlowPaint.shader = fadeShader
+                spinGlowPaint.strokeWidth = 10f
+                spinGlowPaint.alpha = (alpha * 0.3f).toInt().coerceIn(0, 255)
+                canvas.drawPath(massePath, spinGlowPaint)
+                spinPathPaint.shader = fadeShader
+                canvas.drawPath(massePath, spinPathPaint)
+                spinPathPaint.shader = null
+                spinGlowPaint.shader = null
             } else {
                 val screenPath = Path()
                 screenPoints.forEachIndexed { index, finalPt ->
