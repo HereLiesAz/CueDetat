@@ -68,7 +68,7 @@ fun AzNavRailMenu(
         azAdvanced(isLoading = false, helpEnabled = true, onDismissHelp = {})
 
         if (uiState.experienceMode == ExperienceMode.HATER) {
-            azRailItem(id = "shake", text = "Shake", fillColor = b1Y, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.Shake) })
+            azRailItem(id = "shake", text = "Shake", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.Shake) })
             azRailItem(id = "exit", text = "Exit", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ExitToSplash) })
             content(); return@AzHostActivityLayout
         }
@@ -107,22 +107,22 @@ fun AzNavRailMenu(
         azDivider()
 
         if (uiState.experienceMode == ExperienceMode.EXPERT && uiState.lockedHsvColor != null) {
-            azMenuItem(id = "scan", text = "Scan Table", fillColor = b11R, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen) })
+            azMenuItem(id = "scan", text = "Scan Table", fillColor = b11R, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen) })
             if (hasTableModel) {
                 azMenuItem(id = "rescan", text = "Rescan Table", fillColor = b12P, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ClearTableScan); onEvent(MainScreenEvent.ToggleTableScanScreen) })
             }
         }
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azMenuItem(id = "size", text = "Table Size", fillColor = b13O, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) })
+            azMenuItem(id = "size", text = "Table Size", fillColor = b13O, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) })
             azMenuItem(id = "units", text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Metric" else "Imperial", fillColor = b14G, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) })
             azDivider()
         }
 
-        azMenuItem(id = "orientation", text = "Orientation", fillColor = b15M, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) })
+        azMenuItem(id = "orientation", text = "Orientation", fillColor = b15M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) })
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azMenuItem(id = "advanced", text = "Advanced", fillColor = b1Y, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) })
+            azMenuItem(id = "advanced", text = "Advanced", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) })
         }
 
         azDivider()

@@ -6,6 +6,7 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.ui.graphics.Color
+import com.hereliesaz.cuedetat.domain.reducers.generateMassePath
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
@@ -251,12 +252,21 @@ class UpdateStateUseCase @Inject constructor(
     }
 
     private fun updateSpinCalculations(state: CueDetatState): CueDetatState {
-        val spinPaths: Map<Color, List<PointF>> = when {
-            state.isBankingMode -> emptyMap()
-            state.isMasseModeActive -> state.spinPaths ?: emptyMap()
-            else -> calculateSpinPaths(state)
-        }
-        return state.copy(spinPaths = spinPaths)
+        if (state.isBankingMode) return state.copy(spinPaths = emptyMap())
+        if (!state.isMasseModeActive) return state.copy(spinPaths = calculateSpinPaths(state))
+
+        // Masse mode: regenerate path from stored spin offset so moving the cue
+        // ball always reflects the current aim direction.
+        val stored = state.selectedSpinOffset ?: state.lingeringSpinOffset
+            ?: return state.copy(spinPaths = emptyMap())
+        val radiusPx = 60f * state.screenDensity
+        val nx = (stored.x - radiusPx) / radiusPx
+        val ny = (stored.y - radiusPx) / radiusPx
+        val result = generateMassePath(PointF(nx, ny), state)
+        return state.copy(
+            spinPaths = mapOf(Color.White to result.points),
+            aimedPocketIndex = result.pocketIndex
+        )
     }
 
     private fun createFullMatrix(

@@ -13,7 +13,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-private data class MasseResult(
+internal data class MasseResult(
     val points: List<PointF>,
     val pocketIndex: Int?
 )
@@ -97,15 +97,23 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
     }
 }
 
-private fun generateMassePath(offset: PointF, state: CueDetatState): MasseResult {
+internal fun generateMassePath(offset: PointF, state: CueDetatState): MasseResult {
     val points = mutableListOf<PointF>()
     val steps = 60
     val mu = 1.8f
     val random = Random(42)
 
+    // Elevation factor: how steeply the cue is angled downward.
+    // Matches the MasseControl visual: flat phone = 90° elevation (max masse curve),
+    // upright phone = 0° elevation (standard shot, minimal curve).
+    val elevationDeg = (90f - abs(state.pitchAngle)).coerceIn(0f, 90f)
+    val elevationFactor = elevationDeg / 90f  // 0 = upright/flat shot, 1 = horizontal phone/full masse
+
     val compression = if (offset.y < 0) (1.0f - (abs(offset.y) * 0.45f)).coerceAtLeast(0.4f) else 1.0f + (offset.y * 0.2f)
-    val dynamicDeflection = 40f + (abs(offset.y) * 55f)
-    val velocityBase = 350f
+    // Higher elevation → tighter lateral curve. At near-zero elevation the curve is minimal.
+    val dynamicDeflection = (40f + (abs(offset.y) * 55f)) * (0.15f + elevationFactor * 0.85f)
+    // Higher elevation → slower forward travel (ball curves more, goes less far straight).
+    val velocityBase = 350f * (1f - elevationFactor * 0.45f)
 
     val cuePos = state.onPlaneBall?.center ?: PointF(0f, 0f)
     val table = state.table
