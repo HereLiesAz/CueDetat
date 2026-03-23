@@ -255,21 +255,10 @@ class UpdateStateUseCase @Inject constructor(
         if (state.isBankingMode) return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
         if (!state.isMasseModeActive) return state.copy(spinPaths = calculateSpinPaths(state), masseImpactPoints = emptyList())
 
-        // Masse mode: regenerate path from stored spin offset so moving the cue
-        // ball always reflects the current aim direction.
+        // Masse mode: always regenerate — rail geometry depends on absolute cue ball
+        // position and must never be served from a stale cache.
         val stored = state.selectedSpinOffset ?: state.lingeringSpinOffset
-            ?: return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList(), massePathFingerprint = 0)
-        val cueBall = state.onPlaneBall?.center
-        val ghostCenter = state.protractorUnit.ghostCueBallCenter
-        val fingerprint = listOf(
-            stored.x.toInt(), stored.y.toInt(),
-            cueBall?.x?.toInt() ?: 0, cueBall?.y?.toInt() ?: 0,
-            ghostCenter.x.toInt(), ghostCenter.y.toInt(),
-            (state.pitchAngle * 2).toInt()  // 0.5° granularity
-        ).hashCode()
-        if (fingerprint == state.massePathFingerprint && state.spinPaths?.isNotEmpty() == true) {
-            return state  // inputs unchanged — skip expensive regeneration
-        }
+            ?: return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
         val radiusPx = 60f * state.screenDensity
         val nx = (stored.x - radiusPx) / radiusPx
         val ny = (stored.y - radiusPx) / radiusPx
@@ -277,8 +266,7 @@ class UpdateStateUseCase @Inject constructor(
         return state.copy(
             spinPaths = mapOf(Color.White to result.points),
             aimedPocketIndex = result.pocketIndex,
-            masseImpactPoints = result.impactPoints,
-            massePathFingerprint = fingerprint
+            masseImpactPoints = result.impactPoints
         )
     }
 
