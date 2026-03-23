@@ -26,7 +26,7 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
             state.copy(
                 isMasseModeActive = nextActive,
                 isSpinControlVisible = if (nextActive) false else state.isSpinControlVisible,
-                spinPaths = if (!nextActive) emptyMap() else state.spinPaths,
+                spinPaths = emptyMap(),
                 aimedPocketIndex = if (!nextActive) null else state.aimedPocketIndex
             )
         }

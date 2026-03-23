@@ -48,7 +48,7 @@ fun AzNavRailMenu(
     ) {
         background(weight = 0) {
             val cueBallPos = uiState.onPlaneBall?.center
-            if (cueBallPos != null && !uiState.spinPaths.isNullOrEmpty()) {
+            if (cueBallPos != null && !uiState.spinPaths.isNullOrEmpty() && !uiState.isMasseModeActive) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     uiState.spinPaths.forEach { (color, points) ->
                         if (points.size > 1) {
