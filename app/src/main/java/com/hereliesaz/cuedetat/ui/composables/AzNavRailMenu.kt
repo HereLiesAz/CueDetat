@@ -73,7 +73,7 @@ fun AzNavRailMenu(
             content(); return@AzHostActivityLayout
         }
 
-        azRailToggle(id = "help", isChecked = uiState.areHelpersVisible, toggleOnText = "Help", toggleOffText = "Help", fillColor = b1Y, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.ToggleHelp) })
+        azRailToggle(id = "help", isChecked = uiState.areHelpersVisible, toggleOnText = "Help", toggleOffText = "Help", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleHelp) })
         azMenuItem(id = "tutorial", text = "Tutorial", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.StartTutorial) })
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
@@ -83,7 +83,7 @@ fun AzNavRailMenu(
 
         if (uiState.experienceMode != ExperienceMode.BEGINNER) {
             azRailToggle(id = "spin", isChecked = uiState.isSpinControlVisible, toggleOnText = "Spin", toggleOffText = "Spin", fillColor = b4P, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleSpinControl) })
-            azRailToggle(id = "masse", isChecked = uiState.isMasseModeActive, toggleOnText = "Massé", toggleOffText = "Massé", fillColor = b5O, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.ToggleMasseMode) })
+            azRailToggle(id = "masse", isChecked = uiState.isMasseModeActive, toggleOnText = "Massé", toggleOffText = "Massé", fillColor = b5O, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleMasseMode) })
         }
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
