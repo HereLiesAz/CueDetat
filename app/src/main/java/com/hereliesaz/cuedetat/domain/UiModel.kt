@@ -143,6 +143,7 @@ data class CueDetatState(
     @Transient val magnifierSourceCenter: Offset? = null,
     val isWorldLocked: Boolean = false,
     @Transient val preResetState: CueDetatState? = null,
+    @Transient val postResetState: CueDetatState? = null,
     @Transient val latestVersionName: String? = null,
     val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
     @Transient val targetBallDistance: Float = 0f,

@@ -33,7 +33,11 @@ class VisionAnalyzer @Inject constructor(
                 val bitmap = image.toBitmap()
                 _currentFrameBitmap.value = bitmap
             }
-            visionRepository.processImage(image, state)
+            if (state.isBeginnerViewLocked) {
+                image.close()
+            } else {
+                visionRepository.processImage(image, state)
+            }
         } ?: image.close() // Close the image if state is not available to prevent leaks
     }
 

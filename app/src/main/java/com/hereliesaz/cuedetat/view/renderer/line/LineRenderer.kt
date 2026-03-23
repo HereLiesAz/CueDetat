@@ -287,12 +287,15 @@ class LineRenderer {
         canvas.save()
         canvas.concat(inverseMatrix)
 
+        val masseCueBallPos = if (state.isMasseModeActive) state.onPlaneBall?.center else null
+
         paths.forEach { (color, points) ->
             if (points.size < 2) return@forEach
 
             val screenPath = Path()
             points.forEachIndexed { index, pt ->
-                val screenPt = DrawingUtils.mapPoint(pt, activeMatrix)
+                val logicalPt = if (masseCueBallPos != null) PointF(pt.x + masseCueBallPos.x, pt.y + masseCueBallPos.y) else pt
+                val screenPt = DrawingUtils.mapPoint(logicalPt, activeMatrix)
                 val finalPt = if (camArray != null && distArray != null && camArray.size == 9) {
                     DrawingUtils.applyBarrelDistortion(screenPt.x, screenPt.y, camArray, distArray)
                 } else screenPt
@@ -539,9 +542,9 @@ class LineRenderer {
                 canvas.rotate(angle)
 
                 val triPath = Path().apply {
-                    moveTo(20f, 0f)
-                    lineTo(-15f, 15f)
-                    lineTo(-15f, -15f)
+                    moveTo(80f, 0f)
+                    lineTo(-55f, 55f)
+                    lineTo(-55f, -55f)
                     close()
                 }
                 canvas.drawPath(triPath, trianglePaint)

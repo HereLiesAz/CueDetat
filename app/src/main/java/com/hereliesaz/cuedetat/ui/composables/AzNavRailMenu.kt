@@ -77,7 +77,7 @@ fun AzNavRailMenu(
         azMenuItem(id = "tutorial", text = "Tutorial", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.StartTutorial) })
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailCycler(id = "cam", options = listOf("Off", "Cam", "ar"), selectedOption = when (uiState.cameraMode) { CameraMode.OFF -> "Off"; CameraMode.CAMERA -> "Cam"; CameraMode.AR -> "ar" }, fillColor = b3R, textColor = Color.White, onClick = { onEvent(MainScreenEvent.CycleCameraMode) })
+            azRailCycler(id = "cam", options = listOf("Off", "Cam", "AR"), selectedOption = when (uiState.cameraMode) { CameraMode.OFF -> "Off"; CameraMode.CAMERA -> "Cam"; CameraMode.AR -> "AR" }, fillColor = b3R, textColor = Color.White, onClick = { onEvent(MainScreenEvent.CycleCameraMode) })
         }
         azDivider()
 
@@ -95,7 +95,13 @@ fun AzNavRailMenu(
             azRailItem(id = "static", text = "Static", fillColor = b6G, textColor = Color.White, onClick = { onEvent(MainScreenEvent.LockBeginnerView) })
             azRailItem(id = "dynamic", text = "Dynamic", fillColor = b7M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.UnlockBeginnerView) })
         } else {
-            azRailItem(id = "reset", text = "Reset", fillColor = b8K, textColor = Color.White, onClick = { onEvent(MainScreenEvent.Reset) })
+            val resetLabel = when {
+                uiState.obstacleBalls.isNotEmpty() -> "Clear"
+                uiState.preResetState != null -> "Undo"
+                uiState.postResetState != null -> "Redo"
+                else -> "Reset"
+            }
+            azRailItem(id = "reset", text = resetLabel, fillColor = b8K, textColor = Color.White, onClick = { onEvent(MainScreenEvent.Reset) })
         }
 
         azDivider()

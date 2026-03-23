@@ -1,0 +1,105 @@
+name: Jules Security Fixer
+
+on:
+  code_scanning_alert:
+    types: [created]
+  dependabot_alert:
+    types: [created]
+  secret_scanning_alert:
+    types: [created]
+  issues:
+    types: [opened, labeled]
+  workflow_dispatch:
+
+jobs:
+  fix_security_alert:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Invoke Jules for Code Scanning Alert
+        if: github.event_name == 'code_scanning_alert'
+        uses: google-labs-code/jules-invoke@main
+        with:
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
+          prompt: |
+            You are an expert security engineer named Jules.
+            A new code scanning alert has been detected in the repository.
+
+            Alert Details:
+            - Tool: ${{ github.event.alert.tool.name }}
+            - Rule ID: ${{ github.event.alert.rule.id }}
+            - Description: ${{ github.event.alert.rule.description }}
+            - Severity: ${{ github.event.alert.rule.severity }}
+            - Location: ${{ github.event.alert.most_recent_instance.location.path }} (Line ${{ github.event.alert.most_recent_instance.location.start_line }})
+
+            Your task:
+            1. Analyze the vulnerability and the surrounding code.
+            2. Implement a fix that addresses the security concern without breaking functionality.
+            3. Verify the fix (e.g., by running relevant tests if possible).
+            4. Create a Pull Request with the fix. Include "Fixes code scanning alert #${{ github.event.alert.number }}" in the PR description.
+
+      - name: Invoke Jules for Dependabot Alert
+        if: github.event_name == 'dependabot_alert'
+        uses: google-labs-code/jules-invoke@main
+        with:
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
+          prompt: |
+            You are an expert security engineer named Jules.
+            A new Dependabot security alert has been detected in the repository.
+
+            Alert Details:
+            - Package: ${{ github.event.alert.dependency.package.name }}
+            - Vulnerable Versions: ${{ github.event.alert.security_vulnerability.vulnerable_version_range }}
+            - First Patched Version: ${{ github.event.alert.security_vulnerability.first_patched_version.identifier }}
+            - Severity: ${{ github.event.alert.security_advisory.severity }}
+            - Summary: ${{ github.event.alert.security_advisory.summary }}
+            - Advisory URL: ${{ github.event.alert.security_advisory.references[0].url }}
+
+            Your task:
+            1. Update the dependency to a secure version (preferably the first patched version or later).
+            2. Ensure that the update doesn't introduce breaking changes. If it does, adapt the code to work with the new version.
+            3. Run the project's build and tests to ensure everything is still working correctly.
+            4. Create a Pull Request with the fix. Include "Fixes Dependabot alert #${{ github.event.alert.number }}" in the PR description.
+
+      - name: Invoke Jules for Security Issue
+        if: |
+          github.event_name == 'issues' &&
+          (contains(github.event.issue.labels.*.name, 'security') || contains(github.event.issue.title, 'security'))
+        uses: google-labs-code/jules-invoke@main
+        with:
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
+          prompt: |
+            You are an expert security engineer named Jules.
+            A security-related issue has been reported:
+
+            Title: ${{ github.event.issue.title }}
+            Body:
+            ${{ github.event.issue.body }}
+
+            Your task:
+            1. Analyze the reported security issue.
+            2. Determine if a code change is needed and implement it.
+            3. Verify the fix and ensure no regressions are introduced.
+            4. Create a Pull Request with the fix. Include "Fixes #${{ github.event.issue.number }}" in the PR description.
+
+      - name: Invoke Jules for Secret Scanning Alert
+        if: github.event_name == 'secret_scanning_alert'
+        uses: google-labs-code/jules-invoke@main
+        with:
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
+          prompt: |
+            You are an expert security engineer named Jules.
+            A secret scanning alert has been detected. A sensitive secret (e.g., API key, credential) has been found in the repository.
+
+            Alert Details:
+            - Secret Type: ${{ github.event.alert.secret_type }}
+            - Location: ${{ github.event.alert.locations[0].path }}
+            - Advisory: Please remediate this immediately.
+
+            Your task:
+            1. Identify the file and line where the secret is located.
+            2. If possible, replace the hardcoded secret with a reference to a configuration file, environment variable, or secret manager.
+            3. Provide instructions on how to rotate the compromised secret.
+            4. Create a Pull Request with the fix if it involves code changes. Include "Fixes secret scanning alert #${{ github.event.alert.number }}" in the PR description.
+            5. IMPORTANT: Remind the user that they must rotate the secret and potentially rewrite history if the secret was committed.

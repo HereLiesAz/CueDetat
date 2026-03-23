@@ -195,7 +195,7 @@ fun ProtractorScreen(
 
         // --- Onscreen HUD: Zoom slider (main route only) ---
         onscreen(alignment = Alignment.CenterEnd) {
-            if (isOnMain) {
+            if (isOnMain && !(uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked)) {
                 ZoomControls(
                     zoomSliderPosition = uiState.zoomSliderPosition,
                     onZoomChange = { mainViewModel.onEvent(MainScreenEvent.ZoomSliderChanged(it)) },
@@ -247,7 +247,7 @@ fun ProtractorScreen(
             if (isOnMain && uiState.isMasseModeActive && uiState.spinControlCenter != null) {
                 val center = uiState.spinControlCenter!!
                 MasseControl(
-                    elevationAngle = uiState.pitchAngle,
+                    elevationAngle = (90f - kotlin.math.abs(uiState.pitchAngle)).coerceIn(0f, 90f),
                     selectedSpinOffset = uiState.selectedSpinOffset,
                     lingeringSpinOffset = uiState.lingeringSpinOffset,
                     spinPathAlpha = uiState.spinPathsAlpha,

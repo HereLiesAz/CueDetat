@@ -35,30 +35,6 @@ class SensorRepository @Inject constructor(
     private var smoothedPitch: Float? = null
     private var smoothedRoll: Float? = null
 
-    // Keep the old pitchAngleFlow for now if anything still relies on it directly,
-    // but prefer using fullOrientationFlow.
-    val pitchAngleFlow: Flow<Float> = callbackFlow {
-        val listener = object : SensorEventListener {
-            private val rotationMatrix = FloatArray(9)
-            private val orientationAngles = FloatArray(3) // For yaw, pitch, roll
-
-            override fun onSensorChanged(event: SensorEvent?) {
-                if (event?.sensor?.type == Sensor.TYPE_ROTATION_VECTOR) {
-                    SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-                    SensorManager.getOrientation(rotationMatrix, orientationAngles)
-                    // orientationAngles[1] is pitch. Convert radians to degrees.
-                    val pitchInDegrees = Math.toDegrees(orientationAngles[1].toDouble()).toFloat()
-                    trySend(-pitchInDegrees) // Send negative pitch as per existing convention
-                }
-            }
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) { /* Not used */ }
-        }
-        if (rotationVectorSensor != null) {
-            sensorManager.registerListener(listener, rotationVectorSensor, SensorManager.SENSOR_DELAY_GAME)
-        }
-        awaitClose { sensorManager.unregisterListener(listener) }
-    }
-
     val fullOrientationFlow: Flow<FullOrientation> = callbackFlow {
         val listener = object : SensorEventListener {
             private val rotationMatrix = FloatArray(9)

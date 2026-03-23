@@ -62,6 +62,22 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             )
         }
 
+        // 2b. Target Ball Movement (Protractor Unit center and Ghost Cue Ball contact point)
+        if (!currentState.isBankingMode) {
+            val targetPos = currentState.protractorUnit.center
+            val ghostCuePos = currentState.protractorUnit.ghostCueBallCenter
+            val isHitOnTarget = getDistance(event.logicalPoint, targetPos) < touchRadius
+            val isHitOnGhostCue = getDistance(event.logicalPoint, ghostCuePos) < touchRadius
+
+            if (isHitOnTarget || isHitOnGhostCue) {
+                return currentState.copy(
+                    interactionMode = InteractionMode.MOVING_PROTRACTOR_UNIT,
+                    isMagnifierVisible = true,
+                    magnifierSourceCenter = event.screenOffset
+                )
+            }
+        }
+
         // 3. Bank Mode or Default Shot Line Rotation
         return if (currentState.isBankingMode) {
             currentState.copy(interactionMode = InteractionMode.AIMING_BANK_SHOT)
@@ -75,6 +91,19 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             InteractionMode.MOVING_SPIN_CONTROL -> {
                 val currentCenter = currentState.spinControlCenter ?: return currentState
                 currentState.copy(spinControlCenter = PointF(currentCenter.x + event.screenDelta.x, currentCenter.y + event.screenDelta.y))
+            }
+            InteractionMode.MOVING_PROTRACTOR_UNIT -> {
+                val dx = event.currentLogicalPoint.x - event.previousLogicalPoint.x
+                val dy = event.currentLogicalPoint.y - event.previousLogicalPoint.y
+                currentState.copy(
+                    protractorUnit = currentState.protractorUnit.copy(
+                        center = PointF(
+                            currentState.protractorUnit.center.x + dx,
+                            currentState.protractorUnit.center.y + dy
+                        )
+                    ),
+                    valuesChangedSinceReset = true
+                )
             }
             InteractionMode.MOVING_ACTUAL_CUE_BALL -> {
                 currentState.onPlaneBall?.let {

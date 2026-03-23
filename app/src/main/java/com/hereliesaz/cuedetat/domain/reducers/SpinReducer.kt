@@ -6,7 +6,10 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.pow
+import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
 
@@ -153,5 +156,16 @@ private fun generateMassePath(offset: PointF, state: CueDetatState): MasseResult
         lx = rawX; ly = rawY
         if (vScale < 0.1f) break
     }
-    return MasseResult(points, hitIdx)
+    // Rotate path so -Y direction aligns with cue ball → target ball direction
+    val cuePos = state.onPlaneBall?.center ?: PointF(0f, 0f)
+    val ghostCuePos = state.protractorUnit.ghostCueBallCenter
+    val aimAngle = atan2((ghostCuePos.y - cuePos.y).toDouble(), (ghostCuePos.x - cuePos.x).toDouble()).toFloat()
+    // Simulation goes in -Y (angle = -PI/2), so rotate by aimAngle - (-PI/2) = aimAngle + PI/2
+    val rotAngle = aimAngle + (Math.PI / 2).toFloat()
+    val cosR = cos(rotAngle)
+    val sinR = sin(rotAngle)
+    val rotatedPoints = points.map { p ->
+        PointF(p.x * cosR - p.y * sinR, p.x * sinR + p.y * cosR)
+    }
+    return MasseResult(rotatedPoints, hitIdx)
 }

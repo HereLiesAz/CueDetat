@@ -135,11 +135,11 @@ fun ArSetupPrompt(visible: Boolean, modifier: Modifier = Modifier) {
                     fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                SetupStep(number = "1", text = "Point camera at the table")
+                SetupStep(number = "1", text = "Open the menu → tap \"Scan Table\"")
                 Spacer(modifier = Modifier.height(6.dp))
-                SetupStep(number = "2", text = "Open the menu → Scan Table")
+                SetupStep(number = "2", text = "Move the camera over each pocket (6 total)")
                 Spacer(modifier = Modifier.height(6.dp))
-                SetupStep(number = "3", text = "Follow the scan prompts, then return here")
+                SetupStep(number = "3", text = "Return here when the scan completes")
             }
         }
     }

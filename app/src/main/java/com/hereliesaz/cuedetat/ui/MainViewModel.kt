@@ -10,6 +10,7 @@ import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.ArDepthSession
 import com.hereliesaz.cuedetat.data.ArFrameProcessor
 import com.hereliesaz.cuedetat.data.GithubRepository
+import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.TableScanRepository
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
@@ -57,6 +58,7 @@ class MainViewModel @Inject constructor(
 ) : ViewModel() {
 
     private var experienceModeUpdateJob: Job? = null
+    private var lastEmittedOrientation: FullOrientation? = null
     private val _uiState = MutableStateFlow(CueDetatState())
     val uiState = _uiState.asStateFlow()
 
@@ -85,7 +87,14 @@ class MainViewModel @Inject constructor(
 
         viewModelScope.launch {
             sensorRepository.fullOrientationFlow.collect { orientation ->
-                onEvent(MainScreenEvent.FullOrientationChanged(orientation))
+                val last = lastEmittedOrientation
+                if (last == null ||
+                    kotlin.math.abs(orientation.pitch - last.pitch) > 0.3f ||
+                    kotlin.math.abs(orientation.roll - last.roll) > 0.3f ||
+                    kotlin.math.abs(orientation.yaw - last.yaw) > 0.5f) {
+                    lastEmittedOrientation = orientation
+                    onEvent(MainScreenEvent.FullOrientationChanged(orientation))
+                }
             }
         }
 

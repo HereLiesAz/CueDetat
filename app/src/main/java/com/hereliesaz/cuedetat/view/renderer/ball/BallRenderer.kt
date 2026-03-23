@@ -145,7 +145,7 @@ class BallRenderer {
             val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
 
             // 1. CALCULATE BUBBLE PHYSICS
-            val sensitivity = 2.5f
+            val sensitivity = 6.0f
             // INVERTED MATH: Bubble fights gravity and floats UP to the highest point of the phone
             val screenOffsetX = -state.currentOrientation.roll * sensitivity
             val screenOffsetY = state.currentOrientation.pitch * sensitivity
@@ -169,7 +169,7 @@ class BallRenderer {
             // 2. PAINTS
             val translucentFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = config.strokeColor.toArgb()
-                alpha = (config.opacity * 255 * 0.4f).toInt() // Ensure it is distinctly translucent
+                alpha = (config.opacity * 255 * 0.15f).toInt() // Ensure it is distinctly translucent
                 style = Paint.Style.FILL
             }
             val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -186,22 +186,22 @@ class BallRenderer {
 
             val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = config.strokeColor.toArgb()
-                strokeWidth = effectiveStrokeWidth
+                strokeWidth = 14f // Wide stroke for beginner locked mode
                 alpha = (config.opacity * 255).toInt()
                 style = Paint.Style.STROKE // Outline stroke, no fill
             }
             val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints)
-            val screenInnerRadius = exactScreenRadius - (effectiveStrokeWidth / 2f)
+            val screenInnerRadius = exactScreenRadius - (14f / 2f)
 
-            // 3. DRAW THE BUBBLE (Moves with tilt) - TRANSLUCENT FILL, NO DOT
-            // Drawn first so it renders beneath the stationary outline
-            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, exactScreenRadius, translucentFillPaint)
-
-            // 4. DRAW THE STATIONARY OUTLINE (Locked in place on the table) - STROKE, NO FILL, HAS DOT
-            // Drawn last so it renders on top of the bubble.
+            // 3. DRAW THE STATIONARY OUTLINE (Locked in place on the table) - STROKE, NO FILL, HAS DOT
+            // Drawn first so the bubble renders on top of it.
             canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, exactScreenRadius, glowPaint)
             canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, screenInnerRadius, strokePaint)
             canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, dotRadius, dotPaint)
+
+            // 4. DRAW THE BUBBLE (Moves with tilt) - TRANSLUCENT FILL, NO DOT
+            // Drawn last so it renders on top of the stationary outline.
+            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, exactScreenRadius, translucentFillPaint)
 
         } else {
             // EXPERT MODE LOGIC

@@ -166,18 +166,16 @@ private fun handleToggleBankingMode(
     val bankingEnabled = !state.isBankingMode
 
     val newState = if (bankingEnabled) {
-        val newBankingBall = OnPlaneBall(center = PointF(0f, 0f), radius = LOGICAL_BALL_RADIUS)
-        val defaultTableRotation = 90f
-        val initialAimTarget = calculateInitialBankingAimTarget(newBankingBall, defaultTableRotation)
+        val newBankingBall = OnPlaneBall(center = state.onPlaneBall?.center ?: PointF(0f, 0f), radius = LOGICAL_BALL_RADIUS)
+        val initialAimTarget = calculateInitialBankingAimTarget(newBankingBall, state.worldRotationDegrees)
 
         state.copy(
             isBankingMode = true,
             onPlaneBall = newBankingBall,
             zoomSliderPosition = 0f,
             table = state.table.copy(isVisible = true),
-            worldRotationDegrees = defaultTableRotation,
             bankingAimTarget = initialAimTarget,
-            protractorUnit = state.protractorUnit.copy(radius = LOGICAL_BALL_RADIUS, center = PointF(0f, 0f)),
+            protractorUnit = state.protractorUnit.copy(radius = LOGICAL_BALL_RADIUS),
             warningText = null
         )
     } else {
@@ -186,9 +184,8 @@ private fun handleToggleBankingMode(
             bankingAimTarget = null,
             zoomSliderPosition = 0f,
             table = state.table.copy(isVisible = state.experienceMode == ExperienceMode.EXPERT),
-            worldRotationDegrees = 0f,
-            onPlaneBall = OnPlaneBall(reducerUtils.getDefaultCueBallPosition(state), LOGICAL_BALL_RADIUS),
-            protractorUnit = state.protractorUnit.copy(radius = LOGICAL_BALL_RADIUS, center = PointF(0f, 0f)),
+            onPlaneBall = OnPlaneBall(state.onPlaneBall?.center ?: reducerUtils.getDefaultCueBallPosition(state), LOGICAL_BALL_RADIUS),
+            protractorUnit = state.protractorUnit.copy(radius = LOGICAL_BALL_RADIUS),
             warningText = null
         )
     }

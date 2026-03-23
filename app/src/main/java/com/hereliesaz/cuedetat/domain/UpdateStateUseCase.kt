@@ -251,10 +251,10 @@ class UpdateStateUseCase @Inject constructor(
     }
 
     private fun updateSpinCalculations(state: CueDetatState): CueDetatState {
-        val spinPaths: Map<Color, List<PointF>> = if (!state.isBankingMode) {
-            calculateSpinPaths(state)
-        } else {
-            emptyMap()
+        val spinPaths: Map<Color, List<PointF>> = when {
+            state.isBankingMode -> emptyMap()
+            state.isMasseModeActive -> state.spinPaths ?: emptyMap()
+            else -> calculateSpinPaths(state)
         }
         return state.copy(spinPaths = spinPaths)
     }
