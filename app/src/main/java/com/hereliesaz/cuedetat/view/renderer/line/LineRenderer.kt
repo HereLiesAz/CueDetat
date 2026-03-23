@@ -292,26 +292,79 @@ class LineRenderer {
         paths.forEach { (color, points) ->
             if (points.size < 2) return@forEach
 
-            val screenPath = Path()
-            points.forEachIndexed { index, pt ->
+            val screenPoints = points.map { pt ->
                 val logicalPt = if (masseCueBallPos != null) PointF(pt.x + masseCueBallPos.x, pt.y + masseCueBallPos.y) else pt
                 val screenPt = DrawingUtils.mapPoint(logicalPt, activeMatrix)
-                val finalPt = if (camArray != null && distArray != null && camArray.size == 9) {
+                if (camArray != null && distArray != null && camArray.size == 9)
                     DrawingUtils.applyBarrelDistortion(screenPt.x, screenPt.y, camArray, distArray)
-                } else screenPt
-
-                if (index == 0) screenPath.moveTo(finalPt.x, finalPt.y)
-                else screenPath.lineTo(finalPt.x, finalPt.y)
+                else screenPt
             }
 
-            spinPathPaint.color = color.toArgb()
-            spinPathPaint.alpha = alpha
-            spinGlowPaint.color = color.toArgb()
-            spinGlowPaint.alpha = (color.alpha * 100 * state.spinPathsAlpha).toInt().coerceIn(0, 255)
-
-            canvas.drawPath(screenPath, spinGlowPaint)
-            canvas.drawPath(screenPath, spinPathPaint)
+            if (state.isMasseModeActive) {
+                // Segment-by-segment draw with alpha fading to zero at the tail.
+                val n = screenPoints.size
+                for (i in 0 until n - 1) {
+                    val t = i.toFloat() / (n - 1).coerceAtLeast(1).toFloat()
+                    val segAlpha = (alpha * (1f - t)).toInt().coerceIn(0, 255)
+                    if (segAlpha == 0) break
+                    spinPathPaint.color = color.toArgb()
+                    spinPathPaint.alpha = segAlpha
+                    spinGlowPaint.color = color.toArgb()
+                    spinGlowPaint.alpha = (segAlpha * 0.4f).toInt().coerceIn(0, 255)
+                    canvas.drawLine(
+                        screenPoints[i].x, screenPoints[i].y,
+                        screenPoints[i + 1].x, screenPoints[i + 1].y,
+                        spinPathPaint
+                    )
+                    canvas.drawLine(
+                        screenPoints[i].x, screenPoints[i].y,
+                        screenPoints[i + 1].x, screenPoints[i + 1].y,
+                        spinGlowPaint
+                    )
+                }
+            } else {
+                val screenPath = Path()
+                screenPoints.forEachIndexed { index, finalPt ->
+                    if (index == 0) screenPath.moveTo(finalPt.x, finalPt.y)
+                    else screenPath.lineTo(finalPt.x, finalPt.y)
+                }
+                spinPathPaint.color = color.toArgb()
+                spinPathPaint.alpha = alpha
+                spinGlowPaint.color = color.toArgb()
+                spinGlowPaint.alpha = (color.alpha * 100 * state.spinPathsAlpha).toInt().coerceIn(0, 255)
+                canvas.drawPath(screenPath, spinGlowPaint)
+                canvas.drawPath(screenPath, spinPathPaint)
+            }
         }
+
+        // Ghost balls at rail/ball impact points along the masse path
+        if (state.isMasseModeActive && masseCueBallPos != null && state.masseImpactPoints.isNotEmpty()) {
+            val ghostStroke = Paint().apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 3f
+                color = android.graphics.Color.WHITE
+                this.alpha = (alpha * 0.75f).toInt().coerceIn(0, 255)
+                isAntiAlias = true
+            }
+            val ghostGlow = Paint().apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 7f
+                color = android.graphics.Color.WHITE
+                this.alpha = (alpha * 0.25f).toInt().coerceIn(0, 255)
+                isAntiAlias = true
+            }
+            state.masseImpactPoints.forEach { relPt ->
+                val logicalPt = PointF(relPt.x + masseCueBallPos.x, relPt.y + masseCueBallPos.y)
+                val screenPt = DrawingUtils.mapPoint(logicalPt, activeMatrix)
+                val finalPt = if (camArray != null && distArray != null && camArray.size == 9)
+                    DrawingUtils.applyBarrelDistortion(screenPt.x, screenPt.y, camArray, distArray)
+                else screenPt
+                val screenRadius = DrawingUtils.getPerspectiveRadiusAndLift(logicalPt, LOGICAL_BALL_RADIUS, state, activeMatrix).radius
+                canvas.drawCircle(finalPt.x, finalPt.y, screenRadius, ghostGlow)
+                canvas.drawCircle(finalPt.x, finalPt.y, screenRadius, ghostStroke)
+            }
+        }
+
         canvas.restore()
     }
 

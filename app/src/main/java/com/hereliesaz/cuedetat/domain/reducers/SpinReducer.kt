@@ -15,7 +15,8 @@ import kotlin.random.Random
 
 internal data class MasseResult(
     val points: List<PointF>,
-    val pocketIndex: Int?
+    val pocketIndex: Int?,
+    val impactPoints: List<PointF> = emptyList()
 )
 
 internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): CueDetatState {
@@ -99,7 +100,7 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
 
 internal fun generateMassePath(offset: PointF, state: CueDetatState): MasseResult {
     val points = mutableListOf<PointF>()
-    val steps = 60
+    val steps = 100
     val mu = 1.8f
     val random = Random(42)
 
@@ -113,7 +114,7 @@ internal fun generateMassePath(offset: PointF, state: CueDetatState): MasseResul
     // Higher elevation → tighter lateral curve. At near-zero elevation the curve is minimal.
     val dynamicDeflection = (40f + (abs(offset.y) * 55f)) * (0.15f + elevationFactor * 0.85f)
     // Higher elevation → slower forward travel (ball curves more, goes less far straight).
-    val velocityBase = 350f * (1f - elevationFactor * 0.45f)
+    val velocityBase = 700f * (1f - elevationFactor * 0.45f)
 
     val cuePos = state.onPlaneBall?.center ?: PointF(0f, 0f)
     val table = state.table
@@ -121,6 +122,7 @@ internal fun generateMassePath(offset: PointF, state: CueDetatState): MasseResul
 
     var rx = 1f; var ry = 1f; var vScale = 1.0f
     var lx = 0f; var ly = 0f; var hitIdx: Int? = null
+    val relativeImpactPoints = mutableListOf<PointF>()
 
     points.add(PointF(0f, 0f))
 
@@ -151,7 +153,9 @@ internal fun generateMassePath(offset: PointF, state: CueDetatState): MasseResul
         val worldC = PointF(cuePos.x + lastP.x, cuePos.y + lastP.y)
         val intersection = table.findRailIntersectionAndNormal(worldC, worldN)
         if (intersection != null) {
-            val (_, normal) = intersection
+            val (impactPt, normal) = intersection
+            // Store relative to cue ball so we can rotate with the path below
+            relativeImpactPoints.add(PointF(impactPt.x - cuePos.x, impactPt.y - cuePos.y))
             val reflected = table.reflect(PointF(vX, vY), normal, offset.x)
             vX = reflected.x * 0.75f
             vY = reflected.y * 0.75f
@@ -174,5 +178,8 @@ internal fun generateMassePath(offset: PointF, state: CueDetatState): MasseResul
     val rotatedPoints = points.map { p ->
         PointF(p.x * cosR - p.y * sinR, p.x * sinR + p.y * cosR)
     }
-    return MasseResult(rotatedPoints, hitIdx)
+    val rotatedImpactPoints = relativeImpactPoints.map { p ->
+        PointF(p.x * cosR - p.y * sinR, p.x * sinR + p.y * cosR)
+    }
+    return MasseResult(rotatedPoints, hitIdx, rotatedImpactPoints)
 }

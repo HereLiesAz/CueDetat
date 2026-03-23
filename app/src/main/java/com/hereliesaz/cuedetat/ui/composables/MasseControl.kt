@@ -122,6 +122,21 @@ fun MasseControl(
                 drawCircle(brush = Brush.radialGradient(colors = listOf(Color.White, Color.Transparent), center = center, radius = radius), radius = radius, center = center, alpha = spinPathAlpha)
                 drawCircle(color = Color.White.copy(alpha = 0.5f * spinPathAlpha), radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
 
+                // Center label
+                val labelTextSize = 12.dp.toPx()
+                drawContext.canvas.nativeCanvas.drawText(
+                    "TOP",
+                    center.x,
+                    center.y + labelTextSize * 0.35f,
+                    android.graphics.Paint().apply {
+                        color = android.graphics.Color.argb((180 * spinPathAlpha).toInt(), 30, 30, 30)
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        textSize = labelTextSize
+                        isFakeBoldText = true
+                        isAntiAlias = true
+                    }
+                )
+
                 // Indicators
                 lingeringSpinOffset?.let { drawLogicalIndicator(it, color = Color.White.copy(alpha = 0.6f * spinPathAlpha)) }
 

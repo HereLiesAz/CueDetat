@@ -224,7 +224,7 @@ fun ProtractorScreen(
         // --- Onscreen HUD: Spin control (main route only) ---
         // Positioned absolutely at spinControlCenter (screen pixels). Double-tap+drag to reposition.
         onscreen(alignment = Alignment.TopStart) {
-            if (isOnMain && uiState.isSpinControlVisible && uiState.spinControlCenter != null) {
+            if (isOnMain && uiState.isSpinControlVisible && !uiState.isMasseModeActive && uiState.spinControlCenter != null) {
                 val center = uiState.spinControlCenter!!
                 SpinControl(
                     selectedSpinOffset = uiState.selectedSpinOffset,

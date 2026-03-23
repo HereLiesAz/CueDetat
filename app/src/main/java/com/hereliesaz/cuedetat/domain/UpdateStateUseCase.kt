@@ -252,20 +252,21 @@ class UpdateStateUseCase @Inject constructor(
     }
 
     private fun updateSpinCalculations(state: CueDetatState): CueDetatState {
-        if (state.isBankingMode) return state.copy(spinPaths = emptyMap())
-        if (!state.isMasseModeActive) return state.copy(spinPaths = calculateSpinPaths(state))
+        if (state.isBankingMode) return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
+        if (!state.isMasseModeActive) return state.copy(spinPaths = calculateSpinPaths(state), masseImpactPoints = emptyList())
 
         // Masse mode: regenerate path from stored spin offset so moving the cue
         // ball always reflects the current aim direction.
         val stored = state.selectedSpinOffset ?: state.lingeringSpinOffset
-            ?: return state.copy(spinPaths = emptyMap())
+            ?: return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
         val radiusPx = 60f * state.screenDensity
         val nx = (stored.x - radiusPx) / radiusPx
         val ny = (stored.y - radiusPx) / radiusPx
         val result = generateMassePath(PointF(nx, ny), state)
         return state.copy(
             spinPaths = mapOf(Color.White to result.points),
-            aimedPocketIndex = result.pocketIndex
+            aimedPocketIndex = result.pocketIndex,
+            masseImpactPoints = result.impactPoints
         )
     }
 
