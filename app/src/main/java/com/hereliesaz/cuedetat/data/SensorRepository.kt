@@ -65,7 +65,7 @@ class SensorRepository @Inject constructor(
             sensorManager.registerListener(
                 listener,
                 rotationVectorSensor,
-                SensorManager.SENSOR_DELAY_GAME // SENSOR_DELAY_UI or SENSOR_DELAY_NORMAL might be better for smoother UI if GAME is too fast
+                SensorManager.SENSOR_DELAY_UI
             )
         }
         awaitClose {

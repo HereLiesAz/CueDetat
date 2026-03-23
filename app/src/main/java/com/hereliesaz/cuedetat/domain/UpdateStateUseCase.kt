@@ -258,7 +258,18 @@ class UpdateStateUseCase @Inject constructor(
         // Masse mode: regenerate path from stored spin offset so moving the cue
         // ball always reflects the current aim direction.
         val stored = state.selectedSpinOffset ?: state.lingeringSpinOffset
-            ?: return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
+            ?: return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList(), massePathFingerprint = 0)
+        val cueBall = state.onPlaneBall?.center
+        val ghostCenter = state.protractorUnit.ghostCueBallCenter
+        val fingerprint = listOf(
+            stored.x.toInt(), stored.y.toInt(),
+            cueBall?.x?.toInt() ?: 0, cueBall?.y?.toInt() ?: 0,
+            ghostCenter.x.toInt(), ghostCenter.y.toInt(),
+            (state.pitchAngle * 2).toInt()  // 0.5° granularity
+        ).hashCode()
+        if (fingerprint == state.massePathFingerprint && state.spinPaths?.isNotEmpty() == true) {
+            return state  // inputs unchanged — skip expensive regeneration
+        }
         val radiusPx = 60f * state.screenDensity
         val nx = (stored.x - radiusPx) / radiusPx
         val ny = (stored.y - radiusPx) / radiusPx
@@ -266,7 +277,8 @@ class UpdateStateUseCase @Inject constructor(
         return state.copy(
             spinPaths = mapOf(Color.White to result.points),
             aimedPocketIndex = result.pocketIndex,
-            masseImpactPoints = result.impactPoints
+            masseImpactPoints = result.impactPoints,
+            massePathFingerprint = fingerprint
         )
     }
 

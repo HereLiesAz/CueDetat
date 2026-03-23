@@ -124,18 +124,20 @@ fun MasseControl(
 
                 // Center label
                 val labelTextSize = 12.dp.toPx()
-                drawContext.canvas.nativeCanvas.drawText(
-                    "TOP",
-                    center.x,
-                    center.y + labelTextSize * 0.35f,
-                    android.graphics.Paint().apply {
-                        color = android.graphics.Color.argb((180 * spinPathAlpha).toInt(), 30, 30, 30)
-                        textAlign = android.graphics.Paint.Align.CENTER
-                        textSize = labelTextSize
-                        isFakeBoldText = true
-                        isAntiAlias = true
-                    }
-                )
+                drawIntoCanvas { canvas ->
+                    canvas.nativeCanvas.drawText(
+                        "TOP",
+                        center.x,
+                        center.y + labelTextSize * 0.35f,
+                        android.graphics.Paint().apply {
+                            color = android.graphics.Color.argb((180 * spinPathAlpha).toInt(), 30, 30, 30)
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            textSize = labelTextSize
+                            isFakeBoldText = true
+                            isAntiAlias = true
+                        }
+                    )
+                }
 
                 // Indicators
                 lingeringSpinOffset?.let { drawLogicalIndicator(it, color = Color.White.copy(alpha = 0.6f * spinPathAlpha)) }

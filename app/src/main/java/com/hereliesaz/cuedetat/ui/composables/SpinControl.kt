@@ -125,18 +125,20 @@ fun SpinControl(
 
                 // Center label
                 val labelTextSize = 12.dp.toPx()
-                drawContext.canvas.nativeCanvas.drawText(
-                    "SIDE",
-                    center.x,
-                    center.y + labelTextSize * 0.35f,
-                    android.graphics.Paint().apply {
-                        color = android.graphics.Color.argb((180 * spinPathAlpha).toInt(), 30, 30, 30)
-                        textAlign = android.graphics.Paint.Align.CENTER
-                        textSize = labelTextSize
-                        isFakeBoldText = true
-                        isAntiAlias = true
-                    }
-                )
+                drawIntoCanvas { canvas ->
+                    canvas.nativeCanvas.drawText(
+                        "SIDE",
+                        center.x,
+                        center.y + labelTextSize * 0.35f,
+                        android.graphics.Paint().apply {
+                            color = android.graphics.Color.argb((180 * spinPathAlpha).toInt(), 30, 30, 30)
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            textSize = labelTextSize
+                            isFakeBoldText = true
+                            isAntiAlias = true
+                        }
+                    )
+                }
 
                 lingeringSpinOffset?.let { drawLogicalIndicator(it, center, radius, Color.White.copy(alpha = 0.6f * spinPathAlpha)) }
                 selectedSpinOffset?.let { drawLogicalIndicator(it, center, radius, Color.White) }
