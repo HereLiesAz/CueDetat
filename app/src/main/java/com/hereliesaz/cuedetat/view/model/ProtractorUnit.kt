@@ -1,11 +1,13 @@
 package com.hereliesaz.cuedetat.view.model
 
 import android.graphics.PointF
+import androidx.annotation.Keep
 
 /**
  * The data model for the main aiming tool, consisting of a Target Ball and a Ghost Cue Ball.
  * Its position is defined by the Target Ball's center.
  */
+@Keep
 data class ProtractorUnit(
     override val center: PointF,
     override val radius: Float,

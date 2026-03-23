@@ -1,10 +1,12 @@
 package com.hereliesaz.cuedetat.view.model
 
 import android.graphics.PointF
+import androidx.annotation.Keep
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.view.state.TableSize
 import kotlin.math.pow
 
+@Keep
 data class Table(
     val size: TableSize,
     val isVisible: Boolean,

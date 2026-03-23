@@ -3,7 +3,13 @@
 package com.hereliesaz.cuedetat.di
 
 import android.content.Context
+import android.graphics.PointF
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.google.gson.TypeAdapter
+import com.google.gson.stream.JsonReader
+import com.google.gson.stream.JsonToken
+import com.google.gson.stream.JsonWriter
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
@@ -99,6 +105,30 @@ object AppModule {
     @Provides
     @Singleton
     fun provideGson(): Gson {
-        return Gson()
+        return GsonBuilder()
+            .registerTypeAdapter(PointF::class.java, object : TypeAdapter<PointF>() {
+                override fun write(out: JsonWriter, value: PointF?) {
+                    if (value == null) { out.nullValue(); return }
+                    out.beginObject()
+                    out.name("x").value(value.x)
+                    out.name("y").value(value.y)
+                    out.endObject()
+                }
+                override fun read(input: JsonReader): PointF? {
+                    if (input.peek() == JsonToken.NULL) { input.nextNull(); return null }
+                    var x = 0f; var y = 0f
+                    input.beginObject()
+                    while (input.hasNext()) {
+                        when (input.nextName()) {
+                            "x" -> x = input.nextDouble().toFloat()
+                            "y" -> y = input.nextDouble().toFloat()
+                            else -> input.skipValue()
+                        }
+                    }
+                    input.endObject()
+                    return PointF(x, y)
+                }
+            })
+            .create()
     }
 }
