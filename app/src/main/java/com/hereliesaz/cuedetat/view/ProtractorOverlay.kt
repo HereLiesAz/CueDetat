@@ -41,7 +41,7 @@ fun ProtractorOverlay(
         paints.setTypeface(barbaroTypeface)
     }
 
-    LaunchedEffect(uiState, systemIsDark) {
+    LaunchedEffect(Unit) {
         paints.updateColors(uiState, systemIsDark)
     }
 

@@ -17,16 +17,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
@@ -48,6 +50,30 @@ fun SpinControl(
     var isMoveModeActive by remember { mutableStateOf(false) }
     val moveIconPainter = rememberVectorPainter(image = Icons.Default.OpenWith)
     val viewConfiguration = LocalViewConfiguration.current
+    val density = LocalDensity.current.density
+    val colorWheelBitmap = remember(density) {
+        val sizePx = (120f * density).toInt().coerceAtLeast(1)
+        val bmp = android.graphics.Bitmap.createBitmap(sizePx, sizePx, android.graphics.Bitmap.Config.ARGB_8888)
+        val bmpCanvas = android.graphics.Canvas(bmp)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        val rectF = android.graphics.RectF(0f, 0f, sizePx.toFloat(), sizePx.toFloat())
+        val numArcs = 72
+        val arcAngle = 360f / numArcs
+        for (i in 0 until numArcs) {
+            val startAngle = i * arcAngle
+            paint.color = SpinColorUtils.getColorFromAngleAndDistance(startAngle + arcAngle / 2, 1.0f).toArgb()
+            bmpCanvas.drawArc(rectF, startAngle, arcAngle, true, paint)
+        }
+        val center = sizePx / 2f
+        val gradientPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        gradientPaint.shader = android.graphics.RadialGradient(
+            center, center, center,
+            intArrayOf(android.graphics.Color.WHITE, android.graphics.Color.TRANSPARENT),
+            null, android.graphics.Shader.TileMode.CLAMP
+        )
+        bmpCanvas.drawCircle(center, center, center, gradientPaint)
+        bmp.asImageBitmap()
+    }
 
     Box(
         modifier = modifier
@@ -112,15 +138,7 @@ fun SpinControl(
                     drawCircle(color = Color.White.copy(alpha = 0.2f), radius = radius, center = center)
                 }
 
-                val numArcs = 72
-                val arcAngle = 360f / numArcs
-                for (i in 0 until numArcs) {
-                    val startAngle = i * arcAngle
-                    val color = SpinColorUtils.getColorFromAngleAndDistance(startAngle + (arcAngle / 2), 1.0f)
-                    drawArc(color = color, startAngle = startAngle, sweepAngle = arcAngle, useCenter = true, alpha = spinPathAlpha)
-                }
-
-                drawCircle(brush = Brush.radialGradient(colors = listOf(Color.White, Color.Transparent), center = center, radius = radius), radius = radius, center = center, alpha = spinPathAlpha)
+                drawImage(colorWheelBitmap, alpha = spinPathAlpha)
                 drawCircle(color = Color.White.copy(alpha = 0.5f * spinPathAlpha), radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
 
                 // Center label

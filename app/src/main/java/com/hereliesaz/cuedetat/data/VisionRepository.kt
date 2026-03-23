@@ -132,7 +132,7 @@ class VisionRepository @Inject constructor(
         // Step 1: Throttling.
         // Check if enough time has passed since the last frame to maintain ~30 FPS.
         val currentTime = System.currentTimeMillis()
-        if (currentTime - lastFrameTime < 33) {
+        if (currentTime - lastFrameTime < 100) {
             imageProxy.close() // DROP FRAME.
             return
         }
@@ -601,7 +601,7 @@ class VisionRepository @Inject constructor(
     @SuppressLint("UnsafeOptInUsageError")
     fun processArCpuImage(image: MediaImage, rotationDegrees: Int, state: CueDetatState) {
         val currentTime = System.currentTimeMillis()
-        if (currentTime - lastFrameTime < 33) return
+        if (currentTime - lastFrameTime < 100) return
         lastFrameTime = currentTime
 
         try {

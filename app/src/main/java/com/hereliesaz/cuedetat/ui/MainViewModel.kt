@@ -58,6 +58,7 @@ class MainViewModel @Inject constructor(
 ) : ViewModel() {
 
     private var experienceModeUpdateJob: Job? = null
+    private var saveJob: Job? = null
     private var lastEmittedOrientation: FullOrientation? = null
     private val _uiState = MutableStateFlow(CueDetatState())
     val uiState = _uiState.asStateFlow()
@@ -219,7 +220,9 @@ class MainViewModel @Inject constructor(
         arFrameProcessor.updateUiState(derivedState)
 
         if (type != UpdateType.SPIN_ONLY) {
-            viewModelScope.launch {
+            saveJob?.cancel()
+            saveJob = viewModelScope.launch {
+                delay(2000L)
                 userPreferencesRepository.saveState(derivedState)
             }
         }
