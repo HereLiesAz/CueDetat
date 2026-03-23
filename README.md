@@ -34,6 +34,9 @@ This is an Android application that uses your device's camera and a frankly exce
 *   **Spin Control**    
     *   A tool for applying English. Maybe even British.
     *   Explore the subtle arts of post-impact trajectory, and other new and exciting ways to scratch.
+*   **Massé Master**
+    *   Pick your impact point and the angle of attack to make the prettiest loop-de-loos on the table. 
+    *   Leave your opponent's jaw on the floor as you tear the felt up with such precision.
 *   **Dynamic 3D Perspective** 
     *   Use your phone's sensor data to create a 3D illusion. This feature's primary purpose is to induce a subtle vertigo that mirrors the existential dread of a poorly-played safety.  
 * **VERY Helpful Help:**
