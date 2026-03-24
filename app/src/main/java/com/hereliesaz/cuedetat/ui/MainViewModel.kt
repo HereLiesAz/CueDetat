@@ -30,6 +30,9 @@ import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.SingleEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -97,15 +100,19 @@ class MainViewModel @Inject constructor(
             }
         }
 
+        // Gate sensor collection on process lifecycle — unregisters the hardware listener
+        // automatically when the screen turns off or the app goes to background.
         viewModelScope.launch {
-            sensorRepository.fullOrientationFlow.collect { orientation ->
-                val last = lastEmittedOrientation
-                if (last == null ||
-                    kotlin.math.abs(orientation.pitch - last.pitch) > 0.3f ||
-                    kotlin.math.abs(orientation.roll - last.roll) > 0.3f ||
-                    kotlin.math.abs(orientation.yaw - last.yaw) > 0.5f) {
-                    lastEmittedOrientation = orientation
-                    onEvent(MainScreenEvent.FullOrientationChanged(orientation))
+            ProcessLifecycleOwner.get().lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                sensorRepository.fullOrientationFlow.collect { orientation ->
+                    val last = lastEmittedOrientation
+                    if (last == null ||
+                        kotlin.math.abs(orientation.pitch - last.pitch) > 0.3f ||
+                        kotlin.math.abs(orientation.roll - last.roll) > 0.3f ||
+                        kotlin.math.abs(orientation.yaw - last.yaw) > 0.5f) {
+                        lastEmittedOrientation = orientation
+                        onEvent(MainScreenEvent.FullOrientationChanged(orientation))
+                    }
                 }
             }
         }

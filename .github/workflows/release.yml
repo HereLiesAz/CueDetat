@@ -51,8 +51,8 @@ jobs:
       - name: Determine Version
         id: versioning
         run: |
-          # Base version for pre-releases
-          BASE_VERSION_NAME="1.3.0"
+          # Base version read from the single source of truth
+          BASE_VERSION_NAME=$(grep "^versionName=" version.properties | cut -d= -f2)
 
           # Create unique version using run number
           NEW_VERSION_NAME="${BASE_VERSION_NAME}.${{ github.run_number }}"
@@ -112,9 +112,9 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           # The name of the tag for this release
-          tag_name: v1.3-debug
+          tag_name: v1.4-debug
           # The name of the release
-          name: 1.3 Debug Builds
+          name: 1.4 Debug Builds
           # Mark this release as a pre-release
           prerelease: true
           # A list of files to upload as assets to the release

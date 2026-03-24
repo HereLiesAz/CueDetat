@@ -62,12 +62,13 @@ class OverlayRenderer {
             }
         }
 
-        // Pass 2.5: Beginner foreground lines + triangles (before balls for correct z-order)
+        // Pass 3: Draw all balls and their associated text
+        ballRenderer.draw(canvas, state, paints, typeface)
+
+        // Pass 4: Beginner foreground lines, triangles, and labels — drawn last so text
+        // is always above balls and every other element.
         if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
             lineRenderer.drawBeginnerForeground(canvas, state, paints, typeface, matrixFor2DPlane)
         }
-
-        // Pass 3: Draw all balls and their associated text
-        ballRenderer.draw(canvas, state, paints, typeface)
     }
 }

@@ -601,8 +601,8 @@ class LineRenderer {
 
                 val triPath = Path().apply {
                     moveTo(80f, 0f)
-                    lineTo(-55f, 55f)
-                    lineTo(-55f, -55f)
+                    lineTo(-50f, 120f)
+                    lineTo(-50f, -120f)
                     close()
                 }
                 canvas.drawPath(triPath, trianglePaint)

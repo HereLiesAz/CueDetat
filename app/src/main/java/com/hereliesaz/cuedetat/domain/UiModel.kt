@@ -60,7 +60,7 @@ data class CueDetatState(
     val worldRotationDegrees: Float = 0f,
     val areHelpersVisible: Boolean = LabelConfig.showLabelsByDefault,
     val valuesChangedSinceReset: Boolean = false,
-    val cameraMode: CameraMode = CameraMode.CAMERA,
+    val cameraMode: CameraMode = CameraMode.OFF,
     val viewOffset: PointF = PointF(0f, 0f),
     val orientationLock: OrientationLock = OrientationLock.PORTRAIT,
     @Transient val pendingOrientationLock: OrientationLock? = null,

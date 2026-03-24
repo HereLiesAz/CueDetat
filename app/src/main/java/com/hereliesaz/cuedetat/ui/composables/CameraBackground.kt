@@ -2,6 +2,7 @@
 package com.hereliesaz.cuedetat.ui.composables
 
 import android.util.Log
+import android.util.Size
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -60,6 +61,9 @@ fun CameraBackground(
                 val imageAnalysis = ImageAnalysis.Builder()
                     // Drop frames if the analyzer is too slow (keeps UI responsive).
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    // Cap resolution to 640×480 — CV doesn't benefit from full sensor size,
+                    // and smaller frames cut CPU, GPU, and memory bandwidth significantly.
+                    .setTargetResolution(Size(640, 480))
                     .build()
                     .also {
                         it.setAnalyzer(cameraExecutor, analyzer)

@@ -72,7 +72,7 @@ class SensorRepository @Inject constructor(
             sensorManager.registerListener(
                 listener,
                 rotationVectorSensor,
-                SensorManager.SENSOR_DELAY_UI
+                SensorManager.SENSOR_DELAY_GAME
             )
         }
         awaitClose {

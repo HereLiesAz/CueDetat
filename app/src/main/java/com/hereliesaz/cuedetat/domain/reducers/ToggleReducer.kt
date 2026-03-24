@@ -47,7 +47,9 @@ internal fun reduceToggleAction(
             val newMode = when (state.isForceLightMode) { null -> true; true -> false; false -> null }
             state.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)
         }
-        is MainScreenEvent.CycleCameraMode -> state.copy(cameraMode = state.cameraMode.next())
+        is MainScreenEvent.CycleCameraMode -> state.copy(
+            cameraMode = if (state.cameraMode == CameraMode.AR) CameraMode.OFF else CameraMode.AR
+        )
         is MainScreenEvent.ToggleDistanceUnit -> state.copy(distanceUnit = if (state.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC, valuesChangedSinceReset = true)
         is MainScreenEvent.ToggleLuminanceDialog -> state.copy(showLuminanceDialog = !state.showLuminanceDialog)
         is MainScreenEvent.ToggleGlowStickDialog -> state.copy(showGlowStickDialog = !state.showGlowStickDialog)

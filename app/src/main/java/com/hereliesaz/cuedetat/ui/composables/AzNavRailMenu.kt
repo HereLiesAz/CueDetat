@@ -4,6 +4,8 @@ import android.content.res.Configuration
 import android.graphics.PointF
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -11,6 +13,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.hereliesaz.aznavrail.AzHostActivityLayout
 import com.hereliesaz.aznavrail.AzNavHostScope
@@ -46,6 +50,17 @@ fun AzNavRailMenu(
         isLandscape = isLandscape,
         initiallyExpanded = false
     ) {
+        if (uiState.areHelpersVisible) {
+            onscreen(alignment = Alignment.TopStart) {
+                Text(
+                    text = "Tap the icon for more",
+                    fontSize = 9.sp,
+                    color = Color.White.copy(alpha = 0.55f),
+                    modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                )
+            }
+        }
+
         background(weight = 0) {
             val cueBallPos = uiState.onPlaneBall?.center
             if (cueBallPos != null && !uiState.spinPaths.isNullOrEmpty() && !uiState.isMasseModeActive) {
@@ -77,7 +92,7 @@ fun AzNavRailMenu(
         azMenuItem(id = "tutorial", text = "Tutorial", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.StartTutorial) })
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailCycler(id = "cam", options = listOf("Off", "Cam", "AR"), selectedOption = when (uiState.cameraMode) { CameraMode.OFF -> "Off"; CameraMode.CAMERA -> "Cam"; CameraMode.AR -> "AR" }, fillColor = b3R, textColor = Color.White, onClick = { onEvent(MainScreenEvent.CycleCameraMode) })
+            azRailToggle(id = "ar", isChecked = uiState.cameraMode == CameraMode.AR, toggleOnText = "AR", toggleOffText = "AR", fillColor = b3R, textColor = Color.White, onClick = { onEvent(MainScreenEvent.CycleCameraMode) })
         }
         azDivider()
 
