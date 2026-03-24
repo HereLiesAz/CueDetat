@@ -122,7 +122,6 @@ internal fun generateMassePath(offset: PointF, state: CueDetatState): MasseResul
 
     var rx = 1f; var ry = 1f; var vScale = 1.0f
     var lx = 0f; var ly = 0f; var hitIdx: Int? = null
-    val relativeImpactPoints = mutableListOf<PointF>()
 
     points.add(PointF(0f, 0f))
 
@@ -153,14 +152,11 @@ internal fun generateMassePath(offset: PointF, state: CueDetatState): MasseResul
         val worldC = PointF(cuePos.x + lastP.x, cuePos.y + lastP.y)
         val intersection = table.findRailIntersectionAndNormal(worldC, worldN)
         if (intersection != null) {
-            val (impactPt, normal) = intersection
-            // Store relative to cue ball so we can rotate with the path below
-            relativeImpactPoints.add(PointF(impactPt.x - cuePos.x, impactPt.y - cuePos.y))
-            val reflected = table.reflect(PointF(vX, vY), normal, offset.x)
+            val reflected = table.reflect(PointF(vX, vY), intersection.second, offset.x)
             vX = reflected.x * 0.75f
             vY = reflected.y * 0.75f
-            if (abs(normal.x) > 0.5f) rx *= -1f
-            if (abs(normal.y) > 0.5f) ry *= -1f
+            if (abs(intersection.second.x) > 0.5f) rx *= -1f
+            if (abs(intersection.second.y) > 0.5f) ry *= -1f
             vScale *= 0.75f
         }
 
@@ -178,8 +174,20 @@ internal fun generateMassePath(offset: PointF, state: CueDetatState): MasseResul
     val rotatedPoints = points.map { p ->
         PointF(p.x * cosR - p.y * sinR, p.x * sinR + p.y * cosR)
     }
-    val rotatedImpactPoints = relativeImpactPoints.map { p ->
-        PointF(p.x * cosR - p.y * sinR, p.x * sinR + p.y * cosR)
+
+    // Recompute impact points from the rotated path in logical space.
+    // The simulation runs in pre-rotation sim space, so any intersections found
+    // during simulation are against mis-oriented table rails. Walking the final
+    // rotated path gives the correct logical-space impact positions.
+    val impactPoints = mutableListOf<PointF>()
+    for (i in 1 until rotatedPoints.size) {
+        val a = PointF(rotatedPoints[i - 1].x + cuePos.x, rotatedPoints[i - 1].y + cuePos.y)
+        val b = PointF(rotatedPoints[i].x + cuePos.x, rotatedPoints[i].y + cuePos.y)
+        val hit = table.findRailIntersectionAndNormal(a, b)
+        if (hit != null) {
+            impactPoints.add(PointF(hit.first.x - cuePos.x, hit.first.y - cuePos.y))
+        }
     }
-    return MasseResult(rotatedPoints, hitIdx, rotatedImpactPoints)
+
+    return MasseResult(rotatedPoints, hitIdx, impactPoints)
 }

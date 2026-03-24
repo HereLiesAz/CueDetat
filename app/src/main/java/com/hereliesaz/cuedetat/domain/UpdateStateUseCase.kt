@@ -44,7 +44,15 @@ class UpdateStateUseCase @Inject constructor(
             state
         }
 
-        if (type == UpdateType.MATRICES_ONLY) return stateAfterMatrices
+        if (type == UpdateType.MATRICES_ONLY) {
+            // When masse mode is active, also regenerate the masse path so that
+            // phone-tilt changes (pitchAngle) immediately affect the curve.
+            return if (stateAfterMatrices.isMasseModeActive) {
+                updateSpinCalculations(stateAfterMatrices)
+            } else {
+                stateAfterMatrices
+            }
+        }
 
         val stateAfterAiming = if (type == UpdateType.FULL || type == UpdateType.AIMING) {
             updateAimingCalculations(stateAfterMatrices)
