@@ -7,6 +7,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlin.math.abs
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -29,8 +30,6 @@ class SensorRepository @Inject constructor(
     private val rotationVectorSensor: Sensor? =
         sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
 
-    // EMA filter parameters
-    private val alpha = 0.05f // Smoothing factor; lower means more smoothing (less responsive)
     private var smoothedYaw: Float? = null
     private var smoothedPitch: Float? = null
     private var smoothedRoll: Float? = null
@@ -49,7 +48,15 @@ class SensorRepository @Inject constructor(
                     val rawPitch = Math.toDegrees(orientationAngles[1].toDouble()).toFloat()
                     val rawRoll = Math.toDegrees(orientationAngles[2].toDouble()).toFloat()
 
-                    // Apply EMA filter
+                    // Adaptive EMA: heavy smoothing when phone is still (stabilization),
+                    // lighter smoothing when deliberately tilted (responsiveness).
+                    val deltaP = abs(rawPitch - (smoothedPitch ?: rawPitch))
+                    val deltaR = abs(rawRoll - (smoothedRoll ?: rawRoll))
+                    val alpha = when {
+                        maxOf(deltaP, deltaR) > 4f -> 0.20f  // deliberate tilt
+                        maxOf(deltaP, deltaR) > 1.5f -> 0.07f // moderate movement
+                        else -> 0.025f                         // near-still: maximum stabilization
+                    }
                     smoothedYaw = smoothedYaw?.let { (rawYaw * alpha) + (it * (1 - alpha)) } ?: rawYaw
                     smoothedPitch = smoothedPitch?.let { (rawPitch * alpha) + (it * (1 - alpha)) } ?: rawPitch
                     smoothedRoll = smoothedRoll?.let { (rawRoll * alpha) + (it * (1 - alpha)) } ?: rawRoll

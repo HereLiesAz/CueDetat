@@ -20,6 +20,7 @@ import kotlin.math.sqrt
 
 enum class UpdateType {
     FULL,
+    MATRICES_ONLY, // Recalculates projection matrices only — skips aiming geometry and spin paths
     AIMING,
     SPIN_ONLY
 }
@@ -37,11 +38,13 @@ class UpdateStateUseCase @Inject constructor(
     operator fun invoke(state: CueDetatState, type: UpdateType): CueDetatState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
-        val stateAfterMatrices = if (type == UpdateType.FULL) {
+        val stateAfterMatrices = if (type == UpdateType.FULL || type == UpdateType.MATRICES_ONLY) {
             updateMatricesAndTransforms(state)
         } else {
             state
         }
+
+        if (type == UpdateType.MATRICES_ONLY) return stateAfterMatrices
 
         val stateAfterAiming = if (type == UpdateType.FULL || type == UpdateType.AIMING) {
             updateAimingCalculations(stateAfterMatrices)

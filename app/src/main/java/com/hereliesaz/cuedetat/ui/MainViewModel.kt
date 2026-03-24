@@ -30,6 +30,8 @@ import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.SingleEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -60,6 +62,7 @@ class MainViewModel @Inject constructor(
     private var experienceModeUpdateJob: Job? = null
     private var saveJob: Job? = null
     private var lastEmittedOrientation: FullOrientation? = null
+    private val eventChannel = Channel<MainScreenEvent>(Channel.UNLIMITED)
     private val _uiState = MutableStateFlow(CueDetatState())
     val uiState = _uiState.asStateFlow()
 
@@ -73,6 +76,14 @@ class MainViewModel @Inject constructor(
     }
 
     init {
+        // Single background coroutine that serially processes all events —
+        // keeps heavy computation (matrices, geometry) off the main thread.
+        viewModelScope.launch(Dispatchers.Default) {
+            for (event in eventChannel) {
+                processEvent(event)
+            }
+        }
+
         viewModelScope.launch {
             val savedState = userPreferencesRepository.stateFlow.first()
             val initialState = savedState ?: CueDetatState()
@@ -140,68 +151,70 @@ class MainViewModel @Inject constructor(
     }
 
     fun onEvent(event: MainScreenEvent) {
-        viewModelScope.launch {
-            if (event is MainScreenEvent.ToggleExperienceModeSelection) {
-                experienceModeUpdateJob?.cancel()
-                val currentState = _uiState.value
-                val nextMode = currentState.pendingExperienceMode?.next() ?: currentState.experienceMode?.next() ?: ExperienceMode.EXPERT
-                _uiState.value = currentState.copy(pendingExperienceMode = nextMode)
-                experienceModeUpdateJob = viewModelScope.launch {
-                    delay(1000)
-                    onEvent(MainScreenEvent.ApplyPendingExperienceMode)
-                }
-                return@launch
-            }
+        eventChannel.trySend(event)
+    }
 
+    private suspend fun processEvent(event: MainScreenEvent) {
+        if (event is MainScreenEvent.ToggleExperienceModeSelection) {
+            experienceModeUpdateJob?.cancel()
             val currentState = _uiState.value
-
-            val logicalEvent = when (event) {
-                is MainScreenEvent.ScreenGestureStarted -> {
-                    val logicalPoint = Perspective.screenToLogical(
-                        event.position,
-                        currentState.inversePitchMatrix ?: return@launch
-                    )
-                    MainScreenEvent.LogicalGestureStarted(
-                        logicalPoint,
-                        Offset(event.position.x, event.position.y)
-                    )
-                }
-
-                is MainScreenEvent.Drag -> {
-                    val prevLogical = Perspective.screenToLogical(
-                        event.previousPosition,
-                        currentState.inversePitchMatrix ?: return@launch
-                    )
-                    val currLogical = Perspective.screenToLogical(
-                        event.currentPosition,
-                        currentState.inversePitchMatrix ?: return@launch
-                    )
-                    val screenDelta = Offset(
-                        event.currentPosition.x - event.previousPosition.x,
-                        event.currentPosition.y - event.previousPosition.y
-                    )
-                    MainScreenEvent.LogicalDragApplied(prevLogical, currLogical, screenDelta)
-                }
-
-                else -> event
+            val nextMode = currentState.pendingExperienceMode?.next() ?: currentState.experienceMode?.next() ?: ExperienceMode.EXPERT
+            _uiState.value = currentState.copy(pendingExperienceMode = nextMode)
+            experienceModeUpdateJob = viewModelScope.launch {
+                delay(1000)
+                onEvent(MainScreenEvent.ApplyPendingExperienceMode)
             }
-
-            val reducedState =
-                stateReducer(currentState, logicalEvent, reducerUtils, gestureReducer)
-
-            // After CV data is integrated into state, update snap candidates.
-            val finalState = if (logicalEvent is MainScreenEvent.CvDataUpdated) {
-                snapReducer.reduce(reducedState, logicalEvent.visionData)
-            } else {
-                reducedState
-            }
-
-            val updateType = determineUpdateType(currentState, finalState, logicalEvent)
-
-            processAndEmitState(finalState, updateType)
-
-            handleSingleEvents(logicalEvent)
+            return
         }
+
+        val currentState = _uiState.value
+
+        val logicalEvent = when (event) {
+            is MainScreenEvent.ScreenGestureStarted -> {
+                val logicalPoint = Perspective.screenToLogical(
+                    event.position,
+                    currentState.inversePitchMatrix ?: return
+                )
+                MainScreenEvent.LogicalGestureStarted(
+                    logicalPoint,
+                    Offset(event.position.x, event.position.y)
+                )
+            }
+
+            is MainScreenEvent.Drag -> {
+                val prevLogical = Perspective.screenToLogical(
+                    event.previousPosition,
+                    currentState.inversePitchMatrix ?: return
+                )
+                val currLogical = Perspective.screenToLogical(
+                    event.currentPosition,
+                    currentState.inversePitchMatrix ?: return
+                )
+                val screenDelta = Offset(
+                    event.currentPosition.x - event.previousPosition.x,
+                    event.currentPosition.y - event.previousPosition.y
+                )
+                MainScreenEvent.LogicalDragApplied(prevLogical, currLogical, screenDelta)
+            }
+
+            else -> event
+        }
+
+        val reducedState =
+            stateReducer(currentState, logicalEvent, reducerUtils, gestureReducer)
+
+        // After CV data is integrated into state, update snap candidates.
+        val finalState = if (logicalEvent is MainScreenEvent.CvDataUpdated) {
+            snapReducer.reduce(reducedState, logicalEvent.visionData)
+        } else {
+            reducedState
+        }
+
+        val updateType = determineUpdateType(currentState, finalState, logicalEvent)
+
+        processAndEmitState(finalState, updateType)
+
+        handleSingleEvents(logicalEvent)
     }
 
     private fun processAndEmitState(state: CueDetatState, type: UpdateType) {
@@ -234,8 +247,10 @@ class MainViewModel @Inject constructor(
         event: MainScreenEvent
     ): UpdateType {
         return when (event) {
+            is MainScreenEvent.FullOrientationChanged -> UpdateType.MATRICES_ONLY
+
             is MainScreenEvent.SizeChanged, is MainScreenEvent.ZoomScaleChanged, is MainScreenEvent.ZoomSliderChanged,
-            is MainScreenEvent.PanView, is MainScreenEvent.FullOrientationChanged, is MainScreenEvent.TableRotationChanged,
+            is MainScreenEvent.PanView, is MainScreenEvent.TableRotationChanged,
             is MainScreenEvent.TableRotationApplied, is MainScreenEvent.SetExperienceMode, is MainScreenEvent.ToggleBankingMode,
             is MainScreenEvent.SetTableSize, is MainScreenEvent.RestoreState -> UpdateType.FULL
 
