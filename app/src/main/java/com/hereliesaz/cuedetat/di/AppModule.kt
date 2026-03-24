@@ -16,6 +16,8 @@ import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.hereliesaz.cuedetat.data.ShakeDetector
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.network.GithubApi
+import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
+import com.hereliesaz.cuedetat.ui.composables.tablescan.TFLitePocketDetector
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -96,6 +98,16 @@ object AppModule {
     @Singleton
     fun provideShakeDetector(@ApplicationContext context: Context): ShakeDetector {
         return ShakeDetector(context)
+    }
+
+    /**
+     * Provides the TFLite-backed pocket detector used during table scanning.
+     * Gracefully degrades to Hough circles if the model fails to initialize.
+     */
+    @Provides
+    @Singleton
+    fun providePocketDetector(@ApplicationContext context: Context): PocketDetector {
+        return TFLitePocketDetector(context)
     }
 
     /**

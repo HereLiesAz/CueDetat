@@ -113,6 +113,9 @@ dependencies {
     // ARCore — Depth API (optional; app degrades gracefully on unsupported devices)
     implementation("com.google.ar:core:1.44.0")
 
+    // TFLite — pocket detection model
+    implementation(libs.tensorflow.lite)
+
     // Physics
     // implementation(libs.google.liquidfun)
 

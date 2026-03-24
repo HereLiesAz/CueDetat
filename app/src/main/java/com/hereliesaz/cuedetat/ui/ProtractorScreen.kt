@@ -82,7 +82,7 @@ fun ProtractorScreen(
     val navController = rememberNavController()
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
-    val tableScanAnalyzer = remember(tableScanViewModel) { TableScanAnalyzer(tableScanViewModel::onFrame, tableScanViewModel::onFeltColorSampled) }
+    val tableScanAnalyzer = remember(tableScanViewModel) { TableScanAnalyzer(tableScanViewModel::onFrame, tableScanViewModel::onFeltColorSampled, tableScanViewModel.pocketDetector) }
 
     LaunchedEffect(uiState.showCalibrationScreen) {
         val route = navController.currentBackStackEntry?.destination?.route

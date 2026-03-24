@@ -38,7 +38,8 @@ private const val CLUSTER_MERGE_DISTANCE = 3.0f
 
 @HiltViewModel
 class TableScanViewModel @Inject constructor(
-    private val tableScanRepository: TableScanRepository
+    private val tableScanRepository: TableScanRepository,
+    val pocketDetector: PocketDetector
 ) : ViewModel() {
 
     private val _scanProgress = MutableStateFlow<Map<PocketId, Boolean>>(emptyMap())
