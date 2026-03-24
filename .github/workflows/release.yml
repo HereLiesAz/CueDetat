@@ -51,8 +51,8 @@ jobs:
       - name: Determine Version
         id: versioning
         run: |
-          # Base version for pre-releases
-          BASE_VERSION_NAME="1.3.0"
+          # Base version read from the single source of truth
+          BASE_VERSION_NAME=$(grep "^versionName=" version.properties | cut -d= -f2)
 
           # Create unique version using run number
           NEW_VERSION_NAME="${BASE_VERSION_NAME}.${{ github.run_number }}"

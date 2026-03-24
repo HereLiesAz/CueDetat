@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.hilt.android)
@@ -13,8 +15,12 @@ android {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 26
         targetSdk = 36
-        versionCode = project.findProperty("versionCode")?.toString()?.toInt() ?: 4
-        versionName = project.findProperty("versionName")?.toString() ?: "1.4"
+        val versionProps = Properties()
+        versionProps.load(rootProject.file("version.properties").reader())
+        versionCode = (project.findProperty("versionCode") as? String
+            ?: versionProps.getProperty("versionCode")).toInt()
+        versionName = (project.findProperty("versionName") as? String
+            ?: versionProps.getProperty("versionName"))
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
