@@ -113,7 +113,32 @@ fun AzNavRailMenu(
         azMenuItem(id = "tutorial", text = "Tutorial", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.StartTutorial) })
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailToggle(id = "ar", isChecked = uiState.cameraMode == CameraMode.AR_ACTIVE, toggleOnText = "AR", toggleOffText = "AR", fillColor = b3R, textColor = Color.White, onClick = { onEvent(MainScreenEvent.CycleCameraMode) })
+            val isArActive = uiState.cameraMode == CameraMode.AR_SETUP || uiState.cameraMode == CameraMode.AR_ACTIVE
+            azRailToggle(
+                id = "ar",
+                isChecked = isArActive,
+                toggleOnText = "AR", toggleOffText = "AR",
+                fillColor = b3R, textColor = Color.White,
+                onClick = { if (!isArActive) onEvent(MainScreenEvent.CycleCameraMode) }
+            )
+            if (uiState.cameraMode == CameraMode.AR_SETUP) {
+                azRailItem(
+                    id = "ar_cancel",
+                    text = "Cancel",
+                    fillColor = Color(0xFF8B0000),
+                    textColor = Color.White,
+                    onClick = { onEvent(MainScreenEvent.CancelArSetup) }
+                )
+            }
+            if (uiState.cameraMode == CameraMode.CAMERA_ONLY) {
+                azRailItem(
+                    id = "camera_off",
+                    text = "Off",
+                    fillColor = b12P,
+                    textColor = Color.White,
+                    onClick = { onEvent(MainScreenEvent.TurnCameraOff) }
+                )
+            }
         }
         azDivider()
 
