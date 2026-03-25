@@ -53,4 +53,48 @@ We use OpenCV to detect balls based on color.
 
 ## 3. Ghost Ball Physics
 
-(To be implemented: Describe the calculation of the cut angle and tangent lines).
+### Cut Angle & Ghost Ball Position
+
+The "ghost ball" is the position the cue ball must occupy at the moment of contact to send the target ball into the pocket. Given:
+- Cue ball center **C**
+- Target ball center **T**
+- Pocket center **P**
+
+The ghost ball center **G** is found by walking backwards from **T** toward **C** by one ball diameter:
+
+    direction = normalize(T → P)
+    G = T - direction × (2 × ballRadius)
+
+### Tangent Line
+
+After impact, the cue ball travels perpendicular to the line connecting the two ball centers at impact. The tangent line direction:
+
+    tangentDir = perpendicular(normalize(G → T))
+
+This is the theoretical trajectory of the cue ball post-impact (zero English). Sidespin modifies the actual path — see Spin Paths in `CalculateSpinPaths.kt`.
+
+### Cut Angle
+
+The cut angle θ is the angle between the original cue ball travel direction and the line **C→G**:
+
+    θ = acos(dot(normalize(C → shotTarget), normalize(C → G)))
+
+A cut of 0° is a straight shot; 90° is a full cut (barely grazes the target ball, rarely pocketable).
+
+## 4. TPS Lens Distortion Correction
+
+The AR overlay uses a **Thin-Plate Spline (TPS)** residual warp to correct for lens distortion beyond what a simple homography can model.
+
+### Overview
+
+1. **Table Scan** — `TableScanViewModel` collects 6 pocket positions in image space and fits a homography H mapping image → logical space.
+2. **Geometry Fit** — `TableGeometryFitter` assigns identities (TL, TR, BL, BR, SL, SR) and produces the 6 *true* logical positions from the known 2:1 table model.
+3. **Residual TPS** — `ThinPlateSpline` solves the system: src = homography-estimated logical positions, dst = true logical positions. The residual TPS captures what the homography got wrong.
+4. **Rendering** — `TpsUtils.warpedBy(tps)` applies the *inverse* TPS (dst→src) to each draw point before passing it to the `pitchMatrix`. This corrects the rendered overlay to match real physical pocket positions.
+
+### AR Overlay Confidence & Auto-Advance
+
+`VisionData.tableOverlayConfidence` (0–1) is set by the CV pipeline during `AR_SETUP`. `CvReducer` auto-advances `AR_SETUP → AR_ACTIVE` when:
+- `lockedHsvColor != null` (color step done)
+- `tableScanModel != null` (scan step done)
+- `tableOverlayConfidence >= 0.8`
