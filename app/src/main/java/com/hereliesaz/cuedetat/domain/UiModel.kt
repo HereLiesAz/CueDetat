@@ -41,6 +41,10 @@ enum class ExperienceMode {
     }
 }
 
+enum class BallSelectionPhase {
+    NONE, AWAITING_CUE, AWAITING_TARGET
+}
+
 @Keep
 data class CueDetatState(
     val experienceMode: ExperienceMode? = null,
@@ -145,6 +149,10 @@ data class CueDetatState(
     val isWorldLocked: Boolean = false,
     @Transient val preResetState: CueDetatState? = null,
     @Transient val postResetState: CueDetatState? = null,
+    @Transient val ballSelectionPhase: BallSelectionPhase = BallSelectionPhase.NONE,
+    @Transient val cueBallCvAnchor: PointF? = null,
+    @Transient val targetCvAnchor: PointF? = null,
+    @Transient val obstacleCvAnchors: List<PointF?> = emptyList(),
     @Transient val latestVersionName: String? = null,
     val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
     @Transient val targetBallDistance: Float = 0f,

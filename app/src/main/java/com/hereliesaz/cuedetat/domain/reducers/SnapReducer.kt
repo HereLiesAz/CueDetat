@@ -102,13 +102,48 @@ class SnapReducer @Inject constructor() {
         // NOTE: Any candidates remaining in 'previousCandidates' were NOT matched in this frame.
         // They are implicitly dropped (lost tracking). This acts as a basic debouncing/cleanup.
 
-        // The heresy of passive auto-snapping has been purged.
-        // Snapping now only occurs in the GestureReducer upon user action (e.g., releasing a drag).
-        // This reducer is now only responsible for maintaining the candidate list for UI visualization.
+        // Re-anchor virtual balls to their nearest CV candidate, if anchored.
+        // Uses a generous threshold (3× snap proximity) to hold through brief occlusions.
+        val anchorFollowThreshold = SNAP_PROXIMITY_THRESHOLD_PX * 3
 
-        // Return the state with the updated list of candidates.
+        var newOnPlaneBall = currentState.onPlaneBall
+        var newProtractorUnit = currentState.protractorUnit
+        var newCueBallAnchor = currentState.cueBallCvAnchor
+        var newTargetAnchor = currentState.targetCvAnchor
+
+        currentState.cueBallCvAnchor?.let { anchor ->
+            val nearest = newCandidates.minByOrNull {
+                hypot((it.detectedPoint.x - anchor.x).toDouble(), (it.detectedPoint.y - anchor.y).toDouble())
+            }
+            val dist = nearest?.let {
+                hypot((it.detectedPoint.x - anchor.x).toDouble(), (it.detectedPoint.y - anchor.y).toDouble())
+            } ?: Double.MAX_VALUE
+            if (nearest != null && dist < anchorFollowThreshold) {
+                newCueBallAnchor = nearest.detectedPoint
+                newOnPlaneBall = newOnPlaneBall?.copy(center = nearest.detectedPoint)
+            }
+            // else: hold last known position — anchor and virtual ball unchanged
+        }
+
+        currentState.targetCvAnchor?.let { anchor ->
+            val nearest = newCandidates.minByOrNull {
+                hypot((it.detectedPoint.x - anchor.x).toDouble(), (it.detectedPoint.y - anchor.y).toDouble())
+            }
+            val dist = nearest?.let {
+                hypot((it.detectedPoint.x - anchor.x).toDouble(), (it.detectedPoint.y - anchor.y).toDouble())
+            } ?: Double.MAX_VALUE
+            if (nearest != null && dist < anchorFollowThreshold) {
+                newTargetAnchor = nearest.detectedPoint
+                newProtractorUnit = newProtractorUnit.copy(center = nearest.detectedPoint)
+            }
+        }
+
         return currentState.copy(
             snapCandidates = newCandidates,
+            onPlaneBall = newOnPlaneBall,
+            protractorUnit = newProtractorUnit,
+            cueBallCvAnchor = newCueBallAnchor,
+            targetCvAnchor = newTargetAnchor
         )
     }
 }

@@ -11,6 +11,7 @@ import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.withMatrix
+import com.hereliesaz.cuedetat.domain.BallSelectionPhase
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.ui.ZoomMapping
@@ -73,6 +74,36 @@ class BallRenderer {
                         logicalBall.radius * 0.5f,
                         snappedPaint
                     )
+                    canvas.restore()
+                }
+            }
+        }
+
+        // Draw tap-target rings on confirmed snap candidates during ball selection phases
+        if (state.ballSelectionPhase != BallSelectionPhase.NONE) {
+            val candidates = state.snapCandidates?.filter { it.isConfirmed } ?: emptyList()
+            val candidateRingPaint = Paint().apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 5f
+                color = when (state.ballSelectionPhase) {
+                    BallSelectionPhase.AWAITING_CUE -> Color(0xFFFFEB3B).toArgb()   // yellow = cue ball color
+                    BallSelectionPhase.AWAITING_TARGET -> Color(0xFF4FC3F7).toArgb() // light blue = target
+                    BallSelectionPhase.NONE -> Color.White.toArgb()
+                }
+                alpha = 200
+            }
+            val candidateGlowPaint = Paint(candidateRingPaint).apply {
+                strokeWidth = 14f
+                alpha = 60
+                maskFilter = android.graphics.BlurMaskFilter(18f, android.graphics.BlurMaskFilter.Blur.NORMAL)
+            }
+            state.pitchMatrix?.let { matrix ->
+                candidates.forEach { candidate ->
+                    canvas.save()
+                    canvas.concat(matrix)
+                    val r = state.protractorUnit.radius
+                    canvas.drawCircle(candidate.detectedPoint.x, candidate.detectedPoint.y, r * 1.3f, candidateGlowPaint)
+                    canvas.drawCircle(candidate.detectedPoint.x, candidate.detectedPoint.y, r * 1.3f, candidateRingPaint)
                     canvas.restore()
                 }
             }

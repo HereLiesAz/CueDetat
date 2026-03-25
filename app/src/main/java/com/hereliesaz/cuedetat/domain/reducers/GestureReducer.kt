@@ -2,10 +2,13 @@ package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
 import androidx.compose.ui.geometry.Offset
+import com.hereliesaz.cuedetat.domain.BallSelectionPhase
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
+import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ReducerUtils
+import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -33,9 +36,34 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         }
 
         val spinControlCenter = currentState.spinControlCenter
+        val touchRadius = 25f * 4.0f
+
+        // 0. Ball Selection Phase: tap near a confirmed snap candidate to attach a virtual ball
+        if (currentState.tableScanModel != null &&
+            currentState.ballSelectionPhase != BallSelectionPhase.NONE) {
+            val confirmed = currentState.snapCandidates?.filter { it.isConfirmed } ?: emptyList()
+            val snapTapRadius = touchRadius * 2f
+            val closest = confirmed.minByOrNull { getDistance(event.logicalPoint, it.detectedPoint) }
+            if (closest != null && getDistance(event.logicalPoint, closest.detectedPoint) < snapTapRadius) {
+                return when (currentState.ballSelectionPhase) {
+                    BallSelectionPhase.AWAITING_CUE -> currentState.copy(
+                        onPlaneBall = currentState.onPlaneBall?.copy(center = closest.detectedPoint)
+                            ?: OnPlaneBall(center = closest.detectedPoint, radius = LOGICAL_BALL_RADIUS),
+                        cueBallCvAnchor = closest.detectedPoint,
+                        ballSelectionPhase = BallSelectionPhase.AWAITING_TARGET
+                    )
+                    BallSelectionPhase.AWAITING_TARGET -> currentState.copy(
+                        protractorUnit = currentState.protractorUnit.copy(center = closest.detectedPoint),
+                        targetCvAnchor = closest.detectedPoint,
+                        ballSelectionPhase = BallSelectionPhase.NONE
+                    )
+                    BallSelectionPhase.NONE -> currentState
+                }
+            }
+            // Tap missed all candidates — fall through to normal interaction
+        }
         val onPlaneBall = currentState.onPlaneBall
         val protractorUnit = currentState.protractorUnit
-        val touchRadius = 25f * 4.0f
 
         // 1. Relocate UI Widget (Double Tap + Drag on Center)
         if (currentState.isSpinControlVisible || currentState.isMasseModeActive) {

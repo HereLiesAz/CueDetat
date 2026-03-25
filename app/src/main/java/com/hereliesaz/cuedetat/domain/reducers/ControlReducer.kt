@@ -1,7 +1,9 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
+import com.hereliesaz.cuedetat.domain.BallSelectionPhase
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 
@@ -65,12 +67,19 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
 
         is MainScreenEvent.LoadTableScan -> state.copy(
             tableScanModel = action.model,
-            lensWarpTps = action.model.lensWarpTps
+            lensWarpTps = action.model.lensWarpTps,
+            ballSelectionPhase = if (state.experienceMode == ExperienceMode.EXPERT && state.ballSelectionPhase == BallSelectionPhase.NONE)
+                BallSelectionPhase.AWAITING_CUE else state.ballSelectionPhase,
+            cueBallCvAnchor = null,
+            targetCvAnchor = null
         )
 
         is MainScreenEvent.ClearTableScan -> state.copy(
             tableScanModel = null,
-            lensWarpTps = null
+            lensWarpTps = null,
+            ballSelectionPhase = BallSelectionPhase.NONE,
+            cueBallCvAnchor = null,
+            targetCvAnchor = null
         )
 
         is MainScreenEvent.UpdateArPose -> {

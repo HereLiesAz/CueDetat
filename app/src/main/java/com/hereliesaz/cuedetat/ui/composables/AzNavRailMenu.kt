@@ -21,6 +21,7 @@ import com.hereliesaz.aznavrail.AzNavHostScope
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import com.hereliesaz.aznavrail.model.AzDockingSide
 import com.hereliesaz.aznavrail.model.AzHeaderIconShape
+import com.hereliesaz.cuedetat.domain.BallSelectionPhase
 import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
@@ -57,6 +58,26 @@ fun AzNavRailMenu(
                     fontSize = 9.sp,
                     color = Color.White.copy(alpha = 0.55f),
                     modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                )
+            }
+        }
+
+        if (uiState.ballSelectionPhase == BallSelectionPhase.AWAITING_CUE) {
+            onscreen(alignment = Alignment.BottomCenter) {
+                Text(
+                    text = "Tap the cue ball",
+                    fontSize = 16.sp,
+                    color = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.padding(bottom = 32.dp)
+                )
+            }
+        } else if (uiState.ballSelectionPhase == BallSelectionPhase.AWAITING_TARGET) {
+            onscreen(alignment = Alignment.BottomCenter) {
+                Text(
+                    text = "Tap the target ball",
+                    fontSize = 16.sp,
+                    color = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.padding(bottom = 32.dp)
                 )
             }
         }
@@ -112,6 +133,7 @@ fun AzNavRailMenu(
         } else {
             val resetLabel = when {
                 uiState.obstacleBalls.isNotEmpty() -> "Clear"
+                uiState.targetCvAnchor != null -> "Undo"
                 uiState.preResetState != null -> "Undo"
                 uiState.postResetState != null -> "Redo"
                 else -> "Reset"
