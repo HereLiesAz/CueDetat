@@ -66,20 +66,19 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                         }
 
                         // 2. Rotation & Pan (Two-finger drag)
-                        // Allowed when Table is visible (Expert/Bank) OR in Dynamic Beginner Mode.
-                        if (uiState.table.isVisible || (uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked)) {
-                            // Rotation: Only for Expert/Banking (where table is visible).
-                            if (uiState.table.isVisible) {
-                                val rotation = event.calculateRotation()
-                                if (rotation != 0f) {
-                                    onEvent(MainScreenEvent.TableRotationApplied(rotation))
-                                }
+                        if (uiState.table.isVisible) {
+                            // Table visible (Expert/Banking): allow rotation and pan.
+                            val rotation = event.calculateRotation()
+                            if (rotation != 0f) {
+                                onEvent(MainScreenEvent.TableRotationApplied(rotation))
                             }
                             // Pan (using two fingers to move the camera view)
                             val pan = event.calculatePan()
                             if (abs(pan.y) > 0.1f || abs(pan.x) > 0.1f) {
                                 onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
                             }
+                        } else if (uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked) {
+                            // Dynamic beginner: pan suppressed to keep anchor at screen-center-bottom.
                         }
                     } else if (event.changes.size == 1) {
                         // SINGLE-TOUCH DETECTED (1 finger)
@@ -89,8 +88,9 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                         if (pan != Offset.Zero) {
                             // Special Case: "World Locked" mode (AR tracking suspended).
                             // If world is locked, single finger might PAN the view instead of dragging objects,
-                            // UNLESS we are in Beginner mode which locks the view entirely.
-                            if (uiState.isWorldLocked && (uiState.experienceMode != ExperienceMode.BEGINNER || !uiState.isBeginnerViewLocked)) {
+                            // UNLESS we are in dynamic Beginner mode which suppresses pan to keep the anchor fixed.
+                            val isDynamicBeginner = uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked
+                            if (uiState.isWorldLocked && !isDynamicBeginner) {
                                 onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
                             } else {
                                 // Standard Case: Dragging virtual objects (Ball, Slider, Spin control).
