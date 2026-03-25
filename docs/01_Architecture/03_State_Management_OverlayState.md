@@ -22,7 +22,7 @@ This document provides an overview of its key properties.
   disk, which forces the user to select a mode on every fresh application launch.
 - **`isBankingMode`**: `Boolean` flag to switch between Protractor and Banking modes.
 - **`isSpinControlVisible`**: `Boolean` for the visibility of the spin control UI.
-- **`isCameraVisible`**: `Boolean` for the visibility of the camera feed.
+- **`cameraMode`**: A `CameraMode` enum controlling the camera/AR pipeline. Values: `OFF` (camera inactive), `CAMERA` (camera preview, no AR), `AR_SETUP` (AR wizard in progress — guides user through color lock and table scan), `AR_ACTIVE` (AR overlay running), `CAMERA_ONLY` (camera on but AR deactivated, awaiting user action to turn off or re-enter AR setup).
 - **`orientationLock`**: An `OrientationLock` enum. Its default value is **`PORTRAIT`**.
 - **`isBeginnerViewLocked`**: A `Boolean` specific to Beginner Mode, which locks the view to a
   top-down perspective and disables certain interactions.
