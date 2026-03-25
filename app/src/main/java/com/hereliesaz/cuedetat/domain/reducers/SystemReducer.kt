@@ -74,7 +74,7 @@ private fun handleSizeChanged(
     // Also initialize spinControlCenter if null (e.g., restored from old saved state).
     // Ensure we have non-zero dimensions before calculating default center.
     val newSpinCenter = if (state.spinControlCenter == null && action.width > 0 && action.height > 0) {
-        PointF(action.width * 0.25f, action.height * 0.70f)
+        PointF(action.width - 108f * action.density, 116f * action.density)
     } else {
         state.spinControlCenter
     }
@@ -110,9 +110,9 @@ private fun createInitialState(
     // Default center for the target ball (ProtractorUnit) is logical (0,0).
     val initialProtractorCenter = PointF(0f, 0f)
 
-    // Default position for the spin control UI element (left side, 30% from bottom).
-    // Set X to 25% of width to ensure it's not covered by the nav rail (0.15f was too close).
-    val initialSpinControlCenter = PointF(viewWidth * 0.25f, viewHeight * 0.70f)
+    // Default position for the spin control UI element (top-right below top bar).
+    // Positioned at top-right: viewWidth - 108dp, 116dp from top.
+    val initialSpinControlCenter = PointF(viewWidth - 108f * density, 116f * density)
 
     // Construct and return the state object.
     return CueDetatState(
