@@ -69,7 +69,8 @@ fun stateReducer(
         is MainScreenEvent.PanView, is MainScreenEvent.ApplyQuickAlign,
         is MainScreenEvent.LoadTableScan, is MainScreenEvent.ClearTableScan,
         is MainScreenEvent.UpdateArPose, is MainScreenEvent.UpdateTableScanClusters,
-        is MainScreenEvent.DepthPlaneUpdated, is MainScreenEvent.DepthCapabilityDetected ->
+        is MainScreenEvent.DepthPlaneUpdated, is MainScreenEvent.DepthCapabilityDetected,
+        is MainScreenEvent.ArTrackingLost ->
             reduceControlAction(currentState, action)
 
         // --- COMPUTER VISION DATA ---
@@ -121,7 +122,9 @@ fun stateReducer(
         is MainScreenEvent.UnlockBeginnerView, is MainScreenEvent.LockBeginnerView,
         is MainScreenEvent.ToggleCalibrationScreen,
         is MainScreenEvent.ExitToSplash,
-        is MainScreenEvent.ToggleBankingMode, is MainScreenEvent.ToggleTableScanScreen ->
+        is MainScreenEvent.ToggleBankingMode, is MainScreenEvent.ToggleTableScanScreen,
+        is MainScreenEvent.CancelArSetup,
+        is MainScreenEvent.TurnCameraOff ->
             reduceToggleAction(currentState, action, reducerUtils)
 
         // --- ONBOARDING ---
