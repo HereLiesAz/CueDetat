@@ -51,6 +51,7 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                 val canceled = event.changes.any { it.isConsumed }
                 if (!canceled) {
                     val centroid = event.calculateCentroid()
+                    val isDynamicBeginner = uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked
 
                     // Check how many pointers are active.
                     if (event.changes.size > 1) {
@@ -77,7 +78,7 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                             if (abs(pan.y) > 0.1f || abs(pan.x) > 0.1f) {
                                 onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
                             }
-                        } else if (uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked) {
+                        } else if (isDynamicBeginner) {
                             // Dynamic beginner: pan suppressed to keep anchor at screen-center-bottom.
                         }
                     } else if (event.changes.size == 1) {
@@ -89,7 +90,6 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                             // Special Case: "World Locked" mode (AR tracking suspended).
                             // If world is locked, single finger might PAN the view instead of dragging objects,
                             // UNLESS we are in dynamic Beginner mode which suppresses pan to keep the anchor fixed.
-                            val isDynamicBeginner = uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked
                             if (uiState.isWorldLocked && !isDynamicBeginner) {
                                 onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
                             } else {
