@@ -131,9 +131,12 @@ fun ProtractorScreen(
                     )
                 }
                 uiState.cameraMode != CameraMode.OFF -> {
-                    val activeAnalyzer = when (currentRoute) {
-                        ROUTE_CALIBRATION -> calibrationAnalyzer
-                        ROUTE_SCAN -> tableScanAnalyzer
+                    // Static beginner mode shows the camera as a background but CV must not run.
+                    // Pass null → CameraBackground binds Preview only, no ImageAnalysis use case.
+                    val activeAnalyzer: ImageAnalysis.Analyzer? = when {
+                        uiState.isBeginnerViewLocked -> null
+                        currentRoute == ROUTE_CALIBRATION -> calibrationAnalyzer
+                        currentRoute == ROUTE_SCAN -> tableScanAnalyzer
                         else -> mainViewModel.visionAnalyzer
                     }
                     CameraBackground(
