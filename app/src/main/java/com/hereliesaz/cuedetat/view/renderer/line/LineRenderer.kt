@@ -614,39 +614,39 @@ class LineRenderer {
             d += 15f
         }
 
-        if (drawTriangles && visibleCount > 5) {
-            val trianglePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.FILL
-                color = paint.color
-            }
-
-            val spacing = visibleCount / 4
-            for (i in 1..3) {
-                val ptIdx = (i * spacing).coerceIn(0, visibleCount - 1) * 4
-                val x = visiblePtsBuffer[ptIdx]
-                val y = visiblePtsBuffer[ptIdx + 1]
-                val tx = visiblePtsBuffer[ptIdx + 2]
-                val ty = visiblePtsBuffer[ptIdx + 3]
-                val angle = Math.toDegrees(atan2(ty.toDouble(), tx.toDouble())).toFloat()
-
-                canvas.save()
-                canvas.translate(x, y)
-                canvas.rotate(angle)
-
-                val triPath = Path().apply {
-                    moveTo(80f, 0f)
-                    lineTo(-50f, 120f)
-                    lineTo(-50f, -120f)
-                    close()
-                }
-                canvas.drawPath(triPath, trianglePaint)
-                canvas.restore()
-            }
-        }
-
         if (drawGeometry) {
             glowPaint?.let { canvas.drawPath(path, it) }
             canvas.drawPath(path, paint)
+
+            if (drawTriangles && visibleCount > 5) {
+                val trianglePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    style = Paint.Style.FILL
+                    color = paint.color
+                }
+
+                val spacing = visibleCount / 4
+                for (i in 1..3) {
+                    val ptIdx = (i * spacing).coerceIn(0, visibleCount - 1) * 4
+                    val x = visiblePtsBuffer[ptIdx]
+                    val y = visiblePtsBuffer[ptIdx + 1]
+                    val tx = visiblePtsBuffer[ptIdx + 2]
+                    val ty = visiblePtsBuffer[ptIdx + 3]
+                    val angle = Math.toDegrees(atan2(ty.toDouble(), tx.toDouble())).toFloat()
+
+                    canvas.save()
+                    canvas.translate(x, y)
+                    canvas.rotate(angle)
+
+                    val triPath = Path().apply {
+                        moveTo(80f, 0f)
+                        lineTo(-50f, 120f)
+                        lineTo(-50f, -120f)
+                        close()
+                    }
+                    canvas.drawPath(triPath, trianglePaint)
+                    canvas.restore()
+                }
+            }
         }
 
         if (textToDraw != null && state.areHelpersVisible && visibleCount > 0) {
