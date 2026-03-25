@@ -27,16 +27,17 @@ fun createGlowPaint(
     baseGlowColor: Color,
     baseGlowWidth: Float,
     state: CueDetatState,
-    paints: com.hereliesaz.cuedetat.view.PaintCache
+    paints: com.hereliesaz.cuedetat.view.PaintCache,
+    blurType: android.graphics.BlurMaskFilter.Blur = android.graphics.BlurMaskFilter.Blur.NORMAL
 ): Paint {
     // Determine a cache key based on the glow stick state.
     // If glow stick is active, key depends on its value.
     // If inactive, key depends on the base color and width.
     val glowValue = state.glowStickValue
     val key = if (abs(glowValue) > 0.05f) {
-        "glow_${glowValue}"
+        "glow_${glowValue}_${blurType.name}"
     } else {
-        "glow_${baseGlowColor}_${baseGlowWidth}"
+        "glow_${baseGlowColor}_${baseGlowWidth}_${blurType.name}"
     }
 
     // Retrieve from cache or create new.
@@ -56,14 +57,14 @@ fun createGlowPaint(
 
             paint.color = color
             paint.alpha = glowAlpha
-            paint.maskFilter = BlurMaskFilter(blurRadius, BlurMaskFilter.Blur.NORMAL)
+            paint.maskFilter = BlurMaskFilter(blurRadius, blurType)
         } else {
             // Default behavior: Use the provided base color.
             paint.color = baseGlowColor.toArgb()
             // Default glow is 70% opacity of the base color.
             paint.alpha = (baseGlowColor.alpha * 255 * 0.7f).toInt()
             // Fixed blur radius for standard UI elements.
-            paint.maskFilter = BlurMaskFilter(8f, BlurMaskFilter.Blur.NORMAL)
+            paint.maskFilter = BlurMaskFilter(8f, blurType)
         }
         paint
     }
