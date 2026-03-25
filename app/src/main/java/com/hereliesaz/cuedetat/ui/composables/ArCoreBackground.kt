@@ -26,7 +26,7 @@ private const val TAG = "ArCoreBackground"
 /**
  * Full-screen camera background powered by ARCore.
  *
- * Replaces [CameraBackground] when [CameraMode.AR] is active. Uses a [GLSurfaceView] to:
+ * Replaces [CameraBackground] when [CameraMode.AR_ACTIVE] is active. Uses a [GLSurfaceView] to:
  * 1. Allocate an OES texture and hand its ID to the ARCore session.
  * 2. Render the camera feed as a fullscreen quad each frame.
  * 3. Feed the CPU camera image to [ArFrameProcessor] for OpenCV ball detection.

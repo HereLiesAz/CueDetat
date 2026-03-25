@@ -26,12 +26,14 @@ import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 import org.opencv.core.Mat
 
 enum class CameraMode {
-    OFF, CAMERA, AR;
+    OFF, CAMERA, AR_SETUP, AR_ACTIVE, CAMERA_ONLY;
     fun next(): CameraMode {
         val nextOrdinal = (this.ordinal + 1) % values().size
         return values()[nextOrdinal]
     }
 }
+
+enum class ArSetupStep { PICK_COLOR, SCAN_TABLE, VERIFY }
 
 enum class ExperienceMode {
     EXPERT, BEGINNER, HATER;
@@ -281,4 +283,9 @@ sealed class MainScreenEvent {
     // Depth / ARCore events
     data class DepthPlaneUpdated(val plane: DepthPlane) : MainScreenEvent()
     data class DepthCapabilityDetected(val capability: DepthCapability) : MainScreenEvent()
+
+    // AR setup / lifecycle events
+    object CancelArSetup : MainScreenEvent()
+    object TurnCameraOff : MainScreenEvent()
+    object ArTrackingLost : MainScreenEvent()
 }

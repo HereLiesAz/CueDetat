@@ -121,7 +121,7 @@ fun ProtractorScreen(
         // All other camera modes use the standard CameraX-backed CameraBackground.
         background(weight = 0) {
             when {
-                uiState.cameraMode == CameraMode.AR
+                uiState.cameraMode == CameraMode.AR_ACTIVE
                         && uiState.depthCapability == com.hereliesaz.cuedetat.domain.DepthCapability.DEPTH_API
                         && isOnMain -> {
                     ArCoreBackground(
@@ -378,14 +378,14 @@ fun ProtractorScreen(
         onscreen(alignment = Alignment.Center) {
             if (isOnMain) {
                 ArSetupPrompt(
-                    visible = uiState.cameraMode == CameraMode.AR && uiState.tableScanModel == null
+                    visible = uiState.cameraMode == CameraMode.AR_ACTIVE && uiState.tableScanModel == null
                 )
             }
         }
 
         // --- Onscreen: AR tracking badge (bottom-start, when AR is actively tracking) ---
         onscreen(alignment = Alignment.BottomStart) {
-            if (isOnMain && uiState.cameraMode == CameraMode.AR
+            if (isOnMain && uiState.cameraMode == CameraMode.AR_ACTIVE
                 && (uiState.tableScanModel != null || uiState.depthPlane != null)) {
                 ArTrackingBadge(
                     modifier = Modifier.padding(start = 16.dp, bottom = 72.dp),

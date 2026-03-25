@@ -113,7 +113,7 @@ fun AzNavRailMenu(
         azMenuItem(id = "tutorial", text = "Tutorial", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.StartTutorial) })
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailToggle(id = "ar", isChecked = uiState.cameraMode == CameraMode.AR, toggleOnText = "AR", toggleOffText = "AR", fillColor = b3R, textColor = Color.White, onClick = { onEvent(MainScreenEvent.CycleCameraMode) })
+            azRailToggle(id = "ar", isChecked = uiState.cameraMode == CameraMode.AR_ACTIVE, toggleOnText = "AR", toggleOffText = "AR", fillColor = b3R, textColor = Color.White, onClick = { onEvent(MainScreenEvent.CycleCameraMode) })
         }
         azDivider()
 

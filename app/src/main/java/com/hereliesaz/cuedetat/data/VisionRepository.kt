@@ -363,8 +363,8 @@ class VisionRepository @Inject constructor(
                 _visionDataFlow.value = finalVisionData
 
                 // AR tracking pass — only when using CameraX (not ARCore).
-                // When cameraMode == AR and ArCoreBackground is active, depth handles tracking.
-                if (state.cameraMode == CameraMode.AR && state.tableScanModel != null
+                // When cameraMode == AR_ACTIVE and ArCoreBackground is active, depth handles tracking.
+                if (state.cameraMode == CameraMode.AR_ACTIVE && state.tableScanModel != null
                     && state.depthCapability == com.hereliesaz.cuedetat.domain.DepthCapability.NONE) {
                     arFrameCounter++
                     if (arFrameCounter % 5 == 0) {
