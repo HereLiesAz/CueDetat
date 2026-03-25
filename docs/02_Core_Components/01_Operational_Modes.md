@@ -43,8 +43,8 @@ This is the default state upon entering Beginner Mode.
   perfectly flat orientation. This effect is constrained, preventing the 3D component's center from
   moving beyond its own radius from the 2D component's center. The tilt effect is capped at +/- 20
   degrees.
-- **Gestures**: All drag, pan, and multi-touch gestures are disabled. The protractor unit is
-  immobile.
+- **Gestures**: All pan, drag, and world-rotation gestures are disabled. The protractor unit is
+  immobile. Zoom is controlled exclusively via the on-screen zoom slider.
 - **Visuals**: The `ShotGuideLine`, distance display, and all warning popups are hidden. The tangent
   line is rendered as two solid lines.
 - **Zoom**: A special, expanded zoom range is active to make the protractor large and clear.
@@ -57,6 +57,8 @@ This mode is entered after the user taps "Unlock View".
 - **`isBeginnerViewLocked`**: `false`.
 - **View**: The standard 3D perspective tilt (based on pitch only) is enabled.
 - **Controls**: The `TargetBall` becomes draggable, and rotational aiming is enabled.
+- **Gestures**: Single-finger pan and two-finger pan are suppressed. Two-finger rotation
+  (`TableRotationApplied`) and pinch-to-zoom remain active.
 - **Visuals**: The `ShotGuideLine` becomes visible. The tangent line reverts to its standard
   half-solid, half-dotted appearance. Warnings and the distance display are active.
 - **Zoom**: The zoom range reverts to the standard range used in Expert Mode.

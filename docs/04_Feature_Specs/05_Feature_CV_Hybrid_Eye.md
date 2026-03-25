@@ -35,6 +35,41 @@ The application's vision system uses a hybrid, two-stage pipeline to achieve rob
 * This lock is automatically disengaged if the user begins dragging a ball or presses the "Reset
   View" button.
 
+## AR Table Tracking
+
+The AR overlay relies on a second vision sub-pipeline for pocket detection and table geometry.
+
+### Table Scan Pipeline
+
+1. **Pocket Detection** (`TableScanAnalyzer`): Runs a `CameraX` `ImageAnalysis` stream. Tries a
+   TFLite YOLOv5 model (`TFLitePocketDetector`) first; falls back to Hough circles if the model
+   file is absent.
+2. **Cluster Accumulation** (`TableScanViewModel`): Detected pocket positions are accumulated across
+   frames into `PocketCluster`s (one per pocket) to reduce noise.
+3. **Geometry Fit** (`TableGeometryFitter`): Once enough observations are collected, assigns pocket
+   identities (TL, TR, BL, BR, SL, SR) and fits a 2:1 table geometry model. Produces a homography
+   H mapping image space → logical space and the six true logical pocket positions.
+4. **TPS Residual Warp** (`ThinPlateSpline`): Solves a thin-plate spline from homography-estimated
+   logical positions to true logical positions. The residual TPS captures lens distortion beyond
+   what the homography can model.
+5. **Persistence** (`TableScanRepository`): Persists the resulting `TableScanModel` to disk as JSON.
+   Optionally attaches GPS coordinates for location-based table identification.
+
+### Overlay Confidence & Auto-Advance
+
+`VisionData.tableOverlayConfidence` (0–1 float) is populated by the CV pipeline during `AR_SETUP`
+to report how well the rendered overlay aligns with the detected pocket positions. `CvReducer`
+auto-advances `AR_SETUP → AR_ACTIVE` when all three conditions hold:
+- `lockedHsvColor != null` (felt color step complete)
+- `tableScanModel != null` (table scan step complete)
+- `tableOverlayConfidence >= 0.8`
+
+### ARCore Tracking Loss
+
+When ARCore tracking drops from `TRACKING` to `PAUSED`, `ArCoreBackground` dispatches an
+`ArTrackingLost` event. The handler clears `tableScanModel` and `lensWarpTps` from `CueDetatState`
+and returns `cameraMode` to `AR_SETUP`, requiring a fresh scan.
+
 ## Other CV Rules
 
 * **Conditional Snapping:** Auto-snapping of logical balls only occurs if the user places a logical

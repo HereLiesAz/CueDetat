@@ -27,8 +27,8 @@ The main application module must be configured with the following parameters:
     * **`defaultConfig`**:
         * `minSdk`: 26
         * `targetSdk`: 36
-      * `versionCode`: 21
-      * `versionName`: "0.9.0"
+      * `versionCode`: 24
+      * `versionName`: "0.9.3"
       * **ABI Splitting**: The build is configured to split APKs for four common ABIs (
         `armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`) to provide optimized builds for different
         devices.
@@ -67,5 +67,9 @@ essential libraries and their purpose:
     * `object-detection-custom` & `vision-common` (Google ML Kit): For the "Scout" phase of the
       vision pipeline.
     * `tensorflow-lite-task-vision`: The TFLite Task Library for custom models.
+* **Augmented Reality:**
+    * `com.google.ar:core`: The ARCore SDK for motion tracking, plane detection, and depth data.
+      Used by `ArDepthSession`, `ArCoreBackground`, and `ArFrameProcessor` to power the AR overlay
+      mode.
 * **Physics Engine:**
     * `com.google.liquidfun:liquidfun:1.1.0`: The physics engine used for Hater Mode.

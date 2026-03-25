@@ -11,7 +11,7 @@ This document specifies the application's visual identity.
 ## Theme Toggle
 
 * A menu option must exist to toggle between dark, light, and system-default themes.
-* The `isForceLightMode: Boolean?` property in `OverlayState` controls this: `true` for light,
+* The `isForceLightMode: Boolean?` property in `CueDetatState` controls this: `true` for light,
   `false` for dark, `null` for system.
 
 ## Glow Effect
@@ -21,6 +21,9 @@ This document specifies the application's visual identity.
   `BlurMaskFilter`.
 * **Line Glows:** Use `Paint.Style.FILL_AND_STROKE`.
 * **Ball Glows:** Use `Paint.Style.STROKE`.
+* **Beginner Ball Stationary Outline Glow:** Uses `BlurMaskFilter.Blur.OUTER` so that blur radiates
+  outward only, keeping the circle interior transparent. All other glows use `Blur.NORMAL`.
+  `createGlowPaint` accepts a `blurType` parameter (defaults to `Blur.NORMAL`).
 * Glows must be drawn *before* the primary element to create a halo effect.
 
 ## Stroke & Opacity Rules

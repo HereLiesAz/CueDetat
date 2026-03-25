@@ -10,8 +10,11 @@ The manifest must contain the following essential declarations:
 * **Permissions:**
     * `android.permission.CAMERA`: Required for the core functionality.
     * `android.permission.INTERNET`: Required for the "Check for Updates" feature.
+    * `com.google.ar.core` (uses-library): Required by the ARCore SDK for AR features.
 * **Features:**
     * `android.hardware.camera.any`: Declares that the app requires a camera.
+    * `android.hardware.camera.ar` (not required): Declares AR camera capability as optional so the
+      app installs on non-AR devices. ARCore features degrade gracefully when unavailable.
 * **Application Tag:**
     * `android:name=".MyApplication"`: This is **critical**. It specifies the custom Application
       class that initializes Hilt. The build will fail without it.

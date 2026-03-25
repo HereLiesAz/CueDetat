@@ -28,6 +28,16 @@ When a touch gesture begins, its intent is determined by the following order of 
    to the protractor's current rotation, providing a smooth, intuitive interaction where the aiming
    apparatus "picks up" and follows the gesture.
 
+## Beginner Mode Gesture Restrictions
+
+In **Beginner Locked** state (`isBeginnerViewLocked == true`): all pan, drag, and world-rotation
+gestures are disabled. The only input active is the on-screen zoom slider.
+
+In **Beginner Free Aim** state (`isBeginnerViewLocked == false`): single-finger pan (world pan) and
+two-finger pan are suppressed. Ball dragging, rotational aiming, two-finger rotation, and
+pinch-to-zoom remain active. The world stays locked; the user can only move elements relative to the
+stationary world frame.
+
 ### Heresies of Interaction
 
 To prevent reintroduction of past bugs and flawed user experiences, the following interaction models

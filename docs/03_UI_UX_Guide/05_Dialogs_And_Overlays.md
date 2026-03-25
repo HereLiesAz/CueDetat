@@ -30,3 +30,22 @@
 * **Camera Calibration Screen**:
   * A full-screen developer tool for performing a full camera calibration using an on-screen
     pattern.
+* **Table Scan Screen** (`TableScanScreen`):
+  * A full-screen overlay launched during `AR_SETUP`. Displays the live camera feed and instructs
+    the user to tap each of the six pocket positions. `TableScanAnalyzer` accumulates taps into
+    `PocketCluster`s; `TableGeometryFitter` fits a 2:1 geometry and computes a homography plus a
+    residual TPS warp for lens-distortion correction. On success the resulting `TableScanModel` is
+    persisted via `TableScanRepository`.
+* **AR Setup Wizard** (`ArSetupPrompt`):
+  * A non-blocking overlay visible while `cameraMode == AR_SETUP`. Displays a three-step wizard:
+    1. **Lock Felt Color** — tap the felt to sample its HSV color (`lockedHsvColor != null` → DONE).
+    2. **Scan Table** — complete the table scan (`tableScanModel != null` → DONE).
+    3. **Verify Alignment** — system checks overlay confidence; auto-advances to `AR_ACTIVE` when
+       `tableOverlayConfidence >= 0.8`.
+  * Each step shows one of three `WizardStepState` badges: `PENDING` (grey dot), `ACTIVE`
+    (accent-colored filled circle), `DONE` (filled circle with strikethrough text).
+  * The wizard is dismissed automatically when the state advances to `AR_ACTIVE`.
+* **AR Tracking Badge** (`ArTrackingBadge`):
+  * A small pulsing indicator shown in `AR_ACTIVE` state to signal that ARCore is tracking.
+  * When tracking drops from `TRACKING` to `PAUSED`, `ArCoreBackground` dispatches `ArTrackingLost`,
+    which clears the scan model and returns to `AR_SETUP`.

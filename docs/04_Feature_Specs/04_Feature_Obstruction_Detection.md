@@ -27,5 +27,5 @@ Guide Line** are rendered with a translucent under-stroke.
   to the center-line of both the Shot Guide Path and the Aiming Path.
 * **Collision Condition:** A collision occurs if this distance is less than the diameter of a ball (
   `radius * 2`).
-* **Result:** If a collision is detected, the `isObstructed` flag in the `OverlayState` must be set
+* **Result:** If a collision is detected, the `isObstructed` flag in the `CueDetatState` must be set
   to `true`, which engages the warning system.

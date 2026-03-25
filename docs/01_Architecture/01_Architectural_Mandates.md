@@ -18,7 +18,7 @@ will compromise the stability and maintainability of the codebase.
   refactored.
 
 * **Mandate 4: Holistic Model Updates**
-  Any change to a data model (e.g., in `OverlayState`) requires a thorough review of all components
+  Any change to a data model (e.g., in `CueDetatState`) requires a thorough review of all components
   that consume it (Reducers, UseCases, Renderers). Failure to account for the downstream impact of a
   model change is a primary source of bugs.
 

@@ -31,6 +31,13 @@ This document defines the logical objects that represent pool balls.
 * **Model**: An instance of `OnPlaneBall`.
 * **Rendering**: Rendered with a simple **dot** at its center.
 
+## Bubble Center Dot (Beginner Locked Mode)
+
+In the Beginner Locked state (`isBeginnerViewLocked == true`), the 3D "ghost" component of each
+ball is repurposed as a bubble level. A small hollow circle (white stroke, no fill) is drawn centered
+on the bubble's current floating position. This makes the bubble's location visible when it drifts
+away from the stationary 2D ball anchor due to device tilt.
+
 ## Default Positions
 
 * Upon reset, or when the table is first made visible, all positions are set to a table-centric
