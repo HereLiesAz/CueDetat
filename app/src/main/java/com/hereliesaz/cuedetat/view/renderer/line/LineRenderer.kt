@@ -101,6 +101,35 @@ class LineRenderer {
         canvas.restore()
     }
 
+    fun drawBeginnerLines(
+        canvas: Canvas,
+        state: CueDetatState,
+        paints: PaintCache,
+        activeMatrix: Matrix
+    ) {
+        val (camArray, distArray) = resolveLensArrays(state)
+        canvas.save()
+        canvas.concat(activeMatrix)
+        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true)
+        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true)
+        canvas.restore()
+    }
+
+    fun drawBeginnerLabels(
+        canvas: Canvas,
+        state: CueDetatState,
+        paints: PaintCache,
+        typeface: Typeface?,
+        activeMatrix: Matrix
+    ) {
+        val (camArray, distArray) = resolveLensArrays(state)
+        canvas.save()
+        canvas.concat(activeMatrix)
+        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false)
+        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false)
+        canvas.restore()
+    }
+
     private fun applyTableMask(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix) {
         paints.gradientMaskPaint.shader = null
         paints.gradientMaskPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
@@ -177,7 +206,7 @@ class LineRenderer {
         }
     }
 
-    private fun drawAimingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?) {
+    private fun drawAimingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true) {
         val aimingLineConfig = AimingLine()
         val isPocketed = state.aimedPocketIndex != null
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
@@ -209,16 +238,16 @@ class LineRenderer {
 
         if (state.table.isVisible || state.obstacleBalls.isNotEmpty()) {
             val layer = canvas.saveLayer(null, null)
-            drawBankablePath(canvas, path, obstructionPaint, null, isPocketed = false, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
+            drawBankablePath(canvas, path, obstructionPaint, null, isPocketed = false, state, paints, activeMatrix, camArray, distArray, false, null, typeface, drawGeometry)
             applyTableMask(canvas, state, paints, activeMatrix)
             canvas.restoreToCount(layer)
         }
 
-        val textToDraw = if (isBeginnerLocked) "Aim this line at the pocket." else null
-        drawBankablePath(canvas, path, aimingLinePaint, aimingLineGlow, isPocketed, state, paints, activeMatrix, camArray, distArray, isBeginnerLocked, textToDraw, typeface)
+        val textToDraw = if (isBeginnerLocked && !drawGeometry) "Aim this line at the pocket." else null
+        drawBankablePath(canvas, path, aimingLinePaint, aimingLineGlow, isPocketed, state, paints, activeMatrix, camArray, distArray, isBeginnerLocked, textToDraw, typeface, drawGeometry)
     }
 
-    private fun drawTangentLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?) {
+    private fun drawTangentLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true) {
         val tangentLineConfig = TangentLine()
         val isPocketed = state.tangentAimedPocketIndex != null
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
@@ -257,21 +286,22 @@ class LineRenderer {
         val start = rawStart.warpedBy(tps)
 
         if (isBeginnerLocked) {
-            drawClippedLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, true, "Tangent Line", typeface)
-            drawClippedLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, true, "Tangent Line", typeface)
+            val tangentTextToDraw = if (!drawGeometry) "Tangent Line" else null
+            drawClippedLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, true, tangentTextToDraw, typeface, drawGeometry)
+            drawClippedLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, true, tangentTextToDraw, typeface, drawGeometry)
             return
         }
 
         if (state.isStraightShot) {
-            drawClippedLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
-            drawClippedLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
+            drawClippedLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, false, null, typeface, drawGeometry)
+            drawClippedLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, false, null, typeface, drawGeometry)
         } else {
             val rawActivePath = state.tangentLineBankPath ?: listOf(rawStart, PointF(rawStart.x + tangentDx * 5000f * state.tangentDirection, rawStart.y + tangentDy * 5000f * state.tangentDirection))
             val activePath = rawActivePath.map { it.warpedBy(tps) }
-            drawBankablePath(canvas, activePath, tangentSolidPaint, tangentGlow, isPocketed, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
+            drawBankablePath(canvas, activePath, tangentSolidPaint, tangentGlow, isPocketed, state, paints, activeMatrix, camArray, distArray, false, null, typeface, drawGeometry)
 
             val inactiveDirection = normalize(PointF(tangentDx * -state.tangentDirection, tangentDy * -state.tangentDirection))
-            drawClippedLine(canvas, start, inactiveDirection, tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
+            drawClippedLine(canvas, start, inactiveDirection, tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, false, null, typeface, drawGeometry)
         }
     }
 
@@ -463,7 +493,8 @@ class LineRenderer {
         distArray: DoubleArray?,
         drawTriangles: Boolean,
         textToDraw: String?,
-        typeface: Typeface?
+        typeface: Typeface?,
+        drawGeometry: Boolean = true
     ) {
         if (path.size < 2) return
         val finalSegmentIndex = path.size - 2
@@ -476,7 +507,7 @@ class LineRenderer {
 
             if (isLastSegment) {
                 val direction = normalize(PointF(rawEnd.x - start.x, rawEnd.y - start.y))
-                drawClippedLine(canvas, start, direction, primaryPaint, glowPaint, state, paints, activeMatrix, camArray, distArray, drawTriangles, textToDraw, typeface)
+                drawClippedLine(canvas, start, direction, primaryPaint, glowPaint, state, paints, activeMatrix, camArray, distArray, drawTriangles, textToDraw, typeface, drawGeometry)
             } else {
                 val truncatedEnd = getTruncatedEnd(start, rawEnd, state)
                 val end = getSafeLogicalPoint(start, truncatedEnd, activeMatrix) ?: continue
@@ -484,8 +515,10 @@ class LineRenderer {
                 val segmentPath = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
                 canvas.save()
                 canvas.concat(inverseMatrix)
-                glowPaint?.let { canvas.drawPath(segmentPath, it) }
-                canvas.drawPath(segmentPath, primaryPaint)
+                if (drawGeometry) {
+                    glowPaint?.let { canvas.drawPath(segmentPath, it) }
+                    canvas.drawPath(segmentPath, primaryPaint)
+                }
                 canvas.restore()
             }
         }
@@ -542,7 +575,8 @@ class LineRenderer {
         distArray: DoubleArray?,
         drawTriangles: Boolean,
         textToDraw: String? = null,
-        typeface: Typeface? = null
+        typeface: Typeface? = null,
+        drawGeometry: Boolean = true
     ) {
         val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
 
@@ -610,8 +644,10 @@ class LineRenderer {
             }
         }
 
-        glowPaint?.let { canvas.drawPath(path, it) }
-        canvas.drawPath(path, paint)
+        if (drawGeometry) {
+            glowPaint?.let { canvas.drawPath(path, it) }
+            canvas.drawPath(path, paint)
+        }
 
         if (textToDraw != null && state.areHelpersVisible && visibleCount > 0) {
             val midPtIdx = (visibleCount / 2) * 4
@@ -642,6 +678,15 @@ class LineRenderer {
         }
 
         canvas.restore()
+    }
+
+    private fun resolveLensArrays(state: CueDetatState): Pair<DoubleArray?, DoubleArray?> {
+        val camMat = state.cameraMatrix
+        val distMat = state.distCoeffs
+        if (camMat == null || camMat.empty() || distMat == null || distMat.empty()) return null to null
+        val cam = DoubleArray(camMat.total().toInt()).also { camMat.get(0, 0, it) }
+        val dist = DoubleArray(distMat.total().toInt()).also { distMat.get(0, 0, it) }
+        return cam to dist
     }
 
     private fun normalize(p: PointF): PointF {
