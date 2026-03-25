@@ -31,9 +31,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.hereliesaz.cuedetat.domain.ArSetupStep
+import com.hereliesaz.cuedetat.domain.TableScanModel
 
 /**
  * Shown in the bottom-start corner when AR mode is active and a table scan exists.
@@ -91,21 +93,29 @@ fun ArTrackingBadge(
 }
 
 /**
- * Shown as a centered overlay when AR mode is selected but no table scan exists.
- * Guides the user through the setup steps.
+ * Shown as a centered overlay during AR_SETUP mode.
+ * Guides the user through the three setup steps with live progress.
  */
 @Composable
-fun ArSetupPrompt(visible: Boolean, modifier: Modifier = Modifier) {
+fun ArSetupPrompt(
+    visible: Boolean,
+    lockedHsvColor: FloatArray?,
+    tableScanModel: TableScanModel?,
+    modifier: Modifier = Modifier
+) {
+    val arSetupStep = when {
+        lockedHsvColor == null -> ArSetupStep.PICK_COLOR
+        tableScanModel == null -> ArSetupStep.SCAN_TABLE
+        else -> ArSetupStep.VERIFY
+    }
+
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(tween(400)),
         exit = fadeOut(tween(300)),
         modifier = modifier.fillMaxSize()
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(
                 modifier = Modifier
                     .clip(RoundedCornerShape(16.dp))
@@ -113,63 +123,61 @@ fun ArSetupPrompt(visible: Boolean, modifier: Modifier = Modifier) {
                     .padding(horizontal = 28.dp, vertical = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "AR Mode",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "AR tracks the table using its pockets\nas reference points.",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 20.sp
-                )
+                Text("AR Setup", color = MaterialTheme.colorScheme.primary,
+                    fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "To get started:",
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
+                WizardStep(
+                    number = "1",
+                    text = "Lock felt color — tap the table surface",
+                    state = if (lockedHsvColor != null) WizardStepState.DONE else WizardStepState.ACTIVE
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                SetupStep(number = "1", text = "Open the menu → tap \"Scan Table\"")
-                Spacer(modifier = Modifier.height(6.dp))
-                SetupStep(number = "2", text = "Move the camera over each pocket (6 total)")
-                Spacer(modifier = Modifier.height(6.dp))
-                SetupStep(number = "3", text = "Return here when the scan completes")
+                WizardStep(
+                    number = "2",
+                    text = "Point camera at the table",
+                    state = when {
+                        tableScanModel != null -> WizardStepState.DONE
+                        lockedHsvColor != null -> WizardStepState.ACTIVE
+                        else -> WizardStepState.PENDING
+                    }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                WizardStep(
+                    number = "3",
+                    text = "Verifying alignment…",
+                    state = when {
+                        arSetupStep == ArSetupStep.VERIFY -> WizardStepState.ACTIVE
+                        else -> WizardStepState.PENDING
+                    }
+                )
             }
         }
     }
 }
 
+private enum class WizardStepState { PENDING, ACTIVE, DONE }
+
 @Composable
-private fun SetupStep(number: String, text: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Start
-    ) {
+private fun WizardStep(number: String, text: String, state: WizardStepState) {
+    val (bgColor, textColor, numberText) = when (state) {
+        WizardStepState.DONE    -> Triple(Color(0xFF1B5E20), Color(0xFFA5D6A7), "✓")
+        WizardStepState.ACTIVE  -> Triple(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f), Color.White, number)
+        WizardStepState.PENDING -> Triple(Color(0xFF333333), Color(0xFF777777), number)
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
-            modifier = Modifier
-                .size(22.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)),
+            modifier = Modifier.size(24.dp).clip(CircleShape).background(bgColor),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = number,
-                color = Color.Black,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Text(numberText, color = textColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = text,
-            color = Color.White,
-            fontSize = 13.sp
+            color = if (state == WizardStepState.PENDING) Color(0xFF777777) else Color.White,
+            fontSize = 13.sp,
+            textDecoration = if (state == WizardStepState.DONE) TextDecoration.LineThrough else null,
+            lineHeight = 18.sp
         )
     }
 }

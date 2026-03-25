@@ -378,7 +378,9 @@ fun ProtractorScreen(
         onscreen(alignment = Alignment.Center) {
             if (isOnMain) {
                 ArSetupPrompt(
-                    visible = uiState.cameraMode == CameraMode.AR_ACTIVE && uiState.tableScanModel == null
+                    visible = uiState.cameraMode == CameraMode.AR_SETUP,
+                    lockedHsvColor = uiState.lockedHsvColor,
+                    tableScanModel = uiState.tableScanModel
                 )
             }
         }
