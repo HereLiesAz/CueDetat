@@ -221,18 +221,26 @@ class BallRenderer {
                 alpha = (config.opacity * 255).toInt()
                 style = Paint.Style.STROKE // Outline stroke, no fill
             }
-            val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints)
+            val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints,
+                blurType = android.graphics.BlurMaskFilter.Blur.OUTER)
             val screenInnerRadius = exactScreenRadius - (14f / 2f)
 
-            // 3. DRAW THE STATIONARY OUTLINE (Locked in place on the table) - STROKE, NO FILL, HAS DOT
-            // Drawn first so the bubble renders on top of it.
+            // 3. DRAW IN CORRECT LAYERED ORDER (bottom to top)
+            // Layer 1: Glow on static circle (outward only, OUTER blur)
             canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, exactScreenRadius, glowPaint)
+            // Layer 2: Static circle stroke ring
             canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, screenInnerRadius, strokePaint)
-            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, dotRadius, dotPaint)
-
-            // 4. DRAW THE BUBBLE (Moves with tilt) - TRANSLUCENT FILL, NO DOT
-            // Drawn last so it renders on top of the stationary outline.
+            // Layer 3: Bubble fill (translucent, moves with tilt)
             canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, exactScreenRadius, translucentFillPaint)
+            // Layer 4: Static center dot (white fill, fixed position)
+            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, dotRadius, dotPaint)
+            // Layer 5: Bubble center dot (white stroke only, moves with bubble)
+            val bubbleDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                style = Paint.Style.STROKE
+                strokeWidth = 3f
+            }
+            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, dotRadius, bubbleDotPaint)
 
         } else {
             // EXPERT MODE LOGIC
