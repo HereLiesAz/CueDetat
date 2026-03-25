@@ -106,6 +106,7 @@ private class ArCoreRenderer(
     private val background = ArBackgroundRenderer()
     private var surfaceWidth = 1
     private var surfaceHeight = 1
+    private var previousTrackingState: TrackingState? = null
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         background.createOnGlThread()
@@ -123,8 +124,15 @@ private class ArCoreRenderer(
         try {
             val frame: Frame = session.update()
             val camera = frame.camera
+            val currentTracking = camera.trackingState
 
-            if (camera.trackingState != TrackingState.STOPPED) {
+            if (previousTrackingState == TrackingState.TRACKING &&
+                currentTracking == TrackingState.PAUSED) {
+                onEvent(MainScreenEvent.ArTrackingLost)
+            }
+            previousTrackingState = currentTracking
+
+            if (currentTracking != TrackingState.STOPPED) {
                 background.draw(frame)
             }
 
