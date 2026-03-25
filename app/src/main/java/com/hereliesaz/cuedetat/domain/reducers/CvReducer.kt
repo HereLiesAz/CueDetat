@@ -1,5 +1,6 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
+import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 
@@ -38,6 +39,15 @@ internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueD
                     nextState = nextState.copy(isAutoCalibrating = false)
                 }
             }
+            // Auto-advance AR_SETUP → AR_ACTIVE when all conditions are met
+            val AR_AUTO_CONFIRM_CONFIDENCE_THRESHOLD = 0.8f
+            if (nextState.cameraMode == CameraMode.AR_SETUP &&
+                nextState.lockedHsvColor != null &&
+                nextState.tableScanModel != null &&
+                action.visionData.tableOverlayConfidence >= AR_AUTO_CONFIRM_CONFIDENCE_THRESHOLD) {
+                nextState = nextState.copy(cameraMode = CameraMode.AR_ACTIVE)
+            }
+
             nextState
         }
 

@@ -1,7 +1,9 @@
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
+import com.hereliesaz.cuedetat.data.VisionData
 import com.hereliesaz.cuedetat.domain.reducers.reduceControlAction
+import com.hereliesaz.cuedetat.domain.reducers.reduceCvAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceToggleAction
 import com.hereliesaz.cuedetat.view.state.TableSize
 import org.junit.Assert.assertEquals
@@ -85,5 +87,53 @@ class ArFlowReducerTest {
         val s = base.copy(cameraMode = CameraMode.CAMERA_ONLY)
         val result = reduceControlAction(s, MainScreenEvent.ArTrackingLost)
         assertEquals(CameraMode.CAMERA_ONLY, result.cameraMode)
+    }
+
+    @Test
+    fun `CvDataUpdated auto-advances to AR_ACTIVE when all conditions met`() {
+        val tps = TpsWarpData(
+            srcPoints = listOf(PointF(0f, 0f)),
+            dstPoints = listOf(PointF(1f, 1f))
+        )
+        val scan = TableScanModel(
+            pockets = emptyList(),
+            lensWarpTps = tps,
+            tableSize = com.hereliesaz.cuedetat.view.state.TableSize.EIGHT_FT,
+            feltColorHsv = listOf(0f, 0f, 0f),
+            scanLatitude = null,
+            scanLongitude = null
+        )
+        val s = base.copy(
+            cameraMode = CameraMode.AR_SETUP,
+            lockedHsvColor = floatArrayOf(60f, 0.5f, 0.8f),
+            tableScanModel = scan
+        )
+        val visionData = VisionData(tableOverlayConfidence = 0.9f)
+        val result = reduceCvAction(s, MainScreenEvent.CvDataUpdated(visionData))
+        assertEquals(CameraMode.AR_ACTIVE, result.cameraMode)
+    }
+
+    @Test
+    fun `CvDataUpdated does NOT auto-advance when confidence is low`() {
+        val tps = TpsWarpData(
+            srcPoints = listOf(PointF(0f, 0f)),
+            dstPoints = listOf(PointF(1f, 1f))
+        )
+        val scan = TableScanModel(
+            pockets = emptyList(),
+            lensWarpTps = tps,
+            tableSize = com.hereliesaz.cuedetat.view.state.TableSize.EIGHT_FT,
+            feltColorHsv = listOf(0f, 0f, 0f),
+            scanLatitude = null,
+            scanLongitude = null
+        )
+        val s = base.copy(
+            cameraMode = CameraMode.AR_SETUP,
+            lockedHsvColor = floatArrayOf(60f, 0.5f, 0.8f),
+            tableScanModel = scan
+        )
+        val visionData = VisionData(tableOverlayConfidence = 0.5f)
+        val result = reduceCvAction(s, MainScreenEvent.CvDataUpdated(visionData))
+        assertEquals(CameraMode.AR_SETUP, result.cameraMode)
     }
 }
