@@ -2,6 +2,7 @@ package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.domain.BallSelectionPhase
+import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
@@ -106,6 +107,12 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
 
         is MainScreenEvent.DepthCapabilityDetected ->
             state.copy(depthCapability = action.capability)
+
+        is MainScreenEvent.ArTrackingLost -> state.copy(
+            tableScanModel = null,
+            lensWarpTps = null,
+            cameraMode = if (state.cameraMode == CameraMode.AR_ACTIVE) CameraMode.AR_SETUP else state.cameraMode
+        )
 
         else -> state
     }
