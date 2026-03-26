@@ -48,8 +48,8 @@ internal fun reduceToggleAction(
             state.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)
         }
         is MainScreenEvent.CycleCameraMode -> when (state.cameraMode) {
-            CameraMode.OFF, CameraMode.CAMERA_ONLY -> state.copy(cameraMode = CameraMode.AR_SETUP)
-            else -> state
+            CameraMode.OFF -> state.copy(cameraMode = CameraMode.AR_SETUP)
+            else -> state.copy(cameraMode = CameraMode.OFF)
         }
         is MainScreenEvent.CancelArSetup -> state.copy(cameraMode = CameraMode.CAMERA_ONLY)
         is MainScreenEvent.TurnCameraOff -> state.copy(cameraMode = CameraMode.OFF)

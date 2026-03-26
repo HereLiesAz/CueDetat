@@ -195,7 +195,9 @@ class LineRenderer {
         if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
             // Skip inner line in Pass 1; it will be drawn in drawBeginnerForeground in Pass 4
         } else {
-            drawClippedLine(canvas, shotLineAnchor, shotGuideDirection, shotLinePaint, shotLineGlow, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
+            if (!state.isMasseModeActive) {
+                drawClippedLine(canvas, shotLineAnchor, shotGuideDirection, shotLinePaint, shotLineGlow, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
+            }
             drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
             drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
         }
@@ -207,6 +209,7 @@ class LineRenderer {
     }
 
     private fun drawAimingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true) {
+        if (state.isMasseModeActive && !state.masseConnectsTarget) return
         val aimingLineConfig = AimingLine()
         val isPocketed = state.aimedPocketIndex != null
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
@@ -248,6 +251,7 @@ class LineRenderer {
     }
 
     private fun drawTangentLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true) {
+        if (state.isMasseModeActive && !state.masseConnectsTarget) return
         val tangentLineConfig = TangentLine()
         val isPocketed = state.tangentAimedPocketIndex != null
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
