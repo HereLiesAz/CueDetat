@@ -32,17 +32,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (tiltElement && showcaseSection) {
         showcaseSection.addEventListener('mousemove', (e) => {
-            const rect = tiltElement.getBoundingClientRect();
+            requestAnimationFrame(() => {
+                const rect = tiltElement.getBoundingClientRect();
 
-            // Calculate mouse position relative to the element's center
-            const x = e.clientX - rect.left - rect.width / 2;
-            const y = e.clientY - rect.top - rect.height / 2;
+                // Calculate mouse position relative to the element's center
+                const x = e.clientX - rect.left - rect.width / 2;
+                const y = e.clientY - rect.top - rect.height / 2;
 
-            // Sensitivity modifiers
-            const multiplier = 0.05;
+                // Sensitivity modifiers
+                const multiplier = 0.05;
 
-            // Apply 3D transform (rotateX inversely to Y, rotateY directly to X)
-            tiltElement.style.transform = `perspective(1000px) rotateX(${-y * multiplier}deg) rotateY(${x * multiplier}deg) scale3d(1.05, 1.05, 1.05)`;
+                // Apply 3D transform (rotateX inversely to Y, rotateY directly to X)
+                tiltElement.style.transform = `perspective(1000px) rotateX(${-y * multiplier}deg) rotateY(${x * multiplier}deg) scale3d(1.05, 1.05, 1.05)`;
+            });
         });
 
         // Reset transform on mouse leave
