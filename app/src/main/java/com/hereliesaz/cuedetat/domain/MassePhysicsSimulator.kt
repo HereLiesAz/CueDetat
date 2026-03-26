@@ -84,16 +84,16 @@ object MassePhysicsSimulator {
 
             if (table.isVisible) {
                 val railHit = table.findRailIntersectionAndNormal(
-                    PointF(worldCurX, worldCurY),
-                    PointF(worldNextX, worldNextY)
+                    PointF().apply { x = worldCurX; y = worldCurY },
+                    PointF().apply { x = worldNextX; y = worldNextY }
                 )
                 if (railHit != null) {
                     val (worldIntersect, worldNormal) = railHit
 
                     val localIx = worldIntersect.x * cosR + worldIntersect.y * sinR
                     val localIy = -worldIntersect.x * sinR + worldIntersect.y * cosR
-                    points.add(PointF(localIx, localIy))
-                    impactPoints.add(PointF(localIx, localIy))
+                    points.add(PointF().apply { x = localIx; y = localIy })
+                    impactPoints.add(PointF().apply { x = localIx; y = localIy })
 
                     val localNx = worldNormal.x * cosR + worldNormal.y * sinR
                     val localNy = -worldNormal.x * sinR + worldNormal.y * cosR
@@ -115,16 +115,22 @@ object MassePhysicsSimulator {
 
             posX = nextX
             posY = nextY
-            points.add(PointF(posX, posY))
+            points.add(PointF().apply { x = posX; y = posY })
 
             if (sqrt(vx * vx + vy * vy) < 0.05f) break
         }
 
         val worldPoints = points.map { p ->
-            PointF(p.x * cosR - p.y * sinR, p.x * sinR + p.y * cosR)
+            PointF().apply {
+                x = p.x * cosR - p.y * sinR
+                y = p.x * sinR + p.y * cosR
+            }
         }
         val worldImpacts = impactPoints.map { p ->
-            PointF(p.x * cosR - p.y * sinR, p.x * sinR + p.y * cosR)
+            PointF().apply {
+                x = p.x * cosR - p.y * sinR
+                y = p.x * sinR + p.y * cosR
+            }
         }
 
         return MasseResult(

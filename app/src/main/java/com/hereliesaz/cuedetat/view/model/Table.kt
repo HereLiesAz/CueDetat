@@ -28,25 +28,28 @@ data class Table(
         val halfH = logicalHeight / 2f
 
         corners = listOf(
-            PointF(-halfW, -halfH),
-            PointF(halfW, -halfH),
-            PointF(halfW, halfH),
-            PointF(-halfW, halfH)
+            PointF().apply { x = -halfW; y = -halfH },
+            PointF().apply { x = halfW; y = -halfH },
+            PointF().apply { x = halfW; y = halfH },
+            PointF().apply { x = -halfW; y = halfH }
         )
 
         val sidePocketOffset = LOGICAL_BALL_RADIUS * 0.5f
 
         pockets = listOf(
-            PointF(-halfW, -halfH), PointF(halfW, -halfH),
-            PointF(-halfW, halfH), PointF(halfW, halfH),
-            PointF(-halfW - sidePocketOffset, 0f), PointF(halfW + sidePocketOffset, 0f)
+            PointF().apply { x = -halfW; y = -halfH },
+            PointF().apply { x = halfW; y = -halfH },
+            PointF().apply { x = -halfW; y = halfH },
+            PointF().apply { x = halfW; y = halfH },
+            PointF().apply { x = -halfW - sidePocketOffset; y = 0f },
+            PointF().apply { x = halfW + sidePocketOffset; y = 0f }
         )
 
         normals = listOf(
-            PointF(0f, 1f),
-            PointF(-1f, 0f),
-            PointF(0f, -1f),
-            PointF(1f, 0f)
+            PointF().apply { x = 0f; y = 1f },
+            PointF().apply { x = -1f; y = 0f },
+            PointF().apply { x = 0f; y = -1f },
+            PointF().apply { x = 1f; y = 0f }
         )
     }
 
@@ -96,7 +99,10 @@ data class Table(
         val u = -((p1.x - p2.x) * (p1.y - p3.y) - (p1.y - p2.y) * (p1.x - p3.x)) / d
 
         return if (t in 0.001f..1.0f && u in 0f..1f) {
-            PointF(p1.x + t * (p2.x - p1.x), p1.y + t * (p2.y - p1.y))
+            PointF().apply {
+                x = p1.x + t * (p2.x - p1.x)
+                y = p1.y + t * (p2.y - p1.y)
+            }
         } else {
             null
         }
@@ -115,9 +121,9 @@ data class Table(
         val newAngle = kotlin.math.atan2(reflectedVy, reflectedVx) + angleAdjustment
         val mag = kotlin.math.hypot(reflectedVx.toDouble(), reflectedVy.toDouble()).toFloat()
 
-        return PointF(
-            (mag * kotlin.math.cos(newAngle)).toFloat(),
-            (mag * kotlin.math.sin(newAngle)).toFloat()
-        )
+        return PointF().apply {
+            x = (mag * kotlin.math.cos(newAngle)).toFloat()
+            y = (mag * kotlin.math.sin(newAngle)).toFloat()
+        }
     }
 }

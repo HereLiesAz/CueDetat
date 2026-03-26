@@ -8,15 +8,17 @@ import org.junit.Test
 import kotlin.math.abs
 import kotlin.math.atan2
 
+private fun pf(x: Float, y: Float) = PointF().apply { this.x = x; this.y = y }
+
 class SpinPhysicsCalculatorTest {
 
     private val table = Table(size = TableSize.EIGHT_FT, isVisible = true)
 
     // Setup: ghost cue ball at (0,50), object ball at (0,0) — cue aimed straight up
-    private val cueBallPos = PointF(0f, 50f)
-    private val targetBallPos = PointF(0f, 0f)
+    private val cueBallPos = pf(0f, 50f)
+    private val targetBallPos = pf(0f, 0f)
     // Shot came from directly below (cue aimed straight up = same direction as impact)
-    private val shotAngle = atan2(cueBallPos.y - (cueBallPos.y + 100f), 0f)  // pointing from south
+    private val shotAngle = atan2(-100f, 0f)  // pointing north (up screen)
 
     @Test
     fun `path starts at cueBallPos`() {

@@ -49,7 +49,7 @@ object SpinPhysicsCalculator {
         repeat(maxBounces + 1) {
             val endX = currentPos.x + cos(currentAngle) * PATH_LENGTH
             val endY = currentPos.y + sin(currentAngle) * PATH_LENGTH
-            val endPoint = PointF(endX, endY)
+            val endPoint = PointF().apply { x = endX; y = endY }
 
             if (!table.isVisible) {
                 points.add(endPoint)
