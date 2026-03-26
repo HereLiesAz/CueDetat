@@ -98,9 +98,12 @@ class CalibrationViewModel @Inject constructor(
      */
     fun onCalibrationFinished() {
         val size = imageSize
-        if (captured2DPoints.size < 10 || size == null) {
-            // Not enough data to calibrate.
-            // TODO: Better error handling.
+        if (size == null || captured2DPoints.isEmpty()) {
+            _toastMessage.value = "No frames captured. Point the camera at a calibration pattern and capture frames."
+            return
+        }
+        if (captured2DPoints.size < 10) {
+            _toastMessage.value = "Not enough frames captured (${captured2DPoints.size}/10). Please capture more frames."
             return
         }
 
