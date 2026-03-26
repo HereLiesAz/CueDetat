@@ -264,7 +264,7 @@ class UpdateStateUseCase @Inject constructor(
     }
 
     private fun updateSpinCalculations(state: CueDetatState): CueDetatState {
-        if (state.isBankingMode) return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
+        if (state.isBankingMode) return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList(), masseConnectsTarget = false)
 
         val stored = state.selectedSpinOffset ?: state.lingeringSpinOffset
 
@@ -302,12 +302,13 @@ class UpdateStateUseCase @Inject constructor(
             )
             return state.copy(
                 spinPaths = mapOf(pathColor to path),
-                masseImpactPoints = emptyList()
+                masseImpactPoints = emptyList(),
+                masseConnectsTarget = false
             )
         }
 
         // Massé mode via MassePhysicsSimulator
-        if (stored == null) return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
+        if (stored == null) return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList(), masseConnectsTarget = false)
         val radiusPx = 60f * state.screenDensity
         val nx = (stored.x - radiusPx) / radiusPx
         val ny = (stored.y - radiusPx) / radiusPx
@@ -328,10 +329,19 @@ class UpdateStateUseCase @Inject constructor(
             table = state.table,
             startPos = cuePos
         )
+        val targetPos = state.protractorUnit.center
+        val lastPt = result.points.lastOrNull()
+        val connects = if (lastPt != null) {
+            val dx = lastPt.x - targetPos.x
+            val dy = lastPt.y - targetPos.y
+            sqrt(dx * dx + dy * dy) <= 2f * LOGICAL_BALL_RADIUS
+        } else false
+
         return state.copy(
             spinPaths = mapOf(pathColor to result.points),
             aimedPocketIndex = result.pocketIndex,
-            masseImpactPoints = result.impactPoints
+            masseImpactPoints = result.impactPoints,
+            masseConnectsTarget = connects
         )
     }
 
