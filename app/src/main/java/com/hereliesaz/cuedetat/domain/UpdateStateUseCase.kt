@@ -6,8 +6,10 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.ui.graphics.Color
-import com.hereliesaz.cuedetat.domain.reducers.generateMassePath
+import com.hereliesaz.cuedetat.domain.MassePhysicsSimulator
+import com.hereliesaz.cuedetat.domain.SpinPhysicsCalculator
 import com.hereliesaz.cuedetat.ui.ZoomMapping
+import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import javax.inject.Inject
@@ -26,7 +28,6 @@ enum class UpdateType {
 }
 
 class UpdateStateUseCase @Inject constructor(
-    private val calculateSpinPaths: CalculateSpinPaths,
     private val reducerUtils: ReducerUtils,
     private val calculateBankShot: CalculateBankShot
 ) {
@@ -264,18 +265,68 @@ class UpdateStateUseCase @Inject constructor(
 
     private fun updateSpinCalculations(state: CueDetatState): CueDetatState {
         if (state.isBankingMode) return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
-        if (!state.isMasseModeActive) return state.copy(spinPaths = calculateSpinPaths(state), masseImpactPoints = emptyList())
 
-        // Masse mode: always regenerate — rail geometry depends on absolute cue ball
-        // position and must never be served from a stale cache.
         val stored = state.selectedSpinOffset ?: state.lingeringSpinOffset
-            ?: return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
+
+        // Compute wheel color from the stored pixel offset
+        val pathColor = if (stored != null) {
+            val radiusPx = 60f * state.screenDensity
+            val dx = stored.x - radiusPx
+            val dy = stored.y - radiusPx
+            val angleDeg = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
+            val dist = (hypot(dx.toDouble(), dy.toDouble()) / radiusPx).toFloat().coerceIn(0f, 1f)
+            SpinColorUtils.getColorFromAngleAndDistance(angleDeg, dist)
+        } else Color.White
+
+        if (!state.isMasseModeActive) {
+            // English spin path via SpinPhysicsCalculator
+            if (stored == null) return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
+            val radiusPx = 60f * state.screenDensity
+            val nx = (stored.x - radiusPx) / radiusPx
+            val ny = (stored.y - radiusPx) / radiusPx
+            val spinOffset = PointF(nx, ny)
+            val cueBallPos = state.protractorUnit.ghostCueBallCenter
+            val targetBallPos = state.protractorUnit.center
+            val shotLineAnchor = state.onPlaneBall?.center ?: state.shotLineAnchor
+                ?: return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
+            val shotAngle = atan2(
+                (cueBallPos.y - shotLineAnchor.y).toDouble(),
+                (cueBallPos.x - shotLineAnchor.x).toDouble()
+            ).toFloat()
+            val path = SpinPhysicsCalculator.calculatePath(
+                spinOffset = spinOffset,
+                cueBallPos = cueBallPos,
+                targetBallPos = targetBallPos,
+                shotAngle = shotAngle,
+                table = state.table
+            )
+            return state.copy(
+                spinPaths = mapOf(pathColor to path),
+                masseImpactPoints = emptyList()
+            )
+        }
+
+        // Massé mode via MassePhysicsSimulator
+        if (stored == null) return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
         val radiusPx = 60f * state.screenDensity
         val nx = (stored.x - radiusPx) / radiusPx
         val ny = (stored.y - radiusPx) / radiusPx
-        val result = generateMassePath(PointF(nx, ny), state)
+        val physicsOffset = PointF(nx, ny)
+        val cuePos = state.onPlaneBall?.center ?: PointF(0f, 0f)
+        val ghostCuePos = state.protractorUnit.ghostCueBallCenter
+        val shotAngle = atan2(
+            (ghostCuePos.y - cuePos.y).toDouble(),
+            (ghostCuePos.x - cuePos.x).toDouble()
+        ).toFloat()
+        val elevationDeg = (90f - abs(state.pitchAngle)).coerceIn(0f, 90f)
+        val result = MassePhysicsSimulator.simulate(
+            contactOffset = physicsOffset,
+            elevationDeg = elevationDeg,
+            shotAngle = shotAngle,
+            table = state.table
+        )
         return state.copy(
-            spinPaths = mapOf(Color.White to result.points),
+            spinPaths = mapOf(pathColor to result.points),
             aimedPocketIndex = result.pocketIndex,
             masseImpactPoints = result.impactPoints
         )
