@@ -61,10 +61,9 @@ class SpinPhysicsCalculatorTest {
         )
         assertTrue("Right and left spin must produce different paths",
             right.size >= 2 && left.size >= 2)
-        // The end x-coordinates should be different (squirt separates them)
-        val rightEndX = right.last().x
-        val leftEndX = left.last().x
-        assertNotEquals("Right and left spin end points must differ", rightEndX, leftEndX, 1f)
+        // Both paths hit the same first rail at the same x; their y on that rail must differ (squirt deflects up vs down)
+        assertNotEquals("Right and left spin first-bounce y must differ",
+            right[1].y, left[1].y, 0.5f)
     }
 
     @Test

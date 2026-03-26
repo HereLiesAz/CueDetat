@@ -72,9 +72,11 @@ class MassePhysicsSimulatorTest {
 
     @Test
     fun `low elevation produces less curve than high elevation`() {
+        // Use invisible table so rail-saturation can't make both values equal
+        val noRailTable = Table(size = TableSize.EIGHT_FT, isVisible = false)
         fun curveAmount(elev: Float): Float {
             val result = MassePhysicsSimulator.simulate(
-                contactOffset = pf(1f, 0f), elevationDeg = elev, shotAngle = shotAngle, table = table
+                contactOffset = pf(1f, 0f), elevationDeg = elev, shotAngle = shotAngle, table = noRailTable
             )
             return result.points.drop(3).maxOf { abs(it.x) }
         }
