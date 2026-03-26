@@ -314,16 +314,19 @@ class UpdateStateUseCase @Inject constructor(
         val physicsOffset = PointF(nx, ny)
         val cuePos = state.onPlaneBall?.center ?: PointF(0f, 0f)
         val ghostCuePos = state.protractorUnit.ghostCueBallCenter
+        // shotAngle points from ghost cue ball back toward the cue ball — the cue approaches
+        // from behind (the back side of the ball, opposite the shot line).
         val shotAngle = atan2(
-            (ghostCuePos.y - cuePos.y).toDouble(),
-            (ghostCuePos.x - cuePos.x).toDouble()
+            (cuePos.y - ghostCuePos.y).toDouble(),
+            (cuePos.x - ghostCuePos.x).toDouble()
         ).toFloat()
         val elevationDeg = (90f - abs(state.pitchAngle)).coerceIn(0f, 90f)
         val result = MassePhysicsSimulator.simulate(
             contactOffset = physicsOffset,
             elevationDeg = elevationDeg,
             shotAngle = shotAngle,
-            table = state.table
+            table = state.table,
+            startPos = cuePos
         )
         return state.copy(
             spinPaths = mapOf(pathColor to result.points),

@@ -55,7 +55,7 @@ fun AzNavRailMenu(
             onscreen(alignment = Alignment.TopStart) {
                 Text(
                     text = "Tap the icon for more",
-                    fontSize = 9.sp,
+                    fontSize = 14.sp,
                     color = Color.White.copy(alpha = 0.55f),
                     modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                 )

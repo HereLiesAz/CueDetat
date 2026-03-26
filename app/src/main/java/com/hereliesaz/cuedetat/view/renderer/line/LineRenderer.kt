@@ -317,15 +317,13 @@ class LineRenderer {
         canvas.save()
         canvas.concat(inverseMatrix)
 
-        val masseCueBallPos = if (state.isMasseModeActive) state.onPlaneBall?.center else null
         val pathColor = paths.keys.firstOrNull() ?: Color.White
 
         paths.forEach { (color, points) ->
             if (points.size < 2) return@forEach
 
             val screenPoints = points.map { pt ->
-                val logicalPt = if (masseCueBallPos != null) PointF(pt.x + masseCueBallPos.x, pt.y + masseCueBallPos.y) else pt
-                val screenPt = DrawingUtils.mapPoint(logicalPt, activeMatrix)
+                val screenPt = DrawingUtils.mapPoint(pt, activeMatrix)
                 if (camArray != null && distArray != null && camArray.size == 9)
                     DrawingUtils.applyBarrelDistortion(screenPt.x, screenPt.y, camArray, distArray)
                 else screenPt
@@ -377,7 +375,7 @@ class LineRenderer {
         }
 
         // Ghost balls at rail/ball impact points along the masse path
-        if (state.isMasseModeActive && masseCueBallPos != null && state.masseImpactPoints.isNotEmpty()) {
+        if (state.isMasseModeActive && state.masseImpactPoints.isNotEmpty()) {
             val ghostStroke = Paint().apply {
                 style = Paint.Style.STROKE
                 strokeWidth = 3f
@@ -392,8 +390,7 @@ class LineRenderer {
                 this.alpha = (alpha * 0.25f).toInt().coerceIn(0, 255)
                 isAntiAlias = true
             }
-            state.masseImpactPoints.forEach { relPt ->
-                val logicalPt = PointF(relPt.x + masseCueBallPos.x, relPt.y + masseCueBallPos.y)
+            state.masseImpactPoints.forEach { logicalPt ->
                 val screenPt = DrawingUtils.mapPoint(logicalPt, activeMatrix)
                 val finalPt = if (camArray != null && distArray != null && camArray.size == 9)
                     DrawingUtils.applyBarrelDistortion(screenPt.x, screenPt.y, camArray, distArray)

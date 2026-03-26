@@ -74,7 +74,7 @@ private fun handleSizeChanged(
     // Also initialize spinControlCenter if null (e.g., restored from old saved state).
     // Ensure we have non-zero dimensions before calculating default center.
     val newSpinCenter = if (state.spinControlCenter == null && action.width > 0 && action.height > 0) {
-        PointF(action.width - 108f * action.density, 116f * action.density)
+        PointF(action.width / 2f, 116f * action.density)
     } else {
         state.spinControlCenter
     }
@@ -112,7 +112,7 @@ private fun createInitialState(
 
     // Default position for the spin control UI element (top-right below top bar).
     // Positioned at top-right: viewWidth - 108dp, 116dp from top.
-    val initialSpinControlCenter = PointF(viewWidth - 108f * density, 116f * density)
+    val initialSpinControlCenter = PointF(viewWidth / 2f, 116f * density)
 
     // Construct and return the state object.
     return CueDetatState(

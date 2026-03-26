@@ -20,7 +20,8 @@ object MassePhysicsSimulator {
         elevationDeg: Float,
         shotAngle: Float,
         table: Table,
-        mu: Float = 1.5f
+        mu: Float = 1.5f,
+        startPos: PointF = PointF()
     ): MasseResult {
         val alpha = Math.toRadians(elevationDeg.toDouble()).toFloat()
 
@@ -33,9 +34,12 @@ object MassePhysicsSimulator {
         val cosR = cos(rotAngle)
         val sinR = sin(rotAngle)
 
-        val points = mutableListOf(PointF(0f, 0f))
-        var posX = 0f
-        var posY = 0f
+        // Convert world startPos into the local (pre-rotation) frame so that
+        // rail detection uses absolute logical coordinates throughout.
+        var posX = startPos.x * cosR + startPos.y * sinR
+        var posY = -startPos.x * sinR + startPos.y * cosR
+
+        val points = mutableListOf(PointF().apply { x = posX; y = posY })
 
         val pocketThreshold = R * 1.3f
         var pocketIndex: Int? = null
