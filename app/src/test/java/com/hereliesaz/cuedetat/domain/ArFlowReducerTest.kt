@@ -23,24 +23,24 @@ class ArFlowReducerTest {
     }
 
     @Test
-    fun `CycleCameraMode from CAMERA_ONLY transitions to AR_SETUP`() {
+    fun `CycleCameraMode from CAMERA_ONLY turns off`() {
         val s = base.copy(cameraMode = CameraMode.CAMERA_ONLY)
         val result = reduceToggleAction(s, MainScreenEvent.CycleCameraMode, utils)
-        assertEquals(CameraMode.AR_SETUP, result.cameraMode)
+        assertEquals(CameraMode.OFF, result.cameraMode)
     }
 
     @Test
-    fun `CycleCameraMode from AR_SETUP is a no-op`() {
+    fun `CycleCameraMode from AR_SETUP turns off`() {
         val s = base.copy(cameraMode = CameraMode.AR_SETUP)
         val result = reduceToggleAction(s, MainScreenEvent.CycleCameraMode, utils)
-        assertEquals(CameraMode.AR_SETUP, result.cameraMode)
+        assertEquals(CameraMode.OFF, result.cameraMode)
     }
 
     @Test
-    fun `CycleCameraMode from AR_ACTIVE is a no-op`() {
+    fun `CycleCameraMode from AR_ACTIVE turns off`() {
         val s = base.copy(cameraMode = CameraMode.AR_ACTIVE)
         val result = reduceToggleAction(s, MainScreenEvent.CycleCameraMode, utils)
-        assertEquals(CameraMode.AR_ACTIVE, result.cameraMode)
+        assertEquals(CameraMode.OFF, result.cameraMode)
     }
 
     @Test
