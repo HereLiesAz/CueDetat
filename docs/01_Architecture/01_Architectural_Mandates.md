@@ -32,3 +32,6 @@ will compromise the stability and maintainability of the codebase.
   every possible state transition. It is not sufficient to enforce it only during user-driven
   gestures; it must also be re-verified after events like screen resizing or table visibility
   changes.
+
+* **Mandate 7: ONE SINGLE USER INTERACTION for AR Setup**
+  The AR setup flow must strictly adhere to a single interaction paradigm. There is NO multi-step wizard. The app must NEVER attempt to see the whole table at once, identify pockets automatically, or balls automatically during AR setup. The sole interaction required from the user is capturing the felt color (a single tap on a capture button), which MUST immediately drop them into an active AR Tracking state. Any fine-tuning of pocket alignment relies entirely on the user rotating/zooming via sliders.

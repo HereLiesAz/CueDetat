@@ -53,6 +53,23 @@ internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueD
 
         is MainScreenEvent.LockColor -> state.copy(lockedHsvColor = action.hsvMean, lockedHsvStdDev = action.hsvStdDev)
         is MainScreenEvent.LockOrUnlockColor -> if (state.lockedHsvColor != null) state.copy(lockedHsvColor = null, lockedHsvStdDev = null) else state
+        is MainScreenEvent.AddFeltSample -> {
+            val newList = state.savedFeltSamples.toMutableList()
+            newList.add(com.hereliesaz.cuedetat.domain.FeltSample(hsv = action.hsv))
+            state.copy(savedFeltSamples = newList)
+        }
+        is MainScreenEvent.DeleteFeltSamples -> {
+            val newList = state.savedFeltSamples.filterNot { it.id in action.ids }
+            state.copy(savedFeltSamples = newList)
+        }
+        is MainScreenEvent.MoveFeltSample -> {
+            val newList = state.savedFeltSamples.toMutableList()
+            if (action.fromIndex in newList.indices && action.toIndex in newList.indices) {
+                val item = newList.removeAt(action.fromIndex)
+                newList.add(action.toIndex, item)
+            }
+            state.copy(savedFeltSamples = newList)
+        }
         is MainScreenEvent.ClearSamplePoint -> state.copy(colorSamplePoint = null)
         else -> state
     }

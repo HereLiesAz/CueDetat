@@ -1,5 +1,6 @@
 package com.hereliesaz.cuedetat.ui.composables.overlays
 
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -103,12 +104,6 @@ fun ArSetupPrompt(
     tableScanModel: TableScanModel?,
     modifier: Modifier = Modifier
 ) {
-    val arSetupStep = when {
-        lockedHsvColor == null -> ArSetupStep.PICK_COLOR
-        tableScanModel == null -> ArSetupStep.SCAN_TABLE
-        else -> ArSetupStep.VERIFY
-    }
-
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(tween(400)),
@@ -120,64 +115,20 @@ fun ArSetupPrompt(
                 modifier = Modifier
                     .clip(RoundedCornerShape(16.dp))
                     .background(Color.Black.copy(alpha = 0.75f))
-                    .padding(horizontal = 28.dp, vertical = 24.dp),
+                    .padding(horizontal = 28.dp, vertical = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("AR Setup", color = MaterialTheme.colorScheme.primary,
-                    fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(16.dp))
-                WizardStep(
-                    number = "1",
-                    text = "Lock felt color — tap the table surface",
-                    state = if (lockedHsvColor != null) WizardStepState.DONE else WizardStepState.ACTIVE
-                )
+                Text("Aligning Table", color = MaterialTheme.colorScheme.primary,
+                    fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                WizardStep(
-                    number = "2",
-                    text = "Point camera at the table",
-                    state = when {
-                        tableScanModel != null -> WizardStepState.DONE
-                        lockedHsvColor != null -> WizardStepState.ACTIVE
-                        else -> WizardStepState.PENDING
-                    }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                WizardStep(
-                    number = "3",
-                    text = "Verifying alignment…",
-                    state = when {
-                        arSetupStep == ArSetupStep.VERIFY -> WizardStepState.ACTIVE
-                        else -> WizardStepState.PENDING
-                    }
+                Text(
+                    text = "Searching for the felt...",
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center
                 )
             }
         }
     }
 }
 
-private enum class WizardStepState { PENDING, ACTIVE, DONE }
-
-@Composable
-private fun WizardStep(number: String, text: String, state: WizardStepState) {
-    val (bgColor, textColor, numberText) = when (state) {
-        WizardStepState.DONE    -> Triple(Color(0xFF1B5E20), Color(0xFFA5D6A7), "✓")
-        WizardStepState.ACTIVE  -> Triple(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f), Color.White, number)
-        WizardStepState.PENDING -> Triple(Color(0xFF333333), Color(0xFF777777), number)
-    }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier.size(24.dp).clip(CircleShape).background(bgColor),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(numberText, color = textColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        }
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(
-            text = text,
-            color = if (state == WizardStepState.PENDING) Color(0xFF777777) else Color.White,
-            fontSize = 13.sp,
-            textDecoration = if (state == WizardStepState.DONE) TextDecoration.LineThrough else null,
-            lineHeight = 18.sp
-        )
-    }
-}
