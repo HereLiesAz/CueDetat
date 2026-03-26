@@ -7,6 +7,8 @@ import org.junit.Assert.*
 import org.junit.Test
 import kotlin.math.abs
 
+private fun pf(x: Float, y: Float) = PointF().apply { this.x = x; this.y = y }
+
 class MassePhysicsSimulatorTest {
 
     private val table = Table(size = TableSize.EIGHT_FT, isVisible = true)
@@ -15,7 +17,7 @@ class MassePhysicsSimulatorTest {
     @Test
     fun `center strike produces straight path`() {
         val result = MassePhysicsSimulator.simulate(
-            contactOffset = PointF(0f, 0f),
+            contactOffset = pf(0f, 0f),
             elevationDeg = 45f,
             shotAngle = shotAngle,
             table = table
@@ -31,7 +33,7 @@ class MassePhysicsSimulatorTest {
     @Test
     fun `right contact offset curves ball to the right`() {
         val result = MassePhysicsSimulator.simulate(
-            contactOffset = PointF(1f, 0f),
+            contactOffset = pf(1f, 0f),
             elevationDeg = 45f,
             shotAngle = shotAngle,
             table = table
@@ -44,7 +46,7 @@ class MassePhysicsSimulatorTest {
     @Test
     fun `left contact offset curves ball to the left`() {
         val result = MassePhysicsSimulator.simulate(
-            contactOffset = PointF(-1f, 0f),
+            contactOffset = pf(-1f, 0f),
             elevationDeg = 45f,
             shotAngle = shotAngle,
             table = table
@@ -57,10 +59,10 @@ class MassePhysicsSimulatorTest {
     @Test
     fun `right and left curves go opposite directions`() {
         val right = MassePhysicsSimulator.simulate(
-            contactOffset = PointF(1f, 0f), elevationDeg = 45f, shotAngle = shotAngle, table = table
+            contactOffset = pf(1f, 0f), elevationDeg = 45f, shotAngle = shotAngle, table = table
         )
         val left = MassePhysicsSimulator.simulate(
-            contactOffset = PointF(-1f, 0f), elevationDeg = 45f, shotAngle = shotAngle, table = table
+            contactOffset = pf(-1f, 0f), elevationDeg = 45f, shotAngle = shotAngle, table = table
         )
         val rightMidX = right.points.getOrNull(right.points.size / 2)?.x ?: 0f
         val leftMidX = left.points.getOrNull(left.points.size / 2)?.x ?: 0f
@@ -72,7 +74,7 @@ class MassePhysicsSimulatorTest {
     fun `low elevation produces less curve than high elevation`() {
         fun curveAmount(elev: Float): Float {
             val result = MassePhysicsSimulator.simulate(
-                contactOffset = PointF(1f, 0f), elevationDeg = elev, shotAngle = shotAngle, table = table
+                contactOffset = pf(1f, 0f), elevationDeg = elev, shotAngle = shotAngle, table = table
             )
             return result.points.drop(3).maxOf { abs(it.x) }
         }
@@ -86,7 +88,7 @@ class MassePhysicsSimulatorTest {
     fun `pocketIndex is null when table is invisible`() {
         val invisibleTable = Table(size = TableSize.EIGHT_FT, isVisible = false)
         val result = MassePhysicsSimulator.simulate(
-            contactOffset = PointF(0f, 0f),
+            contactOffset = pf(0f, 0f),
             elevationDeg = 45f,
             shotAngle = shotAngle,
             table = invisibleTable

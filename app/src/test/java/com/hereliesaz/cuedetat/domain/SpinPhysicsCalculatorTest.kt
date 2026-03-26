@@ -54,10 +54,10 @@ class SpinPhysicsCalculatorTest {
     fun `right and left spin produce different directions`() {
         val args = Triple(cueBallPos, targetBallPos, atan2(-1f, 0f))
         val right = SpinPhysicsCalculator.calculatePath(
-            PointF(1f, 0f), args.first, args.second, args.third, table
+            pf(1f, 0f), args.first, args.second, args.third, table
         )
         val left = SpinPhysicsCalculator.calculatePath(
-            PointF(-1f, 0f), args.first, args.second, args.third, table
+            pf(-1f, 0f), args.first, args.second, args.third, table
         )
         assertTrue("Right and left spin must produce different paths",
             right.size >= 2 && left.size >= 2)
@@ -70,11 +70,11 @@ class SpinPhysicsCalculatorTest {
     @Test
     fun `path with bounces has more than two points`() {
         // Aim toward the top rail to guarantee a bounce
-        val cueBall = PointF(0f, 0f)
-        val target = PointF(0f, -1000f)   // well past the top rail
+        val cueBall = pf(0f, 0f)
+        val target = pf(0f, -1000f)   // well past the top rail
         val angle = atan2(-1000f, 0f)
         val path = SpinPhysicsCalculator.calculatePath(
-            spinOffset = PointF(0.5f, 0f),
+            spinOffset = pf(0.5f, 0f),
             cueBallPos = cueBall,
             targetBallPos = target,
             shotAngle = angle,
@@ -88,7 +88,7 @@ class SpinPhysicsCalculatorTest {
     fun `invisible table produces single-segment path`() {
         val invisibleTable = Table(size = TableSize.EIGHT_FT, isVisible = false)
         val path = SpinPhysicsCalculator.calculatePath(
-            spinOffset = PointF(0.5f, 0f),
+            spinOffset = pf(0.5f, 0f),
             cueBallPos = cueBallPos,
             targetBallPos = targetBallPos,
             shotAngle = atan2(-1f, 0f),

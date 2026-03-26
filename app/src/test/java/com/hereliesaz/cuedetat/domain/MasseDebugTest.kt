@@ -6,12 +6,14 @@ import com.hereliesaz.cuedetat.view.state.TableSize
 import org.junit.Test
 import kotlin.math.abs
 
+private fun pf(x: Float, y: Float) = PointF().apply { this.x = x; this.y = y }
+
 class MasseDebugTest {
 
     @Test
     fun `debug low elevation`() {
         val table = Table(size = TableSize.EIGHT_FT, isVisible = true)
-        val contactOffset = PointF(1f, 0f)
+        val contactOffset = pf(1f, 0f)
         println("contactOffset.x=${contactOffset.x} .y=${contactOffset.y}")
         
         val result = MassePhysicsSimulator.simulate(
