@@ -33,16 +33,13 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.unit.dp
 import androidx.core.content.res.ResourcesCompat
 import com.hereliesaz.cuedetat.R
 import kotlin.math.roundToInt
-import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
@@ -61,6 +58,10 @@ fun MasseControl(
     val moveIconPainter = rememberVectorPainter(image = Icons.Default.OpenWith)
     val viewConfig = LocalViewConfiguration.current
     val density = LocalDensity.current.density
+    val context = LocalContext.current
+    val barbaroTypeface = remember {
+        try { ResourcesCompat.getFont(context, R.font.barbaro) } catch (e: Exception) { null }
+    }
     val colorWheelBitmap = remember(density) {
         val sizePx = (120f * density).toInt().coerceAtLeast(1)
         val bmp = android.graphics.Bitmap.createBitmap(sizePx, sizePx, android.graphics.Bitmap.Config.ARGB_8888)
@@ -239,6 +240,22 @@ fun MasseControl(
                 radius = 4.dp.toPx(),
                 center = Offset(tipX, tipY)
             )
+
+            // Degree readout — bottom-right corner, above the baseline
+            drawIntoCanvas { canvas ->
+                canvas.nativeCanvas.drawText(
+                    "${elevationAngle.roundToInt()}°",
+                    size.width - 12.dp.toPx(),
+                    size.height - 8.dp.toPx(),
+                    android.graphics.Paint().apply {
+                        color = android.graphics.Color.argb(204, 255, 255, 255)  // 80% white
+                        textAlign = android.graphics.Paint.Align.RIGHT
+                        textSize = 14.dp.toPx()
+                        isAntiAlias = true
+                        typeface = barbaroTypeface
+                    }
+                )
+            }
         }
     }
 }

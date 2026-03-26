@@ -318,6 +318,7 @@ class LineRenderer {
         canvas.concat(inverseMatrix)
 
         val masseCueBallPos = if (state.isMasseModeActive) state.onPlaneBall?.center else null
+        val pathColor = paths.keys.firstOrNull() ?: Color.White
 
         paths.forEach { (color, points) ->
             if (points.size < 2) return@forEach
@@ -335,11 +336,14 @@ class LineRenderer {
                 // transparent at the tail. Far fewer draw calls than per-segment.
                 val start = screenPoints.first()
                 val end = screenPoints.last()
+                val pr = (pathColor.red * 255).toInt()
+                val pg = (pathColor.green * 255).toInt()
+                val pb = (pathColor.blue * 255).toInt()
                 val fadeShader = LinearGradient(
                     start.x, start.y, end.x, end.y,
                     intArrayOf(
-                        android.graphics.Color.argb(alpha, 255, 255, 255),
-                        android.graphics.Color.argb(0, 255, 255, 255)
+                        android.graphics.Color.argb(alpha, pr, pg, pb),
+                        android.graphics.Color.argb(0, pr, pg, pb)
                     ),
                     null,
                     Shader.TileMode.CLAMP
