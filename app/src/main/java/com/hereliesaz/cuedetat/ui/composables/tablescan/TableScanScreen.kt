@@ -5,9 +5,29 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -15,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Fill
@@ -24,6 +45,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.PocketId
+import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
 
 /**
  * Full-screen scan UI.
@@ -77,31 +99,116 @@ fun TableScanScreen(
 
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Pocket progress overlay.
-        // Positions match PocketId enum order: TL, TR, BL, BR, SL, SR.
-        val pocketPositionFractions = remember {
-            listOf(
-                0.15f to 0.15f, // TL
-                0.85f to 0.15f, // TR
-                0.15f to 0.85f, // BL
-                0.85f to 0.85f, // BR
-                0.15f to 0.50f, // SL
-                0.85f to 0.50f  // SR
-            )
+        // Top Gallery: Felt Samples
+        if (uiState.savedFeltSamples.isNotEmpty()) {
+            val selectedIds by viewModel.selectedSampleIds.collectAsState()
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(48.dp),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 32.dp, start = 16.dp, end = 16.dp)
+                    .fillMaxWidth()
+                    .heightIn(max = 200.dp),
+                contentPadding = PaddingValues(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(uiState.savedFeltSamples) { sample ->
+                    val color = Color.hsv(sample.hsv[0], sample.hsv[1], sample.hsv[2])
+                    val isSelected = selectedIds.contains(sample.id)
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .border(
+                                width = if (isSelected) 3.dp else 1.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
+                                shape = CircleShape
+                            )
+                            .combinedClickable(
+                                onClick = { viewModel.toggleSampleSelection(sample.id) },
+                                onLongClick = { viewModel.toggleSampleSelection(sample.id) }
+                            )
+                    )
+                }
+            }
         }
-        val pocketIds = remember { PocketId.values() }
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            pocketIds.forEachIndexed { i, id ->
-                val (xFrac, yFrac) = pocketPositionFractions[i]
-                val pos = Offset(size.width * xFrac, size.height * yFrac)
-                val isFound = scanProgress[id] == true
+
+        // Context Menu for Selected Samples
+        val selectedIds by viewModel.selectedSampleIds.collectAsState()
+        if (selectedIds.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 240.dp)
+                    .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                TextButton(onClick = { /* TODO Move */ }) {
+                    Text("Move", color = Color.White)
+                }
+                TextButton(onClick = { viewModel.deleteSelectedSamples() }) {
+                    Text("Delete", color = Color.Red.copy(alpha = 0.8f))
+                }
+            }
+        }
+
+        // Magnifying Circle in the center.
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(120.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.2f))
+                .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
+        ) {
+            // Visual indicator of the sampled color.
+            Canvas(modifier = Modifier.fillMaxSize()) {
                 drawCircle(
-                    color = Color.Yellow,
-                    radius = 24.dp.toPx(),
-                    center = pos,
-                    style = if (isFound) Fill else Stroke(width = 3.dp.toPx()),
-                    alpha = if (isFound) 0.9f else 0.5f
+                    color = Color.White.copy(alpha = 0.3f),
+                    radius = size.minDimension / 2,
+                    style = Stroke(width = 1.dp.toPx())
                 )
+                // Small dot in the dead center.
+                drawCircle(
+                    color = Color.White,
+                    radius = 2.dp.toPx(),
+                    center = center
+                )
+            }
+        }
+
+        // Bottom Controls: Capture Felt Button.
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Point at the felt and tap below",
+                color = Color.White,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            
+            // Camera Shutter Button
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(Color.White)
+                    .border(4.dp, Color.LightGray, CircleShape)
+                    .clickable { viewModel.captureFeltAndComplete() }
+            )
+            
+            TextButton(
+                onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen) },
+                modifier = Modifier.padding(top = 16.dp)
+            ) {
+                Text("Cancel", color = Color.White.copy(alpha = 0.7f))
             }
         }
     }

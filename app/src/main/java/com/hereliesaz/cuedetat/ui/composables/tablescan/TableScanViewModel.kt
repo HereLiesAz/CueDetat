@@ -57,9 +57,40 @@ class TableScanViewModel @Inject constructor(
     private val _scanResult = MutableSharedFlow<MainScreenEvent>()
     val scanResult = _scanResult.asSharedFlow()
 
-    /** Flips to true after completeScan emits all events. Screen dismisses on this signal. */
     private val _scanComplete = MutableStateFlow(false)
     val scanComplete: StateFlow<Boolean> = _scanComplete.asStateFlow()
+
+    private val _selectedSampleIds = MutableStateFlow<Set<String>>(emptySet())
+    val selectedSampleIds: StateFlow<Set<String>> = _selectedSampleIds.asStateFlow()
+
+    fun toggleSampleSelection(id: String) {
+        val current = _selectedSampleIds.value
+        _selectedSampleIds.value = if (current.contains(id)) current - id else current + id
+    }
+
+    fun selectSamples(ids: Set<String>) {
+        _selectedSampleIds.value = ids
+    }
+
+    fun clearSelection() {
+        _selectedSampleIds.value = emptySet()
+    }
+
+    fun deleteSelectedSamples() {
+        val ids = _selectedSampleIds.value
+        if (ids.isNotEmpty()) {
+            viewModelScope.launch {
+                _scanResult.emit(MainScreenEvent.DeleteFeltSamples(ids))
+                clearSelection()
+            }
+        }
+    }
+
+    fun moveSample(fromIndex: Int, toIndex: Int) {
+        viewModelScope.launch {
+            _scanResult.emit(MainScreenEvent.MoveFeltSample(fromIndex, toIndex))
+        }
+    }
 
     // Mutable cluster accumulator: identity → running cluster.
     private val clusters = mutableMapOf<PocketId, MutableList<PointF>>()
@@ -252,6 +283,55 @@ class TableScanViewModel @Inject constructor(
     }
 
     // ------ Coordinate helpers ------
+
+    /**
+     * One-click felt capture. 
+     * Immediately completes the scan using the captured felt color and a default table pose.
+     */
+    fun captureFeltAndComplete() {
+        viewModelScope.launch {
+            val hsv = lastFeltHsv.toList()
+            _scanResult.emit(MainScreenEvent.AddFeltSample(hsv))
+
+            val tableSize = _selectedTableSize.value
+            
+            // Default model: Identity warp, 6 placeholder logical pockets.
+            val tpsWarpData = TpsWarpData(
+                srcPoints = listOf(PointF(0f, 0f)),
+                dstPoints = listOf(PointF(0f, 0f))
+            )
+            
+            val logicalTable = Table(tableSize, true)
+            val defaultClusters = logicalTable.pockets.mapIndexed { i, pt ->
+                PocketCluster(
+                    identity = PocketId.values()[i],
+                    logicalPosition = PointF(pt.x, pt.y),
+                    observationCount = 1,
+                    variance = 0f
+                )
+            }
+            
+            val location = tableScanRepository.getCurrentLocation()
+            val model = TableScanModel(
+                pockets = defaultClusters,
+                lensWarpTps = tpsWarpData,
+                tableSize = tableSize,
+                feltColorHsv = hsv,
+                scanLatitude = location?.first,
+                scanLongitude = location?.second
+            )
+            
+            tableScanRepository.save(model)
+            
+            // Lock the color and load the model.
+            _scanResult.emit(MainScreenEvent.LockColor(lastFeltHsv, floatArrayOf(0.01f, 0.01f, 0.01f)))
+            _scanResult.emit(MainScreenEvent.LoadTableScan(model))
+            _scanResult.emit(MainScreenEvent.StartArTracking)
+            
+            // Signal scan complete
+            _scanComplete.value = true
+        }
+    }
 
     private fun screenToLogical(screen: PointF, inverse: Matrix): PointF {
         val arr = floatArrayOf(screen.x, screen.y)

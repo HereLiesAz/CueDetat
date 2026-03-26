@@ -48,6 +48,12 @@ enum class BallSelectionPhase {
 }
 
 @Keep
+data class FeltSample(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val hsv: List<Float>
+)
+
+@Keep
 data class CueDetatState(
     val experienceMode: ExperienceMode? = null,
     val pendingExperienceMode: ExperienceMode? = null,
@@ -58,6 +64,7 @@ data class CueDetatState(
     val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), LOGICAL_BALL_RADIUS, 0f),
     val onPlaneBall: OnPlaneBall? = null,
     val obstacleBalls: List<OnPlaneBall> = emptyList(),
+    val savedFeltSamples: List<FeltSample> = emptyList(),
     val table: Table = Table(
         size = TableSize.EIGHT_FT,
         isVisible = false
@@ -232,6 +239,10 @@ sealed class MainScreenEvent {
     object AutoCalibrateCv : MainScreenEvent()
     object LockOrUnlockColor : MainScreenEvent()
     data class LockColor(val hsvMean: FloatArray, val hsvStdDev: FloatArray) : MainScreenEvent()
+    data class AddFeltSample(val hsv: List<Float>) : MainScreenEvent()
+    data class DeleteFeltSamples(val ids: Set<String>) : MainScreenEvent()
+    data class MoveFeltSample(val fromIndex: Int, val toIndex: Int) : MainScreenEvent()
+    object StartArTracking : MainScreenEvent()
     object ClearSamplePoint : MainScreenEvent()
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
     object ToggleCalibrationScreen : MainScreenEvent()

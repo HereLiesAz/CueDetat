@@ -35,34 +35,19 @@ The application's vision system uses a hybrid, two-stage pipeline to achieve rob
 * This lock is automatically disengaged if the user begins dragging a ball or presses the "Reset
   View" button.
 
-## AR Table Tracking
+## AR Table Tracking & Setup
 
-The AR overlay relies on a second vision sub-pipeline for pocket detection and table geometry.
+The AR setup pipeline strictly adheres to the **"ONE SINGLE USER INTERACTION" mandate**. The previous multi-step wizard involving automatic pocket detection and geometry fitting is deprecated and hidden. 
 
-### Table Scan Pipeline
+### Felt Capture Pipeline
 
-1. **Pocket Detection** (`TableScanAnalyzer`): Runs a `CameraX` `ImageAnalysis` stream. Tries a
-   TFLite YOLOv5 model (`TFLitePocketDetector`) first; falls back to Hough circles if the model
-   file is absent.
-2. **Cluster Accumulation** (`TableScanViewModel`): Detected pocket positions are accumulated across
-   frames into `PocketCluster`s (one per pocket) to reduce noise.
-3. **Geometry Fit** (`TableGeometryFitter`): Once enough observations are collected, assigns pocket
-   identities (TL, TR, BL, BR, SL, SR) and fits a 2:1 table geometry model. Produces a homography
-   H mapping image space → logical space and the six true logical pocket positions.
-4. **TPS Residual Warp** (`ThinPlateSpline`): Solves a thin-plate spline from homography-estimated
-   logical positions to true logical positions. The residual TPS captures lens distortion beyond
-   what the homography can model.
-5. **Persistence** (`TableScanRepository`): Persists the resulting `TableScanModel` to disk as JSON.
-   Optionally attaches GPS coordinates for location-based table identification.
+1. **Magnifying UI**: The setup screen presents a magnifying circle UI. 
+2. **Single Interaction**: The user points at the felt and taps the "Capture" button.
+3. **Immediate AR**: This single tap adds the captured HSV color to a persistent list of `FeltSample`s and *immediately* transitions the application into `AR_ACTIVE` tracking mode.
+4. **Multiple Samples**: While on the capture screen, the user can manage previously captured samples (move, delete). Order dictates the weight of influence in the tracking algorithm.
 
-### Overlay Confidence & Auto-Advance
+The application relies entirely on the user for fine-tuning the table geometry (rotation, zoom) via manual sliders after the AR session has started. MVI state advancement happens instantly upon capture.
 
-`VisionData.tableOverlayConfidence` (0–1 float) is populated by the CV pipeline during `AR_SETUP`
-to report how well the rendered overlay aligns with the detected pocket positions. `CvReducer`
-auto-advances `AR_SETUP → AR_ACTIVE` when all three conditions hold:
-- `lockedHsvColor != null` (felt color step complete)
-- `tableScanModel != null` (table scan step complete)
-- `tableOverlayConfidence >= 0.8`
 
 ### ARCore Tracking Loss
 

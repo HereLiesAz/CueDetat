@@ -121,6 +121,17 @@ fun AzNavRailMenu(
                 fillColor = b3R, textColor = Color.White,
                 onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
             )
+
+            val inArSubMode = uiState.cameraMode == CameraMode.AR_SETUP || uiState.cameraMode == CameraMode.AR_ACTIVE
+            if (inArSubMode) {
+                azRailItem(id = "felt", text = "Felt", fillColor = b11R, textColor = Color.White, onClick = { 
+                    onEvent(MainScreenEvent.ClearTableScan)
+                    onEvent(MainScreenEvent.ToggleTableScanScreen) 
+                })
+                azRailItem(id = "cancel_ar", text = "Cancel", fillColor = b12P, textColor = Color.White, onClick = { 
+                    onEvent(MainScreenEvent.CancelArSetup) 
+                })
+            }
         }
         azDivider()
 
@@ -147,13 +158,13 @@ fun AzNavRailMenu(
             }
             azRailItem(id = "reset", text = resetLabel, fillColor = b8K, textColor = Color.White, onClick = { onEvent(MainScreenEvent.Reset) })
         }
-
         azDivider()
 
-        if (uiState.experienceMode == ExperienceMode.EXPERT && uiState.lockedHsvColor != null) {
-            azMenuItem(id = "scan", text = "Scan Table", fillColor = b11R, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen) })
+        if (uiState.experienceMode == ExperienceMode.EXPERT) {
             if (hasTableModel) {
-                azMenuItem(id = "rescan", text = "Rescan Table", fillColor = b12P, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ClearTableScan); onEvent(MainScreenEvent.ToggleTableScanScreen) })
+                azMenuItem(id = "rescan", text = "Recalibrate Felt", fillColor = b12P, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ClearTableScan); onEvent(MainScreenEvent.ToggleTableScanScreen) })
+            } else {
+                azMenuItem(id = "scan", text = "Felt Capture", fillColor = b11R, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen) })
             }
         }
 
