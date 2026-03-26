@@ -148,7 +148,7 @@ dependencies {
 configurations.all {
     resolutionStrategy.eachDependency {
         if (requested.group == "io.netty") {
-            useVersion("4.1.125.Final")
+            useVersion("4.1.132.Final")
             because("Transitive dependency vulnerabilities in testing/grpc")
         }
     }
