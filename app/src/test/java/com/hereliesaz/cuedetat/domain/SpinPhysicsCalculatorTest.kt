@@ -23,7 +23,7 @@ class SpinPhysicsCalculatorTest {
     @Test
     fun `path starts at cueBallPos`() {
         val path = SpinPhysicsCalculator.calculatePath(
-            spinOffset = PointF(0.5f, 0f),
+            spinOffset = pf(0.5f, 0f),
             cueBallPos = cueBallPos,
             targetBallPos = targetBallPos,
             shotAngle = shotAngle,
@@ -37,7 +37,7 @@ class SpinPhysicsCalculatorTest {
     @Test
     fun `zero spin produces path along tangent`() {
         val path = SpinPhysicsCalculator.calculatePath(
-            spinOffset = PointF(0f, 0f),
+            spinOffset = pf(0f, 0f),
             cueBallPos = cueBallPos,
             targetBallPos = targetBallPos,
             shotAngle = atan2(-1f, 0f),  // cue aimed north
