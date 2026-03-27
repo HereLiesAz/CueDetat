@@ -59,6 +59,9 @@ class TableScanViewModel @Inject constructor(
     private val _scanComplete = MutableStateFlow(false)
     val scanComplete: StateFlow<Boolean> = _scanComplete.asStateFlow()
 
+    private val _capturedFeltHsv = MutableStateFlow<FloatArray?>(null)
+    val capturedFeltHsv: StateFlow<FloatArray?> = _capturedFeltHsv.asStateFlow()
+
     private val _selectedSampleIds = MutableStateFlow<Set<String>>(emptySet())
     val selectedSampleIds: StateFlow<Set<String>> = _selectedSampleIds.asStateFlow()
 
@@ -254,6 +257,7 @@ class TableScanViewModel @Inject constructor(
         clusters.clear()
         _scanProgress.value = emptyMap()
         _scanComplete.value = false
+        _capturedFeltHsv.value = null
     }
 
     // ------ Coordinate helpers ------
@@ -301,8 +305,9 @@ class TableScanViewModel @Inject constructor(
             _scanResult.emit(MainScreenEvent.LockColor(lastFeltHsv, floatArrayOf(0.01f, 0.01f, 0.01f)))
             _scanResult.emit(MainScreenEvent.LoadTableScan(model))
             _scanResult.emit(MainScreenEvent.StartArTracking)
-            
-            // Signal scan complete
+
+            // Signal the UI to show the captured color, then close after the animation plays.
+            _capturedFeltHsv.value = lastFeltHsv
             _scanComplete.value = true
         }
     }

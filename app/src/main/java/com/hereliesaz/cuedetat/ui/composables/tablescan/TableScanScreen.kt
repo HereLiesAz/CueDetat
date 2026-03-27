@@ -1,6 +1,9 @@
 // app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanScreen.kt
 package com.hereliesaz.cuedetat.ui.composables.tablescan
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -30,9 +33,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -43,6 +49,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.PocketId
+import kotlinx.coroutines.delay
 
 /**
  * Full-screen scan UI.
@@ -59,6 +66,32 @@ fun TableScanScreen(
     uiState: CueDetatState,
     viewModel: TableScanViewModel = hiltViewModel()
 ) {
+    // Animation state: tracks whether the user has tapped capture (circle expands).
+    var isCapturing by remember { mutableStateOf(false) }
+
+    // Captured felt color from the ViewModel (non-null once captureFeltAndComplete fires).
+    val capturedHsv by viewModel.capturedFeltHsv.collectAsState()
+
+    // Magnifying circle size: expands to 240dp on tap, snaps back to 120dp when idle.
+    val circleSize by animateDpAsState(
+        targetValue = if (isCapturing) 240.dp else 120.dp,
+        animationSpec = tween(durationMillis = 400),
+        label = "magnifyCircle"
+    )
+
+    // Alpha for the felt display circle: 0 → snap 1 → hold 1s → animate to 0.
+    val feltAlpha = remember { Animatable(0f) }
+
+    // When the captured color arrives, drive the display-then-fade animation.
+    LaunchedEffect(capturedHsv) {
+        if (capturedHsv != null) {
+            isCapturing = false
+            feltAlpha.snapTo(1f)
+            delay(1000L)
+            feltAlpha.animateTo(0f, animationSpec = tween(durationMillis = 1000))
+        }
+    }
+
     // Pass current state snapshot to ViewModel so it can do coordinate transforms.
     LaunchedEffect(uiState.inversePitchMatrix, uiState.hasInverseMatrix) {
         viewModel.updateStateSnapshot(
@@ -80,10 +113,12 @@ fun TableScanScreen(
     // Combining reset + close-watch into one LaunchedEffect(Unit) prevents a race where
     // a stale scanComplete=true (left from the previous capture) would fire the close
     // effect immediately before resetScan() had a chance to clear it.
+    // The 2-second delay matches the felt display animation (1s hold + 1s fade).
     LaunchedEffect(Unit) {
         viewModel.resetScan()
         viewModel.scanComplete.collect { complete ->
             if (complete) {
+                delay(2000L)
                 onEvent(MainScreenEvent.ToggleTableScanScreen)
             }
         }
@@ -148,55 +183,73 @@ fun TableScanScreen(
             }
         }
 
-        // Magnifying Circle in the center.
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(120.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.2f))
-                .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
-        ) {
-            // Visual indicator of the sampled color.
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.3f),
-                    radius = size.minDimension / 2,
-                    style = Stroke(width = 1.dp.toPx())
-                )
-                // Small dot in the dead center.
-                drawCircle(
-                    color = Color.White,
-                    radius = 2.dp.toPx(),
-                    center = center
-                )
+        // Magnifying circle: visible while capture hasn't completed yet.
+        // Expands from 120dp to 240dp when the user taps, giving tactile feedback.
+        if (capturedHsv == null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(circleSize)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.2f))
+                    .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
+            ) {
+                // Hide the crosshair while expanding — it looks odd when stretched.
+                if (!isCapturing) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.3f),
+                            radius = size.minDimension / 2,
+                            style = Stroke(width = 1.dp.toPx())
+                        )
+                        drawCircle(color = Color.White, radius = 2.dp.toPx(), center = center)
+                    }
+                }
             }
         }
 
-        // Bottom Controls: Capture Felt Button.
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(bottom = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Point at the felt and tap below",
-                color = Color.White,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-            
-            // Camera Shutter Button
+        // Felt display circle: appears once capture is done, fades out after 1 second.
+        capturedHsv?.let { hsv ->
             Box(
                 modifier = Modifier
-                    .size(72.dp)
+                    .align(Alignment.Center)
+                    .alpha(feltAlpha.value)
+                    .size(240.dp)
                     .clip(CircleShape)
-                    .background(Color.White)
-                    .border(4.dp, Color.LightGray, CircleShape)
-                    .clickable { viewModel.captureFeltAndComplete() }
+                    .background(Color.hsv(hsv[0], hsv[1], hsv[2]))
+                    .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
             )
+        }
+
+        // Bottom Controls: hidden once capture is in progress or complete.
+        if (!isCapturing && capturedHsv == null) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Point at the felt and tap below",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                // Camera Shutter Button
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .border(4.dp, Color.LightGray, CircleShape)
+                        .clickable {
+                            isCapturing = true
+                            viewModel.captureFeltAndComplete()
+                        }
+                )
+            }
         }
     }
 }
