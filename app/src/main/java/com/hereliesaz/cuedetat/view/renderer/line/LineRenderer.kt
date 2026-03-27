@@ -277,7 +277,8 @@ class LineRenderer {
         )
 
         val tps = state.lensWarpTps
-        val rawStart = state.protractorUnit.ghostCueBallCenter
+        val rawStart = if (state.isMasseModeActive) state.masseGhostBallCenter ?: return
+                       else state.protractorUnit.ghostCueBallCenter
         val towards = state.protractorUnit.center
         val dxToTarget = towards.x - rawStart.x
         val dyToTarget = towards.y - rawStart.y
