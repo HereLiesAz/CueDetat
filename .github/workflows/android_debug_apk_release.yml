@@ -2,8 +2,6 @@ name: Publish Pre-release APK
 
 on:
   push:
-    tags:
-      - 'v*'
 
 jobs:
   release:
