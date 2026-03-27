@@ -24,3 +24,11 @@ This document specifies the behavior of the primary shot visualization mode.
 **Note on Forbidden Mechanics:** Any implementation interpreting the aiming gesture as a "direct
 linear drag" (i.e., making the aiming line point *at* the user's finger) is incorrect. This model is
 ambiguous and provides a poor, imprecise user experience.
+
+## Aiming Calculations in Expert Mode (MATRICES_ONLY Path)
+
+In Expert Mode, certain state updates use a `MATRICES_ONLY` update type to avoid full recalculation.
+`updateAimingCalculations` must be called **before** `updateSpinCalculations` in this path, not
+skipped. Skipping it leaves `@Transient` aiming fields (`tangentAimedPocketIndex`, `aimedPocketIndex`,
+etc.) stale, which causes the Expert Mode red aiming line to stop updating until a full recalculation
+is triggered. The `MATRICES_ONLY` path now correctly runs `updateAimingCalculations` first.

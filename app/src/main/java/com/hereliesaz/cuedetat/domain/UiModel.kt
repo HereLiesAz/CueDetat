@@ -33,8 +33,6 @@ enum class CameraMode {
     }
 }
 
-enum class ArSetupStep { PICK_COLOR, SCAN_TABLE, VERIFY }
-
 enum class ExperienceMode {
     EXPERT, BEGINNER, HATER;
     fun next(): ExperienceMode {
@@ -90,6 +88,7 @@ data class CueDetatState(
     val showGlowStickDialog: Boolean = false,
     val isSpinControlVisible: Boolean = false,
     val isMasseModeActive: Boolean = false,
+    val masseShotAngleDeg: Float = 0f,
     val selectedSpinOffset: PointF? = null,
     @Transient val spinPaths: Map<Color, List<PointF>>? = null,
     @Transient val masseImpactPoints: List<PointF> = emptyList(),

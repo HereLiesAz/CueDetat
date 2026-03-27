@@ -1,9 +1,6 @@
 // app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanScreen.kt
 package com.hereliesaz.cuedetat.ui.composables.tablescan
 
-import android.Manifest
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -45,7 +42,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.PocketId
-import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
 
 /**
  * Full-screen scan UI.
@@ -64,13 +60,8 @@ fun TableScanScreen(
 ) {
     val scanProgress by viewModel.scanProgress.collectAsState()
 
-    // GPS permission request — fired once when the composable first appears.
-    val locationPermLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { /* granted or not — TableScanRepository.getCurrentLocation() handles null gracefully */ }
-    LaunchedEffect(Unit) {
-        locationPermLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-    }
+    // Reset scan state each time this overlay appears.
+    LaunchedEffect(Unit) { viewModel.resetScan() }
 
     // Pass current state snapshot to ViewModel so it can do coordinate transforms.
     LaunchedEffect(uiState.inversePitchMatrix, uiState.hasInverseMatrix) {
@@ -203,13 +194,6 @@ fun TableScanScreen(
                     .border(4.dp, Color.LightGray, CircleShape)
                     .clickable { viewModel.captureFeltAndComplete() }
             )
-            
-            TextButton(
-                onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen) },
-                modifier = Modifier.padding(top = 16.dp)
-            ) {
-                Text("Cancel", color = Color.White.copy(alpha = 0.7f))
-            }
         }
     }
 }

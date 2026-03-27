@@ -3,6 +3,7 @@ package com.hereliesaz.cuedetat.domain.reducers
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
+import kotlin.math.atan2
 import kotlin.math.sqrt
 
 internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): CueDetatState {
@@ -10,10 +11,25 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
         is MainScreenEvent.ToggleMasseMode -> {
             val nextActive = !state.isMasseModeActive
             if (nextActive) {
-                state.copy(isMasseModeActive = true, isSpinControlVisible = false)
+                val cuePos = state.onPlaneBall?.center ?: PointF(0f, 0f)
+                val ghostCuePos = state.protractorUnit.ghostCueBallCenter
+                val initAngleDeg = Math.toDegrees(
+                    atan2(
+                        (cuePos.y - ghostCuePos.y).toDouble(),
+                        (cuePos.x - ghostCuePos.x).toDouble()
+                    )
+                ).toFloat()
+                state.copy(
+                    isMasseModeActive = true,
+                    isSpinControlVisible = false,
+                    lingeringSpinOffset = null,
+                    selectedSpinOffset = null,
+                    masseShotAngleDeg = initAngleDeg
+                )
             } else {
                 state.copy(
                     isMasseModeActive = false,
+                    masseShotAngleDeg = 0f,
                     spinPaths = emptyMap(),
                     selectedSpinOffset = null,
                     lingeringSpinOffset = null,

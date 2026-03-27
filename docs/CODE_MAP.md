@@ -48,6 +48,8 @@ This document serves as an index, mapping high-level concepts to their concrete 
     *   *Responsibility:* The root reducer that delegates to sub-reducers.
 *   **Sub-Reducers:** `app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/`
     *   *Responsibility:* Handling specific slices of state (Gestures, System, Controls).
+*   **`CueDetatState` notable fields:**
+    *   `masseShotAngleDeg: Float` — stores the current massé shot direction in degrees. Set from geometry on massé enable; reset to `0f` on disable. Used directly by massé physics (`Math.toRadians(masseShotAngleDeg)`) instead of deriving the angle from ghost ball position.
 
 ### Gestures
 *   **Gesture Modifier:** `app/src/main/java/com/hereliesaz/cuedetat/view/gestures/GestureHandler.kt`
@@ -65,12 +67,13 @@ This document serves as an index, mapping high-level concepts to their concrete 
 *   **GL Background Renderer:** `app/src/main/java/com/hereliesaz/cuedetat/data/ArBackgroundRenderer.kt`
     *   *Responsibility:* OpenGL ES 2.0 renderer that allocates the OES texture and draws the ARCore camera feed as a fullscreen quad.
 *   **AR Status Overlays:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/ArStatusOverlay.kt`
-    *   *Key composables:* `ArTrackingBadge` (pulsing indicator when AR is active), `ArSetupPrompt` (wizard with PENDING/ACTIVE/DONE step states during `AR_SETUP`).
+    *   *Key composables:* `ArTrackingBadge` (pulsing indicator when AR is active). `ArSetupPrompt` has been deleted.
 
 ### Table Scan
 *   **Table Scan Screen:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanScreen.kt`
+    *   Rendered as an **inline overlay** inside `ProtractorScreen`, shown when `uiState.showTableScanScreen` is `true`. It is not a navigated route; `ROUTE_SCAN` has been removed from the `NavHost`. No GPS permission request, no Cancel button. Calls `viewModel.resetScan()` on entry via `LaunchedEffect`.
 *   **Table Scan ViewModel:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanViewModel.kt`
-    *   *Responsibility:* Accumulates pocket detections into `PocketCluster`s, fits geometry via `TableGeometryFitter`, computes homography and residual TPS warp, and persists the resulting `TableScanModel`.
+    *   *Responsibility:* Accumulates pocket detections into `PocketCluster`s, fits geometry via `TableGeometryFitter`, computes homography and residual TPS warp, and persists the resulting `TableScanModel`. Pocket-detection auto-complete has been removed from `onFrame()`; only `captureFeltAndComplete()` can complete a scan.
 *   **Table Scan Analyzer:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanAnalyzer.kt`
     *   *Responsibility:* CameraX `ImageAnalysis.Analyzer` that detects pocket-sized blobs using `PocketDetector` (TFLite) or a Hough-circle fallback.
 *   **Pocket Detector Interface:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/PocketDetector.kt`

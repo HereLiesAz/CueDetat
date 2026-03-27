@@ -4,7 +4,6 @@ package com.hereliesaz.cuedetat.ui
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,9 +16,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -56,7 +53,6 @@ import com.hereliesaz.cuedetat.ui.composables.dialogs.LuminanceAdjustmentDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.TableSizeSelectionDialog
 import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.ExperienceMode
-import com.hereliesaz.cuedetat.ui.composables.overlays.ArSetupPrompt
 import com.hereliesaz.cuedetat.ui.composables.MasseControl
 import com.hereliesaz.cuedetat.ui.composables.overlays.ArTrackingBadge
 import com.hereliesaz.cuedetat.ui.composables.overlays.KineticWarningOverlay
@@ -69,7 +65,6 @@ import com.hereliesaz.cuedetat.view.ProtractorOverlay
 
 private const val ROUTE_MAIN = "main"
 private const val ROUTE_CALIBRATION = "calibration"
-private const val ROUTE_SCAN = "scan"
 
 @Composable
 fun ProtractorScreen(
@@ -94,18 +89,8 @@ fun ProtractorScreen(
         }
     }
 
-    LaunchedEffect(uiState.showTableScanScreen) {
-        val route = navController.currentBackStackEntry?.destination?.route
-        if (uiState.showTableScanScreen && route != ROUTE_SCAN) {
-            navController.navigate(ROUTE_SCAN) { launchSingleTop = true }
-        } else if (!uiState.showTableScanScreen && route == ROUTE_SCAN) {
-            navController.popBackStack()
-        }
-    }
-
     val isOnMain = currentRoute == ROUTE_MAIN || currentRoute == null
     val isOnCalibration = currentRoute == ROUTE_CALIBRATION
-    val isOnScan = currentRoute == ROUTE_SCAN
 
     AzNavRailMenu(
         uiState = uiState,
@@ -114,7 +99,6 @@ fun ProtractorScreen(
         currentDestination = if (uiState.experienceMode == ExperienceMode.BEGINNER && isOnMain) {
             if (uiState.isBeginnerViewLocked) "static" else "dynamic"
         } else currentRoute,
-        hasTableModel = uiState.tableScanModel != null
     ) {
         // --- Background layer 0: Camera ---
         // AR mode with ARCore depth uses ArCoreBackground (manages its own GL + session).
@@ -137,7 +121,7 @@ fun ProtractorScreen(
                     val activeAnalyzer: ImageAnalysis.Analyzer? = when {
                         uiState.isBeginnerViewLocked -> null
                         currentRoute == ROUTE_CALIBRATION -> calibrationAnalyzer
-                        currentRoute == ROUTE_SCAN -> tableScanAnalyzer
+                        uiState.showTableScanScreen -> tableScanAnalyzer
                         else -> mainViewModel.visionAnalyzer
                     }
                     CameraBackground(
@@ -170,13 +154,6 @@ fun ProtractorScreen(
                         onEvent = mainViewModel::onEvent,
                         viewModel = calibrationViewModel,
                         analyzer = calibrationAnalyzer
-                    )
-                }
-                composable(ROUTE_SCAN) {
-                    TableScanScreen(
-                        onEvent = mainViewModel::onEvent,
-                        uiState = uiState,
-                        viewModel = tableScanViewModel
                     )
                 }
             }
@@ -332,36 +309,6 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen HUD: Table Scan Controls ---
-        onscreen(alignment = Alignment.BottomCenter) {
-            if (isOnScan) {
-                val scanProgress by tableScanViewModel.scanProgress.collectAsState()
-                val foundCount = scanProgress.count { it.value }
-                val allFound = foundCount >= 6
-
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "$foundCount / 6 pockets found — pan across the table",
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedButton(onClick = {
-                            tableScanViewModel.resetScan()
-                        }) { Text("Reset") }
-                        Button(
-                            onClick = { mainViewModel.onEvent(MainScreenEvent.ToggleTableScanScreen) },
-                            enabled = allFound
-                        ) { Text("Done") }
-                    }
-                }
-            }
-        }
-
         // --- Onscreen: Kinetic warning overlay ---
         onscreen(alignment = Alignment.Center) {
             KineticWarningOverlay(text = uiState.warningText)
@@ -374,13 +321,13 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen: AR setup prompt (center, when AR active but no scan) ---
-        onscreen(alignment = Alignment.Center) {
-            if (isOnMain) {
-                ArSetupPrompt(
-                    visible = uiState.cameraMode == CameraMode.AR_SETUP,
-                    lockedHsvColor = uiState.lockedHsvColor,
-                    tableScanModel = uiState.tableScanModel
+        // --- Onscreen: Inline felt capture overlay ---
+        onscreen(alignment = Alignment.TopStart) {
+            if (isOnMain && uiState.showTableScanScreen) {
+                TableScanScreen(
+                    onEvent = mainViewModel::onEvent,
+                    uiState = uiState,
+                    viewModel = tableScanViewModel
                 )
             }
         }

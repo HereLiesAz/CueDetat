@@ -46,12 +46,13 @@ class UpdateStateUseCase @Inject constructor(
         }
 
         if (type == UpdateType.MATRICES_ONLY) {
-            // When masse mode is active, also regenerate the masse path so that
-            // phone-tilt changes (pitchAngle) immediately affect the curve.
-            return if (stateAfterMatrices.isMasseModeActive) {
-                updateSpinCalculations(stateAfterMatrices)
+            // Always re-run aiming so that @Transient fields (tangentAimedPocketIndex, etc.)
+            // stay fresh when the matrix changes (e.g., phone-tilt).
+            val stateAfterAiming = updateAimingCalculations(stateAfterMatrices)
+            return if (stateAfterAiming.isMasseModeActive) {
+                updateSpinCalculations(stateAfterAiming)
             } else {
-                stateAfterMatrices
+                stateAfterAiming
             }
         }
 
@@ -314,13 +315,7 @@ class UpdateStateUseCase @Inject constructor(
         val ny = (stored.y - radiusPx) / radiusPx
         val physicsOffset = PointF(nx, ny)
         val cuePos = state.onPlaneBall?.center ?: PointF(0f, 0f)
-        val ghostCuePos = state.protractorUnit.ghostCueBallCenter
-        // shotAngle points from ghost cue ball back toward the cue ball — the cue approaches
-        // from behind (the back side of the ball, opposite the shot line).
-        val shotAngle = atan2(
-            (cuePos.y - ghostCuePos.y).toDouble(),
-            (cuePos.x - ghostCuePos.x).toDouble()
-        ).toFloat()
+        val shotAngle = Math.toRadians(state.masseShotAngleDeg.toDouble()).toFloat()
         val elevationDeg = (90f - abs(state.pitchAngle)).coerceIn(0f, 90f)
         val result = MassePhysicsSimulator.simulate(
             contactOffset = physicsOffset,

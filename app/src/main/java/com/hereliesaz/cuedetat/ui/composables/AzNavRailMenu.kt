@@ -34,7 +34,6 @@ fun AzNavRailMenu(
     onEvent: (MainScreenEvent) -> Unit,
     navController: NavHostController,
     currentDestination: String?,
-    hasTableModel: Boolean = false,
     content: AzNavHostScope.() -> Unit = {},
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -117,16 +116,15 @@ fun AzNavRailMenu(
             azRailToggle(
                 id = "ar",
                 isChecked = isArActive,
-                toggleOnText = "AR", toggleOffText = "AR",
+                toggleOnText = "AR", toggleOffText = "off",
                 fillColor = b3R, textColor = Color.White,
                 onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
             )
 
             val inArSubMode = uiState.cameraMode == CameraMode.AR_SETUP || uiState.cameraMode == CameraMode.AR_ACTIVE
             if (inArSubMode) {
-                azRailItem(id = "felt", text = "Felt", fillColor = b11R, textColor = Color.White, onClick = { 
-                    onEvent(MainScreenEvent.ClearTableScan)
-                    onEvent(MainScreenEvent.ToggleTableScanScreen) 
+                azRailItem(id = "felt", text = "Felt", fillColor = b11R, textColor = Color.White, onClick = {
+                    onEvent(MainScreenEvent.ToggleTableScanScreen)
                 })
                 azRailItem(id = "cancel_ar", text = "Cancel", fillColor = b12P, textColor = Color.White, onClick = { 
                     onEvent(MainScreenEvent.CancelArSetup) 
@@ -159,14 +157,6 @@ fun AzNavRailMenu(
             azRailItem(id = "reset", text = resetLabel, fillColor = b8K, textColor = Color.White, onClick = { onEvent(MainScreenEvent.Reset) })
         }
         azDivider()
-
-        if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            if (hasTableModel) {
-                azMenuItem(id = "rescan", text = "Recalibrate Felt", fillColor = b12P, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ClearTableScan); onEvent(MainScreenEvent.ToggleTableScanScreen) })
-            } else {
-                azMenuItem(id = "scan", text = "Felt Capture", fillColor = b11R, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen) })
-            }
-        }
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azMenuItem(id = "size", text = "Table Size", fillColor = b13O, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) })

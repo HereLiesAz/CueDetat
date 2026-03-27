@@ -118,15 +118,13 @@ fun SpinControl(
                     val radiusPx = size.width / 2f
                     detectDragGestures(
                         onDragStart = { offset ->
-                            val normalized = PointF((offset.x - radiusPx) / radiusPx, (offset.y - radiusPx) / radiusPx)
-                            onEvent(MainScreenEvent.SpinApplied(normalized))
+                            onEvent(MainScreenEvent.SpinApplied(PointF(offset.x, offset.y)))
                         },
                         onDragEnd = { onEvent(MainScreenEvent.SpinSelectionEnded) },
                         onDragCancel = { onEvent(MainScreenEvent.SpinSelectionEnded) }
                     ) { change, _ ->
                         val pos = change.position
-                        val normalized = PointF((pos.x - radiusPx) / radiusPx, (pos.y - radiusPx) / radiusPx)
-                        onEvent(MainScreenEvent.SpinApplied(normalized))
+                        onEvent(MainScreenEvent.SpinApplied(PointF(pos.x, pos.y)))
                         change.consume()
                     }
                 }
@@ -176,8 +174,7 @@ fun SpinControl(
 }
 
 private fun DrawScope.drawLogicalIndicator(offset: PointF, center: Offset, radius: Float, color: Color) {
-    val indicatorX = center.x + (offset.x * radius)
-    val indicatorY = center.y + (offset.y * radius)
-    drawCircle(color = color, radius = 5.dp.toPx(), center = Offset(indicatorX, indicatorY))
-    drawCircle(color = color, radius = 5.dp.toPx(), center = Offset(indicatorX, indicatorY), style = Stroke(width = 2.dp.toPx()))
+    val indicatorCenter = Offset(offset.x, offset.y)
+    drawCircle(color = color, radius = 5.dp.toPx(), center = indicatorCenter)
+    drawCircle(color = color, radius = 5.dp.toPx(), center = indicatorCenter, style = Stroke(width = 2.dp.toPx()))
 }

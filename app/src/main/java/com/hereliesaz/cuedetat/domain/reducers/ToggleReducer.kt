@@ -48,13 +48,7 @@ internal fun reduceToggleAction(
             state.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)
         }
         is MainScreenEvent.CycleCameraMode -> when (state.cameraMode) {
-            CameraMode.OFF -> {
-                if (state.tableScanModel == null) {
-                    state.copy(showTableScanScreen = true, cameraMode = CameraMode.CAMERA_ONLY)
-                } else {
-                    state.copy(cameraMode = CameraMode.AR_SETUP)
-                }
-            }
+            CameraMode.OFF -> state.copy(cameraMode = CameraMode.AR_SETUP)
             else -> state.copy(cameraMode = CameraMode.OFF)
         }
         is MainScreenEvent.StartArTracking -> state.copy(cameraMode = CameraMode.AR_ACTIVE, showTableScanScreen = false)
@@ -125,11 +119,8 @@ internal fun reduceToggleAction(
             )
         }
         is MainScreenEvent.ToggleCalibrationScreen -> state.copy(showCalibrationScreen = !state.showCalibrationScreen)
-        is MainScreenEvent.ToggleTableScanScreen -> {
-            val nextScreenState = !state.showTableScanScreen
-            val newCameraMode = if (nextScreenState && state.cameraMode == CameraMode.OFF) CameraMode.CAMERA_ONLY else state.cameraMode
-            state.copy(showTableScanScreen = nextScreenState, cameraMode = newCameraMode)
-        }
+        is MainScreenEvent.ToggleTableScanScreen ->
+            state.copy(showTableScanScreen = !state.showTableScanScreen)
 
         is MainScreenEvent.ExitToSplash -> state.copy(experienceMode = null)
         else -> state

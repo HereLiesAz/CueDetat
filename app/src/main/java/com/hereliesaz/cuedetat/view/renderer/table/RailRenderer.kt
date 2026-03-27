@@ -182,6 +182,7 @@ class RailRenderer {
         paints: PaintCache,
         typeface: Typeface?
     ) {
+        if (state.isMasseModeActive) return
         val matrix = state.railPitchMatrix ?: return
         val referenceRadius = DrawingUtils.getPerspectiveRadiusAndLift(
             state.protractorUnit.center, state.protractorUnit.radius, state, matrix

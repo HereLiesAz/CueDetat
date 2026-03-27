@@ -74,6 +74,31 @@ This mode is entered after the user taps "Unlock View".
 - World Rotation
 - The following menu items are hidden: Camera Toggle, Table Size, and Distance Unit Toggle.
 
+## IV. AR Camera Flow
+
+The AR camera system follows a strict state machine. The mandatory rule is: **one user interaction = felt color capture only**. The pocket scan is a separate, user-initiated action.
+
+### Camera Mode State Machine
+
+- **`OFF`** → `AR_SETUP`: `CycleCameraMode` always transitions directly from `OFF` to `AR_SETUP`. There is no first-launch `CAMERA_ONLY` intermediate path.
+- **`AR_SETUP`** → `AR_ACTIVE`: Auto-advances when `tableOverlayConfidence >= 0.8` and all prerequisites are met.
+- **`AR_ACTIVE`** / **`AR_SETUP`** → `OFF`: `TurnCameraOff`.
+- **`AR_ACTIVE`** → `AR_SETUP`: `ArTrackingLost` (clears scan model and returns to setup).
+- `ToggleTableScanScreen` does **not** change `cameraMode`; it only shows/hides the felt-scan overlay.
+
+### AR_SETUP Behavior
+
+- The **Felt** and **Cancel** nav rail items appear immediately when `cameraMode == AR_SETUP` or `cameraMode == AR_ACTIVE` — not only after the scan completes.
+- The **Felt** button dispatches only `ToggleTableScanScreen`. It no longer dispatches `ClearTableScan` first.
+- The **AR toggle** in the nav rail uses `toggleOnText = "AR"` and `toggleOffText = "off"`.
+
+### TableScanScreen
+
+- `TableScanScreen` is rendered as an **inline overlay** composable inside `ProtractorScreen`, controlled by `uiState.showTableScanScreen`. It is not a navigated route; `ROUTE_SCAN` has been removed from the `NavHost` entirely.
+- The camera analyzer routes to `TableScanAnalyzer` based on `uiState.showTableScanScreen` (not by checking the current navigation route).
+- `TableScanScreen` does not request GPS permission and does not show a Cancel button. It includes `LaunchedEffect(Unit) { viewModel.resetScan() }` to reset scan state on entry.
+- Pocket-detection auto-complete has been removed from `TableScanViewModel.onFrame()`. Only an explicit call to `captureFeltAndComplete()` can complete the scan.
+
 ## III. Hater Mode
 
 Hater Mode transforms the application into a "Magic 8-Ball" that delivers cynical and unhelpful "

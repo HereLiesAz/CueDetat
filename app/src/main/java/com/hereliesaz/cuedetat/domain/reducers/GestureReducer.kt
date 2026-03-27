@@ -144,14 +144,28 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                 currentState.copy(bankingAimTarget = event.currentLogicalPoint, valuesChangedSinceReset = true)
             }
             InteractionMode.ROTATING_PROTRACTOR -> {
-                val center = currentState.protractorUnit.center
-                val prevAngle = atan2(event.previousLogicalPoint.y - center.y, event.previousLogicalPoint.x - center.x)
-                val currAngle = atan2(event.currentLogicalPoint.y - center.y, event.currentLogicalPoint.x - center.x)
-                val angleDelta = Math.toDegrees(currAngle.toDouble() - prevAngle.toDouble()).toFloat()
-                currentState.copy(
-                    protractorUnit = currentState.protractorUnit.copy(rotationDegrees = currentState.protractorUnit.rotationDegrees + angleDelta),
-                    valuesChangedSinceReset = true
-                )
+                if (currentState.isMasseModeActive) {
+                    val cuePos = currentState.onPlaneBall?.center ?: return currentState
+                    val prevAngle = atan2(
+                        event.previousLogicalPoint.y - cuePos.y,
+                        event.previousLogicalPoint.x - cuePos.x
+                    )
+                    val currAngle = atan2(
+                        event.currentLogicalPoint.y - cuePos.y,
+                        event.currentLogicalPoint.x - cuePos.x
+                    )
+                    val delta = Math.toDegrees(currAngle.toDouble() - prevAngle.toDouble()).toFloat()
+                    currentState.copy(masseShotAngleDeg = currentState.masseShotAngleDeg + delta)
+                } else {
+                    val center = currentState.protractorUnit.center
+                    val prevAngle = atan2(event.previousLogicalPoint.y - center.y, event.previousLogicalPoint.x - center.x)
+                    val currAngle = atan2(event.currentLogicalPoint.y - center.y, event.currentLogicalPoint.x - center.x)
+                    val angleDelta = Math.toDegrees(currAngle.toDouble() - prevAngle.toDouble()).toFloat()
+                    currentState.copy(
+                        protractorUnit = currentState.protractorUnit.copy(rotationDegrees = currentState.protractorUnit.rotationDegrees + angleDelta),
+                        valuesChangedSinceReset = true
+                    )
+                }
             }
             else -> currentState
         }

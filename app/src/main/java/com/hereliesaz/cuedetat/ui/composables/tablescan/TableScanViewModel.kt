@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.opencv.calib3d.Calib3d
 import org.opencv.core.Core
 import org.opencv.core.MatOfPoint2f
@@ -150,33 +149,8 @@ class TableScanViewModel @Inject constructor(
                 screenToLogical(screenPt, inverse)
             }
 
-            // Step 3: Merge into clusters.
+            // Step 3: Merge into clusters (accumulated for manual geometry fitting if needed).
             logicalPts.forEach { logicalPt -> mergeIntoCluster(logicalPt) }
-
-            // Step 4: Update UI progress — count clusters with enough observations.
-            val stableIds = clusters.entries
-                .filter { it.value.size >= MIN_OBSERVATIONS_TO_FIT }
-                .map { it.key }
-                .toSet()
-            withContext(Dispatchers.Main) {
-                _scanProgress.value = stableIds.associateWith { true }
-            }
-
-            // Step 5: Attempt fit when 6 clusters are stable.
-            val stableClusters = clusters.filter { it.value.size >= MIN_OBSERVATIONS_TO_FIT }
-            if (stableClusters.size >= 6) {
-                val centerPts = stableClusters.values.map { observations ->
-                    PointF(
-                        observations.sumOf { it.x.toDouble() }.toFloat() / observations.size,
-                        observations.sumOf { it.y.toDouble() }.toFloat() / observations.size
-                    )
-                }
-                val fitResult = TableGeometryFitter.fit(centerPts) ?: return@launch
-
-                // Re-key clusters by identified PocketId.
-                val identifiedCenters = fitResult.associate { (id, pt) -> id to pt }
-                completeScan(identifiedCenters, imageWidth.toFloat(), imageHeight.toFloat())
-            }
         }
     }
 

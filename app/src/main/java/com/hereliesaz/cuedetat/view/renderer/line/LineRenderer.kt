@@ -461,6 +461,7 @@ class LineRenderer {
     }
 
     private fun drawProtractorGuides(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
+        if (state.isMasseModeActive) return
         val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
         val targetCenter = state.protractorUnit.center
         val config = ProtractorGuides()

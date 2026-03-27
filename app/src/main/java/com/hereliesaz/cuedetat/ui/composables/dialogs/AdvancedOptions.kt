@@ -148,16 +148,8 @@ fun AdvancedOptionsDialog(
 
                     // --- Calibration Controls ---
                     Text("Fix Lens Warp", style = MaterialTheme.typography.titleMedium)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        TextButton(onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen); onDismiss() }) {
-                            Text("Scan Table", color = MaterialTheme.colorScheme.tertiary)
-                        }
-                        TextButton(onClick = { onEvent(MainScreenEvent.ToggleCalibrationScreen); onDismiss() }) {
-                            Text("Full Calibration", color = MaterialTheme.colorScheme.tertiary)
-                        }
+                    TextButton(onClick = { onEvent(MainScreenEvent.ToggleCalibrationScreen); onDismiss() }) {
+                        Text("Full Calibration", color = MaterialTheme.colorScheme.tertiary)
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
