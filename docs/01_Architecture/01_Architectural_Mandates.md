@@ -34,4 +34,21 @@ will compromise the stability and maintainability of the codebase.
   changes.
 
 * **Mandate 7: ONE SINGLE USER INTERACTION for AR Setup**
-  The AR setup flow must strictly adhere to a single interaction paradigm. There is NO multi-step wizard. The app must NEVER attempt to see the whole table at once, identify pockets automatically, or balls automatically during AR setup. The sole interaction required from the user is capturing the felt color (a single tap on a capture button), which MUST immediately drop them into an active AR Tracking state. Any fine-tuning of pocket alignment relies entirely on the user rotating/zooming via sliders.
+  The AR setup flow must strictly adhere to a single interaction paradigm. There is NO multi-step
+  wizard. The app must NEVER attempt to see the whole table at once, identify pockets
+  automatically, or balls automatically during AR setup. The sole interaction required from the
+  user is capturing the felt color using a magnifying circle and a capture button (styled like a
+  camera app). This action must immediately drop the user into an active AR Tracking state. Any
+  fine-tuning of pocket alignment relies entirely on the user rotating/zooming via UI controls.
+  Felt color samples must be persisted and saved for as long as the app is installed.
+
+* **Mandate 8: Logical Space Rendering for Massé**
+  All Massé shot components, including kicks and paths, must be calculated and drawn in logical
+  table space. 2D transformations must occur before 3D perspective algorithms are applied. The
+  order of operations must ensure that mathematical consistency is maintained within the logical
+  coordinate system.
+
+* **Mandate 9: State Cache Purging**
+  Without exception, all caching of any kind related to Massé mode (shot directions, impact
+  points, etc.) must be dumped and reset when the user turns off Massé mode. No Massé-specific
+  state may persist into other operational modes.

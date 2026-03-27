@@ -4,6 +4,9 @@
   default.
 * **Toggle:** Their visibility is controlled exclusively by the "WTF is all this?" menu option (
   `areHelpersVisible` state property). This includes labels on sliders, balls, and lines.
+* **App Icon Helper**: The text indicating how to open the menu ("Click app icon") must use an
+  enlarged font size (1-2 sizes larger than standard helper text) for prominence.
+
 
 ## Specific Label Content
 

@@ -22,6 +22,21 @@ users who are comfortable with all the tools and want no restrictions.
 * **Functionality:** The standard aiming mode for cut shots. The user can drag the `TargetBall` and
   `ActualCueBall` to match the real balls on the table. A rotational drag gesture aims the shot.
 
+### Massé Sub-Mode (Expert)
+
+* **Interaction**: The `ROTATING_PROTRACTOR` gesture rotates the Massé shot's direction of origin
+  around the cue ball.
+* **Physics**: The shot is always assumed to be taken from the back side of the cue ball, opposite
+  the shot line.
+* **State Management**: The shot direction is reset every time the user selects an impact point on
+  the color wheel. All Massé caching is dumped upon exiting the mode.
+* **Visuals**:
+    * Protractor angle lines and rail labels (bank diamond numbers) are suppressed.
+    * Aiming and tangent lines are hidden unless the Massé ghost ball impacts the target ball.
+    * When impact occurs, the ghost ball rotates around the target ball, and aiming/tangent lines
+      are displayed from the ghost ball center through the target ball center.
+
+
 ### Banking Sub-Mode (Expert)
 
 * **Functionality:** Allows the user to calculate multi-rail kick and bank shots by dragging the
@@ -76,21 +91,28 @@ This mode is entered after the user taps "Unlock View".
 
 ## IV. AR Camera Flow
 
-The AR camera system follows a strict state machine. The mandatory rule is: **one user interaction = felt color capture only**. The pocket scan is a separate, user-initiated action.
+The AR camera system follows a strict state machine built on the mandatory rule: **one user interaction = felt color capture**. The app identifies the table without requiring the whole table to be visible.
 
 ### Camera Mode State Machine
 
-- **`OFF`** → `AR_SETUP`: `CycleCameraMode` always transitions directly from `OFF` to `AR_SETUP`. There is no first-launch `CAMERA_ONLY` intermediate path.
-- **`AR_SETUP`** → `AR_ACTIVE`: Auto-advances when `tableOverlayConfidence >= 0.8` and all prerequisites are met.
-- **`AR_ACTIVE`** / **`AR_SETUP`** → `OFF`: `TurnCameraOff`.
+- **`OFF`** → `AR_SETUP`: Pressing the **AR** button turns on the camera and automatically
+  initiates the felt capture process (identifying the table).
+- **`AR_SETUP`** / **`AR_ACTIVE`** → `OFF`: Pressing the **Off** button turns off the camera and
+  toggles the button back to **AR**.
+- **`AR_SETUP`** (Cancel): Pressing **Cancel** stops AR (turning all CV off) but leaves the
+  camera on.
+- **Camera-Only Mode** → `OFF`: Clicking **Off** while in camera-only mode turns off the camera
+  and toggles the button back to **AR**.
+- **`AR_SETUP`** → `AR_ACTIVE`: Auto-advances when table identification is successful.
 - **`AR_ACTIVE`** → `AR_SETUP`: `ArTrackingLost` (clears scan model and returns to setup).
-- `ToggleTableScanScreen` does **not** change `cameraMode`; it only shows/hides the felt-scan overlay.
 
 ### AR_SETUP Behavior
 
-- The **Felt** and **Cancel** nav rail items appear immediately when `cameraMode == AR_SETUP` or `cameraMode == AR_ACTIVE` — not only after the scan completes.
-- The **Felt** button dispatches only `ToggleTableScanScreen`. It no longer dispatches `ClearTableScan` first.
-- The **AR toggle** in the nav rail uses `toggleOnText = "AR"` and `toggleOffText = "off"`.
+- The **Felt** and **Cancel** nav rail items appear immediately when AR is initialized.
+- **Felt**: Allows adding a new color sample to the persistent list.
+- **Cancel**: Stops all AR/CV processing but leaves the camera active.
+- The user is guided through the process: picking felt color and verifying alignment.
+
 
 ### TableScanScreen
 

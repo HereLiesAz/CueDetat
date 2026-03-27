@@ -28,9 +28,13 @@
 
 The AR-related controls live in the navigation rail (`AzNavRailMenu`), not the drawer.
 
-- **AR toggle**: `toggleOnText = "AR"`, `toggleOffText = "off"`. Lit (active state) when `cameraMode == AR_SETUP` or `cameraMode == AR_ACTIVE`.
-- **Felt item**: Visible when `cameraMode == AR_SETUP` or `cameraMode == AR_ACTIVE`. Dispatches `ToggleTableScanScreen` only — it does **not** dispatch `ClearTableScan` first.
-- **Cancel item**: Visible when `cameraMode == AR_SETUP`.
+- **AR toggle**: A rail toggle with options **"AR"** and **"off"**. Lit (active state) when
+  `cameraMode == AR_SETUP` or `cameraMode == AR_ACTIVE`. Initiates AR setup or turns off camera.
+- **Felt item**: Visible immediately upon AR initialization. Pressing it adds a new color sample
+  to the persistent collection.
+- **Cancel item**: Visible when `cameraMode == AR_SETUP`. Stops all CV/AR processing but leaves the
+  camera feed active.
+
 - All rail controls are gated by `experienceMode`.
 
 There are no "Recalibrate Felt", "Felt Capture", or equivalent advanced menu items for felt re-sampling. The Felt rail button is the sole entry point for opening the table scan overlay.
