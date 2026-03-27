@@ -42,11 +42,24 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
 
         is MainScreenEvent.ToggleSpinControl -> {
             val nextVisible = !state.isSpinControlVisible
-            state.copy(
-                isSpinControlVisible = nextVisible,
-                isMasseModeActive = if (nextVisible) false else state.isMasseModeActive,
-                spinPaths = if (!nextVisible) emptyMap() else state.spinPaths
-            )
+            if (nextVisible) {
+                // Enabling spin: fully exit masse mode if it was active
+                state.copy(
+                    isSpinControlVisible = true,
+                    isMasseModeActive = false,
+                    masseShotAngleDeg = 0f,
+                    spinPaths = emptyMap(),
+                    masseImpactPoints = emptyList(),
+                    masseConnectsTarget = false,
+                    selectedSpinOffset = null,
+                    lingeringSpinOffset = null
+                )
+            } else {
+                state.copy(
+                    isSpinControlVisible = false,
+                    spinPaths = emptyMap()
+                )
+            }
         }
 
         is MainScreenEvent.SpinApplied -> {
