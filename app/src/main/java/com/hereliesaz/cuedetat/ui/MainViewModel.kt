@@ -89,7 +89,8 @@ class MainViewModel @Inject constructor(
 
         viewModelScope.launch {
             val savedState = userPreferencesRepository.stateFlow.first()
-            val initialState = savedState ?: CueDetatState()
+            val currentExperienceMode = _uiState.value.experienceMode
+            val initialState = (savedState ?: CueDetatState()).copy(experienceMode = currentExperienceMode)
             processAndEmitState(initialState, UpdateType.FULL)
         }
 
