@@ -34,6 +34,18 @@ This document specifies the application's visual identity.
   * Menu backgrounds: 80% (`0.8f`).
   * Popup dialogs: 66% (`0.66f`).
 
+## Beginner Mode Specific Styling
+
+* **Static (Locked) Mode**:
+    * **Static Circles**: Must have **NO FILL, stroke only**.
+    * **Bubble Levels**: Must have **translucent fill only, NO STROKE**.
+    * **Layering**: Center dots must be rendered **above** all lines. Only text is permitted to
+      overlap center dots.
+
+* **Dynamic (Unlocked) Mode**:
+    * **Shot Line Anchor**: The near-end of the shot line must be permanently anchored to the
+      bottom of the screen.
+
 ## Spin Control Color Wheel
 
 * **Description:** A circular UI element for selecting cue ball spin.
