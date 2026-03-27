@@ -1,4 +1,41 @@
 import java.util.Properties
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+
+val versionPropsFile = rootProject.file("version.properties")
+val versionPropsPath = versionPropsFile.absolutePath
+val versionProps = Properties()
+if (versionPropsFile.exists()) {
+    versionPropsFile.inputStream().use { versionProps.load(it) }
+}
+
+var majorVal = (versionProps.getProperty("MAJOR") ?: "0").toInt()
+var minorVal = (versionProps.getProperty("MINOR") ?: "0").toInt()
+var patchVal = (versionProps.getProperty("PATCH") ?: "0").toInt()
+var buildVal = (versionProps.getProperty("BUILD") ?: "0").toInt()
+val lastMajorVal = (versionProps.getProperty("LAST_MAJOR") ?: majorVal.toString()).toInt()
+val lastMinorVal = (versionProps.getProperty("LAST_MINOR") ?: minorVal.toString()).toInt()
+
+val isBuildingTask = gradle.startParameter.taskNames.any {
+    it.contains("assemble") || it.contains("bundle") || it.contains("install")
+}
+
+if (isBuildingTask) {
+    buildVal++
+    if (majorVal != lastMajorVal || minorVal != lastMinorVal) {
+        patchVal = 0
+    } else {
+        patchVal++
+    }
+}
+
+val finalBuild = buildVal
+val finalPatch = patchVal
+val finalMajor = majorVal
+val finalMinor = minorVal
+val finalVersionName = "$finalMajor.$finalMinor.$finalPatch.$finalBuild"
+val finalIsBuilding = isBuildingTask
 
 plugins {
     alias(libs.plugins.android.application)
@@ -15,12 +52,42 @@ android {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 26
         targetSdk = 36
-        val versionProps = Properties()
-        versionProps.load(rootProject.file("version.properties").reader())
-        versionCode = (project.findProperty("versionCode") as? String
-            ?: versionProps.getProperty("versionCode")).toInt()
-        versionName = (project.findProperty("versionName") as? String
-            ?: versionProps.getProperty("versionName"))
+        
+        versionCode = finalBuild
+        versionName = finalVersionName
+
+        // Task to write back the updated properties
+        tasks.register("updateVersionProperties") {
+            val path = versionPropsPath
+            val b = finalBuild
+            val p = finalPatch
+            val maj = finalMajor
+            val min = finalMinor
+            val vn = finalVersionName
+            val shouldRun = finalIsBuilding
+
+            doLast {
+                if (shouldRun) {
+                    val properties = Properties()
+                    val f = File(path)
+                    if (f.exists()) {
+                        FileInputStream(f).use { properties.load(it) }
+                    }
+                    properties.setProperty("BUILD", b.toString())
+                    properties.setProperty("PATCH", p.toString())
+                    properties.setProperty("LAST_MAJOR", maj.toString())
+                    properties.setProperty("LAST_MINOR", min.toString())
+                    properties.setProperty("versionCode", b.toString())
+                    properties.setProperty("versionName", vn)
+                    FileOutputStream(f).use { properties.store(it, "Automated Version Update") }
+                }
+            }
+        }
+        
+        // Ensure the update happens on every relevant build
+        tasks.matching { it.name.contains("assemble") || it.name.contains("bundle") || it.name.contains("install") }.all {
+            dependsOn("updateVersionProperties")
+        }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
