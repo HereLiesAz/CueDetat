@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -58,11 +59,6 @@ fun TableScanScreen(
     uiState: CueDetatState,
     viewModel: TableScanViewModel = hiltViewModel()
 ) {
-    val scanProgress by viewModel.scanProgress.collectAsState()
-
-    // Reset scan state each time this overlay appears.
-    LaunchedEffect(Unit) { viewModel.resetScan() }
-
     // Pass current state snapshot to ViewModel so it can do coordinate transforms.
     LaunchedEffect(uiState.inversePitchMatrix, uiState.hasInverseMatrix) {
         viewModel.updateStateSnapshot(
@@ -80,19 +76,26 @@ fun TableScanScreen(
         scanResult.collect { result -> onEvent(result) }
     }
 
-    // Close screen only after completeScan has signalled that ALL events have been emitted.
-    val scanComplete by viewModel.scanComplete.collectAsState()
-    LaunchedEffect(scanComplete) {
-        if (scanComplete) {
-            onEvent(MainScreenEvent.ToggleTableScanScreen)
+    // Reset scan state each time this overlay appears, then wait for completion.
+    // Combining reset + close-watch into one LaunchedEffect(Unit) prevents a race where
+    // a stale scanComplete=true (left from the previous capture) would fire the close
+    // effect immediately before resetScan() had a chance to clear it.
+    LaunchedEffect(Unit) {
+        viewModel.resetScan()
+        viewModel.scanComplete.collect { complete ->
+            if (complete) {
+                onEvent(MainScreenEvent.ToggleTableScanScreen)
+            }
         }
     }
 
 
     Box(modifier = Modifier.fillMaxSize()) {
+        // State hoisted above conditionals (Compose rule: no @Composable calls in if/when blocks)
+        val selectedIds by viewModel.selectedSampleIds.collectAsState()
+
         // Top Gallery: Felt Samples
         if (uiState.savedFeltSamples.isNotEmpty()) {
-            val selectedIds by viewModel.selectedSampleIds.collectAsState()
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(48.dp),
                 modifier = Modifier
@@ -127,7 +130,6 @@ fun TableScanScreen(
         }
 
         // Context Menu for Selected Samples
-        val selectedIds by viewModel.selectedSampleIds.collectAsState()
         if (selectedIds.isNotEmpty()) {
             Row(
                 modifier = Modifier
@@ -175,7 +177,8 @@ fun TableScanScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 48.dp),
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(

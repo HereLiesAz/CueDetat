@@ -174,9 +174,9 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen HUD: Zoom slider (main route only) ---
+        // --- Onscreen HUD: Zoom slider (main route only, hidden during felt capture) ---
         onscreen(alignment = Alignment.CenterEnd) {
-            if (isOnMain && !(uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked)) {
+            if (isOnMain && !uiState.showTableScanScreen && !(uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked)) {
                 ZoomControls(
                     zoomSliderPosition = uiState.zoomSliderPosition,
                     onZoomChange = { mainViewModel.onEvent(MainScreenEvent.ZoomSliderChanged(it)) },
@@ -188,9 +188,9 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen HUD: Table rotation slider (main route only) ---
+        // --- Onscreen HUD: Table rotation slider (main route only, hidden during felt capture) ---
         onscreen(alignment = Alignment.BottomCenter) {
-            if (isOnMain) {
+            if (isOnMain && !uiState.showTableScanScreen) {
                 TableRotationSlider(
                     isVisible = uiState.table.isVisible,
                     worldRotationDegrees = uiState.worldRotationDegrees,
