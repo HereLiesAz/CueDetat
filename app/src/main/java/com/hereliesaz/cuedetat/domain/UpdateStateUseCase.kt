@@ -189,7 +189,7 @@ class UpdateStateUseCase @Inject constructor(
             )
         }
 
-sd        // In masse mode the aiming/tangent geometry is driven by masseGhostBallCenter,
+        // In masse mode the aiming/tangent geometry is driven by masseGhostBallCenter,
         // which is one frame behind (computed in the previous updateSpinCalculations call).
         if (state.isMasseModeActive) {
             if (!state.masseConnectsTarget || state.masseGhostBallCenter == null) {
