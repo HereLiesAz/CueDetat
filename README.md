@@ -14,7 +14,7 @@ This is an Android application that uses your device's camera and a frankly exce
 **(Warning: May induce an inflated sense of skill, followed by the crushing reality of physics. Use with a healthy dose of self-deprecating humor.)**
 
 ## Features
-
+ 
 *   **Live Camera Augmented Reality Overlay:**
     *   See the guides directly on your pool game.
     *   Designed for easy one or two-handed use.
