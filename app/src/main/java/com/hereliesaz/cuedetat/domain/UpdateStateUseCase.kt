@@ -189,6 +189,65 @@ class UpdateStateUseCase @Inject constructor(
             )
         }
 
+sd        // In masse mode the aiming/tangent geometry is driven by masseGhostBallCenter,
+        // which is one frame behind (computed in the previous updateSpinCalculations call).
+        if (state.isMasseModeActive) {
+            if (!state.masseConnectsTarget || state.masseGhostBallCenter == null) {
+                return state.copy(
+                    aimingLineBankPath = null,
+                    tangentLineBankPath = null,
+                    aimingLineEndPoint = null,
+                    tangentAimedPocketIndex = null,
+                    isStraightShot = false,
+                    isGeometricallyImpossible = false,
+                    isObstructed = false,
+                    isTiltBeyondLimit = false,
+                    tangentDirection = 1.0f
+                )
+            }
+            val masseGhost = state.masseGhostBallCenter
+            val targetCenter = state.protractorUnit.center
+            val cuePos = state.onPlaneBall?.center ?: masseGhost
+
+            val (isGeometricallyImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
+                shotAnchor = cuePos,
+                ghostBall = masseGhost,
+                targetBall = targetCenter
+            )
+            val isStraightShot = isShotStraight(cuePos, masseGhost, targetCenter)
+
+            val (finalAimingLineBankPath, _, aimingLineEndPoint) = if (state.table.isVisible) {
+                val (path, pocketIndex, endPoint) = calculateAimAndBank(masseGhost, targetCenter, state)
+                Triple(path, pocketIndex, endPoint)
+            } else {
+                val extendedPath = getExtendedLinePath(masseGhost, targetCenter)
+                Triple(extendedPath, null, extendedPath.last())
+            }
+
+            val activeTangentTarget = PointF(
+                masseGhost.x - (targetCenter.y - masseGhost.y) * tangentDirection,
+                masseGhost.y + (targetCenter.x - masseGhost.x) * tangentDirection
+            )
+            var (finalTangentLineBankPath, tangentAimedPocketIndex, _) = if (state.table.isVisible) {
+                calculateAimAndBank(masseGhost, activeTangentTarget, state)
+            } else {
+                Triple(getExtendedLinePath(masseGhost, activeTangentTarget), null, null)
+            }
+            if (isStraightShot) tangentAimedPocketIndex = null
+
+            return state.copy(
+                isStraightShot = isStraightShot,
+                isGeometricallyImpossible = isGeometricallyImpossible,
+                isObstructed = false,
+                isTiltBeyondLimit = false,
+                tangentDirection = tangentDirection,
+                tangentAimedPocketIndex = tangentAimedPocketIndex,
+                aimingLineEndPoint = aimingLineEndPoint,
+                aimingLineBankPath = finalAimingLineBankPath,
+                tangentLineBankPath = finalTangentLineBankPath
+            )
+        }
+
         val logicalShotLineAnchor = getLogicalShotLineAnchor(state) ?: return state
 
         val isTiltBeyondLimit =
