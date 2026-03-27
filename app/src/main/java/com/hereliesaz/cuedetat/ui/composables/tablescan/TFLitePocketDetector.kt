@@ -9,23 +9,27 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 
-private const val MODEL_FILE = "pocket_detector.tflite"
+private const val MODEL_FILE = "pocket_detector_fp16.tflite"
 private const val INPUT_SIZE = 640
 private const val CONFIDENCE_THRESHOLD = 0.30f
 private const val MAX_POCKETS = 6
 
+// Class indices from metadata.yaml: pool-table=0, pool-table-hole=1, pool-table-side=2
+private const val HOLE_CLASS_ID = 1
+
 /**
  * TFLite-backed implementation of [PocketDetector].
  *
- * Model: pocket_detector.tflite (YOLOv5, NMS built-in)
+ * Model: pocket_detector_fp16.tflite (YOLOv8n, FP16, NMS built-in, mAP50=0.8123)
  * Input:  [1, 640, 640, 3] float32 — RGB normalized [0, 1]
  * Output: [1, 300, 6] float32 — NMS post-processed detections
  *         Each row: [y1, x1, y2, x2, score, class_id] (TF NMS convention, normalized)
+ *         Classes: 0=pool-table  1=pool-table-hole  2=pool-table-side
  *
  * Falls back to Hough circles (returns null) when:
  * - Model fails to initialize
  * - Inference throws an exception
- * - No detections exceed [CONFIDENCE_THRESHOLD]
+ * - No detections exceed [CONFIDENCE_THRESHOLD] for the hole class
  */
 class TFLitePocketDetector(private val context: Context) : PocketDetector {
 
@@ -84,11 +88,13 @@ class TFLitePocketDetector(private val context: Context) : PocketDetector {
     /**
      * Converts normalized [y1, x1, y2, x2, score, class_id] rows into image-space
      * centre points. Returns null (→ Hough fallback) if nothing passes the threshold.
+     * Only accepts class 1 (pool-table-hole); ignores table and rail detections.
      */
     private fun parseDetections(width: Int, height: Int): List<PointF>? {
         val results = mutableListOf<PointF>()
         for (det in outputBuffer[0]) {
             if (det[4] < CONFIDENCE_THRESHOLD) continue
+            if (det[5].toInt() != HOLE_CLASS_ID) continue
             // TF NMS convention: [y1, x1, y2, x2, ...]
             val cx = ((det[1] + det[3]) / 2f * width)
             val cy = ((det[0] + det[2]) / 2f * height)
