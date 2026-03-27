@@ -2,6 +2,15 @@ name: Publish Pre-release APK
 
 on:
   push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+# ⚡ Concurrency: Cancels the entire job if a new push comes in.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   release:
