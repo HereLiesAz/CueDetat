@@ -48,11 +48,11 @@ internal fun reduceToggleAction(
             state.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)
         }
         is MainScreenEvent.CycleCameraMode -> when (state.cameraMode) {
-            CameraMode.OFF -> state.copy(cameraMode = CameraMode.AR_SETUP)
-            else -> state.copy(cameraMode = CameraMode.OFF)
+            CameraMode.OFF -> state.copy(cameraMode = CameraMode.AR_SETUP, showTableScanScreen = true)
+            else -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false)
         }
         is MainScreenEvent.StartArTracking -> state.copy(cameraMode = CameraMode.AR_ACTIVE, showTableScanScreen = false)
-        is MainScreenEvent.CancelArSetup -> state.copy(cameraMode = CameraMode.CAMERA_ONLY)
+        is MainScreenEvent.CancelArSetup -> state.copy(cameraMode = CameraMode.CAMERA_ONLY, showTableScanScreen = false)
         is MainScreenEvent.TurnCameraOff -> state.copy(cameraMode = CameraMode.OFF)
         is MainScreenEvent.ToggleDistanceUnit -> state.copy(distanceUnit = if (state.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC, valuesChangedSinceReset = true)
         is MainScreenEvent.ToggleLuminanceDialog -> state.copy(showLuminanceDialog = !state.showLuminanceDialog)

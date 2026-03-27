@@ -116,7 +116,7 @@ fun AzNavRailMenu(
             azRailToggle(
                 id = "ar",
                 isChecked = isArActive,
-                toggleOnText = "AR", toggleOffText = "off",
+                toggleOnText = "off", toggleOffText = "AR",
                 fillColor = b3R, textColor = Color.White,
                 onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
             )

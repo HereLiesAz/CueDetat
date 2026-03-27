@@ -325,18 +325,56 @@ class UpdateStateUseCase @Inject constructor(
             startPos = cuePos
         )
         val targetPos = state.protractorUnit.center
-        val lastPt = result.points.lastOrNull()
-        val connects = if (lastPt != null) {
-            val dx = lastPt.x - targetPos.x
-            val dy = lastPt.y - targetPos.y
-            sqrt(dx * dx + dy * dy) <= 2f * LOGICAL_BALL_RADIUS
-        } else false
+        val diameter = 2f * LOGICAL_BALL_RADIUS
+
+        // Find the first point on the path (or its segments) that comes within one diameter of target.
+        var masseGhostCenter: PointF? = null
+        outer@ for (i in result.points.indices) {
+            val pt = result.points[i]
+            // Check the point itself.
+            val dx0 = pt.x - targetPos.x
+            val dy0 = pt.y - targetPos.y
+            val d0 = sqrt(dx0 * dx0 + dy0 * dy0)
+            if (d0 <= diameter) {
+                val len = if (d0 > 0f) d0 else 1f
+                masseGhostCenter = PointF(
+                    targetPos.x + dx0 / len * diameter,
+                    targetPos.y + dy0 / len * diameter
+                )
+                break@outer
+            }
+            // Check the segment from this point to the next.
+            if (i < result.points.size - 1) {
+                val next = result.points[i + 1]
+                val sdx = next.x - pt.x
+                val sdy = next.y - pt.y
+                val lenSq = sdx * sdx + sdy * sdy
+                if (lenSq > 0f) {
+                    val t = ((targetPos.x - pt.x) * sdx + (targetPos.y - pt.y) * sdy) / lenSq
+                    val cT = t.coerceIn(0f, 1f)
+                    val cx = pt.x + cT * sdx
+                    val cy = pt.y + cT * sdy
+                    val cdx = cx - targetPos.x
+                    val cdy = cy - targetPos.y
+                    val cd = sqrt(cdx * cdx + cdy * cdy)
+                    if (cd <= diameter) {
+                        val len = if (cd > 0f) cd else 1f
+                        masseGhostCenter = PointF(
+                            targetPos.x + cdx / len * diameter,
+                            targetPos.y + cdy / len * diameter
+                        )
+                        break@outer
+                    }
+                }
+            }
+        }
 
         return state.copy(
             spinPaths = mapOf(pathColor to result.points),
             aimedPocketIndex = result.pocketIndex,
             masseImpactPoints = result.impactPoints,
-            masseConnectsTarget = connects
+            masseConnectsTarget = masseGhostCenter != null,
+            masseGhostBallCenter = masseGhostCenter
         )
     }
 

@@ -93,6 +93,7 @@ data class CueDetatState(
     @Transient val spinPaths: Map<Color, List<PointF>>? = null,
     @Transient val masseImpactPoints: List<PointF> = emptyList(),
     @Transient val masseConnectsTarget: Boolean = false,
+    @Transient val masseGhostBallCenter: PointF? = null,
     val spinControlCenter: PointF? = null,
     val lingeringSpinOffset: PointF? = null,
     @Transient val spinPathsAlpha: Float = 1.0f,

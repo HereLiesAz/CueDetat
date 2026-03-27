@@ -94,10 +94,17 @@ object MassePhysicsSimulator {
                 if (railHit != null) {
                     val (worldIntersect, worldNormal) = railHit
 
+                    // Physics path: ball center is at the rail surface (worldIntersect).
                     val localIx = worldIntersect.x * cosR + worldIntersect.y * sinR
                     val localIy = -worldIntersect.x * sinR + worldIntersect.y * cosR
                     points.add(PointF().apply { x = localIx; y = localIy })
-                    impactPoints.add(PointF().apply { x = localIx; y = localIy })
+
+                    // Visual ghost ball: offset inward by one radius so the ball's EDGE sits at the rail.
+                    val ghostWorldX = worldIntersect.x + worldNormal.x * R
+                    val ghostWorldY = worldIntersect.y + worldNormal.y * R
+                    val ghostLocalIx = ghostWorldX * cosR + ghostWorldY * sinR
+                    val ghostLocalIy = -ghostWorldX * sinR + ghostWorldY * cosR
+                    impactPoints.add(PointF().apply { x = ghostLocalIx; y = ghostLocalIy })
 
                     val localNx = worldNormal.x * cosR + worldNormal.y * sinR
                     val localNy = -worldNormal.x * sinR + worldNormal.y * cosR

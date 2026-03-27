@@ -149,8 +149,9 @@ class BallRenderer {
         drawGhostedBall(canvas, protractor, TargetBall(), state, paints)
 
         if (!state.isMasseModeActive || state.masseConnectsTarget) {
+            val ghostCenter = if (state.isMasseModeActive) state.masseGhostBallCenter else null
             drawGhostedBall(canvas, object : LogicalCircular {
-                override val center = protractor.ghostCueBallCenter
+                override val center = ghostCenter ?: protractor.ghostCueBallCenter
                 override val radius = protractor.radius
             }, GhostCueBall(), state, paints)
         }
