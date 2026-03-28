@@ -165,7 +165,6 @@ dependencies {
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-    ksp(libs.kotlin.metadata.jvm)
     implementation(libs.androidx.hilt.navigation.compose)
 
     // CameraX
@@ -203,9 +202,6 @@ dependencies {
     implementation(libs.kotlin.metadata.jvm)
 
     constraints {
-        implementation("com.google.guava:guava:32.0.0-android") {
-            because("Transitive dependency vulnerabilities in various plugins")
-        }
         implementation("org.bitbucket.b_c:jose4j:0.9.6") {
             because("Transitive dependency vulnerability")
         }
