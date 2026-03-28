@@ -13,8 +13,6 @@ import com.google.gson.stream.JsonWriter
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
-import com.hereliesaz.cuedetat.data.ShakeDetector
-import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.network.GithubApi
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
 import com.hereliesaz.cuedetat.ui.composables.tablescan.TFLitePocketDetector
@@ -54,19 +52,6 @@ object AppModule {
     }
 
     /**
-     * Provides the repository for reading/writing local user preferences (DataStore).
-     * Requires Gson for serializing complex objects (like custom color profiles).
-     */
-    @Provides
-    @Singleton
-    fun provideUserPreferencesRepository(
-        @ApplicationContext context: Context,
-        gson: Gson
-    ): UserPreferencesRepository {
-        return UserPreferencesRepository(context, gson)
-    }
-
-    /**
      * Provides the Google ML Kit Object Detector.
      *
      * Configuration:
@@ -88,16 +73,6 @@ object AppModule {
         } catch (e: Exception) {
             throw IllegalStateException("Failed to initialize ML Kit Object Detector.", e)
         }
-    }
-
-    /**
-     * Provides the accelerometer listener for detecting shakes.
-     * Used to trigger calibration resets or "Undo" actions.
-     */
-    @Provides
-    @Singleton
-    fun provideShakeDetector(@ApplicationContext context: Context): ShakeDetector {
-        return ShakeDetector(context)
     }
 
     /**

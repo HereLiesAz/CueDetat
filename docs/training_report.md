@@ -10,7 +10,7 @@ Generated: 2026-03-27 07:33:59
 
 ## 2. Model Configuration
 - **Architecture:** YOLOv8n
-- **Target Classes:** ['pool-table', 'pool-table-hole', 'pool-table-side']
+- **Target Classes:** ["pool-table", "pool-table-hole", "pool-table-side"]
 - **Input Resolution:** 640x640
 - **Training Schedule:** 100 Epochs / Batch 32
 

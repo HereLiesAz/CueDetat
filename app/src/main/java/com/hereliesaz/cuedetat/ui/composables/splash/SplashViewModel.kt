@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ExperienceMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

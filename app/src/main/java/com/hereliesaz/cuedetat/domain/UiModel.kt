@@ -146,6 +146,8 @@ data class CueDetatState(
     @Transient val isObstructed: Boolean = false,
     @Transient val isTiltBeyondLimit: Boolean = false,
     @Transient val warningText: String? = null,
+    @Transient val arConfidenceHistory: List<Float> = emptyList(),
+    @Transient val arLowConfidenceFrameCount: Int = 0,
     @Transient val shotGuideImpactPoint: PointF? = null,
     @Transient val aimedPocketIndex: Int? = null,
     @Transient val aimingLineBankPath: List<PointF>? = null,
@@ -271,6 +273,7 @@ sealed class MainScreenEvent {
     object StartTutorial : MainScreenEvent()
     object NextTutorialStep : MainScreenEvent()
     object EndTutorial : MainScreenEvent()
+    object TutorialBack : MainScreenEvent()
     data class UpdateHighlightAlpha(val alpha: Float) : MainScreenEvent()
     object CheckForUpdate : MainScreenEvent()
     object ViewArt : MainScreenEvent()
