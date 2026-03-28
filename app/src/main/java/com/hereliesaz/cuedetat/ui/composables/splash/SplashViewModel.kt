@@ -39,6 +39,12 @@ class SplashViewModel @Inject constructor(
                             navigateToMain = true
                         )
                     }
+                                        val experienceMode = try {
+                        ExperienceMode.valueOf(event.mode)
+                    } catch (_: Exception) {
+                        ExperienceMode.EXPERT
+                    }
+                    userPreferences.saveState(CueDetatState(experienceMode = experienceMode))
                 }
             }
             is SplashEvent.NavigationConsumed -> {
