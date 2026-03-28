@@ -30,7 +30,7 @@ class SplashViewModel @Inject constructor(
 
                     val experienceMode = try {
                         ExperienceMode.valueOf(event.mode)
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         ExperienceMode.EXPERT
                     }
                     userPreferences.saveState(CueDetatState(experienceMode = experienceMode))
