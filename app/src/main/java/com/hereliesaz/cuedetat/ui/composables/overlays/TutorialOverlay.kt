@@ -1,4 +1,4 @@
-// --- FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/TutorialOverlay.kt ---
+// app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/TutorialOverlay.kt
 package com.hereliesaz.cuedetat.ui.composables.overlays
 
 import androidx.compose.animation.core.RepeatMode
@@ -39,22 +39,11 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 
-/**
- * An overlay that guides the user through the application features.
- *
- * It draws attention to specific UI elements (like balls or sliders) by drawing
- * pulsing highlights around them on a Canvas layer sitting above the main view.
- * It uses the [DrawingUtils] to correctly project 2D screen coordinates onto 3D world objects.
- *
- * @param uiState Current application state.
- * @param onEvent Event dispatcher.
- */
 @Composable
 fun TutorialOverlay(
     uiState: CueDetatState,
     onEvent: (MainScreenEvent) -> Unit
 ) {
-    // The hardcoded tutorial script.
     val tutorialSteps = remember {
         listOf(
             "Alright, let's get this over with. This isn't a toy. It's a precision instrument. Try to keep up. Tap 'Next'.",
@@ -68,7 +57,6 @@ fun TutorialOverlay(
     }
 
     if (uiState.showTutorialOverlay) {
-        // Animation for the pulsing highlight effect.
         val infiniteTransition = rememberInfiniteTransition(label = "highlight-transition")
         val highlightAlpha by infiniteTransition.animateFloat(
             initialValue = 0.3f,
@@ -81,19 +69,17 @@ fun TutorialOverlay(
         )
         val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = highlightAlpha)
 
-        // Canvas for drawing highlights over 3D objects.
+        // The Kafkaesque nightmare ends here.
+        // We removed the zIndex conceit, sliding the highlight below the gesture interceptors.
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .zIndex(9f) // Ensure it draws above the GLSurfaceView/Camera.
         ) {
             val matrix = uiState.pitchMatrix
             if (matrix == null) return@Canvas
 
-            // Switch on which element should be highlighted for the current step.
             when (uiState.tutorialHighlight ?: TutorialHighlightElement.NONE) {
                 TutorialHighlightElement.TARGET_BALL -> {
-                    // Calculate screen position and radius for the target ball.
                     val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
                         uiState.protractorUnit.center,
                         uiState.protractorUnit.radius,
@@ -103,12 +89,11 @@ fun TutorialOverlay(
                     val screenPos = DrawingUtils.mapPoint(uiState.protractorUnit.center, matrix)
                     drawCircle(
                         color = highlightColor,
-                        radius = radiusInfo.radius * 2.0f, // Draw slightly larger than the ball.
+                        radius = radiusInfo.radius * 2.0f,
                         center = Offset(screenPos.x, screenPos.y),
                         style = Stroke(width = 4.dp.toPx())
                     )
                 }
-
                 TutorialHighlightElement.GHOST_BALL -> {
                     val ghostCenter = uiState.protractorUnit.ghostCueBallCenter
                     val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
@@ -125,7 +110,6 @@ fun TutorialOverlay(
                         style = Stroke(width = 4.dp.toPx())
                     )
                 }
-
                 TutorialHighlightElement.CUE_BALL -> {
                     uiState.onPlaneBall?.let {
                         val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
@@ -143,9 +127,7 @@ fun TutorialOverlay(
                         )
                     }
                 }
-
                 TutorialHighlightElement.ZOOM_SLIDER -> {
-                    // Highlight the area where the zoom slider is typically located (right side).
                     drawRoundRect(
                         color = highlightColor,
                         topLeft = Offset(
@@ -157,15 +139,13 @@ fun TutorialOverlay(
                         style = Stroke(width = 4.dp.toPx())
                     )
                 }
-                // Other cases can be added here
                 else -> {}
             }
         }
 
-        // Bottom text box for instructions.
         Box(
             modifier = Modifier
-                .fillMaxWidth() // Changed from fillMaxSize()
+                .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(bottom = 96.dp, start = 16.dp, end = 16.dp)
                 .zIndex(10f),

@@ -7,23 +7,15 @@ import androidx.camera.core.ImageProxy
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
-import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 
 /**
  * CameraX ImageAnalysis.Analyzer that detects pocket-sized circular blobs
  * in each frame and forwards detected image-space positions to the ViewModel.
  *
- * Detection strategy (in priority order):
- * 1. If [pocketDetector] is non-null, delegate to it. A null return from the
- *    detector falls through to strategy 2.
- * 2. Hough-circle fallback: downsample to 480p, run [Imgproc.HoughCircles],
- *    filter candidates by adaptive darkness threshold derived from the felt luma.
- *
- * Hough tuning (480p scale): minRadius=15, maxRadius=60,
- * param1 (Canny)=80, param2 (accumulator)=25.
- *
- * In v1.4, supply a TFLite-backed [PocketDetector] to replace the Hough pipeline.
+ * We no longer harbor the schizophrenic delusion of trusting 1990s Hough Circle
+ * algorithms when our YOLOv8n model fails. If the neural net can't see the pocket,
+ * the pocket doesn't exist. There is no fallback. Only the void.
  */
 class TableScanAnalyzer(
     private val onPocketsDetected: (imagePoints: List<PointF>, imageWidth: Int, imageHeight: Int, rotationDegrees: Int) -> Unit,
@@ -41,76 +33,11 @@ class TableScanAnalyzer(
         val yBytes = ByteArray(yBuffer.remaining()).also { yBuffer.get(it) }
 
         // --- Strategy 1: TFLite detector (v1.4+) ---
+        // We ripped out Strategy 2. If this fails, let it fail. The 90s are over.
         val modelDetections: List<PointF>? = pocketDetector?.detect(yBytes, originalWidth, originalHeight)
 
-        val detections: List<PointF>
-        if (modelDetections != null) {
-            detections = modelDetections
-        } else {
-            // --- Strategy 2: Hough-circle fallback ---
-            val grayFull = Mat(originalHeight, originalWidth, CvType.CV_8UC1)
-            grayFull.put(0, 0, yBytes)
-
-            // Downsample to target height of 480 for speed.
-            val targetHeight = 480
-            val scale = targetHeight.toDouble() / originalHeight
-            val targetWidth = (originalWidth * scale).toInt()
-            val graySmall = Mat()
-            Imgproc.resize(grayFull, graySmall, Size(targetWidth.toDouble(), targetHeight.toDouble()))
-            grayFull.release()
-
-            // Hough circle detection tuned for pocket size.
-            val circles = Mat()
-            Imgproc.HoughCircles(
-                graySmall, circles, Imgproc.CV_HOUGH_GRADIENT,
-                /* dp= */ 1.5,
-                /* minDist= */ graySmall.rows() / 5.0,
-                /* param1= */ 80.0,
-                /* param2= */ 25.0,
-                /* minRadius= */ 15,
-                /* maxRadius= */ 60
-            )
-
-            // Derive adaptive brightness threshold from the felt's own luma.
-            // Sample the center 10% of graySmall (same region as HSV felt-color sampling).
-            // Pockets must be at least 60 Y-units darker than the felt surface.
-            val fcx = targetWidth / 2; val fcy = targetHeight / 2
-            val fhw = (targetWidth / 20).coerceAtLeast(1)
-            val fhh = (targetHeight / 20).coerceAtLeast(1)
-            val feltRoi = org.opencv.core.Rect(
-                (fcx - fhw).coerceAtLeast(0), (fcy - fhh).coerceAtLeast(0),
-                (fhw * 2).coerceAtMost(targetWidth), (fhh * 2).coerceAtMost(targetHeight)
-            )
-            val feltSample = Mat(graySmall, feltRoi)
-            val feltMeanY = Core.mean(feltSample).`val`[0]
-            feltSample.release()
-            val pocketMaxBrightness = (feltMeanY - 60.0).coerceAtLeast(30.0)
-
-            // Upscale detected centres back to original frame coordinates.
-            // Filter by darkness: pockets are far darker than felt or balls.
-            // graySmall is NOT released yet so we can sample brightness at each detection.
-            val houghDetections = mutableListOf<PointF>()
-            if (!circles.empty()) {
-                for (i in 0 until circles.cols()) {
-                    val data = circles.get(0, i)
-                    val cx = data[0].toInt().coerceIn(0, targetWidth - 1)
-                    val cy = data[1].toInt().coerceIn(0, targetHeight - 1)
-                    val centerPixel = graySmall.get(cy, cx)
-                    val brightness = centerPixel?.getOrNull(0) ?: 255.0
-                    if (brightness < pocketMaxBrightness) {
-                        val x = (data[0] / scale).toFloat()
-                        val y = (data[1] / scale).toFloat()
-                        houghDetections.add(PointF(x, y))
-                    }
-                }
-            }
-            circles.release()
-            graySmall.release()
-            detections = houghDetections
-        }
-
-        if (detections.isNotEmpty()) {
-            onPocketsDetected(detections, originalWidth, originalHeight, rotationDegrees)
+        if (modelDetections != null && modelDetections.isNotEmpty()) {
+            onPocketsDetected(modelDetections, originalWidth, originalHeight, rotationDegrees)
         }
 
         // Sample felt colour from the centre 10% of the frame.

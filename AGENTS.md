@@ -10,6 +10,16 @@ Welcome, Agent. This document serves as the primary entry point for understandin
 
 ## Table of Contents
 
+### Scoped Backup System (Token Conservation)
+Before starting a deep task, use the `backup.ps1` script with the `-Scope` parameter to extract only the context you need.
+- **Global (Default)**: `pwsh backup.ps1` — Documentation and root configuration (use this first).
+- **UI**: `pwsh backup.ps1 -Scope UI` — UI source and resources.
+- **Physics**: `pwsh backup.ps1 -Scope Physics` — Domain and UI logic for Masse, Spin, Hater Mode.
+- **CV**: `pwsh backup.ps1 -Scope CV` — Vision analyzers, table scan, ML models.
+- **Domain**: `pwsh backup.ps1 -Scope Domain` — All business logic.
+- **Data**: `pwsh backup.ps1 -Scope Data` — Repositories and network layers.
+- **Example**: `pwsh backup.ps1 -Scope UI,CV` — Combines scopes.
+
 ### 00. Project Overview
 - [Introduction](file:///home/az/StudioProjects/CueDetat/docs/00_Project_Overview/00_Introduction.md)
 - [Project Persona](file:///home/az/StudioProjects/CueDetat/docs/00_Project_Overview/01_ProjectPersona.md)
