@@ -30,7 +30,7 @@ class SplashViewModel @Inject constructor(
                     _uiState.update { it.copy(isSaving = true) }
 
                     val state = userPreferences.stateFlow.firstOrNull() ?: CueDetatState()
-                    val modeEnum = try { com.hereliesaz.cuedetat.domain.ExperienceMode.valueOf(event.mode) } catch (e: Exception) { null }
+                    val modeEnum = try { ExperienceMode.valueOf(event.mode) } catch (e: Exception) { null }
                     userPreferences.saveState(state.copy(experienceMode = modeEnum))
 
                     _uiState.update {
