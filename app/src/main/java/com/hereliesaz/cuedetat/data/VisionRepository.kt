@@ -364,7 +364,7 @@ class VisionRepository @Inject constructor(
                 // When cameraMode == AR_ACTIVE and ArCoreBackground is active, depth handles tracking.
                 var currentConfidence = state.visionData?.tableOverlayConfidence ?: 0f
                 if ((state.cameraMode == CameraMode.AR_ACTIVE || state.cameraMode == CameraMode.AR_SETUP) && state.tableScanModel != null
-                    && state.depthCapability == com.hereliesaz.cuedetat.domain.DepthCapability.NONE) {
+                    && state.depthCapability == DepthCapability.NONE) {
                     arFrameCounter++
                     if (arFrameCounter % 5 == 0) {
                         currentConfidence = runArTrackingPass(matToUse, state, inputImage.width, inputImage.height, rotationDegrees)
