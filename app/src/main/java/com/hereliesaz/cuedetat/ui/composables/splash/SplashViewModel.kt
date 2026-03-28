@@ -3,11 +3,13 @@ package com.hereliesaz.cuedetat.ui.composables.splash
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.hereliesaz.cuedetat.data.repository.UserPreferencesRepository
+import com.hereliesaz.cuedetat.data.UserPreferencesRepository
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -26,9 +28,9 @@ class SplashViewModel @Inject constructor(
                 viewModelScope.launch {
                     _uiState.update { it.copy(isSaving = true) }
 
-                    // Look at your UserPreferencesRepository class.
-                    // Find the function that saves this. Put it here.
-                    userPreferences.YOUR_ACTUAL_SAVE_METHOD_HERE(event.mode)
+                    val state = userPreferences.stateFlow.firstOrNull() ?: CueDetatState()
+                    val modeEnum = try { com.hereliesaz.cuedetat.domain.ExperienceMode.valueOf(event.mode) } catch (e: Exception) { null }
+                    userPreferences.saveState(state.copy(experienceMode = modeEnum))
 
                     _uiState.update {
                         it.copy(

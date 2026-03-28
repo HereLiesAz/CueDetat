@@ -94,7 +94,8 @@ The AR overlay uses a **Thin-Plate Spline (TPS)** residual warp to correct for l
 
 ### AR Overlay Confidence & Auto-Advance
 
-`VisionData.tableOverlayConfidence` (0–1) is set by the CV pipeline during `AR_SETUP`. `CvReducer` auto-advances `AR_SETUP → AR_ACTIVE` when:
-- `lockedHsvColor != null` (color step done)
-- `tableScanModel != null` (scan step done)
-- `tableOverlayConfidence >= 0.8`
+`VisionData.tableOverlayConfidence` (0–1) is derived from the TPS homography fit residual quality. The `fitQuality` is computed as `1.0f - (meanResidual / 50.0f)` bounded between `0.0f` and `1.0f`. `CvReducer` maintains a rolling average (`AR_CONFIDENCE_WINDOW` of 20 frames) of this confidence during `AR_SETUP`.
+
+Normal auto-advance (`AR_SETUP → AR_ACTIVE`) triggers when the smoothed confidence is `>= 0.8`.
+
+If the smoothed confidence remains between `0.5` and `0.8` for `150` consecutive frames, a degraded auto-advance triggers, accompanied by a warning message.

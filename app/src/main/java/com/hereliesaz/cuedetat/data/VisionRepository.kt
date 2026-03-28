@@ -360,17 +360,20 @@ class VisionRepository @Inject constructor(
                     )
                 }
 
-                _visionDataFlow.value = finalVisionData
-
                 // AR tracking pass — only when using CameraX (not ARCore).
                 // When cameraMode == AR_ACTIVE and ArCoreBackground is active, depth handles tracking.
-                if (state.cameraMode == CameraMode.AR_ACTIVE && state.tableScanModel != null
+                var currentConfidence = state.visionData?.tableOverlayConfidence ?: 0f
+                if ((state.cameraMode == CameraMode.AR_ACTIVE || state.cameraMode == CameraMode.AR_SETUP) && state.tableScanModel != null
                     && state.depthCapability == com.hereliesaz.cuedetat.domain.DepthCapability.NONE) {
                     arFrameCounter++
                     if (arFrameCounter % 5 == 0) {
-                        runArTrackingPass(matToUse, state, inputImage.width, inputImage.height, rotationDegrees)
+                        currentConfidence = runArTrackingPass(matToUse, state, inputImage.width, inputImage.height, rotationDegrees)
                     }
                 }
+
+                finalVisionData = finalVisionData.copy(tableOverlayConfidence = currentConfidence)
+
+                _visionDataFlow.value = finalVisionData
 
                 // NOTE: We intentionally do NOT release reusable mats here. They are cleared/overwritten next frame.
 
@@ -729,10 +732,10 @@ class VisionRepository @Inject constructor(
         imageWidth: Int,
         imageHeight: Int,
         rotationDegrees: Int
-    ) {
-        val model = state.tableScanModel ?: return
-        if (!state.hasInverseMatrix) return
-        val inverse = state.inversePitchMatrix ?: return
+    ): Float {
+        val model = state.tableScanModel ?: return 0f
+        if (!state.hasInverseMatrix) return 0f
+        val inverse = state.inversePitchMatrix ?: return 0f
 
         // Downsample for Hough.
         val targetHeight = 480
@@ -804,16 +807,32 @@ class VisionRepository @Inject constructor(
         }
 
         // Pose update — requires ≥ 2 matched pockets.
+        var fitQuality = 0f
         if (matchedPairs.size >= 2) {
             val srcMat = MatOfPoint2f()
             val dstMat = MatOfPoint2f()
-            srcMat.fromList(matchedPairs.map { org.opencv.core.Point(it.second.x.toDouble(), it.second.y.toDouble()) })
-            dstMat.fromList(matchedPairs.map {
+            val srcList = matchedPairs.map { org.opencv.core.Point(it.second.x.toDouble(), it.second.y.toDouble()) }
+            val dstList = matchedPairs.map {
                 val cluster = model.pockets.first { c -> c.identity == it.first }
                 org.opencv.core.Point(cluster.logicalPosition.x.toDouble(), cluster.logicalPosition.y.toDouble())
-            })
+            }
+            srcMat.fromList(srcList)
+            dstMat.fromList(dstList)
             val h = Calib3d.findHomography(srcMat, dstMat, Calib3d.RANSAC, 3.0)
             if (!h.empty()) {
+                val estimatedDstMat = MatOfPoint2f()
+                Core.perspectiveTransform(srcMat, estimatedDstMat, h)
+                val estimatedList = estimatedDstMat.toList()
+                var totalErrorSq = 0.0
+                for (i in dstList.indices) {
+                    val dx = estimatedList[i].x - dstList[i].x
+                    val dy = estimatedList[i].y - dstList[i].y
+                    totalErrorSq += dx * dx + dy * dy
+                }
+                val meanResidual = kotlin.math.sqrt(totalErrorSq / dstList.size).toFloat()
+                fitQuality = (1f - (meanResidual / 50f)).coerceIn(0f, 1f)
+                estimatedDstMat.release()
+
                 val (rawT, rawR, rawS) = decomposeHomography(h, imageWidth.toFloat(), imageHeight.toFloat())
                 val alpha = 0.15f
                 val current = state
@@ -836,6 +855,8 @@ class VisionRepository @Inject constructor(
         } else if (matchedPairs.isEmpty()) {
             runEdgeFallback(mat, state, inverse, imageWidth, imageHeight, rotationDegrees)
         }
+
+        return fitQuality
     }
 
     private fun runEdgeFallback(
