@@ -81,7 +81,7 @@ internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueD
                     }
                 } else {
                     nextState = nextState.copy(
-                        arConfidenceHistory = history,
+                        arConfidenceHistory = history.toList(),
                         arLowConfidenceFrameCount = 0
                     )
                 }
