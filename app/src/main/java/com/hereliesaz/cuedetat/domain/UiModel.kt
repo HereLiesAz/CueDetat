@@ -111,6 +111,8 @@ data class CueDetatState(
     @Transient val logicalPlaneMatrix: Matrix? = null,
     @Transient val hasInverseMatrix: Boolean = false,
     @Transient val visionData: VisionData? = null,
+    @Transient val arConfidenceHistory: List<Float> = emptyList(),
+    @Transient val arLowConfidenceFrameCount: Int = 0,
     @Transient val snapCandidates: List<SnapCandidate>? = null,
     @Transient val tableScanModel: TableScanModel? = null,
     @Transient val depthPlane: DepthPlane? = null,

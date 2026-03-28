@@ -9,7 +9,6 @@ import com.hereliesaz.cuedetat.data.TableScanRepository
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.PocketCluster
 import com.hereliesaz.cuedetat.domain.PocketId
-import com.hereliesaz.cuedetat.domain.TableGeometryFitter
 import com.hereliesaz.cuedetat.domain.TableScanModel
 import com.hereliesaz.cuedetat.domain.TpsWarpData
 import com.hereliesaz.cuedetat.domain.decomposeHomography

@@ -151,6 +151,8 @@ All existing callers omit the parameter and continue using `Blur.NORMAL` unchang
 
 ## Issue 4 — AR / CV Flow Redesign
 
+**Status:** Partially completed. The state machine, state definitions, AR flow redesign, and AR Confidence calculation logic are now implemented.
+
 **Context:** Pocket identification is unreliable. The new flow introduces a guided AR setup wizard using felt color + edge detection. The camera mode enum gains two new values and new state-machine transitions.
 
 ### State Machine

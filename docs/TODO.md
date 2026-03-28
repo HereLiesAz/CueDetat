@@ -7,11 +7,13 @@ Last updated: 2026-03-28
 ## Priority 1 — Incomplete Implementations (Documented But Not Done)
 
 ### 1.1 Non-Blocking Tutorial Redesign
+- **Status: DONE**
 - **File:** `ui/composables/overlays/TutorialOverlay.kt`, `domain/reducers/TutorialReducer.kt`
 - **Problem:** Current tutorial is a full-screen blocking canvas that prevents user interaction with the UI elements being described. The spec (`docs/03_UI_UX_Guide/05_Dialogs_And_Overlays.md`) explicitly calls this a placeholder that must be replaced.
 - **Required:** Non-blocking transparent overlay that highlights specific UI elements while leaving them interactive, so the user can actually perform the described action during the tutorial.
 
 ### 1.2 `tableOverlayConfidence` Never Calculated
+- **Status: DONE**
 - **File:** `data/VisionRepository.kt`, `data/VisionData.kt`, `domain/reducers/CvReducer.kt`
 - **Problem:** `VisionData.tableOverlayConfidence` is always `0.0f`. The field was added and `CvReducer` checks `>= 0.8` for auto-advance from `AR_SETUP → AR_ACTIVE`, but the actual computation was never implemented in `VisionRepository`. Auto-advance can therefore never trigger.
 - **Spec:** `docs/superpowers/specs/2026-03-24-beginner-rendering-ar-flow-design.md` — confidence should rise during the `SCAN_TABLE` phase as table boundary coverage increases.

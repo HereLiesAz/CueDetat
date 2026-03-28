@@ -4,6 +4,13 @@ import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 
+object ArConfidenceConfig {
+    const val AR_CONFIDENCE_THRESHOLD = 0.8f
+    const val AR_DEGRADED_FLOOR = 0.5f
+    const val AR_DEGRADED_FRAME_COUNT = 150
+    const val AR_CONFIDENCE_WINDOW = 20
+}
+
 internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueDetatState {
     return when (action) {
         is MainScreenEvent.AutoCalibrateCv -> {
@@ -39,13 +46,45 @@ internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueD
                     nextState = nextState.copy(isAutoCalibrating = false)
                 }
             }
-            // Auto-advance AR_SETUP → AR_ACTIVE when all conditions are met
-            val AR_AUTO_CONFIRM_CONFIDENCE_THRESHOLD = 0.8f
             if (nextState.cameraMode == CameraMode.AR_SETUP &&
                 nextState.lockedHsvColor != null &&
-                nextState.tableScanModel != null &&
-                action.visionData.tableOverlayConfidence >= AR_AUTO_CONFIRM_CONFIDENCE_THRESHOLD) {
-                nextState = nextState.copy(cameraMode = CameraMode.AR_ACTIVE)
+                nextState.tableScanModel != null) {
+
+                val history = nextState.arConfidenceHistory.toMutableList()
+                history.add(action.visionData.tableOverlayConfidence)
+                if (history.size > ArConfidenceConfig.AR_CONFIDENCE_WINDOW) {
+                    history.removeAt(0)
+                }
+
+                val smoothedConfidence = history.average().toFloat()
+
+                if (smoothedConfidence >= ArConfidenceConfig.AR_CONFIDENCE_THRESHOLD) {
+                    nextState = nextState.copy(
+                        cameraMode = CameraMode.AR_ACTIVE,
+                        arConfidenceHistory = emptyList(),
+                        arLowConfidenceFrameCount = 0
+                    )
+                } else if (smoothedConfidence >= ArConfidenceConfig.AR_DEGRADED_FLOOR) {
+                    val newFrameCount = nextState.arLowConfidenceFrameCount + 1
+                    if (newFrameCount >= ArConfidenceConfig.AR_DEGRADED_FRAME_COUNT) {
+                        nextState = nextState.copy(
+                            cameraMode = CameraMode.AR_ACTIVE,
+                            warningText = "AR Tracking may be degraded.",
+                            arConfidenceHistory = emptyList(),
+                            arLowConfidenceFrameCount = 0
+                        )
+                    } else {
+                        nextState = nextState.copy(
+                            arConfidenceHistory = history.toList(),
+                            arLowConfidenceFrameCount = newFrameCount
+                        )
+                    }
+                } else {
+                    nextState = nextState.copy(
+                        arConfidenceHistory = history,
+                        arLowConfidenceFrameCount = 0
+                    )
+                }
             }
 
             nextState

@@ -10,6 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -28,12 +29,9 @@ class SplashViewModel @Inject constructor(
                 viewModelScope.launch {
                     _uiState.update { it.copy(isSaving = true) }
 
-                    val experienceMode = try {
-                        ExperienceMode.valueOf(event.mode)
-                    } catch (_: Exception) {
-                        ExperienceMode.EXPERT
-                    }
-                    userPreferences.saveState(CueDetatState(experienceMode = experienceMode))
+                    val state = userPreferences.stateFlow.firstOrNull() ?: CueDetatState()
+                    val modeEnum = try { ExperienceMode.valueOf(event.mode) } catch (e: Exception) { null }
+                    userPreferences.saveState(state.copy(experienceMode = modeEnum))
 
                     _uiState.update {
                         it.copy(
