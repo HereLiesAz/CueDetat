@@ -1,5 +1,4 @@
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/data/VisionRepository.kt
-
 package com.hereliesaz.cuedetat.data
 
 import android.annotation.SuppressLint
@@ -48,178 +47,89 @@ import kotlin.math.hypot
 import kotlin.math.pow
 import org.opencv.core.Rect as OCVRect
 
-/**
- * The central repository for all Computer Vision (CV) operations.
- *
- * This class acts as the bridge between the CameraX image stream and the application's state.
- * It is responsible for:
- * 1.  Processing raw camera frames (YUV/NV21) into OpenCV Matrices.
- * 2.  Executing ML Kit object detection to find generic "round objects".
- * 3.  Refining those detections using OpenCV algorithms (Hough Circles or Contours) to precise ball locations.
- * 4.  Calculating color statistics (HSV) to distinguish the cue ball from object balls.
- * 5.  Transforming 2D image coordinates into 3D-aware logical table coordinates.
- *
- * PERFORMANCE CRITICALITY:
- * This class runs on a background thread for every single camera frame (aiming for 30 FPS).
- * Therefore, object allocation is strictly forbidden inside the main loop.
- * All OpenCV [Mat] objects are allocated once as class members ("reusable...") and reused.
- */
 @Singleton
 class VisionRepository @Inject constructor(
-    // We inject a generic ML Kit detector configured for "Prominent Objects".
-    // This gives us rough bounding boxes (ROIs) which we then refine with OpenCV.
     @GenericDetector private val genericObjectDetector: ObjectDetector,
 ) {
-
-    // The single source of truth for vision data.
-    // The UI collects from this flow to render debug overlays or update the game state.
     private val _visionDataFlow = MutableStateFlow(VisionData())
     val visionDataFlow = _visionDataFlow.asStateFlow()
 
-    // AR tracking events emitted to MainViewModel.
     private var arFrameCounter = 0
     private val _arEvents = MutableSharedFlow<MainScreenEvent>(extraBufferCapacity = 16)
     val arEvents: SharedFlow<MainScreenEvent> = _arEvents.asSharedFlow()
 
-    // FPS throttling: We track the last processing time to ensure we don't clog the pipeline
-    // if processing takes longer than 33ms.
     private var lastFrameTime = 0L
 
-    // A cached mask Mat for debugging visualization.
-    // It is nullable because we only allocate it if the user enables "Show CV Mask".
     private var reusableMask: Mat? = null
+    private val maskRingBuffer = Array(3) { Mat() }
+    private var maskRingIndex = 0
 
-    // ---------------------------------------------------------------------------------------------
-    // REUSABLE MATRICES (MEMORY OPTIMIZATION)
-    // ---------------------------------------------------------------------------------------------
-    // Allocating Mat objects in a loop causes massive GC thrashing. We reuse these instances.
-
-    // Holds the converted BGR image from the camera.
     private val reusableFrameMat = Mat()
-    // Holds the rotated version of the frame if the device orientation requires it.
     private val reusableRotatedMat = Mat()
-    // Holds the HSV (Hue-Saturation-Value) version of the frame for color segmentation.
     private val reusableHsvMat = Mat()
-
-    // Reusable temporary Mats for the refineBallCenter pipeline.
-    private val reusableGray = Mat()      // Grayscale version of ROI
-    private val reusableEdges = Mat()     // Canny edge detection output
-    private val reusableHierarchy = Mat() // Contour hierarchy (unused but required by findContours)
-    private val reusableCircles = Mat()   // Output of HoughCircles
-
-    // Reusable primitive arrays to avoid 'new float[]' calls.
-    private val reusableMatrixValues = FloatArray(9) // For dumping Matrix values
-    private val reusablePointArray = FloatArray(2)   // For mapping points
-
-    // Reusable wrappers for mean/stdDev calculations.
+    private val reusableGray = Mat()
+    private val reusableEdges = Mat()
+    private val reusableHierarchy = Mat()
+    private val reusableCircles = Mat()
+    private val reusableMatrixValues = FloatArray(9)
+    private val reusablePointArray = FloatArray(2)
     private val reusableMean = MatOfDouble()
     private val reusableStdDev = MatOfDouble()
 
-    // A standard morphological kernel (5x5 Ellipse).
-    // Used for "opening" and "closing" operations to clean up noise in binary masks.
     private val reusableMorphKernel by lazy {
         Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
     }
 
-    /**
-     * The main entry point for frame processing.
-     * Called by CameraX's ImageAnalysis.Analyzer.
-     *
-     * @param imageProxy The wrapper around the raw hardware buffer. MUST be closed.
-     * @param state The current application state (needed for zoom/pitch context).
-     */
     @SuppressLint("UnsafeOptInUsageError")
     fun processImage(imageProxy: ImageProxy, state: CueDetatState) {
-        // Step 1: Throttling.
-        // Check if enough time has passed since the last frame to maintain ~30 FPS.
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastFrameTime < 100) {
-            imageProxy.close() // DROP FRAME.
+            imageProxy.close()
             return
         }
         lastFrameTime = currentTime
 
-        // Extract the underlying android.media.Image.
         val mediaImage = imageProxy.image
         if (mediaImage != null) {
             val rotationDegrees = imageProxy.imageInfo.rotationDegrees
-
-            // Wrap it for ML Kit.
             val inputImage = InputImage.fromMediaImage(mediaImage, rotationDegrees)
 
-            // Calculate the scaling matrix between Camera Image coordinates and Screen View coordinates.
-            // Camera buffers are often high-res (e.g., 1920x1080) while the View might be smaller.
             val imageToScreenMatrix = getTransformationMatrix(
                 inputImage.width, inputImage.height,
                 state.viewWidth, state.viewHeight
             )
 
             try {
-                // Step 2: ML Kit Detection (Coarse Pass).
-                // We use ML Kit to find "objects" first. This is faster than running
-                // Hough Circles on the entire 1080p frame.
-                // Tasks.await is safe here because we are already on a background thread.
                 val detectedObjects = Tasks.await(genericObjectDetector.process(inputImage))
-
-                // Step 3: OpenCV Conversion.
-                // Convert the YUV image buffer to a BGR Mat.
-                // We use our extension method 'toMat' which efficiently copies the buffer.
-                // Result is stored in 'reusableFrameMat'.
                 val originalMat = imageProxy.toMat(reusableFrameMat)
 
-                // Step 4: Rotation Handling.
-                // OpenCV Mats don't respect the metadata rotation tag. We must manually rotate the pixels
-                // if the device is in portrait or reverse-landscape.
                 var matToUse: Mat
                 when (rotationDegrees) {
-                    90 -> {
-                        Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_CLOCKWISE)
-                        matToUse = reusableRotatedMat
-                    }
-                    180 -> {
-                        Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_180)
-                        matToUse = reusableRotatedMat
-                    }
-                    270 -> {
-                        Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_COUNTERCLOCKWISE)
-                        matToUse = reusableRotatedMat
-                    }
-                    else -> {
-                        matToUse = originalMat
-                    }
+                    90 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_CLOCKWISE); matToUse = reusableRotatedMat }
+                    180 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_180); matToUse = reusableRotatedMat }
+                    270 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_COUNTERCLOCKWISE); matToUse = reusableRotatedMat }
+                    else -> { matToUse = originalMat }
                 }
-                // NOTE: 'matToUse' now points to the correct, upright BGR image.
 
-                // Step 5: Color Space Conversion (BGR -> HSV).
-                // We need HSV for robust color sampling.
                 Imgproc.cvtColor(matToUse, reusableHsvMat, Imgproc.COLOR_BGR2HSV)
                 val hsvMat = reusableHsvMat
 
-                // Step 6: Color Sampling (User Interaction).
-                // If the user is dragging the color picker (state.colorSamplePoint is not null),
-                // we calculate the mean color in a 5x5 patch under their finger.
                 val hsvTuple = state.colorSamplePoint?.let {
-                    // Map screen coordinates (0..1) to image coordinates (pixels).
                     val imageX = (it.x * (hsvMat.cols() / state.viewWidth.toFloat())).toInt()
                     val imageY = (it.y * (hsvMat.rows() / state.viewHeight.toFloat())).toInt()
 
-                    // Define the Region of Interest (ROI) - a small 5x5 square.
                     val patchSize = 5
                     val roiX = (imageX - patchSize / 2).coerceIn(0, hsvMat.cols() - patchSize)
                     val roiY = (imageY - patchSize / 2).coerceIn(0, hsvMat.rows() - patchSize)
                     val roi = OCVRect(roiX, roiY, patchSize, patchSize)
 
-                    // Extract the submatrix.
                     val sampleRegion = hsvMat.submat(roi)
-
-                    // Compute Mean and Standard Deviation.
                     Core.meanStdDev(sampleRegion, reusableMean, reusableStdDev)
 
-                    // Extract values to float arrays.
                     val meanArray = floatArrayOf(
-                        reusableMean.get(0, 0)[0].toFloat(), // H
-                        reusableMean.get(1, 0)[0].toFloat(), // S
-                        reusableMean.get(2, 0)[0].toFloat()  // V
+                        reusableMean.get(0, 0)[0].toFloat(),
+                        reusableMean.get(1, 0)[0].toFloat(),
+                        reusableMean.get(2, 0)[0].toFloat()
                     )
                     val stddevArray = floatArrayOf(
                         reusableStdDev.get(0, 0)[0].toFloat(),
@@ -227,14 +137,11 @@ class VisionRepository @Inject constructor(
                         reusableStdDev.get(2, 0)[0].toFloat()
                     )
 
-                    sampleRegion.release() // Always release submatrices to avoid memory leaks.
+                    sampleRegion.release()
                     Pair(meanArray, stddevArray)
                 }
 
-                // Determine the "Reference Color" for detection.
-                // Priority: Locked Color > Sampled Color > Center of Screen Default.
                 val hsv = state.lockedHsvColor ?: hsvTuple?.first ?: run {
-                    // Default: Sample center 50x50 pixels.
                     val roiWidth = 50
                     val roiHeight = 50
                     val roiX = (hsvMat.cols() - roiWidth) / 2
@@ -249,25 +156,19 @@ class VisionRepository @Inject constructor(
                     )
                 }
 
-                // Step 7: Debug Mask Generation (Optional).
-                // If "Show CV Mask" is enabled, we perform a full-frame color threshold
-                // so the user can see what the computer sees.
                 val cvMask = if (state.showCvMask) {
                     if (reusableMask == null) {
                         reusableMask = Mat()
                     }
                     val mask = reusableMask!!
-
-                    // Calculate dynamic thresholds based on standard deviation if available.
                     if (state.lockedHsvColor != null && state.lockedHsvStdDev != null) {
                         val mean = state.lockedHsvColor
                         val stdDev = state.lockedHsvStdDev
-                        val stdDevMultiplier = 2.0 // Strictness factor
-
+                        val stdDevMultiplier = 2.0
                         val lowerBound = Scalar(
                             (mean[0] - stdDevMultiplier * stdDev[0]).coerceAtLeast(0.0),
-                            (mean[1] - stdDevMultiplier * stdDev[1]).coerceAtLeast(40.0), // Min Saturation
-                            (mean[2] - stdDevMultiplier * stdDev[2]).coerceAtLeast(40.0)  // Min Value
+                            (mean[1] - stdDevMultiplier * stdDev[1]).coerceAtLeast(40.0),
+                            (mean[2] - stdDevMultiplier * stdDev[2]).coerceAtLeast(40.0)
                         )
                         val upperBound = Scalar(
                             (mean[0] + stdDevMultiplier * stdDev[0]).coerceAtMost(180.0),
@@ -276,75 +177,58 @@ class VisionRepository @Inject constructor(
                         )
                         Core.inRange(hsvMat, lowerBound, upperBound, mask)
                     } else {
-                        // Fallback: Fixed Hue range.
                         val hueRange = 10.0
                         val lowerBound = Scalar((hsv[0] - hueRange).coerceAtLeast(0.0), 100.0, 100.0)
                         val upperBound = Scalar((hsv[0] + hueRange).coerceAtMost(180.0), 255.0, 255.0)
                         Core.inRange(hsvMat, lowerBound, upperBound, mask)
                     }
 
-                    // Clean up noise (close small holes).
                     Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, reusableMorphKernel)
 
-                    // CRITICAL: We MUST clone the mask here.
-                    // The UI thread reads this mask to draw the bitmap. If we modify 'mask' (which is 'reusableMask')
-                    // in the next frame while the UI is still drawing the previous one, we get tearing or crashes.
-                    mask.clone()
+                    val outputMask = maskRingBuffer[maskRingIndex]
+                    mask.copyTo(outputMask)
+                    maskRingIndex = (maskRingIndex + 1) % 3
+                    outputMask
                 } else {
                     reusableMask?.release()
                     reusableMask = null
                     null
                 }
 
-                // Step 8: Filter ML Kit Results.
-                // ML Kit often detects non-ball objects. We filter them by calculating the
-                // expected size of a ball at that Y-coordinate (perspective-aware).
                 val filteredDetectedObjects = detectedObjects.filter {
                     val box = it.boundingBox
                     val expectedRadius = getExpectedRadiusAtImageY(
-                        box.centerY().toFloat(),
-                        state,
-                        imageToScreenMatrix
+                        box.centerY().toFloat(), state, imageToScreenMatrix
                     )
                     val maxAllowedArea = 2 * Math.PI * expectedRadius.pow(2)
-                    // If the box is massively larger than a ball, ignore it.
                     (box.width() * box.height()) <= maxAllowedArea
                 }
 
-                // Step 9: Refine Locations.
-                // For each valid ML Kit box, we zoom in (Crop) and run precise OpenCV algorithms.
                 val refinedScreenPoints = filteredDetectedObjects.mapNotNull { detectedObject ->
                     refineBallCenter(detectedObject, matToUse, state, imageToScreenMatrix)
                 }.map { pointInImageCoords ->
-                    // Convert the result from Image Coords -> Screen Coords.
                     val screenPointArray = floatArrayOf(pointInImageCoords.x, pointInImageCoords.y)
                     imageToScreenMatrix.mapPoints(screenPointArray)
                     PointF(screenPointArray[0], screenPointArray[1])
                 }
 
-                // Step 10: Map to Logical Space.
-                // Convert Screen Pixels -> Logical Inches using the inverse perspective matrix.
                 val detectedLogicalPoints = if (state.hasInverseMatrix) {
                     val inverseMatrix = state.inversePitchMatrix ?: Matrix()
                     val tps = state.lensWarpTps
                     refinedScreenPoints.map { screenPoint ->
                         val logical = Perspective.screenToLogical(screenPoint, inverseMatrix)
-                        // Apply forward residual TPS: homography-estimated logical → true logical.
                         if (tps != null) ThinPlateSpline.applyWarp(tps, logical) else logical
                     }
                 } else {
                     emptyList()
                 }
 
-                // Step 11: Table Filtering.
-                // Ignore balls detected outside the table boundaries.
                 val filteredBalls = if (state.table.isVisible) {
                     detectedLogicalPoints.filter { state.table.isPointInside(it) }
                 } else {
                     detectedLogicalPoints
                 }
 
-                // Step 12: Emit Results.
                 var finalVisionData = VisionData(
                     genericBalls = filteredBalls,
                     detectedHsvColor = hsvTuple?.first ?: hsv,
@@ -361,11 +245,9 @@ class VisionRepository @Inject constructor(
                     )
                 }
 
-                // AR tracking pass — only when using CameraX (not ARCore).
-                // When cameraMode == AR_ACTIVE and ArCoreBackground is active, depth handles tracking.
                 var currentConfidence = state.visionData?.tableOverlayConfidence ?: 0f
-                if ((state.cameraMode == CameraMode.AR_ACTIVE || state.cameraMode == CameraMode.AR_SETUP) && state.tableScanModel != null
-                    && state.depthCapability == DepthCapability.NONE) {
+                if ((state.cameraMode == CameraMode.AR_ACTIVE || state.cameraMode == CameraMode.AR_SETUP) &&
+                    state.tableScanModel != null && state.depthCapability == DepthCapability.NONE) {
                     arFrameCounter++
                     if (arFrameCounter % 5 == 0) {
                         currentConfidence = runArTrackingPass(matToUse, state, inputImage.width, inputImage.height, rotationDegrees)
@@ -373,16 +255,11 @@ class VisionRepository @Inject constructor(
                 }
 
                 finalVisionData = finalVisionData.copy(tableOverlayConfidence = currentConfidence)
-
                 _visionDataFlow.value = finalVisionData
-
-                // NOTE: We intentionally do NOT release reusable mats here. They are cleared/overwritten next frame.
 
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
-                // ALWAYS close the image proxy to free the hardware buffer.
-                // Failure to do this hangs the camera.
                 imageProxy.close()
             }
         } else {
@@ -390,12 +267,6 @@ class VisionRepository @Inject constructor(
         }
     }
 
-    /**
-     * Refines the center of a detected object using precise computer vision.
-     *
-     * ML Kit gives us a box. We assume the ball is inside. We crop that box and run
-     * either Contour detection or Hough Circle Transform on that small patch.
-     */
     private fun refineBallCenter(
         detectedObject: DetectedObject,
         frame: Mat,
@@ -405,56 +276,33 @@ class VisionRepository @Inject constructor(
         val box = detectedObject.boundingBox
         val roi = OCVRect(box.left, box.top, box.width(), box.height())
 
-        // Safety check: Ensure ROI is inside the image.
         if (roi.x < 0 || roi.y < 0 || roi.x + roi.width > frame.cols() || roi.y + roi.height > frame.rows()) {
             return null
         }
 
-        // Calculate expected radius again for the local search.
-        val expectedRadiusInImageCoords =
-            getExpectedRadiusAtImageY(box.centerY().toFloat(), state, imageToScreenMatrix)
-        val tolerance = 0.5f // +/- 50% size tolerance
+        val expectedRadiusInImageCoords = getExpectedRadiusAtImageY(box.centerY().toFloat(), state, imageToScreenMatrix)
+        val tolerance = 0.5f
         val minRadius = expectedRadiusInImageCoords * (1 - tolerance)
         val maxRadius = expectedRadiusInImageCoords * (1 + tolerance)
 
-        // Create a submatrix (view) into the frame. No data copy.
         val roiMat = frame.submat(roi)
-
-        // Clean up the ROI image.
         Imgproc.morphologyEx(roiMat, roiMat, Imgproc.MORPH_OPEN, reusableMorphKernel)
 
-        // Run the selected algorithm.
         val refinedCenterInRoi = when (state.cvRefinementMethod) {
             CvRefinementMethod.CONTOUR -> findBallByContour(
-                roiMat,
-                minRadius,
-                maxRadius,
-                state.cannyThreshold1.toDouble(),
-                state.cannyThreshold2.toDouble()
+                roiMat, minRadius, maxRadius,
+                state.cannyThreshold1.toDouble(), state.cannyThreshold2.toDouble()
             )
             CvRefinementMethod.HOUGH -> findBallByHough(
-                roiMat,
-                minRadius,
-                maxRadius,
-                state.houghP1.toDouble(),
-                state.houghP2.toDouble()
+                roiMat, minRadius, maxRadius,
+                state.houghP1.toDouble(), state.houghP2.toDouble()
             )
         }
 
-        roiMat.release() // Release the submat wrapper.
-
-        // Convert the local ROI coordinate back to global image coordinate.
-        return refinedCenterInRoi?.let {
-            PointF(it.x + roi.x, it.y + roi.y)
-        }
+        roiMat.release()
+        return refinedCenterInRoi?.let { PointF(it.x + roi.x, it.y + roi.y) }
     }
 
-    /**
-     * Calculates how large a ball *should* be in the image at a given vertical position.
-     *
-     * Due to perspective, balls at the bottom of the screen (closer) appear larger than
-     * balls at the top (further away). We use the projection matrix to determine this scale factor.
-     */
     private fun getExpectedRadiusAtImageY(
         imageY: Float,
         state: CueDetatState,
@@ -463,47 +311,39 @@ class VisionRepository @Inject constructor(
         val pitchMatrix = state.pitchMatrix
         if (!state.hasInverseMatrix || pitchMatrix == null) return LOGICAL_BALL_RADIUS
 
-        // Map Image Y -> Screen Y.
         reusablePointArray[0] = 0f
         reusablePointArray[1] = imageY
         imageToScreenMatrix.mapPoints(reusablePointArray)
         val screenY = reusablePointArray[1]
 
-        // Determine logical top/bottom of the table/world.
         val logicalTopY = if (state.table.isVisible) -state.table.logicalHeight / 2f else -200f
         val logicalBottomY = if (state.table.isVisible) state.table.logicalHeight / 2f else 200f
+
         val logicalTop = PointF(0f, logicalTopY)
         val logicalBottom = PointF(0f, logicalBottomY)
 
-        // Project logical points to Screen Space to get their radii.
         val screenTopInfo = DrawingUtils.getPerspectiveRadiusAndLift(
             logicalTop, LOGICAL_BALL_RADIUS, state, pitchMatrix
         )
         val screenBottomInfo = DrawingUtils.getPerspectiveRadiusAndLift(
             logicalBottom, LOGICAL_BALL_RADIUS, state, pitchMatrix
         )
+
         val screenTopY = DrawingUtils.mapPoint(logicalTop, pitchMatrix).y
         val screenBottomY = DrawingUtils.mapPoint(logicalBottom, pitchMatrix).y
 
         val rangeY = screenBottomY - screenTopY
         if (abs(rangeY) < 1f) return screenBottomInfo.radius
 
-        // Linear interpolation based on screen Y position.
         val fraction = ((screenY - screenTopY) / rangeY).coerceIn(0f, 1f)
-        val interpolatedRadius =
-            screenTopInfo.radius + fraction * (screenBottomInfo.radius - screenTopInfo.radius)
+        val interpolatedRadius = screenTopInfo.radius + fraction * (screenBottomInfo.radius - screenTopInfo.radius)
 
-        // Convert back from Screen Radius -> Image Radius using scale factor.
         imageToScreenMatrix.getValues(reusableMatrixValues)
         val scaleY = reusableMatrixValues[Matrix.MSCALE_Y]
 
         return if (scaleY > 0) interpolatedRadius / scaleY else LOGICAL_BALL_RADIUS
     }
 
-    /**
-     * Algorithm 1: Canny Edge Detection + Contours.
-     * Finds balls by looking for circular edges.
-     */
     private fun findBallByContour(
         roiMat: Mat,
         minRadius: Float,
@@ -511,57 +351,38 @@ class VisionRepository @Inject constructor(
         cannyT1: Double,
         cannyT2: Double
     ): PointF? {
-        // Convert to Grayscale.
         Imgproc.cvtColor(roiMat, reusableGray, Imgproc.COLOR_BGR2GRAY)
-        // Blur to reduce noise (vital for Canny).
         Imgproc.GaussianBlur(reusableGray, reusableGray, Size(5.0, 5.0), 2.0, 2.0)
-
-        // Edge Detection.
         Imgproc.Canny(reusableGray, reusableEdges, cannyT1, cannyT2)
 
         val contours = ArrayList<MatOfPoint>()
-        // Find Contours in the edge map.
         Imgproc.findContours(
-            reusableEdges,
-            contours,
-            reusableHierarchy,
-            Imgproc.RETR_EXTERNAL,
-            Imgproc.CHAIN_APPROX_SIMPLE
+            reusableEdges, contours, reusableHierarchy,
+            Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE
         )
 
         var bestCenter: PointF? = null
-
         if (contours.isNotEmpty()) {
-            // Concatenate all contours to find the Minimum Enclosing Circle of *all* edges in the box.
-            // This assumes the box primarily contains one object (the ball).
             val allPoints = MatOfPoint()
             Core.vconcat(contours as List<Mat>, allPoints)
             val allPoints2f = MatOfPoint2f(*allPoints.toArray())
-
             val centerArray = org.opencv.core.Point()
             val radiusArray = FloatArray(1)
+
             Imgproc.minEnclosingCircle(allPoints2f, centerArray, radiusArray)
             val radius = radiusArray[0]
 
-            // Validate size.
             if (radius > minRadius && radius < maxRadius) {
                 bestCenter = PointF(centerArray.x.toFloat(), centerArray.y.toFloat())
             }
-
             allPoints.release()
             allPoints2f.release()
         }
 
-        // Release contours manually.
         contours.forEach { it.release() }
-
         return bestCenter
     }
 
-    /**
-     * Algorithm 2: Hough Circle Transform.
-     * Finds circles by voting in parameter space. Slower but more robust to partial occlusion.
-     */
     private fun findBallByHough(
         roiMat: Mat,
         minRadius: Float,
@@ -573,20 +394,13 @@ class VisionRepository @Inject constructor(
         Imgproc.medianBlur(reusableGray, reusableGray, 5)
 
         Imgproc.HoughCircles(
-            reusableGray,
-            reusableCircles,
-            Imgproc.HOUGH_GRADIENT,
-            1.0,
-            roiMat.rows().toDouble() / 8, // Min dist between circles
-            houghP1,
-            houghP2,
-            minRadius.toInt(),
-            maxRadius.toInt()
+            reusableGray, reusableCircles, Imgproc.HOUGH_GRADIENT, 1.0,
+            roiMat.rows().toDouble() / 8,
+            houghP1, houghP2, minRadius.toInt(), maxRadius.toInt()
         )
 
         var center: PointF? = null
         if (reusableCircles.cols() > 0) {
-            // Get the first detected circle.
             val circleData = reusableCircles[0, 0]
             if (circleData != null && circleData.isNotEmpty()) {
                 center = PointF(circleData[0].toFloat(), circleData[1].toFloat())
@@ -595,13 +409,6 @@ class VisionRepository @Inject constructor(
         return center
     }
 
-    /**
-     * Processes a camera frame delivered by ARCore (as [android.media.Image]) through the
-     * same ball-detection pipeline as [processImage], but skips the pocket-based AR pose
-     * update — ARCore's Depth API handles pose tracking instead.
-     *
-     * Called from the GL thread; all operations here are synchronous and blocking.
-     */
     @SuppressLint("UnsafeOptInUsageError")
     fun processArCpuImage(image: MediaImage, rotationDegrees: Int, state: CueDetatState) {
         val currentTime = System.currentTimeMillis()
@@ -614,17 +421,15 @@ class VisionRepository @Inject constructor(
                 state.viewWidth, state.viewHeight
             )
 
-            val inputImage = com.google.mlkit.vision.common.InputImage
-                .fromMediaImage(image, rotationDegrees)
-            val detectedObjects = com.google.android.gms.tasks.Tasks
-                .await(genericObjectDetector.process(inputImage))
+            val inputImage = com.google.mlkit.vision.common.InputImage.fromMediaImage(image, rotationDegrees)
+            val detectedObjects = com.google.android.gms.tasks.Tasks.await(genericObjectDetector.process(inputImage))
 
             val originalMat = image.toMat(reusableFrameMat)
-
             var matToUse: Mat = originalMat
+
             when (rotationDegrees) {
-                90  -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_CLOCKWISE);        matToUse = reusableRotatedMat }
-                180 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_180);               matToUse = reusableRotatedMat }
+                90 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_CLOCKWISE); matToUse = reusableRotatedMat }
+                180 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_180); matToUse = reusableRotatedMat }
                 270 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_COUNTERCLOCKWISE); matToUse = reusableRotatedMat }
             }
 
@@ -661,8 +466,7 @@ class VisionRepository @Inject constructor(
                 }
             } else emptyList()
 
-            val filteredBalls = if (state.table.isVisible) logicalPoints.filter { state.table.isPointInside(it) }
-                                else logicalPoints
+            val filteredBalls = if (state.table.isVisible) logicalPoints.filter { state.table.isPointInside(it) } else logicalPoints
 
             _visionDataFlow.value = VisionData(
                 genericBalls = filteredBalls,
@@ -673,37 +477,27 @@ class VisionRepository @Inject constructor(
                 sourceImageRotation = rotationDegrees,
             )
 
-            // In AR mode, depth provides table-plane scale. If depth is confident but no
-            // scan exists, emit a scale-only pose update so the protractor is correctly sized.
             val depth = state.depthPlane
             if (depth != null && depth.confidence > 0.6f && state.tableScanModel == null) {
                 runDepthOnlyScaleUpdate(depth, state)
             }
+
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    /**
-     * When no table scan exists but depth is confident, nudge the zoom slider so the
-     * protractor renders at the correct physical scale for the detected table distance.
-     *
-     * Billiard ball physical radius: 28.575 mm = 0.028575 m.
-     * [LOGICAL_BALL_RADIUS] = 25 logical units.
-     * ARCore reports focal length in pixels via camera intrinsics.
-     */
     private fun runDepthOnlyScaleUpdate(
         depth: com.hereliesaz.cuedetat.domain.DepthPlane,
         state: CueDetatState,
     ) {
-        // Map: further away → zoom out (negative slider); closer → zoom in (positive)
         val clampedDist = depth.distanceMeters.coerceIn(0.5f, 3.0f)
-        val normalised = (clampedDist - 0.5f) / 2.5f   // 0 (close) … 1 (far)
-        val targetSlider = 50f * (1f - normalised) - 25f  // +25 (0.5m) … -25 (3m)
-
+        val normalised = (clampedDist - 0.5f) / 2.5f
+        val targetSlider = 50f * (1f - normalised) - 25f
         val currentSlider = state.zoomSliderPosition
         val delta = abs(targetSlider - currentSlider)
-        if (delta > 3f) {   // Only update if meaningfully different to avoid jitter
+
+        if (delta > 3f) {
             emitEvent(MainScreenEvent.UpdateArPose(
                 translation = androidx.compose.ui.geometry.Offset(state.viewOffset.x, state.viewOffset.y),
                 rotation = state.worldRotationDegrees,
@@ -720,13 +514,6 @@ class VisionRepository @Inject constructor(
         _arEvents.tryEmit(event)
     }
 
-    /**
-     * Per-frame AR tracking:
-     * 1. Detect pocket-sized circles.
-     * 2. Match to known clusters; update cluster weights (Kalman-style).
-     * 3. If ≥2 matched: solve homography → blend pose → emit UpdateArPose.
-     * 4. If 0 matched: attempt edge-based fallback.
-     */
     private fun runArTrackingPass(
         mat: Mat,
         state: CueDetatState,
@@ -738,7 +525,6 @@ class VisionRepository @Inject constructor(
         if (!state.hasInverseMatrix) return 0f
         val inverse = state.inversePitchMatrix ?: return 0f
 
-        // Downsample for Hough.
         val targetHeight = 480
         val scale = targetHeight.toDouble() / imageHeight
         val targetWidth = (imageWidth * scale).toInt()
@@ -750,17 +536,15 @@ class VisionRepository @Inject constructor(
 
         val circles = Mat()
         Imgproc.HoughCircles(
-            grayResized, circles, Imgproc.CV_HOUGH_GRADIENT,
-            1.5, grayResized.rows() / 5.0, 80.0, 25.0, 15, 60
+            grayResized, circles, Imgproc.CV_HOUGH_GRADIENT, 1.5,
+            grayResized.rows() / 5.0, 80.0, 25.0, 15, 60
         )
         grayResized.release()
 
-        // Project detected blobs to logical space.
-        val detectedLogical = mutableListOf<Pair<PointF, PointF>>() // (imagePoint, logicalPoint)
+        val detectedLogical = mutableListOf<Pair<PointF, PointF>>()
         if (!circles.empty()) {
             val imageToScreen = Matrix().apply {
-                postScale(state.viewWidth.toFloat() / imageWidth.toFloat(),
-                          state.viewHeight.toFloat() / imageHeight.toFloat())
+                postScale(state.viewWidth.toFloat() / imageWidth.toFloat(), state.viewHeight.toFloat() / imageHeight.toFloat())
             }
             for (i in 0 until circles.cols()) {
                 val data = circles.get(0, i)
@@ -774,22 +558,19 @@ class VisionRepository @Inject constructor(
         }
         circles.release()
 
-        // Match detections to known clusters (nearest within 3 logical inches).
-        val matchedPairs = mutableListOf<Triple<PocketId, PointF, PointF>>() // (id, imgPt, logicalPt)
+        val matchedPairs = mutableListOf<Triple<PocketId, PointF, PointF>>()
         val tolerance = 3.0f
+
         detectedLogical.forEach { (imgPt, logPt) ->
             val nearest = model.pockets.minByOrNull { cluster ->
-                hypot((cluster.logicalPosition.x - logPt.x).toDouble(),
-                      (cluster.logicalPosition.y - logPt.y).toDouble()).toFloat()
+                hypot((cluster.logicalPosition.x - logPt.x).toDouble(), (cluster.logicalPosition.y - logPt.y).toDouble()).toFloat()
             }
             if (nearest != null) {
-                val dist = hypot((nearest.logicalPosition.x - logPt.x).toDouble(),
-                                 (nearest.logicalPosition.y - logPt.y).toDouble()).toFloat()
+                val dist = hypot((nearest.logicalPosition.x - logPt.x).toDouble(), (nearest.logicalPosition.y - logPt.y).toDouble()).toFloat()
                 if (dist <= tolerance) matchedPairs.add(Triple(nearest.identity, imgPt, logPt))
             }
         }
 
-        // Cluster update (persistent point cloud refinement).
         if (matchedPairs.isNotEmpty()) {
             val updatedClusters = model.pockets.map { cluster ->
                 val match = matchedPairs.firstOrNull { it.first == cluster.identity }
@@ -807,7 +588,6 @@ class VisionRepository @Inject constructor(
             emitEvent(MainScreenEvent.UpdateTableScanClusters(updatedClusters))
         }
 
-        // Pose update — requires ≥ 2 matched pockets.
         var fitQuality = 0f
         if (matchedPairs.size >= 2) {
             val srcMat = MatOfPoint2f()
@@ -819,6 +599,7 @@ class VisionRepository @Inject constructor(
             }
             srcMat.fromList(srcList)
             dstMat.fromList(dstList)
+
             val h = Calib3d.findHomography(srcMat, dstMat, Calib3d.RANSAC, 3.0)
             if (!h.empty()) {
                 val estimatedDstMat = MatOfPoint2f()
@@ -847,8 +628,8 @@ class VisionRepository @Inject constructor(
                     ZoomMapping.getZoomRange(current.experienceMode).first,
                     ZoomMapping.getZoomRange(current.experienceMode).second
                 )
-                val delta = hypot((blendedTranslation.x - current.viewOffset.x).toDouble(),
-                                  (blendedTranslation.y - current.viewOffset.y).toDouble())
+
+                val delta = hypot((blendedTranslation.x - current.viewOffset.x).toDouble(), (blendedTranslation.y - current.viewOffset.y).toDouble())
                 if (delta > 0.5) {
                     emitEvent(MainScreenEvent.UpdateArPose(blendedTranslation, blendedRotation, blendedScale))
                 }
@@ -856,7 +637,6 @@ class VisionRepository @Inject constructor(
         } else if (matchedPairs.isEmpty()) {
             runEdgeFallback(mat, state, inverse, imageWidth, imageHeight, rotationDegrees)
         }
-
         return fitQuality
     }
 
@@ -870,16 +650,20 @@ class VisionRepository @Inject constructor(
     ) {
         val model = state.tableScanModel ?: return
         val hsv = floatArrayOf(model.feltColorHsv[0], model.feltColorHsv[1], model.feltColorHsv[2])
-
         val hsvMat = Mat()
         Imgproc.cvtColor(mat, hsvMat, Imgproc.COLOR_BGR2HSV)
 
         val lower = Scalar(
-            maxOf(0.0, hsv[0] - 20.0), maxOf(0.0, hsv[1] * 255 - 60.0), maxOf(0.0, hsv[2] * 255 - 60.0)
+            maxOf(0.0, hsv[0] - 20.0),
+            maxOf(0.0, hsv[1] * 255 - 60.0),
+            maxOf(0.0, hsv[2] * 255 - 60.0)
         )
         val upper = Scalar(
-            minOf(180.0, hsv[0] + 20.0), minOf(255.0, hsv[1] * 255 + 60.0), minOf(255.0, hsv[2] * 255 + 60.0)
+            minOf(180.0, hsv[0] + 20.0),
+            minOf(255.0, hsv[1] * 255 + 60.0),
+            minOf(255.0, hsv[2] * 255 + 60.0)
         )
+
         val mask = Mat()
         Core.inRange(hsvMat, lower, upper, mask)
         hsvMat.release()
@@ -897,7 +681,6 @@ class VisionRepository @Inject constructor(
         Imgproc.approxPolyDP(contour2f, approx, epsilon, true)
 
         if (approx.rows() != 4) return
-        // Valid quad found but corner-to-pose mapping is complex; hold pose (IMU maintains tilt).
     }
 
     private fun getTransformationMatrix(

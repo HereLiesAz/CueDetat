@@ -64,7 +64,6 @@ class MainViewModel @Inject constructor(
 
     private var experienceModeUpdateJob: Job? = null
     private var saveJob: Job? = null
-    private var lastEmittedOrientation: FullOrientation? = null
     private val eventChannel = Channel<MainScreenEvent>(Channel.UNLIMITED)
     private val _uiState = MutableStateFlow(CueDetatState())
     val uiState = _uiState.asStateFlow()
@@ -106,14 +105,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             ProcessLifecycleOwner.get().lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 sensorRepository.fullOrientationFlow.collect { orientation ->
-                    val last = lastEmittedOrientation
-                    if (last == null ||
-                        kotlin.math.abs(orientation.pitch - last.pitch) > 0.3f ||
-                        kotlin.math.abs(orientation.roll - last.roll) > 0.3f ||
-                        kotlin.math.abs(orientation.yaw - last.yaw) > 0.5f) {
-                        lastEmittedOrientation = orientation
-                        onEvent(MainScreenEvent.FullOrientationChanged(orientation))
-                    }
+                    onEvent(MainScreenEvent.FullOrientationChanged(orientation))
                 }
             }
         }

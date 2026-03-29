@@ -146,3 +146,8 @@ Get-ChildItem -Path $PSScriptRoot -Recurse -File | ForEach-Object {
 
 Write-Host "---"
 Write-Host "Extraction complete: $BackupFile" -ForegroundColor Green
+
+Write-Host "`n[AI SCOPE INSTRUCTIONS]" -ForegroundColor Cyan
+Write-Host "To request more specific context, use: pwsh backup.ps1 -Scope <ScopeName>"
+Write-Host "Available Scopes: Global (Default), UI, Physics, CV, Domain, Data, All"
+Write-Host "Example: pwsh backup.ps1 -Scope UI,Physics"
