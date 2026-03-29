@@ -15,7 +15,7 @@ sealed class HaterEvent {
     /** Device shake detected, trigger the answer reveal animation. */
     data object ShakeDetected : HaterEvent()
     /** User is dragging finger on screen, apply force to the virtual die. */
-    data class Dragging(val delta: Offset) : HaterEvent()
+    data class Dragging(val delta: Offset, val position: Offset) : HaterEvent()
     /** User released drag. */
     data object DragEnd : HaterEvent()
     /** Device orientation changed, update gravity vector for physics. */

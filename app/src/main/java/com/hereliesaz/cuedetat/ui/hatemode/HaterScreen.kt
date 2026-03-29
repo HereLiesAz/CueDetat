@@ -80,7 +80,7 @@ fun HaterScreen(
                         detectDragGestures(
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                haterViewModel.onEvent(HaterEvent.Dragging(dragAmount))
+                                haterViewModel.onEvent(HaterEvent.Dragging(dragAmount, change.position))
                             },
                             onDragEnd = { haterViewModel.onEvent(HaterEvent.DragEnd) }
                         )

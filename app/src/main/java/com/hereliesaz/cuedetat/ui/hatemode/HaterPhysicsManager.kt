@@ -172,9 +172,23 @@ class HaterPhysicsManager {
         }
     }
 
-    fun pushDie(delta: Offset) {
+    fun pushDie(delta: Offset, position: Offset) {
         dieVel     += delta * 0.04f
-        angularVel += (delta.x - delta.y) * 0.015f
+        
+        // Calculate vector from die center to touch position
+        val centerX = screenWidth / 2f
+        val centerY = screenHeight / 2f
+        val dieScreenX = centerX + diePos.x
+        val dieScreenY = centerY + diePos.y
+        val rX = position.x - dieScreenX
+        val rY = position.y - dieScreenY
+        
+        // Torque = r x F = (rX * F_y) - (rY * F_x)
+        val torque = (rX * delta.y) - (rY * delta.x)
+        
+        // Apply area-aware rotation using torque
+        angularVel += torque * 0.00015f
+        
         // Touching stirs the surface noticeably
         if (bobAmplitude < 0.75f) bobAmplitude = 0.75f
     }
@@ -186,8 +200,8 @@ class HaterPhysicsManager {
 
     fun applyGravity(roll: Float, pitch: Float) {
         gravityVec = Offset(
-            sin(Math.toRadians(roll.toDouble())).toFloat(),
-            sin(Math.toRadians(pitch.toDouble())).toFloat()
+            -sin(Math.toRadians(roll.toDouble())).toFloat(),
+            -sin(Math.toRadians(pitch.toDouble())).toFloat()
         )
     }
 

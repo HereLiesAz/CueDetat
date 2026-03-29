@@ -60,19 +60,6 @@ private fun handleSizeChanged(
     state: CueDetatState,
     action: MainScreenEvent.SizeChanged
 ): CueDetatState {
-    // Check if the state has been initialized with valid dimensions yet.
-    if (state.viewWidth == 0 && state.viewHeight == 0) {
-        // If not, this is the first layout pass. Create the full initial state.
-        return createInitialState(
-            action.width,
-            action.height,
-            action.density,
-            state.appControlColorScheme ?: darkColorScheme() // Use existing scheme or default dark.
-        )
-    }
-    // If state already exists, just update the dimensions to match the new layout.
-    // Also initialize spinControlCenter if null (e.g., restored from old saved state).
-    // Ensure we have non-zero dimensions before calculating default center.
     val newSpinCenter = if (state.spinControlCenter == null && action.width > 0 && action.height > 0) {
         PointF(action.width / 2f, 116f * action.density)
     } else {
@@ -84,64 +71,5 @@ private fun handleSizeChanged(
         viewHeight = action.height,
         screenDensity = action.density,
         spinControlCenter = newSpinCenter
-    )
-}
-
-/**
- * Creates the initial application state with default values.
- *
- * This is called once when the view dimensions are first known.
- *
- * @param viewWidth The width of the view in pixels.
- * @param viewHeight The height of the view in pixels.
- * @param density Screen pixel density.
- * @param appColorScheme The color scheme to use.
- * @return A fresh [CueDetatState] instance.
- */
-private fun createInitialState(
-    viewWidth: Int,
-    viewHeight: Int,
-    density: Float,
-    appColorScheme: ColorScheme
-): CueDetatState {
-    // Default zoom slider position (0.0 means unzoomed/default).
-    val initialSliderPos = 0f
-
-    // Default center for the target ball (ProtractorUnit) is logical (0,0).
-    val initialProtractorCenter = PointF(0f, 0f)
-
-    // Default position for the spin control UI element (top-right below top bar).
-    // Positioned at top-right: viewWidth - 108dp, 116dp from top.
-    val initialSpinControlCenter = PointF(viewWidth / 2f, 116f * density)
-
-    // Construct and return the state object.
-    return CueDetatState(
-        viewWidth = viewWidth,
-        viewHeight = viewHeight,
-        screenDensity = density,
-        protractorUnit = ProtractorUnit(
-            center = initialProtractorCenter,
-            radius = LOGICAL_BALL_RADIUS,
-            rotationDegrees = 0f
-        ),
-        table = Table(
-            size = TableSize.EIGHT_FT, // Default table size.
-            isVisible = false, // Table is hidden by default.
-        ),
-        onPlaneBall = null, // Cue ball is not placed initially.
-        zoomSliderPosition = initialSliderPos,
-        isBankingMode = false, // Banking mode disabled by default.
-        bankingAimTarget = null,
-        valuesChangedSinceReset = false,
-        areHelpersVisible = LabelConfig.showLabelsByDefault, // Respect global config.
-        isForceLightMode = null, // Follow system theme by default.
-        luminanceAdjustment = 0f, // No brightness adjustment.
-        showLuminanceDialog = false,
-        showTutorialOverlay = false,
-        currentTutorialStep = 0,
-        appControlColorScheme = appColorScheme,
-        interactionMode = InteractionMode.NONE, // No interaction active initially.
-        spinControlCenter = initialSpinControlCenter,
-        experienceMode = null // Force user to select mode on first load (if null).
     )
 }
