@@ -55,8 +55,7 @@ fun stateReducer(
         is MainScreenEvent.ToggleAdvancedOptionsDialog, is MainScreenEvent.ToggleCvMask,
         is MainScreenEvent.EnterCvMaskTestMode, is MainScreenEvent.ExitCvMaskTestMode,
         is MainScreenEvent.EnterCalibrationMode, is MainScreenEvent.SampleColorAt,
-        is MainScreenEvent.ToggleCvRefinementMethod, is MainScreenEvent.UpdateHoughP1,
-        is MainScreenEvent.UpdateHoughP2, is MainScreenEvent.UpdateHoughThreshold,
+        is MainScreenEvent.ToggleCvRefinementMethod,
         is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2 ->
             reduceAdvancedOptionsAction(currentState, action)
 

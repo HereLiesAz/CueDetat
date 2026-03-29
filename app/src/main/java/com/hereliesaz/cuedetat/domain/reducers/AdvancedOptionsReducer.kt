@@ -48,18 +48,7 @@ internal fun reduceAdvancedOptionsAction(state: CueDetatState, action: MainScree
             )
         }
 
-        // Manual tuning of the Hough and Canny filters.
-        is MainScreenEvent.UpdateHoughP1 -> {
-            state.copy(houghP1 = action.value)
-        }
 
-        is MainScreenEvent.UpdateHoughP2 -> {
-            state.copy(houghP2 = action.value)
-        }
-
-        is MainScreenEvent.UpdateHoughThreshold -> {
-            state.copy(houghThreshold = action.value.toInt())
-        }
 
         is MainScreenEvent.UpdateCannyT1 -> {
             state.copy(cannyThreshold1 = action.value)

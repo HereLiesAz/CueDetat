@@ -28,12 +28,10 @@ internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueD
                 if (detectionCount < 1) {
                     val newT1 = (state.cannyThreshold1 - 5f).coerceAtLeast(10f)
                     val newT2 = (state.cannyThreshold2 - 10f).coerceAtLeast(20f)
-                    val newHough = (state.houghThreshold - 2).coerceAtLeast(15)
 
                     nextState = nextState.copy(
                         cannyThreshold1 = newT1,
-                        cannyThreshold2 = newT2,
-                        houghThreshold = newHough
+                        cannyThreshold2 = newT2
                     )
 
                     if (newT1 <= 10f && newT2 <= 20f) {
