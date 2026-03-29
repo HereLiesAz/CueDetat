@@ -56,7 +56,7 @@ internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueD
                     history.removeAt(0)
                 }
 
-                val smoothedConfidence = history.average().toFloat()
+                val smoothedConfidence = if (history.isNotEmpty()) history.sum() / history.size else 0f
 
                 if (smoothedConfidence >= ArConfidenceConfig.AR_CONFIDENCE_THRESHOLD) {
                     nextState = nextState.copy(

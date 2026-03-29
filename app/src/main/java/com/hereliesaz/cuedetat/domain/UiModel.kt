@@ -146,8 +146,6 @@ data class CueDetatState(
     @Transient val isObstructed: Boolean = false,
     @Transient val isTiltBeyondLimit: Boolean = false,
     @Transient val warningText: String? = null,
-    @Transient val arConfidenceHistory: List<Float> = emptyList(),
-    @Transient val arLowConfidenceFrameCount: Int = 0,
     @Transient val shotGuideImpactPoint: PointF? = null,
     @Transient val aimedPocketIndex: Int? = null,
     @Transient val aimingLineBankPath: List<PointF>? = null,

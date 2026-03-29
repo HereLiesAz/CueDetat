@@ -14,6 +14,7 @@ import com.google.mlkit.vision.objects.ObjectDetector
 import com.hereliesaz.cuedetat.di.GenericDetector
 import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.DepthCapability
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.PocketId
