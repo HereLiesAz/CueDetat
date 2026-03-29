@@ -48,7 +48,14 @@ internal fun reduceToggleAction(
             state.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)
         }
         is MainScreenEvent.CycleCameraMode -> when (state.cameraMode) {
-            CameraMode.OFF -> state.copy(cameraMode = CameraMode.AR_SETUP, showTableScanScreen = true)
+            CameraMode.OFF -> state.copy(
+                cameraMode = CameraMode.AR_SETUP,
+                showTableScanScreen = true,
+                lockedHsvColor = null,
+                lockedHsvStdDev = null,
+                tableScanModel = null,
+                lensWarpTps = null
+            )
             else -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false)
         }
         is MainScreenEvent.StartArTracking -> state.copy(cameraMode = CameraMode.AR_ACTIVE, showTableScanScreen = false)

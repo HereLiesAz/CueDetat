@@ -10,5 +10,12 @@ import com.hereliesaz.cuedetat.domain.TpsWarpData
  * Used inside canvas.withMatrix(pitchMatrix) blocks to correct for lens distortion.
  * If tps is null (no alignment performed), returns this unchanged.
  */
-fun PointF.warpedBy(tps: TpsWarpData?): PointF =
-    if (tps == null) this else ThinPlateSpline.applyInverseWarp(tps, this)
+fun PointF.warpedBy(tps: TpsWarpData?): PointF {
+    if (tps == null) return this
+    val warped = ThinPlateSpline.applyInverseWarp(tps, this)
+    return if (warped.x.isNaN() || warped.y.isNaN() || warped.x.isInfinite() || warped.y.isInfinite()) {
+        this
+    } else {
+        warped
+    }
+}
