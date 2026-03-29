@@ -77,7 +77,7 @@ class TableScanAnalyzer(
                 val meanHsv = Core.mean(crop)
                 onFeltColorSampled(
                     floatArrayOf(
-                        meanHsv.`val`[0].toFloat(),
+                        meanHsv.`val`[0].toFloat() * 2f,
                         meanHsv.`val`[1].toFloat() / 255f,
                         meanHsv.`val`[2].toFloat() / 255f
                     )

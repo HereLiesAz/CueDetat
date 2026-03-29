@@ -88,8 +88,12 @@ class MainViewModel @Inject constructor(
 
         viewModelScope.launch {
             val savedState = userPreferencesRepository.stateFlow.first()
+            val savedFeltSamples = tableScanRepository.loadFeltSamples()
             val currentExperienceMode = _uiState.value.experienceMode
-            val initialState = (savedState ?: CueDetatState()).copy(experienceMode = currentExperienceMode)
+            val initialState = (savedState ?: CueDetatState()).copy(
+                experienceMode = currentExperienceMode,
+                savedFeltSamples = savedFeltSamples
+            )
             processAndEmitState(initialState, UpdateType.FULL)
         }
 
@@ -237,6 +241,7 @@ class MainViewModel @Inject constructor(
             saveJob = viewModelScope.launch {
                 delay(2000L)
                 userPreferencesRepository.saveState(derivedState)
+                tableScanRepository.saveFeltSamples(derivedState.savedFeltSamples)
             }
         }
     }

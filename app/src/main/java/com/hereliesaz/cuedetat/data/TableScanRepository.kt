@@ -21,6 +21,7 @@ class TableScanRepository @Inject constructor(
     private val gson: Gson
 ) {
     private val file: File get() = File(context.filesDir, "table_scan_model.json")
+    private val feltSamplesFile: File get() = File(context.filesDir, "felt_samples.json")
 
     /** Loads the saved model from disk, or null if none exists. */
     fun load(): TableScanModel? = runCatching {
@@ -36,6 +37,18 @@ class TableScanRepository @Inject constructor(
     /** Clears the saved model from disk. */
     fun clear() {
         file.delete()
+    }
+
+    /** Loads the saved felt samples from disk. */
+    fun loadFeltSamples(): List<com.hereliesaz.cuedetat.domain.FeltSample> = runCatching {
+        if (!feltSamplesFile.exists()) return@runCatching emptyList()
+        val type = object : com.google.gson.reflect.TypeToken<List<com.hereliesaz.cuedetat.domain.FeltSample>>() {}.type
+        gson.fromJson<List<com.hereliesaz.cuedetat.domain.FeltSample>>(feltSamplesFile.readText(), type) ?: emptyList()
+    }.getOrDefault(emptyList())
+
+    /** Saves the felt samples to disk. */
+    fun saveFeltSamples(samples: List<com.hereliesaz.cuedetat.domain.FeltSample>) {
+        runCatching { feltSamplesFile.writeText(gson.toJson(samples)) }
     }
 
     /**
