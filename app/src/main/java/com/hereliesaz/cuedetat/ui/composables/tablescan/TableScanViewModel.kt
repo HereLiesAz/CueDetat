@@ -300,10 +300,16 @@ class TableScanViewModel @Inject constructor(
             
             tableScanRepository.save(model)
             
-            // Lock the color and load the model.
-            _scanResult.emit(MainScreenEvent.LockColor(lastFeltHsv, floatArrayOf(0.01f, 0.01f, 0.01f)))
+            // Convert Android Compose HSV (0-360, 0-1, 0-1) to OpenCV HSV (0-180, 0-255, 0-255)
+            val opencvHsv = floatArrayOf(
+                lastFeltHsv[0] / 2f,
+                lastFeltHsv[1] * 255f,
+                lastFeltHsv[2] * 255f
+            )
+
+            // Lock the color with a sensible threshold and load the model.
+            _scanResult.emit(MainScreenEvent.LockColor(opencvHsv, floatArrayOf(5.0f, 30.0f, 30.0f)))
             _scanResult.emit(MainScreenEvent.LoadTableScan(model))
-            _scanResult.emit(MainScreenEvent.StartArTracking)
 
             // Signal the UI to show the captured color, then close after the animation plays.
             _capturedFeltHsv.value = lastFeltHsv

@@ -76,7 +76,9 @@ fun stateReducer(
         // Handled by [CvReducer].
         // Covers updates flowing in from the VisionRepository and color locking interactions.
         is MainScreenEvent.CvDataUpdated, is MainScreenEvent.LockOrUnlockColor,
-        is MainScreenEvent.LockColor, is MainScreenEvent.ClearSamplePoint ->
+        is MainScreenEvent.LockColor, is MainScreenEvent.ClearSamplePoint,
+        is MainScreenEvent.AddFeltSample, is MainScreenEvent.DeleteFeltSamples,
+        is MainScreenEvent.MoveFeltSample ->
             reduceCvAction(currentState, action)
 
         // --- OBSTACLES ---

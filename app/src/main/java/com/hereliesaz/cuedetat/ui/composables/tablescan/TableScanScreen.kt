@@ -119,7 +119,7 @@ fun TableScanScreen(
         viewModel.scanComplete.collect { complete ->
             if (complete) {
                 delay(2000L)
-                onEvent(MainScreenEvent.ToggleTableScanScreen)
+                onEvent(MainScreenEvent.StartArTracking)
             }
         }
     }
