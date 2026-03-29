@@ -1,7 +1,4 @@
-/**
- * The central state definition for CueDetat.
- * Added isAutoCalibrating for low-light CV feedback loops.
- */
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/CueDetatState.kt
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.Matrix
@@ -127,9 +124,6 @@ data class CueDetatState(
     val isSnappingEnabled: Boolean = true,
     val hasTargetBallBeenMoved: Boolean = false,
     val hasCueBallBeenMoved: Boolean = false,
-    val houghP1: Float = 100f,
-    val houghP2: Float = 20f,
-    val houghThreshold: Int = 40,
     val cannyThreshold1: Float = 40f,
     val cannyThreshold2: Float = 120f,
     val isAutoCalibrating: Boolean = false,
@@ -256,9 +250,6 @@ sealed class MainScreenEvent {
     ) : MainScreenEvent()
 
     object ToggleCvRefinementMethod : MainScreenEvent()
-    data class UpdateHoughP1(val value: Float) : MainScreenEvent()
-    data class UpdateHoughP2(val value: Float) : MainScreenEvent()
-    data class UpdateHoughThreshold(val value: Float) : MainScreenEvent()
     data class UpdateCannyT1(val value: Float) : MainScreenEvent()
     data class UpdateCannyT2(val value: Float) : MainScreenEvent()
     object ToggleCvModel : MainScreenEvent()

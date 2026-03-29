@@ -24,7 +24,6 @@ import com.hereliesaz.cuedetat.utils.toMat
 import android.media.Image as MediaImage
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
-import com.hereliesaz.cuedetat.view.state.CvRefinementMethod
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -70,7 +69,6 @@ class VisionRepository @Inject constructor(
     private val reusableGray = Mat()
     private val reusableEdges = Mat()
     private val reusableHierarchy = Mat()
-    private val reusableCircles = Mat()
     private val reusableMatrixValues = FloatArray(9)
     private val reusablePointArray = FloatArray(2)
     private val reusableMean = MatOfDouble()
@@ -288,16 +286,10 @@ class VisionRepository @Inject constructor(
         val roiMat = frame.submat(roi)
         Imgproc.morphologyEx(roiMat, roiMat, Imgproc.MORPH_OPEN, reusableMorphKernel)
 
-        val refinedCenterInRoi = when (state.cvRefinementMethod) {
-            CvRefinementMethod.CONTOUR -> findBallByContour(
-                roiMat, minRadius, maxRadius,
-                state.cannyThreshold1.toDouble(), state.cannyThreshold2.toDouble()
-            )
-            CvRefinementMethod.HOUGH -> findBallByHough(
-                roiMat, minRadius, maxRadius,
-                state.houghP1.toDouble(), state.houghP2.toDouble()
-            )
-        }
+        val refinedCenterInRoi = findBallByContour(
+            roiMat, minRadius, maxRadius,
+            state.cannyThreshold1.toDouble(), state.cannyThreshold2.toDouble()
+        )
 
         roiMat.release()
         return refinedCenterInRoi?.let { PointF(it.x + roi.x, it.y + roi.y) }
@@ -381,32 +373,6 @@ class VisionRepository @Inject constructor(
 
         contours.forEach { it.release() }
         return bestCenter
-    }
-
-    private fun findBallByHough(
-        roiMat: Mat,
-        minRadius: Float,
-        maxRadius: Float,
-        houghP1: Double,
-        houghP2: Double
-    ): PointF? {
-        Imgproc.cvtColor(roiMat, reusableGray, Imgproc.COLOR_BGR2GRAY)
-        Imgproc.medianBlur(reusableGray, reusableGray, 5)
-
-        Imgproc.HoughCircles(
-            reusableGray, reusableCircles, Imgproc.HOUGH_GRADIENT, 1.0,
-            roiMat.rows().toDouble() / 8,
-            houghP1, houghP2, minRadius.toInt(), maxRadius.toInt()
-        )
-
-        var center: PointF? = null
-        if (reusableCircles.cols() > 0) {
-            val circleData = reusableCircles[0, 0]
-            if (circleData != null && circleData.isNotEmpty()) {
-                center = PointF(circleData[0].toFloat(), circleData[1].toFloat())
-            }
-        }
-        return center
     }
 
     @SuppressLint("UnsafeOptInUsageError")
@@ -521,134 +487,18 @@ class VisionRepository @Inject constructor(
         imageHeight: Int,
         rotationDegrees: Int
     ): Float {
-        val model = state.tableScanModel ?: return 0f
-        if (!state.hasInverseMatrix) return 0f
-        val inverse = state.inversePitchMatrix ?: return 0f
-
-        val targetHeight = 480
-        val scale = targetHeight.toDouble() / imageHeight
-        val targetWidth = (imageWidth * scale).toInt()
-        val graySmall = Mat()
-        Imgproc.cvtColor(mat, graySmall, Imgproc.COLOR_BGR2GRAY)
-        val grayResized = Mat()
-        Imgproc.resize(graySmall, grayResized, Size(targetWidth.toDouble(), targetHeight.toDouble()))
-        graySmall.release()
-
-        val circles = Mat()
-        Imgproc.HoughCircles(
-            grayResized, circles, Imgproc.CV_HOUGH_GRADIENT, 1.5,
-            grayResized.rows() / 5.0, 80.0, 25.0, 15, 60
-        )
-        grayResized.release()
-
-        val detectedLogical = mutableListOf<Pair<PointF, PointF>>()
-        if (!circles.empty()) {
-            val imageToScreen = Matrix().apply {
-                postScale(state.viewWidth.toFloat() / imageWidth.toFloat(), state.viewHeight.toFloat() / imageHeight.toFloat())
-            }
-            for (i in 0 until circles.cols()) {
-                val data = circles.get(0, i)
-                val imgPt = PointF((data[0] / scale).toFloat(), (data[1] / scale).toFloat())
-                val screenArr = floatArrayOf(imgPt.x, imgPt.y)
-                imageToScreen.mapPoints(screenArr)
-                val logicalArr = floatArrayOf(screenArr[0], screenArr[1])
-                inverse.mapPoints(logicalArr)
-                detectedLogical.add(imgPt to PointF(logicalArr[0], logicalArr[1]))
-            }
-        }
-        circles.release()
-
-        val matchedPairs = mutableListOf<Triple<PocketId, PointF, PointF>>()
-        val tolerance = 3.0f
-
-        detectedLogical.forEach { (imgPt, logPt) ->
-            val nearest = model.pockets.minByOrNull { cluster ->
-                hypot((cluster.logicalPosition.x - logPt.x).toDouble(), (cluster.logicalPosition.y - logPt.y).toDouble()).toFloat()
-            }
-            if (nearest != null) {
-                val dist = hypot((nearest.logicalPosition.x - logPt.x).toDouble(), (nearest.logicalPosition.y - logPt.y).toDouble()).toFloat()
-                if (dist <= tolerance) matchedPairs.add(Triple(nearest.identity, imgPt, logPt))
-            }
-        }
-
-        if (matchedPairs.isNotEmpty()) {
-            val updatedClusters = model.pockets.map { cluster ->
-                val match = matchedPairs.firstOrNull { it.first == cluster.identity }
-                if (match != null) {
-                    val n = cluster.observationCount
-                    val newX = (n * cluster.logicalPosition.x + match.third.x) / (n + 1)
-                    val newY = (n * cluster.logicalPosition.y + match.third.y) / (n + 1)
-                    cluster.copy(
-                        logicalPosition = PointF(newX, newY),
-                        observationCount = n + 1,
-                        variance = cluster.variance * 0.95f
-                    )
-                } else cluster
-            }
-            emitEvent(MainScreenEvent.UpdateTableScanClusters(updatedClusters))
-        }
-
-        var fitQuality = 0f
-        if (matchedPairs.size >= 2) {
-            val srcMat = MatOfPoint2f()
-            val dstMat = MatOfPoint2f()
-            val srcList = matchedPairs.map { org.opencv.core.Point(it.second.x.toDouble(), it.second.y.toDouble()) }
-            val dstList = matchedPairs.map {
-                val cluster = model.pockets.first { c -> c.identity == it.first }
-                org.opencv.core.Point(cluster.logicalPosition.x.toDouble(), cluster.logicalPosition.y.toDouble())
-            }
-            srcMat.fromList(srcList)
-            dstMat.fromList(dstList)
-
-            val h = Calib3d.findHomography(srcMat, dstMat, Calib3d.RANSAC, 3.0)
-            if (!h.empty()) {
-                val estimatedDstMat = MatOfPoint2f()
-                Core.perspectiveTransform(srcMat, estimatedDstMat, h)
-                val estimatedList = estimatedDstMat.toList()
-                var totalErrorSq = 0.0
-                for (i in dstList.indices) {
-                    val dx = estimatedList[i].x - dstList[i].x
-                    val dy = estimatedList[i].y - dstList[i].y
-                    totalErrorSq += dx * dx + dy * dy
-                }
-                val meanResidual = kotlin.math.sqrt(totalErrorSq / dstList.size).toFloat()
-                fitQuality = (1f - (meanResidual / 50f)).coerceIn(0f, 1f)
-                estimatedDstMat.release()
-
-                val (rawT, rawR, rawS) = decomposeHomography(h, imageWidth.toFloat(), imageHeight.toFloat())
-                val alpha = 0.15f
-                val current = state
-                val blendedTranslation = Offset(
-                    alpha * rawT.x + (1 - alpha) * current.viewOffset.x,
-                    alpha * rawT.y + (1 - alpha) * current.viewOffset.y
-                )
-                val blendedRotation = alpha * rawR + (1 - alpha) * current.worldRotationDegrees
-                val blendedScale = alpha * rawS + (1 - alpha) * ZoomMapping.sliderToZoom(
-                    current.zoomSliderPosition,
-                    ZoomMapping.getZoomRange(current.experienceMode).first,
-                    ZoomMapping.getZoomRange(current.experienceMode).second
-                )
-
-                val delta = hypot((blendedTranslation.x - current.viewOffset.x).toDouble(), (blendedTranslation.y - current.viewOffset.y).toDouble())
-                if (delta > 0.5) {
-                    emitEvent(MainScreenEvent.UpdateArPose(blendedTranslation, blendedRotation, blendedScale))
-                }
-            }
-        } else if (matchedPairs.isEmpty()) {
-            runEdgeFallback(mat, state, inverse, imageWidth, imageHeight, rotationDegrees)
-        }
-        return fitQuality
+        if (state.tableScanModel == null || !state.hasInverseMatrix) return 0f
+        return runEdgeFallback(mat, state, imageWidth, imageHeight, rotationDegrees)
     }
 
     private fun runEdgeFallback(
         mat: Mat,
         state: CueDetatState,
-        inverse: Matrix,
         imageWidth: Int,
         imageHeight: Int,
         rotationDegrees: Int
-    ) {
-        val model = state.tableScanModel ?: return
+    ): Float {
+        val model = state.tableScanModel ?: return 0f
         val hsv = floatArrayOf(model.feltColorHsv[0], model.feltColorHsv[1], model.feltColorHsv[2])
         val hsvMat = Mat()
         Imgproc.cvtColor(mat, hsvMat, Imgproc.COLOR_BGR2HSV)
@@ -668,19 +518,84 @@ class VisionRepository @Inject constructor(
         Core.inRange(hsvMat, lower, upper, mask)
         hsvMat.release()
 
+        val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(9.0, 9.0))
+        Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, kernel)
+        Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_OPEN, kernel)
+
         val contours = mutableListOf<MatOfPoint>()
         Imgproc.findContours(mask, contours, Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
         mask.release()
+        kernel.release()
 
-        val largest = contours.maxByOrNull { Imgproc.contourArea(it) } ?: return
-        if (Imgproc.contourArea(largest) < mat.rows() * mat.cols() * 0.05) return
+        val largest = contours.maxByOrNull { Imgproc.contourArea(it) } ?: return 0f
+        if (Imgproc.contourArea(largest) < mat.rows() * mat.cols() * 0.05) return 0f
 
         val approx = MatOfPoint2f()
         val contour2f = MatOfPoint2f(*largest.toArray())
-        val epsilon = 0.02 * Imgproc.arcLength(contour2f, true)
-        Imgproc.approxPolyDP(contour2f, approx, epsilon, true)
+        var epsilonCoeff = 0.01
+        val perimeter = Imgproc.arcLength(contour2f, true)
 
-        if (approx.rows() != 4) return
+        while (epsilonCoeff < 0.1) {
+            Imgproc.approxPolyDP(contour2f, approx, epsilonCoeff * perimeter, true)
+            if (approx.rows() == 4) break
+            epsilonCoeff += 0.01
+        }
+
+        if (approx.rows() != 4) {
+            approx.release()
+            contour2f.release()
+            contours.forEach { it.release() }
+            return 0f
+        }
+
+        val pts = approx.toArray()
+        approx.release()
+        contour2f.release()
+        contours.forEach { it.release() }
+
+        val imageCenter = org.opencv.core.Point(mat.cols() / 2.0, mat.rows() / 2.0)
+        val sortedCorners = pts.sortedBy { Math.atan2(it.y - imageCenter.y, it.x - imageCenter.x) }
+
+        val logicalWidth = state.table.logicalWidth
+        val logicalHeight = state.table.logicalHeight
+        val logicalCorners = listOf(
+            org.opencv.core.Point(-logicalWidth / 2.0, -logicalHeight / 2.0),
+            org.opencv.core.Point(logicalWidth / 2.0, -logicalHeight / 2.0),
+            org.opencv.core.Point(logicalWidth / 2.0, logicalHeight / 2.0),
+            org.opencv.core.Point(-logicalWidth / 2.0, logicalHeight / 2.0)
+        )
+
+        val srcMat = MatOfPoint2f(*sortedCorners.toTypedArray())
+        val dstMat = MatOfPoint2f(*logicalCorners.toTypedArray())
+
+        val h = Calib3d.findHomography(srcMat, dstMat, Calib3d.RANSAC, 5.0)
+        srcMat.release()
+        dstMat.release()
+
+        if (h.empty()) return 0f
+
+        val (rawT, rawR, rawS) = decomposeHomography(h, imageWidth.toFloat(), imageHeight.toFloat())
+        val alpha = 0.2f
+        val blendedTranslation = Offset(
+            alpha * rawT.x + (1f - alpha) * state.viewOffset.x,
+            alpha * rawT.y + (1f - alpha) * state.viewOffset.y
+        )
+        val blendedRotation = alpha * rawR + (1f - alpha) * state.worldRotationDegrees
+        val currentZoom = ZoomMapping.sliderToZoom(
+            state.zoomSliderPosition,
+            ZoomMapping.getZoomRange(state.experienceMode).first,
+            ZoomMapping.getZoomRange(state.experienceMode).second
+        )
+        val blendedScale = alpha * rawS + (1f - alpha) * currentZoom
+
+        h.release()
+
+        val delta = hypot((blendedTranslation.x - state.viewOffset.x).toDouble(), (blendedTranslation.y - state.viewOffset.y).toDouble())
+        if (delta > 0.5) {
+            emitEvent(MainScreenEvent.UpdateArPose(blendedTranslation, blendedRotation, blendedScale))
+        }
+
+        return 0.8f
     }
 
     private fun getTransformationMatrix(
