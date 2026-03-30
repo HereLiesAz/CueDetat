@@ -158,11 +158,11 @@ fun AzNavRailMenu(
             azRailItemLowerCase(id = "dynamic", text = "Dynamic", fillColor = b7M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.UnlockBeginnerView) })
         } else {
             val resetLabel = when {
-                uiState.obstacleBalls.isNotEmpty() -> "Clear"
-                uiState.targetCvAnchor != null -> "Undo"
-                uiState.preResetState != null -> "Undo"
-                uiState.postResetState != null -> "Redo"
-                else -> "Reset"
+                uiState.obstacleBalls.isNotEmpty() -> "clear"
+                uiState.targetCvAnchor != null -> "undo"
+                uiState.preResetState != null -> "undo"
+                uiState.postResetState != null -> "redo"
+                else -> "reset"
             }
             azRailItemLowerCase(id = "reset", text = resetLabel, fillColor = b8K, textColor = Color.White, onClick = { onEvent(MainScreenEvent.Reset) })
         }
