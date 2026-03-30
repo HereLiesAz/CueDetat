@@ -206,6 +206,9 @@ dependencies {
         implementation("org.bitbucket.b_c:jose4j:0.9.6") {
             because("Transitive dependency vulnerability")
         }
+        implementation("com.google.guava:guava:32.1.3-android") {
+            because("Transitive dependency vulnerability")
+        }
     }
 }
 
