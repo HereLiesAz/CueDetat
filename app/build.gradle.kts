@@ -138,12 +138,6 @@ android {
     }
 }
 
-// Migrated from kotlinOptions to compilerOptions
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-    }
-}
 
 dependencies {
     implementation(libs.androidx.datastore.preferences)
@@ -204,6 +198,9 @@ dependencies {
 
     constraints {
         implementation("org.bitbucket.b_c:jose4j:0.9.6") {
+            because("Transitive dependency vulnerability")
+        }
+        implementation("com.google.guava:guava:32.1.3-android") {
             because("Transitive dependency vulnerability")
         }
     }
