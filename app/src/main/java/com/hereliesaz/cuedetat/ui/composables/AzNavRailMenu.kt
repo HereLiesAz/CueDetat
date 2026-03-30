@@ -149,8 +149,7 @@ fun AzNavRailMenu(
         } else {
             val resetLabel = when {
                 uiState.obstacleBalls.isNotEmpty() -> "clear"
-                uiState.targetCvAnchor != null -> "undo"
-                uiState.preResetState != null -> "undo"
+                uiState.targetCvAnchor != null || uiState.preResetState != null -> "undo"
                 uiState.postResetState != null -> "redo"
                 else -> "reset"
             }
