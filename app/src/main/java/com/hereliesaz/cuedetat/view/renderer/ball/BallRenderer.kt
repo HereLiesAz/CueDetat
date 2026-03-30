@@ -79,6 +79,34 @@ class BallRenderer {
             }
         }
 
+        // Passive detection glow: visible before selection phase, signals CV is seeing balls
+        if (state.tableScanModel != null && state.ballSelectionPhase == BallSelectionPhase.NONE) {
+            val candidates = state.snapCandidates ?: emptyList()
+            state.pitchMatrix?.let { matrix ->
+                candidates.forEach { candidate ->
+                    val glowPaint = Paint().apply {
+                        style = Paint.Style.STROKE
+                        strokeWidth = 14f
+                        color = android.graphics.Color.WHITE
+                        alpha = if (candidate.isConfirmed) 180 else 40
+                        maskFilter = android.graphics.BlurMaskFilter(18f, android.graphics.BlurMaskFilter.Blur.NORMAL)
+                    }
+                    val ringPaint = Paint().apply {
+                        style = Paint.Style.STROKE
+                        strokeWidth = 5f
+                        color = android.graphics.Color.WHITE
+                        alpha = if (candidate.isConfirmed) 200 else 80
+                    }
+                    canvas.save()
+                    canvas.concat(matrix)
+                    val r = state.protractorUnit.radius * 1.3f
+                    canvas.drawCircle(candidate.detectedPoint.x, candidate.detectedPoint.y, r, glowPaint)
+                    canvas.drawCircle(candidate.detectedPoint.x, candidate.detectedPoint.y, r, ringPaint)
+                    canvas.restore()
+                }
+            }
+        }
+
         // Draw tap-target rings on confirmed snap candidates during ball selection phases
         if (state.ballSelectionPhase != BallSelectionPhase.NONE) {
             val candidates = state.snapCandidates?.filter { it.isConfirmed } ?: emptyList()

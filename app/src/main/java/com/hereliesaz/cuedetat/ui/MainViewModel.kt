@@ -16,6 +16,7 @@ import com.hereliesaz.cuedetat.data.TableScanRepository
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.data.VisionAnalyzer
 import com.hereliesaz.cuedetat.data.VisionRepository
+import com.hereliesaz.cuedetat.domain.BallSelectionPhase
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
@@ -209,7 +210,16 @@ class MainViewModel @Inject constructor(
 
         // After CV data is integrated into state, update snap candidates.
         val finalState = if (logicalEvent is MainScreenEvent.CvDataUpdated) {
-            snapReducer.reduce(reducedState, logicalEvent.visionData)
+            val stateAfterSnap = snapReducer.reduce(reducedState, logicalEvent.visionData)
+            if (stateAfterSnap.tableScanModel != null &&
+                stateAfterSnap.experienceMode == ExperienceMode.EXPERT &&
+                stateAfterSnap.ballSelectionPhase == BallSelectionPhase.NONE &&
+                stateAfterSnap.snapCandidates?.any { it.isConfirmed } == true
+            ) {
+                stateAfterSnap.copy(ballSelectionPhase = BallSelectionPhase.AWAITING_CUE)
+            } else {
+                stateAfterSnap
+            }
         } else {
             reducedState
         }

@@ -11,6 +11,7 @@ import com.hereliesaz.cuedetat.domain.PocketCluster
 import com.hereliesaz.cuedetat.domain.PocketId
 import com.hereliesaz.cuedetat.domain.TableScanModel
 import com.hereliesaz.cuedetat.domain.TpsWarpData
+import com.hereliesaz.cuedetat.domain.TableGeometryFitter
 import com.hereliesaz.cuedetat.domain.decomposeHomography
 import com.hereliesaz.cuedetat.view.model.Table
 import com.hereliesaz.cuedetat.view.state.TableSize
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.opencv.calib3d.Calib3d
 import org.opencv.core.Core
@@ -151,8 +153,28 @@ class TableScanViewModel @Inject constructor(
                 screenToLogical(screenPt, inverse)
             }
 
-            // Step 3: Merge into clusters (accumulated for manual geometry fitting if needed).
+            // Step 3: Merge into clusters.
             logicalPts.forEach { logicalPt -> mergeIntoCluster(logicalPt) }
+
+            // Step 4: Update UI progress (# of stable clusters / 6).
+            val stableCount = clusters.count { it.value.size >= MIN_OBSERVATIONS_TO_FIT }
+            _scanProgress.value = PocketId.values()
+                .take(stableCount)
+                .associateWith { true }
+
+            // Step 5: Auto-fit and complete when 6 clusters are stable.
+            if (stableCount >= 6 && !_scanComplete.value) {
+                val stableClusters = clusters.filter { it.value.size >= MIN_OBSERVATIONS_TO_FIT }
+                val centerPts = stableClusters.values.map { observations ->
+                    PointF(
+                        observations.sumOf { it.x.toDouble() }.toFloat() / observations.size,
+                        observations.sumOf { it.y.toDouble() }.toFloat() / observations.size
+                    )
+                }
+                val fitResult = TableGeometryFitter.fit(centerPts) ?: return@launch
+                val identifiedCenters = fitResult.associate { (id, pt) -> id to pt }
+                completeScan(identifiedCenters, imageWidth.toFloat(), imageHeight.toFloat())
+            }
         }
     }
 
@@ -307,13 +329,17 @@ class TableScanViewModel @Inject constructor(
                 lastFeltHsv[2] * 255f
             )
 
-            // Lock the color with a sensible threshold and load the model.
+            // Lock the color and place the table immediately with the default pose.
             _scanResult.emit(MainScreenEvent.LockColor(opencvHsv, floatArrayOf(5.0f, 30.0f, 30.0f)))
             _scanResult.emit(MainScreenEvent.LoadTableScan(model))
-
-            // Signal the UI to show the captured color, then close after the animation plays.
             _capturedFeltHsv.value = lastFeltHsv
-            _scanComplete.value = true
+
+            // Keep scanning for pockets to refine placement. Close after a timeout if
+            // completeScan() (the pocket-based path) hasn't already fired.
+            delay(4000L)
+            if (!_scanComplete.value) {
+                _scanComplete.value = true
+            }
         }
     }
 
