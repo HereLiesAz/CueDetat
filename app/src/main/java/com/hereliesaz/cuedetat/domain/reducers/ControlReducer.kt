@@ -52,6 +52,10 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             state.copy(viewOffset = PointF(newX, newY))
         }
 
+        is MainScreenEvent.MoveTableZ -> state.copy(
+            tableZOffset = (state.tableZOffset + action.delta).coerceIn(-50f, 50f)
+        )
+
         is MainScreenEvent.ApplyQuickAlign -> {
             val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode)
             val newZoomSliderPos = ZoomMapping.zoomToSlider(action.scale, minZoom, maxZoom)

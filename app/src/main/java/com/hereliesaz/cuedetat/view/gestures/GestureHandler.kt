@@ -25,6 +25,7 @@ import kotlin.math.abs
  * - Two-finger Pinch: Controls Zoom.
  * - Two-finger Rotation: Rotates the table/camera.
  * - Two-finger Pan: Pans the camera view.
+ * - Three-finger Drag: Moves the table up/down along its Z-axis.
  *
  * @param uiState The current state (used to gate specific gestures based on mode).
  * @param onEvent Callback to dispatch detected gesture events to the ViewModel.
@@ -54,8 +55,16 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                     val isDynamicBeginner = uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked
 
                     // Check how many pointers are active.
-                    if (event.changes.size > 1) {
-                        // MULTI-TOUCH DETECTED (2+ fingers)
+                    if (event.changes.size >= 3) {
+                        // THREE-FINGER GESTURE: Z-axis table movement
+                        if (uiState.table.isVisible) {
+                            val pan = event.calculatePan()
+                            if (abs(pan.y) > 0.1f) {
+                                onEvent(MainScreenEvent.MoveTableZ(-pan.y * 0.05f))
+                            }
+                        }
+                    } else if (event.changes.size == 2) {
+                        // TWO-FINGER GESTURE: zoom, rotation, pan
 
                         // 1. Zoom (Pinch)
                         // Blocked only in Static (Locked) Beginner Mode.

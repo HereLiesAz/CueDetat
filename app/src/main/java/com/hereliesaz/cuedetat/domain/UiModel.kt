@@ -70,6 +70,7 @@ data class CueDetatState(
     val valuesChangedSinceReset: Boolean = false,
     val cameraMode: CameraMode = CameraMode.OFF,
     val viewOffset: PointF = PointF(0f, 0f),
+    val tableZOffset: Float = 0f,
     val orientationLock: OrientationLock = OrientationLock.PORTRAIT,
     @Transient val pendingOrientationLock: OrientationLock? = null,
     val isBeginnerViewLocked: Boolean = false,
@@ -191,6 +192,7 @@ sealed class MainScreenEvent {
     data class TableRotationApplied(val degrees: Float) : MainScreenEvent()
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
     data class PanView(val delta: PointF) : MainScreenEvent()
+    data class MoveTableZ(val delta: Float) : MainScreenEvent()
     object ToggleSpinControl : MainScreenEvent()
     object ToggleMasseMode : MainScreenEvent()
     data class SpinApplied(val offset: PointF) : MainScreenEvent()

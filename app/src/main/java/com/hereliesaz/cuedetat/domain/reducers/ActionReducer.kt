@@ -82,6 +82,7 @@ internal fun reduceAction(
                 hasTargetBallBeenMoved = false,
                 isWorldLocked = false,
                 viewOffset = PointF(0f, 0f),
+                tableZOffset = 0f,
                 cueBallCvAnchor = null,
                 targetCvAnchor = null,
                 obstacleCvAnchors = emptyList(),
