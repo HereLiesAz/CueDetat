@@ -28,6 +28,16 @@ import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 
+private fun AzNavHostScope.azRailItemLowerCase(
+    id: String,
+    text: String,
+    fillColor: Color,
+    textColor: Color,
+    onClick: () -> Unit
+) {
+    azRailItem(id = id, text = text.lowercase(), fillColor = fillColor, textColor = textColor, onClick = onClick)
+}
+
 @Composable
 fun AzNavRailMenu(
     uiState: CueDetatState,
@@ -103,8 +113,8 @@ fun AzNavRailMenu(
         azAdvanced(isLoading = false, helpEnabled = true, onDismissHelp = {})
 
         if (uiState.experienceMode == ExperienceMode.HATER) {
-            azRailItem(id = "shake", text = "Shake", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.Shake) })
-            azRailItem(id = "exit", text = "Exit", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ExitToSplash) })
+            azRailItemLowerCase(id = "shake", text = "Shake", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.Shake) })
+            azRailItemLowerCase(id = "exit", text = "Exit", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ExitToSplash) })
             content(); return@AzHostActivityLayout
         }
 
@@ -123,10 +133,10 @@ fun AzNavRailMenu(
 
             val inArSubMode = uiState.cameraMode == CameraMode.AR_SETUP || uiState.cameraMode == CameraMode.AR_ACTIVE
             if (inArSubMode) {
-                azRailItem(id = "felt", text = "Felt", fillColor = b11R, textColor = Color.White, onClick = {
+                azRailItemLowerCase(id = "felt", text = "Felt", fillColor = b11R, textColor = Color.White, onClick = {
                     onEvent(MainScreenEvent.ToggleTableScanScreen)
                 })
-                azRailItem(id = "cancel_ar", text = "Cancel", fillColor = b12P, textColor = Color.White, onClick = { 
+                azRailItemLowerCase(id = "cancel_ar", text = "Cancel", fillColor = b12P, textColor = Color.White, onClick = {
                     onEvent(MainScreenEvent.CancelArSetup) 
                 })
             }
@@ -140,21 +150,21 @@ fun AzNavRailMenu(
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azRailToggle(id = "bank", isChecked = uiState.isBankingMode, toggleOnText = "Aim", toggleOffText = "Bank", fillColor = b6G, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleBankingMode) })
-            azRailItem(id = "add_obstacle", text = "Add", fillColor = b7M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.AddObstacleBall) })
+            azRailItemLowerCase(id = "add_obstacle", text = "Add", fillColor = b7M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.AddObstacleBall) })
         }
 
         if (uiState.experienceMode == ExperienceMode.BEGINNER) {
-            azRailItem(id = "static", text = "Static", fillColor = b6G, textColor = Color.White, onClick = { onEvent(MainScreenEvent.LockBeginnerView) })
-            azRailItem(id = "dynamic", text = "Dynamic", fillColor = b7M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.UnlockBeginnerView) })
+            azRailItemLowerCase(id = "static", text = "Static", fillColor = b6G, textColor = Color.White, onClick = { onEvent(MainScreenEvent.LockBeginnerView) })
+            azRailItemLowerCase(id = "dynamic", text = "Dynamic", fillColor = b7M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.UnlockBeginnerView) })
         } else {
             val resetLabel = when {
-                uiState.obstacleBalls.isNotEmpty() -> "Clear"
-                uiState.targetCvAnchor != null -> "Undo"
-                uiState.preResetState != null -> "Undo"
-                uiState.postResetState != null -> "Redo"
-                else -> "Reset"
+                uiState.obstacleBalls.isNotEmpty() -> "clear"
+                uiState.targetCvAnchor != null -> "undo"
+                uiState.preResetState != null -> "undo"
+                uiState.postResetState != null -> "redo"
+                else -> "reset"
             }
-            azRailItem(id = "reset", text = resetLabel, fillColor = b8K, textColor = Color.White, onClick = { onEvent(MainScreenEvent.Reset) })
+            azRailItemLowerCase(id = "reset", text = resetLabel, fillColor = b8K, textColor = Color.White, onClick = { onEvent(MainScreenEvent.Reset) })
         }
         azDivider()
 
