@@ -114,6 +114,7 @@ data class CueDetatState(
     @Transient val snapCandidates: List<SnapCandidate>? = null,
     @Transient val tableScanModel: TableScanModel? = null,
     @Transient val depthPlane: DepthPlane? = null,
+    @Transient val arDerivedPitch: Float? = null,
     val depthCapability: DepthCapability = DepthCapability.NONE,
     val lockedHsvColor: FloatArray? = null,
     val lockedHsvStdDev: FloatArray? = null,
@@ -291,6 +292,10 @@ sealed class MainScreenEvent {
     // Depth / ARCore events
     data class DepthPlaneUpdated(val plane: DepthPlane) : MainScreenEvent()
     data class DepthCapabilityDetected(val capability: DepthCapability) : MainScreenEvent()
+    data class ArCameraPoseUpdated(
+        val pitchDegrees: Float,
+        val heightAboveSurfaceM: Float
+    ) : MainScreenEvent()
 
     // AR setup / lifecycle events
     object CancelArSetup : MainScreenEvent()

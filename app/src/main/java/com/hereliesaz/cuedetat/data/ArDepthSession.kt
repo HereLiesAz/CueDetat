@@ -2,16 +2,23 @@ package com.hereliesaz.cuedetat.data
 
 import android.content.Context
 import android.media.Image
+import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
+import com.google.ar.core.Plane
 import com.google.ar.core.Session
+import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.NotYetAvailableException
 import com.hereliesaz.cuedetat.domain.DepthCapability
 import com.hereliesaz.cuedetat.domain.DepthPlane
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 /**
  * Manages the lifecycle of an ARCore [Session] and extracts table-plane depth information
@@ -24,13 +31,23 @@ import javax.inject.Singleton
  * is called from the GL thread. [session] is only mutated from those two call sites, which
  * are sequential in practice (create → GL loop → close).
  */
+/** Height and derived pitch for the camera's position above the detected table plane. */
+data class CameraAbovePlane(val pitchDegrees: Float, val heightM: Float)
+
 @Singleton
 class ArDepthSession @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     private var session: Session? = null
+    private var tableAnchor: Anchor? = null
     var isDepthSupported: Boolean = false
         private set
+
+    private companion object {
+        // Pool table minimum playing surface: ≈ 1.0m × 2.0m (7ft table)
+        // ARCore extentX/extentZ are half-extents, so full area = (2*extentX)*(2*extentZ)
+        const val MIN_TABLE_AREA_M2 = 0.8f
+    }
 
     val capability: DepthCapability
         get() = if (isDepthSupported) DepthCapability.DEPTH_API else DepthCapability.NONE
@@ -57,7 +74,7 @@ class ArDepthSession @Inject constructor(
                             else Config.DepthMode.DISABLED
                 updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                 lightEstimationMode = Config.LightEstimationMode.DISABLED
-                planeFindingMode = Config.PlaneFindingMode.DISABLED
+                planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
             }
             s.configure(config)
             session = s
@@ -141,7 +158,73 @@ class ArDepthSession @Inject constructor(
         )
     }
 
+    /**
+     * Searches updated trackables for a horizontal plane that matches pool-table dimensions
+     * and anchors to it. Skips if an anchor is already established.
+     *
+     * Called every AR frame from the GL thread. [expectedDepthM] is used to prefer the plane
+     * closest to the known table distance; pass 0f to accept any qualifying plane.
+     */
+    fun findAndAnchorTablePlane(frame: Frame, expectedDepthM: Float) {
+        if (tableAnchor != null) return
+
+        val cameraPose = frame.camera.pose
+        val candidates = frame.getUpdatedTrackables(Plane::class.java)
+            .filter { it.trackingState == TrackingState.TRACKING }
+            .filter { it.type == Plane.Type.HORIZONTAL_UPWARD_FACING }
+            // extentX/Z are half-extents; full area = (2*extentX)*(2*extentZ)
+            .filter { 4f * it.extentX * it.extentZ >= MIN_TABLE_AREA_M2 }
+
+        val best = if (expectedDepthM > 0f) {
+            candidates.minByOrNull { plane ->
+                val p = plane.centerPose
+                val dx = cameraPose.tx() - p.tx()
+                val dy = cameraPose.ty() - p.ty()
+                val dz = cameraPose.tz() - p.tz()
+                abs(sqrt(dx * dx + dy * dy + dz * dz) - expectedDepthM)
+            }
+        } else {
+            candidates.firstOrNull()
+        }
+
+        best?.let { plane ->
+            try {
+                tableAnchor = plane.createAnchor(plane.centerPose)
+            } catch (_: Exception) { /* retry next frame */ }
+        }
+    }
+
+    /**
+     * Computes the camera's geometric position above the anchored table plane.
+     * Returns null if no anchor is established or tracking is lost.
+     *
+     * The resulting [CameraAbovePlane.pitchDegrees] is the actual viewing elevation angle
+     * (atan2 of camera height above table ÷ horizontal distance from anchor center),
+     * reflecting real-world geometry rather than raw device tilt.
+     */
+    fun computeCameraAbovePlane(frame: Frame): CameraAbovePlane? {
+        val anchor = tableAnchor ?: return null
+        if (anchor.trackingState != TrackingState.TRACKING) return null
+
+        val cameraInAnchor = anchor.pose.inverse().compose(frame.camera.pose)
+        val heightM = cameraInAnchor.ty()
+        if (heightM <= 0f) return null  // camera below table plane — bad data
+
+        val horizontal = sqrt(cameraInAnchor.tx().pow(2) + cameraInAnchor.tz().pow(2))
+        if (horizontal < 0.01f) return null  // directly overhead — degenerate geometry
+
+        val pitchDeg = Math.toDegrees(atan2(heightM.toDouble(), horizontal.toDouble()))
+            .toFloat().coerceIn(5f, 85f)
+        return CameraAbovePlane(pitchDegrees = pitchDeg, heightM = heightM)
+    }
+
+    /** Detaches the table plane anchor. Called when tracking is lost or the session closes. */
+    fun clearAnchor() {
+        tableAnchor?.detach()
+        tableAnchor = null
+    }
+
     fun pause()  { session?.pause() }
     fun resume() { try { session?.resume() } catch (_: Exception) {} }
-    fun close()  { session?.close(); session = null }
+    fun close()  { clearAnchor(); session?.close(); session = null }
 }

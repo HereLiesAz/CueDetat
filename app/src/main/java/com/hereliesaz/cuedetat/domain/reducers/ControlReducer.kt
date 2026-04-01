@@ -107,12 +107,16 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
         is MainScreenEvent.DepthPlaneUpdated ->
             state.copy(depthPlane = action.plane)
 
+        is MainScreenEvent.ArCameraPoseUpdated ->
+            state.copy(arDerivedPitch = action.pitchDegrees)
+
         is MainScreenEvent.DepthCapabilityDetected ->
             state.copy(depthCapability = action.capability)
 
         is MainScreenEvent.ArTrackingLost -> state.copy(
             tableScanModel = null,
             lensWarpTps = null,
+            arDerivedPitch = null,
             cameraMode = if (state.cameraMode == CameraMode.AR_ACTIVE) CameraMode.AR_SETUP else state.cameraMode
         )
 

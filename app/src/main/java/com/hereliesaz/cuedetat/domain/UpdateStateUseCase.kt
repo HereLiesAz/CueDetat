@@ -36,6 +36,10 @@ class UpdateStateUseCase @Inject constructor(
     private val distanceReferenceConstant = 1200f
     private val lineExtensionFactor = 5000f
 
+    // Assumed camera height above the table surface when no ARCore anchor is available.
+    // Derived from: user eye height ≈ 4.5 ft above floor, pool table ≈ 3 ft above floor → 1.5 ft ≈ 0.45 m.
+    private val assumedHeightAboveTableM = 0.45f
+
     operator fun invoke(state: CueDetatState, type: UpdateType): CueDetatState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
@@ -114,9 +118,34 @@ class UpdateStateUseCase @Inject constructor(
 
         val stateWithCoercedPan = state.copy(viewOffset = coercedViewOffset)
 
+        // Determine the best available pitch estimate:
+        //   1. ARCore anchor: exact atan2(height, horizontal) from camera-above-plane geometry
+        //   2. Depth fallback: atan2(assumed 0.45m height, sqrt(depth²−0.45²))
+        //   3. IMU pitch: raw sensor data (existing behavior)
+        val effectivePitch: Float = when {
+            stateWithCoercedPan.cameraMode == CameraMode.AR_ACTIVE
+                    && stateWithCoercedPan.arDerivedPitch != null ->
+                stateWithCoercedPan.arDerivedPitch
+
+            stateWithCoercedPan.depthPlane != null
+                    && stateWithCoercedPan.depthPlane!!.confidence > 0.6f -> {
+                val depth = stateWithCoercedPan.depthPlane!!.distanceMeters
+                if (depth > assumedHeightAboveTableM) {
+                    val horizontal = sqrt(depth * depth - assumedHeightAboveTableM * assumedHeightAboveTableM)
+                    Math.toDegrees(atan2(assumedHeightAboveTableM.toDouble(), horizontal.toDouble()))
+                        .toFloat().coerceIn(5f, 85f)
+                } else {
+                    stateWithCoercedPan.currentOrientation.pitch
+                }
+            }
+
+            else -> stateWithCoercedPan.currentOrientation.pitch
+        }
+        val orientationForPerspective = stateWithCoercedPan.currentOrientation.copy(pitch = effectivePitch)
+
         val camera = Camera()
         val perspectiveMatrix = Perspective.createPerspectiveMatrix(
-            currentOrientation = stateWithCoercedPan.currentOrientation,
+            currentOrientation = orientationForPerspective,
             camera = camera,
             lift = stateWithCoercedPan.tableZOffset,
             applyPitch = isPitchApplied
@@ -130,10 +159,10 @@ class UpdateStateUseCase @Inject constructor(
         val logicalTableShortSide = stateWithCoercedPan.table.logicalHeight
         val baseRailLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
         val railLiftAmount =
-            baseRailLiftAmount * abs(sin(Math.toRadians(stateWithCoercedPan.pitchAngle.toDouble()))).toFloat()
+            baseRailLiftAmount * abs(sin(Math.toRadians(effectivePitch.toDouble()))).toFloat()
 
         val railPerspectiveMatrix = Perspective.createPerspectiveMatrix(
-            currentOrientation = stateWithCoercedPan.currentOrientation,
+            currentOrientation = orientationForPerspective,
             camera = camera,
             lift = railLiftAmount + stateWithCoercedPan.tableZOffset,
             applyPitch = isPitchApplied

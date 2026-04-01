@@ -128,6 +128,7 @@ private class ArCoreRenderer(
 
             if (previousTrackingState == TrackingState.TRACKING &&
                 currentTracking == TrackingState.PAUSED) {
+                arDepthSession.clearAnchor()
                 onEvent(MainScreenEvent.ArTrackingLost)
             }
             previousTrackingState = currentTracking
@@ -143,6 +144,19 @@ private class ArCoreRenderer(
             val plane = arDepthSession.processFrame(frame)
             if (plane != null) {
                 onEvent(MainScreenEvent.DepthPlaneUpdated(plane))
+            }
+
+            // Plane anchoring + geometry-derived viewing pitch
+            if (currentTracking == TrackingState.TRACKING) {
+                arDepthSession.findAndAnchorTablePlane(frame, plane?.distanceMeters ?: 0f)
+
+                val abovePlane = arDepthSession.computeCameraAbovePlane(frame)
+                if (abovePlane != null) {
+                    onEvent(MainScreenEvent.ArCameraPoseUpdated(
+                        pitchDegrees = abovePlane.pitchDegrees,
+                        heightAboveSurfaceM = abovePlane.heightM
+                    ))
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "ARCore frame error", e)
