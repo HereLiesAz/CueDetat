@@ -47,7 +47,8 @@ Controls visual style defaults.
 ```kotlin
 azTheme(
     defaultShape = AzButtonShape.RECTANGLE, // Default shape for all items
-    activeColor = MaterialTheme.colorScheme.primary // Color for active state
+    activeColor = MaterialTheme.colorScheme.primary, // Color for active state
+    translucentBackground = Color.Black.copy(alpha = 0.5f) // Set the background color for menus/overlays!
 )
 ```
 
@@ -59,6 +60,7 @@ azAdvanced(
     isLoading = isLoading,               // Boolean: Show global loading overlay
     enableRailDragging = true,           // Boolean: Enable FAB Mode (detach rail)
     helpEnabled = showHelp,              // Boolean: Show Help Overlay
+    helpList = mapOf("home" to "Home screen") // Map<String, String>: Extra help texts
     onDismissHelp = { showHelp = false }
 )
 ```
@@ -102,6 +104,11 @@ azRailItem(id = "icon-item", text = "Icon", content = android.R.drawable.ic_menu
 
 // Rail item with specific shape override
 azRailItem(id = "none-shape", text = "No Shape", shape = AzButtonShape.NONE)
+
+// Rail item with Custom Composable Content Size
+azRailItem(id = "wide-composable", text = "Wide", content = AzComposableContent {
+    Box(Modifier.width(120.dp).background(Color.Blue))
+}) // Will not clip to rail width!
 
 // Disabled item
 azRailItem(id = "profile", text = "Profile", disabled = true, route = "profile")
@@ -218,6 +225,8 @@ azRailRelocItem(
     id = "reloc-1",
     hostId = "rail-host", // Cluster ID
     text = "Reloc Item 1",
+    forceHiddenMenuOpen = false, // Programmatic control for hidden context menu
+    onHiddenMenuDismiss = { /* Menu was closed! */ },
     onRelocate = { from, to, newOrder -> /* handle reorder */ }
 ) {
     // Hidden Context Menu (Tap to open)
@@ -337,7 +346,7 @@ AzForm(
     formName = "loginForm",
     onSubmit = { formData -> /* Map<String, String> */ }
 ) {
-    entry(entryName = "username", hint = "Username")
+    entry(entryName = "username", hint = "Username", initialValue = "AzRailFan") // Pre-filled!
     entry(entryName = "password", hint = "Password", secret = true) // Password mask
     entry(entryName = "bio", hint = "Biography", multiline = true)  // Multi-line
 }
