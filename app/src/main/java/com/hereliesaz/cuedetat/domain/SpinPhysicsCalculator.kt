@@ -10,14 +10,17 @@ object SpinPhysicsCalculator {
     private const val K3 = 0.008f // spin decay rate per logical unit
     private const val PATH_LENGTH = 2000f // must reach any rail from anywhere on the table
 
+    private const val STEP_SIZE = 5f
+    private const val MAX_STEPS = (PATH_LENGTH / STEP_SIZE).toInt()
+
     fun calculatePath(
-        spinOffset: PointF, // normalized -1..1; x = lateral English
-        cueBallPos: PointF, // world coords — ghost cue ball position (where contact occurs)
-        targetBallPos: PointF, // world coords — object ball center
+        spinOffset: Vector2, // normalized -1..1; x = lateral English
+        cueBallPos: Vector2, // world coords — ghost cue ball position (where contact occurs)
+        targetBallPos: Vector2, // world coords — object ball center
         shotAngle: Float, // radians — direction cue was traveling before contact
         table: Table,
         maxBounces: Int = 2
-    ): List<PointF> {
+    ): List<Vector2> {
         val dx = targetBallPos.x - cueBallPos.x
         val dy = targetBallPos.y - cueBallPos.y
         val mag = hypot(dx.toDouble(), dy.toDouble()).toFloat()
@@ -33,7 +36,7 @@ object SpinPhysicsCalculator {
 
         val squirt = K1 * spinOffset.x * sin(cutAngle)
         var currentAngle = tangentAngle + squirt
-        var omega = abs(spinOffset.x)
+        var omega = spinOffset.x
 
         val points = mutableListOf(cueBallPos)
         var currentPos = cueBallPos
@@ -42,77 +45,69 @@ object SpinPhysicsCalculator {
         val pocketThreshold = LOGICAL_BALL_RADIUS * 1.5f
 
         repeat(maxBounces + 1) {
-            val endX = currentPos.x + cos(currentAngle) * PATH_LENGTH
-            val endY = currentPos.y + sin(currentAngle) * PATH_LENGTH
-            val endPoint = PointF().apply { x = endX; y = endY }
-
             if (!table.isVisible) {
-                points.add(endPoint)
+                val endX = currentPos.x + cos(currentAngle) * PATH_LENGTH
+                val endY = currentPos.y + sin(currentAngle) * PATH_LENGTH
+                points.add(Vector2(endX, endY))
                 return points
             }
 
-            // --- Pocket detection: find the closest pocket entry along this segment ---
-            val segDx = endX - currentPos.x
-            val segDy = endY - currentPos.y
-            val segLenSq = segDx * segDx + segDy * segDy
-            var pocketEntry: PointF? = null
-            var pocketT = Float.MAX_VALUE
-
-            if (segLenSq > 0f) {
+            var hitRail = false
+            
+            for (step in 1..MAX_STEPS) {
+                val swerveAmount = 0.001f * omega * exp((-K3 * totalDistance).toDouble()).toFloat()
+                currentAngle += swerveAmount
+                
+                val nextX = currentPos.x + cos(currentAngle) * STEP_SIZE
+                val nextY = currentPos.y + sin(currentAngle) * STEP_SIZE
+                val nextPos = Vector2(nextX, nextY)
+                
+                totalDistance += STEP_SIZE
+                
                 for (pocket in table.pockets) {
-                    val t = ((pocket.x - currentPos.x) * segDx + (pocket.y - currentPos.y) * segDy) / segLenSq
-                    val ct = t.coerceIn(0f, 1f)
-                    val cx = currentPos.x + ct * segDx
-                    val cy = currentPos.y + ct * segDy
-                    val dist = hypot((cx - pocket.x).toDouble(), (cy - pocket.y).toDouble()).toFloat()
-                    if (dist < pocketThreshold && ct < pocketT) {
-                        pocketT = ct
-                        pocketEntry = PointF().apply { x = cx; y = cy }
+                    val pdx = nextX - pocket.x
+                    val pdy = nextY - pocket.y
+                    if (hypot(pdx.toDouble(), pdy.toDouble()).toFloat() < pocketThreshold) {
+                        points.add(nextPos)
+                        return points
                     }
                 }
+                
+                val railHit = table.findRailIntersectionAndNormal(currentPos.toPointF(), nextPos.toPointF())
+                if (railHit != null) {
+                    val intersection = railHit.first.toVector2()
+                    val normal = railHit.second.toVector2()
+                    points.add(intersection)
+                    
+                    val omegaAtRail = abs(omega) * exp((-K3 * totalDistance).toDouble()).toFloat()
+                    val dot = cos(currentAngle) * normal.x + sin(currentAngle) * normal.y
+                    val reflectedX = cos(currentAngle) - 2f * dot * normal.x
+                    val reflectedY = sin(currentAngle) - 2f * dot * normal.y
+                    val reflectedAngle = atan2(reflectedY, reflectedX)
+
+                    val normalAngle = atan2(normal.y, normal.x)
+                    var incidentAngle = abs(currentAngle - (normalAngle + PI.toFloat()))
+                    if (incidentAngle > PI) incidentAngle = (2 * PI - incidentAngle).toFloat()
+
+                    val throwAmount = K2 * omegaAtRail * cos(incidentAngle) * sign(spinOffset.x)
+                    currentAngle = reflectedAngle + throwAmount
+                    omega = omegaAtRail * sign(spinOffset.x)
+                    currentPos = intersection
+                    hitRail = true
+                    break
+                }
+                
+                if (step == MAX_STEPS || step % 5 == 0) {
+                    points.add(nextPos)
+                }
+                
+                currentPos = nextPos
             }
-
-            // --- Rail detection ---
-            val railHit = table.findRailIntersectionAndNormal(currentPos, endPoint)
-            val railT = if (railHit != null && segLenSq > 0f) {
-                val rdx = railHit.first.x - currentPos.x
-                val rdy = railHit.first.y - currentPos.y
-                hypot(rdx.toDouble(), rdy.toDouble()).toFloat() / sqrt(segLenSq)
-            } else Float.MAX_VALUE
-
-            // Stop at whichever comes first: pocket or rail
-            if (pocketEntry != null && pocketT <= railT) {
-                points.add(pocketEntry)
+            
+            if (!hitRail) {
+                points.add(currentPos)
                 return points
             }
-
-            if (railHit == null) {
-                points.add(endPoint)
-                return points
-            }
-
-            val (intersection, normal) = railHit
-            val segDist = hypot(
-                (intersection.x - currentPos.x).toDouble(),
-                (intersection.y - currentPos.y).toDouble()
-            ).toFloat()
-            totalDistance += segDist
-            points.add(intersection)
-
-            val omegaAtRail = omega * exp((-K3 * totalDistance).toDouble()).toFloat()
-            val dot = cos(currentAngle) * normal.x + sin(currentAngle) * normal.y
-            val reflectedX = cos(currentAngle) - 2f * dot * normal.x
-            val reflectedY = sin(currentAngle) - 2f * dot * normal.y
-            val reflectedAngle = atan2(reflectedY, reflectedX)
-
-            val normalAngle = atan2(normal.y, normal.x)
-            var incidentAngle = abs(currentAngle - (normalAngle + PI.toFloat()))
-            if (incidentAngle > PI) incidentAngle = (2 * PI - incidentAngle).toFloat()
-
-            val throwAmount = K2 * omegaAtRail * cos(incidentAngle) * sign(spinOffset.x)
-            currentAngle = reflectedAngle + throwAmount
-            omega = omegaAtRail
-            currentPos = intersection
         }
         return points
     }
