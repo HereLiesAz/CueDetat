@@ -1,6 +1,5 @@
 package com.hereliesaz.cuedetat.domain
 
-import android.graphics.PointF
 import com.hereliesaz.cuedetat.view.model.Table
 import com.hereliesaz.cuedetat.view.state.TableSize
 import org.junit.Assert.*
@@ -8,7 +7,7 @@ import org.junit.Test
 import kotlin.math.abs
 import kotlin.math.atan2
 
-private fun pf(x: Float, y: Float) = PointF().apply { this.x = x; this.y = y }
+private fun pf(x: Float, y: Float) = Vector2(x, y)
 
 class SpinPhysicsCalculatorTest {
 
@@ -95,5 +94,35 @@ class SpinPhysicsCalculatorTest {
         )
         // No table = no rail checks = single straight segment (2 points: start + end)
         assertEquals("With invisible table, path must be a straight line (2 points)", 2, path.size)
+    }
+
+    @Test
+    fun `swerve curve simulation produces non-linear path`() {
+        val cueBall = pf(0f, 0f)
+        val target = pf(0f, -100f)
+        val angle = atan2(-100f, 0f)
+        val path = SpinPhysicsCalculator.calculatePath(
+            spinOffset = pf(1f, 0f), // max right english
+            cueBallPos = cueBall,
+            targetBallPos = target,
+            shotAngle = angle,
+            table = table,
+            maxBounces = 0
+        )
+
+        assertTrue("Path aimed straight with spin should swerve (>2 points)", path.size > 2)
+
+        // A straight line path would have all points colinear.
+        // We can check if the middle point deviates from the line connecting start and end.
+        val start = path.first()
+        val end = path.last()
+        val mid = path[path.size / 2]
+
+        // Distance from point to line: |(x2-x1)(y1-y0) - (x1-x0)(y2-y1)| / sqrt((x2-x1)^2 + (y2-y1)^2)
+        val num = kotlin.math.abs((end.x - start.x) * (start.y - mid.y) - (start.x - mid.x) * (end.y - start.y))
+        val den = kotlin.math.hypot((end.x - start.x).toDouble(), (end.y - start.y).toDouble()).toFloat()
+        val distToLine = if (den > 0) num / den else 0f
+
+        assertTrue("Path should deviate from a straight line (swerve)", distToLine > 0.1f)
     }
 }
