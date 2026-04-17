@@ -49,7 +49,7 @@ import org.opencv.core.Rect as OCVRect
 @Singleton
 class VisionRepository @Inject constructor(
     @GenericDetector private val genericObjectDetector: ObjectDetector,
-    private val poolDetector: com.hereliesaz.cuedetat.data.TFLitePoolDetector,
+    private val poolDetector: MergedTFLiteDetector,
 ) {
     private val _visionDataFlow = MutableStateFlow(VisionData())
     val visionDataFlow = _visionDataFlow.asStateFlow()
@@ -100,7 +100,7 @@ class VisionRepository @Inject constructor(
 
             try {
                 val detectedObjects = Tasks.await(genericObjectDetector.process(inputImage))
-            val rawDetections = poolDetector.detect(bitmap)
+            val rawDetections = poolDetector.detectPool(bitmap)
             val customPoolBalls = rawDetections.filter { it.classId == 1 }
             val detectedCues = rawDetections.filter { it.classId == 2 }.map {
                 android.graphics.Rect(it.rect.left.toInt(), it.rect.top.toInt(), it.rect.right.toInt(), it.rect.bottom.toInt())
@@ -424,7 +424,7 @@ class VisionRepository @Inject constructor(
             val inputImage = com.google.mlkit.vision.common.InputImage.fromMediaImage(image, rotationDegrees)
             val bitmap = image.toBitmap() ?: return
             val detectedObjects = com.google.android.gms.tasks.Tasks.await(genericObjectDetector.process(inputImage))
-            val rawDetections = poolDetector.detect(bitmap)
+            val rawDetections = poolDetector.detectPool(bitmap)
             val customPoolBalls = rawDetections.filter { it.classId == 1 }
             val detectedCues = rawDetections.filter { it.classId == 2 }.map {
                 android.graphics.Rect(it.rect.left.toInt(), it.rect.top.toInt(), it.rect.right.toInt(), it.rect.bottom.toInt())

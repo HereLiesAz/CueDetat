@@ -2,6 +2,7 @@
 package com.hereliesaz.cuedetat.ui.composables.tablescan
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.PointF
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
@@ -9,7 +10,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 
-private const val MODEL_FILE = "pocket_detector_fp16.tflite"
+private const val MODEL_FILE = "ml/pocket_detector_fp16.tflite"
 private const val INPUT_SIZE = 640
 private const val CONFIDENCE_THRESHOLD = 0.30f
 private const val MAX_POCKETS = 6
@@ -25,11 +26,6 @@ private const val HOLE_CLASS_ID = 1
  * Output: [1, 300, 6] float32 — NMS post-processed detections
  *         Each row: [y1, x1, y2, x2, score, class_id] (TF NMS convention, normalized)
  *         Classes: 0=pool-table  1=pool-table-hole  2=pool-table-side
- *
- * Falls back to Hough circles (returns null) when:
- * - Model fails to initialize
- * - Inference throws an exception
- * - No detections exceed [CONFIDENCE_THRESHOLD] for the hole class
  */
 class TFLitePocketDetector(private val context: Context) : PocketDetector {
 
@@ -45,51 +41,45 @@ class TFLitePocketDetector(private val context: Context) : PocketDetector {
         }
     }
 
-    // Reused per-call buffers — detect() runs on a single CameraX analysis thread.
+    // Reused per-call buffers
     private val inputBuffer: ByteBuffer by lazy {
         ByteBuffer.allocateDirect(1 * INPUT_SIZE * INPUT_SIZE * 3 * 4)
             .order(ByteOrder.nativeOrder())
     }
     private val outputBuffer = Array(1) { Array(300) { FloatArray(6) } }
+    private val intValues = IntArray(INPUT_SIZE * INPUT_SIZE)
 
-    override fun detect(yBytes: ByteArray, width: Int, height: Int): List<PointF>? {
+    override fun detect(bitmap: Bitmap): List<PointF>? {
         val interp = interpreter ?: return null
         return try {
-            fillInputBuffer(yBytes, width, height)
+            val resized = if (bitmap.width == INPUT_SIZE && bitmap.height == INPUT_SIZE) {
+                bitmap
+            } else {
+                Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, true)
+            }
+            fillInputBuffer(resized)
             interp.run(inputBuffer, outputBuffer)
-            parseDetections(width, height)
+            parseDetections(bitmap.width, bitmap.height)
         } catch (_: Exception) {
             null
         }
     }
 
-    /**
-     * Nearest-neighbour resize of the Y-plane to [INPUT_SIZE]×[INPUT_SIZE],
-     * then replicate the single luma value across R, G, B channels.
-     */
-    private fun fillInputBuffer(yBytes: ByteArray, width: Int, height: Int) {
+    private fun fillInputBuffer(bitmap: Bitmap) {
         inputBuffer.rewind()
-        val scaleX = width.toFloat() / INPUT_SIZE
-        val scaleY = height.toFloat() / INPUT_SIZE
-        for (row in 0 until INPUT_SIZE) {
-            val srcRow = (row * scaleY).toInt().coerceIn(0, height - 1)
-            val rowOffset = srcRow * width
-            for (col in 0 until INPUT_SIZE) {
-                val srcCol = (col * scaleX).toInt().coerceIn(0, width - 1)
-                val luma = (yBytes[rowOffset + srcCol].toInt() and 0xFF) / 255f
-                inputBuffer.putFloat(luma) // R
-                inputBuffer.putFloat(luma) // G
-                inputBuffer.putFloat(luma) // B
-            }
+        bitmap.getPixels(intValues, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        for (i in 0 until intValues.size) {
+            val pixelValue = intValues[i]
+            val r = ((pixelValue shr 16) and 0xFF) / 255.0f
+            val g = ((pixelValue shr 8) and 0xFF) / 255.0f
+            val b = (pixelValue and 0xFF) / 255.0f
+            inputBuffer.putFloat(r)
+            inputBuffer.putFloat(g)
+            inputBuffer.putFloat(b)
         }
         inputBuffer.rewind()
     }
 
-    /**
-     * Converts normalized [y1, x1, y2, x2, score, class_id] rows into image-space
-     * centre points. Returns null (→ Hough fallback) if nothing passes the threshold.
-     * Only accepts class 1 (pool-table-hole); ignores table and rail detections.
-     */
     private fun parseDetections(width: Int, height: Int): List<PointF>? {
         val results = mutableListOf<PointF>()
         for (det in outputBuffer[0]) {

@@ -130,6 +130,7 @@ android {
     
     buildFeatures {
         compose = true
+        mlModelBinding = true
     }
     packaging {
         resources {
@@ -159,6 +160,8 @@ dependencies {
 
     // Hilt
     implementation(libs.hilt.android)
+    implementation(libs.tensorflow.lite.metadata)
+    implementation(libs.tensorflow.lite.support)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 
