@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Beginner glow now uses `Blur.OUTER`**: The stationary outline glow in beginner-locked mode now uses outward-only blur, so the circle interior remains transparent. `createGlowPaint` accepts a `blurType` parameter (defaults to `Blur.NORMAL` for all other callers).
 - **Bubble center dot**: A new hollow white circle (stroke, no fill) is drawn centered on the bubble in the beginner-locked view, making the bubble's current position visible when it drifts from the stationary anchor.
 
+### 6. Spin Control Robustness
+- **Normalized State Storage**: Refactored `selectedSpinOffset` and `lingeringSpinOffset` to store values as normalized vectors (-1.0 to 1.0). This makes the spin state independent of screen density and orientation, preventing the UI "jumping" bugs common on high-DPI devices.
+- **Velocity-Aware Swerve**: Updated `SpinPhysicsCalculator` to factor in shot velocity. The physics model now correctly predicts tighter curves for soft shots and straighter paths for hard blasts, significantly improving simulation realism.
+- **Mis-cue Protection**: Added a red "Mis-cue Zone" visual boundary at 0.85 radius in the Spin Control wheel to guide users away from unreliable tip-contact points.
+- **Double-Tap Reset**: Implemented a "Double-tap inside" gesture to immediately clear all English/Side-spin, providing a quick way to return to center-ball hitting.
+
 ## [0.9.2] - 2026-03-22
 
 ### Changed

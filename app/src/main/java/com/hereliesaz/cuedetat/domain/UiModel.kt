@@ -46,6 +46,10 @@ enum class TutorialType {
     GENERAL, DYNAMIC_NON_AR, DYNAMIC_AR
 }
 
+enum class TargetType {
+    SOLIDS, STRIPES
+}
+
 @Keep
 data class FeltSample(
     val id: String = java.util.UUID.randomUUID().toString(),
@@ -91,12 +95,14 @@ data class CueDetatState(
     val isSpinControlVisible: Boolean = false,
     val isMasseModeActive: Boolean = false,
     val masseShotAngleDeg: Float = 0f,
+    /** Normalized spin offset: x = English (side), y = Vertical (draw/follow). Range -1.0..1.0. */
     val selectedSpinOffset: PointF? = null,
     @Transient val spinPaths: Map<Color, List<PointF>>? = null,
     @Transient val masseImpactPoints: List<PointF> = emptyList(),
     @Transient val masseConnectsTarget: Boolean = false,
     @Transient val masseGhostBallCenter: PointF? = null,
     val spinControlCenter: PointF? = null,
+    /** Normalized spin offset: x = English (side), y = Vertical (draw/follow). Range -1.0..1.0. */
     val lingeringSpinOffset: PointF? = null,
     @Transient val spinPathsAlpha: Float = 1.0f,
     val showTutorialOverlay: Boolean = false,
@@ -171,6 +177,11 @@ data class CueDetatState(
     @Transient val targetBallDistance: Float = 0f,
     val lensWarpTps: TpsWarpData? = null,
     @Transient val myriadTrajectory: List<PointF>? = null,
+    val targetType: TargetType = TargetType.SOLIDS,
+    val isFlowPokeEnabled: Boolean = true,
+    val isTopDownViewActive: Boolean = false,
+    @Transient val topDownBitmap: android.graphics.Bitmap? = null,
+    val topDownTransitionProgress: Float = 0f,
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
@@ -308,4 +319,10 @@ sealed class MainScreenEvent {
     object TurnCameraOff : MainScreenEvent()
     object ArTrackingLost : MainScreenEvent()
     data class MyriadTrajectoryReceived(val points: List<PointF>) : MainScreenEvent()
+    data class ArSurfaceTapped(val screenPoint: PointF) : MainScreenEvent()
+    object ToggleTargetType : MainScreenEvent()
+    object ToggleFlowPoke : MainScreenEvent()
+    object ToggleTopDownView : MainScreenEvent()
+    object ClearTopDownView : MainScreenEvent()
+    data class SetTopDownBitmap(val bitmap: android.graphics.Bitmap?) : MainScreenEvent()
 }

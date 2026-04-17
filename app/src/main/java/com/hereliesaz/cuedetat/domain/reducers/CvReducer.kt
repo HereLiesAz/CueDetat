@@ -107,6 +107,43 @@ internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueD
             }
             state.copy(savedFeltSamples = newList)
         }
+        is MainScreenEvent.ArSurfaceTapped -> {
+            val inverse = state.inversePitchMatrix ?: return state
+            val tappedLogical = com.hereliesaz.cuedetat.view.model.Perspective.screenToLogical(
+                android.graphics.PointF(action.screenPoint.x, action.screenPoint.y), 
+                inverse
+            )
+            
+            val allDetectedBalls = state.visionData?.balls ?: emptyList()
+            
+            val nearestBallPos = allDetectedBalls.minByOrNull { ball ->
+                val dist = kotlin.math.hypot((ball.position.x - tappedLogical.x).toDouble(), (ball.position.y - tappedLogical.y).toDouble())
+                
+                // Preference matching: if we are looking for a specific type, prefer those detections
+                val isMatchingType = when (state.ballSelectionPhase) {
+                    com.hereliesaz.cuedetat.domain.BallSelectionPhase.AWAITING_TARGET -> {
+                        val targetIsStripe = state.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES
+                        (ball.type == com.hereliesaz.cuedetat.data.BallType.STRIPE && targetIsStripe) ||
+                        (ball.type == com.hereliesaz.cuedetat.data.BallType.SOLID && !targetIsStripe)
+                    }
+                    else -> false
+                }
+                
+                if (isMatchingType) dist * 0.5 else dist // 50% distance bonus for matching types
+            }?.position ?: tappedLogical
+
+            when (state.ballSelectionPhase) {
+                com.hereliesaz.cuedetat.domain.BallSelectionPhase.AWAITING_CUE -> state.copy(
+                    cueBallCvAnchor = nearestBallPos,
+                    ballSelectionPhase = com.hereliesaz.cuedetat.domain.BallSelectionPhase.AWAITING_TARGET
+                )
+                com.hereliesaz.cuedetat.domain.BallSelectionPhase.AWAITING_TARGET -> state.copy(
+                    targetCvAnchor = nearestBallPos,
+                    ballSelectionPhase = com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE
+                )
+                else -> state
+            }
+        }
         is MainScreenEvent.ClearSamplePoint -> state.copy(colorSamplePoint = null)
         else -> state
     }

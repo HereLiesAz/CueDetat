@@ -25,7 +25,8 @@ fun ProtractorOverlay(
     uiState: CueDetatState,
     systemIsDark: Boolean,
     isTestingCvMask: Boolean,
-    onEvent: (MainScreenEvent) -> Unit
+    onEvent: (MainScreenEvent) -> Unit,
+    topDownProgress: Float
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
@@ -54,7 +55,7 @@ fun ProtractorOverlay(
             .detectManualGestures(uiState, onEvent)
     ) {
         drawIntoCanvas { canvas ->
-            renderer.draw(canvas.nativeCanvas, uiState, paints, barbaroTypeface)
+            renderer.draw(canvas.nativeCanvas, uiState, paints, barbaroTypeface, topDownProgress)
         }
     }
 }

@@ -7,13 +7,27 @@ import androidx.annotation.Keep
 import android.graphics.Rect
 import org.opencv.core.Mat
 
+enum class BallType {
+    UNKNOWN, SOLID, STRIPE
+}
+
+@Keep
+data class DetectedBall(
+    val position: PointF,
+    val type: BallType = BallType.UNKNOWN,
+    val confidence: Float = 0f,
+    val boundingBox: Rect? = null
+)
+
 /**
  * Data class to hold the results of computer vision processing.
  */
 @Keep
 data class VisionData(
     val genericBalls: List<PointF> = emptyList(),
+    @Deprecated("Use balls instead")
     val customBalls: List<PointF> = emptyList(),
+    val balls: List<DetectedBall> = emptyList(),
     val detectedHsvColor: FloatArray? = null,
     val detectedBoundingBoxes: List<Rect> = emptyList(),
     val detectedCues: List<Rect> = emptyList(),

@@ -66,16 +66,15 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
             val rawOffset = action.offset
             val density = state.screenDensity
             val radiusPx = 60f * density
+            
+            // Convert raw screen pixels (0..120dp) to normalized units (-1..1)
             val nx = (rawOffset.x - radiusPx) / radiusPx
             val ny = (rawOffset.y - radiusPx) / radiusPx
             val dist = sqrt(nx * nx + ny * ny)
-            val physicsOffset = if (dist > 1.0f) PointF(nx / dist, ny / dist) else PointF(nx, ny)
-            val clampedRawOffset = PointF(
-                (physicsOffset.x * radiusPx) + radiusPx,
-                (physicsOffset.y * radiusPx) + radiusPx
-            )
+            val normalizedOffset = if (dist > 1.0f) PointF(nx / dist, ny / dist) else PointF(nx, ny)
+            
             state.copy(
-                selectedSpinOffset = clampedRawOffset,
+                selectedSpinOffset = normalizedOffset,
                 valuesChangedSinceReset = true,
                 spinPathsAlpha = 1.0f
             )

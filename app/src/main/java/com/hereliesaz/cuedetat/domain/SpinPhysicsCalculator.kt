@@ -21,6 +21,7 @@ object SpinPhysicsCalculator {
         targetBallPos: Vector2, // world coords — object ball center
         shotAngle: Float, // radians — direction cue was traveling before contact
         table: Table,
+        velocity: Float = 1.0f, // 1.0 = standard speed. higher = less swerve.
         maxBounces: Int = 2
     ): List<Vector2> {
         val dx = targetBallPos.x - cueBallPos.x
@@ -46,6 +47,10 @@ object SpinPhysicsCalculator {
 
         val pocketThreshold = LOGICAL_BALL_RADIUS * 1.5f
 
+        // Swerve scale factor should decrease as velocity increases.
+        // Formula: swerve_k / velocity
+        val effectiveSwerveScale = SWERVE_SCALE_FACTOR / velocity.coerceAtLeast(0.1f)
+
         repeat(maxBounces + 1) {
             if (!table.isVisible) {
                 val endX = currentPos.x + cos(currentAngle) * PATH_LENGTH
@@ -57,7 +62,7 @@ object SpinPhysicsCalculator {
             var hitRail = false
 
             for (step in 1..MAX_STEPS) {
-                val swerveAmount = SWERVE_SCALE_FACTOR * omega * exp((-K3 * totalDistance).toDouble()).toFloat()
+                val swerveAmount = effectiveSwerveScale * omega * exp((-K3 * totalDistance).toDouble()).toFloat()
                 currentAngle += swerveAmount
 
                 val nextX = currentPos.x + cos(currentAngle) * STEP_SIZE
