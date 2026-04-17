@@ -535,11 +535,11 @@ class LineRenderer {
             val rawEnd = path[i + 1]
             val isLastSegment = i == finalSegmentIndex
 
-            if (isLastSegment) {
+            if (isLastSegment && !isPocketed) {
                 val direction = normalize(PointF(rawEnd.x - start.x, rawEnd.y - start.y))
                 drawClippedLine(canvas, start, direction, primaryPaint, glowPaint, state, paints, activeMatrix, camArray, distArray, drawTriangles, textToDraw, typeface, drawGeometry)
             } else {
-                val truncatedEnd = getTruncatedEnd(start, rawEnd, state)
+                val truncatedEnd = if (isLastSegment && isPocketed) rawEnd else getTruncatedEnd(start, rawEnd, state)
                 val end = getSafeLogicalPoint(start, truncatedEnd, activeMatrix) ?: continue
 
                 val segmentPath = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
@@ -602,9 +602,9 @@ class LineRenderer {
         typeface: Typeface? = null,
         drawGeometry: Boolean = true
     ) {
-        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
-
-        val totalLength = state.table.logicalHeight * 4.0f
+        val isDynamicBeginner = state.experienceMode == ExperienceMode.BEGINNER && !state.isBeginnerViewLocked
+        val lengthMultiplier = if (isDynamicBeginner) 20.0f else 4.0f
+        val totalLength = state.table.logicalHeight * lengthMultiplier
         val rawEnd = PointF(start.x + direction.x * totalLength, start.y + direction.y * totalLength)
 
         val truncatedEnd = getTruncatedEnd(start, rawEnd, state)
@@ -612,11 +612,20 @@ class LineRenderer {
 
         val path = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
 
+        if (drawGeometry) {
+            glowPaint?.let { canvas.drawPath(path, it) }
+            canvas.drawPath(path, paint)
+        }
+
+        val needsPathMeasure = (drawTriangles || (textToDraw != null && state.areHelpersVisible))
+        if (!needsPathMeasure) return
+
         val measure = android.graphics.PathMeasure(path, false)
         val pathLen = measure.length
 
         var visibleCount = 0
         var d = 0f
+        val step = 30f // Increased step size for performance
 
         while (d <= pathLen && visibleCount < 1000) {
             if (measure.getPosTan(d, posBuffer, tanBuffer)) {
@@ -632,41 +641,36 @@ class LineRenderer {
                     break
                 }
             }
-            d += 15f
+            d += step
         }
 
-        if (drawGeometry) {
-            glowPaint?.let { canvas.drawPath(path, it) }
-            canvas.drawPath(path, paint)
+        if (drawTriangles && visibleCount > 5) {
+            val trianglePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.FILL
+                color = paint.color
+            }
 
-            if (drawTriangles && visibleCount > 5) {
-                val trianglePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    style = Paint.Style.FILL
-                    color = paint.color
+            val spacing = visibleCount / 4
+            for (i in 1..3) {
+                val ptIdx = (i * spacing).coerceIn(0, visibleCount - 1) * 4
+                val x = visiblePtsBuffer[ptIdx]
+                val y = visiblePtsBuffer[ptIdx + 1]
+                val tx = visiblePtsBuffer[ptIdx + 2]
+                val ty = visiblePtsBuffer[ptIdx + 3]
+                val angle = Math.toDegrees(atan2(ty.toDouble(), tx.toDouble())).toFloat()
+
+                canvas.save()
+                canvas.translate(x, y)
+                canvas.rotate(angle)
+
+                val triPath = Path().apply {
+                    moveTo(80f, 0f)
+                    lineTo(-50f, 120f)
+                    lineTo(-50f, -120f)
+                    close()
                 }
-
-                val spacing = visibleCount / 4
-                for (i in 1..3) {
-                    val ptIdx = (i * spacing).coerceIn(0, visibleCount - 1) * 4
-                    val x = visiblePtsBuffer[ptIdx]
-                    val y = visiblePtsBuffer[ptIdx + 1]
-                    val tx = visiblePtsBuffer[ptIdx + 2]
-                    val ty = visiblePtsBuffer[ptIdx + 3]
-                    val angle = Math.toDegrees(atan2(ty.toDouble(), tx.toDouble())).toFloat()
-
-                    canvas.save()
-                    canvas.translate(x, y)
-                    canvas.rotate(angle)
-
-                    val triPath = Path().apply {
-                        moveTo(80f, 0f)
-                        lineTo(-50f, 120f)
-                        lineTo(-50f, -120f)
-                        close()
-                    }
-                    canvas.drawPath(triPath, trianglePaint)
-                    canvas.restore()
-                }
+                canvas.drawPath(triPath, trianglePaint)
+                canvas.restore()
             }
         }
 
