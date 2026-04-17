@@ -158,6 +158,15 @@ internal fun reduceToggleAction(
                 valuesChangedSinceReset = false
             )
         }
+        is MainScreenEvent.UnlockBeginnerView -> {
+            state.copy(
+                isBeginnerViewLocked = false,
+                cameraMode = CameraMode.LITE_AR,
+                zoomSliderPosition = 0f,
+                viewOffset = PointF(0f, 0f),
+                worldRotationDegrees = 0f
+            )
+        }
         is MainScreenEvent.ToggleCalibrationScreen -> state.copy(showCalibrationScreen = !state.showCalibrationScreen)
         is MainScreenEvent.ToggleTableScanScreen ->
             state.copy(showTableScanScreen = !state.showTableScanScreen)

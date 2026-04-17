@@ -34,20 +34,47 @@ class TableScanAnalyzer(
         val originalWidth = image.width
         val originalHeight = image.height
 
-        val planes = image.planes
-        val yBuffer = planes[0].buffer
-        val uBuffer = planes[1].buffer
-        val vBuffer = planes[2].buffer
+        // --- Efficient YUV_420_888 to BGR conversion handling strides ---
+        val yPlane = image.planes[0]
+        val uPlane = image.planes[1]
+        val vPlane = image.planes[2]
 
-        // --- Prepare BGR Mat and Bitmap for Strategy 1 & 2 ---
-        val ySize = yBuffer.remaining()
-        val vSize = vBuffer.remaining()
-        val uSize = uBuffer.remaining()
+        val yBuffer = yPlane.buffer
+        val uBuffer = uPlane.buffer
+        val vBuffer = vPlane.buffer
 
-        val nv21 = ByteArray(ySize + vSize + uSize)
-        yBuffer.get(nv21, 0, ySize)
-        vBuffer.get(nv21, ySize, vSize)
-        uBuffer.get(nv21, ySize + vSize, uSize)
+        val nv21 = ByteArray(originalWidth * originalHeight * 3 / 2)
+        val ySize = originalWidth * originalHeight
+
+        // Copy Y plane row by row to handle strides
+        val yRowStride = yPlane.rowStride
+        for (row in 0 until originalHeight) {
+            yBuffer.position(row * yRowStride)
+            yBuffer.get(nv21, row * originalWidth, originalWidth)
+        }
+
+        // Interleave UV for NV21 (VUVU...)
+        val vPixelStride = vPlane.pixelStride
+        val uPixelStride = uPlane.pixelStride
+        val vRowStride = vPlane.rowStride
+        val uRowStride = uPlane.rowStride
+
+        if (vPixelStride == 2 && uPixelStride == 2 && vRowStride == uRowStride) {
+            // Optimization: UV are already interleaved in memory.
+            val uvSize = (originalWidth * originalHeight) / 2
+            vBuffer.get(nv21, ySize, minOf(vBuffer.remaining(), uvSize))
+        } else {
+            // Manual interleave (Robust fallback)
+            var pos = ySize
+            val uvWidth = originalWidth / 2
+            val uvHeight = originalHeight / 2
+            for (row in 0 until uvHeight) {
+                for (col in 0 until uvWidth) {
+                    nv21[pos++] = vBuffer.get(row * vRowStride + col * vPixelStride)
+                    nv21[pos++] = uBuffer.get(row * uRowStride + col * uPixelStride)
+                }
+            }
+        }
 
         val yuvMat = Mat(originalHeight + originalHeight / 2, originalWidth, CvType.CV_8UC1)
         yuvMat.put(0, 0, nv21)
@@ -57,6 +84,30 @@ class TableScanAnalyzer(
         val bitmap = reusableBitmap?.takeIf { it.width == originalWidth && it.height == originalHeight }
             ?: Bitmap.createBitmap(originalWidth, originalHeight, Bitmap.Config.ARGB_8888).also { reusableBitmap = it }
         Utils.matToBitmap(bgr, bitmap)
+
+        // --- ALWAYS sample felt color from every frame ---
+        val scale = 0.25
+        val smallWidth = (originalWidth * scale).toInt()
+        val smallHeight = (originalHeight * scale).toInt()
+        val smallBgr = Mat()
+        Imgproc.resize(bgr, smallBgr, Size(smallWidth.toDouble(), smallHeight.toDouble()))
+
+        val hsv = Mat()
+        Imgproc.cvtColor(smallBgr, hsv, Imgproc.COLOR_BGR2HSV)
+
+        // Sample the centre felt color
+        val cx = smallWidth / 2; val cy = smallHeight / 2
+        val hw = smallWidth / 20; val hh = smallHeight / 20
+        val roi = org.opencv.core.Rect(cx - hw, cy - hh, hw * 2, hh * 2)
+        val crop = Mat(hsv, roi)
+        val meanHsv = Core.mean(crop)
+        onFeltColorSampled(
+            floatArrayOf(
+                meanHsv.`val`[0].toFloat() * 2f,
+                meanHsv.`val`[1].toFloat() / 255f,
+                meanHsv.`val`[2].toFloat() / 255f
+            )
+        )
 
         // --- Strategy 1: ML detector (TFLite + ONNX side-by-side) ---
         val modelDetections = pocketDetector?.detect(bitmap)
@@ -73,30 +124,6 @@ class TableScanAnalyzer(
         } else {
             // --- Strategy 2: Felt-Boundary Extraction Fallback ---
             try {
-                // Downscale for performance to avoid freezing the camera pipeline
-                val scale = 0.25
-                val smallWidth = (originalWidth * scale).toInt()
-                val smallHeight = (originalHeight * scale).toInt()
-                val smallBgr = Mat()
-                Imgproc.resize(bgr, smallBgr, Size(smallWidth.toDouble(), smallHeight.toDouble()))
-
-                val hsv = Mat()
-                Imgproc.cvtColor(smallBgr, hsv, Imgproc.COLOR_BGR2HSV)
-
-                // Sample the centre felt color
-                val cx = smallWidth / 2; val cy = smallHeight / 2
-                val hw = smallWidth / 20; val hh = smallHeight / 20
-                val roi = org.opencv.core.Rect(cx - hw, cy - hh, hw * 2, hh * 2)
-                val crop = Mat(hsv, roi)
-                val meanHsv = Core.mean(crop)
-                onFeltColorSampled(
-                    floatArrayOf(
-                        meanHsv.`val`[0].toFloat() * 2f,
-                        meanHsv.`val`[1].toFloat() / 255f,
-                        meanHsv.`val`[2].toFloat() / 255f
-                    )
-                )
-
                 // Isolate the felt based on the sampled center
                 val lowerBound = Scalar(maxOf(0.0, meanHsv.`val`[0] - 15.0), 50.0, 50.0)
                 val upperBound = Scalar(minOf(180.0, meanHsv.`val`[0] + 15.0), 255.0, 255.0)
@@ -117,7 +144,7 @@ class TableScanAnalyzer(
                     val perimeter = Imgproc.arcLength(contour2f, true)
                     val approx = MatOfPoint2f()
 
-                    // Iteratively force a quadrilateral collapse. We beat the polygon until it surrenders 4 points.
+                    // Iteratively force a quadrilateral collapse.
                     var epsilonCoeff = 0.01
                     while (epsilonCoeff < 0.1) {
                         Imgproc.approxPolyDP(contour2f, approx, epsilonCoeff * perimeter, true)
@@ -136,7 +163,6 @@ class TableScanAnalyzer(
                         }
 
                         // The two longest edges on a pool table are the side rails.
-                        // Their exact midpoints are the side pockets.
                         edges.sortByDescending { (p1, p2) -> hypot((p2.x - p1.x).toDouble(), (p2.y - p1.y).toDouble()) }
 
                         val side1 = edges[0]
@@ -156,19 +182,20 @@ class TableScanAnalyzer(
                     contour2f.release()
                 }
 
-                // Release memory back to the ether
-                crop.release()
                 mask.release()
                 kernel.release()
-                hsv.release()
-                smallBgr.release()
-                yuvMat.release()
                 contours.forEach { it.release() }
 
             } catch (_: Exception) {
                 // The machine blinked. Let the frame die in peace.
             }
         }
+
+        // Cleanup
+        crop.release()
+        hsv.release()
+        smallBgr.release()
+        yuvMat.release()
         bgr.release()
         image.close()
     }

@@ -93,12 +93,10 @@ class LineRenderer {
             distMat.get(0, 0, distArray)
         }
 
-        // IMPORTANT: Wrap in matrix block because tangent/aiming internally map points
-        canvas.save()
-        canvas.concat(activeMatrix)
+        // IMPORTANT: Tangent/aiming internally map points to screen space using activeMatrix, 
+        // so we must NOT concat activeMatrix here or we will double-project the lines.
         drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
         drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
-        canvas.restore()
     }
 
     fun drawBeginnerLines(
@@ -108,11 +106,8 @@ class LineRenderer {
         activeMatrix: Matrix
     ) {
         val (camArray, distArray) = resolveLensArrays(state)
-        canvas.save()
-        canvas.concat(activeMatrix)
         drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true)
         drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true)
-        canvas.restore()
     }
 
     fun drawBeginnerLabels(
@@ -123,11 +118,8 @@ class LineRenderer {
         activeMatrix: Matrix
     ) {
         val (camArray, distArray) = resolveLensArrays(state)
-        canvas.save()
-        canvas.concat(activeMatrix)
         drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false)
         drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false)
-        canvas.restore()
     }
 
     private fun applyTableMask(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix) {
