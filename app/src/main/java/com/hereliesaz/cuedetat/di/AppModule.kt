@@ -13,10 +13,11 @@ import com.google.gson.stream.JsonWriter
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
-import com.hereliesaz.cuedetat.data.TFLitePoolDetector
+import com.hereliesaz.cuedetat.data.MergedTFLiteDetector
 import com.hereliesaz.cuedetat.network.GithubApi
+import com.hereliesaz.cuedetat.ui.composables.tablescan.CompositePocketDetector
+import com.hereliesaz.cuedetat.ui.composables.tablescan.OpenCVPocketDetector
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
-import com.hereliesaz.cuedetat.ui.composables.tablescan.TFLitePocketDetector
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -72,22 +73,27 @@ object AppModule {
     }
 
     /**
-     * Provides the TFLite Pool detector used for tracking balls and cues.
+     * Provides a shared Merged TFLite Detector instance.
+     * This combines pocket and pool detection with shared preprocessing.
      */
     @Provides
     @Singleton
-    fun providePoolDetector(@ApplicationContext context: Context): TFLitePoolDetector {
-        return TFLitePoolDetector(context)
+    fun provideMergedTFLiteDetector(@ApplicationContext context: Context): MergedTFLiteDetector {
+        return MergedTFLiteDetector(context)
     }
 
     /**
-     * Provides the TFLite-backed pocket detector used during table scanning.
-     * Gracefully degrades to Hough circles if the model fails to initialize.
+     * Provides the TFLite/ONNX-backed pocket detector used during table scanning.
+     * Runs TFLite (via MergedDetector) and ONNX (OpenCV DNN) side-by-side.
      */
     @Provides
     @Singleton
-    fun providePocketDetector(@ApplicationContext context: Context): PocketDetector {
-        return TFLitePocketDetector(context)
+    fun providePocketDetector(
+        @ApplicationContext context: Context,
+        mergedDetector: MergedTFLiteDetector
+    ): PocketDetector {
+        val onnx = OpenCVPocketDetector(context)
+        return CompositePocketDetector(listOf(mergedDetector, onnx))
     }
 
     /**

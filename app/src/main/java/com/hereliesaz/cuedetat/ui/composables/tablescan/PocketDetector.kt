@@ -1,6 +1,6 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/PocketDetector.kt
 package com.hereliesaz.cuedetat.ui.composables.tablescan
 
+import android.graphics.Bitmap
 import android.graphics.PointF
 
 /**
@@ -10,5 +10,5 @@ import android.graphics.PointF
  * collapsing the felt boundary into a strict quadrilateral prison.
  */
 interface PocketDetector {
-    fun detect(yuvBytes: ByteArray, width: Int, height: Int): List<PointF>?
+    fun detect(bitmap: Bitmap): List<PointF>?
 }

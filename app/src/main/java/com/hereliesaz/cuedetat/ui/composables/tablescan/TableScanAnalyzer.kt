@@ -1,9 +1,11 @@
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanAnalyzer.kt
 package com.hereliesaz.cuedetat.ui.composables.tablescan
 
+import android.graphics.Bitmap
 import android.graphics.PointF
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
+import org.opencv.android.Utils
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -16,7 +18,7 @@ import kotlin.math.hypot
 
 /**
  * CameraX ImageAnalysis.Analyzer.
- * Strategy 1: TFLite Object Detection.
+ * Strategy 1: TFLite/ONNX Object Detection.
  * Strategy 2: Felt-Boundary Extraction. We map the presence of the table
  * to deduce the absence of the pockets by collapsing the felt into a quadrilateral.
  */
@@ -26,6 +28,8 @@ class TableScanAnalyzer(
     private val pocketDetector: PocketDetector? = null,
 ) : ImageAnalysis.Analyzer {
 
+    private var reusableBitmap: Bitmap? = null
+
     override fun analyze(image: ImageProxy) {
         val rotationDegrees = image.imageInfo.rotationDegrees
         val originalWidth = image.width
@@ -33,32 +37,36 @@ class TableScanAnalyzer(
 
         val planes = image.planes
         val yBuffer = planes[0].buffer
-        val yBytes = ByteArray(yBuffer.remaining()).also { yBuffer.get(it) }
+        val uBuffer = planes[1].buffer
+        val vBuffer = planes[2].buffer
 
-        // --- Strategy 1: TFLite detector ---
-        val modelDetections = pocketDetector?.detect(yBytes, originalWidth, originalHeight)
+        // --- Prepare BGR Mat and Bitmap for Strategy 1 & 2 ---
+        val ySize = yBuffer.remaining()
+        val vSize = vBuffer.remaining()
+        val uSize = uBuffer.remaining()
+
+        val nv21 = ByteArray(ySize + vSize + uSize)
+        yBuffer.get(nv21, 0, ySize)
+        vBuffer.get(nv21, ySize, vSize)
+        uBuffer.get(nv21, ySize + vSize, uSize)
+
+        val yuvMat = Mat(originalHeight + originalHeight / 2, originalWidth, CvType.CV_8UC1)
+        yuvMat.put(0, 0, nv21)
+        val bgr = Mat()
+        Imgproc.cvtColor(yuvMat, bgr, Imgproc.COLOR_YUV2BGR_NV21)
+
+        val bitmap = reusableBitmap?.takeIf { it.width == originalWidth && it.height == originalHeight }
+            ?: Bitmap.createBitmap(originalWidth, originalHeight, Bitmap.Config.ARGB_8888).also { reusableBitmap = it }
+        Utils.matToBitmap(bgr, bitmap)
+
+        // --- Strategy 1: ML detector (TFLite + ONNX side-by-side) ---
+        val modelDetections = pocketDetector?.detect(bitmap)
 
         if (!modelDetections.isNullOrEmpty()) {
             onPocketsDetected(modelDetections, originalWidth, originalHeight, rotationDegrees)
         } else {
             // --- Strategy 2: Felt-Boundary Extraction Fallback ---
             try {
-                val uBuffer = planes[1].buffer
-                val vBuffer = planes[2].buffer
-                val ySize = yBytes.size
-                val vSize = vBuffer.remaining()
-                val uSize = uBuffer.remaining()
-
-                val nv21 = ByteArray(ySize + vSize + uSize)
-                System.arraycopy(yBytes, 0, nv21, 0, ySize)
-                vBuffer.get(nv21, ySize, vSize)
-                uBuffer.get(nv21, ySize + vSize, uSize)
-
-                val yuvMat = Mat(originalHeight + originalHeight / 2, originalWidth, CvType.CV_8UC1)
-                yuvMat.put(0, 0, nv21)
-                val bgr = Mat()
-                Imgproc.cvtColor(yuvMat, bgr, Imgproc.COLOR_YUV2BGR_NV21)
-
                 // Downscale for performance to avoid freezing the camera pipeline
                 val scale = 0.25
                 val smallWidth = (originalWidth * scale).toInt()
@@ -148,7 +156,6 @@ class TableScanAnalyzer(
                 kernel.release()
                 hsv.release()
                 smallBgr.release()
-                bgr.release()
                 yuvMat.release()
                 contours.forEach { it.release() }
 
@@ -156,7 +163,7 @@ class TableScanAnalyzer(
                 // The machine blinked. Let the frame die in peace.
             }
         }
-
+        bgr.release()
         image.close()
     }
 }

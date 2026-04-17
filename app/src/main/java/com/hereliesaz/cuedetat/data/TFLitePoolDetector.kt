@@ -28,7 +28,7 @@ class TFLitePoolDetector(private val context: Context) {
 
     private val interpreter: Interpreter? by lazy {
         try {
-            val fd = context.assets.openFd("pool_detector_pivot_fp16.tflite")
+            val fd = context.assets.openFd("ml/pool_detector_pivot_fp16.tflite")
             val model = FileInputStream(fd.fileDescriptor).channel.map(
                 FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.declaredLength
             )
