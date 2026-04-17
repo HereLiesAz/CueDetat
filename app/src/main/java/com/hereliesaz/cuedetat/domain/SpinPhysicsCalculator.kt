@@ -11,6 +11,8 @@ object SpinPhysicsCalculator {
     private const val PATH_LENGTH = 2000f // must reach any rail from anywhere on the table
 
     private const val STEP_SIZE = 5f
+    private const val PATH_SAMPLING_RATE = 5
+    private const val SWERVE_SCALE_FACTOR = 0.001f
     private const val MAX_STEPS = (PATH_LENGTH / STEP_SIZE).toInt()
 
     fun calculatePath(
@@ -55,7 +57,7 @@ object SpinPhysicsCalculator {
             var hitRail = false
 
             for (step in 1..MAX_STEPS) {
-                val swerveAmount = 0.0002f * STEP_SIZE * omega * exp((-K3 * totalDistance).toDouble()).toFloat()
+                val swerveAmount = SWERVE_SCALE_FACTOR * omega * exp((-K3 * totalDistance).toDouble()).toFloat()
                 currentAngle += swerveAmount
 
                 val nextX = currentPos.x + cos(currentAngle) * STEP_SIZE
@@ -64,12 +66,21 @@ object SpinPhysicsCalculator {
 
                 totalDistance += STEP_SIZE
 
-                for (pocket in table.pockets) {
-                    val pdx = nextX - pocket.x
-                    val pdy = nextY - pocket.y
-                    if (pdx * pdx + pdy * pdy < pocketThreshold * pocketThreshold) {
-                        points.add(nextPos)
-                        return points
+                // --- Pocket detection: segment intersection to prevent tunneling ---
+                val segDx = nextX - currentPos.x
+                val segDy = nextY - currentPos.y
+                val segLenSq = segDx * segDx + segDy * segDy
+                if (segLenSq > 0f) {
+                    for (pocket in table.pockets) {
+                        val t = ((pocket.x - currentPos.x) * segDx + (pocket.y - currentPos.y) * segDy) / segLenSq
+                        val ct = t.coerceIn(0f, 1f)
+                        val cx = currentPos.x + ct * segDx
+                        val cy = currentPos.y + ct * segDy
+                        val dist = hypot((cx - pocket.x).toDouble(), (cy - pocket.y).toDouble()).toFloat()
+                        if (dist < pocketThreshold) {
+                            points.add(Vector2(cx, cy))
+                            return points
+                        }
                     }
                 }
 
@@ -79,9 +90,7 @@ object SpinPhysicsCalculator {
                     val normal = railHit.second.toVector2()
                     points.add(intersection)
 
-                    val distToRail = currentPos.distanceTo(intersection)
-                    totalDistance += distToRail
-                    val omegaAtRail = omega * exp((-K3 * totalDistance).toDouble()).toFloat()
+                    val omegaAtRail = abs(omega) * exp((-K3 * totalDistance).toDouble()).toFloat()
                     val dot = cos(currentAngle) * normal.x + sin(currentAngle) * normal.y
                     val reflectedX = cos(currentAngle) - 2f * dot * normal.x
                     val reflectedY = sin(currentAngle) - 2f * dot * normal.y
@@ -91,16 +100,15 @@ object SpinPhysicsCalculator {
                     var incidentAngle = abs(currentAngle - (normalAngle + PI.toFloat()))
                     if (incidentAngle > PI) incidentAngle = (2 * PI - incidentAngle).toFloat()
 
-                    val throwAmount = K2 * omegaAtRail * cos(incidentAngle)
+                    val throwAmount = K2 * omegaAtRail * cos(incidentAngle) * sign(spinOffset.x)
                     currentAngle = reflectedAngle + throwAmount
-                    omega = omegaAtRail
-                    currentPos = intersection
+                    omega = omegaAtRail * sign(spinOffset.x)
                     currentPos = intersection
                     hitRail = true
                     break
                 }
 
-                if (step == MAX_STEPS || step % 5 == 0) {
+                if (step == MAX_STEPS || step % PATH_SAMPLING_RATE == 0) {
                     points.add(nextPos)
                 }
 
