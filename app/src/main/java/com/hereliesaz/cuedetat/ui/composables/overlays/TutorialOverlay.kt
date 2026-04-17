@@ -44,8 +44,18 @@ fun TutorialOverlay(
     uiState: CueDetatState,
     onEvent: (MainScreenEvent) -> Unit
 ) {
-    val tutorialSteps = remember {
-        listOf(
+    val tutorialSteps = when (uiState.tutorialType) {
+        com.hereliesaz.cuedetat.domain.TutorialType.DYNAMIC_NON_AR -> listOf(
+            "Look at you, breaking free. This is Dynamic Mode. The world is your table.",
+            "Your phone is now the cue stick. Rotate it horizontally and vertically to aim. The line follows your gaze.",
+            "Tap anywhere on the 'floor' to move the Target Ball. It's like magic, but with math. Tap Finish when you're ready."
+        )
+        com.hereliesaz.cuedetat.domain.TutorialType.DYNAMIC_AR -> listOf(
+            "AR mode active. Aim your lens at the table. This is the future, or at least a reasonable approximation.",
+            "The shot guide line is anchored to the bottom of your screen. Point and shoot, essentially.",
+            "Tap on a physical ball on the table. The Target Ball will 'Snap' right to it. Efficiency is the only virtue here. Tap Finish."
+        )
+        else -> listOf(
             "Alright, let's get this over with. This isn't a toy. It's a precision instrument. Try to keep up. Tap 'Next'.",
             "That circle with the dot is the Target Ball. Drag it over your object ball. I'll wait.",
             "The crosshairs mark the Ghost Ball—that's where you *should* hit the cue ball. Drag a single finger *anywhere* to rotate the aim. The line should point to a pocket. You know what a pocket is, I assume.",

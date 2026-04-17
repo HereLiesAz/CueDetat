@@ -66,6 +66,21 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             }
             // Tap missed all candidates — fall through to normal interaction
         }
+
+        // LITE AR Snapping (Dynamic Beginner)
+        if (currentState.experienceMode == ExperienceMode.BEGINNER && !currentState.isBeginnerViewLocked) {
+            val detectedBalls = (currentState.visionData?.genericBalls ?: emptyList()) + (currentState.visionData?.customBalls ?: emptyList())
+            val snapThreshold = LOGICAL_BALL_RADIUS * 2.5f
+            val closestBall = detectedBalls.minByOrNull { getDistance(event.logicalPoint, it) }
+            if (closestBall != null && getDistance(event.logicalPoint, closestBall) < snapThreshold) {
+                return currentState.copy(
+                    protractorUnit = currentState.protractorUnit.copy(center = closestBall),
+                    interactionMode = InteractionMode.NONE,
+                    valuesChangedSinceReset = true
+                )
+            }
+        }
+        
         val onPlaneBall = currentState.onPlaneBall
         val protractorUnit = currentState.protractorUnit
 

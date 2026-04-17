@@ -14,24 +14,28 @@ internal fun reduceTutorialAction(state: CueDetatState, action: MainScreenEvent)
         is MainScreenEvent.StartTutorial -> {
             state.copy(
                 showTutorialOverlay = true,
+                tutorialType = action.type,
                 currentTutorialStep = 0,
-                tutorialHighlight = TutorialHighlightElement.CUE_BALL
+                tutorialHighlight = if (action.type == TutorialType.GENERAL) TutorialHighlightElement.CUE_BALL else TutorialHighlightElement.NONE
             )
         }
 
         is MainScreenEvent.NextTutorialStep -> {
             val nextStep = state.currentTutorialStep + 1
 
-            val highlight = when (nextStep) {
-                1 -> TutorialHighlightElement.GHOST_BALL
-                2 -> TutorialHighlightElement.ZOOM_SLIDER
-                3 -> {
-                    // Expert isolation: Only prompt for scanning if in Expert mode
-                    // and the table is currently invisible.
-                    if (state.experienceMode == ExperienceMode.EXPERT && !state.table.isVisible) {
-                        TutorialHighlightElement.SCAN_TABLE
-                    } else {
-                        TutorialHighlightElement.TARGET_BALL
+            val highlight = when (state.tutorialType) {
+                TutorialType.GENERAL -> {
+                    when (nextStep) {
+                        1 -> TutorialHighlightElement.GHOST_BALL
+                        2 -> TutorialHighlightElement.ZOOM_SLIDER
+                        3 -> {
+                            if (state.experienceMode == ExperienceMode.EXPERT && !state.table.isVisible) {
+                                TutorialHighlightElement.SCAN_TABLE
+                            } else {
+                                TutorialHighlightElement.TARGET_BALL
+                            }
+                        }
+                        else -> TutorialHighlightElement.NONE
                     }
                 }
                 else -> TutorialHighlightElement.NONE

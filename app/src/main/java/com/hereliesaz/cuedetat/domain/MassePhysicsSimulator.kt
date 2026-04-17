@@ -2,18 +2,16 @@ package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.view.model.Table
-// LOGICAL_BALL_RADIUS = 25f is a top-level const in this package (UiModel.kt) — no import needed
 import kotlin.math.*
 
 object MassePhysicsSimulator {
 
-    private const val JUMP_THRESHOLD_DEG = 72f   // v1.4 activation threshold (inert now)
     private const val STEPS = 100
     private const val MU_ROLL = 0.02f
     private const val EPSILON = 0.5f
     private const val ELASTIC = 0.65f
     private const val V0 = 60f
-    private const val R = LOGICAL_BALL_RADIUS     // 25f
+    private const val R = LOGICAL_BALL_RADIUS
 
     fun simulate(
         contactOffset: PointF,
@@ -34,14 +32,13 @@ object MassePhysicsSimulator {
         val cosR = cos(rotAngle)
         val sinR = sin(rotAngle)
 
-        // Convert world startPos into the local (pre-rotation) frame so that
-        // rail detection uses absolute logical coordinates throughout.
         var posX = startPos.x * cosR + startPos.y * sinR
         var posY = -startPos.x * sinR + startPos.y * cosR
 
-        val points = mutableListOf(PointF().apply { x = posX; y = posY })
+        val points = mutableListOf(PointF(posX, posY))
 
         val pocketThreshold = R * 1.3f
+        val pocketThresholdSq = pocketThreshold * pocketThreshold
         var pocketIndex: Int? = null
         val impactPoints = mutableListOf<PointF>()
 
@@ -74,11 +71,24 @@ object MassePhysicsSimulator {
             val worldNextY = nextX * sinR + nextY * cosR
 
             if (table.isVisible) {
+                // Segment-to-pocket distance check to prevent tunneling
                 for (idx in table.pockets.indices) {
                     val p = table.pockets[idx]
-                    val dx = worldNextX - p.x
-                    val dy = worldNextY - p.y
-                    if (sqrt(dx * dx + dy * dy) < pocketThreshold) {
+                    val sdx = worldNextX - worldCurX
+                    val sdy = worldNextY - worldCurY
+                    val slenSq = sdx * sdx + sdy * sdy
+                    
+                    val distSq = if (slenSq < 0.001f) {
+                        (worldNextX - p.x).pow(2) + (worldNextY - p.y).pow(2)
+                    } else {
+                        var t = ((p.x - worldCurX) * sdx + (p.y - worldCurY) * sdy) / slenSq
+                        t = t.coerceIn(0f, 1f)
+                        val projX = worldCurX + t * sdx
+                        val projY = worldCurY + t * sdy
+                        (projX - p.x).pow(2) + (projY - p.y).pow(2)
+                    }
+                    
+                    if (distSq < pocketThresholdSq) {
                         pocketIndex = idx
                         break
                     }
@@ -88,23 +98,21 @@ object MassePhysicsSimulator {
 
             if (table.isVisible) {
                 val railHit = table.findRailIntersectionAndNormal(
-                    PointF().apply { x = worldCurX; y = worldCurY },
-                    PointF().apply { x = worldNextX; y = worldNextY }
+                    PointF(worldCurX, worldCurY),
+                    PointF(worldNextX, worldNextY)
                 )
                 if (railHit != null) {
                     val (worldIntersect, worldNormal) = railHit
 
-                    // Physics path: ball center is at the rail surface (worldIntersect).
                     val localIx = worldIntersect.x * cosR + worldIntersect.y * sinR
                     val localIy = -worldIntersect.x * sinR + worldIntersect.y * cosR
-                    points.add(PointF().apply { x = localIx; y = localIy })
+                    points.add(PointF(localIx, localIy))
 
-                    // Visual ghost ball: offset inward by one radius so the ball's EDGE sits at the rail.
                     val ghostWorldX = worldIntersect.x + worldNormal.x * R
                     val ghostWorldY = worldIntersect.y + worldNormal.y * R
                     val ghostLocalIx = ghostWorldX * cosR + ghostWorldY * sinR
                     val ghostLocalIy = -ghostWorldX * sinR + ghostWorldY * cosR
-                    impactPoints.add(PointF().apply { x = ghostLocalIx; y = ghostLocalIy })
+                    impactPoints.add(PointF(ghostLocalIx, ghostLocalIy))
 
                     val localNx = worldNormal.x * cosR + worldNormal.y * sinR
                     val localNy = -worldNormal.x * sinR + worldNormal.y * cosR
@@ -126,22 +134,16 @@ object MassePhysicsSimulator {
 
             posX = nextX
             posY = nextY
-            points.add(PointF().apply { x = posX; y = posY })
+            points.add(PointF(posX, posY))
 
-            if (sqrt(vx * vx + vy * vy) < 0.05f) break
+            if (vx * vx + vy * vy < 0.0025f) break // approx 0.05f speed squared
         }
 
         val worldPoints = points.map { p ->
-            PointF().apply {
-                x = p.x * cosR - p.y * sinR
-                y = p.x * sinR + p.y * cosR
-            }
+            PointF(p.x * cosR - p.y * sinR, p.x * sinR + p.y * cosR)
         }
         val worldImpacts = impactPoints.map { p ->
-            PointF().apply {
-                x = p.x * cosR - p.y * sinR
-                y = p.x * sinR + p.y * cosR
-            }
+            PointF(p.x * cosR - p.y * sinR, p.x * sinR + p.y * cosR)
         }
 
         return MasseResult(

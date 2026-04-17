@@ -131,17 +131,23 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Background layer 1: AR protractor overlay (main route only) ---
-        background(weight = 1) {
-            if (isOnMain) {
-                ProtractorOverlay(
-                    uiState = uiState,
-                    systemIsDark = systemIsDark,
-                    isTestingCvMask = uiState.isTestingCvMask,
-                    onEvent = mainViewModel::onEvent
-                )
-            }
+    // --- Background layer 1: AR protractor overlay (main route only) ---
+    val topDownProgress by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (uiState.isTopDownViewActive && uiState.topDownBitmap != null) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 600)
+    )
+
+    background(weight = 1) {
+        if (isOnMain) {
+            ProtractorOverlay(
+                uiState = uiState,
+                systemIsDark = systemIsDark,
+                isTestingCvMask = uiState.isTestingCvMask,
+                onEvent = mainViewModel::onEvent,
+                topDownProgress = topDownProgress
+            )
         }
+    }
 
         // --- Background layer 2: Navigation host (full-screen screens) ---
         background(weight = 2) {

@@ -23,7 +23,7 @@ import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 import org.opencv.core.Mat
 
 enum class CameraMode {
-    OFF, CAMERA, AR_SETUP, AR_ACTIVE, CAMERA_ONLY;
+    OFF, CAMERA, AR_SETUP, AR_ACTIVE, CAMERA_ONLY, LITE_AR;
     fun next(): CameraMode {
         val nextOrdinal = (this.ordinal + 1) % values().size
         return values()[nextOrdinal]
@@ -40,6 +40,14 @@ enum class ExperienceMode {
 
 enum class BallSelectionPhase {
     NONE, AWAITING_CUE, AWAITING_TARGET
+}
+
+enum class TutorialType {
+    GENERAL, DYNAMIC_NON_AR, DYNAMIC_AR
+}
+
+enum class TargetType {
+    SOLIDS, STRIPES
 }
 
 @Keep
@@ -87,15 +95,18 @@ data class CueDetatState(
     val isSpinControlVisible: Boolean = false,
     val isMasseModeActive: Boolean = false,
     val masseShotAngleDeg: Float = 0f,
+    /** Normalized spin offset: x = English (side), y = Vertical (draw/follow). Range -1.0..1.0. */
     val selectedSpinOffset: PointF? = null,
     @Transient val spinPaths: Map<Color, List<PointF>>? = null,
     @Transient val masseImpactPoints: List<PointF> = emptyList(),
     @Transient val masseConnectsTarget: Boolean = false,
     @Transient val masseGhostBallCenter: PointF? = null,
     val spinControlCenter: PointF? = null,
+    /** Normalized spin offset: x = English (side), y = Vertical (draw/follow). Range -1.0..1.0. */
     val lingeringSpinOffset: PointF? = null,
     @Transient val spinPathsAlpha: Float = 1.0f,
     val showTutorialOverlay: Boolean = false,
+    val tutorialType: TutorialType = TutorialType.GENERAL,
     val currentTutorialStep: Int = 0,
     @Transient val tutorialHighlight: TutorialHighlightElement? = TutorialHighlightElement.NONE,
     @Transient val flashingTutorialElement: TutorialHighlightElement? = null,
@@ -165,6 +176,12 @@ data class CueDetatState(
     val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
     @Transient val targetBallDistance: Float = 0f,
     val lensWarpTps: TpsWarpData? = null,
+    @Transient val myriadTrajectory: List<PointF>? = null,
+    val targetType: TargetType = TargetType.SOLIDS,
+    val isFlowPokeEnabled: Boolean = true,
+    val isTopDownViewActive: Boolean = false,
+    @Transient val topDownBitmap: android.graphics.Bitmap? = null,
+    val topDownTransitionProgress: Float = 0f,
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
@@ -260,9 +277,9 @@ sealed class MainScreenEvent {
     object ToggleCvMask : MainScreenEvent()
     object EnterCvMaskTestMode : MainScreenEvent()
     object ExitCvMaskTestMode : MainScreenEvent()
-    object EnterCalibrationMode : MainScreenEvent()
+    object StartCalibrationMode : MainScreenEvent()
     data class SampleColorAt(val screenPosition: Offset) : MainScreenEvent()
-    object StartTutorial : MainScreenEvent()
+    data class StartTutorial(val type: TutorialType = TutorialType.GENERAL) : MainScreenEvent()
     object NextTutorialStep : MainScreenEvent()
     object EndTutorial : MainScreenEvent()
     object TutorialBack : MainScreenEvent()
@@ -301,4 +318,11 @@ sealed class MainScreenEvent {
     object CancelArSetup : MainScreenEvent()
     object TurnCameraOff : MainScreenEvent()
     object ArTrackingLost : MainScreenEvent()
+    data class MyriadTrajectoryReceived(val points: List<PointF>) : MainScreenEvent()
+    data class ArSurfaceTapped(val screenPoint: PointF) : MainScreenEvent()
+    object ToggleTargetType : MainScreenEvent()
+    object ToggleFlowPoke : MainScreenEvent()
+    object ToggleTopDownView : MainScreenEvent()
+    object ClearTopDownView : MainScreenEvent()
+    data class SetTopDownBitmap(val bitmap: android.graphics.Bitmap?) : MainScreenEvent()
 }

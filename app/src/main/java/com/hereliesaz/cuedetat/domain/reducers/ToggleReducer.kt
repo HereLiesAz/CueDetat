@@ -56,11 +56,28 @@ internal fun reduceToggleAction(
                 tableScanModel = null,
                 lensWarpTps = null
             )
+            CameraMode.AR_ACTIVE -> state.copy(cameraMode = CameraMode.LITE_AR)
             else -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false)
         }
-        is MainScreenEvent.StartArTracking -> state.copy(cameraMode = CameraMode.AR_ACTIVE, showTableScanScreen = false)
+        is MainScreenEvent.StartArTracking -> {
+            val phase = if (state.experienceMode == ExperienceMode.EXPERT) {
+                com.hereliesaz.cuedetat.domain.BallSelectionPhase.AWAITING_CUE
+            } else com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE
+            state.copy(
+                cameraMode = CameraMode.AR_ACTIVE,
+                showTableScanScreen = false,
+                ballSelectionPhase = phase
+            )
+        }
         is MainScreenEvent.CancelArSetup -> state.copy(cameraMode = CameraMode.CAMERA_ONLY, showTableScanScreen = false)
         is MainScreenEvent.TurnCameraOff -> state.copy(cameraMode = CameraMode.OFF)
+        is MainScreenEvent.ToggleTargetType -> {
+            val nextType = if (state.targetType == com.hereliesaz.cuedetat.domain.TargetType.SOLIDS) {
+                com.hereliesaz.cuedetat.domain.TargetType.STRIPES
+            } else com.hereliesaz.cuedetat.domain.TargetType.SOLIDS
+            state.copy(targetType = nextType)
+        }
+        is MainScreenEvent.ToggleFlowPoke -> state.copy(isFlowPokeEnabled = !state.isFlowPokeEnabled)
         is MainScreenEvent.ToggleDistanceUnit -> state.copy(distanceUnit = if (state.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC, valuesChangedSinceReset = true)
         is MainScreenEvent.ToggleLuminanceDialog -> state.copy(showLuminanceDialog = !state.showLuminanceDialog)
         is MainScreenEvent.ToggleGlowStickDialog -> state.copy(showGlowStickDialog = !state.showGlowStickDialog)
@@ -81,7 +98,21 @@ internal fun reduceToggleAction(
             if (state.pendingExperienceMode == null) return state
             return handleSetExperienceMode(state, state.pendingExperienceMode, reducerUtils).copy(pendingExperienceMode = null)
         }
-        is MainScreenEvent.UnlockBeginnerView -> state.copy(isBeginnerViewLocked = false)
+            val tutorialType = if (nextCameraMode == CameraMode.LITE_AR) {
+                com.hereliesaz.cuedetat.domain.TutorialType.DYNAMIC_AR
+            } else {
+                com.hereliesaz.cuedetat.domain.TutorialType.DYNAMIC_NON_AR
+            }
+
+            state.copy(
+                isBeginnerViewLocked = false,
+                cameraMode = nextCameraMode,
+                showTutorialOverlay = true,
+                tutorialType = tutorialType,
+                currentTutorialStep = 0,
+                tutorialHighlight = com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.NONE
+            )
+        }
         is MainScreenEvent.LockBeginnerView -> {
 
             // DYNAMIC DEVICE-AGNOSTIC ZOOM: Calculate slider value to fit within screen width minus 200dp total margin
@@ -130,6 +161,8 @@ internal fun reduceToggleAction(
             state.copy(showTableScanScreen = !state.showTableScanScreen)
 
         is MainScreenEvent.ExitToSplash -> state.copy(experienceMode = null)
+        is MainScreenEvent.ToggleTopDownView -> state.copy(isTopDownViewActive = !state.isTopDownViewActive)
+        is MainScreenEvent.ClearTopDownView -> state.copy(isTopDownViewActive = false, topDownBitmap = null)
         else -> state
     }
 }

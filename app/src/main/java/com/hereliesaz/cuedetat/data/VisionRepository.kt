@@ -46,10 +46,15 @@ import kotlin.math.hypot
 import kotlin.math.pow
 import org.opencv.core.Rect as OCVRect
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
 @Singleton
 class VisionRepository @Inject constructor(
     @GenericDetector private val genericObjectDetector: ObjectDetector,
     private val poolDetector: MergedTFLiteDetector,
+    private val myriadRepository: MyriadRepository
 ) {
     private val _visionDataFlow = MutableStateFlow(VisionData())
     val visionDataFlow = _visionDataFlow.asStateFlow()
@@ -59,6 +64,7 @@ class VisionRepository @Inject constructor(
     val arEvents: SharedFlow<MainScreenEvent> = _arEvents.asSharedFlow()
 
     private var lastFrameTime = 0L
+    private var lastMyriadTime = 0L
 
     private var reusableMask: Mat? = null
     private val maskRingBuffer = Array(3) { Mat() }
@@ -250,18 +256,79 @@ class VisionRepository @Inject constructor(
                         if (tps != null) ThinPlateSpline.applyWarp(tps, logical) else logical
                     }
                 } else { emptyList() }
-
-                val filteredBalls = if (state.table.isVisible) {
-                    detectedLogicalPoints.filter { state.table.isPointInside(it) }
-                } else { detectedLogicalPoints }
                 
-                val finalCustomBalls = if (state.table.isVisible) {
-                    customLogicalPoints.filter { state.table.isPointInside(it) }
-                } else { customLogicalPoints }
+                // MYRIAD PREDICTION: Automatically track physical cue stick
+                if (detectedCues.isNotEmpty() && filteredCustomPoolBalls.isNotEmpty()) {
+                    if (currentTime - lastMyriadTime > 2000L) {
+                        lastMyriadTime = currentTime
+                        
+                        // We use the first cue and the first pool ball to assemble a poke vector.
+                        val cueRect = detectedCues.first()
+                        val poolBall = filteredCustomPoolBalls.first()
+                        
+                        val cueCenter = PointF(cueRect.exactCenterX(), cueRect.exactCenterY())
+                        val ballCenter = PointF(poolBall.rect.exactCenterX(), poolBall.rect.exactCenterY())
+                        
+                        val pokeDx = ballCenter.x - cueCenter.x
+                        val pokeDy = ballCenter.y - cueCenter.y
+                        
+                        val currentMatrix = Matrix(imageToScreenMatrix)
+                        val inverseMatrix = state.inversePitchMatrix ?: Matrix()
+                        val tps = state.lensWarpTps
+                        val hasInverse = state.hasInverseMatrix
+                        
+                        // Make a copy of bitmap for network call
+                        val bmpCopy = bitmap.copy(bitmap.config, false)
+                        
+                        CoroutineScope(Dispatchers.IO).launch {
+                            val result = myriadRepository.fetchTrajectory(bmpCopy, ballCenter, PointF(pokeDx, pokeDy))
+                            result.onSuccess { response ->
+                                val mappedPoints = response.points.mapNotNull { pt ->
+                                    val screenPoint = floatArrayOf(pt.x, pt.y)
+                                    currentMatrix.mapPoints(screenPoint)
+                                    val sp = PointF(screenPoint[0], screenPoint[1])
+                                    if (hasInverse) {
+                                        val logical = Perspective.screenToLogical(sp, inverseMatrix)
+                                        if (tps != null) ThinPlateSpline.applyWarp(tps, logical) else logical
+                                    } else sp
+                                }
+                                emitEvent(MainScreenEvent.MyriadTrajectoryReceived(mappedPoints))
+                            }
+                            bmpCopy.recycle()
+                        }
+                    }
+                }
+
+                val genericBallsStructured = refinedScreenPoints.mapIndexed { idx, sp ->
+                    val logical = if (state.hasInverseMatrix) {
+                        val inv = state.inversePitchMatrix ?: Matrix()
+                        val lp = Perspective.screenToLogical(sp, inv)
+                        if (state.lensWarpTps != null) ThinPlateSpline.applyWarp(state.lensWarpTps, lp) else lp
+                    } else sp
+                    
+                    val box = filteredDetectedObjects[idx].boundingBox
+                    val ballType = classifyBallType(matToUse, box)
+                    DetectedBall(position = logical, type = ballType, confidence = 0.9f, boundingBox = box)
+                }
+
+                val customBallsStructured = customScreenPoints.mapIndexed { idx, sp ->
+                    val logical = if (state.hasInverseMatrix) {
+                        val inv = state.inversePitchMatrix ?: Matrix()
+                        val lp = Perspective.screenToLogical(sp, inv)
+                        if (state.lensWarpTps != null) ThinPlateSpline.applyWarp(state.lensWarpTps, lp) else lp
+                    } else sp
+                    
+                    val box = filteredCustomPoolBalls[idx].rect
+                    val intBox = android.graphics.Rect(box.left.toInt(), box.top.toInt(), box.right.toInt(), box.bottom.toInt())
+                    val ballType = classifyBallType(matToUse, intBox)
+                    DetectedBall(position = logical, type = ballType, confidence = 0.9f, boundingBox = intBox)
+                }
+
+                val allStructuredBalls = genericBallsStructured + customBallsStructured
 
                 var finalVisionData = VisionData(
-                    genericBalls = filteredBalls,
-                    customBalls = finalCustomBalls,
+                    genericBalls = refinedScreenPoints, // Keep for legacy
+                    balls = allStructuredBalls,
                     detectedHsvColor = hsvTuple?.first ?: hsv,
                     detectedBoundingBoxes = filteredDetectedObjects.map { it.boundingBox },
                     detectedCues = detectedCues,
@@ -619,7 +686,9 @@ class VisionRepository @Inject constructor(
         if (h.empty()) return 0f
 
         val (rawT, rawR, rawS) = decomposeHomography(h, imageWidth.toFloat(), imageHeight.toFloat())
-        val alpha = 0.2f
+        
+        val alpha = if (state.experienceMode == com.hereliesaz.cuedetat.domain.ExperienceMode.EXPERT) 0.05f else 0.2f
+        
         val blendedTranslation = Offset(
             alpha * rawT.x + (1f - alpha) * state.viewOffset.x,
             alpha * rawT.y + (1f - alpha) * state.viewOffset.y
@@ -723,5 +792,110 @@ class VisionRepository @Inject constructor(
 
         roiMat.release()
         return refinedCenterInRoi?.let { android.graphics.PointF(it.x.toFloat() + roi.x, it.y.toFloat() + roi.y) }
+    }
+
+    private fun classifyBallType(frame: Mat, box: android.graphics.Rect): BallType {
+        // Coordinate safety check
+        val x = box.left.coerceIn(0, frame.cols() - 1)
+        val y = box.top.coerceIn(0, frame.rows() - 1)
+        val w = box.width().coerceIn(1, frame.cols() - x)
+        val h = box.height().coerceIn(1, frame.rows() - y)
+        
+        val roi = OCVRect(x, y, w, h)
+        val ballMat = frame.submat(roi)
+        
+        // Sample poles (top 15% and bottom 15%)
+        val poleHeight = (h * 0.15f).toInt().coerceAtLeast(1)
+        val topPole = ballMat.submat(OCVRect(0, 0, w, poleHeight))
+        val bottomPole = ballMat.submat(OCVRect(0, h - poleHeight, w, poleHeight))
+        
+        // Convert to HSV for robust color analysis
+        val hsvMat = Mat()
+        Imgproc.cvtColor(ballMat, hsvMat, Imgproc.COLOR_BGR2HSV)
+        val topHsv = hsvMat.submat(OCVRect(0, 0, w, poleHeight))
+        val bottomHsv = hsvMat.submat(OCVRect(0, h - poleHeight, w, poleHeight))
+        
+        val topMean = Core.mean(topHsv)
+        val bottomMean = Core.mean(bottomHsv)
+        
+        topPole.release()
+        bottomPole.release()
+        topHsv.release()
+        bottomHsv.release()
+        ballMat.release()
+        hsvMat.release()
+
+        // Stripe heuristic: Poles are "White" (Low Saturation, High Value)
+        val isTopWhite = topMean.`val`[1] < 50.0 && topMean.`val`[2] > 180.0
+        val isBottomWhite = bottomMean.`val`[1] < 50.0 && bottomMean.`val`[2] > 180.0
+        
+        return if (isTopWhite && isBottomWhite) BallType.STRIPE else BallType.SOLID
+    }
+
+    fun captureRectifiedSnapshot(state: CueDetatState) {
+        val mat = if (reusableRotatedMat.empty()) null else reusableRotatedMat
+        if (mat == null) return
+
+        val width = mat.cols()
+        val height = mat.rows()
+        
+        // Output dimensions for the rectified table (2:1 aspect ratio typical for 8ft tables)
+        val outW = 2048.0
+        val outH = 1024.0
+
+        val halfW = state.table.logicalWidth / 2f
+        val halfH = state.table.logicalHeight / 2f
+
+        // Logical corners
+        val corners = arrayOf(
+            PointF(-halfW, -halfH), // TL
+            PointF(halfW, -halfH),  // TR
+            PointF(halfW, halfH),   // BR
+            PointF(-halfW, halfH)   // BL
+        )
+
+        val pitchMatrix = state.pitchMatrix ?: return
+        val imageToScreen = Matrix().apply {
+            postScale(state.viewWidth.toFloat() / width.toFloat(), state.viewHeight.toFloat() / height.toFloat())
+        }
+        val screenToImage = Matrix().apply { imageToScreen.invert(this) }
+
+        val srcPointsList = mutableListOf<org.opencv.core.Point>()
+        val pts = FloatArray(2)
+        for (c in corners) {
+            pts[0] = c.x
+            pts[1] = c.y
+            pitchMatrix.mapPoints(pts)      // Logical -> Screen
+            screenToImage.mapPoints(pts)    // Screen -> Image
+            srcPointsList.add(org.opencv.core.Point(pts[0].toDouble(), pts[1].toDouble()))
+        }
+
+        val dstPointsList = listOf(
+            org.opencv.core.Point(0.0, 0.0),
+            org.opencv.core.Point(outW, 0.0),
+            org.opencv.core.Point(outW, outH),
+            org.opencv.core.Point(0.0, outH)
+        )
+
+        val srcMat = MatOfPoint2f()
+        srcMat.fromList(srcPointsList)
+        val dstMat = MatOfPoint2f()
+        dstMat.fromList(dstPointsList)
+
+        val h = Calib3d.getPerspectiveTransform(srcMat, dstMat)
+        val outMat = Mat()
+        Imgproc.warpPerspective(mat, outMat, h, Size(outW, outH))
+
+        val bitmap = android.graphics.Bitmap.createBitmap(outW.toInt(), outH.toInt(), android.graphics.Bitmap.Config.ARGB_8888)
+        org.opencv.android.Utils.matToBitmap(outMat, bitmap)
+        
+        outMat.release()
+        h.release()
+        srcMat.release()
+        dstMat.release()
+
+        CoroutineScope(Dispatchers.Main).launch {
+            _arEvents.emit(MainScreenEvent.SetTopDownBitmap(bitmap))
+        }
     }
 }

@@ -30,7 +30,8 @@ enum class UpdateType {
 
 class UpdateStateUseCase @Inject constructor(
     private val reducerUtils: ReducerUtils,
-    private val calculateBankShot: CalculateBankShot
+    private val calculateBankShot: CalculateBankShot,
+    private val myriadPredictor: MyriadPredictor
 ) {
 
     private val railHeightToTableHeightRatio = 0.025f
@@ -51,23 +52,31 @@ class UpdateStateUseCase @Inject constructor(
         }
 
         if (type == UpdateType.MATRICES_ONLY) {
-            // Always re-run aiming so that @Transient fields (tangentAimedPocketIndex, etc.)
-            // stay fresh when the matrix changes (e.g., phone-tilt).
-            val stateAfterAiming = updateAimingCalculations(stateAfterMatrices)
-            return if (stateAfterAiming.isMasseModeActive) {
-                updateSpinCalculations(stateAfterAiming)
+            // For Matrices only, we still need to decide order.
+            return if (stateAfterMatrices.isMasseModeActive) {
+                val stateAfterSpin = updateSpinCalculations(stateAfterMatrices)
+                updateAimingCalculations(stateAfterSpin)
             } else {
+                val stateAfterAiming = updateAimingCalculations(stateAfterMatrices)
                 stateAfterAiming
             }
         }
 
-        val stateAfterAiming = if (type == UpdateType.FULL || type == UpdateType.AIMING) {
-            updateAimingCalculations(stateAfterMatrices)
+        return if (stateAfterMatrices.isMasseModeActive) {
+            val stateAfterSpin = if (type == UpdateType.FULL || type == UpdateType.SPIN_ONLY || type == UpdateType.AIMING) {
+                updateSpinCalculations(stateAfterMatrices)
+            } else {
+                stateAfterMatrices
+            }
+            updateAimingCalculations(stateAfterSpin)
         } else {
-            stateAfterMatrices
+            val stateAfterAiming = if (type == UpdateType.FULL || type == UpdateType.AIMING) {
+                updateAimingCalculations(stateAfterMatrices)
+            } else {
+                stateAfterMatrices
+            }
+            updateSpinCalculations(stateAfterAiming)
         }
-
-        return updateSpinCalculations(stateAfterAiming)
     }
 
     private fun updateMatricesAndTransforms(state: CueDetatState): CueDetatState {
@@ -336,6 +345,17 @@ class UpdateStateUseCase @Inject constructor(
             tangentAimedPocketIndex = null
         }
 
+        // Myriad (Flow-Poke) Envisioning
+        val impactAngleRad = atan2(targetCenter.y - ghostCueCenter.y, targetCenter.x - ghostCueCenter.x)
+        val myriadTrajectory = if (state.isFlowPokeEnabled && aimedPocketIndex != null) {
+            myriadPredictor.envisionFuture(
+                targetBall = targetCenter,
+                impactAngleRad = impactAngleRad,
+                velocity = 1.0f, // Normalized velocity for envisioning
+                state = state
+            )
+        } else null
+
         return state.copy(
             shotLineAnchor = logicalShotLineAnchor,
             isGeometricallyImpossible = isGeometricallyImpossible,
@@ -358,37 +378,34 @@ class UpdateStateUseCase @Inject constructor(
 
         val stored = state.selectedSpinOffset ?: state.lingeringSpinOffset
 
-        // Compute wheel color from the stored pixel offset
+        // Compute wheel color from the stored normalized offset
         val pathColor = if (stored != null) {
-            val radiusPx = 60f * state.screenDensity
-            val dx = stored.x - radiusPx
-            val dy = stored.y - radiusPx
-            val angleDeg = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
-            val dist = (hypot(dx.toDouble(), dy.toDouble()) / radiusPx).toFloat().coerceIn(0f, 1f)
+            val angleDeg = Math.toDegrees(atan2(stored.y.toDouble(), stored.x.toDouble())).toFloat()
+            val dist = hypot(stored.x.toDouble(), stored.y.toDouble()).toFloat().coerceIn(0f, 1f)
             SpinColorUtils.getColorFromAngleAndDistance(angleDeg, dist)
         } else Color.White
 
         if (!state.isMasseModeActive) {
             // English spin path via SpinPhysicsCalculator
             if (stored == null) return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
-            val radiusPx = 60f * state.screenDensity
-            val nx = (stored.x - radiusPx) / radiusPx
-            val ny = (stored.y - radiusPx) / radiusPx
-            val spinOffset = PointF(nx, ny)
+            
             val cueBallPos = state.protractorUnit.ghostCueBallCenter
             val targetBallPos = state.protractorUnit.center
             val shotLineAnchor = state.onPlaneBall?.center ?: state.shotLineAnchor
                 ?: return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
+            
             val shotAngle = atan2(
                 (cueBallPos.y - shotLineAnchor.y).toDouble(),
                 (cueBallPos.x - shotLineAnchor.x).toDouble()
             ).toFloat()
+            
             val path = SpinPhysicsCalculator.calculatePath(
-                spinOffset = spinOffset.toVector2(),
+                spinOffset = Vector2(stored.x, stored.y),
                 cueBallPos = cueBallPos.toVector2(),
                 targetBallPos = targetBallPos.toVector2(),
                 shotAngle = shotAngle,
-                table = state.table
+                table = state.table,
+                velocity = 1.0f // Baseline power
             )
             return state.copy(
                 spinPaths = mapOf(pathColor to path.map { it.toPointF() }),
@@ -399,15 +416,13 @@ class UpdateStateUseCase @Inject constructor(
 
         // Massé mode via MassePhysicsSimulator
         if (stored == null) return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList(), masseConnectsTarget = false)
-        val radiusPx = 60f * state.screenDensity
-        val nx = (stored.x - radiusPx) / radiusPx
-        val ny = (stored.y - radiusPx) / radiusPx
-        val physicsOffset = PointF(nx, ny)
+        
         val cuePos = state.onPlaneBall?.center ?: PointF(0f, 0f)
         val shotAngle = Math.toRadians(state.masseShotAngleDeg.toDouble()).toFloat()
         val elevationDeg = (90f - abs(state.pitchAngle)).coerceIn(0f, 90f)
+        
         val result = MassePhysicsSimulator.simulate(
-            contactOffset = physicsOffset,
+            contactOffset = stored,
             elevationDeg = elevationDeg,
             shotAngle = shotAngle,
             table = state.table,
@@ -504,8 +519,14 @@ class UpdateStateUseCase @Inject constructor(
     }
 
     private fun getLogicalShotLineAnchor(state: CueDetatState): PointF? {
-        state.onPlaneBall?.let { return it.center }
+        val isDynamicBeginner = state.experienceMode == ExperienceMode.BEGINNER && !state.isBeginnerViewLocked
+        
+        if (state.onPlaneBall != null && !isDynamicBeginner) {
+            return state.onPlaneBall.center
+        }
+        
         val inverseMatrix = state.inversePitchMatrix ?: return null
+        // Strictly anchor to center-bottom of screen pixels
         val screenAnchor = PointF(state.viewWidth / 2f, state.viewHeight.toFloat())
         return Perspective.screenToLogical(screenAnchor, inverseMatrix)
     }

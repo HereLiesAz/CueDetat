@@ -135,6 +135,10 @@ fun stateReducer(
         is MainScreenEvent.EndTutorial, is MainScreenEvent.UpdateHighlightAlpha ->
             reduceTutorialAction(currentState, action)
 
+        is MainScreenEvent.MyriadTrajectoryReceived -> {
+            currentState.copy(myriadTrajectory = action.points)
+        }
+
         // Default catch-all (should ideally never happen for known events).
         else -> currentState
     }

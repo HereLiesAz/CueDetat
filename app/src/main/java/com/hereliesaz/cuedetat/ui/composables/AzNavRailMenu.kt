@@ -60,6 +60,12 @@ fun AzNavRailMenu(
         isLandscape = isLandscape,
         initiallyExpanded = false
     ) {
+        // [SECTION 1] Configuration (DSL) - MANDATORY TOP POSITION
+        azConfig(dockingSide = AzDockingSide.LEFT, packButtons = false, showFooter = true)
+        azTheme(defaultShape = AzButtonShape.CIRCLE, activeColor = Color.White)
+        azAdvanced(isLoading = false, helpEnabled = true, onDismissHelp = {})
+
+        // [SECTION 2] Global Onscreen & Background layers (DSL)
         if (uiState.areHelpersVisible) {
             onscreen(alignment = Alignment.TopStart) {
                 Text(
@@ -108,19 +114,23 @@ fun AzNavRailMenu(
             }
         }
 
-        azConfig(dockingSide = AzDockingSide.LEFT, packButtons = false, showFooter = true)
-        azTheme(defaultShape = AzButtonShape.CIRCLE, activeColor = Color.White)
-        azAdvanced(isLoading = false, helpEnabled = true, onDismissHelp = {})
+        // [SECTION 3] Extra content from the caller (ProtractorScreen's Camera & Overlays)
+        content()
 
+        // [SECTION 4] Mode-specific Rail Items
         if (uiState.experienceMode == ExperienceMode.HATER) {
             azRailItemLowerCase(id = "shake", text = "Shake", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.Shake) })
             azRailItemLowerCase(id = "exit", text = "Exit", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ExitToSplash) })
-            content(); return@AzHostActivityLayout
+            return@AzHostActivityLayout // Hater Mode doesn't show standard nav
         }
 
         azRailToggle(id = "help", isChecked = uiState.areHelpersVisible, toggleOnText = "Help", toggleOffText = "Help", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleHelp) })
         azMenuItem(id = "tutorial", text = "Tutorial", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.StartTutorial) })
 
+        val inArSubMode = uiState.cameraMode == CameraMode.AR_SETUP || 
+                          uiState.cameraMode == CameraMode.AR_ACTIVE || 
+                          uiState.cameraMode == CameraMode.LITE_AR
+        
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             val isArActive = uiState.cameraMode != CameraMode.OFF
             azRailToggle(
@@ -131,11 +141,38 @@ fun AzNavRailMenu(
                 onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
             )
 
-            val inArSubMode = uiState.cameraMode == CameraMode.AR_SETUP || uiState.cameraMode == CameraMode.AR_ACTIVE
             if (inArSubMode) {
-                azRailItemLowerCase(id = "felt", text = "Felt", fillColor = b11R, textColor = Color.White, onClick = {
+                azRailItemLowerCase(id = "felt", text = if (uiState.cameraMode == CameraMode.AR_ACTIVE) "re-scan" else "felt", fillColor = b11R, textColor = Color.White, onClick = {
                     onEvent(MainScreenEvent.ToggleTableScanScreen)
                 })
+                
+                azRailToggle(
+                    id = "target_type",
+                    isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
+                    toggleOnText = "stripes", toggleOffText = "solids",
+                    fillColor = b9Y, textColor = Color.Black,
+                    onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
+                )
+
+                azRailToggle(
+                    id = "flow",
+                    isChecked = uiState.isFlowPokeEnabled,
+                    toggleOnText = "flow", toggleOffText = "flow",
+                    fillColor = Color(0xFFE040FB), textColor = Color.White,
+                    onClick = { onEvent(MainScreenEvent.ToggleFlowPoke) }
+                )
+
+                azRailToggle(
+                    id = "top_down_view",
+                    isChecked = uiState.isTopDownViewActive,
+                    toggleOnText = "back", toggleOffText = "view",
+                    fillColor = Color.White, textColor = Color.Black,
+                    onClick = { 
+                        if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
+                        else onEvent(MainScreenEvent.ToggleTopDownView)
+                    }
+                )
+
                 azRailItemLowerCase(id = "cancel_ar", text = "Cancel", fillColor = b12P, textColor = Color.White, onClick = {
                     onEvent(MainScreenEvent.CancelArSetup) 
                 })
@@ -156,6 +193,35 @@ fun AzNavRailMenu(
         if (uiState.experienceMode == ExperienceMode.BEGINNER) {
             azRailItemLowerCase(id = "static", text = "Static", fillColor = b6G, textColor = Color.White, onClick = { onEvent(MainScreenEvent.LockBeginnerView) })
             azRailItemLowerCase(id = "dynamic", text = "Dynamic", fillColor = b7M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.UnlockBeginnerView) })
+            
+            if (inArSubMode) {
+                azRailToggle(
+                    id = "target_type",
+                    isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
+                    toggleOnText = "stripes", toggleOffText = "solids",
+                    fillColor = b9Y, textColor = Color.Black,
+                    onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
+                )
+
+                azRailToggle(
+                    id = "flow",
+                    isChecked = uiState.isFlowPokeEnabled,
+                    toggleOnText = "flow", toggleOffText = "flow",
+                    fillColor = Color(0xFFE040FB), textColor = Color.White,
+                    onClick = { onEvent(MainScreenEvent.ToggleFlowPoke) }
+                )
+
+                azRailToggle(
+                    id = "top_down_view",
+                    isChecked = uiState.isTopDownViewActive,
+                    toggleOnText = "back", toggleOffText = "view",
+                    fillColor = Color.White, textColor = Color.Black,
+                    onClick = { 
+                        if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
+                        else onEvent(MainScreenEvent.ToggleTopDownView)
+                    }
+                )
+            }
         } else {
             val resetLabel = when {
                 uiState.obstacleBalls.isNotEmpty() -> "clear"
@@ -182,7 +248,5 @@ fun AzNavRailMenu(
 
         azDivider()
         azMenuItem(id = "mode", text = "Mode: ${uiState.experienceMode?.name}", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) })
-
-        content()
     }
 }

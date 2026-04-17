@@ -208,20 +208,29 @@ class MainViewModel @Inject constructor(
         val reducedState =
             stateReducer(currentState, logicalEvent, reducerUtils, gestureReducer)
 
-        // After CV data is integrated into state, update snap candidates.
-        val finalState = if (logicalEvent is MainScreenEvent.CvDataUpdated) {
-            val stateAfterSnap = snapReducer.reduce(reducedState, logicalEvent.visionData)
-            if (stateAfterSnap.tableScanModel != null &&
-                stateAfterSnap.experienceMode == ExperienceMode.EXPERT &&
-                stateAfterSnap.ballSelectionPhase == BallSelectionPhase.NONE &&
-                stateAfterSnap.snapCandidates?.any { it.isConfirmed } == true
-            ) {
-                stateAfterSnap.copy(ballSelectionPhase = BallSelectionPhase.AWAITING_CUE)
-            } else {
-                stateAfterSnap
+        // Side-effects for Top-Down view
+        if (logicalEvent is MainScreenEvent.ToggleTopDownView) {
+            if (!reducedState.isTopDownViewActive) {
+                visionRepository.captureRectifiedSnapshot(reducedState)
             }
-        } else {
-            reducedState
+        }
+
+        // After CV data is integrated into state, update snap candidates.
+        val finalState = when (logicalEvent) {
+            is MainScreenEvent.CvDataUpdated -> {
+                val stateAfterSnap = snapReducer.reduce(reducedState, logicalEvent.visionData)
+                if (stateAfterSnap.tableScanModel != null &&
+                    stateAfterSnap.experienceMode == ExperienceMode.EXPERT &&
+                    stateAfterSnap.ballSelectionPhase == BallSelectionPhase.NONE &&
+                    stateAfterSnap.snapCandidates?.any { it.isConfirmed } == true
+                ) {
+                    stateAfterSnap.copy(ballSelectionPhase = BallSelectionPhase.AWAITING_CUE)
+                } else {
+                    stateAfterSnap
+                }
+            }
+            is MainScreenEvent.SetTopDownBitmap -> reducedState.copy(topDownBitmap = logicalEvent.bitmap)
+            else -> reducedState
         }
 
         val updateType = determineUpdateType(currentState, finalState, logicalEvent)
