@@ -210,8 +210,8 @@ class MainViewModel @Inject constructor(
 
         // Side-effects for Top-Down view
         if (logicalEvent is MainScreenEvent.ToggleTopDownView) {
-            if (!reducedState.isTopDownViewActive) {
-                visionRepository.captureRectifiedSnapshot(reducedState)
+            if (finalState.isTopDownViewActive) {
+                visionRepository.captureRectifiedSnapshot(finalState)
             }
         }
 

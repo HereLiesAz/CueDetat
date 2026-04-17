@@ -137,24 +137,28 @@ fun AzNavRailMenu(
                     onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
                 )
 
-                azRailToggle(
-                    id = "flow",
-                    isChecked = uiState.isFlowPokeEnabled,
-                    toggleOnText = "flow", toggleOffText = "flow",
-                    fillColor = Color(0xFFE040FB), textColor = Color.White,
-                    onClick = { onEvent(MainScreenEvent.ToggleFlowPoke) }
-                )
+                if (!uiState.myriadTrajectory.isNullOrEmpty()) {
+                    azRailToggle(
+                        id = "flow",
+                        isChecked = uiState.isFlowPokeEnabled,
+                        toggleOnText = "flow", toggleOffText = "flow",
+                        fillColor = Color(0xFFE040FB), textColor = Color.White,
+                        onClick = { onEvent(MainScreenEvent.ToggleFlowPoke) }
+                    )
+                }
 
-                azRailToggle(
-                    id = "top_down_view",
-                    isChecked = uiState.isTopDownViewActive,
-                    toggleOnText = "back", toggleOffText = "view",
-                    fillColor = Color.White, textColor = Color.Black,
-                    onClick = { 
-                        if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
-                        else onEvent(MainScreenEvent.ToggleTopDownView)
-                    }
-                )
+                if (uiState.pitchMatrix != null || uiState.topDownBitmap != null) {
+                    azRailToggle(
+                        id = "top_down_view",
+                        isChecked = uiState.isTopDownViewActive,
+                        toggleOnText = "back", toggleOffText = "view",
+                        fillColor = Color.White, textColor = Color.Black,
+                        onClick = { 
+                            if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
+                            else onEvent(MainScreenEvent.ToggleTopDownView)
+                        }
+                    )
+                }
 
                 azRailItemLowerCase(id = "cancel_ar", text = "Cancel", fillColor = b12P, textColor = Color.White, onClick = {
                     onEvent(MainScreenEvent.CancelArSetup) 
@@ -195,24 +199,28 @@ fun AzNavRailMenu(
                     onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
                 )
 
-                azRailToggle(
-                    id = "flow",
-                    isChecked = uiState.isFlowPokeEnabled,
-                    toggleOnText = "flow", toggleOffText = "flow",
-                    fillColor = Color(0xFFE040FB), textColor = Color.White,
-                    onClick = { onEvent(MainScreenEvent.ToggleFlowPoke) }
-                )
+                if (!uiState.myriadTrajectory.isNullOrEmpty()) {
+                    azRailToggle(
+                        id = "flow",
+                        isChecked = uiState.isFlowPokeEnabled,
+                        toggleOnText = "flow", toggleOffText = "flow",
+                        fillColor = Color(0xFFE040FB), textColor = Color.White,
+                        onClick = { onEvent(MainScreenEvent.ToggleFlowPoke) }
+                    )
+                }
 
-                azRailToggle(
-                    id = "top_down_view",
-                    isChecked = uiState.isTopDownViewActive,
-                    toggleOnText = "back", toggleOffText = "view",
-                    fillColor = Color.White, textColor = Color.Black,
-                    onClick = { 
-                        if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
-                        else onEvent(MainScreenEvent.ToggleTopDownView)
-                    }
-                )
+                if (uiState.pitchMatrix != null || uiState.topDownBitmap != null) {
+                    azRailToggle(
+                        id = "top_down_view",
+                        isChecked = uiState.isTopDownViewActive,
+                        toggleOnText = "back", toggleOffText = "view",
+                        fillColor = Color.White, textColor = Color.Black,
+                        onClick = { 
+                            if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
+                            else onEvent(MainScreenEvent.ToggleTopDownView)
+                        }
+                    )
+                }
             }
         } else {
             val resetLabel = when {

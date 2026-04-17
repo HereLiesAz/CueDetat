@@ -330,7 +330,7 @@ class VisionRepository @Inject constructor(
                 state.tableScanModel != null && state.depthCapability == DepthCapability.NONE) {
                 arFrameCounter++
                 if (arFrameCounter % 5 == 0) {
-                    currentConfidence = runArTrackingPass(matToUse, state, inputImage.width, inputImage.height, rotationDegrees)
+                    currentConfidence = runArTrackingPass(matToUse, bitmap, state, inputImage.width, inputImage.height, rotationDegrees)
                 }
             }
 
@@ -564,14 +564,102 @@ class VisionRepository @Inject constructor(
 
     private fun runArTrackingPass(
         mat: Mat,
+        bitmap: android.graphics.Bitmap,
         state: CueDetatState,
         imageWidth: Int,
         imageHeight: Int,
         rotationDegrees: Int
     ): Float {
         if (state.tableScanModel == null || !state.hasInverseMatrix) return 0f
+        
+        // Strategy 1: ML-based pocket re-detection (High precision)
+        val detection = poolDetector.detect(bitmap)
+        if (detection != null && detection.pockets.isNotEmpty()) {
+            val confidence = detection.confidence
+            if (confidence > 0.4f) {
+                Log.d("VisionRepository", "AR Re-anchor: ML found ${detection.pockets.size} pockets")
+                // Re-anchor using detected pockets
+                return runPocketReAnchor(detection.pockets, state, imageWidth, imageHeight)
+            }
+        }
+        
+        // Strategy 2: Edge-based fallback (Robust to occlusion)
+        Log.d("VisionRepository", "AR Re-anchor: ML failed or low confidence, falling back to edges")
         return runEdgeFallback(mat, state, imageWidth, imageHeight, rotationDegrees)
     }
+
+    private fun runPocketReAnchor(
+        imagePockets: List<PointF>,
+        state: CueDetatState,
+        imageWidth: Int,
+        imageHeight: Int
+    ): Float {
+        val model = state.tableScanModel ?: return 0f
+        val inverse = state.inversePitchMatrix ?: return 0f
+        
+        // Project image pockets to logical space
+        val imageToScreen = getTransformationMatrix(imageWidth, imageHeight, state.viewWidth, state.viewHeight)
+        val logicalDetections = imagePockets.map { pt ->
+            val arr = floatArrayOf(pt.x, pt.y)
+            imageToScreen.mapPoints(arr)
+            Perspective.screenToLogical(PointF(arr[0], arr[1]), inverse)
+        }
+        
+        // Match detections to known model clusters
+        val matchedImage = mutableListOf<org.opencv.core.Point>()
+        val matchedLogical = mutableListOf<org.opencv.core.Point>()
+        
+        for (ld in logicalDetections) {
+            val nearest = model.pockets.minByOrNull { hypot((it.logicalPosition.x - ld.x).toDouble(), (it.logicalPosition.y - ld.y).toDouble()) }
+            if (nearest != null) {
+                val dist = hypot((nearest.logicalPosition.x - ld.x).toDouble(), (nearest.logicalPosition.y - ld.y).toDouble())
+                if (dist < 5.0) { // 5 logical inch tolerance
+                    val imgPt = imagePockets[logicalDetections.indexOf(ld)]
+                    matchedImage.add(org.opencv.core.Point(imgPt.x.toDouble(), imgPt.y.toDouble()))
+                    matchedLogical.add(org.opencv.core.Point(nearest.logicalPosition.x.toDouble(), nearest.logicalPosition.y.toDouble()))
+                }
+            }
+        }
+        
+        if (matchedImage.size < 2) return 0f
+        
+        val srcMat = MatOfPoint2f(*matchedImage.toTypedArray())
+        val dstMat = MatOfPoint2f(*matchedLogical.toTypedArray())
+        val h = Calib3d.findHomography(srcMat, dstMat, Calib3d.RANSAC, 5.0)
+        srcMat.release()
+        dstMat.release()
+        
+        if (h.empty()) return 0f
+        
+        val (rawT, rawR, rawS) = decomposeHomography(h, imageWidth.toFloat(), imageHeight.toFloat())
+        h.release()
+        
+        applyPoseUpdate(rawT, rawR, rawS, state)
+        
+        return 0.9f // High confidence for ML match
+    }
+
+    private fun applyPoseUpdate(rawT: Offset, rawR: Float, rawS: Float, state: CueDetatState) {
+        val alpha = if (state.experienceMode == com.hereliesaz.cuedetat.domain.ExperienceMode.EXPERT) 0.05f else 0.2f
+        
+        val blendedTranslation = Offset(
+            alpha * rawT.x + (1f - alpha) * state.viewOffset.x,
+            alpha * rawT.y + (1f - alpha) * state.viewOffset.y
+        )
+        val blendedRotation = alpha * rawR + (1f - alpha) * state.worldRotationDegrees
+        val currentZoom = ZoomMapping.sliderToZoom(
+            state.zoomSliderPosition,
+            ZoomMapping.getZoomRange(state.experienceMode).first,
+            ZoomMapping.getZoomRange(state.experienceMode).second
+        )
+        val blendedScale = alpha * rawS + (1f - alpha) * currentZoom
+
+        val delta = hypot((blendedTranslation.x - state.viewOffset.x).toDouble(), (blendedTranslation.y - state.viewOffset.y).toDouble())
+        if (delta > 0.5) {
+            emitEvent(MainScreenEvent.UpdateArPose(blendedTranslation, blendedRotation, blendedScale))
+        }
+    }
+
 
     private fun runEdgeFallback(
         mat: Mat,

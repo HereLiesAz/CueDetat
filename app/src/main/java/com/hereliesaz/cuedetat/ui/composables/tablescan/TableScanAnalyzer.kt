@@ -138,7 +138,8 @@ class TableScanAnalyzer(
             // --- Strategy 1: ML detector (TFLite + ONNX side-by-side) ---
             val modelDetections = pocketDetector?.detect(bitmap)
 
-            if (modelDetections != null) {
+            if (modelDetections != null && modelDetections.pockets.isNotEmpty()) {
+                Log.d("TableScanAnalyzer", "ML Strategy: Found ${modelDetections.pockets.size} pockets (conf: ${modelDetections.confidence})")
                 onPocketsDetected(
                     modelDetections.pockets, 
                     null, 
@@ -149,6 +150,7 @@ class TableScanAnalyzer(
                 )
             } else {
                 // --- Strategy 2: Felt-Boundary Extraction Fallback ---
+                Log.d("TableScanAnalyzer", "Fallback Strategy: ML found no pockets, attempting edge extraction...")
                 try {
                     val lowerBound = Scalar(maxOf(0.0, meanHsv.`val`[0] - 15.0), 50.0, 50.0)
                     val upperBound = Scalar(minOf(180.0, meanHsv.`val`[0] + 15.0), 255.0, 255.0)
