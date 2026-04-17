@@ -16,7 +16,7 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
                 val initAngleDeg = Math.toDegrees(
                     atan2(
                         (ghostCuePos.y - cuePos.y).toDouble(),
-                        (ghostCuePos.x - cuePos.x).toDouble()
+                        (ghostCuePos.x - cuePos.x).toDouble(),
                     )
                 ).toFloat()
                 state.copy(
@@ -76,7 +76,7 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
             // Convert raw screen pixels (0..120dp) to normalized units (-1..1)
             val nx = (rawOffset.x - radiusPx) / radiusPx
             val ny = (rawOffset.y - radiusPx) / radiusPx
-            val dist = sqrt(nx * nx + ny * ny)
+            val dist = sqrt((nx * nx + ny * ny).toDouble()).toFloat()
             val normalizedOffset = if (dist > 1.0f) PointF(nx / dist, ny / dist) else PointF(nx, ny)
             
             state.copy(

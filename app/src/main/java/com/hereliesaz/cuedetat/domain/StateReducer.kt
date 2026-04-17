@@ -98,7 +98,8 @@ fun stateReducer(
         // and visual path decay.
         is MainScreenEvent.SpinApplied, is MainScreenEvent.SpinSelectionEnded,
         is MainScreenEvent.DragSpinControl, is MainScreenEvent.ClearSpinState,
-        is MainScreenEvent.ToggleMasseMode, is MainScreenEvent.SpinPathTick ->
+        is MainScreenEvent.ToggleMasseMode, is MainScreenEvent.SpinPathTick,
+        is MainScreenEvent.ToggleSpinControl ->
             reduceSpinAction(currentState, action)
 
         // --- SYSTEM EVENTS ---
@@ -111,7 +112,6 @@ fun stateReducer(
         // --- UI TOGGLES ---
         // Handled by [ToggleReducer].
         // Simple boolean flips for showing/hiding dialogs and menus.
-        is MainScreenEvent.ToggleSpinControl,
         is MainScreenEvent.CycleTableSize, is MainScreenEvent.SetTableSize,
         is MainScreenEvent.ToggleTableSizeDialog, is MainScreenEvent.ToggleForceTheme,
         is MainScreenEvent.CycleCameraMode, is MainScreenEvent.ToggleDistanceUnit,

@@ -20,19 +20,6 @@ internal fun reduceToggleAction(
     reducerUtils: ReducerUtils
 ): CueDetatState {
     return when (action) {
-        is MainScreenEvent.ToggleSpinControl -> {
-            val isNowVisible = !state.isSpinControlVisible
-            if (isNowVisible) {
-                state.copy(isSpinControlVisible = true)
-            } else {
-                state.copy(
-                    isSpinControlVisible = false,
-                    selectedSpinOffset = null,
-                    lingeringSpinOffset = null,
-                    spinPaths = null
-                )
-            }
-        }
         is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(state, reducerUtils)
         is MainScreenEvent.CycleTableSize -> {
             val newState = state.copy(table = state.table.copy(size = state.table.size.next()), valuesChangedSinceReset = true)
