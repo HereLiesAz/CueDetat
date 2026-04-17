@@ -16,6 +16,7 @@ data class VisionData(
     val customBalls: List<PointF> = emptyList(),
     val detectedHsvColor: FloatArray? = null,
     val detectedBoundingBoxes: List<Rect> = emptyList(),
+    val detectedCues: List<Rect> = emptyList(),
     val cvMask: Mat? = null, // The binary mask for debugging
     val sourceImageWidth: Int = 0,
     val sourceImageHeight: Int = 0,
@@ -35,6 +36,7 @@ data class VisionData(
             if (!detectedHsvColor.contentEquals(other.detectedHsvColor)) return false
         } else if (other.detectedHsvColor != null) return false
         if (detectedBoundingBoxes != other.detectedBoundingBoxes) return false
+        if (detectedCues != other.detectedCues) return false
         if (cvMask != other.cvMask) return false
         if (sourceImageWidth != other.sourceImageWidth) return false
         if (sourceImageHeight != other.sourceImageHeight) return false
@@ -49,6 +51,7 @@ data class VisionData(
         result = 31 * result + customBalls.hashCode()
         result = 31 * result + (detectedHsvColor?.contentHashCode() ?: 0)
         result = 31 * result + detectedBoundingBoxes.hashCode()
+        result = 31 * result + detectedCues.hashCode()
         result = 31 * result + (cvMask?.hashCode() ?: 0)
         result = 31 * result + sourceImageWidth
         result = 31 * result + sourceImageHeight
