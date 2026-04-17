@@ -4,6 +4,7 @@ package com.hereliesaz.cuedetat.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // --- New Color Palette ---
+// A comprehensive set of colors designed for a high-contrast, "Dark Academia" / "Industrial" aesthetic.
 
 // Reds / Pinks
 val Red100 = Color(0xFFF1CFCE)
@@ -78,19 +79,32 @@ val Gray600 = Color(0xFF2B2B2B)
 val Gray700 = Color(0xFF111111)
 
 // --- Semantic Aliases for Compatibility ---
+// Mapping generic colors to domain-specific concepts.
+
+/** Used for warning overlays and critical errors. */
 val WarningRed = Red400
+/** Used for the target ball and aiming lines. High visibility. */
 val SulfurDust = Yellow300
+/** Used for table felt and rails. */
 val HippieGreen = Green400
+/** Used for the cue ball and primary actions. */
 val Mariner = Blue500
+/** Secondary accent color. */
 val MonteCarlo = Mint200
+/** Tertiary accent color. */
 val BruisedPlum = Purple500
+/** Technical/Industrial accent. */
 val GunmetalBlue = LightBlue400
+/** High contrast text/elements on dark backgrounds. */
 val IcedOpal = Gray100
+/** Subdued text or secondary elements. */
 val MutedGray = Gray300
+/** Deep background color. */
 val VoidBlack = Gray700
+/** The specific blue of a pool ball. */
 val Eight_ball_blue = Color(0xFF1923E7)
 
-// Bank lines can still be semantic
+// Bank lines fading sequence (Yellow -> Transparent).
 val BankLine1Yellow = Yellow300.copy(alpha = 0.9f)
 val BankLine2Yellow = Yellow300.copy(alpha = 0.7f)
 val BankLine3Yellow = Yellow300.copy(alpha = 0.5f)

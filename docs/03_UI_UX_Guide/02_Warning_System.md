@@ -4,7 +4,7 @@ The `WarningManager` class manages the display of user-facing warnings.
 
 * **Display:** Warnings (e.g., "Impossible Shot") are displayed as large, semi-transparent kinetic
   text at random locations on the screen.
-* **Trigger:** The `isGeometricallyImpossible` flag in the `OverlayState`, calculated by
+* **Trigger:** The `isGeometricallyImpossible` flag in the `CueDetatState`, calculated by
   `UpdateStateUseCase`, is the primary trigger.
 
 ## Impossible Shot Detection & Display
@@ -16,6 +16,6 @@ The `WarningManager` class manages the display of user-facing warnings.
 
 * **Display Timing**:
 * **Immediate Feedback**: The `shotLine` and `ghostCueBall` outlines must change to a warning color
-  *immediately* when a warning flag in the `OverlayState` becomes `true`.
+  *immediately* when a warning flag in the `CueDetatState` becomes `true`.
 * **Delayed Feedback**: The kinetic text warning message must only be displayed *after* the user's
   gesture has concluded, triggered by the `GestureEnded` event.

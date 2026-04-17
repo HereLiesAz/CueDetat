@@ -17,7 +17,7 @@ Flow (UDF).
 * **Use Cases (e.g., `UpdateStateUseCase`):** Contain complex business logic and calculations. They
   are invoked after a state has been reduced to derive new properties of the state (e.g.,
   calculating line intersections, obstruction). They do not modify state directly.
-* **State (`OverlayState`):** A single, immutable data class that represents the entire state of the
+* **State (`CueDetatState`):** A single, immutable data class that represents the entire state of the
   application. The UI is a pure function of this state.
 
 ## Data Flow
@@ -25,10 +25,10 @@ Flow (UDF).
 1. A user **interacts** with the **View**.
 2. The View creates an **Event** (e.g., `MainScreenEvent.Drag`) and sends it to the **ViewModel**.
 3. The ViewModel receives the Event and forwards it to the **StateReducer**.
-4. The **StateReducer** takes the current `OverlayState` and the Event and produces a new, immutable
-   `OverlayState`.
+4. The **StateReducer** takes the current `CueDetatState` and the Event and produces a new, immutable
+   `CueDetatState`.
 5. The ViewModel runs the `UpdateStateUseCase` on the new state to calculate derived properties.
-6. The final, updated `OverlayState` is emitted from the ViewModel's `StateFlow`.
+6. The final, updated `CueDetatState` is emitted from the ViewModel's `StateFlow`.
 7. The **View**, observing the `StateFlow`, re-renders itself based on the new state.
 
 ## Rendering Pipeline Specification

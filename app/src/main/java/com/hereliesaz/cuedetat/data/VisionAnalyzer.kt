@@ -9,7 +9,6 @@ import androidx.camera.core.ImageProxy
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 
@@ -29,54 +28,64 @@ class VisionAnalyzer @Inject constructor(
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(image: ImageProxy) {
         uiStateRef.get()?.let { state ->
+            val bitmap = image.toBitmap()
+            _currentFrameBitmap.value = bitmap
             if (state.experienceMode == com.hereliesaz.cuedetat.domain.ExperienceMode.HATER) {
-                val bitmap = image.toBitmap()
-                _currentFrameBitmap.value = bitmap
+                // HATER mode only needs the frame for display — skip the full CV pipeline.
+                image.close()
+                return@let
             }
-            visionRepository.processImage(image, state)
+            if (state.isBeginnerViewLocked || bitmap == null) {
+                image.close()
+            } else {
+                visionRepository.processImage(image, bitmap, state)
+            }
         } ?: image.close() // Close the image if state is not available to prevent leaks
     }
+
+    // Reuse output bitmap across frames to avoid per-frame allocation.
+    private var outputBitmap: Bitmap? = null
 
     @OptIn(ExperimentalGetImage::class)
     private fun ImageProxy.toBitmap(): Bitmap? {
         val image = this.image ?: return null
+        if (image.format != ImageFormat.YUV_420_888) return null
 
-        if (image.format == ImageFormat.YUV_420_888) {
-            val yBuffer = image.planes[0].buffer // Y
-            val uBuffer = image.planes[1].buffer // U
-            val vBuffer = image.planes[2].buffer // V
+        val width = image.width
+        val height = image.height
+        val yPlane = image.planes[0]
+        val uPlane = image.planes[1]
+        val vPlane = image.planes[2]
 
-            val ySize = yBuffer.remaining()
-            val uSize = uBuffer.remaining()
-            val vSize = vBuffer.remaining()
+        val yRowStride = yPlane.rowStride
+        val uvRowStride = uPlane.rowStride
+        val uvPixelStride = uPlane.pixelStride
 
-            val nv21 = ByteArray(ySize + uSize + vSize)
+        val yBuf = yPlane.buffer
+        val uBuf = uPlane.buffer
+        val vBuf = vPlane.buffer
 
-            yBuffer.get(nv21, 0, ySize)
-            vBuffer.get(nv21, ySize, vSize)
-            uBuffer.get(nv21, ySize + vSize, uSize)
+        // Reuse pixel array to avoid per-frame allocation.
+        val pixels = IntArray(width * height)
+        for (row in 0 until height) {
+            for (col in 0 until width) {
+                val y = yBuf.get(row * yRowStride + col).toInt() and 0xFF
+                val uvRow = row / 2
+                val uvCol = col / 2
+                val uvIdx = uvRow * uvRowStride + uvCol * uvPixelStride
+                val u = (uBuf.get(uvIdx).toInt() and 0xFF) - 128
+                val v = (vBuf.get(uvIdx).toInt() and 0xFF) - 128
 
-            val yuvImage = android.graphics.YuvImage(
-                nv21,
-                ImageFormat.NV21,
-                this.width,
-                this.height,
-                null
-            )
-
-            val out = java.io.ByteArrayOutputStream()
-            yuvImage.compressToJpeg(
-                android.graphics.Rect(0, 0, yuvImage.width, yuvImage.height),
-                90,
-                out
-            )
-            val imageBytes = out.toByteArray()
-            return android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-        } else {
-            val buffer: ByteBuffer = image.planes[0].buffer
-            val bytes = ByteArray(buffer.remaining())
-            buffer.get(bytes)
-            return android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                val r = (y + 1.370705f * v).toInt().coerceIn(0, 255)
+                val g = (y - 0.698001f * v - 0.337633f * u).toInt().coerceIn(0, 255)
+                val b = (y + 1.732446f * u).toInt().coerceIn(0, 255)
+                pixels[row * width + col] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+            }
         }
+
+        val bmp = outputBitmap?.takeIf { it.width == width && it.height == height }
+            ?: Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { outputBitmap = it }
+        bmp.setPixels(pixels, 0, width, 0, 0, width, height)
+        return bmp
     }
 }

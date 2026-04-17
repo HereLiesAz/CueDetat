@@ -2,38 +2,39 @@
 
 package com.hereliesaz.cuedetat.ui.composables
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 
+/**
+ * The top bar UI containing Contextual Status Info (table size, distance).
+ *
+ * @param experienceMode Current experience mode (affects visibility of controls).
+ * @param isTableVisible Whether the table is visible (affects table size display).
+ * @param tableSizeFeet Current table size in feet.
+ * @param isBeginnerViewLocked Whether the camera view is locked (Beginner mode).
+ * @param targetBallDistance Distance to the target ball.
+ * @param distanceUnit Unit of measurement (Metric/Imperial).
+ * @param onCycleTableSize Callback to cycle table size.
+ * @param modifier Styling modifier.
+ */
 @Composable
 fun TopControls(
-    areHelpersVisible: Boolean,
     experienceMode: ExperienceMode?,
     isTableVisible: Boolean,
     tableSizeFeet: Int,
@@ -41,61 +42,23 @@ fun TopControls(
     targetBallDistance: Float,
     distanceUnit: DistanceUnit,
     onCycleTableSize: () -> Unit,
-    onMenuClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .statusBarsPadding()
+            .statusBarsPadding() // Avoid overlapping system status bar.
             .padding(start = 16.dp, end = 16.dp, top = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.Top
     ) {
-        Box(
-            modifier = Modifier
-                .clip(CircleShape)
-                .clickable(
-                    onClickLabel = "Open Menu",
-                    role = Role.Button,
-                    onClick = onMenuClick
-                )
-                .semantics {
-                    contentDescription = "Menu"
-                },
-            contentAlignment = Alignment.CenterStart
-        ) {
-            if (areHelpersVisible && experienceMode != ExperienceMode.HATER) {
-                Column(
-                     modifier = Modifier.padding(8.dp)
-                ) {
-                    Text(
-                        text = stringResource(id = R.string.app_name),
-                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 28.sp),
-                        color = MaterialTheme.colorScheme.primary,
-                        textAlign = TextAlign.Start
-                    )
-                    Text(
-                        text = stringResource(id = R.string.tagline),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Start
-                    )
-                }
-            } else {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_launcher),
-                    contentDescription = null, // Handled by parent semantics
-                    modifier = Modifier.size(64.dp)
-                )
-            }
-        }
-
+        // --- Right Side: Contextual Status (Table Size, Distance) ---
         if (experienceMode != ExperienceMode.HATER) {
             Column(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Table Size Indicator (Clickable to change).
                 if (isTableVisible) {
                     Column(
                         horizontalAlignment = Alignment.End,
@@ -124,6 +87,7 @@ fun TopControls(
                     }
                 }
 
+                // Distance Indicator.
                 if (experienceMode != ExperienceMode.BEGINNER || !isBeginnerViewLocked) {
                     Column(horizontalAlignment = Alignment.End) {
                         val distanceText = if (targetBallDistance > 0) {

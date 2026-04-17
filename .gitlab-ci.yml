@@ -1,0 +1,193 @@
+image: mobiledevops/android-sdk-image:34.0.0-jdk17
+
+variables:
+  GIT_DEPTH: "0"
+
+stages:
+  - build
+  - release
+  - utils
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .gradle/caches
+    - .gradle/wrapper
+
+build_and_release:
+  stage: build
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" || $CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+  before_script:
+    - apt-get update && apt-get install -y gettext-base zip || true
+    - |
+      if [ -f "app/google-services.json.template" ]; then
+        echo "Template found. Injecting secrets..."
+        sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
+      else
+        echo "Warning: google-services.json.template not found. Skipping injection."
+      fi
+      
+      echo "ARCORE_API_KEY=$ARCORE_API_KEY" >> local.properties
+      
+    - |
+      echo "Generating keystore from certificate chain and private key..."
+      echo "$KEYSTORE_PRIVATE" > private_key.pem
+      echo "$KEYSTORE_CHAIN" > certificate_chain.crt
+      
+      openssl pkcs12 -export -in certificate_chain.crt -inkey private_key.pem \
+        -name "$KEY_ALIAS" -out keystore.p12 \
+        -password pass:"$KEYSTORE_PASSWORD"
+      
+      keytool -importkeystore -srckeystore keystore.p12 -srcstoretype PKCS12 \
+        -destkeystore app/keystore.jks -deststoretype JKS \
+        -srcstorepass "$KEYSTORE_PASSWORD" \
+        -deststorepass "$KEYSTORE_PASSWORD" \
+        -alias "$KEY_ALIAS" -noprompt
+      rm private_key.pem certificate_chain.crt keystore.p12
+      
+    - chmod +x gradlew
+  script:
+    - export BUILD_NUMBER=$(git rev-list --count HEAD)
+    - |
+      ./gradlew assembleDebug -PversionBuild=$BUILD_NUMBER --build-cache \
+        -Pandroid.injected.signing.store.file=$(pwd)/app/keystore.jks \
+        -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
+        -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+        -Pandroid.injected.signing.key.password=$KEY_PASSWORD
+      
+    - MAJOR=$(grep '^MAJOR=' version.properties | cut -d'=' -f2)
+    - MINOR=$(grep '^MINOR=' version.properties | cut -d'=' -f2)
+    - MINOR_COMMIT=$(git blame -L '/^MINOR=/',+1 version.properties | awk '{print $1}' | tr -d '^')
+    - |
+      if [ -n "$MINOR_COMMIT" ]; then
+        PATCH=$(git rev-list --count ${MINOR_COMMIT}..HEAD)
+      else
+        PATCH=$(grep '^PATCH=' version.properties | cut -d'=' -f2)
+      fi
+    - VERSION_NAME="${MAJOR}.${MINOR}.${PATCH}.${BUILD_NUMBER}"
+    - TAG_NAME="v${MAJOR}.${MINOR}-debug"
+    
+    - |
+      if [ -f "settings.gradle.kts" ]; then
+         APP_NAME=$(grep 'rootProject.name' settings.gradle.kts | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
+      elif [ -f "settings.gradle" ]; then
+         APP_NAME=$(grep 'rootProject.name' settings.gradle | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
+      else
+         APP_NAME="App"
+      fi
+      
+    - APK_ORIGINAL=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+    - if [ -z "$APK_ORIGINAL" ]; then echo "Error No APK found"; exit 1; fi
+    - TARGET_NAME="${APP_NAME}-${VERSION_NAME}-debug.apk"
+    - mv "$APK_ORIGINAL" "$TARGET_NAME"
+    - echo "TAG_NAME=$TAG_NAME" >> release.env
+    - echo "APK_FILE=$TARGET_NAME" >> release.env
+    - mkdir -p build_tools_package/tools build_tools_package/native
+    - "[ -d \"app/src/main/assets/tools\" ] && cp -r app/src/main/assets/tools/* build_tools_package/tools/ || true"
+    - "[ -d \"app/src/main/jniLibs/arm64-v8a\" ] && cp -r app/src/main/jniLibs/arm64-v8a/* build_tools_package/native/ || true"
+    - cd build_tools_package && zip -r ../build-tools.zip . && cd ..
+
+  artifacts:
+    reports:
+      dotenv: release.env
+    paths:
+      - "*.apk"
+      - build-tools.zip
+    expire_in: 1 week
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  needs:
+    - job: build_and_release
+      artifacts: true
+  script:
+    - echo "Creating release for $TAG_NAME with $APK_FILE"
+  release:
+    name: 'Latest Debug Build ($TAG_NAME)'
+    description: 'Auto-build from commit $CI_COMMIT_SHA'
+    tag_name: '$TAG_NAME'
+    ref: '$CI_COMMIT_SHA'
+    assets:
+      links:
+        - name: "$APK_FILE"
+          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/${APK_FILE}"
+        - name: "build-tools.zip"
+          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/build-tools.zip"
+
+surgical-extraction:
+  stage: utils
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  script:
+    - TIMESTAMP=$(date +'%Y%m%d_%H%M%S')
+    - OUTFILE="project_backup_surgical_${TIMESTAMP}.txt"
+    - MANIFEST="skipped_files.tmp"
+    - TRASH_DIRS="build out bin obj .gradle .idea .vscode .git node_modules captures captured .cxx generated build_test libs venv __pycache__ .dart_tool .next .nuxt dist site-packages .pytest_cache"
+    - TRASH_FILES="package-lock.json yarn.lock local.properties .DS_Store Thumbs.db"
+    - EXTENSIONS=("kt" "kts" "java" "xml" "gradle" "properties" "pro" "toml" "cpp" "c" "cc" "h" "hpp" "ld" "S" "cmake" "in" "js" "jsx" "ts" "tsx" "html" "css" "vue" "svelte" "json" "dart" "arb" "py" "ipynb" "ini" "cfg" "yaml" "yml" "sql" "env" "md" "markdown" "rst" "adoc" "txt")
+    - CRITICAL_FILES=("CMakeLists.txt" "Android.mk" "Application.mk" "Makefile" "Dockerfile" "docker-compose.yml" "requirements.txt" "Gemfile" "Rakefile" "LICENSE" "README")
+    - |
+      is_binary() {
+        if head -c 512 "$1" | grep -qP '\x00'; then return 0; else return 1; fi
+      }
+    - FILES=$(find . -type f)
+    - touch "$OUTFILE" "$MANIFEST"
+    - echo "$FILES" > filelist.tmp
+    - |
+      while IFS= read -r file; do
+          SKIP=0
+          for trash in $TRASH_DIRS; do
+              if [[ "$file" == *"/$trash/"* ]] || [[ "$file" == "$trash/"* ]] || [[ "$file" == *"/$trash" ]]; then SKIP=1; break; fi
+          done
+          basename=$(basename "$file")
+          for trash in $TRASH_FILES; do
+              if [[ "$basename" == "$trash" ]]; then SKIP=1; break; fi
+          done
+          if [[ "$SKIP" -eq 1 ]]; then continue; fi
+
+          IS_WHITELISTED=0
+          ext="${file##*.}"
+          for valid_ext in "${EXTENSIONS[@]}"; do
+              if [[ "$ext" == "$valid_ext" ]]; then IS_WHITELISTED=1; break; fi
+          done
+          if [[ "$IS_WHITELISTED" -eq 0 ]]; then
+              for valid_name in "${CRITICAL_FILES[@]}"; do
+                  if [[ "$basename" == "$valid_name" ]]; then IS_WHITELISTED=1; break; fi
+              done
+          fi
+
+          if [[ "$IS_WHITELISTED" -eq 1 ]]; then
+              echo ">>> $file" >> "$OUTFILE"
+              if is_binary "$file"; then
+                  echo "[BINARY CONTENT REDACTED]" >> "$OUTFILE"
+              else
+                  cat "$file" >> "$OUTFILE" 2>>/dev/null || echo "[READ ERROR]" >> "$OUTFILE"
+              fi
+              echo -e "\n\n" >> "$OUTFILE"
+          else
+              echo "$file" >> "$MANIFEST"
+          fi
+      done < filelist.tmp
+    - rm filelist.tmp
+    - echo -e "\n\n==================================================================" >> "$OUTFILE"
+    - echo "       SKIPPED FILES REPORT (The Grey Zone)" >> "$OUTFILE"
+    - echo "       (Files present in repo but extensions not whitelisted)" >> "$OUTFILE"
+    - echo "==================================================================" >> "$OUTFILE"
+    - |
+      if [ -s "$MANIFEST" ]; then
+          cat "$MANIFEST" >> "$OUTFILE"
+      else
+          echo "(None)" >> "$OUTFILE"
+      fi
+    - rm "$MANIFEST"
+  artifacts:
+    name: "surgical-backup"
+    paths:
+      - project_backup_surgical_*.txt
+    expire_in: 1 day

@@ -33,7 +33,7 @@ import com.hereliesaz.cuedetat.ui.MainViewModel
 import com.hereliesaz.cuedetat.ui.ProtractorScreen
 import com.hereliesaz.cuedetat.ui.composables.SplashScreen
 import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
-import com.hereliesaz.cuedetat.ui.composables.quickalign.QuickAlignViewModel
+import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanViewModel
 import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
 import com.hereliesaz.cuedetat.ui.hatemode.HaterScreen
 import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
     private val calibrationViewModel: CalibrationViewModel by viewModels()
-    private val quickAlignViewModel: QuickAlignViewModel by viewModels()
+    private val tableScanViewModel: TableScanViewModel by viewModels()
     private val haterViewModel: HaterViewModel by viewModels()
 
     @Inject
@@ -100,7 +100,13 @@ class MainActivity : ComponentActivity() {
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
                         startActivity(intent)
                     } else {
-                        // Log suspicious URL attempt or handle gracefully
+                        // Notify the user instead of failing silently
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Link blocked for security.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        android.util.Log.w("MainActivity", "Suspicious URL blocked: ${event.url}")
                     }
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
@@ -117,6 +123,10 @@ class MainActivity : ComponentActivity() {
                 }
                 is SingleEvent.InitiateHaterMode -> {
                     haterViewModel.onEvent(HaterEvent.EnterHaterMode)
+                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
+                }
+                is SingleEvent.HaterShake -> {
+                    haterViewModel.onEvent(HaterEvent.ShakeDetected)
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 null -> { /* Do nothing */ }
@@ -170,7 +180,7 @@ class MainActivity : ComponentActivity() {
                         ProtractorScreen(
                             mainViewModel = viewModel,
                             calibrationViewModel = calibrationViewModel,
-                            quickAlignViewModel = quickAlignViewModel,
+                            tableScanViewModel = tableScanViewModel,
                             calibrationAnalyzer = calibrationAnalyzer
                         )
                     }

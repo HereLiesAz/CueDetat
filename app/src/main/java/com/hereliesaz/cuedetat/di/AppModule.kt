@@ -1,13 +1,22 @@
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/di/AppModule.kt
+
 package com.hereliesaz.cuedetat.di
 
 import android.content.Context
+import android.graphics.PointF
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.google.gson.TypeAdapter
+import com.google.gson.stream.JsonReader
+import com.google.gson.stream.JsonToken
+import com.google.gson.stream.JsonWriter
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
-import com.hereliesaz.cuedetat.data.ShakeDetector
-import com.hereliesaz.cuedetat.data.UserPreferencesRepository
+import com.hereliesaz.cuedetat.data.TFLitePoolDetector
 import com.hereliesaz.cuedetat.network.GithubApi
+import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
+import com.hereliesaz.cuedetat.ui.composables.tablescan.TFLitePocketDetector
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -17,10 +26,22 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Singleton
 
+/**
+ * The main Dependency Injection module for Hilt.
+ *
+ * This object defines how to create the singleton instances of core application services.
+ * Hilt uses this to generate the dependency graph.
+ *
+ * Scope: [SingletonComponent] -> These objects live as long as the Application.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
+    /**
+     * Provides the Retrofit interface for GitHub API interactions.
+     * Used for checking updates and submitting automated issue reports.
+     */
     @Provides
     @Singleton
     fun provideGithubApi(): GithubApi {
@@ -31,15 +52,9 @@ object AppModule {
             .create(GithubApi::class.java)
     }
 
-    @Provides
-    @Singleton
-    fun provideUserPreferencesRepository(
-        @ApplicationContext context: Context,
-        gson: Gson
-    ): UserPreferencesRepository {
-        return UserPreferencesRepository(context, gson)
-    }
-
+    /**
+     * Provides the Google ML Kit Object Detector.
+     */
     @Provides
     @Singleton
     @GenericDetector
@@ -56,15 +71,56 @@ object AppModule {
         }
     }
 
+    /**
+     * Provides the TFLite Pool detector used for tracking balls and cues.
+     */
     @Provides
     @Singleton
-    fun provideShakeDetector(@ApplicationContext context: Context): ShakeDetector {
-        return ShakeDetector(context)
+    fun providePoolDetector(@ApplicationContext context: Context): TFLitePoolDetector {
+        return TFLitePoolDetector(context)
     }
 
+    /**
+     * Provides the TFLite-backed pocket detector used during table scanning.
+     * Gracefully degrades to Hough circles if the model fails to initialize.
+     */
+    @Provides
+    @Singleton
+    fun providePocketDetector(@ApplicationContext context: Context): PocketDetector {
+        return TFLitePocketDetector(context)
+    }
+
+    /**
+     * Provides a shared Gson instance.
+     * Used for JSON serialization in Repositories and Network calls.
+     */
     @Provides
     @Singleton
     fun provideGson(): Gson {
-        return Gson()
+        return GsonBuilder()
+            .registerTypeAdapter(PointF::class.java, object : TypeAdapter<PointF>() {
+                override fun write(out: JsonWriter, value: PointF?) {
+                    if (value == null) { out.nullValue(); return }
+                    out.beginObject()
+                    out.name("x").value(value.x)
+                    out.name("y").value(value.y)
+                    out.endObject()
+                }
+                override fun read(input: JsonReader): PointF? {
+                    if (input.peek() == JsonToken.NULL) { input.nextNull(); return null }
+                    var x = 0f; var y = 0f
+                    input.beginObject()
+                    while (input.hasNext()) {
+                        when (input.nextName()) {
+                            "x" -> x = input.nextDouble().toFloat()
+                            "y" -> y = input.nextDouble().toFloat()
+                            else -> input.skipValue()
+                        }
+                    }
+                    input.endObject()
+                    return PointF(x, y)
+                }
+            })
+            .create()
     }
 }

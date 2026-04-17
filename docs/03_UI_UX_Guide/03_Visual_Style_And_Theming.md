@@ -11,7 +11,7 @@ This document specifies the application's visual identity.
 ## Theme Toggle
 
 * A menu option must exist to toggle between dark, light, and system-default themes.
-* The `isForceLightMode: Boolean?` property in `OverlayState` controls this: `true` for light,
+* The `isForceLightMode: Boolean?` property in `CueDetatState` controls this: `true` for light,
   `false` for dark, `null` for system.
 
 ## Glow Effect
@@ -21,6 +21,9 @@ This document specifies the application's visual identity.
   `BlurMaskFilter`.
 * **Line Glows:** Use `Paint.Style.FILL_AND_STROKE`.
 * **Ball Glows:** Use `Paint.Style.STROKE`.
+* **Beginner Ball Stationary Outline Glow:** Uses `BlurMaskFilter.Blur.OUTER` so that blur radiates
+  outward only, keeping the circle interior transparent. All other glows use `Blur.NORMAL`.
+  `createGlowPaint` accepts a `blurType` parameter (defaults to `Blur.NORMAL`).
 * Glows must be drawn *before* the primary element to create a halo effect.
 
 ## Stroke & Opacity Rules
@@ -30,6 +33,18 @@ This document specifies the application's visual identity.
 * **Opacity**:
   * Menu backgrounds: 80% (`0.8f`).
   * Popup dialogs: 66% (`0.66f`).
+
+## Beginner Mode Specific Styling
+
+* **Static (Locked) Mode**:
+    * **Static Circles**: Must have **NO FILL, stroke only**.
+    * **Bubble Levels**: Must have **translucent fill only, NO STROKE**.
+    * **Layering**: Center dots must be rendered **above** all lines. Only text is permitted to
+      overlap center dots.
+
+* **Dynamic (Unlocked) Mode**:
+    * **Shot Line Anchor**: The near-end of the shot line must be permanently anchored to the
+      bottom of the screen.
 
 ## Spin Control Color Wheel
 

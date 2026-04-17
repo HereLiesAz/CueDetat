@@ -1,6 +1,8 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
 import android.graphics.PointF
+import com.hereliesaz.cuedetat.domain.BallSelectionPhase
+import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.ZoomMapping
@@ -50,7 +52,40 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             state.copy(viewOffset = PointF(newX, newY))
         }
 
+        is MainScreenEvent.MoveTableZ -> state.copy(
+            tableZOffset = (state.tableZOffset + action.delta).coerceIn(-50f, 50f)
+        )
+
         is MainScreenEvent.ApplyQuickAlign -> {
+            val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode)
+            val newZoomSliderPos = ZoomMapping.zoomToSlider(action.scale, minZoom, maxZoom)
+            state.copy(
+                viewOffset = PointF(action.translation.x, action.translation.y),
+                worldRotationDegrees = action.rotation,
+                zoomSliderPosition = newZoomSliderPos,
+                lensWarpTps = action.tpsWarpData,
+                isWorldLocked = true,
+                valuesChangedSinceReset = true
+            )
+        }
+
+        is MainScreenEvent.LoadTableScan -> state.copy(
+            tableScanModel = action.model,
+            lensWarpTps = action.model.lensWarpTps,
+            isWorldLocked = true,
+            cueBallCvAnchor = null,
+            targetCvAnchor = null
+        )
+
+        is MainScreenEvent.ClearTableScan -> state.copy(
+            tableScanModel = null,
+            lensWarpTps = null,
+            ballSelectionPhase = BallSelectionPhase.NONE,
+            cueBallCvAnchor = null,
+            targetCvAnchor = null
+        )
+
+        is MainScreenEvent.UpdateArPose -> {
             val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode)
             val newZoomSliderPos = ZoomMapping.zoomToSlider(action.scale, minZoom, maxZoom)
             state.copy(
@@ -61,6 +96,29 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
                 valuesChangedSinceReset = true
             )
         }
+
+        is MainScreenEvent.UpdateTableScanClusters -> {
+            val current = state.tableScanModel ?: return state
+            state.copy(
+                tableScanModel = current.copy(pockets = action.updatedClusters)
+            )
+        }
+
+        is MainScreenEvent.DepthPlaneUpdated ->
+            state.copy(depthPlane = action.plane)
+
+        is MainScreenEvent.ArCameraPoseUpdated ->
+            state.copy(arDerivedPitch = action.pitchDegrees)
+
+        is MainScreenEvent.DepthCapabilityDetected ->
+            state.copy(depthCapability = action.capability)
+
+        is MainScreenEvent.ArTrackingLost -> state.copy(
+            tableScanModel = null,
+            lensWarpTps = null,
+            arDerivedPitch = null,
+            cameraMode = if (state.cameraMode == CameraMode.AR_ACTIVE) CameraMode.AR_SETUP else state.cameraMode
+        )
 
         else -> state
     }

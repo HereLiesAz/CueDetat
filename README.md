@@ -14,10 +14,11 @@ This is an Android application that uses your device's camera and a frankly exce
 **(Warning: May induce an inflated sense of skill, followed by the crushing reality of physics. Use with a healthy dose of self-deprecating humor.)**
 
 ## Features
-
+ 
 *   **Live Camera Augmented Reality Overlay:**
     *   See the guides directly on your pool game.
-    *   Designed for easy one or two-handed use. 
+    *   Designed for easy one or two-handed use.
+    *   **Guided AR Table Setup Wizard:** A three-step wizard (lock felt color → scan pockets → verify alignment) walks you through calibrating the AR overlay. The system auto-confirms once the table overlay confidence crosses 0.8. If ARCore loses tracking, it gracefully resets and asks you to try again — because it knows how you are with instructions.
 *   **Protractor Mode** 
     *   To remind you of the basic, soul-crushing simplicity of a cut shot.
     *   See where the balls will go before you hit them.  
@@ -27,13 +28,16 @@ This is an Android application that uses your device's camera and a frankly exce
 *   **Make Bank**
     *   Calculate your multi-rail bank shots.
     *   Proof that even chaos subscribes to the laws of reflection, and it might be time to look at your own. 
-*   **All of the Balls You Could Want**
+*   **All the Balls You Could Want**
     *   (You definitely want them.)
     *   Simulated motherf---ing balls on a projected motherf---ing plane.
-    *   Determine whether or not another ball is in the way. 
+    *   Determine whether another ball is in the way. 
 *   **Spin Control**    
     *   A tool for applying English. Maybe even British.
     *   Explore the subtle arts of post-impact trajectory, and other new and exciting ways to scratch.
+*   **Massé Master**
+    *   Pick your impact point and the angle of attack to make the prettiest loop-de-loos on the table. 
+    *   Leave your opponent's jaw on the floor as you tear the felt up with such precision.
 *   **Dynamic 3D Perspective** 
     *   Use your phone's sensor data to create a 3D illusion. This feature's primary purpose is to induce a subtle vertigo that mirrors the existential dread of a poorly-played safety.  
 * **VERY Helpful Help:**
@@ -79,7 +83,7 @@ Unidirectional Data Flow is the master of the master of the universe. State flow
 *   **Text Collision Avoidance:** Current implementation is basic (first-drawn wins space).
 *   **A Virtual Table for Virtually Useful Bank Shot Projection:** Using more sophisticated dynamic layout involving a line drawing of a billiards table will come someday.
 *   **True 3D Rendering:** This app fakes 3D with 2D canvas tricks. Moving to OpenGL ES or a 3D engine like Filament would allow for actual 3D models and lighting, but would also drastically increase complexity. And probably anxiety. But probably not usefulness.
-*   **Ball, Table and Pocket Detection:** The ultimate fantasy. Using CV to detect the table, balls, and pockets automatically. For now, you are the CV.
+*   **Ball, Table and Pocket Detection:** Partially real, believe it or not. Pocket detection uses Hough circles with an optional TFLite (YOLOv5) model. Table scanning accumulates observations across frames, fits a 2:1 geometry model, and builds a TPS warp map for lens-distortion correction. Ball detection runs via ML Kit + OpenCV contour refinement on every frame. What remains fantasy: doing all of this reliably on a $12 phone held by someone who has had three beers.
 *   **Insulting Warnings:** The pool of sarcastic remarks is finite. Contributions welcome if they tickle me the required level of pink.
 *   **Performance:** Drawing many complex paths and text elements on every frame can be demanding. Optimizations are an ongoing battle. And yet, somehow, it feels more like a you-problem.
 

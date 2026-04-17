@@ -14,7 +14,7 @@ When a touch gesture begins, its intent is determined by the following order of 
     * **Twisting** (`calculateRotation`) dispatches a `TableRotationApplied` event.
 
 2. **Object Interaction:** A touch that begins directly upon an interactive
-   logical element will manipulate that element exclusively. This includes the `SpinControl`,
+   logical element will manipulate that element exclusively. This includes the `SpinControl` (which uses a double-tap-to-drag relocation gesture), `MasseControl` (also uses double-tap-to-drag),
    `ActualCueBall`, `TargetBall`, `GhostCueBall`, and any `ObstacleBall`. The touch target for these
    balls is a generous `radius * 3.5f`.
 
@@ -27,6 +27,16 @@ When a touch gesture begins, its intent is determined by the following order of 
    relative to the `TargetBall`'s center between pointer events. This angular delta is then applied
    to the protractor's current rotation, providing a smooth, intuitive interaction where the aiming
    apparatus "picks up" and follows the gesture.
+
+## Beginner Mode Gesture Restrictions
+
+In **Beginner Locked** state (`isBeginnerViewLocked == true`): all pan, drag, and world-rotation
+gestures are disabled. The only input active is the on-screen zoom slider.
+
+In **Beginner Free Aim** state (`isBeginnerViewLocked == false`): single-finger pan (world pan) and
+two-finger pan are suppressed. Ball dragging, rotational aiming, two-finger rotation, and
+pinch-to-zoom remain active. The world stays locked; the user can only move elements relative to the
+stationary world frame.
 
 ### Heresies of Interaction
 

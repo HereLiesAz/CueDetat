@@ -11,7 +11,7 @@ serving as a guide to avoid repeating past mistakes.
   incorrect calculations.
 * **Lesson Learned:** Reducers **must** be pure, stateless functions. Their output should depend
   only on their inputs (the current state and the event). Transient data needed for a single,
-  continuous gesture must be stored in the `OverlayState` itself, not as a property of the reducer.
+  continuous gesture must be stored in the `CueDetatState` itself, not as a property of the reducer.
 
 ### Case Study: Specificity of Events
 
@@ -28,7 +28,7 @@ serving as a guide to avoid repeating past mistakes.
 
 * **Issue:** On first launch, the aiming protractor defaulted to a horizontal (`0f`) angle instead
   of the specified vertical shot.
-* **Cause:** The default values in the `OverlayState` data class did not match the specification.
+* **Cause:** The default values in the `CueDetatState` data class did not match the specification.
 * **Lesson Learned:** The default values within a state class are the genesis of the application's
   world. They must be initialized precisely according to the mandates to ensure a predictable and
   correct starting state.
@@ -42,5 +42,5 @@ serving as a guide to avoid repeating past mistakes.
   different state object.
 * **Lesson Learned:** An `AndroidView` within a Compose hierarchy does not automatically obey
   Compose theming. All necessary state, including theme-defining flags, must be passed down from the
-  single source of truth (`OverlayState`) and applied within the `AndroidView`'s update logic (in
+  single source of truth (`CueDetatState`) and applied within the `AndroidView`'s update logic (in
   this case, the `PaintCache`).

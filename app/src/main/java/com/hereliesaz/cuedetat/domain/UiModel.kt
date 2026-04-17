@@ -1,5 +1,4 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/UiModel.kt
-
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/domain/CueDetatState.kt
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.Matrix
@@ -10,7 +9,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.VisionData
-import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
 import com.hereliesaz.cuedetat.ui.hatemode.HaterState
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
@@ -22,9 +20,15 @@ import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
 import com.hereliesaz.cuedetat.view.state.TableSize
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
-import kotlinx.coroutines.Job
 import org.opencv.core.Mat
 
+enum class CameraMode {
+    OFF, CAMERA, AR_SETUP, AR_ACTIVE, CAMERA_ONLY;
+    fun next(): CameraMode {
+        val nextOrdinal = (this.ordinal + 1) % values().size
+        return values()[nextOrdinal]
+    }
+}
 
 enum class ExperienceMode {
     EXPERT, BEGINNER, HATER;
@@ -34,18 +38,28 @@ enum class ExperienceMode {
     }
 }
 
+enum class BallSelectionPhase {
+    NONE, AWAITING_CUE, AWAITING_TARGET
+}
+
+@Keep
+data class FeltSample(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val hsv: List<Float>
+)
+
 @Keep
 data class CueDetatState(
     val experienceMode: ExperienceMode? = null,
     val pendingExperienceMode: ExperienceMode? = null,
     val haterState: HaterState = HaterState(),
-    val isMenuVisible: Boolean = false,
-    val isNavigationRailExpanded: Boolean = false,
     val viewWidth: Int = 0,
     val viewHeight: Int = 0,
+    val screenDensity: Float = 1.0f,
     val protractorUnit: ProtractorUnit = ProtractorUnit(PointF(0f, 0f), LOGICAL_BALL_RADIUS, 0f),
     val onPlaneBall: OnPlaneBall? = null,
     val obstacleBalls: List<OnPlaneBall> = emptyList(),
+    val savedFeltSamples: List<FeltSample> = emptyList(),
     val table: Table = Table(
         size = TableSize.EIGHT_FT,
         isVisible = false
@@ -53,11 +67,10 @@ data class CueDetatState(
     val zoomSliderPosition: Float = 0f,
     val worldRotationDegrees: Float = 0f,
     val areHelpersVisible: Boolean = LabelConfig.showLabelsByDefault,
-    val isMoreHelpVisible: Boolean = false,
     val valuesChangedSinceReset: Boolean = false,
-    val isCameraVisible: Boolean = true,
-    val showCameraFeed: Boolean = false,
+    val cameraMode: CameraMode = CameraMode.OFF,
     val viewOffset: PointF = PointF(0f, 0f),
+    val tableZOffset: Float = 0f,
     val orientationLock: OrientationLock = OrientationLock.PORTRAIT,
     @Transient val pendingOrientationLock: OrientationLock? = null,
     val isBeginnerViewLocked: Boolean = false,
@@ -72,16 +85,21 @@ data class CueDetatState(
     val glowStickValue: Float = 0f,
     val showGlowStickDialog: Boolean = false,
     val isSpinControlVisible: Boolean = false,
+    val isMasseModeActive: Boolean = false,
+    val masseShotAngleDeg: Float = 0f,
     val selectedSpinOffset: PointF? = null,
     @Transient val spinPaths: Map<Color, List<PointF>>? = null,
+    @Transient val masseImpactPoints: List<PointF> = emptyList(),
+    @Transient val masseConnectsTarget: Boolean = false,
+    @Transient val masseGhostBallCenter: PointF? = null,
     val spinControlCenter: PointF? = null,
     val lingeringSpinOffset: PointF? = null,
     @Transient val spinPathsAlpha: Float = 1.0f,
     val showTutorialOverlay: Boolean = false,
     val currentTutorialStep: Int = 0,
     @Transient val tutorialHighlight: TutorialHighlightElement? = TutorialHighlightElement.NONE,
-@Transient val flashingTutorialElement: TutorialHighlightElement? = null,
-@Transient val highlightAlpha: Float = 0f,
+    @Transient val flashingTutorialElement: TutorialHighlightElement? = null,
+    @Transient val highlightAlpha: Float = 0f,
     val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f),
     @Transient val pitchMatrix: Matrix? = null,
     @Transient val railPitchMatrix: Matrix? = null,
@@ -91,22 +109,26 @@ data class CueDetatState(
     @Transient val logicalPlaneMatrix: Matrix? = null,
     @Transient val hasInverseMatrix: Boolean = false,
     @Transient val visionData: VisionData? = null,
+    @Transient val arConfidenceHistory: List<Float> = emptyList(),
+    @Transient val arLowConfidenceFrameCount: Int = 0,
     @Transient val snapCandidates: List<SnapCandidate>? = null,
+    @Transient val tableScanModel: TableScanModel? = null,
+    @Transient val depthPlane: DepthPlane? = null,
+    @Transient val arDerivedPitch: Float? = null,
+    val depthCapability: DepthCapability = DepthCapability.NONE,
     val lockedHsvColor: FloatArray? = null,
     val lockedHsvStdDev: FloatArray? = null,
     val showAdvancedOptionsDialog: Boolean = false,
     val showCalibrationScreen: Boolean = false,
-    val showQuickAlignScreen: Boolean = false,
+    val showTableScanScreen: Boolean = false,
     val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
     val useCustomModel: Boolean = false,
     val isSnappingEnabled: Boolean = true,
     val hasTargetBallBeenMoved: Boolean = false,
     val hasCueBallBeenMoved: Boolean = false,
-    val houghP1: Float = 100f,
-    val houghP2: Float = 20f,
-    val houghThreshold: Int = 50,
-    val cannyThreshold1: Float = 50f,
-    val cannyThreshold2: Float = 150f,
+    val cannyThreshold1: Float = 40f,
+    val cannyThreshold2: Float = 120f,
+    val isAutoCalibrating: Boolean = false,
     val showCvMask: Boolean = false,
     val isTestingCvMask: Boolean = false,
     val isCalibratingColor: Boolean = false,
@@ -121,10 +143,10 @@ data class CueDetatState(
     @Transient val isTiltBeyondLimit: Boolean = false,
     @Transient val warningText: String? = null,
     @Transient val shotGuideImpactPoint: PointF? = null,
+    @Transient val aimedPocketIndex: Int? = null,
     @Transient val aimingLineBankPath: List<PointF>? = null,
     @Transient val tangentLineBankPath: List<PointF>? = null,
     @Transient val inactiveTangentLineBankPath: List<PointF>? = null,
-    @Transient val aimedPocketIndex: Int? = null,
     @Transient val tangentAimedPocketIndex: Int? = null,
     @Transient val aimingLineEndPoint: PointF? = null,
     @Transient val appControlColorScheme: ColorScheme? = null,
@@ -134,9 +156,15 @@ data class CueDetatState(
     @Transient val magnifierSourceCenter: Offset? = null,
     val isWorldLocked: Boolean = false,
     @Transient val preResetState: CueDetatState? = null,
+    @Transient val postResetState: CueDetatState? = null,
+    @Transient val ballSelectionPhase: BallSelectionPhase = BallSelectionPhase.NONE,
+    @Transient val cueBallCvAnchor: PointF? = null,
+    @Transient val targetCvAnchor: PointF? = null,
+    @Transient val obstacleCvAnchors: List<PointF?> = emptyList(),
     @Transient val latestVersionName: String? = null,
     val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
     @Transient val targetBallDistance: Float = 0f,
+    val lensWarpTps: TpsWarpData? = null,
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
@@ -157,23 +185,23 @@ sealed class MainScreenEvent {
     object ToggleExperienceModeSelection : MainScreenEvent()
     object ApplyPendingExperienceMode : MainScreenEvent()
     data class SetExperienceMode(val mode: ExperienceMode) : MainScreenEvent()
-    data class HaterAction(val action: HaterEvent) : MainScreenEvent()
-    object ToggleMenu : MainScreenEvent()
-    object ToggleNavigationRail : MainScreenEvent()
     data class ScreenGestureStarted(val position: PointF) : MainScreenEvent()
     data class Drag(val previousPosition: PointF, val currentPosition: PointF) : MainScreenEvent()
     object GestureEnded : MainScreenEvent()
-    data class SizeChanged(val width: Int, val height: Int) : MainScreenEvent()
+    data class SizeChanged(val width: Int, val height: Int, val density: Float) : MainScreenEvent()
     data class ZoomScaleChanged(val scaleFactor: Float) : MainScreenEvent()
     data class TableRotationApplied(val degrees: Float) : MainScreenEvent()
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
     data class PanView(val delta: PointF) : MainScreenEvent()
+    data class MoveTableZ(val delta: Float) : MainScreenEvent()
     object ToggleSpinControl : MainScreenEvent()
+    object ToggleMasseMode : MainScreenEvent()
     data class SpinApplied(val offset: PointF) : MainScreenEvent()
     object SpinSelectionEnded : MainScreenEvent()
     data class DragSpinControl(val delta: PointF) : MainScreenEvent()
     object ClearSpinState : MainScreenEvent()
-    internal data class LogicalGestureStarted(val logicalPoint: PointF, val screenOffset: Offset) :
+    object SpinPathTick : MainScreenEvent()
+    internal data class LogicalGestureStarted(val logicalPoint: PointF, val screenOffset: Offset, val isDoubleTap: Boolean = false) :
         MainScreenEvent()
 
     internal data class LogicalDragApplied(
@@ -186,13 +214,12 @@ sealed class MainScreenEvent {
     data class ThemeChanged(val scheme: ColorScheme) : MainScreenEvent()
     object Reset : MainScreenEvent()
     object ToggleHelp : MainScreenEvent()
-    object ToggleMoreHelp : MainScreenEvent()
     object ToggleBankingMode : MainScreenEvent()
     object CycleTableSize : MainScreenEvent()
     data class SetTableSize(val size: TableSize) : MainScreenEvent()
     object ToggleTableSizeDialog : MainScreenEvent()
     object ToggleForceTheme : MainScreenEvent()
-    object ToggleCamera : MainScreenEvent()
+    object CycleCameraMode : MainScreenEvent()
     object ToggleLuminanceDialog : MainScreenEvent()
     data class AdjustLuminance(val adjustment: Float) : MainScreenEvent()
     object ToggleDistanceUnit : MainScreenEvent()
@@ -208,19 +235,24 @@ sealed class MainScreenEvent {
     object LockBeginnerView : MainScreenEvent()
     object AddObstacleBall : MainScreenEvent()
     data class CvDataUpdated(val visionData: VisionData) : MainScreenEvent()
+    object AutoCalibrateCv : MainScreenEvent()
     object LockOrUnlockColor : MainScreenEvent()
     data class LockColor(val hsvMean: FloatArray, val hsvStdDev: FloatArray) : MainScreenEvent()
+    data class AddFeltSample(val hsv: List<Float>) : MainScreenEvent()
+    data class DeleteFeltSamples(val ids: Set<String>) : MainScreenEvent()
+    data class MoveFeltSample(val fromIndex: Int, val toIndex: Int) : MainScreenEvent()
+    object StartArTracking : MainScreenEvent()
     object ClearSamplePoint : MainScreenEvent()
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
     object ToggleCalibrationScreen : MainScreenEvent()
-    object ToggleQuickAlignScreen : MainScreenEvent()
-    data class ApplyQuickAlign(val translation: Offset, val rotation: Float, val scale: Float) :
-        MainScreenEvent()
+    data class ApplyQuickAlign(
+        val translation: Offset,
+        val rotation: Float,
+        val scale: Float,
+        val tpsWarpData: TpsWarpData
+    ) : MainScreenEvent()
 
     object ToggleCvRefinementMethod : MainScreenEvent()
-    data class UpdateHoughP1(val value: Float) : MainScreenEvent()
-    data class UpdateHoughP2(val value: Float) : MainScreenEvent()
-    data class UpdateHoughThreshold(val value: Float) : MainScreenEvent()
     data class UpdateCannyT1(val value: Float) : MainScreenEvent()
     data class UpdateCannyT2(val value: Float) : MainScreenEvent()
     object ToggleCvModel : MainScreenEvent()
@@ -233,12 +265,40 @@ sealed class MainScreenEvent {
     object StartTutorial : MainScreenEvent()
     object NextTutorialStep : MainScreenEvent()
     object EndTutorial : MainScreenEvent()
+    object TutorialBack : MainScreenEvent()
     data class UpdateHighlightAlpha(val alpha: Float) : MainScreenEvent()
     object CheckForUpdate : MainScreenEvent()
     object ViewArt : MainScreenEvent()
     object ViewAboutPage : MainScreenEvent()
     object SendFeedback : MainScreenEvent()
     object SingleEventConsumed : MainScreenEvent()
-    object ToastShown : MainScreenEvent()
+    object Shake : MainScreenEvent()
+    object ExitToSplash : MainScreenEvent()
     data class RestoreState(val state: CueDetatState) : MainScreenEvent()
+
+    // Table scan events
+    data class LoadTableScan(val model: TableScanModel) : MainScreenEvent()
+    object ClearTableScan : MainScreenEvent()
+    data class UpdateArPose(
+        val translation: Offset,
+        val rotation: Float,
+        val scale: Float
+    ) : MainScreenEvent()
+    data class UpdateTableScanClusters(
+        val updatedClusters: List<PocketCluster>
+    ) : MainScreenEvent()
+    object ToggleTableScanScreen : MainScreenEvent()
+
+    // Depth / ARCore events
+    data class DepthPlaneUpdated(val plane: DepthPlane) : MainScreenEvent()
+    data class DepthCapabilityDetected(val capability: DepthCapability) : MainScreenEvent()
+    data class ArCameraPoseUpdated(
+        val pitchDegrees: Float,
+        val heightAboveSurfaceM: Float
+    ) : MainScreenEvent()
+
+    // AR setup / lifecycle events
+    object CancelArSetup : MainScreenEvent()
+    object TurnCameraOff : MainScreenEvent()
+    object ArTrackingLost : MainScreenEvent()
 }

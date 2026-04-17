@@ -3,60 +3,66 @@ package com.hereliesaz.cuedetat.domain.reducers
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 
-internal fun reduceAdvancedOptionsAction(
-    state: CueDetatState,
-    action: MainScreenEvent
-): CueDetatState {
+/**
+ * Reducer responsible for the 'Felt Sacrifice' and CV tuning.
+ *
+ * This governs the advanced configuration of the computer vision engine, allowing
+ * the user to manually refine thresholds when the lighting conditions are
+ * ontologically challenging.
+ *
+ * @param state The current application state.
+ * @param action The specific CV tuning event.
+ * @return A new state reflecting the adjusted vision parameters.
+ */
+internal fun reduceAdvancedOptionsAction(state: CueDetatState, action: MainScreenEvent): CueDetatState {
     return when (action) {
+        // Toggle the visibility of the deep configuration dialog.
         is MainScreenEvent.ToggleAdvancedOptionsDialog -> {
-            val isOpening = !state.showAdvancedOptionsDialog
-            if (!isOpening) {
-                state.copy(
-                    showAdvancedOptionsDialog = false,
-                    showCvMask = false,
-                    isTestingCvMask = false,
-                    isCalibratingColor = false
-                )
-            } else {
-                state.copy(showAdvancedOptionsDialog = true)
-            }
+            state.copy(showAdvancedOptionsDialog = !state.showAdvancedOptionsDialog)
         }
 
-        is MainScreenEvent.ToggleCvMask -> state.copy(showCvMask = !state.showCvMask)
-        is MainScreenEvent.EnterCvMaskTestMode -> state.copy(
-            isTestingCvMask = true,
-            showCvMask = true,
-            showAdvancedOptionsDialog = false
-        )
+        // Enable/Disable the CV mask overlay (seeing the world as the AI does).
+        is MainScreenEvent.ToggleCvMask -> {
+            state.copy(showCvMask = !state.showCvMask)
+        }
 
-        is MainScreenEvent.ExitCvMaskTestMode -> state.copy(
-            isTestingCvMask = false,
-            showCvMask = true,
-            showAdvancedOptionsDialog = true
-        )
+        // Entering the void where only contours and thresholded pixels exist.
+        is MainScreenEvent.EnterCvMaskTestMode -> {
+            state.copy(isTestingCvMask = true)
+        }
 
-        is MainScreenEvent.EnterCalibrationMode -> state.copy(
-            isCalibratingColor = true,
-            showAdvancedOptionsDialog = false,
-            showCvMask = false
-        )
+        is MainScreenEvent.ExitCvMaskTestMode -> {
+            state.copy(isTestingCvMask = false)
+        }
 
-        is MainScreenEvent.SampleColorAt -> state.copy(
-            colorSamplePoint = action.screenPosition,
-            isCalibratingColor = false,
-            isTestingCvMask = true,
-            showCvMask = true
-        )
+        // The 'Felt Sacrifice' phase: defining the color of the table.
+        is MainScreenEvent.EnterCalibrationMode -> {
+            state.copy(isCalibratingColor = true)
+        }
 
-        is MainScreenEvent.ToggleCvRefinementMethod -> state.copy(
-            cvRefinementMethod = state.cvRefinementMethod.next()
-        )
+        is MainScreenEvent.SampleColorAt -> {
+            state.copy(
+                colorSamplePoint = action.screenPosition,
+                // Exit calibration mode once the sacrifice is made.
+                isCalibratingColor = false
+            )
+        }
 
-        is MainScreenEvent.UpdateHoughP1 -> state.copy(houghP1 = action.value)
-        is MainScreenEvent.UpdateHoughP2 -> state.copy(houghP2 = action.value)
-        is MainScreenEvent.UpdateHoughThreshold -> state.copy(houghThreshold = action.value.toInt())
-        is MainScreenEvent.UpdateCannyT1 -> state.copy(cannyThreshold1 = action.value)
-        is MainScreenEvent.UpdateCannyT2 -> state.copy(cannyThreshold2 = action.value)
+
+
+        is MainScreenEvent.UpdateCannyT1 -> {
+            state.copy(cannyThreshold1 = action.value)
+        }
+
+        is MainScreenEvent.UpdateCannyT2 -> {
+            state.copy(cannyThreshold2 = action.value)
+        }
+
+        // Cycle through refinement algorithms (Hough vs Contour).
+        is MainScreenEvent.ToggleCvRefinementMethod -> {
+            state.copy(cvRefinementMethod = state.cvRefinementMethod.next())
+        }
+
         else -> state
     }
 }

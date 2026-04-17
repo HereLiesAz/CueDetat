@@ -12,69 +12,64 @@ import com.hereliesaz.cuedetat.view.model.Table
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.TableSize
 
+/**
+ * Reducer function responsible for handling System-level events.
+ *
+ * This includes events related to:
+ * - Screen size changes (layout updates).
+ * - Device orientation changes.
+ * - Theme/Color scheme updates.
+ * - System warnings.
+ *
+ * @param state The current state.
+ * @param action The system event.
+ * @return The updated state.
+ */
 internal fun reduceSystemAction(state: CueDetatState, action: MainScreenEvent): CueDetatState {
+    // Process the specific system event.
     return when (action) {
+        // Case: The size of the main view container has changed (e.g., layout pass, resize).
         is MainScreenEvent.SizeChanged -> handleSizeChanged(state, action)
+
+        // Case: The device's physical orientation has changed (Portrait/Landscape).
         is MainScreenEvent.FullOrientationChanged -> state.copy(currentOrientation = action.orientation)
+
+        // Case: The application's theme/color scheme has been updated (e.g., dynamic colors).
         is MainScreenEvent.ThemeChanged -> state.copy(appControlColorScheme = action.scheme)
+
+        // Case: A warning message needs to be displayed or cleared.
         is MainScreenEvent.SetWarning -> state.copy(warningText = action.warning)
+
+        // Fallback: Return state unchanged for unknown actions.
         else -> state
     }
 }
 
+/**
+ * Handles changes to the view's dimensions.
+ *
+ * If this is the FIRST time dimensions are being set (initialization),
+ * it triggers the creation of the initial state with default values centered in the view.
+ * Otherwise, it just updates the dimensions in the existing state.
+ *
+ * @param state The current state.
+ * @param action The size change event containing new width and height.
+ * @return The updated state.
+ */
 private fun handleSizeChanged(
     state: CueDetatState,
     action: MainScreenEvent.SizeChanged
 ): CueDetatState {
-    if (state.viewWidth == 0 && state.viewHeight == 0) {
-        return createInitialState(
-            action.width,
-            action.height,
-            state.appControlColorScheme ?: darkColorScheme()
-        )
+    val newSpinCenter = if (state.spinControlCenter == null && action.width > 0 && action.height > 0) {
+        PointF(action.width / 2f, 116f * action.density)
+    } else {
+        state.spinControlCenter
     }
+
     return state.copy(
         viewWidth = action.width,
         viewHeight = action.height,
-    )
-}
-
-private fun createInitialState(
-    viewWidth: Int,
-    viewHeight: Int,
-    appColorScheme: ColorScheme
-): CueDetatState {
-    val initialSliderPos = 0f
-    val initialProtractorCenter = PointF(0f, 0f)
-    val initialSpinControlCenter = PointF(viewWidth / 2f, viewHeight * 0.75f)
-
-    return CueDetatState(
-        viewWidth = viewWidth,
-        viewHeight = viewHeight,
-        protractorUnit = ProtractorUnit(
-            center = initialProtractorCenter,
-            radius = LOGICAL_BALL_RADIUS,
-            rotationDegrees = 0f
-        ),
-        table = Table(
-            size = TableSize.EIGHT_FT,
-            isVisible = false,
-        ),
-        onPlaneBall = null,
-        zoomSliderPosition = initialSliderPos,
-        isBankingMode = false,
-        bankingAimTarget = null,
-        valuesChangedSinceReset = false,
-        areHelpersVisible = LabelConfig.showLabelsByDefault,
-        isMoreHelpVisible = false,
-        isForceLightMode = null,
-        luminanceAdjustment = 0f,
-        showLuminanceDialog = false,
-        showTutorialOverlay = false,
-        currentTutorialStep = 0,
-        appControlColorScheme = appColorScheme,
-        interactionMode = InteractionMode.NONE,
-        spinControlCenter = initialSpinControlCenter,
-        experienceMode = null // Force selection on first load
+        screenDensity = action.density,
+        spinControlCenter = newSpinCenter
     )
 }

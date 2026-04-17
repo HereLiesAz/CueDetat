@@ -17,6 +17,7 @@ import com.hereliesaz.cuedetat.view.config.table.Rail
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
+import com.hereliesaz.cuedetat.view.renderer.warpedBy
 import kotlin.math.pow
 
 class RailRenderer {
@@ -45,7 +46,24 @@ class RailRenderer {
         val railOffsetAmount = LOGICAL_BALL_RADIUS * railVisualOffsetFromEdgeFactor
         val pocketRadius = LOGICAL_BALL_RADIUS * 1.8f
 
-        val corners = state.table.corners
+        val tps = state.lensWarpTps
+        val corners = state.table.corners.map { it.warpedBy(tps) }
+
+        // Recompute outward normals from warped corner edges.
+        // Corner order: [0]=TL, [1]=TR, [2]=BR, [3]=BL (clockwise).
+        val tableCenter = PointF(
+            corners.sumOf { it.x.toDouble() }.toFloat() / 4,
+            corners.sumOf { it.y.toDouble() }.toFloat() / 4
+        )
+        val warpedNormals = (0 until 4).map { i ->
+            val a = corners[i]
+            val b = corners[(i + 1) % 4]
+            val perp = normalize(PointF(-(b.y - a.y), b.x - a.x))
+            val edgeMid = PointF((a.x + b.x) / 2f, (a.y + b.y) / 2f)
+            val toCenter = PointF(tableCenter.x - edgeMid.x, tableCenter.y - edgeMid.y)
+            val dot = perp.x * toCenter.x + perp.y * toCenter.y
+            if (dot <= 0f) perp else PointF(-perp.x, -perp.y)
+        }
 
         val offsetCorners = corners.mapIndexed { index, corner ->
             // Inward normal for segment from previous corner to current corner
@@ -77,7 +95,7 @@ class RailRenderer {
         // --- Draw Diamonds ---
         val diamondRadius = LOGICAL_BALL_RADIUS * diamondSizeFactor
         val diamondOffset = 50f
-        val normals = state.table.normals
+        val normals = warpedNormals
 
         for (i in 1..3) {
             val fraction = i / 4.0f
@@ -164,6 +182,7 @@ class RailRenderer {
         paints: PaintCache,
         typeface: Typeface?
     ) {
+        if (state.isMasseModeActive) return
         val matrix = state.railPitchMatrix ?: return
         val referenceRadius = DrawingUtils.getPerspectiveRadiusAndLift(
             state.protractorUnit.center, state.protractorUnit.radius, state, matrix
@@ -176,11 +195,15 @@ class RailRenderer {
         }
         val textPadding = referenceRadius * 5f
 
+        if (!state.table.isVisible || state.table.corners.size < 4) return
+        val tps = state.lensWarpTps
+        val warpedCorners = state.table.corners.map { it.warpedBy(tps) }
+
         val pathToLabel = if (state.isBankingMode) state.bankShotPath else state.aimingLineBankPath
         pathToLabel?.let { path ->
             if (path.size > 1) {
                 val bankPoint = path[1]
-                getRailForPoint(bankPoint, state)?.let { railType ->
+                getRailForPoint(bankPoint, warpedCorners)?.let { railType ->
                     textRenderer.drawDiamondLabel(
                         canvas,
                         bankPoint,
@@ -197,7 +220,7 @@ class RailRenderer {
             state.tangentLineBankPath?.let { path ->
                 if (path.size > 1) {
                     val tangentBankPoint = path[1]
-                    getRailForPoint(tangentBankPoint, state)?.let { railType ->
+                    getRailForPoint(tangentBankPoint, warpedCorners)?.let { railType ->
                         textRenderer.drawDiamondLabel(
                             canvas,
                             tangentBankPoint,
@@ -214,24 +237,20 @@ class RailRenderer {
 
         if (!state.isBankingMode) {
             state.shotGuideImpactPoint?.let { impactPoint ->
-                getRailForPoint(impactPoint, state)?.let { railType ->
+                getRailForPoint(impactPoint, warpedCorners)?.let { railType ->
                     textRenderer.drawDiamondLabel(canvas, impactPoint, railType, state, textPaint, textPadding)
                 }
             }
         }
     }
 
-    private fun getRailForPoint(point: PointF, state: CueDetatState): LineTextRenderer.RailType? {
-        val table = state.table
-        if (!table.isVisible) return null
-
-        val corners = table.corners
+    private fun getRailForPoint(point: PointF, warpedCorners: List<PointF>): LineTextRenderer.RailType? {
         val tolerance = 5f
 
-        if (pointToSegmentDistance(point, corners[0], corners[1]) < tolerance) return LineTextRenderer.RailType.TOP
-        if (pointToSegmentDistance(point, corners[1], corners[2]) < tolerance) return LineTextRenderer.RailType.RIGHT
-        if (pointToSegmentDistance(point, corners[2], corners[3]) < tolerance) return LineTextRenderer.RailType.BOTTOM
-        if (pointToSegmentDistance(point, corners[3], corners[0]) < tolerance) return LineTextRenderer.RailType.LEFT
+        if (pointToSegmentDistance(point, warpedCorners[0], warpedCorners[1]) < tolerance) return LineTextRenderer.RailType.TOP
+        if (pointToSegmentDistance(point, warpedCorners[1], warpedCorners[2]) < tolerance) return LineTextRenderer.RailType.RIGHT
+        if (pointToSegmentDistance(point, warpedCorners[2], warpedCorners[3]) < tolerance) return LineTextRenderer.RailType.BOTTOM
+        if (pointToSegmentDistance(point, warpedCorners[3], warpedCorners[0]) < tolerance) return LineTextRenderer.RailType.LEFT
 
         return null
     }

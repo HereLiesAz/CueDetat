@@ -6,20 +6,16 @@ import kotlin.math.ln
 import kotlin.math.pow
 
 internal object ZoomMapping {
-    // --- Master Zoom Controls ---
     const val DEFAULT_ZOOM = 1.0f
 
-    // Standard Mode Range
-    private const val STANDARD_MIN_ZOOM = 0.5f
+    private const val STANDARD_MIN_ZOOM = 0.2f
     private const val STANDARD_MAX_ZOOM = 4.0f
 
-    // Beginner Mode Range
     private const val BEGINNER_MIN_ZOOM = 0.5f
-    private const val BEGINNER_LOCKED_MAX_ZOOM = 9.6f
-    // ----------------------------
+    // Increased logical max so the auto-zoom math has plenty of room to scale
+    private const val BEGINNER_LOCKED_MAX_ZOOM = 15.0f
 
-    // Slider now operates on a -50 to +50 range.
-    private const val SLIDER_RANGE = 100f // The total span of the slider (-50 to 50)
+    private const val SLIDER_RANGE = 100f
 
     fun getZoomRange(
         mode: ExperienceMode?,
@@ -32,30 +28,18 @@ internal object ZoomMapping {
         }
     }
 
-    /**
-     * Converts a symmetrical slider position (-50f to 50f) to an exponential
-     * zoom factor.
-     */
     fun sliderToZoom(sliderValue: Float, minZoom: Float, maxZoom: Float): Float {
-        // Normalize the slider value from -50..50 to 0..100 for the formula
         val normalizedSlider = sliderValue + 50f
         val b = (maxZoom / minZoom).pow(1 / SLIDER_RANGE)
         return minZoom * b.pow(normalizedSlider)
     }
 
-
-    /**
-     * Converts a zoom factor back to its corresponding symmetrical slider
-     * position (-50f to 50f).
-     */
     fun zoomToSlider(zoomFactor: Float, minZoom: Float, maxZoom: Float): Float {
         if (zoomFactor <= minZoom) return -50f
         if (zoomFactor >= maxZoom) return 50f
 
         val b = (maxZoom / minZoom).pow(1 / SLIDER_RANGE)
-        // Formula: sliderValue = log(zoomFactor / MIN_ZOOM) / log(B)
         val normalizedSlider = (ln(zoomFactor / minZoom) / ln(b))
-        // Denormalize from 0..100 back to -50..50
         return normalizedSlider - 50f
     }
 }

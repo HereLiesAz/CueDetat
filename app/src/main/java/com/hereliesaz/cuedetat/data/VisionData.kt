@@ -16,10 +16,12 @@ data class VisionData(
     val customBalls: List<PointF> = emptyList(),
     val detectedHsvColor: FloatArray? = null,
     val detectedBoundingBoxes: List<Rect> = emptyList(),
+    val detectedCues: List<Rect> = emptyList(),
     val cvMask: Mat? = null, // The binary mask for debugging
     val sourceImageWidth: Int = 0,
     val sourceImageHeight: Int = 0,
-    val sourceImageRotation: Int = 0
+    val sourceImageRotation: Int = 0,
+    val tableOverlayConfidence: Float = 0f,  // 0..1, set by CV pipeline during AR_SETUP
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -34,10 +36,12 @@ data class VisionData(
             if (!detectedHsvColor.contentEquals(other.detectedHsvColor)) return false
         } else if (other.detectedHsvColor != null) return false
         if (detectedBoundingBoxes != other.detectedBoundingBoxes) return false
+        if (detectedCues != other.detectedCues) return false
         if (cvMask != other.cvMask) return false
         if (sourceImageWidth != other.sourceImageWidth) return false
         if (sourceImageHeight != other.sourceImageHeight) return false
         if (sourceImageRotation != other.sourceImageRotation) return false
+        if (tableOverlayConfidence != other.tableOverlayConfidence) return false
 
         return true
     }
@@ -47,10 +51,12 @@ data class VisionData(
         result = 31 * result + customBalls.hashCode()
         result = 31 * result + (detectedHsvColor?.contentHashCode() ?: 0)
         result = 31 * result + detectedBoundingBoxes.hashCode()
+        result = 31 * result + detectedCues.hashCode()
         result = 31 * result + (cvMask?.hashCode() ?: 0)
         result = 31 * result + sourceImageWidth
         result = 31 * result + sourceImageHeight
         result = 31 * result + sourceImageRotation
+        result = 31 * result + tableOverlayConfidence.hashCode()
         return result
     }
 }

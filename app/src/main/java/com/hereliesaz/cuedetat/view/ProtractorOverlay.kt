@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.res.ResourcesCompat
 import com.hereliesaz.cuedetat.R
@@ -27,6 +28,7 @@ fun ProtractorOverlay(
     onEvent: (MainScreenEvent) -> Unit
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current.density
     val paints = remember { PaintCache() }
     val renderer = remember { OverlayRenderer() }
     val barbaroTypeface: Typeface? = remember {
@@ -39,7 +41,7 @@ fun ProtractorOverlay(
         paints.setTypeface(barbaroTypeface)
     }
 
-    LaunchedEffect(uiState, systemIsDark) {
+    LaunchedEffect(Unit) {
         paints.updateColors(uiState, systemIsDark)
     }
 
@@ -47,7 +49,7 @@ fun ProtractorOverlay(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { size ->
-                onEvent(MainScreenEvent.SizeChanged(size.width, size.height))
+                onEvent(MainScreenEvent.SizeChanged(size.width, size.height, density))
             }
             .detectManualGestures(uiState, onEvent)
     ) {

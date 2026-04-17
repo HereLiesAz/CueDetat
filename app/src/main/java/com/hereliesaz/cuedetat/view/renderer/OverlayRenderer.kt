@@ -3,6 +3,7 @@
 package com.hereliesaz.cuedetat.view.renderer
 
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Typeface
 import androidx.core.graphics.withMatrix
 import com.hereliesaz.cuedetat.domain.CueDetatState
@@ -44,15 +45,14 @@ class OverlayRenderer {
                 pitchMatrix
             }
 
-        // Pass 1: Draw elements on the logical plane
+        // Pass 1: Draw elements on the logical plane (Lines drawn UNDER balls)
         canvas.withMatrix(matrixFor2DPlane) {
             if (state.table.isVisible) {
                 tableRenderer.drawSurface(this, state, paints)
                 tableRenderer.drawPockets(this, state, paints)
             }
-            lineRenderer.drawLogicalLines(this, state, paints, typeface)
+            lineRenderer.drawLogicalLines(this, state, paints, typeface, matrixFor2DPlane)
         }
-
 
         // Pass 2: Draw the "lifted" table rails
         canvas.withMatrix(railPitchMatrix) {
@@ -62,8 +62,17 @@ class OverlayRenderer {
             }
         }
 
+        // Pass 2.5: Beginner direction lines + triangles (below balls)
+        if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
+            lineRenderer.drawBeginnerLines(canvas, state, paints, matrixFor2DPlane)
+        }
 
-        // Pass 3: Draw all balls
+        // Pass 3: Draw all balls and their associated text
         ballRenderer.draw(canvas, state, paints, typeface)
+
+        // Pass 4: Beginner text labels (above balls)
+        if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
+            lineRenderer.drawBeginnerLabels(canvas, state, paints, typeface, matrixFor2DPlane)
+        }
     }
 }

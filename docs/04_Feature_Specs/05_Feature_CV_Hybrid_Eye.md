@@ -35,6 +35,26 @@ The application's vision system uses a hybrid, two-stage pipeline to achieve rob
 * This lock is automatically disengaged if the user begins dragging a ball or presses the "Reset
   View" button.
 
+## AR Table Tracking & Setup
+
+The AR setup pipeline strictly adheres to the **"ONE SINGLE USER INTERACTION" mandate**. The previous multi-step wizard involving automatic pocket detection and geometry fitting is deprecated and hidden. 
+
+### Felt Capture Pipeline
+
+1. **Magnifying UI**: The setup screen presents a magnifying circle UI. 
+2. **Single Interaction**: The user points at the felt and taps the "Capture" button.
+3. **Immediate AR**: This single tap adds the captured HSV color to a persistent list of `FeltSample`s and *immediately* transitions the application into `AR_ACTIVE` tracking mode.
+4. **Multiple Samples**: While on the capture screen, the user can manage previously captured samples (move, delete). Order dictates the weight of influence in the tracking algorithm.
+
+The application relies entirely on the user for fine-tuning the table geometry (rotation, zoom) via manual sliders after the AR session has started. MVI state advancement happens instantly upon capture.
+
+
+### ARCore Tracking Loss
+
+When ARCore tracking drops from `TRACKING` to `PAUSED`, `ArCoreBackground` dispatches an
+`ArTrackingLost` event. The handler clears `tableScanModel` and `lensWarpTps` from `CueDetatState`
+and returns `cameraMode` to `AR_SETUP`, requiring a fresh scan.
+
 ## Other CV Rules
 
 * **Conditional Snapping:** Auto-snapping of logical balls only occurs if the user places a logical

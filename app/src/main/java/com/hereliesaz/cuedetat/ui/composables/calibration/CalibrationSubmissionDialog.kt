@@ -9,11 +9,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 
+/**
+ * A dialog prompting the user to submit their calculated calibration profile to the backend.
+ *
+ * Used to crowd-source device-specific lens profiles.
+ *
+ * @param onDismiss Callback when the user declines or dismisses the dialog.
+ * @param onSubmit Callback when the user agrees to submit.
+ */
 @Composable
 fun CalibrationSubmissionDialog(
     onDismiss: () -> Unit,
     onSubmit: () -> Unit
 ) {
+    // Get device model name for the dialog text.
     val deviceName = "${Build.MANUFACTURER} ${Build.MODEL}"
 
     AlertDialog(

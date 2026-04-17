@@ -6,8 +6,12 @@ import android.graphics.Camera
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.ui.graphics.Color
+import com.hereliesaz.cuedetat.domain.MassePhysicsSimulator
+import com.hereliesaz.cuedetat.domain.SpinPhysicsCalculator
 import com.hereliesaz.cuedetat.ui.ZoomMapping
+import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
 import com.hereliesaz.cuedetat.view.model.Perspective
+import com.hereliesaz.cuedetat.domain.toVector2
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import javax.inject.Inject
 import kotlin.math.abs
@@ -17,23 +21,14 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** Defines the level of recalculation needed for a state update. */
 enum class UpdateType {
-    /** Recalculate everything: matrices, aiming, spin paths. */
     FULL,
-
-    /** Recalculate aiming and spin paths; matrices are assumed to be current. */
+    MATRICES_ONLY, // Recalculates projection matrices only — skips aiming geometry and spin paths
     AIMING,
-
-    /**
-     * Recalculate only a spin path; matrices and aiming are assumed to be
-     * current.
-     */
     SPIN_ONLY
 }
 
 class UpdateStateUseCase @Inject constructor(
-    private val calculateSpinPaths: CalculateSpinPaths,
     private val reducerUtils: ReducerUtils,
     private val calculateBankShot: CalculateBankShot
 ) {
@@ -42,13 +37,28 @@ class UpdateStateUseCase @Inject constructor(
     private val distanceReferenceConstant = 1200f
     private val lineExtensionFactor = 5000f
 
+    // Assumed camera height above the table surface when no ARCore anchor is available.
+    // Derived from: user eye height ≈ 4.5 ft above floor, pool table ≈ 3 ft above floor → 1.5 ft ≈ 0.45 m.
+    private val assumedHeightAboveTableM = 0.45f
+
     operator fun invoke(state: CueDetatState, type: UpdateType): CueDetatState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
 
-        val stateAfterMatrices = if (type == UpdateType.FULL) {
+        val stateAfterMatrices = if (type == UpdateType.FULL || type == UpdateType.MATRICES_ONLY) {
             updateMatricesAndTransforms(state)
         } else {
             state
+        }
+
+        if (type == UpdateType.MATRICES_ONLY) {
+            // Always re-run aiming so that @Transient fields (tangentAimedPocketIndex, etc.)
+            // stay fresh when the matrix changes (e.g., phone-tilt).
+            val stateAfterAiming = updateAimingCalculations(stateAfterMatrices)
+            return if (stateAfterAiming.isMasseModeActive) {
+                updateSpinCalculations(stateAfterAiming)
+            } else {
+                stateAfterAiming
+            }
         }
 
         val stateAfterAiming = if (type == UpdateType.FULL || type == UpdateType.AIMING) {
@@ -61,41 +71,101 @@ class UpdateStateUseCase @Inject constructor(
     }
 
     private fun updateMatricesAndTransforms(state: CueDetatState): CueDetatState {
+        val targetPoint = state.protractorUnit.center
+        val cuePoint = state.onPlaneBall?.center ?: PointF(targetPoint.x, targetPoint.y + 30f)
+
         val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
             state.experienceMode,
             state.isBeginnerViewLocked
         )
-        val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom)
+
+        var zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom)
+        var coercedViewOffset = state.viewOffset
+
+        if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
+            val paddingPx = 50f * state.screenDensity
+            val availWidth = state.viewWidth - (paddingPx * 2)
+            val availHeight = state.viewHeight - (paddingPx * 2)
+
+            if (availWidth > 0 && availHeight > 0) {
+                val dx = abs(targetPoint.x - cuePoint.x)
+                val dy = abs(targetPoint.y - cuePoint.y)
+
+                val requiredZoomX = availWidth / (dx + (LOGICAL_BALL_RADIUS * 4))
+                val requiredZoomY = availHeight / (dy + (LOGICAL_BALL_RADIUS * 4))
+
+                // Multiply the required autoframing zoom by 2.0f to double the apparent size
+                // of the balls on screen, making the UX much better for beginners!
+                zoomFactor = (minOf(requiredZoomX, requiredZoomY) * 2.0f).coerceIn(minZoom, maxZoom)
+
+                val midX = (targetPoint.x + cuePoint.x) / 2f
+                val midY = (targetPoint.y + cuePoint.y) / 2f
+
+                val midPointLogical = PointF(midX, midY)
+                val rotMatrix = Matrix().apply { postRotate(state.worldRotationDegrees) }
+                val rotatedMid = floatArrayOf(midPointLogical.x * zoomFactor, midPointLogical.y * zoomFactor)
+                rotMatrix.mapPoints(rotatedMid)
+
+                coercedViewOffset = PointF(-rotatedMid[0], -rotatedMid[1])
+            }
+        } else {
+            val screenSpaceLimit = (state.table.logicalHeight / 2f) * zoomFactor
+            val coercedOffsetY = state.viewOffset.y.coerceIn(-screenSpaceLimit, screenSpaceLimit)
+            coercedViewOffset = PointF(state.viewOffset.x, coercedOffsetY)
+        }
+
         val isPitchApplied =
             state.experienceMode != ExperienceMode.BEGINNER || !state.isBeginnerViewLocked
 
-        val screenSpaceLimit = (state.table.logicalHeight / 2f) * zoomFactor
-        val coercedOffsetY = state.viewOffset.y.coerceIn(-screenSpaceLimit, screenSpaceLimit)
-        val coercedViewOffset = PointF(state.viewOffset.x, coercedOffsetY)
         val stateWithCoercedPan = state.copy(viewOffset = coercedViewOffset)
 
-        val camera = Camera()
+        // Determine the best available pitch estimate:
+        //   1. ARCore anchor: exact atan2(height, horizontal) from camera-above-plane geometry
+        //   2. Depth fallback: atan2(assumed 0.45m height, sqrt(depth²−0.45²))
+        //   3. IMU pitch: raw sensor data (existing behavior)
+        val effectivePitch: Float = when {
+            stateWithCoercedPan.cameraMode == CameraMode.AR_ACTIVE
+                    && stateWithCoercedPan.arDerivedPitch != null ->
+                stateWithCoercedPan.arDerivedPitch
 
+            stateWithCoercedPan.depthPlane != null
+                    && stateWithCoercedPan.depthPlane!!.confidence > 0.6f -> {
+                val depth = stateWithCoercedPan.depthPlane!!.distanceMeters
+                if (depth > assumedHeightAboveTableM) {
+                    val horizontal = sqrt(depth * depth - assumedHeightAboveTableM * assumedHeightAboveTableM)
+                    Math.toDegrees(atan2(assumedHeightAboveTableM.toDouble(), horizontal.toDouble()))
+                        .toFloat().coerceIn(5f, 85f)
+                } else {
+                    stateWithCoercedPan.currentOrientation.pitch
+                }
+            }
+
+            else -> stateWithCoercedPan.currentOrientation.pitch
+        }
+        val orientationForPerspective = stateWithCoercedPan.currentOrientation.copy(pitch = effectivePitch)
+
+        val camera = Camera()
         val perspectiveMatrix = Perspective.createPerspectiveMatrix(
-            currentOrientation = stateWithCoercedPan.currentOrientation,
+            currentOrientation = orientationForPerspective,
             camera = camera,
-            lift = 0f,
+            lift = stateWithCoercedPan.tableZOffset,
             applyPitch = isPitchApplied
         )
 
         val finalPitchMatrix = createFullMatrix(stateWithCoercedPan, zoomFactor, perspectiveMatrix)
+
         val inverseMatrix = Matrix()
         val hasFinalInverse = finalPitchMatrix.invert(inverseMatrix)
 
         val logicalTableShortSide = stateWithCoercedPan.table.logicalHeight
         val baseRailLiftAmount = logicalTableShortSide * railHeightToTableHeightRatio
         val railLiftAmount =
-            baseRailLiftAmount * abs(sin(Math.toRadians(stateWithCoercedPan.pitchAngle.toDouble()))).toFloat()
+            baseRailLiftAmount * abs(sin(Math.toRadians(effectivePitch.toDouble()))).toFloat()
 
         val railPerspectiveMatrix = Perspective.createPerspectiveMatrix(
-            currentOrientation = stateWithCoercedPan.currentOrientation,
+            currentOrientation = orientationForPerspective,
             camera = camera,
-            lift = railLiftAmount,
+            lift = railLiftAmount + stateWithCoercedPan.tableZOffset,
             applyPitch = isPitchApplied
         )
         val finalRailPitchMatrix =
@@ -107,14 +177,8 @@ class UpdateStateUseCase @Inject constructor(
             applyPitch = false
         )
         val flatMatrix = createFullMatrix(stateWithCoercedPan, 1f, flatPerspectiveMatrix)
-
-        val logicalPlaneMatrix =
-            createFullMatrix(stateWithCoercedPan, zoomFactor, flatPerspectiveMatrix)
-
-
-        val sizeCalculationMatrix =
-            createFullMatrix(state, zoomFactor, perspectiveMatrix)
-
+        val logicalPlaneMatrix = createFullMatrix(stateWithCoercedPan, zoomFactor, flatPerspectiveMatrix)
+        val sizeCalculationMatrix = createFullMatrix(state, zoomFactor, perspectiveMatrix)
 
         return stateWithCoercedPan.copy(
             pitchMatrix = finalPitchMatrix,
@@ -155,6 +219,65 @@ class UpdateStateUseCase @Inject constructor(
             )
         }
 
+        // In masse mode the aiming/tangent geometry is driven by masseGhostBallCenter,
+        // which is one frame behind (computed in the previous updateSpinCalculations call).
+        if (state.isMasseModeActive) {
+            if (!state.masseConnectsTarget || state.masseGhostBallCenter == null) {
+                return state.copy(
+                    aimingLineBankPath = null,
+                    tangentLineBankPath = null,
+                    aimingLineEndPoint = null,
+                    tangentAimedPocketIndex = null,
+                    isStraightShot = false,
+                    isGeometricallyImpossible = false,
+                    isObstructed = false,
+                    isTiltBeyondLimit = false,
+                    tangentDirection = 1.0f
+                )
+            }
+            val masseGhost = state.masseGhostBallCenter
+            val targetCenter = state.protractorUnit.center
+            val cuePos = state.onPlaneBall?.center ?: masseGhost
+
+            val (isGeometricallyImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
+                shotAnchor = cuePos,
+                ghostBall = masseGhost,
+                targetBall = targetCenter
+            )
+            val isStraightShot = isShotStraight(cuePos, masseGhost, targetCenter)
+
+            val (finalAimingLineBankPath, _, aimingLineEndPoint) = if (state.table.isVisible) {
+                val (path, pocketIndex, endPoint) = calculateAimAndBank(masseGhost, targetCenter, state)
+                Triple(path, pocketIndex, endPoint)
+            } else {
+                val extendedPath = getExtendedLinePath(masseGhost, targetCenter)
+                Triple(extendedPath, null, extendedPath.last())
+            }
+
+            val activeTangentTarget = PointF(
+                masseGhost.x - (targetCenter.y - masseGhost.y) * tangentDirection,
+                masseGhost.y + (targetCenter.x - masseGhost.x) * tangentDirection
+            )
+            var (finalTangentLineBankPath, tangentAimedPocketIndex, _) = if (state.table.isVisible) {
+                calculateAimAndBank(masseGhost, activeTangentTarget, state)
+            } else {
+                Triple(getExtendedLinePath(masseGhost, activeTangentTarget), null, null)
+            }
+            if (isStraightShot) tangentAimedPocketIndex = null
+
+            return state.copy(
+                isStraightShot = isStraightShot,
+                isGeometricallyImpossible = isGeometricallyImpossible,
+                isObstructed = false,
+                isTiltBeyondLimit = false,
+                tangentDirection = tangentDirection,
+                tangentAimedPocketIndex = tangentAimedPocketIndex,
+                aimingLineEndPoint = aimingLineEndPoint,
+                aimingLineBankPath = finalAimingLineBankPath,
+                tangentLineBankPath = finalTangentLineBankPath
+            )
+        }
+
         val logicalShotLineAnchor = getLogicalShotLineAnchor(state) ?: return state
 
         val isTiltBeyondLimit =
@@ -171,8 +294,11 @@ class UpdateStateUseCase @Inject constructor(
             state.protractorUnit.ghostCueBallCenter,
             state.protractorUnit.center
         )
+
         val isObstructed = checkForObstructions(state)
+
         val targetBallDistance = calculateDistance(state, state.pitchMatrix ?: Matrix())
+
         val shotGuideImpactPoint = if (state.table.isVisible && !state.isBankingMode) {
             calculateShotGuideImpact(state, useShotGuideLine = true)
         } else {
@@ -228,12 +354,117 @@ class UpdateStateUseCase @Inject constructor(
     }
 
     private fun updateSpinCalculations(state: CueDetatState): CueDetatState {
-        val spinPaths: Map<Color, List<PointF>> = if (!state.isBankingMode) {
-            calculateSpinPaths(state)
-        } else {
-            emptyMap()
+        if (state.isBankingMode) return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList(), masseConnectsTarget = false)
+
+        val stored = state.selectedSpinOffset ?: state.lingeringSpinOffset
+
+        // Compute wheel color from the stored pixel offset
+        val pathColor = if (stored != null) {
+            val radiusPx = 60f * state.screenDensity
+            val dx = stored.x - radiusPx
+            val dy = stored.y - radiusPx
+            val angleDeg = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
+            val dist = (hypot(dx.toDouble(), dy.toDouble()) / radiusPx).toFloat().coerceIn(0f, 1f)
+            SpinColorUtils.getColorFromAngleAndDistance(angleDeg, dist)
+        } else Color.White
+
+        if (!state.isMasseModeActive) {
+            // English spin path via SpinPhysicsCalculator
+            if (stored == null) return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
+            val radiusPx = 60f * state.screenDensity
+            val nx = (stored.x - radiusPx) / radiusPx
+            val ny = (stored.y - radiusPx) / radiusPx
+            val spinOffset = PointF(nx, ny)
+            val cueBallPos = state.protractorUnit.ghostCueBallCenter
+            val targetBallPos = state.protractorUnit.center
+            val shotLineAnchor = state.onPlaneBall?.center ?: state.shotLineAnchor
+                ?: return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList())
+            val shotAngle = atan2(
+                (cueBallPos.y - shotLineAnchor.y).toDouble(),
+                (cueBallPos.x - shotLineAnchor.x).toDouble()
+            ).toFloat()
+            val path = SpinPhysicsCalculator.calculatePath(
+                spinOffset = spinOffset.toVector2(),
+                cueBallPos = cueBallPos.toVector2(),
+                targetBallPos = targetBallPos.toVector2(),
+                shotAngle = shotAngle,
+                table = state.table
+            )
+            return state.copy(
+                spinPaths = mapOf(pathColor to path.map { it.toPointF() }),
+                masseImpactPoints = emptyList(),
+                masseConnectsTarget = false
+            )
         }
-        return state.copy(spinPaths = spinPaths)
+
+        // Massé mode via MassePhysicsSimulator
+        if (stored == null) return state.copy(spinPaths = emptyMap(), masseImpactPoints = emptyList(), masseConnectsTarget = false)
+        val radiusPx = 60f * state.screenDensity
+        val nx = (stored.x - radiusPx) / radiusPx
+        val ny = (stored.y - radiusPx) / radiusPx
+        val physicsOffset = PointF(nx, ny)
+        val cuePos = state.onPlaneBall?.center ?: PointF(0f, 0f)
+        val shotAngle = Math.toRadians(state.masseShotAngleDeg.toDouble()).toFloat()
+        val elevationDeg = (90f - abs(state.pitchAngle)).coerceIn(0f, 90f)
+        val result = MassePhysicsSimulator.simulate(
+            contactOffset = physicsOffset,
+            elevationDeg = elevationDeg,
+            shotAngle = shotAngle,
+            table = state.table,
+            startPos = cuePos
+        )
+        val targetPos = state.protractorUnit.center
+        val diameter = 2f * LOGICAL_BALL_RADIUS
+
+        // Find the first point on the path (or its segments) that comes within one diameter of target.
+        var masseGhostCenter: PointF? = null
+        outer@ for (i in result.points.indices) {
+            val pt = result.points[i]
+            // Check the point itself.
+            val dx0 = pt.x - targetPos.x
+            val dy0 = pt.y - targetPos.y
+            val d0 = sqrt(dx0 * dx0 + dy0 * dy0)
+            if (d0 <= diameter) {
+                val len = if (d0 > 0f) d0 else 1f
+                masseGhostCenter = PointF(
+                    targetPos.x + dx0 / len * diameter,
+                    targetPos.y + dy0 / len * diameter
+                )
+                break@outer
+            }
+            // Check the segment from this point to the next.
+            if (i < result.points.size - 1) {
+                val next = result.points[i + 1]
+                val sdx = next.x - pt.x
+                val sdy = next.y - pt.y
+                val lenSq = sdx * sdx + sdy * sdy
+                if (lenSq > 0f) {
+                    val t = ((targetPos.x - pt.x) * sdx + (targetPos.y - pt.y) * sdy) / lenSq
+                    val cT = t.coerceIn(0f, 1f)
+                    val cx = pt.x + cT * sdx
+                    val cy = pt.y + cT * sdy
+                    val cdx = cx - targetPos.x
+                    val cdy = cy - targetPos.y
+                    val cd = sqrt(cdx * cdx + cdy * cdy)
+                    if (cd <= diameter) {
+                        val len = if (cd > 0f) cd else 1f
+                        masseGhostCenter = PointF(
+                            targetPos.x + cdx / len * diameter,
+                            targetPos.y + cdy / len * diameter
+                        )
+                        break@outer
+                    }
+                }
+            }
+        }
+
+        return state.copy(
+            spinPaths = mapOf(pathColor to result.points),
+            aimedPocketIndex = result.pocketIndex,
+            masseImpactPoints = result.impactPoints,
+            masseConnectsTarget = masseGhostCenter != null,
+            masseGhostBallCenter = masseGhostCenter
+        )
     }
 
     private fun createFullMatrix(
@@ -289,12 +520,16 @@ class UpdateStateUseCase @Inject constructor(
             (ghostBall.y - shotAnchor.y).pow(2) + (ghostBall.x - shotAnchor.x).pow(2)
         val distToTargetSq =
             (targetBall.y - shotAnchor.y).pow(2) + (targetBall.x - shotAnchor.x).pow(2)
+
         val isImpossible = distToGhostSq > distToTargetSq
+
         val shotAngle = atan2(ghostBall.y - shotAnchor.y, ghostBall.x - shotAnchor.x)
         var angleDifference =
             Math.toDegrees(aimingAngle.toDouble() - shotAngle.toDouble()).toFloat()
+
         while (angleDifference <= -180) angleDifference += 360
         while (angleDifference > 180) angleDifference -= 360
+
         val tangentDirection = if (angleDifference < 0) 1.0f else -1.0f
         return Pair(isImpossible, tangentDirection)
     }
@@ -332,7 +567,9 @@ class UpdateStateUseCase @Inject constructor(
         if (directPocketIndex != null && directIntersection != null) {
             return Triple(listOf(start, directIntersection), directPocketIndex, directIntersection)
         }
+
         val bankPath = calculateSingleBank(start, end, state)
+
         if (bankPath.size > 2) {
             val (bankedPocketIndex, bankedIntersection) = checkPocketAim(
                 bankPath[1],
@@ -363,11 +600,14 @@ class UpdateStateUseCase @Inject constructor(
             start.x + dirX / mag * lineExtensionFactor,
             start.y + dirY / mag * lineExtensionFactor
         )
+
         val pockets = state.table.pockets
         val pocketRadius = state.protractorUnit.radius * 1.8f
+
         var closestIntersection: PointF? = null
         var closestPocketIndex: Int? = null
         var minDistanceSq = Float.MAX_VALUE
+
         pockets.forEachIndexed { index, pocket ->
             val intersection = getLineCircleIntersection(start, extendedEnd, pocket, pocketRadius)
             if (intersection != null) {
@@ -412,14 +652,18 @@ class UpdateStateUseCase @Inject constructor(
         val dirY = end.y - start.y
         val extendedEnd =
             PointF(start.x + dirX * lineExtensionFactor, start.y + dirY * lineExtensionFactor)
+
         val intersectionResult =
             state.table.findRailIntersectionAndNormal(start, extendedEnd) ?: return listOf(
                 start,
                 extendedEnd
             )
+
         val (intersectionPoint, railNormal) = intersectionResult
         val incidentVector = PointF(extendedEnd.x - start.x, extendedEnd.y - start.y)
+
         val reflectedDir = state.table.reflect(incidentVector, railNormal)
+
         val finalEndPoint = PointF(
             intersectionPoint.x + reflectedDir.x * lineExtensionFactor,
             intersectionPoint.y + reflectedDir.y * lineExtensionFactor
@@ -433,6 +677,7 @@ class UpdateStateUseCase @Inject constructor(
         val collisionDistance = ballRadius * 2
         val shotLineStart = state.shotLineAnchor ?: return false
         val shotLineEnd = state.protractorUnit.ghostCueBallCenter
+
         for (obstacle in state.obstacleBalls) {
             if (isSegmentObstructed(
                     shotLineStart,
@@ -444,6 +689,7 @@ class UpdateStateUseCase @Inject constructor(
                 return true
             }
         }
+
         val aimingLineStart = state.protractorUnit.ghostCueBallCenter
         val aimingLineEnd = state.protractorUnit.center
         for (obstacle in state.obstacleBalls) {

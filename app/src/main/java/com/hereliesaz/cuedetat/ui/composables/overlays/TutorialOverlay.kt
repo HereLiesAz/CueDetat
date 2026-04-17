@@ -1,4 +1,4 @@
-// --- FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/TutorialOverlay.kt ---
+// app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/TutorialOverlay.kt
 package com.hereliesaz.cuedetat.ui.composables.overlays
 
 import androidx.compose.animation.core.RepeatMode
@@ -69,9 +69,11 @@ fun TutorialOverlay(
         )
         val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = highlightAlpha)
 
+        // The Kafkaesque nightmare ends here.
+        // We removed the zIndex conceit, sliding the highlight below the gesture interceptors.
         Canvas(
             modifier = Modifier
-                .zIndex(9f)
+                .fillMaxSize()
         ) {
             val matrix = uiState.pitchMatrix
             if (matrix == null) return@Canvas
@@ -92,7 +94,6 @@ fun TutorialOverlay(
                         style = Stroke(width = 4.dp.toPx())
                     )
                 }
-
                 TutorialHighlightElement.GHOST_BALL -> {
                     val ghostCenter = uiState.protractorUnit.ghostCueBallCenter
                     val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
@@ -109,7 +110,6 @@ fun TutorialOverlay(
                         style = Stroke(width = 4.dp.toPx())
                     )
                 }
-
                 TutorialHighlightElement.CUE_BALL -> {
                     uiState.onPlaneBall?.let {
                         val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
@@ -127,7 +127,6 @@ fun TutorialOverlay(
                         )
                     }
                 }
-
                 TutorialHighlightElement.ZOOM_SLIDER -> {
                     drawRoundRect(
                         color = highlightColor,
@@ -140,13 +139,13 @@ fun TutorialOverlay(
                         style = Stroke(width = 4.dp.toPx())
                     )
                 }
-                // Other cases can be added here
                 else -> {}
             }
         }
 
         Box(
             modifier = Modifier
+                .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(bottom = 96.dp, start = 16.dp, end = 16.dp)
                 .zIndex(10f),

@@ -1,5 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/SpinControl.kt
-
 package com.hereliesaz.cuedetat.ui.composables
 
 import android.graphics.PointF
@@ -19,19 +17,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -40,7 +44,6 @@ import kotlin.math.sin
 @Composable
 fun SpinControl(
     modifier: Modifier = Modifier,
-    centerPosition: PointF,
     selectedSpinOffset: PointF?,
     lingeringSpinOffset: PointF?,
     spinPathAlpha: Float,
@@ -48,6 +51,31 @@ fun SpinControl(
 ) {
     var isMoveModeActive by remember { mutableStateOf(false) }
     val moveIconPainter = rememberVectorPainter(image = Icons.Default.OpenWith)
+    val viewConfiguration = LocalViewConfiguration.current
+    val density = LocalDensity.current.density
+    val colorWheelBitmap = remember(density) {
+        val sizePx = (120f * density).toInt().coerceAtLeast(1)
+        val bmp = android.graphics.Bitmap.createBitmap(sizePx, sizePx, android.graphics.Bitmap.Config.ARGB_8888)
+        val bmpCanvas = android.graphics.Canvas(bmp)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        val rectF = android.graphics.RectF(0f, 0f, sizePx.toFloat(), sizePx.toFloat())
+        val numArcs = 72
+        val arcAngle = 360f / numArcs
+        for (i in 0 until numArcs) {
+            val startAngle = i * arcAngle
+            paint.color = SpinColorUtils.getColorFromAngleAndDistance(startAngle + arcAngle / 2, 1.0f).toArgb()
+            bmpCanvas.drawArc(rectF, startAngle, arcAngle, true, paint)
+        }
+        val center = sizePx / 2f
+        val gradientPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        gradientPaint.shader = android.graphics.RadialGradient(
+            center, center, center,
+            intArrayOf(android.graphics.Color.WHITE, android.graphics.Color.TRANSPARENT),
+            null, android.graphics.Shader.TileMode.CLAMP
+        )
+        bmpCanvas.drawCircle(center, center, center, gradientPaint)
+        bmp.asImageBitmap()
+    }
 
     Box(
         modifier = modifier
@@ -55,39 +83,23 @@ fun SpinControl(
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
                     val firstUp = waitForUpOrCancellation()
-
                     if (firstUp != null) {
                         firstUp.consume()
                         val secondDown = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
                             awaitFirstDown(requireUnconsumed = false)
                         }
-
                         if (secondDown != null) {
                             secondDown.consume()
                             isMoveModeActive = true
                             var pointerId = secondDown.id
-
                             try {
                                 while (true) {
                                     val event = awaitPointerEvent()
                                     val dragChange = event.changes.find { it.id == pointerId }
-
-                                    if (dragChange == null || !dragChange.pressed) {
-                                        break
-                                    }
-                                    if (dragChange.isConsumed) {
-                                        continue
-                                    }
+                                    if (dragChange == null || !dragChange.pressed) break
                                     val pan = dragChange.positionChange()
                                     if (pan != Offset.Zero) {
-                                        onEvent(
-                                            MainScreenEvent.DragSpinControl(
-                                                PointF(
-                                                    pan.x,
-                                                    pan.y
-                                                )
-                                            )
-                                        )
+                                        onEvent(MainScreenEvent.DragSpinControl(PointF(pan.x, pan.y)))
                                         dragChange.consume()
                                     }
                                 }
@@ -103,16 +115,16 @@ fun SpinControl(
             modifier = Modifier
                 .size(120.dp)
                 .pointerInput(Unit) {
+                    val radiusPx = size.width / 2f
                     detectDragGestures(
                         onDragStart = { offset ->
-                            val eventOffset = PointF(offset.x, offset.y)
-                            onEvent(MainScreenEvent.SpinApplied(eventOffset))
+                            onEvent(MainScreenEvent.SpinApplied(PointF(offset.x, offset.y)))
                         },
                         onDragEnd = { onEvent(MainScreenEvent.SpinSelectionEnded) },
                         onDragCancel = { onEvent(MainScreenEvent.SpinSelectionEnded) }
                     ) { change, _ ->
-                        val eventOffset = PointF(change.position.x, change.position.y)
-                        onEvent(MainScreenEvent.SpinApplied(eventOffset))
+                        val pos = change.position
+                        onEvent(MainScreenEvent.SpinApplied(PointF(pos.x, pos.y)))
                         change.consume()
                     }
                 }
@@ -121,73 +133,38 @@ fun SpinControl(
             val center = Offset(radius, radius)
             val scaleFactor = if (isMoveModeActive) 1.1f else 1.0f
 
-            withTransform({
-                scale(scaleFactor, scaleFactor, center)
-            }) {
+            withTransform({ scale(scaleFactor, scaleFactor, center) }) {
                 if (isMoveModeActive) {
-                    drawCircle(
-                        color = Color.White.copy(alpha = 0.2f),
-                        radius = radius,
-                        center = center
+                    drawCircle(color = Color.White.copy(alpha = 0.2f), radius = radius, center = center)
+                }
+
+                drawImage(colorWheelBitmap, alpha = spinPathAlpha)
+                drawCircle(color = Color.White.copy(alpha = 0.5f * spinPathAlpha), radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
+
+                // Center label
+                val labelTextSize = 12.dp.toPx()
+                drawIntoCanvas { canvas ->
+                    canvas.nativeCanvas.drawText(
+                        "SIDE",
+                        center.x,
+                        center.y + labelTextSize * 0.35f,
+                        android.graphics.Paint().apply {
+                            color = android.graphics.Color.argb((180 * spinPathAlpha).toInt(), 30, 30, 30)
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            textSize = labelTextSize
+                            isFakeBoldText = true
+                            isAntiAlias = true
+                        }
                     )
                 }
 
-                val numArcs = 72
-                val arcAngle = 360f / numArcs
-                for (i in 0 until numArcs) {
-                    val startAngle = i * arcAngle
-                    val colorSampleAngle = startAngle + (arcAngle / 2)
-                    val color = SpinColorUtils.getColorFromAngleAndDistance(colorSampleAngle, 1.0f)
-
-                    drawArc(
-                        color = color,
-                        startAngle = startAngle,
-                        sweepAngle = arcAngle,
-                        useCenter = true,
-                        alpha = spinPathAlpha
-                    )
-                }
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color.White, Color.Transparent),
-                        center = center,
-                        radius = radius
-                    ),
-                    radius = radius,
-                    center = center,
-                    alpha = spinPathAlpha
-                )
-
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.5f * spinPathAlpha),
-                    radius = radius,
-                    center = center,
-                    style = Stroke(width = 2.dp.toPx())
-                )
-
-                lingeringSpinOffset?.let {
-                    drawIndicator(
-                        it,
-                        center,
-                        radius,
-                        Color.White.copy(alpha = 0.6f * spinPathAlpha)
-                    )
-                }
-
-                selectedSpinOffset?.let {
-                    drawIndicator(it, center, radius, Color.White)
-                }
+                lingeringSpinOffset?.let { drawLogicalIndicator(it, center, radius, Color.White.copy(alpha = 0.6f * spinPathAlpha)) }
+                selectedSpinOffset?.let { drawLogicalIndicator(it, center, radius, Color.White) }
 
                 if (isMoveModeActive) {
                     with(moveIconPainter) {
-                        translate(
-                            left = center.x - intrinsicSize.width / 2,
-                            top = center.y - intrinsicSize.height / 2
-                        ) {
-                            draw(
-                                size = intrinsicSize,
-                                colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.8f))
-                            )
+                        translate(left = center.x - intrinsicSize.width / 2, top = center.y - intrinsicSize.height / 2) {
+                            draw(size = intrinsicSize, colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.8f)))
                         }
                     }
                 }
@@ -196,30 +173,8 @@ fun SpinControl(
     }
 }
 
-private fun DrawScope.drawIndicator(
-    offset: PointF,
-    center: Offset,
-    radius: Float,
-    color: Color
-) {
-    val dragX = offset.x - center.x
-    val dragY = offset.y - center.y
-    val distance = hypot(dragX, dragY)
-    val clampedDistance = distance.coerceAtMost(radius)
-
-    val angle = atan2(dragY, dragX)
-    val indicatorX = center.x + clampedDistance * cos(angle)
-    val indicatorY = center.y + clampedDistance * sin(angle)
-
-    drawCircle(
-        color = color,
-        radius = 5.dp.toPx(),
-        center = Offset(indicatorX, indicatorY)
-    )
-    drawCircle(
-        color = color,
-        radius = 5.dp.toPx(),
-        center = Offset(indicatorX, indicatorY),
-        style = Stroke(width = 2.dp.toPx())
-    )
+private fun DrawScope.drawLogicalIndicator(offset: PointF, center: Offset, radius: Float, color: Color) {
+    val indicatorCenter = Offset(offset.x, offset.y)
+    drawCircle(color = color, radius = 5.dp.toPx(), center = indicatorCenter)
+    drawCircle(color = color, radius = 5.dp.toPx(), center = indicatorCenter, style = Stroke(width = 2.dp.toPx()))
 }

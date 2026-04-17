@@ -10,6 +10,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 
+/**
+ * A vertical implementation of the Material3 Slider.
+ *
+ * Wraps the standard [Slider] and applies the [vertical] modifier to rotate it.
+ *
+ * @param value Current value.
+ * @param onValueChange Callback for value changes.
+ * @param modifier Styling modifier.
+ * @param enabled Whether slider is active.
+ * @param valueRange Min/Max range.
+ * @param steps Discrete steps.
+ * @param onValueChangeFinished Callback on drag end.
+ * @param interactionSource Interaction source.
+ * @param colors Theme colors.
+ * @param thumb Thumb composable.
+ * @param track Track composable.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VerticalSlider(
@@ -28,7 +45,7 @@ fun VerticalSlider(
     Slider(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier.vertical(),
+        modifier = modifier.vertical(), // Apply rotation
         enabled = enabled,
         valueRange = valueRange,
         steps = steps,

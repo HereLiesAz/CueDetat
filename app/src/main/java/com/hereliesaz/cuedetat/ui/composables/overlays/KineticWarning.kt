@@ -15,10 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
@@ -26,18 +23,29 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.ExperimentalTextApi
-import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import kotlin.random.Random
 
+/**
+ * A dramatic, kinetic typography overlay for displaying warnings (e.g. "Impossible Shot").
+ *
+ * The text appears at random positions on the screen, split into lines that dynamically
+ * resize to fill the width, creating a forceful visual impact.
+ *
+ * @param text The warning message to display. If null, the overlay is hidden.
+ * @param modifier Styling modifier.
+ */
 @OptIn(ExperimentalTextApi::class)
 @Composable
 fun KineticWarningOverlay(text: String?, modifier: Modifier = Modifier) {
+    // Determine a random screen position for the text block each time the text changes.
     val randomAlignment = remember(text) {
         if (text == null) Alignment.Center else
             BiasAlignment(
@@ -59,50 +67,64 @@ fun KineticWarningOverlay(text: String?, modifier: Modifier = Modifier) {
             contentAlignment = randomAlignment
         ) {
             if (text != null) {
-                Column(
-                    horizontalAlignment = Alignment.Start,
-                    verticalArrangement = Arrangement.Center
-                ) {
+                val textMeasurer = rememberTextMeasurer()
+
+                // Calculate base font size relative to screen width.
+                val screenWidthDp = LocalConfiguration.current.screenWidthDp
+                val baseFontSize = (screenWidthDp / 8).coerceIn(32, 100)
+
+                val style = MaterialTheme.typography.displayLarge.copy(
+                    textAlign = TextAlign.Start,
+                    color = WarningRed.copy(alpha = 0.85f)
+                )
+
+                // Note: padding(16.dp) on Box subtracts 32.dp total from available width
+                val screenWidthPx = with(LocalDensity.current) {
+                    (screenWidthDp.dp - 32.dp).toPx()
+                }
+
+                // Split text into lines within a remember block to prevent recalculating on recompose
+                val lines = remember(text, screenWidthPx) {
                     val words = text.split(" ")
-                    val textMeasurer = rememberTextMeasurer()
-
-                    val screenWidthDp = LocalConfiguration.current.screenWidthDp
-                    val baseFontSize = (screenWidthDp / 8).coerceIn(32, 100)
-
-                    val style = MaterialTheme.typography.displayLarge.copy(
-                        textAlign = TextAlign.Start,
-                        color = WarningRed.copy(alpha = 0.85f)
-                    )
-                    val screenWidthPx = with(LocalDensity.current) {
-                        (screenWidthDp.dp - 64.dp).toPx()
-                    }
-
+                    val resultLines = mutableListOf<String>()
                     var currentLineWords = mutableListOf<String>()
-                    words.forEach { word ->
-                        val testLine = (currentLineWords + word).joinToString(" ")
-                        val textLayoutResult = textMeasurer.measure(
-                            text = AnnotatedString(testLine),
-                            style = style.copy(fontSize = baseFontSize.sp)
-                        )
 
-                        if (textLayoutResult.size.width > screenWidthPx && currentLineWords.isNotEmpty()) {
-                            KineticLine(
-                                text = currentLineWords.joinToString(" "),
-                                style = style,
-                                screenWidthPx = screenWidthPx,
-                                baseFontSize = baseFontSize.toFloat()
-                            )
+                    for (word in words) {
+                        val testLine = (currentLineWords + listOf(word)).joinToString(" ")
+                        val width = textMeasurer.measure(
+                            text = AnnotatedString(testLine),
+                            style = style.copy(fontSize = baseFontSize.sp),
+                            maxLines = 1
+                        ).size.width
+
+                        // If it overflows and we have words, push the current line and start a new one
+                        if (width > screenWidthPx && currentLineWords.isNotEmpty()) {
+                            resultLines.add(currentLineWords.joinToString(" "))
                             currentLineWords = mutableListOf(word)
                         } else {
                             currentLineWords.add(word)
                         }
                     }
+                    // Print remaining words.
                     if (currentLineWords.isNotEmpty()) {
+                        resultLines.add(currentLineWords.joinToString(" "))
+                    }
+
+                    resultLines
+                }
+
+                Column(
+                    horizontalAlignment = Alignment.Start,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    lines.forEach { lineText ->
                         KineticLine(
-                            text = currentLineWords.joinToString(" "),
+                            text = lineText,
                             style = style,
                             screenWidthPx = screenWidthPx,
-                            baseFontSize = baseFontSize.toFloat()
+                            baseFontSize = baseFontSize.toFloat(),
+                            textMeasurer = textMeasurer
                         )
                     }
                 }
@@ -111,10 +133,34 @@ fun KineticWarningOverlay(text: String?, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * Renders a single line of text, dynamically scaling the font size down if it overflows.
+ */
+@OptIn(ExperimentalTextApi::class)
 @Composable
-private fun KineticLine(text: String, style: TextStyle, screenWidthPx: Float, baseFontSize: Float) {
-    var readyToDraw by remember { mutableStateOf(false) }
-    var dynamicFontSize by remember { mutableStateOf(baseFontSize.sp) }
+private fun KineticLine(
+    text: String,
+    style: TextStyle,
+    screenWidthPx: Float,
+    baseFontSize: Float,
+    textMeasurer: TextMeasurer
+) {
+    // Pre-calculate scaling to ensure no visual overflow or UI thrashing
+    val dynamicFontSize = remember(text, screenWidthPx, baseFontSize) {
+        val unconstrainedWidth = textMeasurer.measure(
+            text = AnnotatedString(text),
+            style = style.copy(fontSize = baseFontSize.sp),
+            constraints = Constraints(), // Measure with infinite bounds to get true width
+            maxLines = 1
+        ).size.width
+
+        if (unconstrainedWidth > screenWidthPx && unconstrainedWidth > 0) {
+            val scaleFactor = screenWidthPx / unconstrainedWidth.toFloat()
+            (baseFontSize * scaleFactor * 0.95f).sp // Scale down with a 5% safety margin
+        } else {
+            baseFontSize.sp
+        }
+    }
 
     Text(
         text = text,
@@ -123,13 +169,6 @@ private fun KineticLine(text: String, style: TextStyle, screenWidthPx: Float, ba
             .padding(vertical = 2.dp),
         style = style.copy(fontSize = dynamicFontSize),
         maxLines = 1,
-        onTextLayout = { result: TextLayoutResult ->
-            if (result.hasVisualOverflow && !readyToDraw) {
-                val scaleFactor = screenWidthPx / result.size.width
-                dynamicFontSize = (dynamicFontSize.value * scaleFactor * 0.95f).sp
-            } else {
-                readyToDraw = true
-            }
-        }
+        softWrap = false
     )
 }
