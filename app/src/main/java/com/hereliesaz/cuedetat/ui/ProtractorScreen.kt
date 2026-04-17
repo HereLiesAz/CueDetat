@@ -318,7 +318,10 @@ fun ProtractorScreen(
 
         // --- Onscreen: Kinetic warning overlay ---
         onscreen(alignment = Alignment.Center) {
-            KineticWarningOverlay(text = uiState.warningText)
+            val showWarning = uiState.warningText != null && !uiState.isMasseModeActive && !uiState.isSpinControlVisible
+            if (showWarning) {
+                KineticWarningOverlay(text = uiState.warningText)
+            }
         }
 
         // --- Onscreen: Tutorial overlay (main route only) ---

@@ -28,7 +28,7 @@ object MassePhysicsSimulator {
         var omegaX = -(5f / 2f) * V0 * sin(alpha) * contactOffset.x / R
         var omegaY = -(5f / 2f) * V0 * sin(alpha) * contactOffset.y / R
 
-        val rotAngle = shotAngle + (PI / 2).toFloat()
+        val rotAngle = shotAngle
         val cosR = cos(rotAngle)
         val sinR = sin(rotAngle)
 

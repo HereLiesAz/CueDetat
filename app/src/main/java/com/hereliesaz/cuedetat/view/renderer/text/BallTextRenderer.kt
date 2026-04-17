@@ -11,6 +11,7 @@ import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.config.ui.LabelProperties
 import com.hereliesaz.cuedetat.view.model.LogicalCircular
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
+import com.hereliesaz.cuedetat.view.renderer.warpedBy
 
 class BallTextRenderer {
 
@@ -47,8 +48,11 @@ class BallTextRenderer {
 
         paint.textAlign = Paint.Align.CENTER
 
-        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(ball.center, ball.radius, state, matrix)
-        val screenPos = DrawingUtils.mapPoint(ball.center, matrix)
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+        val drawCenter = ball.center.warpedBy(tps)
+
+        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(drawCenter, ball.radius, state, matrix)
+        val screenPos = DrawingUtils.mapPoint(drawCenter, matrix)
 
         val textMetrics = paint.fontMetrics
         val textPadding = 15f

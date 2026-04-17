@@ -15,8 +15,8 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
                 val ghostCuePos = state.protractorUnit.ghostCueBallCenter
                 val initAngleDeg = Math.toDegrees(
                     atan2(
-                        (cuePos.y - ghostCuePos.y).toDouble(),
-                        (cuePos.x - ghostCuePos.x).toDouble()
+                        (ghostCuePos.y - cuePos.y).toDouble(),
+                        (ghostCuePos.x - cuePos.x).toDouble()
                     )
                 ).toFloat()
                 state.copy(

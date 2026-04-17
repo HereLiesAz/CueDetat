@@ -97,23 +97,6 @@ fun AzNavRailMenu(
             }
         }
 
-        background(weight = 0) {
-            val cueBallPos = uiState.onPlaneBall?.center
-            if (cueBallPos != null && !uiState.spinPaths.isNullOrEmpty() && !uiState.isMasseModeActive) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    uiState.spinPaths.forEach { (color, points) ->
-                        if (points.size > 1) {
-                            val path = Path().apply {
-                                moveTo(cueBallPos.x + points[0].x, cueBallPos.y + points[0].y)
-                                points.forEach { lineTo(cueBallPos.x + it.x, cueBallPos.y + it.y) }
-                            }
-                            drawPath(path = path, color = color.copy(alpha = uiState.spinPathsAlpha), style = Stroke(width = 4f))
-                        }
-                    }
-                }
-            }
-        }
-
         // [SECTION 3] Extra content from the caller (ProtractorScreen's Camera & Overlays)
         content()
 

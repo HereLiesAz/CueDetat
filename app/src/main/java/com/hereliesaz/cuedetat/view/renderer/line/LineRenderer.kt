@@ -147,7 +147,12 @@ class LineRenderer {
         camArray: DoubleArray?, distArray: DoubleArray?
     ) {
         val shotLineAnchor = state.shotLineAnchor ?: return
-        val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
+        val protractor = state.protractorUnit
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+        
+        val warpedShotAnchor = shotLineAnchor.warpedBy(tps)
+        val warpedGhost = protractor.ghostCueBallCenter.warpedBy(tps)
+        
         val shotGuideLineConfig = ShotGuideLine()
 
         val shotLineIsWarning = state.isGeometricallyImpossible || state.isTiltBeyondLimit || state.isObstructed
@@ -162,10 +167,10 @@ class LineRenderer {
             paints = paints
         )
         val obstructionPaint = Paint(paints.pathObstructionPaint).apply {
-            strokeWidth = state.protractorUnit.radius * 2
+            strokeWidth = protractor.radius * 2
         }
 
-        val shotGuideDirection = normalize(PointF(ghostCueCenter.x - shotLineAnchor.x, ghostCueCenter.y - shotLineAnchor.y))
+        val shotGuideDirection = normalize(PointF(warpedGhost.x - warpedShotAnchor.x, warpedGhost.y - warpedShotAnchor.y))
 
         if (state.table.isVisible || state.obstacleBalls.isNotEmpty()) {
             val layer = canvas.saveLayer(null, null)
@@ -173,11 +178,12 @@ class LineRenderer {
             if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
                 // Skip pathways in locked
             } else {
-                drawClippedLine(canvas, shotLineAnchor, shotGuideDirection, obstructionPaint, null, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
+                drawClippedLine(canvas, warpedShotAnchor, shotGuideDirection, obstructionPaint, null, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
             }
 
             state.aimingLineBankPath?.let {
-                drawBankablePath(canvas, it, obstructionPaint, null, isPocketed = false, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
+                val warpedPath = it.map { pt -> pt.warpedBy(tps) }
+                drawBankablePath(canvas, warpedPath, obstructionPaint, null, isPocketed = false, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
             }
 
             applyTableMask(canvas, state, paints, activeMatrix)
@@ -188,7 +194,7 @@ class LineRenderer {
             // Skip inner line in Pass 1; it will be drawn in drawBeginnerForeground in Pass 4
         } else {
             if (!state.isMasseModeActive) {
-                drawClippedLine(canvas, shotLineAnchor, shotGuideDirection, shotLinePaint, shotLineGlow, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
+                drawClippedLine(canvas, warpedShotAnchor, shotGuideDirection, shotLinePaint, shotLineGlow, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
             }
             drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
             drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
@@ -308,19 +314,19 @@ class LineRenderer {
         val paths = state.spinPaths ?: return
         if (paths.isEmpty()) return
 
-        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
         val alpha = (255 * state.spinPathsAlpha).toInt()
         val spinPathPaint = Paint(paints.shotLinePaint).apply { strokeWidth = 4f }
         val spinGlowPaint = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 8f }
 
-
         val pathColor = paths.keys.firstOrNull() ?: Color.White
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
 
         paths.forEach { (color, points) ->
             if (points.size < 2) return@forEach
 
             val screenPoints = points.map { pt ->
-                val screenPt = DrawingUtils.mapPoint(pt, activeMatrix)
+                val warpedPt = pt.warpedBy(tps)
+                val screenPt = DrawingUtils.mapPoint(warpedPt, activeMatrix)
                 if (camArray != null && distArray != null && camArray.size == 9)
                     DrawingUtils.applyBarrelDistortion(screenPt.x, screenPt.y, camArray, distArray)
                 else screenPt
@@ -388,16 +394,16 @@ class LineRenderer {
                 isAntiAlias = true
             }
             state.masseImpactPoints.forEach { logicalPt ->
-                val screenPt = DrawingUtils.mapPoint(logicalPt, activeMatrix)
+                val warpedPt = logicalPt.warpedBy(tps)
+                val screenPt = DrawingUtils.mapPoint(warpedPt, activeMatrix)
                 val finalPt = if (camArray != null && distArray != null && camArray.size == 9)
                     DrawingUtils.applyBarrelDistortion(screenPt.x, screenPt.y, camArray, distArray)
                 else screenPt
-                val screenRadius = DrawingUtils.getPerspectiveRadiusAndLift(logicalPt, LOGICAL_BALL_RADIUS, state, activeMatrix).radius
+                val screenRadius = DrawingUtils.getPerspectiveRadiusAndLift(warpedPt, LOGICAL_BALL_RADIUS, state, activeMatrix).radius
                 canvas.drawCircle(finalPt.x, finalPt.y, screenRadius, ghostGlow)
                 canvas.drawCircle(finalPt.x, finalPt.y, screenRadius, ghostStroke)
             }
         }
-
     }
 
     private fun drawMyriadTrajectory(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
@@ -411,11 +417,13 @@ class LineRenderer {
             this.alpha = alpha 
         }
         val myriadGlowPaint = createGlowPaint(Color(0xFFE040FB), 12f, state, paints)
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
 
         val screenPath = Path()
         var first = true
         path.forEach { logicalPt ->
-            val screenPt = DrawingUtils.mapPoint(logicalPt, activeMatrix)
+            val warpedPt = logicalPt.warpedBy(tps)
+            val screenPt = DrawingUtils.mapPoint(warpedPt, activeMatrix)
             val finalPt = if (camArray != null && distArray != null && camArray.size == 9)
                 DrawingUtils.applyBarrelDistortion(screenPt.x, screenPt.y, camArray, distArray)
             else screenPt
@@ -486,8 +494,11 @@ class LineRenderer {
 
     private fun drawProtractorGuides(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
         if (state.isMasseModeActive) return
-        val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
-        val targetCenter = state.protractorUnit.center
+        val protractor = state.protractorUnit
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+        val warpedGhost = protractor.ghostCueBallCenter.warpedBy(tps)
+        val warpedTarget = protractor.center.warpedBy(tps)
+        
         val config = ProtractorGuides()
 
         val guidePaint = Paint(paints.angleGuidePaint).apply {
@@ -501,11 +512,11 @@ class LineRenderer {
         }
 
         protractorAngles.forEach { angle ->
-            drawAngleGuide(canvas, ghostCueCenter, targetCenter, angle, guidePaint, state, paints, activeMatrix, camArray, distArray)
-            drawAngleGuide(canvas, ghostCueCenter, targetCenter, -angle, guidePaint, state, paints, activeMatrix, camArray, distArray)
+            drawAngleGuide(canvas, warpedGhost, warpedTarget, angle, guidePaint, state, paints, activeMatrix, camArray, distArray)
+            drawAngleGuide(canvas, warpedGhost, warpedTarget, -angle, guidePaint, state, paints, activeMatrix, camArray, distArray)
             if (state.areHelpersVisible && state.experienceMode != ExperienceMode.BEGINNER) {
-                textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, angle, textPaint, state.protractorUnit.radius)
-                textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, -angle, textPaint, state.protractorUnit.radius)
+                textRenderer.drawAngleLabel(canvas, warpedGhost, warpedTarget, angle, textPaint, state.protractorUnit.radius)
+                textRenderer.drawAngleLabel(canvas, warpedGhost, warpedTarget, -angle, textPaint, state.protractorUnit.radius)
             }
         }
     }
