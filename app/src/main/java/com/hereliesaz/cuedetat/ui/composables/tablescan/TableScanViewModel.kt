@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.opencv.calib3d.Calib3d
@@ -62,13 +61,10 @@ class TableScanViewModel @Inject constructor(
     val mlConfidence: StateFlow<Float> = _mlConfidence.asStateFlow()
 
     private val _mlTableBoundary = MutableStateFlow<android.graphics.RectF?>(null)
-    val mlTableBoundary: StateFlow<android.graphics.RectF?> = _mlTableBoundary.asStateFlow()
 
     private val _scanProgress = MutableStateFlow<Map<PocketId, Boolean>>(emptyMap())
-    val scanProgress: StateFlow<Map<PocketId, Boolean>> = _scanProgress.asStateFlow()
 
-    private val _selectedTableSize = MutableStateFlow<TableSize>(TableSize.EIGHT_FT)
-    val selectedTableSize: StateFlow<TableSize> = _selectedTableSize.asStateFlow()
+    private val _selectedTableSize = MutableStateFlow(TableSize.EIGHT_FT)
 
     /**
      * Emits events when scan is complete. Collected by TableScanScreen.
@@ -116,10 +112,6 @@ class TableScanViewModel @Inject constructor(
         _selectedSampleIds.value = if (current.contains(id)) current - id else current + id
     }
 
-    fun selectSamples(ids: Set<String>) {
-        _selectedSampleIds.value = ids
-    }
-
     fun clearSelection() {
         _selectedSampleIds.value = emptySet()
     }
@@ -131,12 +123,6 @@ class TableScanViewModel @Inject constructor(
                 _scanResult.emit(MainScreenEvent.DeleteFeltSamples(ids))
                 clearSelection()
             }
-        }
-    }
-
-    fun moveSample(fromIndex: Int, toIndex: Int) {
-        viewModelScope.launch {
-            _scanResult.emit(MainScreenEvent.MoveFeltSample(fromIndex, toIndex))
         }
     }
 
@@ -176,10 +162,6 @@ class TableScanViewModel @Inject constructor(
     /** Called by TableScanAnalyzer each frame with the mean HSV of the centre crop of the felt. */
     fun onFeltColorSampled(hsv: FloatArray) { lastFeltHsv = hsv }
 
-    fun onTableSizeSelected(size: TableSize) {
-        _selectedTableSize.value = size
-    }
-
     /**
      * Called by TableScanAnalyzer on each frame.
      * Projects image-space blobs to logical space and merges into clusters.
@@ -190,8 +172,7 @@ class TableScanViewModel @Inject constructor(
         tableBoundary: android.graphics.RectF?,
         confidence: Float,
         imageWidth: Int,
-        imageHeight: Int,
-        rotationDegrees: Int
+        imageHeight: Int
     ) {
         if (!hasInverseMatrix) return
         val inverse = inversePitchMatrix ?: return
@@ -271,7 +252,7 @@ class TableScanViewModel @Inject constructor(
                 }
                 val fitResult = TableGeometryFitter.fit(centerPts) ?: return@launch
                 val identifiedCenters = fitResult.associate { (id, pt) -> id to pt }
-                completeScan(identifiedCenters, imageWidth.toFloat(), imageHeight.toFloat())
+                completeScan(identifiedCenters)
             }
         }
     }
@@ -305,9 +286,7 @@ class TableScanViewModel @Inject constructor(
     }
 
     private suspend fun completeScan(
-        identifiedLogical: Map<PocketId, PointF>,
-        imgWidth: Float,
-        imgHeight: Float
+        identifiedLogical: Map<PocketId, PointF>
     ) {
         val tableSize = _selectedTableSize.value
         val logicalTable = Table(tableSize, true)
@@ -506,7 +485,7 @@ class TableScanViewModel @Inject constructor(
                 
                 // We don't use TableGeometryFitter here because the user MANUALLY told us which pocket is which.
                 // We trust the identities.
-                completeScan(centerPts, viewWidth.toFloat(), viewHeight.toFloat())
+                completeScan(centerPts)
             }
         }
     }
