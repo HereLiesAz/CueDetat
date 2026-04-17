@@ -14,13 +14,13 @@ object SpinPhysicsCalculator {
     private const val MAX_STEPS = (PATH_LENGTH / STEP_SIZE).toInt()
 
     fun calculatePath(
-        spinOffset: PointF, // normalized -1..1; x = lateral English
-        cueBallPos: PointF, // world coords — ghost cue ball position (where contact occurs)
-        targetBallPos: PointF, // world coords — object ball center
+        spinOffset: Vector2, // normalized -1..1; x = lateral English
+        cueBallPos: Vector2, // world coords — ghost cue ball position (where contact occurs)
+        targetBallPos: Vector2, // world coords — object ball center
         shotAngle: Float, // radians — direction cue was traveling before contact
         table: Table,
         maxBounces: Int = 2
-    ): List<PointF> {
+    ): List<Vector2> {
         val dx = targetBallPos.x - cueBallPos.x
         val dy = targetBallPos.y - cueBallPos.y
         val mag = hypot(dx.toDouble(), dy.toDouble()).toFloat()
@@ -48,39 +48,40 @@ object SpinPhysicsCalculator {
             if (!table.isVisible) {
                 val endX = currentPos.x + cos(currentAngle) * PATH_LENGTH
                 val endY = currentPos.y + sin(currentAngle) * PATH_LENGTH
-                val endPoint = PointF().apply { x = endX; y = endY }
-                points.add(endPoint)
+                points.add(Vector2(endX, endY))
                 return points
             }
 
             var hitRail = false
-            
+
             for (step in 1..MAX_STEPS) {
-                val swerveAmount = 0.001f * omega * exp((-K3 * totalDistance).toDouble()).toFloat()
+                val swerveAmount = 0.0002f * STEP_SIZE * omega * exp((-K3 * totalDistance).toDouble()).toFloat()
                 currentAngle += swerveAmount
-                
+
                 val nextX = currentPos.x + cos(currentAngle) * STEP_SIZE
                 val nextY = currentPos.y + sin(currentAngle) * STEP_SIZE
-                val nextPos = PointF().apply { x = nextX; y = nextY }
-                
+                val nextPos = Vector2(nextX, nextY)
+
                 totalDistance += STEP_SIZE
-                
+
                 for (pocket in table.pockets) {
                     val pdx = nextX - pocket.x
                     val pdy = nextY - pocket.y
-                    if (hypot(pdx.toDouble(), pdy.toDouble()).toFloat() < pocketThreshold) {
+                    if (pdx * pdx + pdy * pdy < pocketThreshold * pocketThreshold) {
                         points.add(nextPos)
                         return points
                     }
                 }
-                
-                val railHit = table.findRailIntersectionAndNormal(currentPos, nextPos)
+
+                val railHit = table.findRailIntersectionAndNormal(currentPos.toPointF(), nextPos.toPointF())
                 if (railHit != null) {
-                    val intersection = railHit.first
-                    val normal = railHit.second
+                    val intersection = railHit.first.toVector2()
+                    val normal = railHit.second.toVector2()
                     points.add(intersection)
-                    
-                    val omegaAtRail = abs(omega) * exp((-K3 * totalDistance).toDouble()).toFloat()
+
+                    val distToRail = currentPos.distanceTo(intersection)
+                    totalDistance += distToRail
+                    val omegaAtRail = omega * exp((-K3 * totalDistance).toDouble()).toFloat()
                     val dot = cos(currentAngle) * normal.x + sin(currentAngle) * normal.y
                     val reflectedX = cos(currentAngle) - 2f * dot * normal.x
                     val reflectedY = sin(currentAngle) - 2f * dot * normal.y
@@ -90,21 +91,22 @@ object SpinPhysicsCalculator {
                     var incidentAngle = abs(currentAngle - (normalAngle + PI.toFloat()))
                     if (incidentAngle > PI) incidentAngle = (2 * PI - incidentAngle).toFloat()
 
-                    val throwAmount = K2 * omegaAtRail * cos(incidentAngle) * sign(spinOffset.x)
+                    val throwAmount = K2 * omegaAtRail * cos(incidentAngle)
                     currentAngle = reflectedAngle + throwAmount
-                    omega = omegaAtRail * sign(spinOffset.x)
+                    omega = omegaAtRail
+                    currentPos = intersection
                     currentPos = intersection
                     hitRail = true
                     break
                 }
-                
+
                 if (step == MAX_STEPS || step % 5 == 0) {
                     points.add(nextPos)
                 }
-                
+
                 currentPos = nextPos
             }
-            
+
             if (!hitRail) {
                 points.add(currentPos)
                 return points
