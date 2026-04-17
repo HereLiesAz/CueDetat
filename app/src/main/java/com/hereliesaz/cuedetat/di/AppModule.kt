@@ -13,6 +13,7 @@ import com.google.gson.stream.JsonWriter
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
+import com.hereliesaz.cuedetat.data.TFLitePoolDetector
 import com.hereliesaz.cuedetat.network.GithubApi
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
 import com.hereliesaz.cuedetat.ui.composables.tablescan.TFLitePocketDetector
@@ -53,15 +54,10 @@ object AppModule {
 
     /**
      * Provides the Google ML Kit Object Detector.
-     *
-     * Configuration:
-     * - STREAM_MODE: Optimized for video (tracks objects across frames).
-     * - MULTIPLE_OBJECTS: We need to find Cue Ball, Object Balls, and Obstacles.
-     * - CLASSIFICATION: Enabled to distinguish broad categories (though we mostly rely on custom CV).
      */
     @Provides
     @Singleton
-    @GenericDetector // Custom Qualifier to distinguish from potential other detectors.
+    @GenericDetector
     fun provideGenericObjectDetector(): ObjectDetector {
         return try {
             val options = ObjectDetectorOptions.Builder()
@@ -73,6 +69,15 @@ object AppModule {
         } catch (e: Exception) {
             throw IllegalStateException("Failed to initialize ML Kit Object Detector.", e)
         }
+    }
+
+    /**
+     * Provides the TFLite Pool detector used for tracking balls and cues.
+     */
+    @Provides
+    @Singleton
+    fun providePoolDetector(@ApplicationContext context: Context): TFLitePoolDetector {
+        return TFLitePoolDetector(context)
     }
 
     /**
