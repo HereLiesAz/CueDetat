@@ -79,7 +79,9 @@ object SpinPhysicsCalculator {
                     val normal = railHit.second.toVector2()
                     points.add(intersection)
 
-                    val omegaAtRail = abs(omega) * exp((-K3 * totalDistance).toDouble()).toFloat()
+                    val distToRail = currentPos.distanceTo(intersection)
+                    totalDistance += distToRail
+                    val omegaAtRail = omega * exp((-K3 * totalDistance).toDouble()).toFloat()
                     val dot = cos(currentAngle) * normal.x + sin(currentAngle) * normal.y
                     val reflectedX = cos(currentAngle) - 2f * dot * normal.x
                     val reflectedY = sin(currentAngle) - 2f * dot * normal.y
@@ -89,9 +91,10 @@ object SpinPhysicsCalculator {
                     var incidentAngle = abs(currentAngle - (normalAngle + PI.toFloat()))
                     if (incidentAngle > PI) incidentAngle = (2 * PI - incidentAngle).toFloat()
 
-                    val throwAmount = K2 * omegaAtRail * cos(incidentAngle) * sign(spinOffset.x)
+                    val throwAmount = K2 * omegaAtRail * cos(incidentAngle)
                     currentAngle = reflectedAngle + throwAmount
-                    omega = omegaAtRail * sign(spinOffset.x)
+                    omega = omegaAtRail
+                    currentPos = intersection
                     currentPos = intersection
                     hitRail = true
                     break
