@@ -705,8 +705,6 @@ class LineRenderer {
             canvas.drawText(textToDraw, 0f, yOffset, textPaint)
             canvas.restore()
         }
-
-        canvas.restore()
     }
 
     private fun resolveLensArrays(state: CueDetatState): Pair<DoubleArray?, DoubleArray?> {
