@@ -256,9 +256,13 @@ class MainViewModel @Inject constructor(
         arFrameProcessor.updateUiState(derivedState)
 
         if (type != UpdateType.SPIN_ONLY) {
+            val isHighPriority = type == UpdateType.FULL || 
+                               state.tableScanModel != previousState.tableScanModel ||
+                               state.viewOffset != previousState.viewOffset
+                               
             saveJob?.cancel()
             saveJob = viewModelScope.launch {
-                delay(2000L)
+                if (!isHighPriority) delay(2000L)
                 userPreferencesRepository.saveState(derivedState)
                 tableScanRepository.saveFeltSamples(derivedState.savedFeltSamples)
             }

@@ -16,7 +16,7 @@ import java.io.FileOutputStream
 private const val MODEL_PATH = "weights/best.onnx"
 private const val INPUT_SIZE = 640
 private const val CONFIDENCE_THRESHOLD = 0.30f
-private const val MAX_POCKETS = 6
+private const val TABLE_CLASS_ID = 0
 private const val HOLE_CLASS_ID = 1
 
 /**
@@ -34,7 +34,7 @@ class OpenCVPocketDetector(private val context: Context) : PocketDetector {
         }
     }
 
-    override fun detect(bitmap: Bitmap): List<PointF>? {
+    override fun detect(bitmap: Bitmap): MlTableDetection? {
         val n = net ?: return null
         return try {
             val rgbMat = Mat()
@@ -54,22 +54,23 @@ class OpenCVPocketDetector(private val context: Context) : PocketDetector {
             val outputs = mutableListOf<Mat>()
             n.forward(outputs, n.unconnectedOutLayersNames)
             
-            val detections = parseDetections(outputs[0], bitmap.width, bitmap.height)
+            val detection = parseDetectionsFull(outputs[0], bitmap.width, bitmap.height)
             
             rgbMat.release()
             blob.release()
             outputs.forEach { it.release() }
             
-            detections
+            detection
         } catch (e: Exception) {
             Log.e("OpenCVPocketDetector", "Inference failed: ${e.message}")
             null
         }
     }
 
-    private fun parseDetections(output: Mat, width: Int, height: Int): List<PointF>? {
-        // Output format is [1, 300, 6] -> Each row: [y1, x1, y2, x2, score, class_id]
-        val results = mutableListOf<PointF>()
+    private fun parseDetectionsFull(output: Mat, width: Int, height: Int): MlTableDetection {
+        val pockets = mutableListOf<PointF>()
+        var tableBoundary: android.graphics.RectF? = null
+        var maxTableScore = 0f
         
         val rows = output.size(1) // 300
         val data = FloatArray(6)
@@ -80,23 +81,37 @@ class OpenCVPocketDetector(private val context: Context) : PocketDetector {
             if (score < CONFIDENCE_THRESHOLD) continue
             
             val classId = data[5].toInt()
-            if (classId != HOLE_CLASS_ID) continue
-            
-            // TF NMS convention in the ONNX export too: [y1, x1, y2, x2, ...]
-            val y1 = data[0]
-            val x1 = data[1]
-            val y2 = data[2]
-            val x2 = data[3]
-            
-            val cx = ((x1 + x2) / 2f * width)
-            val cy = ((y1 + y2) / 2f * height)
-            results.add(PointF(cx, cy))
-            
-            if (results.size >= MAX_POCKETS) break
+            when (classId) {
+                TABLE_CLASS_ID -> {
+                    if (score > maxTableScore) {
+                        maxTableScore = score
+                        tableBoundary = android.graphics.RectF(
+                            data[1] * width,
+                            data[0] * height,
+                            data[3] * width,
+                            data[2] * height
+                        )
+                    }
+                }
+                HOLE_CLASS_ID -> {
+                    val cx = ((data[1] + data[3]) / 2f * width)
+                    val cy = ((data[0] + data[2]) / 2f * height)
+                    pockets.add(PointF(cx, cy))
+                }
+            }
         }
         
-        return if (results.isNotEmpty()) results else null
+        val pocketScore = (pockets.size.toFloat() / 6.0f).coerceAtMost(1.0f)
+        val finalConfidence = (maxTableScore * 0.5f) + (pocketScore * 0.5f)
+
+        return MlTableDetection(
+            tableBoundary = tableBoundary,
+            pockets = pockets,
+            confidence = finalConfidence
+        )
     }
+
+    private fun parseDetections(output: Mat, width: Int, height: Int): List<PointF>? = null
 
     private fun getAssetFile(assetPath: String): File {
         val file = File(context.cacheDir, assetPath.substringAfterLast("/"))

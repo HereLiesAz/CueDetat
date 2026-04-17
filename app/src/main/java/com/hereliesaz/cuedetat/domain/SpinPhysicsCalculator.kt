@@ -5,51 +5,47 @@ import com.hereliesaz.cuedetat.view.model.Table
 import kotlin.math.*
 
 object SpinPhysicsCalculator {
-    private const val K1 = 0.04f // squirt coefficient
-    private const val K2 = 0.15f // rail throw coefficient
-    private const val K3 = 0.008f // spin decay rate per logical unit
-    private const val PATH_LENGTH = 2000f // must reach any rail from anywhere on the table
+    private const val K_SQUIRT = 0.04f   // Side-spin squirt factor
+    private const val K_THROW = 0.15f    // Rail throw factor
+    private const val K_CURVE = 0.015f   // Follow/Draw curve induction rate
+    private const val K_DECAY = 0.005f   // Spin decay rate per logical unit
+    private const val PATH_LENGTH = 2000f 
 
-    private const val STEP_SIZE = 5f
-    private const val PATH_SAMPLING_RATE = 5
-    private const val SWERVE_SCALE_FACTOR = 0.001f
+    private const val STEP_SIZE = 4f
+    private const val PATH_SAMPLING_RATE = 4
     private const val MAX_STEPS = (PATH_LENGTH / STEP_SIZE).toInt()
 
     fun calculatePath(
-        spinOffset: Vector2, // normalized -1..1; x = lateral English
-        cueBallPos: Vector2, // world coords — ghost cue ball position (where contact occurs)
-        targetBallPos: Vector2, // world coords — object ball center
-        shotAngle: Float, // radians — direction cue was traveling before contact
+        spinOffset: Vector2, // x = Lateral English (-1..1), y = Follow/Draw (-1..1)
+        cueBallPos: Vector2,
+        targetBallPos: Vector2,
+        shotAngle: Float,
         table: Table,
-        velocity: Float = 1.0f, // 1.0 = standard speed. higher = less swerve.
+        velocity: Float = 1.0f,
         maxBounces: Int = 2
     ): List<Vector2> {
         val dx = targetBallPos.x - cueBallPos.x
         val dy = targetBallPos.y - cueBallPos.y
-        val mag = hypot(dx.toDouble(), dy.toDouble()).toFloat()
-        if (mag < 0.001f) return listOf(cueBallPos)
+        val distToTarget = hypot(dx.toDouble(), dy.toDouble()).toFloat()
+        if (distToTarget < 0.001f) return listOf(cueBallPos)
 
+        // 1. Initial Impact Geometry
         val impactAngle = atan2(dy, dx)
         val cross = sin(shotAngle - impactAngle)
         val tangentSide = if (cross >= 0f) 1f else -1f
         val tangentAngle = impactAngle + tangentSide * (PI / 2).toFloat()
-
-        var cutAngle = abs(shotAngle - tangentAngle)
-        if (cutAngle > PI) cutAngle = (2 * PI - cutAngle).toFloat()
-
-        val squirt = K1 * spinOffset.x * sin(cutAngle)
-        var currentAngle = tangentAngle + squirt
-        var omega = spinOffset.x
-
+        
+        // 2. Initial State
+        // sideSpin (x) primarily affects rail reflections.
+        // verticalSpin (y) causes the post-collision curve.
+        var currentAngle = tangentAngle 
+        var sideSpin = spinOffset.x
+        var verticalSpin = spinOffset.y
+        
         val points = mutableListOf(cueBallPos)
         var currentPos = cueBallPos
         var totalDistance = 0f
-
         val pocketThreshold = LOGICAL_BALL_RADIUS * 1.5f
-
-        // Swerve scale factor should decrease as velocity increases.
-        // Formula: swerve_k / velocity
-        val effectiveSwerveScale = SWERVE_SCALE_FACTOR / velocity.coerceAtLeast(0.1f)
 
         repeat(maxBounces + 1) {
             if (!table.isVisible) {
@@ -60,42 +56,40 @@ object SpinPhysicsCalculator {
             }
 
             var hitRail = false
-
             for (step in 1..MAX_STEPS) {
-                val swerveAmount = effectiveSwerveScale * omega * exp((-K3 * totalDistance).toDouble()).toFloat()
-                currentAngle += swerveAmount
+                // 3. CURVE INDUCTION (Follow/Draw)
+                // The vertical spin induces a force that pulls the velocity vector toward the natural angle.
+                // For follow (y > 0), target direction is shotAngle.
+                // For draw (y < 0), target direction is shotAngle + PI.
+                val naturalAngle = if (verticalSpin >= 0) shotAngle else (shotAngle + PI.toFloat())
+                
+                // Curve speed depends on spin magnitude and distance traveled.
+                val spinEff = verticalSpin * exp((-K_DECAY * totalDistance).toDouble()).toFloat()
+                
+                // Gradually rotate currentAngle toward naturalAngle
+                val angleDiff = normalizeAngle(naturalAngle - currentAngle)
+                val rotateAmount = angleDiff * K_CURVE * abs(spinEff)
+                currentAngle += rotateAmount
 
                 val nextX = currentPos.x + cos(currentAngle) * STEP_SIZE
                 val nextY = currentPos.y + sin(currentAngle) * STEP_SIZE
                 val nextPos = Vector2(nextX, nextY)
-
                 totalDistance += STEP_SIZE
 
-                // --- Pocket detection: segment intersection to prevent tunneling ---
-                val segDx = nextX - currentPos.x
-                val segDy = nextY - currentPos.y
-                val segLenSq = segDx * segDx + segDy * segDy
-                if (segLenSq > 0f) {
-                    for (pocket in table.pockets) {
-                        val t = ((pocket.x - currentPos.x) * segDx + (pocket.y - currentPos.y) * segDy) / segLenSq
-                        val ct = t.coerceIn(0f, 1f)
-                        val cx = currentPos.x + ct * segDx
-                        val cy = currentPos.y + ct * segDy
-                        val dist = hypot((cx - pocket.x).toDouble(), (cy - pocket.y).toDouble()).toFloat()
-                        if (dist < pocketThreshold) {
-                            points.add(Vector2(cx, cy))
-                            return points
-                        }
-                    }
+                // 4. Pocket detection
+                if (checkPocket(currentPos, nextPos, table, pocketThreshold)) {
+                    points.add(nextPos)
+                    return points
                 }
 
+                // 5. Rail detection
                 val railHit = table.findRailIntersectionAndNormal(currentPos.toPointF(), nextPos.toPointF())
                 if (railHit != null) {
                     val intersection = railHit.first.toVector2()
                     val normal = railHit.second.toVector2()
                     points.add(intersection)
 
-                    val omegaAtRail = abs(omega) * exp((-K3 * totalDistance).toDouble()).toFloat()
+                    // REFLECTION WITH ENGLISH
                     val dot = cos(currentAngle) * normal.x + sin(currentAngle) * normal.y
                     val reflectedX = cos(currentAngle) - 2f * dot * normal.x
                     val reflectedY = sin(currentAngle) - 2f * dot * normal.y
@@ -105,18 +99,18 @@ object SpinPhysicsCalculator {
                     var incidentAngle = abs(currentAngle - (normalAngle + PI.toFloat()))
                     if (incidentAngle > PI) incidentAngle = (2 * PI - incidentAngle).toFloat()
 
-                    val throwAmount = K2 * omegaAtRail * cos(incidentAngle) * sign(spinOffset.x)
+                    val sideSpinEff = sideSpin * exp((-K_DECAY * totalDistance).toDouble()).toFloat()
+                    val throwAmount = K_THROW * sideSpinEff * cos(incidentAngle)
+                    
                     currentAngle = reflectedAngle + throwAmount
-                    omega = omegaAtRail * sign(spinOffset.x)
                     currentPos = intersection
                     hitRail = true
                     break
                 }
 
-                if (step == MAX_STEPS || step % PATH_SAMPLING_RATE == 0) {
+                if (step % PATH_SAMPLING_RATE == 0) {
                     points.add(nextPos)
                 }
-
                 currentPos = nextPos
             }
 
@@ -126,5 +120,26 @@ object SpinPhysicsCalculator {
             }
         }
         return points
+    }
+
+    private fun checkPocket(start: Vector2, end: Vector2, table: Table, threshold: Float): Boolean {
+        val dx = end.x - start.x
+        val dy = end.y - start.y
+        val magSq = dx * dx + dy * dy
+        if (magSq < 0.001f) return false
+        for (pocket in table.pockets) {
+            val t = ((pocket.x - start.x) * dx + (pocket.y - start.y) * dy) / magSq
+            val ct = t.coerceIn(0f, 1f)
+            val dist = hypot((start.x + ct * dx - pocket.x).toDouble(), (start.y + ct * dy - pocket.y).toDouble()).toFloat()
+            if (dist < threshold) return true
+        }
+        return false
+    }
+
+    private fun normalizeAngle(a: Float): Float {
+        var ang = a
+        while (ang <= -PI) ang += (2 * PI).toFloat()
+        while (ang > PI) ang -= (2 * PI).toFloat()
+        return ang
     }
 }

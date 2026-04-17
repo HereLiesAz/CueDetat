@@ -22,6 +22,21 @@ class TableScanRepository @Inject constructor(
 ) {
     private val file: File get() = File(context.filesDir, "table_scan_model.json")
     private val feltSamplesFile: File get() = File(context.filesDir, "felt_samples.json")
+    private val partialScanFile: File get() = File(context.filesDir, "partial_scan.json")
+
+    fun loadPartialScan(): Pair<com.hereliesaz.cuedetat.ui.composables.tablescan.ScanStep, Map<com.hereliesaz.cuedetat.domain.PocketId, android.graphics.PointF>>? = runCatching {
+        if (!partialScanFile.exists()) return@runCatching null
+        val type = object : com.google.gson.reflect.TypeToken<Pair<com.hereliesaz.cuedetat.ui.composables.tablescan.ScanStep, Map<com.hereliesaz.cuedetat.domain.PocketId, android.graphics.PointF>>>() {}.type
+        gson.fromJson<Pair<com.hereliesaz.cuedetat.ui.composables.tablescan.ScanStep, Map<com.hereliesaz.cuedetat.domain.PocketId, android.graphics.PointF>>>(partialScanFile.readText(), type)
+    }.getOrNull()
+
+    fun savePartialScan(step: com.hereliesaz.cuedetat.ui.composables.tablescan.ScanStep, clusters: Map<com.hereliesaz.cuedetat.domain.PocketId, android.graphics.PointF>) {
+        runCatching { partialScanFile.writeText(gson.toJson(Pair(step, clusters))) }
+    }
+
+    fun clearPartialScan() {
+        partialScanFile.delete()
+    }
 
     /** Loads the saved model from disk, or null if none exists. */
     fun load(): TableScanModel? = runCatching {

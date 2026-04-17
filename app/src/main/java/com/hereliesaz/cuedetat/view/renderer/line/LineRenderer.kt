@@ -551,13 +551,10 @@ class LineRenderer {
                 val end = getSafeLogicalPoint(start, truncatedEnd, activeMatrix) ?: continue
 
                 val segmentPath = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
-                canvas.save()
-                canvas.concat(inverseMatrix)
                 if (drawGeometry) {
                     glowPaint?.let { canvas.drawPath(segmentPath, it) }
                     canvas.drawPath(segmentPath, primaryPaint)
                 }
-                canvas.restore()
             }
         }
     }
@@ -566,8 +563,6 @@ class LineRenderer {
         if (path.size < 2) return
         val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
 
-        canvas.save()
-        canvas.concat(inverseMatrix)
         for (i in 0 until path.size - 1) {
             val start = path[i]
             val rawEnd = path[i + 1]
@@ -579,7 +574,6 @@ class LineRenderer {
             glowPaint?.let { canvas.drawPath(segmentPath, it) }
             canvas.drawPath(segmentPath, paint)
         }
-        canvas.restore()
     }
 
     private fun drawAngleGuide(
@@ -625,9 +619,6 @@ class LineRenderer {
         val end = getSafeLogicalPoint(start, truncatedEnd, activeMatrix) ?: return
 
         val path = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
-
-        canvas.save()
-        canvas.concat(inverseMatrix)
 
         val measure = android.graphics.PathMeasure(path, false)
         val pathLen = measure.length

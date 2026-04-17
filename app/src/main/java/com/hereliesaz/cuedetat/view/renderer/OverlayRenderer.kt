@@ -78,13 +78,14 @@ class OverlayRenderer {
         val matrixFor2DPlane = interpolatedMatrix
 
         // Pass 1: Draw elements on the logical plane (Lines drawn UNDER balls)
+        // Pass 1: Draw elements on the logical plane (Lines drawn UNDER balls)
         canvas.withMatrix(matrixFor2DPlane) {
             if (state.table.isVisible) {
                 tableRenderer.drawSurface(this, state, paints)
                 tableRenderer.drawPockets(this, state, paints)
             }
-            lineRenderer.drawLogicalLines(this, state, paints, typeface, matrixFor2DPlane)
         }
+        lineRenderer.drawLogicalLines(canvas, state, paints, typeface, matrixFor2DPlane)
 
         // Pass 2: Draw the "lifted" table rails
         // We only show rails when not in top-down view (or fade them out)

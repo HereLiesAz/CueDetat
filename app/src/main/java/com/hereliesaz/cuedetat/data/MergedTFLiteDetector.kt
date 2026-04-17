@@ -17,6 +17,7 @@ private const val POOL_MODEL = "ml/pool_detector_pivot_fp16.tflite"
 private const val INPUT_SIZE = 640
 private const val CONFIDENCE_THRESHOLD = 0.30f
 private const val MAX_DETECTIONS = 300
+private const val TABLE_CLASS_ID = 0
 private const val HOLE_CLASS_ID = 1
 
 /**
@@ -73,15 +74,12 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
         inputBuffer.rewind()
     }
 
-    /**
-     * Implements [PocketDetector] interface for table scanning.
-     */
-    override fun detect(bitmap: Bitmap): List<PointF>? {
+    override fun detect(bitmap: Bitmap): com.hereliesaz.cuedetat.ui.composables.tablescan.MlTableDetection? {
         val interp = pocketInterp ?: return null
         return try {
             preprocess(bitmap)
             interp.run(inputBuffer, pocketOutput)
-            parsePocketDetections(bitmap.width, bitmap.height)
+            parsePocketDetectionsFull(bitmap.width, bitmap.height)
         } catch (e: Exception) {
             Log.e("MergedTFLiteDetector", "Pocket inference failed: ${e.message}")
             null
@@ -103,20 +101,47 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
         }
     }
 
-    private fun parsePocketDetections(width: Int, height: Int): List<PointF>? {
-        val results = mutableListOf<PointF>()
+    private fun parsePocketDetectionsFull(width: Int, height: Int): com.hereliesaz.cuedetat.ui.composables.tablescan.MlTableDetection {
+        val pockets = mutableListOf<PointF>()
+        var tableBoundary: RectF? = null
+        var maxTableScore = 0f
+
         for (det in pocketOutput[0]) {
-            if (det[4] < CONFIDENCE_THRESHOLD) continue
-            if (det[5].toInt() != HOLE_CLASS_ID) continue
-            
-            // TF NMS convention: [y1, x1, y2, x2, score, class_id]
-            val cx = ((det[1] + det[3]) / 2f * width)
-            val cy = ((det[0] + det[2]) / 2f * height)
-            results.add(PointF(cx, cy))
-            if (results.size >= 6) break
+            val score = det[4]
+            if (score < CONFIDENCE_THRESHOLD) continue
+            val classId = det[5].toInt()
+
+            when (classId) {
+                TABLE_CLASS_ID -> {
+                    if (score > maxTableScore) {
+                        maxTableScore = score
+                        tableBoundary = RectF(
+                            det[1] * width,
+                            det[0] * height,
+                            det[3] * width,
+                            det[2] * height
+                        )
+                    }
+                }
+                HOLE_CLASS_ID -> {
+                    val cx = ((det[1] + det[3]) / 2f * width)
+                    val cy = ((det[0] + det[2]) / 2f * height)
+                    pockets.add(PointF(cx, cy))
+                }
+            }
         }
-        return results.ifEmpty { null }
+
+        val pocketScore = (pockets.size.toFloat() / 6.0f).coerceAtMost(1.0f)
+        val finalConfidence = (maxTableScore * 0.5f) + (pocketScore * 0.5f)
+
+        return com.hereliesaz.cuedetat.ui.composables.tablescan.MlTableDetection(
+            tableBoundary = tableBoundary,
+            pockets = pockets,
+            confidence = finalConfidence
+        )
     }
+
+    private fun parsePocketDetections(width: Int, height: Int): List<PointF>? = null
 
     private fun parsePoolDetections(width: Int, height: Int): List<PoolDetection> {
         val results = mutableListOf<PoolDetection>()

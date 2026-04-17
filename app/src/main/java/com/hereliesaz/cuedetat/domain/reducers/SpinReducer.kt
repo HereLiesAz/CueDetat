@@ -24,7 +24,8 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
                     isSpinControlVisible = false,
                     lingeringSpinOffset = null,
                     selectedSpinOffset = null,
-                    masseShotAngleDeg = initAngleDeg
+                    masseShotAngleDeg = initAngleDeg,
+                    spinPaths = emptyMap()
                 )
             } else {
                 state.copy(
@@ -57,7 +58,8 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
             } else {
                 state.copy(
                     isSpinControlVisible = false,
-                    spinPaths = emptyMap()
+                    spinPaths = emptyMap(),
+                    aimedPocketIndex = null
                 )
             }
         }

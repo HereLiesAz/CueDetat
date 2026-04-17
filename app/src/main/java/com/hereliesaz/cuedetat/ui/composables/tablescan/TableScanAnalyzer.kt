@@ -23,7 +23,7 @@ import kotlin.math.hypot
  * to deduce the absence of the pockets by collapsing the felt into a quadrilateral.
  */
 class TableScanAnalyzer(
-    private val onPocketsDetected: (imagePoints: List<PointF>, imageWidth: Int, imageHeight: Int, rotationDegrees: Int) -> Unit,
+    private val onPocketsDetected: (imagePoints: List<PointF>, edges: List<Pair<PointF, PointF>>?, tableBoundary: android.graphics.RectF?, confidence: Float, imageWidth: Int, imageHeight: Int, rotationDegrees: Int) -> Unit,
     private val onFeltColorSampled: (FloatArray) -> Unit,
     private val pocketDetector: PocketDetector? = null,
 ) : ImageAnalysis.Analyzer {
@@ -62,8 +62,16 @@ class TableScanAnalyzer(
         // --- Strategy 1: ML detector (TFLite + ONNX side-by-side) ---
         val modelDetections = pocketDetector?.detect(bitmap)
 
-        if (!modelDetections.isNullOrEmpty()) {
-            onPocketsDetected(modelDetections, originalWidth, originalHeight, rotationDegrees)
+        if (modelDetections != null) {
+            onPocketsDetected(
+                modelDetections.pockets, 
+                null, 
+                modelDetections.tableBoundary, 
+                modelDetections.confidence, 
+                originalWidth, 
+                originalHeight, 
+                rotationDegrees
+            )
         } else {
             // --- Strategy 2: Felt-Boundary Extraction Fallback ---
             try {
@@ -144,7 +152,7 @@ class TableScanAnalyzer(
                         fallbackDetections.add(mid1)
                         fallbackDetections.add(mid2)
 
-                        onPocketsDetected(fallbackDetections, originalWidth, originalHeight, rotationDegrees)
+                        onPocketsDetected(fallbackDetections, edges, null, 0.5f, originalWidth, originalHeight, rotationDegrees)
                     }
                     approx.release()
                     contour2f.release()
