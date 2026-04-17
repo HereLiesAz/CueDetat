@@ -1,5 +1,6 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
+import com.hereliesaz.cuedetat.ui.ZoomMapping
 import android.graphics.PointF
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.cuedetat.domain.BallSelectionPhase
@@ -36,7 +37,10 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         }
 
         val spinControlCenter = currentState.spinControlCenter
-        val touchRadius = 25f * 4.0f
+
+        val zoomLimits = ZoomMapping.getZoomRange(currentState.experienceMode, currentState.isBeginnerViewLocked)
+        val currentZoom = ZoomMapping.sliderToZoom(currentState.zoomSliderPosition, zoomLimits.first, zoomLimits.second)
+        val touchRadius = (25f * 4.0f) / currentZoom
 
         // 0. Ball Selection Phase: tap near a confirmed snap candidate to attach a virtual ball
         if (currentState.tableScanModel != null &&
