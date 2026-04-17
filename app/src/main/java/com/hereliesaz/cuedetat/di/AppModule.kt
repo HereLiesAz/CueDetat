@@ -15,6 +15,7 @@ import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.hereliesaz.cuedetat.data.MergedTFLiteDetector
 import com.hereliesaz.cuedetat.network.GithubApi
+import com.hereliesaz.cuedetat.network.MyriadApi
 import com.hereliesaz.cuedetat.ui.composables.tablescan.CompositePocketDetector
 import com.hereliesaz.cuedetat.ui.composables.tablescan.OpenCVPocketDetector
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
@@ -51,6 +52,20 @@ object AppModule {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(GithubApi::class.java)
+    }
+
+    /**
+     * Provides the Retrofit interface for the local MYRIAD Python Backend.
+     * Hardcoded to localhost for now assuming emulator execution (10.0.2.2).
+     */
+    @Provides
+    @Singleton
+    fun provideMyriadApi(gson: Gson): MyriadApi {
+        return Retrofit.Builder()
+            .baseUrl("http://10.0.2.2:8000/")
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+            .create(MyriadApi::class.java)
     }
 
     /**

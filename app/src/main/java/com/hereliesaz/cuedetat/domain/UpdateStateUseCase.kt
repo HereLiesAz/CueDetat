@@ -504,8 +504,14 @@ class UpdateStateUseCase @Inject constructor(
     }
 
     private fun getLogicalShotLineAnchor(state: CueDetatState): PointF? {
-        state.onPlaneBall?.let { return it.center }
+        val isDynamicBeginner = state.experienceMode == ExperienceMode.BEGINNER && !state.isBeginnerViewLocked
+        
+        if (state.onPlaneBall != null && !isDynamicBeginner) {
+            return state.onPlaneBall.center
+        }
+        
         val inverseMatrix = state.inversePitchMatrix ?: return null
+        // Strictly anchor to center-bottom of screen pixels
         val screenAnchor = PointF(state.viewWidth / 2f, state.viewHeight.toFloat())
         return Perspective.screenToLogical(screenAnchor, inverseMatrix)
     }

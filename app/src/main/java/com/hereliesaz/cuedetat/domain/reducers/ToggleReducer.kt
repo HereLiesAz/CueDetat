@@ -56,6 +56,7 @@ internal fun reduceToggleAction(
                 tableScanModel = null,
                 lensWarpTps = null
             )
+            CameraMode.AR_ACTIVE -> state.copy(cameraMode = CameraMode.LITE_AR)
             else -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false)
         }
         is MainScreenEvent.StartArTracking -> state.copy(cameraMode = CameraMode.AR_ACTIVE, showTableScanScreen = false)
@@ -81,7 +82,21 @@ internal fun reduceToggleAction(
             if (state.pendingExperienceMode == null) return state
             return handleSetExperienceMode(state, state.pendingExperienceMode, reducerUtils).copy(pendingExperienceMode = null)
         }
-        is MainScreenEvent.UnlockBeginnerView -> state.copy(isBeginnerViewLocked = false)
+            val tutorialType = if (nextCameraMode == CameraMode.LITE_AR) {
+                com.hereliesaz.cuedetat.domain.TutorialType.DYNAMIC_AR
+            } else {
+                com.hereliesaz.cuedetat.domain.TutorialType.DYNAMIC_NON_AR
+            }
+
+            state.copy(
+                isBeginnerViewLocked = false,
+                cameraMode = nextCameraMode,
+                showTutorialOverlay = true,
+                tutorialType = tutorialType,
+                currentTutorialStep = 0,
+                tutorialHighlight = com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.NONE
+            )
+        }
         is MainScreenEvent.LockBeginnerView -> {
 
             // DYNAMIC DEVICE-AGNOSTIC ZOOM: Calculate slider value to fit within screen width minus 200dp total margin

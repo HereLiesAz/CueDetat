@@ -23,7 +23,7 @@ import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 import org.opencv.core.Mat
 
 enum class CameraMode {
-    OFF, CAMERA, AR_SETUP, AR_ACTIVE, CAMERA_ONLY;
+    OFF, CAMERA, AR_SETUP, AR_ACTIVE, CAMERA_ONLY, LITE_AR;
     fun next(): CameraMode {
         val nextOrdinal = (this.ordinal + 1) % values().size
         return values()[nextOrdinal]
@@ -40,6 +40,10 @@ enum class ExperienceMode {
 
 enum class BallSelectionPhase {
     NONE, AWAITING_CUE, AWAITING_TARGET
+}
+
+enum class TutorialType {
+    GENERAL, DYNAMIC_NON_AR, DYNAMIC_AR
 }
 
 @Keep
@@ -96,6 +100,7 @@ data class CueDetatState(
     val lingeringSpinOffset: PointF? = null,
     @Transient val spinPathsAlpha: Float = 1.0f,
     val showTutorialOverlay: Boolean = false,
+    val tutorialType: TutorialType = TutorialType.GENERAL,
     val currentTutorialStep: Int = 0,
     @Transient val tutorialHighlight: TutorialHighlightElement? = TutorialHighlightElement.NONE,
     @Transient val flashingTutorialElement: TutorialHighlightElement? = null,
@@ -165,6 +170,7 @@ data class CueDetatState(
     val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
     @Transient val targetBallDistance: Float = 0f,
     val lensWarpTps: TpsWarpData? = null,
+    @Transient val myriadTrajectory: List<PointF>? = null,
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
@@ -260,9 +266,9 @@ sealed class MainScreenEvent {
     object ToggleCvMask : MainScreenEvent()
     object EnterCvMaskTestMode : MainScreenEvent()
     object ExitCvMaskTestMode : MainScreenEvent()
-    object EnterCalibrationMode : MainScreenEvent()
+    object StartCalibrationMode : MainScreenEvent()
     data class SampleColorAt(val screenPosition: Offset) : MainScreenEvent()
-    object StartTutorial : MainScreenEvent()
+    data class StartTutorial(val type: TutorialType = TutorialType.GENERAL) : MainScreenEvent()
     object NextTutorialStep : MainScreenEvent()
     object EndTutorial : MainScreenEvent()
     object TutorialBack : MainScreenEvent()
@@ -301,4 +307,5 @@ sealed class MainScreenEvent {
     object CancelArSetup : MainScreenEvent()
     object TurnCameraOff : MainScreenEvent()
     object ArTrackingLost : MainScreenEvent()
+    data class MyriadTrajectoryReceived(val points: List<PointF>) : MainScreenEvent()
 }

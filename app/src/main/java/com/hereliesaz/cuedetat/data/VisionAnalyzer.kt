@@ -35,7 +35,8 @@ class VisionAnalyzer @Inject constructor(
                 image.close()
                 return@let
             }
-            if (state.isBeginnerViewLocked || bitmap == null) {
+            val skipProcessing = state.isBeginnerViewLocked
+            if (skipProcessing || bitmap == null) {
                 image.close()
             } else {
                 visionRepository.processImage(image, bitmap, state)

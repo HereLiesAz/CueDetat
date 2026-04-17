@@ -202,6 +202,7 @@ class LineRenderer {
             drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
         }
         drawSpinPaths(canvas, state, paints, activeMatrix, camArray, distArray)
+        drawMyriadTrajectory(canvas, state, paints, activeMatrix, camArray, distArray)
 
         if (state.areHelpersVisible && state.experienceMode != ExperienceMode.BEGINNER) {
             textRenderer.drawProtractorLabels(canvas, state, paints, typeface)
@@ -232,7 +233,7 @@ class LineRenderer {
             strokeWidth = state.protractorUnit.radius * 2
         }
 
-        val tps = state.lensWarpTps
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
         val ghostCueCenter = if (state.isMasseModeActive) state.masseGhostBallCenter ?: return
                              else state.protractorUnit.ghostCueBallCenter
         val targetCenter = state.protractorUnit.center
@@ -276,7 +277,7 @@ class LineRenderer {
             paints = paints
         )
 
-        val tps = state.lensWarpTps
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
         val rawStart = if (state.isMasseModeActive) state.masseGhostBallCenter ?: return
                        else state.protractorUnit.ghostCueBallCenter
         val towards = state.protractorUnit.center
@@ -405,6 +406,38 @@ class LineRenderer {
             }
         }
 
+    }
+
+    private fun drawMyriadTrajectory(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
+        val path = state.myriadTrajectory ?: return
+        if (path.size < 2) return
+
+        val alpha = 255
+        val myriadPathPaint = Paint(paints.shotLinePaint).apply { 
+            strokeWidth = 6f
+            color = android.graphics.Color.parseColor("#E040FB") // Neon purple
+            this.alpha = alpha 
+        }
+        val myriadGlowPaint = createGlowPaint(Color(0xFFE040FB), 12f, state, paints)
+
+        val screenPath = Path()
+        var first = true
+        path.forEach { logicalPt ->
+            val screenPt = DrawingUtils.mapPoint(logicalPt, activeMatrix)
+            val finalPt = if (camArray != null && distArray != null && camArray.size == 9)
+                DrawingUtils.applyBarrelDistortion(screenPt.x, screenPt.y, camArray, distArray)
+            else screenPt
+
+            if (first) {
+                screenPath.moveTo(finalPt.x, finalPt.y)
+                first = false
+            } else {
+                screenPath.lineTo(finalPt.x, finalPt.y)
+            }
+        }
+
+        canvas.drawPath(screenPath, myriadGlowPaint)
+        canvas.drawPath(screenPath, myriadPathPaint)
     }
 
     private fun drawBankingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
@@ -686,6 +719,7 @@ class LineRenderer {
     }
 
     private fun resolveLensArrays(state: CueDetatState): Pair<DoubleArray?, DoubleArray?> {
+        if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) return null to null
         val camMat = state.cameraMatrix
         val distMat = state.distCoeffs
         if (camMat == null || camMat.empty() || distMat == null || distMat.empty()) return null to null
