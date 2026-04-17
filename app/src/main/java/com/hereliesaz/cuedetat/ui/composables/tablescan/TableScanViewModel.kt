@@ -12,8 +12,10 @@ import com.hereliesaz.cuedetat.domain.PocketId
 import com.hereliesaz.cuedetat.domain.TableScanModel
 import com.hereliesaz.cuedetat.domain.TpsWarpData
 import com.hereliesaz.cuedetat.domain.TableGeometryFitter
+import com.hereliesaz.cuedetat.domain.EdgeGeometryFitter
 import com.hereliesaz.cuedetat.domain.decomposeHomography
 import com.hereliesaz.cuedetat.view.model.Table
+import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.TableSize
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -24,11 +26,13 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.opencv.calib3d.Calib3d
 import org.opencv.core.Core
 import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
 import javax.inject.Inject
+import kotlin.math.sqrt
 
 /** Min observations per cluster before geometry fitting is attempted. */
 private const val MIN_OBSERVATIONS_TO_FIT = 3
@@ -37,9 +41,9 @@ private const val MIN_OBSERVATIONS_TO_FIT = 3
 private const val CLUSTER_MERGE_DISTANCE = 3.0f
 
 enum class ScanStep {
-    FELT_CAPTURE,      // Phase 1: User samples the felt color
-    POCKET_GUIDE,      // Phase 2: User aims at 6 pockets sequentially
-    AUTO_READY         // (Optional) ML is confident enough to skip the guide
+    FELT_CAPTURE,
+    POCKET_GUIDE,
+    AUTO_READY
 }
 
 @HiltViewModel
@@ -87,14 +91,14 @@ class TableScanViewModel @Inject constructor(
                 _scanStep.value = step
                 savedPoints.forEach { (id, pt) ->
                     clusters[id] = mutableListOf(pt)
-                    _scanProgress.value = _scanProgress.value + (id to true)
+                    _scanProgress.value += (id to true)
                 }
                 
                 // If it was POCKET_GUIDE, set the target to the first missing pocket
                 if (step == ScanStep.POCKET_GUIDE) {
-                    val nextIdx = PocketId.values().indexOfFirst { !savedPoints.containsKey(it) }
+                    val nextIdx = PocketId.entries.toTypedArray().indexOfFirst { !savedPoints.containsKey(it) }
                     if (nextIdx != -1) {
-                        _currentPocketTarget.value = PocketId.values()[nextIdx]
+                        _currentPocketTarget.value = PocketId.entries.toTypedArray()[nextIdx]
                     }
                 }
             }
@@ -146,6 +150,11 @@ class TableScanViewModel @Inject constructor(
     @Volatile private var currentRotation = 0f
     @Volatile private var currentZoomSlider = 0f
 
+    private var inversePitchMatrix: Matrix? = null
+    private var hasInverseMatrix: Boolean = false
+    private var viewWidth: Int = 0
+    private var viewHeight: Int = 0
+
     fun updateStateSnapshot(
         inverse: Matrix?, 
         hasInverse: Boolean, 
@@ -191,6 +200,8 @@ class TableScanViewModel @Inject constructor(
         _mlTableBoundary.value = tableBoundary
 
         viewModelScope.launch(Dispatchers.Default) {
+            var stableCount = clusters.count { it.value.size >= MIN_OBSERVATIONS_TO_FIT }
+
             // Step 1: Build imageToScreenMatrix — mirrors VisionRepository.getTransformationMatrix exactly.
             val imageToScreen = Matrix().apply {
                 postScale(
@@ -244,8 +255,8 @@ class TableScanViewModel @Inject constructor(
             logicalPts.forEach { logicalPt -> mergeIntoCluster(logicalPt) }
 
             // Step 4: Update UI progress (# of stable clusters / 6).
-            val stableCount = clusters.count { it.value.size >= MIN_OBSERVATIONS_TO_FIT }
-            _scanProgress.value = PocketId.values()
+            stableCount = clusters.count { it.value.size >= MIN_OBSERVATIONS_TO_FIT }
+            _scanProgress.value = PocketId.entries.toTypedArray()
                 .take(stableCount)
                 .associateWith { true }
 
@@ -266,21 +277,30 @@ class TableScanViewModel @Inject constructor(
     }
 
     private fun mergeIntoCluster(pt: PointF) {
-        for ((_, observations) in clusters) {
-            val mean = PointF(
-                observations.sumOf { it.x.toDouble() }.toFloat() / observations.size,
-                observations.sumOf { it.y.toDouble() }.toFloat() / observations.size
-            )
-            val dist = kotlin.math.hypot((pt.x - mean.x).toDouble(), (pt.y - mean.y).toDouble()).toFloat()
-            if (dist <= CLUSTER_MERGE_DISTANCE) {
+        // Find existing cluster within distance
+        val nearest = clusters.minByOrNull { (_, observations) ->
+            val meanX = observations.map { it.x }.average().toFloat()
+            val meanY = observations.map { it.y }.average().toFloat()
+            val dx = pt.x - meanX
+            val dy = pt.y - meanY
+            dx * dx + dy * dy
+        }
+
+        if (nearest != null) {
+            val observations = nearest.value
+            val meanX = observations.map { it.x }.average().toFloat()
+            val meanY = observations.map { it.y }.average().toFloat()
+            val dist = sqrt(((pt.x - meanX) * (pt.x - meanX) + (pt.y - meanY) * (pt.y - meanY)).toDouble()).toFloat()
+            
+            if (dist < CLUSTER_MERGE_DISTANCE) {
                 observations.add(pt)
                 return
             }
         }
         // New cluster — only create up to 6 (one per PocketId).
         // Discard detections beyond 6 to prevent false positives from overwriting real clusters.
-        if (clusters.size < PocketId.values().size) {
-            clusters[PocketId.values()[clusters.size]] = mutableListOf(pt)
+        if (clusters.size < PocketId.entries.size) {
+            clusters[PocketId.entries[clusters.size]] = mutableListOf(pt)
         }
     }
 
@@ -352,7 +372,7 @@ class TableScanViewModel @Inject constructor(
             scanLatitude = location?.first,
             scanLongitude = location?.second
         )
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        withContext(Dispatchers.IO) {
             tableScanRepository.save(model)
             tableScanRepository.clearPartialScan()
         }
@@ -398,7 +418,7 @@ class TableScanViewModel @Inject constructor(
             val logicalTable = Table(tableSize, true)
             val defaultClusters = logicalTable.pockets.mapIndexed { i, pt ->
                 PocketCluster(
-                    identity = PocketId.values()[i],
+                    identity = PocketId.entries[i],
                     logicalPosition = PointF(pt.x, pt.y),
                     observationCount = 1,
                     variance = 0f
@@ -415,11 +435,8 @@ class TableScanViewModel @Inject constructor(
                 scanLongitude = location?.second
             )
             
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            tableScanRepository.save(model)
-            tableScanRepository.clearPartialScan()
-        }
+            withContext(Dispatchers.IO) {
+                tableScanRepository.save(model)
                 tableScanRepository.clearPartialScan()
             }
             
@@ -445,7 +462,7 @@ class TableScanViewModel @Inject constructor(
 
             // Instead of finishing, transition to Guided Pocket mode
             _scanStep.value = ScanStep.POCKET_GUIDE
-            _currentPocketTarget.value = PocketId.values()[0]
+            _currentPocketTarget.value = PocketId.entries.toTypedArray()[0]
         }
     }
 
@@ -466,19 +483,19 @@ class TableScanViewModel @Inject constructor(
 
             // Add to clusters (manually)
             clusters.getOrPut(currentId) { mutableListOf() }.add(logicalPt)
-            
-            _scanProgress.value = _scanProgress.value + (currentId to true)
+
+            _scanProgress.value += (currentId to true)
 
             // Persist progress immediately
             val pointsToSave = clusters.mapValues { it.value.first() }
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            withContext(Dispatchers.IO) {
                 tableScanRepository.savePartialScan(ScanStep.POCKET_GUIDE, pointsToSave)
             }
 
             // Advance Wizard
-            val nextIdx = PocketId.values().indexOf(currentId) + 1
-            if (nextIdx < PocketId.values().size) {
-                _currentPocketTarget.value = PocketId.values()[nextIdx]
+            val nextIdx = PocketId.entries.indexOf(currentId) + 1
+            if (nextIdx < PocketId.entries.size) {
+                _currentPocketTarget.value = PocketId.entries.toTypedArray()[nextIdx]
             } else {
                 // Done capturing all 6!
                 _currentPocketTarget.value = null
@@ -492,11 +509,5 @@ class TableScanViewModel @Inject constructor(
                 completeScan(centerPts, viewWidth.toFloat(), viewHeight.toFloat())
             }
         }
-    }
-
-    private fun screenToLogical(screen: PointF, inverse: Matrix): PointF {
-        val arr = floatArrayOf(screen.x, screen.y)
-        inverse.mapPoints(arr)
-        return PointF(arr[0], arr[1])
     }
 }
