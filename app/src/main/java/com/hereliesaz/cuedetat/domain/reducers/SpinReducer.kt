@@ -25,7 +25,10 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
                     lingeringSpinOffset = null,
                     selectedSpinOffset = null,
                     masseShotAngleDeg = initAngleDeg,
-                    spinPaths = emptyMap()
+                    spinPaths = emptyMap(),
+                    masseImpactPoints = emptyList(),
+                    masseConnectsTarget = false,
+                    aimedPocketIndex = null
                 )
             } else {
                 state.copy(
@@ -53,7 +56,8 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
                     masseImpactPoints = emptyList(),
                     masseConnectsTarget = false,
                     selectedSpinOffset = null,
-                    lingeringSpinOffset = null
+                    lingeringSpinOffset = null,
+                    aimedPocketIndex = null
                 )
             } else {
                 state.copy(
