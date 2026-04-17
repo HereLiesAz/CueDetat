@@ -10,7 +10,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 
-private const val MODEL_FILE = "ml/pocket_detector_fp16.tflite"
+private const val MODEL_FILE = "ml/merged_pocket_detector_final_float16.tflite"
 private const val INPUT_SIZE = 640
 private const val CONFIDENCE_THRESHOLD = 0.30f
 private const val MAX_POCKETS = 6
@@ -18,6 +18,7 @@ private const val MAX_POCKETS = 6
 // Class indices from metadata.yaml: pool-table=0, pool-table-hole=1, pool-table-side=2
 private const val TABLE_CLASS_ID = 0
 private const val HOLE_CLASS_ID = 1
+private const val SIDE_CLASS_ID = 2
 
 /**
  * TFLite-backed implementation of [PocketDetector].
@@ -104,7 +105,7 @@ class TFLitePocketDetector(private val context: Context) : PocketDetector {
                         )
                     }
                 }
-                HOLE_CLASS_ID -> {
+                HOLE_CLASS_ID, SIDE_CLASS_ID -> {
                     val cx = ((det[1] + det[3]) / 2f * width)
                     val cy = ((det[0] + det[2]) / 2f * height)
                     pockets.add(PointF(cx, cy))

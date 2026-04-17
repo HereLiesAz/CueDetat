@@ -13,11 +13,12 @@ import org.opencv.dnn.Net
 import java.io.File
 import java.io.FileOutputStream
 
-private const val MODEL_PATH = "weights/best.onnx"
+private const val MODEL_PATH = "ml/merged_pocket_detector_final.onnx"
 private const val INPUT_SIZE = 640
 private const val CONFIDENCE_THRESHOLD = 0.30f
 private const val TABLE_CLASS_ID = 0
 private const val HOLE_CLASS_ID = 1
+private const val SIDE_CLASS_ID = 2
 
 /**
  * OpenCV-backed implementation of [PocketDetector] using `best.onnx`.
@@ -93,7 +94,7 @@ class OpenCVPocketDetector(private val context: Context) : PocketDetector {
                         )
                     }
                 }
-                HOLE_CLASS_ID -> {
+                HOLE_CLASS_ID, SIDE_CLASS_ID -> {
                     val cx = ((data[1] + data[3]) / 2f * width)
                     val cy = ((data[0] + data[2]) / 2f * height)
                     pockets.add(PointF(cx, cy))
