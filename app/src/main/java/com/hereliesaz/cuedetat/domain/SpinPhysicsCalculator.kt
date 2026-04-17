@@ -55,7 +55,7 @@ object SpinPhysicsCalculator {
             var hitRail = false
 
             for (step in 1..MAX_STEPS) {
-                val swerveAmount = 0.001f * omega * exp((-K3 * totalDistance).toDouble()).toFloat()
+                val swerveAmount = 0.0002f * STEP_SIZE * omega * exp((-K3 * totalDistance).toDouble()).toFloat()
                 currentAngle += swerveAmount
 
                 val nextX = currentPos.x + cos(currentAngle) * STEP_SIZE
