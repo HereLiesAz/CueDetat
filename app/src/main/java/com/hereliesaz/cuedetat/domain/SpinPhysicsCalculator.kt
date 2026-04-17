@@ -67,7 +67,7 @@ object SpinPhysicsCalculator {
                 for (pocket in table.pockets) {
                     val pdx = nextX - pocket.x
                     val pdy = nextY - pocket.y
-                    if (hypot(pdx.toDouble(), pdy.toDouble()).toFloat() < pocketThreshold) {
+                    if (pdx * pdx + pdy * pdy < pocketThreshold * pocketThreshold) {
                         points.add(nextPos)
                         return points
                     }
