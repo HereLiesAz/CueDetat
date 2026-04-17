@@ -265,9 +265,8 @@ class VisionRepository @Inject constructor(
                         // We use the first cue and the first pool ball to assemble a poke vector.
                         val cueRect = detectedCues.first()
                         val poolBall = filteredCustomPoolBalls.first()
-                        
-                        val cueCenter = PointF(cueRect.exactCenterX(), cueRect.exactCenterY())
-                        val ballCenter = PointF(poolBall.rect.exactCenterX(), poolBall.rect.exactCenterY())
+                        val cueCenter = PointF(cueRect.centerX().toFloat(), cueRect.centerY().toFloat())
+                        val ballCenter = PointF(poolBall.rect.centerX(), poolBall.rect.centerY())
                         
                         val pokeDx = ballCenter.x - cueCenter.x
                         val pokeDy = ballCenter.y - cueCenter.y
@@ -278,7 +277,7 @@ class VisionRepository @Inject constructor(
                         val hasInverse = state.hasInverseMatrix
                         
                         // Make a copy of bitmap for network call
-                        val bmpCopy = bitmap.copy(bitmap.config, false)
+                        val bmpCopy = bitmap.copy(bitmap.config ?: android.graphics.Bitmap.Config.ARGB_8888, false)
                         
                         CoroutineScope(Dispatchers.IO).launch {
                             val result = myriadRepository.fetchTrajectory(bmpCopy, ballCenter, PointF(pokeDx, pokeDy))
@@ -882,15 +881,15 @@ class VisionRepository @Inject constructor(
         val dstMat = MatOfPoint2f()
         dstMat.fromList(dstPointsList)
 
-        val h = Calib3d.getPerspectiveTransform(srcMat, dstMat)
+        val transform = Imgproc.getPerspectiveTransform(srcMat, dstMat)
         val outMat = Mat()
-        Imgproc.warpPerspective(mat, outMat, h, Size(outW, outH))
+        Imgproc.warpPerspective(mat, outMat, transform, Size(outW, outH))
 
         val bitmap = android.graphics.Bitmap.createBitmap(outW.toInt(), outH.toInt(), android.graphics.Bitmap.Config.ARGB_8888)
         org.opencv.android.Utils.matToBitmap(outMat, bitmap)
         
         outMat.release()
-        h.release()
+        transform.release()
         srcMat.release()
         dstMat.release()
 

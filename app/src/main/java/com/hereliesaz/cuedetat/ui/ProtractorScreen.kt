@@ -91,6 +91,13 @@ fun ProtractorScreen(
     val isOnMain = currentRoute == ROUTE_MAIN || currentRoute == null
     val isOnCalibration = currentRoute == ROUTE_CALIBRATION
 
+    // --- Top-level animation for top-down snap view ---
+    val topDownProgress by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (uiState.isTopDownViewActive && uiState.topDownBitmap != null) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 600),
+        label = "topDownProgress"
+    )
+
     AzNavRailMenu(
         uiState = uiState,
         onEvent = mainViewModel::onEvent,
@@ -131,11 +138,6 @@ fun ProtractorScreen(
             }
         }
 
-    // --- Background layer 1: AR protractor overlay (main route only) ---
-    val topDownProgress by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (uiState.isTopDownViewActive && uiState.topDownBitmap != null) 1f else 0f,
-        animationSpec = androidx.compose.animation.core.tween(durationMillis = 600)
-    )
 
     background(weight = 1) {
         if (isOnMain) {

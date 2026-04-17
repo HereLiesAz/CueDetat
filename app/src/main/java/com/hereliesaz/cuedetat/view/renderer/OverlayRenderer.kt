@@ -68,7 +68,9 @@ class OverlayRenderer {
                 val halfW = state.table.logicalWidth / 2f
                 val halfH = state.table.logicalHeight / 2f
                 val destRect = android.graphics.RectF(-halfW, -halfH, halfW, halfH)
-                val paint = paints.ballOverlayPaint.apply { alpha = (255 * topDownProgress).toInt() }
+                val paint = paints.ballOverlayPaint.apply { 
+                    this.alpha = (255 * topDownProgress).toInt() 
+                }
                 this.drawBitmap(state.topDownBitmap, null, destRect, paint)
             }
         }

@@ -96,8 +96,10 @@ internal fun reduceToggleAction(
         is MainScreenEvent.SetExperienceMode -> handleSetExperienceMode(state, action.mode, reducerUtils)
         is MainScreenEvent.ApplyPendingExperienceMode -> {
             if (state.pendingExperienceMode == null) return state
-            return handleSetExperienceMode(state, state.pendingExperienceMode, reducerUtils).copy(pendingExperienceMode = null)
+            handleSetExperienceMode(state, state.pendingExperienceMode, reducerUtils).copy(pendingExperienceMode = null)
         }
+        is MainScreenEvent.StartTutorial -> {
+            val nextCameraMode = if (state.cameraMode == CameraMode.OFF) CameraMode.CAMERA else state.cameraMode
             val tutorialType = if (nextCameraMode == CameraMode.LITE_AR) {
                 com.hereliesaz.cuedetat.domain.TutorialType.DYNAMIC_AR
             } else {
@@ -163,7 +165,8 @@ internal fun reduceToggleAction(
         is MainScreenEvent.ExitToSplash -> state.copy(experienceMode = null)
         is MainScreenEvent.ToggleTopDownView -> state.copy(isTopDownViewActive = !state.isTopDownViewActive)
         is MainScreenEvent.ClearTopDownView -> state.copy(isTopDownViewActive = false, topDownBitmap = null)
-        else -> state
+        is MainScreenEvent.SetTopDownBitmap -> state.copy(topDownBitmap = action.bitmap)
+        else -> state // All other events handled by specialized reducers
     }
 }
 

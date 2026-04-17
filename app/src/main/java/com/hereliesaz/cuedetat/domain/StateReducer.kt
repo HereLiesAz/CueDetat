@@ -54,7 +54,7 @@ fun stateReducer(
         // Covers CV tuning (thresholds), Debug Masks, and hidden developer toggles.
         is MainScreenEvent.ToggleAdvancedOptionsDialog, is MainScreenEvent.ToggleCvMask,
         is MainScreenEvent.EnterCvMaskTestMode, is MainScreenEvent.ExitCvMaskTestMode,
-        is MainScreenEvent.EnterCalibrationMode, is MainScreenEvent.SampleColorAt,
+        is MainScreenEvent.StartCalibrationMode, is MainScreenEvent.SampleColorAt,
         is MainScreenEvent.ToggleCvRefinementMethod,
         is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2 ->
             reduceAdvancedOptionsAction(currentState, action)

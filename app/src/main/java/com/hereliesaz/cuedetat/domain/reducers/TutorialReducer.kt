@@ -3,6 +3,7 @@ package com.hereliesaz.cuedetat.domain.reducers
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.TutorialType
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 
 /**

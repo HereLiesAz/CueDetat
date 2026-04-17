@@ -125,7 +125,7 @@ fun AzNavRailMenu(
         }
 
         azRailToggle(id = "help", isChecked = uiState.areHelpersVisible, toggleOnText = "Help", toggleOffText = "Help", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleHelp) })
-        azMenuItem(id = "tutorial", text = "Tutorial", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.StartTutorial) })
+        azMenuItem(id = "tutorial", text = "Tutorial", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.StartTutorial()) })
 
         val inArSubMode = uiState.cameraMode == CameraMode.AR_SETUP || 
                           uiState.cameraMode == CameraMode.AR_ACTIVE || 
