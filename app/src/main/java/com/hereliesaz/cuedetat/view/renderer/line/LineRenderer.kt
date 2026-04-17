@@ -320,8 +320,6 @@ class LineRenderer {
         val spinPathPaint = Paint(paints.shotLinePaint).apply { strokeWidth = 4f }
         val spinGlowPaint = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 8f }
 
-        canvas.save()
-        canvas.concat(inverseMatrix)
 
         val pathColor = paths.keys.firstOrNull() ?: Color.White
 
@@ -407,7 +405,6 @@ class LineRenderer {
             }
         }
 
-        canvas.restore()
     }
 
     private fun drawBankingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
