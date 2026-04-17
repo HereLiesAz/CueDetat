@@ -130,6 +130,7 @@ android {
     
     buildFeatures {
         compose = true
+        mlModelBinding = true
     }
     packaging {
         resources {
