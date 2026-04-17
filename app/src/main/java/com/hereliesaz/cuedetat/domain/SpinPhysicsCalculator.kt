@@ -14,13 +14,13 @@ object SpinPhysicsCalculator {
     private const val MAX_STEPS = (PATH_LENGTH / STEP_SIZE).toInt()
 
     fun calculatePath(
-        spinOffset: Vector2, // normalized -1..1; x = lateral English
-        cueBallPos: Vector2, // world coords — ghost cue ball position (where contact occurs)
-        targetBallPos: Vector2, // world coords — object ball center
+        spinOffset: PointF, // normalized -1..1; x = lateral English
+        cueBallPos: PointF, // world coords — ghost cue ball position (where contact occurs)
+        targetBallPos: PointF, // world coords — object ball center
         shotAngle: Float, // radians — direction cue was traveling before contact
         table: Table,
         maxBounces: Int = 2
-    ): List<Vector2> {
+    ): List<PointF> {
         val dx = targetBallPos.x - cueBallPos.x
         val dy = targetBallPos.y - cueBallPos.y
         val mag = hypot(dx.toDouble(), dy.toDouble()).toFloat()
@@ -48,7 +48,8 @@ object SpinPhysicsCalculator {
             if (!table.isVisible) {
                 val endX = currentPos.x + cos(currentAngle) * PATH_LENGTH
                 val endY = currentPos.y + sin(currentAngle) * PATH_LENGTH
-                points.add(Vector2(endX, endY))
+                val endPoint = PointF().apply { x = endX; y = endY }
+                points.add(endPoint)
                 return points
             }
 
@@ -60,7 +61,7 @@ object SpinPhysicsCalculator {
                 
                 val nextX = currentPos.x + cos(currentAngle) * STEP_SIZE
                 val nextY = currentPos.y + sin(currentAngle) * STEP_SIZE
-                val nextPos = Vector2(nextX, nextY)
+                val nextPos = PointF().apply { x = nextX; y = nextY }
                 
                 totalDistance += STEP_SIZE
                 
@@ -73,10 +74,10 @@ object SpinPhysicsCalculator {
                     }
                 }
                 
-                val railHit = table.findRailIntersectionAndNormal(currentPos.toPointF(), nextPos.toPointF())
+                val railHit = table.findRailIntersectionAndNormal(currentPos, nextPos)
                 if (railHit != null) {
-                    val intersection = railHit.first.toVector2()
-                    val normal = railHit.second.toVector2()
+                    val intersection = railHit.first
+                    val normal = railHit.second
                     points.add(intersection)
                     
                     val omegaAtRail = abs(omega) * exp((-K3 * totalDistance).toDouble()).toFloat()

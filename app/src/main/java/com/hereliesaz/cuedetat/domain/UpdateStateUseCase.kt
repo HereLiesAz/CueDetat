@@ -11,7 +11,6 @@ import com.hereliesaz.cuedetat.domain.SpinPhysicsCalculator
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
 import com.hereliesaz.cuedetat.view.model.Perspective
-import com.hereliesaz.cuedetat.domain.toVector2
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import javax.inject.Inject
 import kotlin.math.abs
@@ -384,14 +383,14 @@ class UpdateStateUseCase @Inject constructor(
                 (cueBallPos.x - shotLineAnchor.x).toDouble()
             ).toFloat()
             val path = SpinPhysicsCalculator.calculatePath(
-                spinOffset = spinOffset.toVector2(),
-                cueBallPos = cueBallPos.toVector2(),
-                targetBallPos = targetBallPos.toVector2(),
+                spinOffset = spinOffset,
+                cueBallPos = cueBallPos,
+                targetBallPos = targetBallPos,
                 shotAngle = shotAngle,
                 table = state.table
             )
             return state.copy(
-                spinPaths = mapOf(pathColor to path.map { it.toPointF() }),
+                spinPaths = mapOf(pathColor to path),
                 masseImpactPoints = emptyList(),
                 masseConnectsTarget = false
             )

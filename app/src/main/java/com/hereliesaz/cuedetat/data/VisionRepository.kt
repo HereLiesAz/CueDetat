@@ -541,14 +541,18 @@ class VisionRepository @Inject constructor(
             epsilonCoeff += 0.01
         }
 
-        if (approx.rows() != 4) {
-            approx.release()
-            contour2f.release()
-            contours.forEach { it.release() }
-            return 0f
+        val pts: Array<org.opencv.core.Point>
+        var confidence = 0.8f
+        if (approx.rows() == 4) {
+            pts = approx.toArray()
+        } else {
+            val rect = Imgproc.minAreaRect(contour2f)
+            val rectPts = arrayOfNulls<org.opencv.core.Point>(4)
+            rect.points(rectPts)
+            pts = Array(4) { rectPts[it]!! }
+            confidence = 0.6f
         }
 
-        val pts = approx.toArray()
         approx.release()
         contour2f.release()
         contours.forEach { it.release() }
@@ -595,7 +599,7 @@ class VisionRepository @Inject constructor(
             emitEvent(MainScreenEvent.UpdateArPose(blendedTranslation, blendedRotation, blendedScale))
         }
 
-        return 0.8f
+        return confidence
     }
 
     private fun getTransformationMatrix(
