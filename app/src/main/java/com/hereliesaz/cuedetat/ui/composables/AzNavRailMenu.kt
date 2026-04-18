@@ -119,19 +119,20 @@ fun AzNavRailMenu(
             azRailToggle(
                 id = "ar",
                 isChecked = isArActive,
-                toggleOnText = "off", toggleOffText = "AR",
+                toggleOnText = "off", toggleOffText = "ar",
                 fillColor = b3R, textColor = Color.White,
                 onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
             )
 
-            if (inArSubMode) {
-                azRailItemLowerCase(id = "felt", text = "felt", fillColor = b11R, textColor = Color.White, onClick = {
-                    onEvent(MainScreenEvent.ToggleTableScanScreen)
-                })
+            azRailItemLowerCase(id = "felt", text = "felt", fillColor = b11R, textColor = Color.White, onClick = {
+                onEvent(MainScreenEvent.ToggleTableScanScreen)
+            })
 
-                azRailItemLowerCase(id = "holes", text = "holes", fillColor = b12P, textColor = Color.White, onClick = {
-                    onEvent(MainScreenEvent.StartManualHoleCapture)
-                })
+            azRailItemLowerCase(id = "holes", text = "holes", fillColor = b12P, textColor = Color.White, onClick = {
+                onEvent(MainScreenEvent.StartManualHoleCapture)
+            })
+
+            if (inArSubMode) {
                 
                 azRailToggle(
                     id = "target_type",
@@ -177,15 +178,15 @@ fun AzNavRailMenu(
         }
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailToggle(id = "bank", isChecked = uiState.isBankingMode, toggleOnText = "Aim", toggleOffText = "Bank", fillColor = b6G, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleBankingMode) })
-            azRailItemLowerCase(id = "add_obstacle", text = "Add", fillColor = b7M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.AddObstacleBall) })
+            azRailToggle(id = "bank", isChecked = uiState.isBankingMode, toggleOnText = "aim", toggleOffText = "bank", fillColor = b6G, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleBankingMode) })
+            azRailItemLowerCase(id = "add_obstacle", text = "add", fillColor = b7M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.AddObstacleBall) })
         }
 
         if (uiState.experienceMode == ExperienceMode.BEGINNER) {
             azRailToggle(
                 id = "lock_view",
                 isChecked = uiState.isBeginnerViewLocked,
-                toggleOnText = "Dynamic", toggleOffText = "Static",
+                toggleOnText = "dynamic", toggleOffText = "static",
                 fillColor = if (uiState.isBeginnerViewLocked) b6G else b7M,
                 textColor = Color.White,
                 onClick = {
@@ -240,7 +241,7 @@ fun AzNavRailMenu(
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azMenuItem(id = "size", text = "Table Size", fillColor = b13O, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) })
-            azMenuItem(id = "units", text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Metric" else "Imperial", fillColor = b14G, textColor = Color.Black, onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) })
+            azMenuItem(id = "units", text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Metric" else "Imperial", fillColor = b14G, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) })
             azDivider()
         }
 
