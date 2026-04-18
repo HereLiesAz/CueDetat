@@ -9,10 +9,15 @@
         <domain includeSubdomains="true">localhost</domain>
     </domain-config>
 
-    <!-- Default: enforce HTTPS for all other traffic -->
+    <!--
+      Default: enforce HTTPS for all other traffic.
+      We include "user" certificates in the base config because some test devices
+      with root/modified ROMs have broken system trust stores or use custom root CAs.
+    -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
+            <certificates src="user" />
         </trust-anchors>
     </base-config>
 

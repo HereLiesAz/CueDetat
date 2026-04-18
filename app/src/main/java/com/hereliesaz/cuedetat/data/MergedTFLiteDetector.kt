@@ -31,9 +31,7 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
 
     // Head mapping indices based on MASTER_POOL_MODEL.tflite.meta
     private val HEAD_POCKET_50E = 0 // pocket_detector_50e_fp16
-    private val HEAD_POCKET_STD = 1 // pocket_detector_fp16
     private val HEAD_POOL_PIVOT = 2 // pool_detector_pivot_fp16
-    private val HEAD_BEST_F16   = 3 // best_float16
 
     private val interpreters = mutableMapOf<Int, Interpreter>()
 

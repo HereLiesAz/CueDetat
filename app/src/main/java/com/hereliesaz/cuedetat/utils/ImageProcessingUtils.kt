@@ -1,16 +1,17 @@
 package com.hereliesaz.cuedetat.utils
 
 import android.annotation.SuppressLint
-import android.util.Log
 import androidx.camera.core.ImageProxy
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.imgproc.Imgproc
-import java.nio.ByteBuffer
 
 /**
  * Robust conversion of [ImageProxy] (YUV_420_888) to OpenCV [Mat] (BGR).
- * This uses OpenCV's native cvtColorTwoPlane for maximum performance and accuracy.
+ *
+ * This implementation avoids direct ByteBuffer wrapping of CameraX planes,
+ * which can cause native SEGVs due to alignment and padding issues in OpenCV HAL.
+ * Instead, it copies data row-by-row into a contiguous buffer before conversion.
  */
 @SuppressLint("UnsafeOptInUsageError")
 fun ImageProxy.toMat(dst: Mat = Mat()): Mat {
@@ -27,62 +28,56 @@ fun ImageProxy.toMat(dst: Mat = Mat()): Mat {
     val uBuffer = uPlane.buffer
     val vBuffer = vPlane.buffer
 
-    // Create Mat wrappers for the buffers
-    // Y plane is always the first plane
-    val yMat = Mat(height, width, CvType.CV_8UC1, yBuffer, yPlane.rowStride.toLong())
+    val yStride = yPlane.rowStride
+    val uStride = uPlane.rowStride
+    val vStride = vPlane.rowStride
+    val uvPixelStride = uPlane.pixelStride
 
-    // For UV planes, we need to check if they are interleaved (pixelStride == 2)
-    // Most Android devices use NV21/NV12 where U and V are interleaved in the same buffer.
-    if (uPlane.pixelStride == 2 && vPlane.pixelStride == 2) {
-        // Interleaved: UV Mat has height/2 and width/2, but 2 channels (CV_8UC2)
-        // We use the buffer that starts earliest (usually V for NV21, U for NV12)
-        val uPos = uBuffer.position()
-        val vPos = vBuffer.position()
-        
-        if (vPos < uPos) {
-            // NV21 layout: V U V U ...
-            val uvMat = Mat(height / 2, width / 2, CvType.CV_8UC2, vBuffer, vPlane.rowStride.toLong())
-            Imgproc.cvtColorTwoPlane(yMat, uvMat, dst, Imgproc.COLOR_YUV2BGR_NV21)
-            uvMat.release()
-        } else {
-            // NV12 layout: U V U V ...
-            val uvMat = Mat(height / 2, width / 2, CvType.CV_8UC2, uBuffer, uPlane.rowStride.toLong())
-            Imgproc.cvtColorTwoPlane(yMat, uvMat, dst, Imgproc.COLOR_YUV2BGR_NV12)
-            uvMat.release()
-        }
-    } else {
-        // Separate planes (I420 or YV12)
-        // Construct a single contiguous YUV Mat and use standard cvtColor
-        val yuvData = ByteArray(width * height * 3 / 2)
-        
-        // Fast copy Y
-        val yBuf = yBuffer.duplicate()
-        for (row in 0 until height) {
-            yBuf.position(row * yPlane.rowStride)
-            yBuf.get(yuvData, row * width, width)
-        }
-        
-        // Copy U and V
-        val uBuf = uBuffer.duplicate()
-        val vBuf = vBuffer.duplicate()
-        val uvSize = (width / 2) * (height / 2)
-        var uOffset = width * height
-        var vOffset = width * height + uvSize
-        
-        for (row in 0 until height / 2) {
-            uBuf.position(row * uPlane.rowStride)
-            uBuf.get(yuvData, uOffset + row * (width / 2), width / 2)
-            
-            vBuf.position(row * vPlane.rowStride)
-            vBuf.get(yuvData, vOffset + row * (width / 2), width / 2)
-        }
-        
-        val yuvMat = Mat(height + height / 2, width, CvType.CV_8UC1)
-        yuvMat.put(0, 0, yuvData)
-        Imgproc.cvtColor(yuvMat, dst, Imgproc.COLOR_YUV2BGR_I420)
-        yuvMat.release()
+    // 1. Pre-allocate a contiguous YUV Mat [Height * 1.5, Width]
+    val yuvMat = Mat(height + height / 2, width, CvType.CV_8UC1)
+    
+    // 2. Copy Y plane row-by-row
+    val yRowData = ByteArray(width)
+    for (row in 0 until height) {
+        yBuffer.position(row * yStride)
+        yBuffer.get(yRowData, 0, width)
+        yuvMat.put(row, 0, yRowData)
     }
 
-    yMat.release()
+    // 3. Handle UV planes based on layout
+    if (uvPixelStride == 2) {
+        // Interleaved layout (NV21/NV12)
+        val uvRowData = ByteArray(width)
+        // Use the buffer that starts at the first interleaved byte
+        // For NV21, vBuffer starts at 0, uBuffer starts at 1.
+        val mainUvBuffer = if (vBuffer.remaining() >= uBuffer.remaining()) vBuffer else uBuffer
+        val isNv21 = vBuffer.remaining() >= uBuffer.remaining()
+
+        for (row in 0 until height / 2) {
+            mainUvBuffer.position(row * uStride)
+            // Cap width to remaining buffer if necessary
+            val bytesToRead = minOf(width, mainUvBuffer.remaining())
+            mainUvBuffer.get(uvRowData, 0, bytesToRead)
+            yuvMat.put(height + row, 0, uvRowData)
+        }
+        
+        Imgproc.cvtColor(yuvMat, dst, if (isNv21) Imgproc.COLOR_YUV2BGR_NV21 else Imgproc.COLOR_YUV2BGR_NV12)
+    } else {
+        // Planar layout (I420)
+        val uRowData = ByteArray(width / 2)
+        val vRowData = ByteArray(width / 2)
+        for (row in 0 until height / 2) {
+            uBuffer.position(row * uStride)
+            uBuffer.get(uRowData, 0, width / 2)
+            yuvMat.put(height + row, 0, uRowData)
+
+            vBuffer.position(row * vStride)
+            vBuffer.get(vRowData, 0, width / 2)
+            yuvMat.put(height + row, width / 2, vRowData)
+        }
+        Imgproc.cvtColor(yuvMat, dst, Imgproc.COLOR_YUV2BGR_I420)
+    }
+
+    yuvMat.release()
     return dst
 }

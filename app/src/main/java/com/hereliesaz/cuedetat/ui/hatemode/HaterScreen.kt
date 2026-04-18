@@ -181,7 +181,6 @@ fun HaterScreen(
                         }
                         canvas.nativeCanvas.drawRect(-hw, -hh, hw, hh, shadePaint)
                     }
-
                     canvas.nativeCanvas.restore()
                 }
             }

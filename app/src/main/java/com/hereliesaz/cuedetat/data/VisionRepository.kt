@@ -458,6 +458,10 @@ class VisionRepository @Inject constructor(
 
     @SuppressLint("UnsafeOptInUsageError")
     fun processArCpuImage(image: MediaImage, rotationDegrees: Int, state: CueDetatState) {
+        if (isProcessing.get()) {
+            return
+        }
+        isProcessing.set(true)
         try {
             val imageToScreenMatrix = getTransformationMatrix(
                 image.width, image.height,
@@ -533,6 +537,8 @@ class VisionRepository @Inject constructor(
 
         } catch (e: Exception) {
             e.printStackTrace()
+        } finally {
+            isProcessing.set(false)
         }
     }
 
