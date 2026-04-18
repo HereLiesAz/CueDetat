@@ -159,7 +159,7 @@ class MainViewModel @Inject constructor(
         eventChannel.trySend(event)
     }
 
-    private suspend fun processEvent(event: MainScreenEvent) {
+    private fun processEvent(event: MainScreenEvent) {
         if (event is MainScreenEvent.ToggleExperienceModeSelection) {
             experienceModeUpdateJob?.cancel()
             val currentState = _uiState.value
