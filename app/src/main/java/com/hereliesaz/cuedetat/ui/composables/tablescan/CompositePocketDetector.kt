@@ -12,24 +12,38 @@ class CompositePocketDetector(
     private val detectors: List<PocketDetector>
 ) : PocketDetector {
 
-    override fun detect(bitmap: Bitmap): List<PointF>? {
-        val allResults = mutableListOf<PointF>()
+    override fun detect(bitmap: Bitmap): MlTableDetection? {
+        val allPockets = mutableListOf<PointF>()
+        var tableBoundary: android.graphics.RectF? = null
+        var totalConfidence = 0f
+        var detectorCount = 0
         
         detectors.forEachIndexed { index, detector ->
             try {
-                val results = detector.detect(bitmap)
-                if (results != null) {
-                    Log.d("CompositePocketDetector", "Detector $index found ${results.size} pockets")
-                    allResults.addAll(results)
+                val result = detector.detect(bitmap)
+                if (result != null) {
+                    Log.d("CompositePocketDetector", "Detector $index found ${result.pockets.size} pockets with confidence ${result.confidence}")
+                    allPockets.addAll(result.pockets)
+                    if (result.tableBoundary != null && tableBoundary == null) {
+                        tableBoundary = result.tableBoundary
+                    }
+                    totalConfidence += result.confidence
+                    detectorCount++
                 }
             } catch (e: Exception) {
                 Log.e("CompositePocketDetector", "Detector $index failed: ${e.message}")
             }
         }
         
-        // Simple deduplication based on distance (e.g., 20px)
-        return if (allResults.isNotEmpty()) {
-            deduplicate(allResults)
+        val uniquePockets = deduplicate(allPockets)
+        val avgConfidence = if (detectorCount > 0) totalConfidence / detectorCount else 0f
+
+        return if (uniquePockets.isNotEmpty() || tableBoundary != null) {
+            MlTableDetection(
+                tableBoundary = tableBoundary,
+                pockets = uniquePockets,
+                confidence = avgConfidence
+            )
         } else null
     }
 

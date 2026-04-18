@@ -68,7 +68,9 @@ class OverlayRenderer {
                 val halfW = state.table.logicalWidth / 2f
                 val halfH = state.table.logicalHeight / 2f
                 val destRect = android.graphics.RectF(-halfW, -halfH, halfW, halfH)
-                val paint = paints.ballOverlayPaint.apply { alpha = (255 * topDownProgress).toInt() }
+                val paint = paints.ballOverlayPaint.apply { 
+                    this.alpha = (255 * topDownProgress).toInt() 
+                }
                 this.drawBitmap(state.topDownBitmap, null, destRect, paint)
             }
         }
@@ -76,13 +78,14 @@ class OverlayRenderer {
         val matrixFor2DPlane = interpolatedMatrix
 
         // Pass 1: Draw elements on the logical plane (Lines drawn UNDER balls)
+        // Pass 1: Draw elements on the logical plane (Lines drawn UNDER balls)
         canvas.withMatrix(matrixFor2DPlane) {
             if (state.table.isVisible) {
                 tableRenderer.drawSurface(this, state, paints)
                 tableRenderer.drawPockets(this, state, paints)
             }
-            lineRenderer.drawLogicalLines(this, state, paints, typeface, matrixFor2DPlane)
         }
+        lineRenderer.drawLogicalLines(canvas, state, paints, typeface, matrixFor2DPlane)
 
         // Pass 2: Draw the "lifted" table rails
         // We only show rails when not in top-down view (or fade them out)

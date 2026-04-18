@@ -159,7 +159,7 @@ class MainViewModel @Inject constructor(
         eventChannel.trySend(event)
     }
 
-    private suspend fun processEvent(event: MainScreenEvent) {
+    private fun processEvent(event: MainScreenEvent) {
         if (event is MainScreenEvent.ToggleExperienceModeSelection) {
             experienceModeUpdateJob?.cancel()
             val currentState = _uiState.value
@@ -208,13 +208,6 @@ class MainViewModel @Inject constructor(
         val reducedState =
             stateReducer(currentState, logicalEvent, reducerUtils, gestureReducer)
 
-        // Side-effects for Top-Down view
-        if (logicalEvent is MainScreenEvent.ToggleTopDownView) {
-            if (!reducedState.isTopDownViewActive) {
-                visionRepository.captureRectifiedSnapshot(reducedState)
-            }
-        }
-
         // After CV data is integrated into state, update snap candidates.
         val finalState = when (logicalEvent) {
             is MainScreenEvent.CvDataUpdated -> {
@@ -231,6 +224,13 @@ class MainViewModel @Inject constructor(
             }
             is MainScreenEvent.SetTopDownBitmap -> reducedState.copy(topDownBitmap = logicalEvent.bitmap)
             else -> reducedState
+        }
+
+        // Side-effects for Top-Down view
+        if (logicalEvent is MainScreenEvent.ToggleTopDownView) {
+            if (finalState.isTopDownViewActive) {
+                visionRepository.captureRectifiedSnapshot(finalState)
+            }
         }
 
         val updateType = determineUpdateType(currentState, finalState, logicalEvent)
@@ -256,9 +256,13 @@ class MainViewModel @Inject constructor(
         arFrameProcessor.updateUiState(derivedState)
 
         if (type != UpdateType.SPIN_ONLY) {
+            val isHighPriority = type == UpdateType.FULL || 
+                               state.tableScanModel != previousState.tableScanModel ||
+                               state.viewOffset != previousState.viewOffset
+                               
             saveJob?.cancel()
             saveJob = viewModelScope.launch {
-                delay(2000L)
+                if (!isHighPriority) delay(2000L)
                 userPreferencesRepository.saveState(derivedState)
                 tableScanRepository.saveFeltSamples(derivedState.savedFeltSamples)
             }

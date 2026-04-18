@@ -10,13 +10,15 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 
-private const val MODEL_FILE = "ml/pocket_detector_fp16.tflite"
+private const val MODEL_FILE = "ml/merged_pocket_detector_final_float16.tflite"
 private const val INPUT_SIZE = 640
 private const val CONFIDENCE_THRESHOLD = 0.30f
 private const val MAX_POCKETS = 6
 
 // Class indices from metadata.yaml: pool-table=0, pool-table-hole=1, pool-table-side=2
+private const val TABLE_CLASS_ID = 0
 private const val HOLE_CLASS_ID = 1
+private const val SIDE_CLASS_ID = 2
 
 /**
  * TFLite-backed implementation of [PocketDetector].
@@ -49,7 +51,7 @@ class TFLitePocketDetector(private val context: Context) : PocketDetector {
     private val outputBuffer = Array(1) { Array(300) { FloatArray(6) } }
     private val intValues = IntArray(INPUT_SIZE * INPUT_SIZE)
 
-    override fun detect(bitmap: Bitmap): List<PointF>? {
+    override fun detect(bitmap: Bitmap): MlTableDetection? {
         val interp = interpreter ?: return null
         return try {
             val resized = if (bitmap.width == INPUT_SIZE && bitmap.height == INPUT_SIZE) {
@@ -59,7 +61,7 @@ class TFLitePocketDetector(private val context: Context) : PocketDetector {
             }
             fillInputBuffer(resized)
             interp.run(inputBuffer, outputBuffer)
-            parseDetections(bitmap.width, bitmap.height)
+            parseDetectionsFull(bitmap.width, bitmap.height)
         } catch (_: Exception) {
             null
         }
@@ -80,17 +82,48 @@ class TFLitePocketDetector(private val context: Context) : PocketDetector {
         inputBuffer.rewind()
     }
 
-    private fun parseDetections(width: Int, height: Int): List<PointF>? {
-        val results = mutableListOf<PointF>()
+    private fun parseDetectionsFull(width: Int, height: Int): MlTableDetection {
+        val pockets = mutableListOf<PointF>()
+        var tableBoundary: android.graphics.RectF? = null
+        var maxTableScore = 0f
+
         for (det in outputBuffer[0]) {
-            if (det[4] < CONFIDENCE_THRESHOLD) continue
-            if (det[5].toInt() != HOLE_CLASS_ID) continue
-            // TF NMS convention: [y1, x1, y2, x2, ...]
-            val cx = ((det[1] + det[3]) / 2f * width)
-            val cy = ((det[0] + det[2]) / 2f * height)
-            results.add(PointF(cx, cy))
-            if (results.size >= MAX_POCKETS) break
+            val score = det[4]
+            if (score < CONFIDENCE_THRESHOLD) continue
+            val classId = det[5].toInt()
+
+            when (classId) {
+                TABLE_CLASS_ID -> {
+                    if (score > maxTableScore) {
+                        maxTableScore = score
+                        // YOLO normalized [y1, x1, y2, x2]
+                        tableBoundary = android.graphics.RectF(
+                            det[1] * width,
+                            det[0] * height,
+                            det[3] * width,
+                            det[2] * height
+                        )
+                    }
+                }
+                HOLE_CLASS_ID, SIDE_CLASS_ID -> {
+                    val cx = ((det[1] + det[3]) / 2f * width)
+                    val cy = ((det[0] + det[2]) / 2f * height)
+                    pockets.add(PointF(cx, cy))
+                }
+            }
         }
-        return if (results.isNotEmpty()) results else null
+
+        // Scoring: 50% for table presence, 50% for pocket count (normalized to 6)
+        val pocketScore = (pockets.size.toFloat() / MAX_POCKETS).coerceAtMost(1.0f)
+        val finalConfidence = (maxTableScore * 0.5f) + (pocketScore * 0.5f)
+
+        return MlTableDetection(
+            tableBoundary = tableBoundary,
+            pockets = pockets,
+            confidence = finalConfidence
+        )
     }
+
+    // Deprecated
+    private fun parseDetections(width: Int, height: Int): List<PointF>? = null
 }

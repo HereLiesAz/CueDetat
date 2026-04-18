@@ -179,14 +179,24 @@ fun TutorialOverlay(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(16.dp))
-                Row {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    TextButton(
+                        onClick = { onEvent(MainScreenEvent.TutorialBack) },
+                        enabled = uiState.currentTutorialStep > 0
+                    ) {
+                        Text("Back")
+                    }
                     if (uiState.currentTutorialStep < tutorialSteps.lastIndex) {
                         TextButton(onClick = { onEvent(MainScreenEvent.NextTutorialStep) }) {
-                            Text("Next")
+                            Text("Skip")
                         }
-                    }
-                    TextButton(onClick = { onEvent(MainScreenEvent.EndTutorial) }) {
-                        Text("Finish")
+                    } else {
+                        TextButton(onClick = { onEvent(MainScreenEvent.EndTutorial) }) {
+                            Text("Done")
+                        }
                     }
                 }
             }

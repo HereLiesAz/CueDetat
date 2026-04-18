@@ -24,6 +24,15 @@ object TableGeometryFitter {
     private const val ASPECT_RATIO = 2.0f
     private const val ASPECT_TOLERANCE = 0.25f  // ±25% tolerance on 2:1 ratio
 
+    /** Max acceptable diagonal difference (in logical units) at which fit quality reaches 0. */
+    private const val MAX_DIAGONAL_DIFF_LOGICAL = 50f
+
+    /** Return type for [fitPtWithQuality] and [fitWithQuality]. */
+    internal data class FitResult(
+        val assignments: List<Pair<PocketId, Pt>>?,
+        val quality: Float  // 0..1; 1 = perfect rectangle, 0 = unfit or too distorted
+    )
+
     // ── Public surface ────────────────────────────────────────────────────────
 
     /**
@@ -38,27 +47,48 @@ object TableGeometryFitter {
     }
 
     /**
+     * Public Android-facing variant of [fitPtWithQuality].
+     * Returns a pair of (pocket assignments or null, quality 0..1).
+     */
+    fun fitWithQuality(points: List<PointF>): Pair<List<Pair<PocketId, PointF>>?, Float> {
+        val pts = points.map { Pt(it.x, it.y) }
+        val result = fitPtWithQuality(pts)
+        return result.assignments?.map { (id, pt) -> id to PointF(pt.x, pt.y) } to result.quality
+    }
+
+    /**
      * Variant that accepts [Pt] directly — used by unit tests to avoid
      * dependency on the Android framework mock.
      */
-    internal fun fitPt(points: List<Pt>): List<Pair<PocketId, Pt>>? {
-        if (points.size != 6) return null
+    internal fun fitPt(points: List<Pt>): List<Pair<PocketId, Pt>>? =
+        fitPtWithQuality(points).assignments
+
+    /**
+     * Like [fitPt] but also returns a quality score (0..1).
+     * Quality = 1 - (diagonal_difference / MAX_DIAGONAL_DIFF_LOGICAL), clamped to [0,1].
+     * Quality is 0 when fit fails or fewer than 6 points are provided.
+     */
+    internal fun fitPtWithQuality(points: List<Pt>): FitResult {
+        if (points.size != 6) return FitResult(null, 0f)
 
         var bestScore = Float.MAX_VALUE
         var bestResult: List<Pair<PocketId, Pt>>? = null
 
-        // Try all C(6,4) = 15 combinations of 4 points as corner candidates.
         val indices = points.indices.toList()
-        for (i in 0 until 6) for (j in i+1 until 6) for (k in j+1 until 6) for (l in k+1 until 6) {
+        for (i in 0 until 6) for (j in i + 1 until 6) for (k in j + 1 until 6) for (l in k + 1 until 6) {
             val cornerIdx = listOf(i, j, k, l)
             val corners = cornerIdx.map { points[it] }
-            val sides   = indices.filter { it !in cornerIdx }.map { points[it] }
-
+            val sides = indices.filter { it !in cornerIdx }.map { points[it] }
             val result = tryFitCorners(corners, sides) ?: continue
-            val score  = rectResidual(result)
+            val score = rectResidual(result)
             if (score < bestScore) { bestScore = score; bestResult = result }
         }
-        return bestResult
+
+        if (bestResult == null) return FitResult(null, 0f)
+
+        val diagonalDiff = kotlin.math.sqrt(bestScore.toDouble()).toFloat()
+        val quality = (1f - diagonalDiff / MAX_DIAGONAL_DIFF_LOGICAL).coerceIn(0f, 1f)
+        return FitResult(bestResult, quality)
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────

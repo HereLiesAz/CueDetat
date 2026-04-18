@@ -97,23 +97,6 @@ fun AzNavRailMenu(
             }
         }
 
-        background(weight = 0) {
-            val cueBallPos = uiState.onPlaneBall?.center
-            if (cueBallPos != null && !uiState.spinPaths.isNullOrEmpty() && !uiState.isMasseModeActive) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    uiState.spinPaths.forEach { (color, points) ->
-                        if (points.size > 1) {
-                            val path = Path().apply {
-                                moveTo(cueBallPos.x + points[0].x, cueBallPos.y + points[0].y)
-                                points.forEach { lineTo(cueBallPos.x + it.x, cueBallPos.y + it.y) }
-                            }
-                            drawPath(path = path, color = color.copy(alpha = uiState.spinPathsAlpha), style = Stroke(width = 4f))
-                        }
-                    }
-                }
-            }
-        }
-
         // [SECTION 3] Extra content from the caller (ProtractorScreen's Camera & Overlays)
         content()
 
@@ -125,7 +108,7 @@ fun AzNavRailMenu(
         }
 
         azRailToggle(id = "help", isChecked = uiState.areHelpersVisible, toggleOnText = "Help", toggleOffText = "Help", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleHelp) })
-        azMenuItem(id = "tutorial", text = "Tutorial", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.StartTutorial) })
+        azMenuItem(id = "tutorial", text = "Tutorial", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.StartTutorial()) })
 
         val inArSubMode = uiState.cameraMode == CameraMode.AR_SETUP || 
                           uiState.cameraMode == CameraMode.AR_ACTIVE || 
@@ -154,24 +137,28 @@ fun AzNavRailMenu(
                     onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
                 )
 
-                azRailToggle(
-                    id = "flow",
-                    isChecked = uiState.isFlowPokeEnabled,
-                    toggleOnText = "flow", toggleOffText = "flow",
-                    fillColor = Color(0xFFE040FB), textColor = Color.White,
-                    onClick = { onEvent(MainScreenEvent.ToggleFlowPoke) }
-                )
+                if (!uiState.myriadTrajectory.isNullOrEmpty()) {
+                    azRailToggle(
+                        id = "flow",
+                        isChecked = uiState.isFlowPokeEnabled,
+                        toggleOnText = "flow", toggleOffText = "flow",
+                        fillColor = Color(0xFFE040FB), textColor = Color.White,
+                        onClick = { onEvent(MainScreenEvent.ToggleFlowPoke) }
+                    )
+                }
 
-                azRailToggle(
-                    id = "top_down_view",
-                    isChecked = uiState.isTopDownViewActive,
-                    toggleOnText = "back", toggleOffText = "view",
-                    fillColor = Color.White, textColor = Color.Black,
-                    onClick = { 
-                        if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
-                        else onEvent(MainScreenEvent.ToggleTopDownView)
-                    }
-                )
+                if (uiState.pitchMatrix != null || uiState.topDownBitmap != null) {
+                    azRailToggle(
+                        id = "top_down_view",
+                        isChecked = uiState.isTopDownViewActive,
+                        toggleOnText = "back", toggleOffText = "view",
+                        fillColor = Color.White, textColor = Color.Black,
+                        onClick = { 
+                            if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
+                            else onEvent(MainScreenEvent.ToggleTopDownView)
+                        }
+                    )
+                }
 
                 azRailItemLowerCase(id = "cancel_ar", text = "Cancel", fillColor = b12P, textColor = Color.White, onClick = {
                     onEvent(MainScreenEvent.CancelArSetup) 
@@ -191,8 +178,17 @@ fun AzNavRailMenu(
         }
 
         if (uiState.experienceMode == ExperienceMode.BEGINNER) {
-            azRailItemLowerCase(id = "static", text = "Static", fillColor = b6G, textColor = Color.White, onClick = { onEvent(MainScreenEvent.LockBeginnerView) })
-            azRailItemLowerCase(id = "dynamic", text = "Dynamic", fillColor = b7M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.UnlockBeginnerView) })
+            azRailToggle(
+                id = "lock_view",
+                isChecked = uiState.isBeginnerViewLocked,
+                toggleOnText = "Dynamic", toggleOffText = "Static",
+                fillColor = if (uiState.isBeginnerViewLocked) b6G else b7M,
+                textColor = Color.White,
+                onClick = {
+                    if (uiState.isBeginnerViewLocked) onEvent(MainScreenEvent.UnlockBeginnerView)
+                    else onEvent(MainScreenEvent.LockBeginnerView)
+                }
+            )
             
             if (inArSubMode) {
                 azRailToggle(
@@ -203,24 +199,28 @@ fun AzNavRailMenu(
                     onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
                 )
 
-                azRailToggle(
-                    id = "flow",
-                    isChecked = uiState.isFlowPokeEnabled,
-                    toggleOnText = "flow", toggleOffText = "flow",
-                    fillColor = Color(0xFFE040FB), textColor = Color.White,
-                    onClick = { onEvent(MainScreenEvent.ToggleFlowPoke) }
-                )
+                if (!uiState.myriadTrajectory.isNullOrEmpty()) {
+                    azRailToggle(
+                        id = "flow",
+                        isChecked = uiState.isFlowPokeEnabled,
+                        toggleOnText = "flow", toggleOffText = "flow",
+                        fillColor = Color(0xFFE040FB), textColor = Color.White,
+                        onClick = { onEvent(MainScreenEvent.ToggleFlowPoke) }
+                    )
+                }
 
-                azRailToggle(
-                    id = "top_down_view",
-                    isChecked = uiState.isTopDownViewActive,
-                    toggleOnText = "back", toggleOffText = "view",
-                    fillColor = Color.White, textColor = Color.Black,
-                    onClick = { 
-                        if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
-                        else onEvent(MainScreenEvent.ToggleTopDownView)
-                    }
-                )
+                if (uiState.pitchMatrix != null || uiState.topDownBitmap != null) {
+                    azRailToggle(
+                        id = "top_down_view",
+                        isChecked = uiState.isTopDownViewActive,
+                        toggleOnText = "back", toggleOffText = "view",
+                        fillColor = Color.White, textColor = Color.Black,
+                        onClick = { 
+                            if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
+                            else onEvent(MainScreenEvent.ToggleTopDownView)
+                        }
+                    )
+                }
             }
         } else {
             val resetLabel = when {

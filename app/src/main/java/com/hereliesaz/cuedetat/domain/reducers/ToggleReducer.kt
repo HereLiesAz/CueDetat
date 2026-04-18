@@ -20,19 +20,6 @@ internal fun reduceToggleAction(
     reducerUtils: ReducerUtils
 ): CueDetatState {
     return when (action) {
-        is MainScreenEvent.ToggleSpinControl -> {
-            val isNowVisible = !state.isSpinControlVisible
-            if (isNowVisible) {
-                state.copy(isSpinControlVisible = true)
-            } else {
-                state.copy(
-                    isSpinControlVisible = false,
-                    selectedSpinOffset = null,
-                    lingeringSpinOffset = null,
-                    spinPaths = null
-                )
-            }
-        }
         is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(state, reducerUtils)
         is MainScreenEvent.CycleTableSize -> {
             val newState = state.copy(table = state.table.copy(size = state.table.size.next()), valuesChangedSinceReset = true)
@@ -96,8 +83,10 @@ internal fun reduceToggleAction(
         is MainScreenEvent.SetExperienceMode -> handleSetExperienceMode(state, action.mode, reducerUtils)
         is MainScreenEvent.ApplyPendingExperienceMode -> {
             if (state.pendingExperienceMode == null) return state
-            return handleSetExperienceMode(state, state.pendingExperienceMode, reducerUtils).copy(pendingExperienceMode = null)
+            handleSetExperienceMode(state, state.pendingExperienceMode, reducerUtils).copy(pendingExperienceMode = null)
         }
+        is MainScreenEvent.StartTutorial -> {
+            val nextCameraMode = if (state.cameraMode == CameraMode.OFF) CameraMode.CAMERA else state.cameraMode
             val tutorialType = if (nextCameraMode == CameraMode.LITE_AR) {
                 com.hereliesaz.cuedetat.domain.TutorialType.DYNAMIC_AR
             } else {
@@ -156,6 +145,15 @@ internal fun reduceToggleAction(
                 valuesChangedSinceReset = false
             )
         }
+        is MainScreenEvent.UnlockBeginnerView -> {
+            state.copy(
+                isBeginnerViewLocked = false,
+                cameraMode = CameraMode.LITE_AR,
+                zoomSliderPosition = 0f,
+                viewOffset = PointF(0f, 0f),
+                worldRotationDegrees = 0f
+            )
+        }
         is MainScreenEvent.ToggleCalibrationScreen -> state.copy(showCalibrationScreen = !state.showCalibrationScreen)
         is MainScreenEvent.ToggleTableScanScreen ->
             state.copy(showTableScanScreen = !state.showTableScanScreen)
@@ -163,7 +161,8 @@ internal fun reduceToggleAction(
         is MainScreenEvent.ExitToSplash -> state.copy(experienceMode = null)
         is MainScreenEvent.ToggleTopDownView -> state.copy(isTopDownViewActive = !state.isTopDownViewActive)
         is MainScreenEvent.ClearTopDownView -> state.copy(isTopDownViewActive = false, topDownBitmap = null)
-        else -> state
+        is MainScreenEvent.SetTopDownBitmap -> state.copy(topDownBitmap = action.bitmap)
+        else -> state // All other events handled by specialized reducers
     }
 }
 

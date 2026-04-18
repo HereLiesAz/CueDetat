@@ -92,13 +92,15 @@ fun TableScanScreen(
         }
     }
 
-    // Pass current state snapshot to ViewModel so it can do coordinate transforms.
-    LaunchedEffect(uiState.inversePitchMatrix, uiState.hasInverseMatrix) {
+    LaunchedEffect(uiState.inversePitchMatrix, uiState.hasInverseMatrix, uiState.viewOffset, uiState.worldRotationDegrees, uiState.zoomSliderPosition) {
         viewModel.updateStateSnapshot(
             uiState.inversePitchMatrix,
             uiState.hasInverseMatrix,
             uiState.viewWidth,
-            uiState.viewHeight
+            uiState.viewHeight,
+            uiState.viewOffset,
+            uiState.worldRotationDegrees,
+            uiState.zoomSliderPosition
         )
     }
 
@@ -128,6 +130,9 @@ fun TableScanScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         // State hoisted above conditionals (Compose rule: no @Composable calls in if/when blocks)
         val selectedIds by viewModel.selectedSampleIds.collectAsState()
+        val scanStep by viewModel.scanStep.collectAsState()
+        val currentPocketTarget by viewModel.currentPocketTarget.collectAsState()
+        val mlConfidence by viewModel.mlConfidence.collectAsState()
 
         // Top Gallery: Felt Samples
         if (uiState.savedFeltSamples.isNotEmpty()) {
@@ -196,13 +201,14 @@ fun TableScanScreen(
             ) {
                 // Hide the crosshair while expanding — it looks odd when stretched.
                 if (!isCapturing) {
+                    val crosshairColor = if (mlConfidence > 0.8f) Color.Green else Color.White
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         drawCircle(
-                            color = Color.White.copy(alpha = 0.3f),
+                            color = crosshairColor.copy(alpha = 0.3f),
                             radius = size.minDimension / 2,
                             style = Stroke(width = 1.dp.toPx())
                         )
-                        drawCircle(color = Color.White, radius = 2.dp.toPx(), center = center)
+                        drawCircle(color = crosshairColor, radius = 2.dp.toPx(), center = center)
                     }
                 }
             }
@@ -230,25 +236,62 @@ fun TableScanScreen(
                     .padding(bottom = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                val instructionText = when (scanStep) {
+                    ScanStep.FELT_CAPTURE -> "Point at the felt and tap below"
+                    ScanStep.POCKET_GUIDE -> "Aim at ${currentPocketTarget?.name ?: "Pocket"} and tap"
+                    ScanStep.AUTO_READY -> "ML Auto-Lock high confidence. Tap to finish."
+                }
+
                 Text(
-                    text = "Point at the felt and tap below",
+                    text = instructionText,
                     color = Color.White,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
-                // Camera Shutter Button
+                // Camera Shutter Button with Confidence Ring
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                        .border(4.dp, Color.LightGray, CircleShape)
-                        .clickable {
-                            isCapturing = true
-                            viewModel.captureFeltAndComplete()
-                        }
-                )
+                        .size(80.dp)
+                        .padding(4.dp)
+                ) {
+                    // Lower layer: Confidence Ring (Sweep Gradient if high confidence)
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.2f),
+                            style = Stroke(width = 4.dp.toPx())
+                        )
+                        drawArc(
+                            color = if (mlConfidence > 0.8f) Color.Green else Color.Yellow,
+                            startAngle = -90f,
+                            sweepAngle = 360f * mlConfidence,
+                            useCenter = false,
+                            style = Stroke(width = 4.dp.toPx())
+                        )
+                    }
+
+                    // Top layer: Shutter Button
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            .border(4.dp, Color.LightGray, CircleShape)
+                            .clickable {
+                                when (scanStep) {
+                                    ScanStep.FELT_CAPTURE -> {
+                                        isCapturing = true
+                                        viewModel.captureFeltAndComplete()
+                                    }
+                                    ScanStep.POCKET_GUIDE -> {
+                                        viewModel.captureCurrentPocket()
+                                    }
+                                    else -> {}
+                                }
+                            }
+                    )
+                }
             }
         }
     }

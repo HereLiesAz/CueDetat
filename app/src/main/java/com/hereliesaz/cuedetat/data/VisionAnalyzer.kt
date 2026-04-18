@@ -44,8 +44,9 @@ class VisionAnalyzer @Inject constructor(
         } ?: image.close() // Close the image if state is not available to prevent leaks
     }
 
-    // Reuse output bitmap across frames to avoid per-frame allocation.
+    // Reuse output bitmap and pixel array across frames to avoid per-frame allocation.
     private var outputBitmap: Bitmap? = null
+    private var pixelBuffer: IntArray? = null
 
     @OptIn(ExperimentalGetImage::class)
     private fun ImageProxy.toBitmap(): Bitmap? {
@@ -67,7 +68,10 @@ class VisionAnalyzer @Inject constructor(
         val vBuf = vPlane.buffer
 
         // Reuse pixel array to avoid per-frame allocation.
-        val pixels = IntArray(width * height)
+        if (pixelBuffer?.size != width * height) {
+            pixelBuffer = IntArray(width * height)
+        }
+        val pixels = pixelBuffer!!
         for (row in 0 until height) {
             for (col in 0 until width) {
                 val y = yBuf.get(row * yRowStride + col).toInt() and 0xFF

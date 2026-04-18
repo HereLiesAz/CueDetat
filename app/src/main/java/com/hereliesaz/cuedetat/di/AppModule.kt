@@ -17,8 +17,8 @@ import com.hereliesaz.cuedetat.data.MergedTFLiteDetector
 import com.hereliesaz.cuedetat.network.GithubApi
 import com.hereliesaz.cuedetat.network.MyriadApi
 import com.hereliesaz.cuedetat.ui.composables.tablescan.CompositePocketDetector
-import com.hereliesaz.cuedetat.ui.composables.tablescan.OpenCVPocketDetector
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
+import com.hereliesaz.cuedetat.ui.composables.tablescan.TfLitePocketDetector
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -107,8 +107,8 @@ object AppModule {
         @ApplicationContext context: Context,
         mergedDetector: MergedTFLiteDetector
     ): PocketDetector {
-        val onnx = OpenCVPocketDetector(context)
-        return CompositePocketDetector(listOf(mergedDetector, onnx))
+        val tflite = TfLitePocketDetector(context)
+        return CompositePocketDetector(listOf(mergedDetector, tflite))
     }
 
     /**

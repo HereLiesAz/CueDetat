@@ -12,56 +12,51 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 
-private const val MASTER_MODEL_FILE = "ml/MASTER_POOL_MODEL.tflite"
+private const val POCKET_MODEL = "ml/merged_pocket_detector_final_float16.tflite"
+private const val POOL_MODEL = "ml/pool_detector_pivot_fp16.tflite"
 private const val INPUT_SIZE = 640
 private const val CONFIDENCE_THRESHOLD = 0.30f
 private const val MAX_DETECTIONS = 300
+private const val TABLE_CLASS_ID = 0
 private const val HOLE_CLASS_ID = 1
+private const val SIDE_CLASS_ID = 2
 
 /**
- * A master TFLite detector that runs FOUR models from a single binary package.
- * It maps the file segments to separate interpreters for maximum stability.
+ * A combined TFLite detector that runs two models (pockets and balls/cues)
+ * on a single input pass. This avoids redundant resizing and normalization.
  */
 class MergedTFLiteDetector(private val context: Context) : PocketDetector {
 
-    // Head mapping indices
-    private val HEAD_POCKET_50E = 0
-    private val HEAD_POOL_PIVOT = 2
+    private val pocketInterp: Interpreter? by lazy { loadModel(POCKET_MODEL) }
+    private val poolInterp: Interpreter? by lazy { loadModel(POOL_MODEL) }
 
-    private val interpreters = mutableMapOf<Int, Interpreter>()
-
-    init {
-        loadMasterPackage()
-    }
-
-    private fun loadMasterPackage() {
-        try {
-            val fd = context.assets.openFd(MASTER_MODEL_FILE)
-            val fullChannel = FileInputStream(fd.fileDescriptor).channel
-            
-            // Physical offsets of the models within the single file
-            val modelSizes = listOf(6242868L, 6242869L, 6243331L, 6242869L)
-            var currentOffset = fd.startOffset
-
-            for (i in 0 until 4) {
-                val size = modelSizes[i]
-                val buffer = fullChannel.map(FileChannel.MapMode.READ_ONLY, currentOffset, size)
-                interpreters[i] = Interpreter(buffer, Interpreter.Options().setNumThreads(2))
-                currentOffset += size
-            }
-            Log.d("MergedTFLiteDetector", "Master package loaded: 4 interpreters active.")
-        } catch (e: Exception) {
-            Log.e("MergedTFLiteDetector", "Failed to load master binary: ${e.message}")
-        }
-    }
-
+    // Reused input buffer shared by both models
     private val inputBuffer: ByteBuffer by lazy {
         ByteBuffer.allocateDirect(1 * INPUT_SIZE * INPUT_SIZE * 3 * 4)
             .order(ByteOrder.nativeOrder())
     }
 
+    // Separate output buffers
+    private val pocketOutput = Array(1) { Array(MAX_DETECTIONS) { FloatArray(6) } }
+    private val poolOutput = Array(1) { Array(MAX_DETECTIONS) { FloatArray(6) } }
     private val intValues = IntArray(INPUT_SIZE * INPUT_SIZE)
 
+    private fun loadModel(path: String): Interpreter? {
+        return try {
+            val fd = context.assets.openFd(path)
+            val model = FileInputStream(fd.fileDescriptor).channel.map(
+                FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.declaredLength
+            )
+            Interpreter(model, Interpreter.Options().setNumThreads(2))
+        } catch (e: Exception) {
+            Log.e("MergedTFLiteDetector", "Failed to load $path: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Common preprocessing: resize and fill the shared input buffer.
+     */
     private fun preprocess(bitmap: Bitmap) {
         val resized = if (bitmap.width == INPUT_SIZE && bitmap.height == INPUT_SIZE) {
             bitmap
@@ -80,55 +75,87 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
         inputBuffer.rewind()
     }
 
-    override fun detect(bitmap: Bitmap): List<PointF>? {
-        val interp = interpreters[HEAD_POCKET_50E] ?: return null
+    override fun detect(bitmap: Bitmap): com.hereliesaz.cuedetat.ui.composables.tablescan.MlTableDetection? {
+        val interp = pocketInterp ?: return null
         return try {
             preprocess(bitmap)
-            val output = Array(1) { Array(MAX_DETECTIONS) { FloatArray(6) } }
-            interp.run(inputBuffer, output)
-            parsePocketDetections(output, bitmap.width, bitmap.height)
+            interp.run(inputBuffer, pocketOutput)
+            parsePocketDetectionsFull(bitmap.width, bitmap.height)
         } catch (e: Exception) {
             Log.e("MergedTFLiteDetector", "Pocket inference failed: ${e.message}")
             null
         }
     }
 
+    /**
+     * Detects balls and cues for live AR tracking.
+     */
     fun detectPool(bitmap: Bitmap): List<PoolDetection> {
-        val interp = interpreters[HEAD_POOL_PIVOT] ?: return emptyList()
+        val interp = poolInterp ?: return emptyList()
         return try {
             preprocess(bitmap)
-            val output = Array(1) { Array(MAX_DETECTIONS) { FloatArray(6) } }
-            interp.run(inputBuffer, output)
-            parsePoolDetections(output, bitmap.width, bitmap.height)
+            interp.run(inputBuffer, poolOutput)
+            parsePoolDetections(bitmap.width, bitmap.height)
         } catch (e: Exception) {
             Log.e("MergedTFLiteDetector", "Pool inference failed: ${e.message}")
             emptyList()
         }
     }
 
-    private fun parsePocketDetections(output: Array<Array<FloatArray>>, width: Int, height: Int): List<PointF>? {
-        val results = mutableListOf<PointF>()
-        for (det in output[0]) {
-            if (det[4] < CONFIDENCE_THRESHOLD) continue
-            if (det[5].toInt() != HOLE_CLASS_ID) continue
-            val cx = ((det[1] + det[3]) / 2f * width)
-            val cy = ((det[0] + det[2]) / 2f * height)
-            results.add(PointF(cx, cy))
-            if (results.size >= 6) break
+    private fun parsePocketDetectionsFull(width: Int, height: Int): com.hereliesaz.cuedetat.ui.composables.tablescan.MlTableDetection {
+        val pockets = mutableListOf<PointF>()
+        var tableBoundary: RectF? = null
+        var maxTableScore = 0f
+
+        for (det in pocketOutput[0]) {
+            val score = det[4]
+            if (score < CONFIDENCE_THRESHOLD) continue
+            val classId = det[5].toInt()
+
+            when (classId) {
+                TABLE_CLASS_ID -> {
+                    if (score > maxTableScore) {
+                        maxTableScore = score
+                        tableBoundary = RectF(
+                            det[1] * width,
+                            det[0] * height,
+                            det[3] * width,
+                            det[2] * height
+                        )
+                    }
+                }
+                HOLE_CLASS_ID, SIDE_CLASS_ID -> {
+                    val cx = ((det[1] + det[3]) / 2f * width)
+                    val cy = ((det[0] + det[2]) / 2f * height)
+                    pockets.add(PointF(cx, cy))
+                }
+            }
         }
-        return results.ifEmpty { null }
+
+        val pocketScore = (pockets.size.toFloat() / 6.0f).coerceAtMost(1.0f)
+        val finalConfidence = (maxTableScore * 0.5f) + (pocketScore * 0.5f)
+
+        return com.hereliesaz.cuedetat.ui.composables.tablescan.MlTableDetection(
+            tableBoundary = tableBoundary,
+            pockets = pockets,
+            confidence = finalConfidence
+        )
     }
 
-    private fun parsePoolDetections(output: Array<Array<FloatArray>>, width: Int, height: Int): List<PoolDetection> {
+    private fun parsePocketDetections(width: Int, height: Int): List<PointF>? = null
+
+    private fun parsePoolDetections(width: Int, height: Int): List<PoolDetection> {
         val results = mutableListOf<PoolDetection>()
-        for (det in output[0]) {
+        for (det in poolOutput[0]) {
             val score = det[4]
             if (score < 0.25f) continue
             val classId = det[5].toInt()
+            
             val top = det[0] * height
             val left = det[1] * width
             val bottom = det[2] * height
             val right = det[3] * width
+            
             results.add(PoolDetection(RectF(left, top, right, bottom), score, classId))
         }
         return results

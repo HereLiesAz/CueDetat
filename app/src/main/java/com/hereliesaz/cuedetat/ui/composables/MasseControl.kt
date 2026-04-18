@@ -168,10 +168,12 @@ fun MasseControl(
                 }
 
                 // Indicators
-                lingeringSpinOffset?.let { drawLogicalIndicator(it, color = Color.White.copy(alpha = 0.6f * spinPathAlpha)) }
+                lingeringSpinOffset?.let { 
+                    drawLogicalIndicator(it, center, radius, Color.White.copy(alpha = 0.6f * spinPathAlpha)) 
+                }
 
                 selectedSpinOffset?.let { activePos ->
-                    drawLogicalIndicator(activePos, color = Color.White)
+                    drawLogicalIndicator(activePos, center, radius, Color.White)
                 }
 
                 if (isMoveModeActive) {
@@ -260,7 +262,12 @@ fun MasseControl(
     }
 }
 
-private fun DrawScope.drawLogicalIndicator(pos: PointF, color: Color) {
-    drawCircle(color = color, radius = 5.dp.toPx(), center = Offset(pos.x, pos.y))
-    drawCircle(color = color, radius = 5.dp.toPx(), center = Offset(pos.x, pos.y), style = Stroke(width = 2.dp.toPx()))
+private fun DrawScope.drawLogicalIndicator(normalizedOffset: PointF, center: Offset, radius: Float, color: Color) {
+    // Map normalized -1..1 to local pixels
+    val indicatorX = center.x + (normalizedOffset.x * radius)
+    val indicatorY = center.y + (normalizedOffset.y * radius)
+    val indicatorCenter = Offset(indicatorX, indicatorY)
+    
+    drawCircle(color = color, radius = 5.dp.toPx(), center = indicatorCenter)
+    drawCircle(color = Color.Black.copy(alpha = 0.3f), radius = 5.dp.toPx(), center = indicatorCenter, style = Stroke(width = 1.dp.toPx()))
 }

@@ -15,8 +15,8 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
                 val ghostCuePos = state.protractorUnit.ghostCueBallCenter
                 val initAngleDeg = Math.toDegrees(
                     atan2(
-                        (cuePos.y - ghostCuePos.y).toDouble(),
-                        (cuePos.x - ghostCuePos.x).toDouble()
+                        (ghostCuePos.y - cuePos.y).toDouble(),
+                        (ghostCuePos.x - cuePos.x).toDouble(),
                     )
                 ).toFloat()
                 state.copy(
@@ -24,7 +24,11 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
                     isSpinControlVisible = false,
                     lingeringSpinOffset = null,
                     selectedSpinOffset = null,
-                    masseShotAngleDeg = initAngleDeg
+                    masseShotAngleDeg = initAngleDeg,
+                    spinPaths = emptyMap(),
+                    masseImpactPoints = emptyList(),
+                    masseConnectsTarget = false,
+                    aimedPocketIndex = null
                 )
             } else {
                 state.copy(
@@ -52,12 +56,14 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
                     masseImpactPoints = emptyList(),
                     masseConnectsTarget = false,
                     selectedSpinOffset = null,
-                    lingeringSpinOffset = null
+                    lingeringSpinOffset = null,
+                    aimedPocketIndex = null
                 )
             } else {
                 state.copy(
                     isSpinControlVisible = false,
-                    spinPaths = emptyMap()
+                    spinPaths = emptyMap(),
+                    aimedPocketIndex = null
                 )
             }
         }
@@ -70,7 +76,7 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
             // Convert raw screen pixels (0..120dp) to normalized units (-1..1)
             val nx = (rawOffset.x - radiusPx) / radiusPx
             val ny = (rawOffset.y - radiusPx) / radiusPx
-            val dist = sqrt(nx * nx + ny * ny)
+            val dist = sqrt((nx * nx + ny * ny).toDouble()).toFloat()
             val normalizedOffset = if (dist > 1.0f) PointF(nx / dist, ny / dist) else PointF(nx, ny)
             
             state.copy(

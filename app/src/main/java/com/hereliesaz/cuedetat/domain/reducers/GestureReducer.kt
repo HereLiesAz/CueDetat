@@ -8,7 +8,6 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
-import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import javax.inject.Inject
@@ -18,7 +17,7 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 
 @Singleton
-class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils) {
+class GestureReducer @Inject constructor() {
     fun reduce(currentState: CueDetatState, event: MainScreenEvent): CueDetatState {
         return when(event) {
             is MainScreenEvent.LogicalGestureStarted -> handleLogicalGestureStarted(currentState, event)
@@ -82,7 +81,6 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
         }
         
         val onPlaneBall = currentState.onPlaneBall
-        val protractorUnit = currentState.protractorUnit
 
         // 1. Relocate UI Widget (Double Tap + Drag on Center)
         if (currentState.isSpinControlVisible || currentState.isMasseModeActive) {
@@ -109,16 +107,36 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
             )
         }
 
-        // 2b. Target Ball Movement (Protractor Unit center and Ghost Cue Ball contact point)
+        // 2b. Target Ball Movement (Protractor Unit center only)
         if (!currentState.isBankingMode) {
             val targetPos = currentState.protractorUnit.center
-            val ghostCuePos = currentState.protractorUnit.ghostCueBallCenter
             val isHitOnTarget = getDistance(event.logicalPoint, targetPos) < touchRadius
-            val isHitOnGhostCue = getDistance(event.logicalPoint, ghostCuePos) < touchRadius
 
-            if (isHitOnTarget || isHitOnGhostCue) {
+            if (isHitOnTarget) {
                 return currentState.copy(
                     interactionMode = InteractionMode.MOVING_PROTRACTOR_UNIT,
+                    isMagnifierVisible = true,
+                    magnifierSourceCenter = event.screenOffset
+                )
+            }
+
+            // Aiming (Rotation) via Ghost Cue Ball hit - provide magnifier but stay in rotation mode
+            val ghostCuePos = currentState.protractorUnit.ghostCueBallCenter
+            if (getDistance(event.logicalPoint, ghostCuePos) < touchRadius) {
+                return currentState.copy(
+                    interactionMode = InteractionMode.ROTATING_PROTRACTOR,
+                    isMagnifierVisible = true,
+                    magnifierSourceCenter = event.screenOffset
+                )
+            }
+        }
+
+        // 2c. Obstacle Ball Movement
+        currentState.obstacleBalls.forEachIndexed { index, obstacle ->
+            if (getDistance(event.logicalPoint, obstacle.center) < touchRadius) {
+                return currentState.copy(
+                    interactionMode = InteractionMode.MOVING_OBSTACLE_BALL,
+                    movingObstacleBallIndex = index,
                     isMagnifierVisible = true,
                     magnifierSourceCenter = event.screenOffset
                 )
@@ -134,10 +152,22 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
     }
 
     private fun handleLogicalDragApplied(currentState: CueDetatState, event: MainScreenEvent.LogicalDragApplied): CueDetatState {
+        // Shared magnifier movement logic
+        val updatedMagnifierCenter = if (currentState.isMagnifierVisible) {
+            currentState.magnifierSourceCenter?.let {
+                Offset(it.x + event.screenDelta.x, it.y + event.screenDelta.y)
+            }
+        } else {
+            currentState.magnifierSourceCenter
+        }
+
         return when (currentState.interactionMode) {
             InteractionMode.MOVING_SPIN_CONTROL -> {
                 val currentCenter = currentState.spinControlCenter ?: return currentState
-                currentState.copy(spinControlCenter = PointF(currentCenter.x + event.screenDelta.x, currentCenter.y + event.screenDelta.y))
+                currentState.copy(
+                    spinControlCenter = PointF(currentCenter.x + event.screenDelta.x, currentCenter.y + event.screenDelta.y),
+                    magnifierSourceCenter = updatedMagnifierCenter
+                )
             }
             InteractionMode.MOVING_PROTRACTOR_UNIT -> {
                 val dx = event.currentLogicalPoint.x - event.previousLogicalPoint.x
@@ -149,6 +179,7 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                             currentState.protractorUnit.center.y + dy
                         )
                     ),
+                    magnifierSourceCenter = updatedMagnifierCenter,
                     valuesChangedSinceReset = true
                 )
             }
@@ -156,11 +187,19 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                 currentState.onPlaneBall?.let {
                     val dx = event.currentLogicalPoint.x - event.previousLogicalPoint.x
                     val dy = event.currentLogicalPoint.y - event.previousLogicalPoint.y
-                    currentState.copy(onPlaneBall = it.copy(center = PointF(it.center.x + dx, it.center.y + dy)), valuesChangedSinceReset = true)
-                } ?: currentState
+                    currentState.copy(
+                        onPlaneBall = it.copy(center = PointF(it.center.x + dx, it.center.y + dy)),
+                        magnifierSourceCenter = updatedMagnifierCenter,
+                        valuesChangedSinceReset = true
+                    )
+                } ?: currentState.copy(magnifierSourceCenter = updatedMagnifierCenter)
             }
             InteractionMode.AIMING_BANK_SHOT -> {
-                currentState.copy(bankingAimTarget = event.currentLogicalPoint, valuesChangedSinceReset = true)
+                currentState.copy(
+                    bankingAimTarget = event.currentLogicalPoint,
+                    magnifierSourceCenter = updatedMagnifierCenter,
+                    valuesChangedSinceReset = true
+                )
             }
             InteractionMode.ROTATING_PROTRACTOR -> {
                 if (currentState.isMasseModeActive) {
@@ -174,7 +213,10 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                         event.currentLogicalPoint.x - cuePos.x
                     )
                     val delta = Math.toDegrees(currAngle.toDouble() - prevAngle.toDouble()).toFloat()
-                    currentState.copy(masseShotAngleDeg = currentState.masseShotAngleDeg + delta)
+                    currentState.copy(
+                        masseShotAngleDeg = currentState.masseShotAngleDeg + delta,
+                        magnifierSourceCenter = updatedMagnifierCenter
+                    )
                 } else {
                     val center = currentState.protractorUnit.center
                     val prevAngle = atan2(event.previousLogicalPoint.y - center.y, event.previousLogicalPoint.x - center.x)
@@ -182,11 +224,25 @@ class GestureReducer @Inject constructor(private val reducerUtils: ReducerUtils)
                     val angleDelta = Math.toDegrees(currAngle.toDouble() - prevAngle.toDouble()).toFloat()
                     currentState.copy(
                         protractorUnit = currentState.protractorUnit.copy(rotationDegrees = currentState.protractorUnit.rotationDegrees + angleDelta),
+                        magnifierSourceCenter = updatedMagnifierCenter,
                         valuesChangedSinceReset = true
                     )
                 }
             }
-            else -> currentState
+            InteractionMode.MOVING_OBSTACLE_BALL -> {
+                val index = currentState.movingObstacleBallIndex ?: return currentState
+                val obstacle = currentState.obstacleBalls.getOrNull(index) ?: return currentState
+                val dx = event.currentLogicalPoint.x - event.previousLogicalPoint.x
+                val dy = event.currentLogicalPoint.y - event.previousLogicalPoint.y
+                val newObstacles = currentState.obstacleBalls.toMutableList()
+                newObstacles[index] = obstacle.copy(center = PointF(obstacle.center.x + dx, obstacle.center.y + dy))
+                currentState.copy(
+                    obstacleBalls = newObstacles,
+                    magnifierSourceCenter = updatedMagnifierCenter,
+                    valuesChangedSinceReset = true
+                )
+            }
+            else -> currentState.copy(magnifierSourceCenter = updatedMagnifierCenter)
         }
     }
 

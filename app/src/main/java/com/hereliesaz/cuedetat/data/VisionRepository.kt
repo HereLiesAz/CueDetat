@@ -2,6 +2,7 @@
 package com.hereliesaz.cuedetat.data
 
 import android.annotation.SuppressLint
+import android.util.Log
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.camera.core.ImageProxy
@@ -39,6 +40,7 @@ import org.opencv.core.Scalar
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import java.util.concurrent.ExecutionException
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
@@ -63,7 +65,6 @@ class VisionRepository @Inject constructor(
     private val _arEvents = MutableSharedFlow<MainScreenEvent>(extraBufferCapacity = 16)
     val arEvents: SharedFlow<MainScreenEvent> = _arEvents.asSharedFlow()
 
-    private var lastFrameTime = 0L
     private var lastMyriadTime = 0L
 
     private var reusableMask: Mat? = null
@@ -85,17 +86,20 @@ class VisionRepository @Inject constructor(
         Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
     }
 
+    private val isProcessing = AtomicBoolean(false)
+
     @SuppressLint("UnsafeOptInUsageError")
     fun processImage(imageProxy: ImageProxy, bitmap: android.graphics.Bitmap, state: CueDetatState) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastFrameTime < 100) {
+        if (isProcessing.get()) {
             imageProxy.close()
             return
         }
-        lastFrameTime = currentTime
+        isProcessing.set(true)
 
-        val mediaImage = imageProxy.image
-        if (mediaImage != null) {
+        val currentTime = System.currentTimeMillis()
+
+        try {
+            val mediaImage = imageProxy.image ?: run { imageProxy.close(); return }
             val rotationDegrees = imageProxy.imageInfo.rotationDegrees
             val inputImage = InputImage.fromMediaImage(mediaImage, rotationDegrees)
 
@@ -104,265 +108,241 @@ class VisionRepository @Inject constructor(
                 state.viewWidth, state.viewHeight
             )
 
-            try {
-                val detectedObjects = Tasks.await(genericObjectDetector.process(inputImage))
+            val detectedObjects = Tasks.await(genericObjectDetector.process(inputImage))
             val rawDetections = poolDetector.detectPool(bitmap)
             val customPoolBalls = rawDetections.filter { it.classId == 1 }
             val detectedCues = rawDetections.filter { it.classId == 2 }.map {
                 android.graphics.Rect(it.rect.left.toInt(), it.rect.top.toInt(), it.rect.right.toInt(), it.rect.bottom.toInt())
             }
-                val originalMat = imageProxy.toMat(reusableFrameMat)
+            val originalMat = imageProxy.toMat(reusableFrameMat)
 
-                var matToUse: Mat
-                when (rotationDegrees) {
-                    90 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_CLOCKWISE); matToUse = reusableRotatedMat }
-                    180 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_180); matToUse = reusableRotatedMat }
-                    270 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_COUNTERCLOCKWISE); matToUse = reusableRotatedMat }
-                    else -> { matToUse = originalMat }
-                }
+            var matToUse: Mat
+            when (rotationDegrees) {
+                90 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_CLOCKWISE); matToUse = reusableRotatedMat }
+                180 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_180); matToUse = reusableRotatedMat }
+                270 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_COUNTERCLOCKWISE); matToUse = reusableRotatedMat }
+                else -> { matToUse = originalMat }
+            }
 
-                Imgproc.cvtColor(matToUse, reusableHsvMat, Imgproc.COLOR_BGR2HSV)
-                val hsvMat = reusableHsvMat
+            Imgproc.cvtColor(matToUse, reusableHsvMat, Imgproc.COLOR_BGR2HSV)
+            val hsvMat = reusableHsvMat
 
-                val hsvTuple = state.colorSamplePoint?.let {
-                    val imageX = (it.x * (hsvMat.cols() / state.viewWidth.toFloat())).toInt()
-                    val imageY = (it.y * (hsvMat.rows() / state.viewHeight.toFloat())).toInt()
+            val hsvTuple = state.colorSamplePoint?.let {
+                val imageX = (it.x * (hsvMat.cols() / state.viewWidth.toFloat())).toInt()
+                val imageY = (it.y * (hsvMat.rows() / state.viewHeight.toFloat())).toInt()
 
-                    val patchSize = 5
-                    val roiX = (imageX - patchSize / 2).coerceIn(0, hsvMat.cols() - patchSize)
-                    val roiY = (imageY - patchSize / 2).coerceIn(0, hsvMat.rows() - patchSize)
-                    val roi = OCVRect(roiX, roiY, patchSize, patchSize)
+                val patchSize = 5
+                val roiX = (imageX - patchSize / 2).coerceIn(0, hsvMat.cols() - patchSize)
+                val roiY = (imageY - patchSize / 2).coerceIn(0, hsvMat.rows() - patchSize)
+                val roi = OCVRect(roiX, roiY, patchSize, patchSize)
 
-                    val sampleRegion = hsvMat.submat(roi)
-                    Core.meanStdDev(sampleRegion, reusableMean, reusableStdDev)
+                val sampleRegion = hsvMat.submat(roi)
+                Core.meanStdDev(sampleRegion, reusableMean, reusableStdDev)
 
-                    val meanArray = floatArrayOf(
-                        reusableMean.get(0, 0)[0].toFloat(),
-                        reusableMean.get(1, 0)[0].toFloat(),
-                        reusableMean.get(2, 0)[0].toFloat()
-                    )
-                    val stddevArray = floatArrayOf(
-                        reusableStdDev.get(0, 0)[0].toFloat(),
-                        reusableStdDev.get(1, 0)[0].toFloat(),
-                        reusableStdDev.get(2, 0)[0].toFloat()
-                    )
-
-                    sampleRegion.release()
-                    Pair(meanArray, stddevArray)
-                }
-
-                val hsv = state.lockedHsvColor ?: hsvTuple?.first ?: run {
-                    val roiWidth = 50
-                    val roiHeight = 50
-                    val roiX = (hsvMat.cols() - roiWidth) / 2
-                    val roiY = (hsvMat.rows() - roiHeight) / 2
-                    val centerRoi = hsvMat.submat(OCVRect(roiX, roiY, roiWidth, roiHeight))
-                    val meanColor = Core.mean(centerRoi)
-                    centerRoi.release()
-                    floatArrayOf(
-                        meanColor.`val`[0].toFloat(),
-                        meanColor.`val`[1].toFloat(),
-                        meanColor.`val`[2].toFloat()
-                    )
-                }
-
-                val cvMask = if (state.showCvMask) {
-                    if (reusableMask == null) {
-                        reusableMask = Mat()
-                    }
-                    val mask = reusableMask!!
-                    if (state.lockedHsvColor != null && state.lockedHsvStdDev != null) {
-                        val mean = state.lockedHsvColor
-                        val stdDev = state.lockedHsvStdDev
-                        val stdDevMultiplier = 2.0
-                        val lowerBound = Scalar(
-                            (mean[0] - stdDevMultiplier * stdDev[0]).coerceAtLeast(0.0),
-                            (mean[1] - stdDevMultiplier * stdDev[1]).coerceAtLeast(40.0),
-                            (mean[2] - stdDevMultiplier * stdDev[2]).coerceAtLeast(40.0)
-                        )
-                        val upperBound = Scalar(
-                            (mean[0] + stdDevMultiplier * stdDev[0]).coerceAtMost(180.0),
-                            (mean[1] + stdDevMultiplier * stdDev[1]).coerceAtMost(255.0),
-                            (mean[2] + stdDevMultiplier * stdDev[2]).coerceAtMost(255.0)
-                        )
-                        Core.inRange(hsvMat, lowerBound, upperBound, mask)
-                    } else {
-                        val hueRange = 10.0
-                        val lowerBound = Scalar((hsv[0] - hueRange).coerceAtLeast(0.0), 100.0, 100.0)
-                        val upperBound = Scalar((hsv[0] + hueRange).coerceAtMost(180.0), 255.0, 255.0)
-                        Core.inRange(hsvMat, lowerBound, upperBound, mask)
-                    }
-
-                    Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, reusableMorphKernel)
-
-                    val outputMask = maskRingBuffer[maskRingIndex]
-                    mask.copyTo(outputMask)
-                    maskRingIndex = (maskRingIndex + 1) % 3
-                    outputMask
-                } else {
-                    reusableMask?.release()
-                    reusableMask = null
-                    null
-                }
-
-                val filteredDetectedObjects = detectedObjects.filter {
-                    val box = it.boundingBox
-                    val expectedRadius = getExpectedRadiusAtImageY(
-                        box.centerY().toFloat(), state, imageToScreenMatrix
-                    )
-                    val maxAllowedArea = 2 * Math.PI * expectedRadius.pow(2)
-                    (box.width() * box.height()) <= maxAllowedArea
-                }
-
-                val refinedScreenPoints = filteredDetectedObjects.mapNotNull { detectedObject ->
-                    refineBallCenter(detectedObject, matToUse, state, imageToScreenMatrix)
-                }.map { pointInImageCoords ->
-                    val screenPointArray = floatArrayOf(pointInImageCoords.x, pointInImageCoords.y)
-                    imageToScreenMatrix.mapPoints(screenPointArray)
-                    PointF(screenPointArray[0], screenPointArray[1])
-                }
-                
-                val filteredCustomPoolBalls = customPoolBalls.filter {
-                    val box = it.rect
-                    val expectedRadius = getExpectedRadiusAtImageY(
-                        box.centerY(), state, imageToScreenMatrix
-                    )
-                    val maxAllowedArea = 2 * Math.PI * expectedRadius.pow(2)
-                    (box.width() * box.height()) <= maxAllowedArea
-                }
-
-                val customScreenPoints = filteredCustomPoolBalls.mapNotNull { detectedObject ->
-                    refineBallCenterPoolDetection(detectedObject, matToUse, state, imageToScreenMatrix)
-                }.map { pointInImageCoords ->
-                    val screenPointArray = floatArrayOf(pointInImageCoords.x, pointInImageCoords.y)
-                    imageToScreenMatrix.mapPoints(screenPointArray)
-                    PointF(screenPointArray[0], screenPointArray[1])
-                }
-
-                val detectedLogicalPoints = if (state.hasInverseMatrix) {
-                    val inverseMatrix = state.inversePitchMatrix ?: Matrix()
-                    val tps = state.lensWarpTps
-                    refinedScreenPoints.map { screenPoint ->
-                        val logical = Perspective.screenToLogical(screenPoint, inverseMatrix)
-                        if (tps != null) ThinPlateSpline.applyWarp(tps, logical) else logical
-                    }
-                } else { emptyList() }
-                
-                val customLogicalPoints = if (state.hasInverseMatrix) {
-                    val inverseMatrix = state.inversePitchMatrix ?: Matrix()
-                    val tps = state.lensWarpTps
-                    customScreenPoints.map { screenPoint ->
-                        val logical = Perspective.screenToLogical(screenPoint, inverseMatrix)
-                        if (tps != null) ThinPlateSpline.applyWarp(tps, logical) else logical
-                    }
-                } else { emptyList() }
-                
-                // MYRIAD PREDICTION: Automatically track physical cue stick
-                if (detectedCues.isNotEmpty() && filteredCustomPoolBalls.isNotEmpty()) {
-                    if (currentTime - lastMyriadTime > 2000L) {
-                        lastMyriadTime = currentTime
-                        
-                        // We use the first cue and the first pool ball to assemble a poke vector.
-                        val cueRect = detectedCues.first()
-                        val poolBall = filteredCustomPoolBalls.first()
-                        
-                        val cueCenter = PointF(cueRect.exactCenterX(), cueRect.exactCenterY())
-                        val ballCenter = PointF(poolBall.rect.exactCenterX(), poolBall.rect.exactCenterY())
-                        
-                        val pokeDx = ballCenter.x - cueCenter.x
-                        val pokeDy = ballCenter.y - cueCenter.y
-                        
-                        val currentMatrix = Matrix(imageToScreenMatrix)
-                        val inverseMatrix = state.inversePitchMatrix ?: Matrix()
-                        val tps = state.lensWarpTps
-                        val hasInverse = state.hasInverseMatrix
-                        
-                        // Make a copy of bitmap for network call
-                        val bmpCopy = bitmap.copy(bitmap.config, false)
-                        
-                        CoroutineScope(Dispatchers.IO).launch {
-                            val result = myriadRepository.fetchTrajectory(bmpCopy, ballCenter, PointF(pokeDx, pokeDy))
-                            result.onSuccess { response ->
-                                val mappedPoints = response.points.mapNotNull { pt ->
-                                    val screenPoint = floatArrayOf(pt.x, pt.y)
-                                    currentMatrix.mapPoints(screenPoint)
-                                    val sp = PointF(screenPoint[0], screenPoint[1])
-                                    if (hasInverse) {
-                                        val logical = Perspective.screenToLogical(sp, inverseMatrix)
-                                        if (tps != null) ThinPlateSpline.applyWarp(tps, logical) else logical
-                                    } else sp
-                                }
-                                emitEvent(MainScreenEvent.MyriadTrajectoryReceived(mappedPoints))
-                            }
-                            bmpCopy.recycle()
-                        }
-                    }
-                }
-
-                val genericBallsStructured = refinedScreenPoints.mapIndexed { idx, sp ->
-                    val logical = if (state.hasInverseMatrix) {
-                        val inv = state.inversePitchMatrix ?: Matrix()
-                        val lp = Perspective.screenToLogical(sp, inv)
-                        if (state.lensWarpTps != null) ThinPlateSpline.applyWarp(state.lensWarpTps, lp) else lp
-                    } else sp
-                    
-                    val box = filteredDetectedObjects[idx].boundingBox
-                    val ballType = classifyBallType(matToUse, box)
-                    DetectedBall(position = logical, type = ballType, confidence = 0.9f, boundingBox = box)
-                }
-
-                val customBallsStructured = customScreenPoints.mapIndexed { idx, sp ->
-                    val logical = if (state.hasInverseMatrix) {
-                        val inv = state.inversePitchMatrix ?: Matrix()
-                        val lp = Perspective.screenToLogical(sp, inv)
-                        if (state.lensWarpTps != null) ThinPlateSpline.applyWarp(state.lensWarpTps, lp) else lp
-                    } else sp
-                    
-                    val box = filteredCustomPoolBalls[idx].rect
-                    val intBox = android.graphics.Rect(box.left.toInt(), box.top.toInt(), box.right.toInt(), box.bottom.toInt())
-                    val ballType = classifyBallType(matToUse, intBox)
-                    DetectedBall(position = logical, type = ballType, confidence = 0.9f, boundingBox = intBox)
-                }
-
-                val allStructuredBalls = genericBallsStructured + customBallsStructured
-
-                var finalVisionData = VisionData(
-                    genericBalls = refinedScreenPoints, // Keep for legacy
-                    balls = allStructuredBalls,
-                    detectedHsvColor = hsvTuple?.first ?: hsv,
-                    detectedBoundingBoxes = filteredDetectedObjects.map { it.boundingBox },
-                    detectedCues = detectedCues,
-                    cvMask = cvMask,
-                    sourceImageWidth = inputImage.width,
-                    sourceImageHeight = inputImage.height,
-                    sourceImageRotation = rotationDegrees
+                val meanArray = floatArrayOf(
+                    reusableMean.get(0, 0)[0].toFloat(),
+                    reusableMean.get(1, 0)[0].toFloat(),
+                    reusableMean.get(2, 0)[0].toFloat()
+                )
+                val stddevArray = floatArrayOf(
+                    reusableStdDev.get(0, 0)[0].toFloat(),
+                    reusableStdDev.get(1, 0)[0].toFloat(),
+                    reusableStdDev.get(2, 0)[0].toFloat()
                 )
 
-                if (hsvTuple != null) {
-                    finalVisionData = finalVisionData.copy(
-                        detectedHsvColor = hsvTuple.first,
+                sampleRegion.release()
+                Pair(meanArray, stddevArray)
+            }
+
+            val hsv = state.lockedHsvColor ?: hsvTuple?.first ?: run {
+                val roiWidth = 50
+                val roiHeight = 50
+                val roiX = (hsvMat.cols() - roiWidth) / 2
+                val roiY = (hsvMat.rows() - roiHeight) / 2
+                val centerRoi = hsvMat.submat(OCVRect(roiX, roiY, roiWidth, roiHeight))
+                val meanColor = Core.mean(centerRoi)
+                centerRoi.release()
+                floatArrayOf(
+                    meanColor.`val`[0].toFloat(),
+                    meanColor.`val`[1].toFloat(),
+                    meanColor.`val`[2].toFloat()
+                )
+            }
+
+            val cvMask = if (state.showCvMask) {
+                if (reusableMask == null) {
+                    reusableMask = Mat()
+                }
+                val mask = reusableMask!!
+                if (state.lockedHsvColor != null && state.lockedHsvStdDev != null) {
+                    val mean = state.lockedHsvColor
+                    val stdDev = state.lockedHsvStdDev
+                    val stdDevMultiplier = 2.0
+                    val lowerBound = Scalar(
+                        (mean[0] - stdDevMultiplier * stdDev[0]).coerceAtLeast(0.0),
+                        (mean[1] - stdDevMultiplier * stdDev[1]).coerceAtLeast(40.0),
+                        (mean[2] - stdDevMultiplier * stdDev[2]).coerceAtLeast(40.0)
                     )
+                    val upperBound = Scalar(
+                        (mean[0] + stdDevMultiplier * stdDev[0]).coerceAtMost(180.0),
+                        (mean[1] + stdDevMultiplier * stdDev[1]).coerceAtMost(255.0),
+                        (mean[2] + stdDevMultiplier * stdDev[2]).coerceAtMost(255.0)
+                    )
+                    Core.inRange(hsvMat, lowerBound, upperBound, mask)
+                } else {
+                    val hueRange = 10.0
+                    val lowerBound = Scalar((hsv[0] - hueRange).coerceAtLeast(0.0), 100.0, 100.0)
+                    val upperBound = Scalar((hsv[0] + hueRange).coerceAtMost(180.0), 255.0, 255.0)
+                    Core.inRange(hsvMat, lowerBound, upperBound, mask)
                 }
 
-                var currentConfidence = state.visionData?.tableOverlayConfidence ?: 0f
-                if ((state.cameraMode == CameraMode.AR_ACTIVE || state.cameraMode == CameraMode.AR_SETUP) &&
-                    state.tableScanModel != null && state.depthCapability == DepthCapability.NONE) {
-                    arFrameCounter++
-                    if (arFrameCounter % 5 == 0) {
-                        currentConfidence = runArTrackingPass(matToUse, state, inputImage.width, inputImage.height, rotationDegrees)
+                Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, reusableMorphKernel)
+
+                val outputMask = maskRingBuffer[maskRingIndex]
+                mask.copyTo(outputMask)
+                maskRingIndex = (maskRingIndex + 1) % 3
+                outputMask
+            } else {
+                reusableMask?.release()
+                reusableMask = null
+                null
+            }
+
+            val filteredDetectedObjects = detectedObjects.filter {
+                val box = it.boundingBox
+                val expectedRadius = getExpectedRadiusAtImageY(
+                    box.centerY().toFloat(), state, imageToScreenMatrix
+                )
+                val maxAllowedArea = 2 * Math.PI * expectedRadius.pow(2)
+                (box.width() * box.height()) <= maxAllowedArea
+            }
+
+            val refinedScreenPoints = filteredDetectedObjects.mapNotNull { detectedObject ->
+                refineBallCenter(detectedObject, matToUse, state, imageToScreenMatrix)
+            }.map { pointInImageCoords ->
+                val screenPointArray = floatArrayOf(pointInImageCoords.x, pointInImageCoords.y)
+                imageToScreenMatrix.mapPoints(screenPointArray)
+                PointF(screenPointArray[0], screenPointArray[1])
+            }
+            
+            val filteredCustomPoolBalls = customPoolBalls.filter {
+                val box = it.rect
+                val expectedRadius = getExpectedRadiusAtImageY(
+                    box.centerY(), state, imageToScreenMatrix
+                )
+                val maxAllowedArea = 2 * Math.PI * expectedRadius.pow(2)
+                (box.width() * box.height()) <= maxAllowedArea
+            }
+
+            val customScreenPoints = filteredCustomPoolBalls.mapNotNull { detectedObject ->
+                refineBallCenterPoolDetection(detectedObject, matToUse, state, imageToScreenMatrix)
+            }.map { pointInImageCoords ->
+                val screenPointArray = floatArrayOf(pointInImageCoords.x, pointInImageCoords.y)
+                imageToScreenMatrix.mapPoints(screenPointArray)
+                PointF(screenPointArray[0], screenPointArray[1])
+            }
+
+            // MYRIAD PREDICTION: Automatically track physical cue stick
+            if (detectedCues.isNotEmpty() && filteredCustomPoolBalls.isNotEmpty()) {
+                if (currentTime - lastMyriadTime > 2000L) {
+                    lastMyriadTime = currentTime
+                    
+                    val cueRect = detectedCues.first()
+                    val poolBall = filteredCustomPoolBalls.first()
+                    val cueCenter = PointF(cueRect.centerX().toFloat(), cueRect.centerY().toFloat())
+                    val ballCenter = PointF(poolBall.rect.centerX(), poolBall.rect.centerY())
+                    
+                    val pokeDx = ballCenter.x - cueCenter.x
+                    val pokeDy = ballCenter.y - cueCenter.y
+                    
+                    val currentMatrix = Matrix(imageToScreenMatrix)
+                    val invMat = state.inversePitchMatrix ?: Matrix()
+                    val tps = state.lensWarpTps
+                    val hasInverse = state.hasInverseMatrix
+                    
+                    val bmpCopy = bitmap.copy(bitmap.config ?: android.graphics.Bitmap.Config.ARGB_8888, false)
+                    
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val result = myriadRepository.fetchTrajectory(bmpCopy, ballCenter, PointF(pokeDx, pokeDy))
+                        result.onSuccess { response ->
+                            val mappedPoints = response.points.mapNotNull { pt ->
+                                val screenPoint = floatArrayOf(pt.x, pt.y)
+                                currentMatrix.mapPoints(screenPoint)
+                                val sp = PointF(screenPoint[0], screenPoint[1])
+                                if (hasInverse) {
+                                    val logical = Perspective.screenToLogical(sp, invMat)
+                                    if (tps != null) ThinPlateSpline.applyWarp(tps, logical) else logical
+                                } else sp
+                            }
+                            emitEvent(MainScreenEvent.MyriadTrajectoryReceived(mappedPoints))
+                        }
+                        bmpCopy.recycle()
                     }
                 }
-
-                finalVisionData = finalVisionData.copy(tableOverlayConfidence = currentConfidence)
-                _visionDataFlow.value = finalVisionData
-
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                imageProxy.close()
             }
-        } else {
+
+            val genericBallsStructured = refinedScreenPoints.mapIndexed { idx, sp ->
+                val logical = if (state.hasInverseMatrix) {
+                    val inv = state.inversePitchMatrix ?: Matrix()
+                    val lp = Perspective.screenToLogical(sp, inv)
+                    if (state.lensWarpTps != null) ThinPlateSpline.applyWarp(state.lensWarpTps, lp) else lp
+                } else sp
+                
+                val box = filteredDetectedObjects[idx].boundingBox
+                val ballType = classifyBallType(matToUse, box)
+                DetectedBall(position = logical, type = ballType, confidence = 0.9f, boundingBox = box)
+            }
+
+            val customBallsStructured = customScreenPoints.mapIndexed { idx, sp ->
+                val logical = if (state.hasInverseMatrix) {
+                    val inv = state.inversePitchMatrix ?: Matrix()
+                    val lp = Perspective.screenToLogical(sp, inv)
+                    if (state.lensWarpTps != null) ThinPlateSpline.applyWarp(state.lensWarpTps, lp) else lp
+                } else sp
+                
+                val box = filteredCustomPoolBalls[idx].rect
+                val intBox = android.graphics.Rect(box.left.toInt(), box.top.toInt(), box.right.toInt(), box.bottom.toInt())
+                val ballType = classifyBallType(matToUse, intBox)
+                DetectedBall(position = logical, type = ballType, confidence = 0.9f, boundingBox = intBox)
+            }
+
+            val allStructuredBalls = genericBallsStructured + customBallsStructured
+
+            var finalVisionData = VisionData(
+                genericBalls = refinedScreenPoints,
+                balls = allStructuredBalls,
+                detectedHsvColor = hsvTuple?.first ?: hsv,
+                detectedBoundingBoxes = filteredDetectedObjects.map { it.boundingBox },
+                detectedCues = detectedCues,
+                cvMask = cvMask,
+                sourceImageWidth = inputImage.width,
+                sourceImageHeight = inputImage.height,
+                sourceImageRotation = rotationDegrees
+            )
+
+            if (hsvTuple != null) {
+                finalVisionData = finalVisionData.copy(
+                    detectedHsvColor = hsvTuple.first,
+                )
+            }
+
+            var currentConfidence = state.visionData?.tableOverlayConfidence ?: 0f
+            if ((state.cameraMode == CameraMode.AR_ACTIVE || state.cameraMode == CameraMode.AR_SETUP) &&
+                state.tableScanModel != null && state.depthCapability == DepthCapability.NONE) {
+                arFrameCounter++
+                if (arFrameCounter % 5 == 0) {
+                    currentConfidence = runArTrackingPass(matToUse, bitmap, state, inputImage.width, inputImage.height, rotationDegrees)
+                }
+            }
+
+            finalVisionData = finalVisionData.copy(tableOverlayConfidence = currentConfidence)
+            _visionDataFlow.value = finalVisionData
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
             imageProxy.close()
+            isProcessing.set(false)
         }
     }
 
@@ -478,10 +458,6 @@ class VisionRepository @Inject constructor(
 
     @SuppressLint("UnsafeOptInUsageError")
     fun processArCpuImage(image: MediaImage, rotationDegrees: Int, state: CueDetatState) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastFrameTime < 100) return
-        lastFrameTime = currentTime
-
         try {
             val imageToScreenMatrix = getTransformationMatrix(
                 image.width, image.height,
@@ -589,14 +565,102 @@ class VisionRepository @Inject constructor(
 
     private fun runArTrackingPass(
         mat: Mat,
+        bitmap: android.graphics.Bitmap,
         state: CueDetatState,
         imageWidth: Int,
         imageHeight: Int,
         rotationDegrees: Int
     ): Float {
         if (state.tableScanModel == null || !state.hasInverseMatrix) return 0f
+        
+        // Strategy 1: ML-based pocket re-detection (High precision)
+        val detection = poolDetector.detect(bitmap)
+        if (detection != null && detection.pockets.isNotEmpty()) {
+            val confidence = detection.confidence
+            if (confidence > 0.4f) {
+                android.util.Log.d("VisionRepository", "AR Re-anchor: ML found ${detection.pockets.size} pockets")
+                // Re-anchor using detected pockets
+                return runPocketReAnchor(detection.pockets, state, imageWidth, imageHeight)
+            }
+        }
+        
+        // Strategy 2: Edge-based fallback (Robust to occlusion)
+        android.util.Log.d("VisionRepository", "AR Re-anchor: ML failed or low confidence, falling back to edges")
         return runEdgeFallback(mat, state, imageWidth, imageHeight, rotationDegrees)
     }
+
+    private fun runPocketReAnchor(
+        imagePockets: List<PointF>,
+        state: CueDetatState,
+        imageWidth: Int,
+        imageHeight: Int
+    ): Float {
+        val model = state.tableScanModel ?: return 0f
+        val inverse = state.inversePitchMatrix ?: return 0f
+        
+        // Project image pockets to logical space
+        val imageToScreen = getTransformationMatrix(imageWidth, imageHeight, state.viewWidth, state.viewHeight)
+        val logicalDetections = imagePockets.map { pt ->
+            val arr = floatArrayOf(pt.x, pt.y)
+            imageToScreen.mapPoints(arr)
+            Perspective.screenToLogical(PointF(arr[0], arr[1]), inverse)
+        }
+        
+        // Match detections to known model clusters
+        val matchedImage = mutableListOf<org.opencv.core.Point>()
+        val matchedLogical = mutableListOf<org.opencv.core.Point>()
+        
+        for (ld in logicalDetections) {
+            val nearest = model.pockets.minByOrNull { hypot((it.logicalPosition.x - ld.x).toDouble(), (it.logicalPosition.y - ld.y).toDouble()) }
+            if (nearest != null) {
+                val dist = hypot((nearest.logicalPosition.x - ld.x).toDouble(), (nearest.logicalPosition.y - ld.y).toDouble())
+                if (dist < 5.0) { // 5 logical inch tolerance
+                    val imgPt = imagePockets[logicalDetections.indexOf(ld)]
+                    matchedImage.add(org.opencv.core.Point(imgPt.x.toDouble(), imgPt.y.toDouble()))
+                    matchedLogical.add(org.opencv.core.Point(nearest.logicalPosition.x.toDouble(), nearest.logicalPosition.y.toDouble()))
+                }
+            }
+        }
+        
+        if (matchedImage.size < 2) return 0f
+        
+        val srcMat = MatOfPoint2f(*matchedImage.toTypedArray())
+        val dstMat = MatOfPoint2f(*matchedLogical.toTypedArray())
+        val h = Calib3d.findHomography(srcMat, dstMat, Calib3d.RANSAC, 5.0)
+        srcMat.release()
+        dstMat.release()
+        
+        if (h.empty()) return 0f
+        
+        val (rawT, rawR, rawS) = decomposeHomography(h, imageWidth.toFloat(), imageHeight.toFloat())
+        h.release()
+        
+        applyPoseUpdate(rawT, rawR, rawS, state)
+        
+        return 0.9f // High confidence for ML match
+    }
+
+    private fun applyPoseUpdate(rawT: Offset, rawR: Float, rawS: Float, state: CueDetatState) {
+        val alpha = if (state.experienceMode == com.hereliesaz.cuedetat.domain.ExperienceMode.EXPERT) 0.05f else 0.2f
+        
+        val blendedTranslation = Offset(
+            alpha * rawT.x + (1f - alpha) * state.viewOffset.x,
+            alpha * rawT.y + (1f - alpha) * state.viewOffset.y
+        )
+        val blendedRotation = alpha * rawR + (1f - alpha) * state.worldRotationDegrees
+        val currentZoom = ZoomMapping.sliderToZoom(
+            state.zoomSliderPosition,
+            ZoomMapping.getZoomRange(state.experienceMode).first,
+            ZoomMapping.getZoomRange(state.experienceMode).second
+        )
+        val blendedScale = alpha * rawS + (1f - alpha) * currentZoom
+
+        val delta = hypot((blendedTranslation.x - state.viewOffset.x).toDouble(), (blendedTranslation.y - state.viewOffset.y).toDouble())
+        if (delta > 0.5) {
+            emitEvent(MainScreenEvent.UpdateArPose(blendedTranslation, blendedRotation, blendedScale))
+        }
+    }
+
 
     private fun runEdgeFallback(
         mat: Mat,
@@ -723,6 +787,7 @@ class VisionRepository @Inject constructor(
     }
 
     private var arOutputBitmap: android.graphics.Bitmap? = null
+    private var arPixelBuffer: IntArray? = null
 
     private fun android.media.Image.toBitmap(): android.graphics.Bitmap? {
         if (format != android.graphics.ImageFormat.YUV_420_888) return null
@@ -741,7 +806,11 @@ class VisionRepository @Inject constructor(
         val uBuf = uPlane.buffer
         val vBuf = vPlane.buffer
 
-        val pixels = IntArray(w * h)
+        if (arPixelBuffer?.size != w * h) {
+            arPixelBuffer = IntArray(w * h)
+        }
+        val pixels = arPixelBuffer!!
+
         for (row in 0 until h) {
             for (col in 0 until w) {
                 val y = yBuf.get(row * yRowStride + col).toInt() and 0xFF
@@ -758,10 +827,14 @@ class VisionRepository @Inject constructor(
             }
         }
 
-        val bmp = arOutputBitmap?.takeIf { it.width == w && it.height == h }
+        val bmp = arOutputBitmap?.takeIn(w, h)
             ?: android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888).also { arOutputBitmap = it }
         bmp.setPixels(pixels, 0, w, 0, 0, w, h)
         return bmp
+    }
+
+    private fun android.graphics.Bitmap.takeIn(w: Int, h: Int): android.graphics.Bitmap? {
+        return if (width == w && height == h) this else null
     }
 
     private fun refineBallCenterPoolDetection(
@@ -795,7 +868,6 @@ class VisionRepository @Inject constructor(
     }
 
     private fun classifyBallType(frame: Mat, box: android.graphics.Rect): BallType {
-        // Coordinate safety check
         val x = box.left.coerceIn(0, frame.cols() - 1)
         val y = box.top.coerceIn(0, frame.rows() - 1)
         val w = box.width().coerceIn(1, frame.cols() - x)
@@ -804,12 +876,10 @@ class VisionRepository @Inject constructor(
         val roi = OCVRect(x, y, w, h)
         val ballMat = frame.submat(roi)
         
-        // Sample poles (top 15% and bottom 15%)
         val poleHeight = (h * 0.15f).toInt().coerceAtLeast(1)
         val topPole = ballMat.submat(OCVRect(0, 0, w, poleHeight))
         val bottomPole = ballMat.submat(OCVRect(0, h - poleHeight, w, poleHeight))
         
-        // Convert to HSV for robust color analysis
         val hsvMat = Mat()
         Imgproc.cvtColor(ballMat, hsvMat, Imgproc.COLOR_BGR2HSV)
         val topHsv = hsvMat.submat(OCVRect(0, 0, w, poleHeight))
@@ -825,7 +895,6 @@ class VisionRepository @Inject constructor(
         ballMat.release()
         hsvMat.release()
 
-        // Stripe heuristic: Poles are "White" (Low Saturation, High Value)
         val isTopWhite = topMean.`val`[1] < 50.0 && topMean.`val`[2] > 180.0
         val isBottomWhite = bottomMean.`val`[1] < 50.0 && bottomMean.`val`[2] > 180.0
         
@@ -839,14 +908,12 @@ class VisionRepository @Inject constructor(
         val width = mat.cols()
         val height = mat.rows()
         
-        // Output dimensions for the rectified table (2:1 aspect ratio typical for 8ft tables)
         val outW = 2048.0
         val outH = 1024.0
 
         val halfW = state.table.logicalWidth / 2f
         val halfH = state.table.logicalHeight / 2f
 
-        // Logical corners
         val corners = arrayOf(
             PointF(-halfW, -halfH), // TL
             PointF(halfW, -halfH),  // TR
@@ -882,15 +949,15 @@ class VisionRepository @Inject constructor(
         val dstMat = MatOfPoint2f()
         dstMat.fromList(dstPointsList)
 
-        val h = Calib3d.getPerspectiveTransform(srcMat, dstMat)
+        val transform = Imgproc.getPerspectiveTransform(srcMat, dstMat)
         val outMat = Mat()
-        Imgproc.warpPerspective(mat, outMat, h, Size(outW, outH))
+        Imgproc.warpPerspective(mat, outMat, transform, Size(outW, outH))
 
         val bitmap = android.graphics.Bitmap.createBitmap(outW.toInt(), outH.toInt(), android.graphics.Bitmap.Config.ARGB_8888)
         org.opencv.android.Utils.matToBitmap(outMat, bitmap)
         
         outMat.release()
-        h.release()
+        transform.release()
         srcMat.release()
         dstMat.release()
 
