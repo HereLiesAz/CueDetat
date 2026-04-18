@@ -208,13 +208,6 @@ class MainViewModel @Inject constructor(
         val reducedState =
             stateReducer(currentState, logicalEvent, reducerUtils, gestureReducer)
 
-        // Side-effects for Top-Down view
-        if (logicalEvent is MainScreenEvent.ToggleTopDownView) {
-            if (finalState.isTopDownViewActive) {
-                visionRepository.captureRectifiedSnapshot(finalState)
-            }
-        }
-
         // After CV data is integrated into state, update snap candidates.
         val finalState = when (logicalEvent) {
             is MainScreenEvent.CvDataUpdated -> {
@@ -231,6 +224,13 @@ class MainViewModel @Inject constructor(
             }
             is MainScreenEvent.SetTopDownBitmap -> reducedState.copy(topDownBitmap = logicalEvent.bitmap)
             else -> reducedState
+        }
+
+        // Side-effects for Top-Down view
+        if (logicalEvent is MainScreenEvent.ToggleTopDownView) {
+            if (finalState.isTopDownViewActive) {
+                visionRepository.captureRectifiedSnapshot(finalState)
+            }
         }
 
         val updateType = determineUpdateType(currentState, finalState, logicalEvent)

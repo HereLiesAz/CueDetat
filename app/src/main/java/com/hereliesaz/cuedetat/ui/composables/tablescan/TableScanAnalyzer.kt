@@ -3,6 +3,7 @@ package com.hereliesaz.cuedetat.ui.composables.tablescan
 
 import android.graphics.Bitmap
 import android.graphics.PointF
+import android.util.Log
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import org.opencv.android.Utils

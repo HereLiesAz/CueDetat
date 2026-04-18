@@ -2,6 +2,7 @@
 package com.hereliesaz.cuedetat.data
 
 import android.annotation.SuppressLint
+import android.util.Log
 import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.camera.core.ImageProxy
@@ -577,14 +578,14 @@ class VisionRepository @Inject constructor(
         if (detection != null && detection.pockets.isNotEmpty()) {
             val confidence = detection.confidence
             if (confidence > 0.4f) {
-                Log.d("VisionRepository", "AR Re-anchor: ML found ${detection.pockets.size} pockets")
+                android.util.Log.d("VisionRepository", "AR Re-anchor: ML found ${detection.pockets.size} pockets")
                 // Re-anchor using detected pockets
                 return runPocketReAnchor(detection.pockets, state, imageWidth, imageHeight)
             }
         }
         
         // Strategy 2: Edge-based fallback (Robust to occlusion)
-        Log.d("VisionRepository", "AR Re-anchor: ML failed or low confidence, falling back to edges")
+        android.util.Log.d("VisionRepository", "AR Re-anchor: ML failed or low confidence, falling back to edges")
         return runEdgeFallback(mat, state, imageWidth, imageHeight, rotationDegrees)
     }
 
