@@ -93,14 +93,19 @@ fun ProtractorScreen(
 
     // --- Top-level animation for top-down snap view ---
     val topDownProgress by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (uiState.isTopDownViewActive && uiState.topDownBitmap != null) 1f else 0f,
+        targetValue = if (uiState.isTopDownViewActive) 1f else 0f,
         animationSpec = androidx.compose.animation.core.tween(durationMillis = 600),
         label = "topDownProgress"
     )
 
     AzNavRailMenu(
         uiState = uiState,
-        onEvent = mainViewModel::onEvent,
+        onEvent = { event ->
+            if (event is MainScreenEvent.StartManualHoleCapture) {
+                tableScanViewModel.startManualHoleCapture()
+            }
+            mainViewModel.onEvent(event)
+        },
         navController = navController,
         currentDestination = if (uiState.experienceMode == ExperienceMode.BEGINNER && isOnMain) {
             if (uiState.isBeginnerViewLocked) "static" else "dynamic"

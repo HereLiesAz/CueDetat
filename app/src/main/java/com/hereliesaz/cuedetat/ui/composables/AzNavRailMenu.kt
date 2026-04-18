@@ -125,15 +125,19 @@ fun AzNavRailMenu(
             )
 
             if (inArSubMode) {
-                azRailItemLowerCase(id = "felt", text = if (uiState.cameraMode == CameraMode.AR_ACTIVE) "re-scan" else "felt", fillColor = b11R, textColor = Color.White, onClick = {
+                azRailItemLowerCase(id = "felt", text = "felt", fillColor = b11R, textColor = Color.White, onClick = {
                     onEvent(MainScreenEvent.ToggleTableScanScreen)
+                })
+
+                azRailItemLowerCase(id = "holes", text = "holes", fillColor = b12P, textColor = Color.White, onClick = {
+                    onEvent(MainScreenEvent.StartManualHoleCapture)
                 })
                 
                 azRailToggle(
                     id = "target_type",
                     isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
                     toggleOnText = "stripes", toggleOffText = "solids",
-                    fillColor = b9Y, textColor = Color.Black,
+                    fillColor = b8K, textColor = Color.White,
                     onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
                 )
 
@@ -152,7 +156,7 @@ fun AzNavRailMenu(
                         id = "top_down_view",
                         isChecked = uiState.isTopDownViewActive,
                         toggleOnText = "back", toggleOffText = "view",
-                        fillColor = Color.White, textColor = Color.Black,
+                        fillColor = b8K, textColor = Color.White,
                         onClick = { 
                             if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
                             else onEvent(MainScreenEvent.ToggleTopDownView)
@@ -160,7 +164,7 @@ fun AzNavRailMenu(
                     )
                 }
 
-                azRailItemLowerCase(id = "cancel_ar", text = "Cancel", fillColor = b12P, textColor = Color.White, onClick = {
+                azRailItemLowerCase(id = "cancel_ar", text = "Cancel", fillColor = Color.DarkGray, textColor = Color.White, onClick = {
                     onEvent(MainScreenEvent.CancelArSetup) 
                 })
             }
@@ -195,7 +199,7 @@ fun AzNavRailMenu(
                     id = "target_type",
                     isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
                     toggleOnText = "stripes", toggleOffText = "solids",
-                    fillColor = b9Y, textColor = Color.Black,
+                    fillColor = b8K, textColor = Color.White,
                     onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
                 )
 
@@ -214,7 +218,7 @@ fun AzNavRailMenu(
                         id = "top_down_view",
                         isChecked = uiState.isTopDownViewActive,
                         toggleOnText = "back", toggleOffText = "view",
-                        fillColor = Color.White, textColor = Color.Black,
+                        fillColor = b8K, textColor = Color.White,
                         onClick = { 
                             if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
                             else onEvent(MainScreenEvent.ToggleTopDownView)

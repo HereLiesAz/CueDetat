@@ -158,6 +158,9 @@ internal fun reduceToggleAction(
         is MainScreenEvent.ToggleTableScanScreen ->
             state.copy(showTableScanScreen = !state.showTableScanScreen)
 
+        is MainScreenEvent.StartManualHoleCapture ->
+            state.copy(showTableScanScreen = true)
+
         is MainScreenEvent.ExitToSplash -> state.copy(experienceMode = null)
         is MainScreenEvent.ToggleTopDownView -> state.copy(isTopDownViewActive = !state.isTopDownViewActive)
         is MainScreenEvent.ClearTopDownView -> state.copy(isTopDownViewActive = false, topDownBitmap = null)

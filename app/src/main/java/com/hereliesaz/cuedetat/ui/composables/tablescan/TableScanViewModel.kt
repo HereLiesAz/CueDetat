@@ -375,6 +375,17 @@ class TableScanViewModel @Inject constructor(
         tableScanRepository.clearPartialScan()
     }
 
+    fun startManualHoleCapture() {
+        clusters.clear()
+        _scanProgress.value = emptyMap()
+        _scanComplete.value = false
+        _scanStep.value = ScanStep.POCKET_GUIDE
+        _currentPocketTarget.value = PocketId.entries.toTypedArray()[0]
+        _mlConfidence.value = 0f
+        _mlTableBoundary.value = null
+        tableScanRepository.clearPartialScan()
+    }
+
     // ------ Coordinate helpers ------
 
     /**

@@ -296,6 +296,7 @@ sealed class MainScreenEvent {
     // Table scan events
     data class LoadTableScan(val model: TableScanModel) : MainScreenEvent()
     object ClearTableScan : MainScreenEvent()
+    object StartManualHoleCapture : MainScreenEvent()
     data class UpdateArPose(
         val translation: Offset,
         val rotation: Float,
