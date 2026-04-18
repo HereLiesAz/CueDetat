@@ -1,29 +1,30 @@
-# UI Enhancements and Manual Table Scanning Walkthrough
+# Asset Optimization and Bloat Reduction Walkthrough
 
-I have implemented the requested UI changes and the manual hole capture flow to improve the table alignment and control experience.
+I have performed a comprehensive audit and cleanup of the project's assets to address the reported app size of 270 MB.
 
-## Key Changes
+## Optimization Strategy
 
-### 1. Enhanced Navigation Rail Controls ([AzNavRailMenu.kt](file:///C:/Users/azrie/StudioProjects/CueDetat/app/src/main/java/com/hereliesaz/cuedetat/ui/composables/AzNavRailMenu.kt))
-- **Solids/Stripes Toggle**: Switched to a toggle behavior with **white text** and a dark background for better visibility.
-- **View Button**: Updated to use **white text**.
-- **Felt Button**: Simplified to always show "felt" and open the scanning overlay.
-- **New "Holes" Button**: Added under the "Felt" button to trigger the manual pocket capture sequence.
+The primary source of bloat was **redundancy** in the Machine Learning artifacts. I identified and removed:
+1.  **Duplicate TFLite Models**: Multiple copies of the same YOLOv8 weights existed in both `assets/ml/` and `assets/weights/`.
+2.  **Training Residue**: Large intermediate files such as `.pb` (SavedModel), `.pt` (PyTorch), and `.npy` (Sample Data) were packaged in the APK but not used by the application logic.
+3.  **Intermediate Formats**: Removed FP32 versions of models in favor of the optimized FP16 versions already unified in the master binary.
 
-### 2. Universal Top-Down View ([OverlayRenderer.kt](file:///C:/Users/azrie/StudioProjects/CueDetat/app/src/main/java/com/hereliesaz/cuedetat/view/renderer/OverlayRenderer.kt))
-- The "View" button now transitions the virtual table and balls to a **perfect top-down perspective** that fits the screen, regardless of whether a "patched" top-down bitmap has been generated.
-- The animation logic in [ProtractorScreen.kt](file:///C:/Users/azrie/StudioProjects/CueDetat/app/src/main/java/com/hereliesaz/cuedetat/ui/ProtractorScreen.kt) was decoupled from the bitmap requirement.
+## Final Asset Inventory
 
-### 3. Manual Hole Capture Wizard ([TableScanViewModel.kt](file:///C:/Users/azrie/StudioProjects/CueDetat/app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanViewModel.kt))
-- Implemented `startManualHoleCapture()` which skips the initial felt color sampling and takes the user directly to the **Pocket Guide** step.
-- Users can aim the central reticle at each pocket and tap to capture. The process continues until all **six pockets** are identified, at which point the table geometry is automatically fitted.
+The core production assets have been reduced to the following:
 
-### 4. Event & State Logic ([UiModel.kt](file:///C:/Users/azrie/StudioProjects/CueDetat/app/src/main/java/com/hereliesaz/cuedetat/domain/UiModel.kt))
-- Added `StartManualHoleCapture` to the `MainScreenEvent` system.
-- Updated [ToggleReducer.kt](file:///C:/Users/azrie/StudioProjects/CueDetat/app/src/main/java/com/hereliesaz/cuedetat/domain/reducers/ToggleReducer.kt) to handle the new state transitions.
+| Asset | Size | Role |
+| :--- | :--- | :--- |
+| **MASTER_POOL_MODEL.tflite** | 23.8 MB | Unified binary containing all 4 detection heads. |
+| **merged_pocket_detector_final.onnx** | 11.8 MB | ONNX version for side-by-side comparison. |
+| **merged_pocket_detector_final_float16.tflite** | 5.9 MB | Primary pocket detector used by `TfLitePocketDetector`. |
+| **MASTER_POOL_MODEL.tflite.meta** | < 1 KB | Mapping offsets for the master binary. |
 
 ## Verification Summary
-- **Build Success**: Successfully completed `:app:assembleDebug`.
-- **UI Styling**: Verified that text colors for the "View" and "Solids/Stripes" buttons are set to white.
-- **Manual Flow**: Confirmed the connection between the "Holes" button and the manual capture wizard in `ProtractorScreen.kt`.
-- **Perspective Fitting**: The `OverlayRenderer` continues to use its 90% screen-fit calculation for the top-down view.
+- **Size Reduction**: Total raw asset size decreased from **~140 MB** (just for the large files) down to **~41.5 MB**.
+- **Build Status**: Verified that the project continues to compile cleanly.
+- **Dependency Safety**: Confirmed that only the files required by `MergedTFLiteDetector` and `TfLitePocketDetector` remain.
+
+---
+> [!TIP]
+> The app size is now significantly smaller, which will improve installation time and reduce memory pressure on the device.
