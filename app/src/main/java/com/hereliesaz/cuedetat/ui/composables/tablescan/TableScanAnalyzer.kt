@@ -15,8 +15,11 @@ import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Scalar
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
+import com.hereliesaz.cuedetat.utils.toMat
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.hypot
+import androidx.core.graphics.createBitmap
 
 /**
  * CameraX ImageAnalysis.Analyzer.
@@ -31,14 +34,14 @@ class TableScanAnalyzer(
 ) : ImageAnalysis.Analyzer {
 
     private var reusableBitmap: Bitmap? = null
-    private var nv21Buffer: ByteArray? = null
-    private var yuvMat: Mat? = null
-    private var bgrMat: Mat? = null
-    private var smallBgrMat: Mat? = null
-    private var hsvMat: Mat? = null
-    private var maskMat: Mat? = null
+    private val bgrMat = Mat()
+    private val rgbMat = Mat()
+    private val smallRgbMat = Mat()
+    private val hsvMat = Mat()
+    private val maskMat = Mat()
     
     private val isProcessing = AtomicBoolean(false)
+    private val frameCounter = AtomicInteger(0)
 
     override fun analyze(image: ImageProxy) {
         // Skip frame if previous one is still processing to keep UI thread fluid
@@ -52,91 +55,70 @@ class TableScanAnalyzer(
             val originalWidth = image.width
             val originalHeight = image.height
 
-            // --- Efficient YUV_420_888 to BGR conversion handling strides ---
-            val yPlane = image.planes[0]
-            val uPlane = image.planes[1]
-            val vPlane = image.planes[2]
-
-            val yBuffer = yPlane.buffer
-            val uBuffer = uPlane.buffer
-            val vBuffer = vPlane.buffer
-
-            val requiredBufferSize = originalWidth * originalHeight * 3 / 2
-            if (nv21Buffer?.size != requiredBufferSize) {
-                nv21Buffer = ByteArray(requiredBufferSize)
-            }
-            val nv21 = nv21Buffer!!
-            val ySize = originalWidth * originalHeight
-
-            // Copy Y plane row by row to handle strides
-            val yRowStride = yPlane.rowStride
-            for (row in 0 until originalHeight) {
-                yBuffer.position(row * yRowStride)
-                yBuffer.get(nv21, row * originalWidth, originalWidth)
+            // --- Robust YUV_420_888 to BGR conversion using shared utility ---
+            image.toMat(bgrMat)
+            
+            if (bgrMat.empty() || bgrMat.cols() == 0 || bgrMat.rows() == 0) {
+                Log.e("TableScanAnalyzer", "BGR Mat is empty or invalid after toMat(): size=${bgrMat.size()} format=${image.format}")
+                return
             }
 
-            // Interleave UV for NV21 (VUVU...)
-            val vPixelStride = vPlane.pixelStride
-            val uPixelStride = uPlane.pixelStride
-            val vRowStride = vPlane.rowStride
-            val uRowStride = uPlane.rowStride
+            // Convert to RGB for detector and sampling
+            Imgproc.cvtColor(bgrMat, rgbMat, Imgproc.COLOR_BGR2RGB)
 
-            if (vPixelStride == 2 && uPixelStride == 2 && vRowStride == uRowStride) {
-                val uvSize = (originalWidth * originalHeight) / 2
-                vBuffer.get(nv21, ySize, minOf(vBuffer.remaining(), uvSize))
-            } else {
-                var pos = ySize
-                val uvWidth = originalWidth / 2
-                val uvHeight = originalHeight / 2
-                for (row in 0 until uvHeight) {
-                    for (col in 0 until uvWidth) {
-                        nv21[pos++] = vBuffer.get(row * vRowStride + col * vPixelStride)
-                        nv21[pos++] = uBuffer.get(row * uRowStride + col * uPixelStride)
-                    }
-                }
+            // Diagnostic: check average brightness and color of the frame
+            val avgColor = Core.mean(rgbMat)
+            if (frameCounter.incrementAndGet() % 30 == 0) {
+                Log.d("TableScanAnalyzer", "Frame Avg RGB: ${avgColor.`val`[0].toInt()}, ${avgColor.`val`[1].toInt()}, ${avgColor.`val`[2].toInt()}")
             }
-
-            if (yuvMat == null || yuvMat!!.cols() != originalWidth || yuvMat!!.rows() != originalHeight + originalHeight / 2) {
-                yuvMat?.release()
-                yuvMat = Mat(originalHeight + originalHeight / 2, originalWidth, CvType.CV_8UC1)
+            if (avgColor.`val`[0] < 5.0 && avgColor.`val`[1] < 5.0 && avgColor.`val`[2] < 5.0) {
+                Log.w("TableScanAnalyzer", "Frame is very dark!")
             }
-            yuvMat!!.put(0, 0, nv21)
-
-            if (bgrMat == null) bgrMat = Mat()
-            Imgproc.cvtColor(yuvMat!!, bgrMat!!, Imgproc.COLOR_YUV2BGR_NV21)
 
             val bitmap = reusableBitmap?.takeIf { it.width == originalWidth && it.height == originalHeight }
-                ?: Bitmap.createBitmap(originalWidth, originalHeight, Bitmap.Config.ARGB_8888).also { reusableBitmap = it }
-            Utils.matToBitmap(bgrMat!!, bitmap)
+                ?: createBitmap(originalWidth, originalHeight).also { reusableBitmap = it }
+            Utils.matToBitmap(rgbMat, bitmap)
 
             // --- ALWAYS sample felt color from every frame ---
             val scale = 0.25
             val smallWidth = (originalWidth * scale).toInt()
             val smallHeight = (originalHeight * scale).toInt()
             
-            if (smallBgrMat == null) smallBgrMat = Mat()
-            Imgproc.resize(bgrMat!!, smallBgrMat!!, Size(smallWidth.toDouble(), smallHeight.toDouble()))
+            if (smallWidth < 1 || smallHeight < 1) return
 
-            if (hsvMat == null) hsvMat = Mat()
-            Imgproc.cvtColor(smallBgrMat!!, hsvMat!!, Imgproc.COLOR_BGR2HSV)
+            Imgproc.resize(rgbMat, smallRgbMat, Size(smallWidth.toDouble(), smallHeight.toDouble()))
+            Imgproc.cvtColor(smallRgbMat, hsvMat, Imgproc.COLOR_RGB2HSV)
 
             // Sample the centre felt color
             val cx = smallWidth / 2; val cy = smallHeight / 2
-            val hw = smallWidth / 20; val hh = smallHeight / 20
-            val roi = org.opencv.core.Rect(cx - hw, cy - hh, hw * 2, hh * 2)
-            val crop = Mat(hsvMat!!, roi)
+            val hw = (smallWidth / 20).coerceAtLeast(1)
+            val hh = (smallHeight / 20).coerceAtLeast(1)
+            
+            val roiX = (cx - hw).coerceIn(0, smallWidth - 1)
+            val roiY = (cy - hh).coerceIn(0, smallHeight - 1)
+            val roiW = (hw * 2).coerceIn(1, smallWidth - roiX)
+            val roiH = (hh * 2).coerceIn(1, smallHeight - roiY)
+            
+            val roi = org.opencv.core.Rect(roiX, roiY, roiW, roiH)
+            val crop = hsvMat.submat(roi)
             val meanHsv = Core.mean(crop)
             crop.release()
             
-            onFeltColorSampled(
-                floatArrayOf(
-                    meanHsv.`val`[0].toFloat() * 2f,
-                    meanHsv.`val`[1].toFloat() / 255f,
-                    meanHsv.`val`[2].toFloat() / 255f
-                )
+            val sampledHsv = floatArrayOf(
+                meanHsv.`val`[0].toFloat() * 2f, // 0-180 -> 0-360
+                meanHsv.`val`[1].toFloat() / 255f, // 0-255 -> 0-1
+                meanHsv.`val`[2].toFloat() / 255f  // 0-255 -> 0-1
             )
+            if (frameCounter.get() % 30 == 0) {
+                Log.d("TableScanAnalyzer", "Sampled HSV: ${sampledHsv[0].toInt()}, ${String.format("%.2f", sampledHsv[1])}, ${String.format("%.2f", sampledHsv[2])}")
+            }
+            onFeltColorSampled(sampledHsv)
 
-            // --- Strategy 1: ML detector (TFLite + ONNX side-by-side) ---
+            if (sampledHsv[2] < 0.05f) {
+                Log.w("TableScanAnalyzer", "Sampled color is black: H=${sampledHsv[0]} S=${sampledHsv[1]} V=${sampledHsv[2]}")
+            }
+
+            // --- Strategy 1: ML detector (TFLite side-by-side) ---
             val modelDetections = pocketDetector?.detect(bitmap)
 
             if (modelDetections != null && modelDetections.pockets.isNotEmpty()) {
@@ -153,19 +135,40 @@ class TableScanAnalyzer(
                 // --- Strategy 2: Felt-Boundary Extraction Fallback ---
                 android.util.Log.d("TableScanAnalyzer", "Fallback Strategy: ML found no pockets, attempting edge extraction...")
                 try {
-                    val lowerBound = Scalar(maxOf(0.0, meanHsv.`val`[0] - 15.0), 50.0, 50.0)
-                    val upperBound = Scalar(minOf(180.0, meanHsv.`val`[0] + 15.0), 255.0, 255.0)
+                    // Adjusted Hue range for RGB-sourced HSV (OpenCV COLOR_RGB2HSV)
+                    // RGB-to-HSV mapping: H [0,180], S [0,255], V [0,255]
+                    val h = meanHsv.`val`[0]
+                    val hRange = 15.0
+                    val sMin = 40.0
+                    val vMin = 40.0
                     
-                    if (maskMat == null) maskMat = Mat()
-                    Core.inRange(hsvMat!!, lowerBound, upperBound, maskMat!!)
+                    if (h - hRange < 0 || h + hRange > 180) {
+                        // Hue wraps around 0/180
+                        val mask1 = Mat()
+                        val mask2 = Mat()
+                        val lower1 = Scalar(0.0, sMin, vMin)
+                        val upper1 = Scalar(minOf(180.0, h + hRange).let { if (it > 180) it - 180 else it }, 255.0, 255.0)
+                        val lower2 = Scalar(maxOf(0.0, h - hRange).let { if (it < 0) it + 180 else it }, sMin, vMin)
+                        val upper2 = Scalar(180.0, 255.0, 255.0)
+                        
+                        Core.inRange(hsvMat, lower1, upper1, mask1)
+                        Core.inRange(hsvMat, lower2, upper2, mask2)
+                        Core.bitwise_or(mask1, mask2, maskMat)
+                        mask1.release()
+                        mask2.release()
+                    } else {
+                        val lowerBound = Scalar(h - hRange, sMin, vMin)
+                        val upperBound = Scalar(h + hRange, 255.0, 255.0)
+                        Core.inRange(hsvMat, lowerBound, upperBound, maskMat)
+                    }
 
                     val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(5.0, 5.0))
-                    Imgproc.morphologyEx(maskMat!!, maskMat!!, Imgproc.MORPH_CLOSE, kernel)
-                    Imgproc.morphologyEx(maskMat!!, maskMat!!, Imgproc.MORPH_OPEN, kernel)
+                    Imgproc.morphologyEx(maskMat, maskMat, Imgproc.MORPH_CLOSE, kernel)
+                    Imgproc.morphologyEx(maskMat, maskMat, Imgproc.MORPH_OPEN, kernel)
                     kernel.release()
 
                     val contours = mutableListOf<MatOfPoint>()
-                    Imgproc.findContours(maskMat!!, contours, Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+                    Imgproc.findContours(maskMat, contours, Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
 
                     val largestContour = contours.maxByOrNull { Imgproc.contourArea(it) }
 
