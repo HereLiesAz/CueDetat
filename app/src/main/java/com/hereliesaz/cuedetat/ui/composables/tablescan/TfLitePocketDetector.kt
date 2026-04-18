@@ -11,7 +11,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 
-private const val POCKET_MODEL = "ml/merged_pocket_detector_final_float16.tflite"
+private const val MASTER_MODEL_FILE = "ml/MASTER_POOL_MODEL.tflite"
 private const val INPUT_SIZE = 640
 private const val CONFIDENCE_THRESHOLD = 0.30f
 private const val MAX_DETECTIONS = 300
@@ -20,21 +20,22 @@ private const val HOLE_CLASS_ID = 1
 private const val SIDE_CLASS_ID = 2
 
 /**
- * TFLite-backed implementation of [PocketDetector] using the merged pocket model.
- * This replaces the failing OpenCVPocketDetector.
+ * TFLite-backed implementation of [PocketDetector] using the 'std' head from the master package.
  */
 class TfLitePocketDetector(private val context: Context) : PocketDetector {
 
     private val interpreter: Interpreter? by lazy {
         try {
-            val fd = context.assets.openFd(POCKET_MODEL)
-            val model = FileInputStream(fd.fileDescriptor).channel.map(
-                FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.declaredLength
-            )
-            Log.d("TfLitePocketDetector", "TFLite model loaded successfully: $POCKET_MODEL")
-            Interpreter(model, Interpreter.Options().setNumThreads(2))
+            val fd = context.assets.openFd(MASTER_MODEL_FILE)
+            val fullChannel = FileInputStream(fd.fileDescriptor).channel
+            // Load MODEL_1 (pocket_detector_fp16) based on offsets
+            val offset = fd.startOffset + 6242868L
+            val size = 6242869L
+            val buffer = fullChannel.map(FileChannel.MapMode.READ_ONLY, offset, size)
+            Log.d("TfLitePocketDetector", "Master head loaded successfully.")
+            Interpreter(buffer, Interpreter.Options().setNumThreads(2))
         } catch (e: Exception) {
-            Log.e("TfLitePocketDetector", "Failed to load $POCKET_MODEL: ${e.message}")
+            Log.e("TfLitePocketDetector", "Failed to load master head: ${e.message}")
             null
         }
     }
@@ -70,7 +71,6 @@ class TfLitePocketDetector(private val context: Context) : PocketDetector {
         resized.getPixels(intValues, 0, resized.width, 0, 0, resized.width, resized.height)
         for (i in intValues.indices) {
             val pixelValue = intValues[i]
-            // RGB normalization
             inputBuffer.putFloat(((pixelValue shr 16) and 0xFF) / 255.0f)
             inputBuffer.putFloat(((pixelValue shr 8) and 0xFF) / 255.0f)
             inputBuffer.putFloat((pixelValue and 0xFF) / 255.0f)
