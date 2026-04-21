@@ -1,3 +1,4 @@
+// app/src/main/java/com/hereliesaz/cuedetat/view/ProtractorOverlay.kt
 package com.hereliesaz.cuedetat.view
 
 import android.graphics.Typeface
@@ -6,13 +7,15 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.core.content.res.ResourcesCompat
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
@@ -42,8 +45,25 @@ fun ProtractorOverlay(
         paints.setTypeface(barbaroTypeface)
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(uiState.luminanceAdjustment, systemIsDark) {
         paints.updateColors(uiState, systemIsDark)
+    }
+
+    // The gatekeeper of the Sisyphean Canvas.
+    // We only force a redraw when the geometry actually shifts.
+    val drawTrigger by remember(uiState) {
+        derivedStateOf {
+            arrayOf(
+                uiState.viewOffset,
+                uiState.arDerivedPitch,
+                uiState.worldRotationDegrees,
+                uiState.zoomSliderPosition,
+                uiState.tableScanModel,
+                uiState.tableZOffset,
+                uiState.onPlaneBall,
+                topDownProgress
+            ).contentHashCode()
+        }
     }
 
     Canvas(
@@ -54,6 +74,8 @@ fun ProtractorOverlay(
             }
             .detectManualGestures(uiState, onEvent)
     ) {
+        // Read the trigger to inform Compose's invalidation tracker
+        drawTrigger
         drawIntoCanvas { canvas ->
             renderer.draw(canvas.nativeCanvas, uiState, paints, barbaroTypeface, topDownProgress)
         }

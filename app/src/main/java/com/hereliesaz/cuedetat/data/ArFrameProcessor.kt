@@ -1,8 +1,9 @@
+// app/src/main/java/com/hereliesaz/cuedetat/data/ArFrameProcessor.kt
 package com.hereliesaz.cuedetat.data
 
 import com.google.ar.core.Frame
 import com.hereliesaz.cuedetat.domain.CueDetatState
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -21,8 +22,9 @@ class ArFrameProcessor @Inject constructor(
     private val visionRepository: VisionRepository,
 ) {
     private val stateRef = AtomicReference<CueDetatState?>(null)
-    // Process every 2nd AR frame — halves CV load on the GL thread with no visible quality loss.
-    private val frameCounter = AtomicInteger(0)
+
+    // Time-based throttling. The physical world moves, but the balls don't move that fast.
+    private val lastProcessTime = AtomicLong(0L)
 
     fun updateUiState(state: CueDetatState) {
         stateRef.set(state)
@@ -34,9 +36,12 @@ class ArFrameProcessor @Inject constructor(
      */
     fun processFrame(frame: Frame) {
         val state = stateRef.get() ?: return
-        // Skip odd frames — AR tracking is still updated by ARCore internally at full rate,
-        // only our CV pipeline (ball detection) runs at half rate.
-        if (frameCounter.getAndIncrement() % 2 != 0) return
+
+        val now = System.currentTimeMillis()
+        // Throttle to ~10 FPS (100ms interval) to stop the CPU from melting.
+        if (now - lastProcessTime.get() < 100L) return
+        lastProcessTime.set(now)
+
         try {
             val cpuImage = frame.acquireCameraImage()
             // ARCore's CPU image sensor orientation matches the display orientation configured

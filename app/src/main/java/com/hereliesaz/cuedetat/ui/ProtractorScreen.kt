@@ -239,7 +239,7 @@ fun ProtractorScreen(
         }
 
         // --- Onscreen: Tutorial overlay (main route only) ---
-        onscreen(alignment = Alignment.TopEnd) {
+        onscreen(alignment = Alignment.TopStart) {
             if (isOnMain) {
                 TutorialOverlay(uiState = uiState, onEvent = mainViewModel::onEvent)
             }

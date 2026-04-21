@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -37,6 +38,7 @@ import androidx.compose.ui.zIndex
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
+import com.hereliesaz.cuedetat.view.renderer.warpedBy
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 
 @Composable
@@ -44,6 +46,8 @@ fun TutorialOverlay(
     uiState: CueDetatState,
     onEvent: (MainScreenEvent) -> Unit
 ) {
+    if (!uiState.showTutorialOverlay) return
+
     val tutorialSteps = when (uiState.tutorialType) {
         com.hereliesaz.cuedetat.domain.TutorialType.DYNAMIC_NON_AR -> listOf(
             "Look at you, breaking free. This is Dynamic Mode. The world is your table.",
@@ -81,75 +85,97 @@ fun TutorialOverlay(
         )
     }
 
-    if (uiState.showTutorialOverlay) {
-        val infiniteTransition = rememberInfiniteTransition(label = "highlight-transition")
-        val highlightAlpha by infiniteTransition.animateFloat(
-            initialValue = 0.3f,
-            targetValue = 0.9f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 1000),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "highlight-alpha"
-        )
-        val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = highlightAlpha)
+    val tps = if (uiState.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else uiState.lensWarpTps
+    val infiniteTransition = rememberInfiniteTransition(label = "highlight-transition")
+    val highlightAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "highlight-alpha"
+    )
+    val highlightColor = Color.Green.copy(alpha = highlightAlpha)
 
+    Box(modifier = Modifier.fillMaxSize()) {
         Canvas(
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = Modifier.fillMaxSize()
         ) {
             val matrix = if (uiState.isBeginnerViewLocked) uiState.logicalPlaneMatrix else uiState.pitchMatrix
             if (matrix == null) return@Canvas
 
             when (uiState.tutorialHighlight ?: TutorialHighlightElement.NONE) {
                 TutorialHighlightElement.TARGET_BALL -> {
+                    val warpedCenter = uiState.protractorUnit.center.warpedBy(tps)
                     val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
-                        uiState.protractorUnit.center,
+                        warpedCenter,
                         uiState.protractorUnit.radius,
                         uiState,
                         matrix
                     )
-                    val screenPos = DrawingUtils.mapPoint(uiState.protractorUnit.center, matrix)
+                    val screenPos = DrawingUtils.mapPoint(warpedCenter, matrix)
+                    val liftedY = screenPos.y - radiusInfo.lift
                     drawCircle(
                         color = highlightColor,
-                        radius = radiusInfo.radius * 2.0f,
-                        center = Offset(screenPos.x, screenPos.y),
+                        radius = radiusInfo.radius,
+                        center = Offset(screenPos.x, liftedY),
                         style = Stroke(width = 4.dp.toPx())
                     )
                 }
+
                 TutorialHighlightElement.GHOST_BALL -> {
-                    val ghostCenter = uiState.protractorUnit.ghostCueBallCenter
+                    val warpedCenter = uiState.protractorUnit.ghostCueBallCenter.warpedBy(tps)
                     val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
-                        ghostCenter,
+                        warpedCenter,
                         uiState.protractorUnit.radius,
                         uiState,
                         matrix
                     )
-                    val screenPos = DrawingUtils.mapPoint(ghostCenter, matrix)
+                    val screenPos = DrawingUtils.mapPoint(warpedCenter, matrix)
+                    val liftedY = screenPos.y - radiusInfo.lift
                     drawCircle(
                         color = highlightColor,
-                        radius = radiusInfo.radius * 2.0f,
-                        center = Offset(screenPos.x, screenPos.y),
+                        radius = radiusInfo.radius * 0.1f,
+                        center = Offset(screenPos.x, liftedY),
                         style = Stroke(width = 4.dp.toPx())
                     )
                 }
+
                 TutorialHighlightElement.CUE_BALL -> {
                     uiState.onPlaneBall?.let {
+                        val warpedCenter = it.center.warpedBy(tps)
                         val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
-                            it.center,
+                            warpedCenter,
                             it.radius,
                             uiState,
                             matrix
                         )
-                        val screenPos = DrawingUtils.mapPoint(it.center, matrix)
+                        val screenPos = DrawingUtils.mapPoint(warpedCenter, matrix)
+                        val liftedY = screenPos.y - radiusInfo.lift
                         drawCircle(
                             color = highlightColor,
-                            radius = radiusInfo.radius * 2.0f,
-                            center = Offset(screenPos.x, screenPos.y),
+                            radius = radiusInfo.radius,
+                            center = Offset(screenPos.x, liftedY),
                             style = Stroke(width = 4.dp.toPx())
                         )
                     }
                 }
+
+                TutorialHighlightElement.AIMING_LINE -> {
+                    val ghostWarped = uiState.protractorUnit.ghostCueBallCenter.warpedBy(tps)
+                    val targetWarped = uiState.protractorUnit.center.warpedBy(tps)
+                    val screenStart = DrawingUtils.mapPoint(ghostWarped, matrix)
+                    val screenEnd = DrawingUtils.mapPoint(targetWarped, matrix)
+
+                    drawLine(
+                        color = highlightColor,
+                        start = Offset(screenStart.x, screenStart.y),
+                        end = Offset(screenEnd.x, screenEnd.y),
+                        strokeWidth = 8.dp.toPx()
+                    )
+                }
+
                 TutorialHighlightElement.ZOOM_SLIDER -> {
                     drawRoundRect(
                         color = highlightColor,
@@ -162,6 +188,7 @@ fun TutorialOverlay(
                         style = Stroke(width = 4.dp.toPx())
                     )
                 }
+
                 else -> {}
             }
         }
@@ -170,8 +197,8 @@ fun TutorialOverlay(
             modifier = Modifier
                 .navigationBarsPadding()
                 .padding(top = 100.dp, end = 24.dp)
-                .zIndex(10f),
-            contentAlignment = Alignment.TopEnd
+                .zIndex(10f)
+                .align(Alignment.TopEnd)
         ) {
             Column(
                 modifier = Modifier
@@ -185,7 +212,8 @@ fun TutorialOverlay(
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = tutorialSteps.getOrNull(uiState.currentTutorialStep) ?: "The tutorial is over. Go away.",
+                    text = tutorialSteps.getOrNull(uiState.currentTutorialStep)
+                        ?: "The tutorial is over. Go away.",
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -203,7 +231,9 @@ fun TutorialOverlay(
                     }
                     if (uiState.currentTutorialStep < tutorialSteps.lastIndex) {
                         TextButton(onClick = { onEvent(MainScreenEvent.NextTutorialStep) }) {
-                            Text(if (uiState.tutorialType == com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_STATIC || uiState.tutorialType == com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_DYNAMIC) "Next" else "Skip")
+                            Text(
+                                if (uiState.tutorialType == com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_STATIC || uiState.tutorialType == com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_DYNAMIC) "Next" else "Skip"
+                            )
                         }
                     } else {
                         TextButton(onClick = { onEvent(MainScreenEvent.EndTutorial) }) {

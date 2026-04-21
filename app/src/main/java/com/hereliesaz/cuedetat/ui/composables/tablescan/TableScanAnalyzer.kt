@@ -1,4 +1,4 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanAnalyzer.kt
+// app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanAnalyzer.kt
 package com.hereliesaz.cuedetat.ui.composables.tablescan
 
 import android.graphics.Bitmap
@@ -8,7 +8,6 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import org.opencv.android.Utils
 import org.opencv.core.Core
-import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.MatOfPoint
 import org.opencv.core.MatOfPoint2f
@@ -33,13 +32,13 @@ class TableScanAnalyzer(
     private val pocketDetector: PocketDetector? = null,
 ) : ImageAnalysis.Analyzer {
 
-    private var reusableBitmap: Bitmap? = null
+    private var reusableMlBitmap: Bitmap? = null
     private val bgrMat = Mat()
     private val rgbMat = Mat()
     private val smallRgbMat = Mat()
     private val hsvMat = Mat()
     private val maskMat = Mat()
-    
+
     private val isProcessing = AtomicBoolean(false)
     private val frameCounter = AtomicInteger(0)
 
@@ -57,7 +56,7 @@ class TableScanAnalyzer(
 
             // --- Robust YUV_420_888 to BGR conversion using shared utility ---
             image.toMat(bgrMat)
-            
+
             if (bgrMat.empty() || bgrMat.cols() == 0 || bgrMat.rows() == 0) {
                 Log.e("TableScanAnalyzer", "BGR Mat is empty or invalid after toMat(): size=${bgrMat.size()} format=${image.format}")
                 return
@@ -75,15 +74,12 @@ class TableScanAnalyzer(
                 Log.w("TableScanAnalyzer", "Frame is very dark!")
             }
 
-            val bitmap = reusableBitmap?.takeIf { it.width == originalWidth && it.height == originalHeight }
-                ?: createBitmap(originalWidth, originalHeight).also { reusableBitmap = it }
-            Utils.matToBitmap(rgbMat, bitmap)
-
             // --- ALWAYS sample felt color from every frame ---
             val scale = 0.25
+            val scaleF = scale.toFloat()
             val smallWidth = (originalWidth * scale).toInt()
             val smallHeight = (originalHeight * scale).toInt()
-            
+
             if (smallWidth < 1 || smallHeight < 1) return
 
             Imgproc.resize(rgbMat, smallRgbMat, Size(smallWidth.toDouble(), smallHeight.toDouble()))
@@ -93,64 +89,72 @@ class TableScanAnalyzer(
             val cx = smallWidth / 2; val cy = smallHeight / 2
             val hw = (smallWidth / 20).coerceAtLeast(1)
             val hh = (smallHeight / 20).coerceAtLeast(1)
-            
+
             val roiX = (cx - hw).coerceIn(0, smallWidth - 1)
             val roiY = (cy - hh).coerceIn(0, smallHeight - 1)
             val roiW = (hw * 2).coerceIn(1, smallWidth - roiX)
             val roiH = (hh * 2).coerceIn(1, smallHeight - roiY)
-            
+
             val roi = org.opencv.core.Rect(roiX, roiY, roiW, roiH)
             val crop = hsvMat.submat(roi)
             val meanHsv = Core.mean(crop)
             crop.release()
-            
+
             val sampledHsv = floatArrayOf(
                 meanHsv.`val`[0].toFloat() * 2f, // 0-180 -> 0-360
                 meanHsv.`val`[1].toFloat() / 255f, // 0-255 -> 0-1
                 meanHsv.`val`[2].toFloat() / 255f  // 0-255 -> 0-1
             )
-            if (frameCounter.get() % 30 == 0) {
-                Log.d("TableScanAnalyzer", "Sampled HSV: ${sampledHsv[0].toInt()}, ${String.format("%.2f", sampledHsv[1])}, ${String.format("%.2f", sampledHsv[2])}")
-            }
             onFeltColorSampled(sampledHsv)
 
-            if (sampledHsv[2] < 0.05f) {
-                Log.w("TableScanAnalyzer", "Sampled color is black: H=${sampledHsv[0]} S=${sampledHsv[1]} V=${sampledHsv[2]}")
-            }
-
             // --- Strategy 1: ML detector (TFLite side-by-side) ---
-            val modelDetections = pocketDetector?.detect(bitmap)
+            // Downsample the silicon torture chamber. We feed it the small mat.
+            val mlBitmap = reusableMlBitmap?.takeIf { it.width == smallWidth && it.height == smallHeight }
+                ?: createBitmap(smallWidth, smallHeight).also { reusableMlBitmap = it }
+            Utils.matToBitmap(smallRgbMat, mlBitmap)
+
+            val modelDetections = pocketDetector?.detect(mlBitmap)
 
             if (modelDetections != null && modelDetections.pockets.isNotEmpty()) {
                 android.util.Log.d("TableScanAnalyzer", "ML Strategy: Found ${modelDetections.pockets.size} pockets (conf: ${modelDetections.confidence})")
+
+                // Scale the detections back up to the original frame size
+                val scaledPockets = modelDetections.pockets.map {
+                    PointF(it.x / scaleF, it.y / scaleF)
+                }
+                val scaledBoundary = modelDetections.tableBoundary?.let {
+                    android.graphics.RectF(
+                        it.left / scaleF,
+                        it.top / scaleF,
+                        it.right / scaleF,
+                        it.bottom / scaleF
+                    )
+                }
+
                 onPocketsDetected(
-                    modelDetections.pockets, 
-                    null, 
-                    modelDetections.tableBoundary, 
-                    modelDetections.confidence, 
-                    originalWidth, 
+                    scaledPockets,
+                    null,
+                    scaledBoundary,
+                    modelDetections.confidence,
+                    originalWidth,
                     originalHeight
                 )
             } else {
                 // --- Strategy 2: Felt-Boundary Extraction Fallback ---
-                android.util.Log.d("TableScanAnalyzer", "Fallback Strategy: ML found no pockets, attempting edge extraction...")
                 try {
-                    // Adjusted Hue range for RGB-sourced HSV (OpenCV COLOR_RGB2HSV)
-                    // RGB-to-HSV mapping: H [0,180], S [0,255], V [0,255]
                     val h = meanHsv.`val`[0]
                     val hRange = 15.0
                     val sMin = 40.0
                     val vMin = 40.0
-                    
+
                     if (h - hRange < 0 || h + hRange > 180) {
-                        // Hue wraps around 0/180
                         val mask1 = Mat()
                         val mask2 = Mat()
                         val lower1 = Scalar(0.0, sMin, vMin)
                         val upper1 = Scalar(minOf(180.0, h + hRange).let { if (it > 180) it - 180 else it }, 255.0, 255.0)
                         val lower2 = Scalar(maxOf(0.0, h - hRange).let { if (it < 0) it + 180 else it }, sMin, vMin)
                         val upper2 = Scalar(180.0, 255.0, 255.0)
-                        
+
                         Core.inRange(hsvMat, lower1, upper1, mask1)
                         Core.inRange(hsvMat, lower2, upper2, mask2)
                         Core.bitwise_or(mask1, mask2, maskMat)

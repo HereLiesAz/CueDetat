@@ -36,7 +36,8 @@ enum class TutorialHighlightElement {
     POWER_METER,
     ZOOM_SLIDER,
     SCAN_TABLE,
-    RESET_BUTTON
+    RESET_BUTTON,
+    AIMING_LINE
 }
 
 enum class InteractionMode {

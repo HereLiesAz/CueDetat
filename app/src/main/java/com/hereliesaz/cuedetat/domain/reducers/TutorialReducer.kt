@@ -100,14 +100,15 @@ private fun highlightForStep(step: Int, state: CueDetatState): TutorialHighlight
     if (state.tutorialType == TutorialType.BEGINNER_STATIC) {
         return when (step) {
             2 -> TutorialHighlightElement.TARGET_BALL // YELLOW CIRCLE
+            3 -> TutorialHighlightElement.AIMING_LINE  // YELLOW LINE
             4 -> TutorialHighlightElement.GHOST_BALL  // BLUE CIRCLE
             else -> TutorialHighlightElement.NONE
         }
     }
     if (state.tutorialType == TutorialType.BEGINNER_DYNAMIC) {
         return when (step) {
-            2 -> TutorialHighlightElement.TARGET_BALL // YELLOW CIRCLE
-            3 -> TutorialHighlightElement.ZOOM_SLIDER
+            3 -> TutorialHighlightElement.TARGET_BALL // YELLOW CIRCLE
+            4 -> TutorialHighlightElement.AIMING_LINE  // YELLOW LINE
             5 -> TutorialHighlightElement.GHOST_BALL  // BLUE CIRCLE
             else -> TutorialHighlightElement.NONE
         }
