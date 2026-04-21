@@ -1,4 +1,3 @@
-// app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/TutorialOverlay.kt
 package com.hereliesaz.cuedetat.ui.composables.overlays
 
 import androidx.compose.animation.core.RepeatMode
@@ -33,6 +32,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.res.stringArrayResource
@@ -76,10 +76,10 @@ fun TutorialOverlay(
 
     val isLocked = uiState.isBeginnerViewLocked
     val matrix = if (isLocked) uiState.logicalPlaneMatrix else uiState.pitchMatrix
-    val tps = if (uiState.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else uiState.lensWarpTps
+    val tps = if (uiState.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR || isLocked) null else uiState.lensWarpTps
 
-    // Optimize: Pre-calculate highlight coordinates to avoid redundant matrix math in the draw loop
-    val highlightParams = remember(uiState.tutorialHighlight, matrix, tps, uiState.protractorUnit, uiState.onPlaneBall, uiState.aimingLineEndPoint, uiState.viewWidth, uiState.viewHeight, isLocked) {
+    // Optimize: Pre-calculate highlight parameters to avoid redundant math in the draw loop
+    val highlightParams = remember(uiState.tutorialHighlight, matrix, tps, uiState.protractorUnit, uiState.onPlaneBall, uiState.aimingLineEndPoint, uiState.viewWidth, uiState.viewHeight, isLocked, uiState.cameraMatrix, uiState.distCoeffs) {
         if (matrix == null) return@remember emptyList<HighlightParams>()
         
         when (uiState.tutorialHighlight ?: TutorialHighlightElement.NONE) {
@@ -107,52 +107,54 @@ fun TutorialOverlay(
                 } ?: emptyList()
             }
             TutorialHighlightElement.AIMING_LINE -> {
-                val ghostWarped = uiState.protractorUnit.ghostCueBallCenter.warpedBy(tps)
-                val endWarped = (uiState.aimingLineEndPoint ?: uiState.protractorUnit.center).warpedBy(tps)
-                val p1 = DrawingUtils.mapPoint(ghostWarped, matrix)
-                val p2 = DrawingUtils.mapPoint(endWarped, matrix)
-                
-                val angleDeg = Math.toDegrees(kotlin.math.atan2((p2.y - p1.y).toDouble(), (p2.x - p1.x).toDouble())).toFloat()
+                val camMat = uiState.cameraMatrix
+                val distMat = uiState.distCoeffs
+                val camArray = if (camMat != null && !camMat.empty()) DoubleArray(camMat.total().toInt()).also { camMat.get(0, 0, it) } else null
+                val distArray = if (distMat != null && !distMat.empty()) DoubleArray(distMat.total().toInt()).also { distMat.get(0, 0, it) } else null
 
-                // Use a PathMeasure to find points on the line that are actually on screen
-                val path = android.graphics.Path().apply {
-                    moveTo(p1.x, p1.y)
-                    lineTo(p2.x, p2.y)
+                val ghostCenter = uiState.protractorUnit.ghostCueBallCenter
+                val targetCenter = uiState.protractorUnit.center
+                val rawPath = uiState.aimingLineBankPath ?: listOf(ghostCenter, targetCenter)
+                val logicalPath = rawPath.map { it.warpedBy(tps) }
+                
+                val screenPath = android.graphics.Path()
+                if (logicalPath.size >= 2) {
+                    for (i in 0 until logicalPath.size - 1) {
+                        val start = logicalPath[i]
+                        val end = logicalPath[i+1]
+                        val segment = DrawingUtils.buildDistortedLinePath(start, end, matrix, camArray, distArray)
+                        screenPath.addPath(segment)
+                    }
                 }
-                val measure = android.graphics.PathMeasure(path, false)
+
+                val measure = android.graphics.PathMeasure(screenPath, false)
                 val pathLen = measure.length
                 
-                // Sample along the line and keep what's visible
+                val visibleData = mutableListOf<TriangleHighlight>()
                 var d = 0f
                 val step = 10f
                 val pos = floatArrayOf(0f, 0f)
-                val visiblePoints = mutableListOf<Offset>()
-                while (d <= pathLen && visiblePoints.size < 1000) {
-                    if (measure.getPosTan(d, pos, null)) {
+                val tan = floatArrayOf(0f, 0f)
+                
+                while (d <= pathLen && visibleData.size < 1000) {
+                    if (measure.getPosTan(d, pos, tan)) {
                         if (pos[0] in 0f..uiState.viewWidth.toFloat() && pos[1] in 0f..uiState.viewHeight.toFloat()) {
-                            visiblePoints.add(Offset(pos[0], pos[1]))
+                            val angle = Math.toDegrees(kotlin.math.atan2(tan[1].toDouble(), tan[0].toDouble())).toFloat()
+                            visibleData.add(TriangleHighlight(Offset(pos[0], pos[1]), angle))
                         }
                     }
                     d += step
                 }
                 
-                val centers = mutableListOf<Offset>()
-                
-                if (visiblePoints.size > 10) {
+                val selectedTriangles = mutableListOf<TriangleHighlight>()
+                if (visibleData.size > 10) {
                     for (i in 1..3) {
-                        val idx = (i * visiblePoints.size / 4).coerceIn(0, visiblePoints.lastIndex)
-                        centers.add(visiblePoints[idx])
-                    }
-                } else {
-                    // Fallback: If path sampling failed, place them between ghost and target
-                    val pTarget = DrawingUtils.mapPoint(uiState.protractorUnit.center.warpedBy(tps), matrix)
-                    for (i in 1..3) {
-                        val t = i / 4f
-                        centers.add(Offset(p1.x + (pTarget.x - p1.x) * t, p1.y + (pTarget.y - p1.y) * t))
+                        val idx = (i * visibleData.size / 4).coerceIn(0, visibleData.lastIndex)
+                        selectedTriangles.add(visibleData[idx])
                     }
                 }
-
-                listOf(HighlightParams.AimingTriangles(centers, angleDeg))
+                
+                listOf(HighlightParams.AimingTriangles(selectedTriangles))
             }
             TutorialHighlightElement.ZOOM_SLIDER -> {
                 val topLeft = Offset(uiState.viewWidth - 64.dp.value * uiState.screenDensity, uiState.viewHeight * 0.2f)
@@ -191,20 +193,20 @@ fun TutorialOverlay(
                     }
                     is HighlightParams.AimingTriangles -> {
                         val triPath = Path().apply {
-                            moveTo(24.dp.toPx(), 0f)
-                            lineTo(-15.dp.toPx(), 20.dp.toPx())
-                            lineTo(-15.dp.toPx(), -20.dp.toPx())
+                            moveTo(32.dp.toPx(), 0f)
+                            lineTo(-20.dp.toPx(), 26.dp.toPx())
+                            lineTo(-20.dp.toPx(), -26.dp.toPx())
                             close()
                         }
-                        param.centers.forEach { center ->
+                        param.triangles.forEach { tri ->
                             withTransform({
-                                translate(center.x, center.y)
-                                rotate(param.angleDeg)
+                                translate(tri.center.x, tri.center.y)
+                                rotate(tri.angleDeg)
                             }) {
                                 drawPath(
                                     path = triPath,
-                                    color = highlightColor,
-                                    style = Stroke(width = 4.dp.toPx())
+                                    color = Color.Green.copy(alpha = highlightAlpha),
+                                    style = Fill
                                 )
                             }
                         }
@@ -278,8 +280,10 @@ fun TutorialOverlay(
     }
 }
 
+private data class TriangleHighlight(val center: Offset, val angleDeg: Float)
+
 private sealed class HighlightParams {
     data class Circle(val center: Offset, val radius: Float) : HighlightParams()
-    data class AimingTriangles(val centers: List<Offset>, val angleDeg: Float) : HighlightParams()
+    data class AimingTriangles(val triangles: List<TriangleHighlight>) : HighlightParams()
     data class Rect(val topLeft: Offset, val size: Size) : HighlightParams()
 }

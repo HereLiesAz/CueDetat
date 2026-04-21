@@ -160,6 +160,10 @@ class MainViewModel @Inject constructor(
     }
 
     private fun processEvent(event: MainScreenEvent) {
+        if (event is MainScreenEvent.ScreenGestureStarted || event is MainScreenEvent.LogicalGestureStarted) {
+            warningManager.dismissWarning()
+        }
+
         if (event is MainScreenEvent.ToggleExperienceModeSelection) {
             experienceModeUpdateJob?.cancel()
             val currentState = _uiState.value
