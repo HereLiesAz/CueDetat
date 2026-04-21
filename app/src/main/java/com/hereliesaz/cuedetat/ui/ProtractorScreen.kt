@@ -136,6 +136,7 @@ fun ProtractorScreen(
                     onEvent = mainViewModel::onEvent,
                     topDownProgress = topDownProgress
                 )
+                TutorialOverlay(uiState = uiState, onEvent = mainViewModel::onEvent)
             }
         }
 
@@ -238,12 +239,6 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen: Tutorial overlay (main route only) ---
-        onscreen(alignment = Alignment.TopStart) {
-            if (isOnMain) {
-                TutorialOverlay(uiState = uiState, onEvent = mainViewModel::onEvent)
-            }
-        }
 
         // --- Onscreen: Inline felt capture overlay ---
         onscreen(alignment = Alignment.TopStart) {

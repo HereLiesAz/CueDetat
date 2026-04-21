@@ -93,7 +93,7 @@ fun TutorialOverlay(
                 val screenPos = DrawingUtils.mapPoint(warpedCenter, matrix)
                 val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(warpedCenter, uiState.protractorUnit.radius, uiState, matrix)
                 val liftedY = if (isLocked) screenPos.y else screenPos.y - radiusInfo.lift
-                listOf(HighlightParams.Circle(Offset(screenPos.x, liftedY), radiusInfo.radius * 0.1f))
+                listOf(HighlightParams.Circle(Offset(screenPos.x, liftedY), radiusInfo.radius * 0.15f))
             }
             TutorialHighlightElement.CUE_BALL -> {
                 uiState.onPlaneBall?.let {
@@ -110,10 +110,44 @@ fun TutorialOverlay(
                 val p1 = DrawingUtils.mapPoint(ghostWarped, matrix)
                 val p2 = DrawingUtils.mapPoint(endWarped, matrix)
                 
-                val centers = (1..3).map { i ->
-                    val t = i / 4f
-                    Offset(p1.x + (p2.x - p1.x) * t, p1.y + (p2.y - p1.y) * t)
+                // Use a PathMeasure to find points on the line that are actually on screen
+                val path = android.graphics.Path().apply {
+                    moveTo(p1.x, p1.y)
+                    lineTo(p2.x, p2.y)
                 }
+                val measure = android.graphics.PathMeasure(path, false)
+                val pathLen = measure.length
+                
+                // Sample along the line and keep what's visible
+                var d = 0f
+                val step = 10f
+                val pos = floatArrayOf(0f, 0f)
+                val visiblePoints = mutableListOf<Offset>()
+                while (d <= pathLen && visiblePoints.size < 1000) {
+                    if (measure.getPosTan(d, pos, null)) {
+                        if (pos[0] in 0f..uiState.viewWidth.toFloat() && pos[1] in 0f..uiState.viewHeight.toFloat()) {
+                            visiblePoints.add(Offset(pos[0], pos[1]))
+                        }
+                    }
+                    d += step
+                }
+                
+                val centers = mutableListOf<Offset>()
+                
+                if (visiblePoints.size > 10) {
+                    for (i in 1..3) {
+                        val idx = (i * visiblePoints.size / 4).coerceIn(0, visiblePoints.lastIndex)
+                        centers.add(visiblePoints[idx])
+                    }
+                } else {
+                    // Fallback: If path sampling failed, place them between ghost and target
+                    val pTarget = DrawingUtils.mapPoint(uiState.protractorUnit.center.warpedBy(tps), matrix)
+                    for (i in 1..3) {
+                        val t = i / 4f
+                        centers.add(Offset(p1.x + (pTarget.x - p1.x) * t, p1.y + (pTarget.y - p1.y) * t))
+                    }
+                }
+
                 listOf(HighlightParams.AimingTriangles(centers))
             }
             TutorialHighlightElement.ZOOM_SLIDER -> {
