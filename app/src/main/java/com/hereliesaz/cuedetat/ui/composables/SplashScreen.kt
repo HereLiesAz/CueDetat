@@ -106,8 +106,8 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "How confident do you feel about playing pool or using this app?",
-                    fontSize = 20.sp,
+                    text = "How confident do you feel about playing pool or using this app?\n\n\n",
+                    fontSize = 18.sp,
                     color = Color.White,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
@@ -117,7 +117,7 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
                 // Vertical list of choice buttons.
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
                     modifier = Modifier.padding(8.dp)
                 ) {
                     QuestionButton("Keep it to the basics, please.") { onRoleSelected(ExperienceMode.BEGINNER) }
@@ -144,7 +144,7 @@ private fun QuestionButton(label: String, onClick: () -> Unit) {
         Text(
             text = label,
             color = Color.White,
-            fontSize = 20.sp, // Reduced font size slightly to fit longer sentences.
+            fontSize = 24.sp, // Reduced font size slightly to fit longer sentences.
             textAlign = TextAlign.Center
         )
     }
