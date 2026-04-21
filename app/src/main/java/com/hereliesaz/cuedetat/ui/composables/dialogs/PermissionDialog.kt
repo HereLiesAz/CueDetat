@@ -15,8 +15,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
 
 @Composable
@@ -35,28 +37,28 @@ fun PermissionExplanationScreen(
             modifier = Modifier.padding(24.dp)
         ) {
             Text(
-                text = "We need a couple of things to get started.",
+                text = stringResource(id = R.string.permission_explanation_title),
                 style = MaterialTheme.typography.headlineSmall,
                 color = Color.White,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "CAMERA: This app works by looking at the table through your lens. Without it, we're just a black screen.",
+                text = stringResource(id = R.string.permission_camera_explanation),
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.LightGray,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "LOCATION: This is optional, but it lets us remember which table you've scanned so you don't have to re-calibrate every time you come back.",
+                text = stringResource(id = R.string.permission_location_explanation),
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.LightGray,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(32.dp))
             CuedetatButton(
-                text = "I understand",
+                text = stringResource(id = R.string.permission_confirm_button),
                 onClick = onConfirm,
                 modifier = Modifier.width(200.dp)
             )

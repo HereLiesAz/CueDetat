@@ -106,8 +106,8 @@ class LineRenderer {
         activeMatrix: Matrix
     ) {
         val (camArray, distArray) = resolveLensArrays(state)
-        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = false, drawTriangles = true)
-        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = false, drawTriangles = true)
+        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = false, drawTriangles = true, labelAim = null, labelTangent = null)
+        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = false, drawTriangles = true, labelAim = null, labelTangent = null)
     }
 
     fun drawBeginnerLines(
@@ -117,8 +117,8 @@ class LineRenderer {
         activeMatrix: Matrix
     ) {
         val (camArray, distArray) = resolveLensArrays(state)
-        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true, drawTriangles = false)
-        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true, drawTriangles = false)
+        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true, drawTriangles = false, labelAim = null, labelTangent = null)
+        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true, drawTriangles = false, labelAim = null, labelTangent = null)
     }
 
     fun drawBeginnerLabels(
@@ -126,11 +126,13 @@ class LineRenderer {
         state: CueDetatState,
         paints: PaintCache,
         typeface: Typeface?,
-        activeMatrix: Matrix
+        activeMatrix: Matrix,
+        labelAim: String?,
+        labelTangent: String?
     ) {
         val (camArray, distArray) = resolveLensArrays(state)
-        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false, drawTriangles = false)
-        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false, drawTriangles = false)
+        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false, drawTriangles = false, labelAim = labelAim, labelTangent = labelTangent)
+        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false, drawTriangles = false, labelAim = labelAim, labelTangent = labelTangent)
     }
 
     private fun applyTableMask(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix) {
@@ -218,7 +220,7 @@ class LineRenderer {
         }
     }
 
-    private fun drawAimingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true, drawTriangles: Boolean? = null) {
+    private fun drawAimingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true, drawTriangles: Boolean? = null, labelAim: String? = null, labelTangent: String? = null) {
         if (state.isMasseModeActive && !state.masseConnectsTarget) return
         val aimingLineConfig = AimingLine()
         val isPocketed = state.aimedPocketIndex != null
@@ -258,11 +260,11 @@ class LineRenderer {
             canvas.restoreToCount(layer)
         }
 
-        val textToDraw = if (isBeginnerLocked && !drawGeometry && typeface != null) "Aim this line at the pocket." else null
+        val textToDraw = if (isBeginnerLocked && !drawGeometry && typeface != null) labelAim else null
         drawBankablePath(canvas, path, aimingLinePaint, aimingLineGlow, isPocketed, state, paints, activeMatrix, camArray, distArray, shouldDrawTriangles, textToDraw, typeface, drawGeometry)
     }
 
-    private fun drawTangentLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true, drawTriangles: Boolean? = null) {
+    private fun drawTangentLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true, drawTriangles: Boolean? = null, labelAim: String? = null, labelTangent: String? = null) {
         if (state.isMasseModeActive && !state.masseConnectsTarget) return
         val tangentLineConfig = TangentLine()
         val isPocketed = state.tangentAimedPocketIndex != null
@@ -304,7 +306,7 @@ class LineRenderer {
         val start = rawStart.warpedBy(tps)
 
         if (isBeginnerLocked) {
-            val tangentTextToDraw = if (!drawGeometry && typeface != null) "Tangent Line" else null
+            val tangentTextToDraw = if (!drawGeometry && typeface != null) labelTangent else null
             drawClippedLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, shouldDrawTriangles, tangentTextToDraw, typeface, drawGeometry)
             drawClippedLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, shouldDrawTriangles, tangentTextToDraw, typeface, drawGeometry)
             return

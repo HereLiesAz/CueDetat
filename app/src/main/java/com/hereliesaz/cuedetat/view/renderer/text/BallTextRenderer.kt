@@ -48,7 +48,7 @@ class BallTextRenderer {
 
         paint.textAlign = Paint.Align.CENTER
 
-        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR || isBeginnerLocked) null else state.lensWarpTps
         val drawCenter = ball.center.warpedBy(tps)
 
         val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(drawCenter, ball.radius, state, matrix)

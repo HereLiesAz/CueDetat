@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -32,9 +33,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
@@ -49,43 +53,13 @@ fun TutorialOverlay(
     if (!uiState.showTutorialOverlay) return
 
     val tutorialSteps = when (uiState.tutorialType) {
-        com.hereliesaz.cuedetat.domain.TutorialType.DYNAMIC_NON_AR -> listOf(
-            "Look at you, breaking free. This is Dynamic Mode. The world is your table.",
-            "Your phone is now the cue stick. Rotate it horizontally and vertically to aim. The line follows your gaze.",
-            "Tap anywhere on the 'floor' to move the Target Ball. It's like magic, but with math. Tap Finish when you're ready."
-        )
-        com.hereliesaz.cuedetat.domain.TutorialType.DYNAMIC_AR -> listOf(
-            "AR mode active. Aim your lens at the table. This is the future, or at least a reasonable approximation.",
-            "The shot guide line is anchored to the bottom of your screen. Point and shoot, essentially.",
-            "Tap on a physical ball on the table. The Target Ball will 'Snap' right to it. Efficiency is the only virtue here. Tap Finish."
-        )
-        com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_STATIC -> listOf(
-            "This is a pool protractor with a bubble leveler.",
-            "In your head, pick the ball you want to hit in, and the pocket where you want it to go.",
-            "Hold your phone over the ball you chose to hit in. Fit it inside the YELLOW CIRCLE.",
-            "Keep it there, and point the YELLOW LINE at the pocket you chose.",
-            "Put your finger under the center dot of the BLUE CIRCLE. This is where you need to aim the cue ball."
-        )
-        com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_DYNAMIC -> listOf(
-            "This mode is the exact same thing as the protractor, except you don't need to hold it over the target ball.",
-            "Hold your phone upright over the cueball.",
-            "Drag the yellow circle over the ball you want to hit in.",
-            "Resize the YELLOW CIRCLE to match the target ball, using the zoom slider.",
-            "Drag your finger on a clear spot on the screen to aim the YELLOW LINE at your pocket.",
-            "The center of the BLUE CIRCLE is where you need to aim the cue ball."
-        )
-        else -> listOf(
-            "Alright, let's get this over with. This isn't a toy. It's a precision instrument. Try to keep up. Tap 'Next'.",
-            "That circle with the dot is the Target Ball. Drag it over your object ball. I'll wait.",
-            "The crosshairs mark the Ghost Ball—that's where you *should* hit the cue ball. Drag a single finger *anywhere* to rotate the aim. The line should point to a pocket. You know what a pocket is, I assume.",
-            "If you insist, you can toggle the 'Cue Ball' from the menu. Drag it to where your real cue ball is. The line between it and the Ghost Ball is the shot you're supposed to be making. It's not rocket science. It's just physics.",
-            "The slider on the right zooms. The one on the bottom rotates the table. I'm not going to hold your hand on this one.",
-            "In the menu, there's a 'Calculate Bank' option. If you're feeling brave, or foolish, press it. We'll see how you handle something that requires actual thought.",
-            "That's the crash course. The rest is a test of your character, or lack thereof. Don't embarrass us both. Press Finish."
-        )
+        com.hereliesaz.cuedetat.domain.TutorialType.DYNAMIC_NON_AR -> stringArrayResource(id = R.array.tutorial_dynamic_non_ar).toList()
+        com.hereliesaz.cuedetat.domain.TutorialType.DYNAMIC_AR -> stringArrayResource(id = R.array.tutorial_dynamic_ar).toList()
+        com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_STATIC -> stringArrayResource(id = R.array.tutorial_beginner_static).toList()
+        com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_DYNAMIC -> stringArrayResource(id = R.array.tutorial_beginner_dynamic).toList()
+        else -> stringArrayResource(id = R.array.tutorial_general).toList()
     }
 
-    val tps = if (uiState.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else uiState.lensWarpTps
     val infiniteTransition = rememberInfiniteTransition(label = "highlight-transition")
     val highlightAlpha by infiniteTransition.animateFloat(
         initialValue = 0.3f,
@@ -98,98 +72,105 @@ fun TutorialOverlay(
     )
     val highlightColor = Color.Green.copy(alpha = highlightAlpha)
 
+    val isLocked = uiState.isBeginnerViewLocked
+    val matrix = if (isLocked) uiState.logicalPlaneMatrix else uiState.pitchMatrix
+    val tps = if (uiState.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else uiState.lensWarpTps
+
+    // Optimize: Pre-calculate highlight coordinates to avoid redundant matrix math in the draw loop
+    val highlightParams = remember(uiState.tutorialHighlight, matrix, tps, uiState.protractorUnit, uiState.onPlaneBall, uiState.aimingLineEndPoint, uiState.viewWidth, uiState.viewHeight, isLocked) {
+        if (matrix == null) return@remember emptyList<HighlightParams>()
+        
+        when (uiState.tutorialHighlight ?: TutorialHighlightElement.NONE) {
+            TutorialHighlightElement.TARGET_BALL -> {
+                val warpedCenter = uiState.protractorUnit.center.warpedBy(tps)
+                val screenPos = DrawingUtils.mapPoint(warpedCenter, matrix)
+                val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(warpedCenter, uiState.protractorUnit.radius, uiState, matrix)
+                val liftedY = if (isLocked) screenPos.y else screenPos.y - radiusInfo.lift
+                listOf(HighlightParams.Circle(Offset(screenPos.x, liftedY), radiusInfo.radius))
+            }
+            TutorialHighlightElement.GHOST_BALL -> {
+                val warpedCenter = uiState.protractorUnit.ghostCueBallCenter.warpedBy(tps)
+                val screenPos = DrawingUtils.mapPoint(warpedCenter, matrix)
+                val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(warpedCenter, uiState.protractorUnit.radius, uiState, matrix)
+                val liftedY = if (isLocked) screenPos.y else screenPos.y - radiusInfo.lift
+                listOf(HighlightParams.Circle(Offset(screenPos.x, liftedY), radiusInfo.radius * 0.1f))
+            }
+            TutorialHighlightElement.CUE_BALL -> {
+                uiState.onPlaneBall?.let {
+                    val warpedCenter = it.center.warpedBy(tps)
+                    val screenPos = DrawingUtils.mapPoint(warpedCenter, matrix)
+                    val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(warpedCenter, it.radius, uiState, matrix)
+                    val liftedY = if (isLocked) screenPos.y else screenPos.y - radiusInfo.lift
+                    listOf(HighlightParams.Circle(Offset(screenPos.x, liftedY), radiusInfo.radius))
+                } ?: emptyList()
+            }
+            TutorialHighlightElement.AIMING_LINE -> {
+                val ghostWarped = uiState.protractorUnit.ghostCueBallCenter.warpedBy(tps)
+                val endWarped = (uiState.aimingLineEndPoint ?: uiState.protractorUnit.center).warpedBy(tps)
+                val p1 = DrawingUtils.mapPoint(ghostWarped, matrix)
+                val p2 = DrawingUtils.mapPoint(endWarped, matrix)
+                
+                val centers = (1..3).map { i ->
+                    val t = i / 4f
+                    Offset(p1.x + (p2.x - p1.x) * t, p1.y + (p2.y - p1.y) * t)
+                }
+                listOf(HighlightParams.AimingTriangles(centers))
+            }
+            TutorialHighlightElement.ZOOM_SLIDER -> {
+                val topLeft = Offset(uiState.viewWidth - 64.dp.value * uiState.screenDensity, uiState.viewHeight * 0.2f)
+                val size = Size(60.dp.value * uiState.screenDensity, uiState.viewHeight * 0.6f)
+                listOf(HighlightParams.Rect(topLeft, size))
+            }
+            TutorialHighlightElement.TARGET_BALL_AND_ZOOM_SLIDER -> {
+                val warpedCenter = uiState.protractorUnit.center.warpedBy(tps)
+                val screenPos = DrawingUtils.mapPoint(warpedCenter, matrix)
+                val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(warpedCenter, uiState.protractorUnit.radius, uiState, matrix)
+                val liftedY = if (isLocked) screenPos.y else screenPos.y - radiusInfo.lift
+                
+                val topLeft = Offset(uiState.viewWidth - 64.dp.value * uiState.screenDensity, uiState.viewHeight * 0.2f)
+                val size = Size(60.dp.value * uiState.screenDensity, uiState.viewHeight * 0.6f)
+                
+                listOf(
+                    HighlightParams.Circle(Offset(screenPos.x, liftedY), radiusInfo.radius),
+                    HighlightParams.Rect(topLeft, size)
+                )
+            }
+            else -> emptyList()
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
-        Canvas(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            val matrix = if (uiState.isBeginnerViewLocked) uiState.logicalPlaneMatrix else uiState.pitchMatrix
-            if (matrix == null) return@Canvas
-
-            when (uiState.tutorialHighlight ?: TutorialHighlightElement.NONE) {
-                TutorialHighlightElement.TARGET_BALL -> {
-                    val warpedCenter = uiState.protractorUnit.center.warpedBy(tps)
-                    val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
-                        warpedCenter,
-                        uiState.protractorUnit.radius,
-                        uiState,
-                        matrix
-                    )
-                    val screenPos = DrawingUtils.mapPoint(warpedCenter, matrix)
-                    val liftedY = screenPos.y - radiusInfo.lift
-                    drawCircle(
-                        color = highlightColor,
-                        radius = radiusInfo.radius,
-                        center = Offset(screenPos.x, liftedY),
-                        style = Stroke(width = 4.dp.toPx())
-                    )
-                }
-
-                TutorialHighlightElement.GHOST_BALL -> {
-                    val warpedCenter = uiState.protractorUnit.ghostCueBallCenter.warpedBy(tps)
-                    val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
-                        warpedCenter,
-                        uiState.protractorUnit.radius,
-                        uiState,
-                        matrix
-                    )
-                    val screenPos = DrawingUtils.mapPoint(warpedCenter, matrix)
-                    val liftedY = screenPos.y - radiusInfo.lift
-                    drawCircle(
-                        color = highlightColor,
-                        radius = radiusInfo.radius * 0.1f,
-                        center = Offset(screenPos.x, liftedY),
-                        style = Stroke(width = 4.dp.toPx())
-                    )
-                }
-
-                TutorialHighlightElement.CUE_BALL -> {
-                    uiState.onPlaneBall?.let {
-                        val warpedCenter = it.center.warpedBy(tps)
-                        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
-                            warpedCenter,
-                            it.radius,
-                            uiState,
-                            matrix
-                        )
-                        val screenPos = DrawingUtils.mapPoint(warpedCenter, matrix)
-                        val liftedY = screenPos.y - radiusInfo.lift
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            highlightParams.forEach { param ->
+                when (param) {
+                    is HighlightParams.Circle -> {
                         drawCircle(
                             color = highlightColor,
-                            radius = radiusInfo.radius,
-                            center = Offset(screenPos.x, liftedY),
+                            radius = param.radius,
+                            center = param.center,
+                            style = Stroke(width = 4.dp.toPx())
+                        )
+                    }
+                    is HighlightParams.AimingTriangles -> {
+                        param.centers.forEach { center ->
+                            drawCircle(
+                                color = highlightColor,
+                                radius = 24.dp.toPx(),
+                                center = center,
+                                style = Stroke(width = 4.dp.toPx())
+                            )
+                        }
+                    }
+                    is HighlightParams.Rect -> {
+                        drawRoundRect(
+                            color = highlightColor,
+                            topLeft = param.topLeft,
+                            size = param.size,
+                            cornerRadius = CornerRadius(16.dp.toPx()),
                             style = Stroke(width = 4.dp.toPx())
                         )
                     }
                 }
-
-                TutorialHighlightElement.AIMING_LINE -> {
-                    val ghostWarped = uiState.protractorUnit.ghostCueBallCenter.warpedBy(tps)
-                    val targetWarped = uiState.protractorUnit.center.warpedBy(tps)
-                    val screenStart = DrawingUtils.mapPoint(ghostWarped, matrix)
-                    val screenEnd = DrawingUtils.mapPoint(targetWarped, matrix)
-
-                    drawLine(
-                        color = highlightColor,
-                        start = Offset(screenStart.x, screenStart.y),
-                        end = Offset(screenEnd.x, screenEnd.y),
-                        strokeWidth = 8.dp.toPx()
-                    )
-                }
-
-                TutorialHighlightElement.ZOOM_SLIDER -> {
-                    drawRoundRect(
-                        color = highlightColor,
-                        topLeft = Offset(
-                            size.width - 64.dp.toPx(),
-                            center.y - (size.height * 0.3f)
-                        ),
-                        size = Size(60.dp.toPx(), size.height * 0.6f),
-                        cornerRadius = CornerRadius(16.dp.toPx()),
-                        style = Stroke(width = 4.dp.toPx())
-                    )
-                }
-
-                else -> {}
             }
         }
 
@@ -213,7 +194,7 @@ fun TutorialOverlay(
             ) {
                 Text(
                     text = tutorialSteps.getOrNull(uiState.currentTutorialStep)
-                        ?: "The tutorial is over. Go away.",
+                        ?: stringResource(id = R.string.tutorial_over),
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -227,21 +208,31 @@ fun TutorialOverlay(
                         onClick = { onEvent(MainScreenEvent.TutorialBack) },
                         enabled = uiState.currentTutorialStep > 0
                     ) {
-                        Text("Back")
+                        Text(stringResource(id = R.string.tutorial_back))
                     }
                     if (uiState.currentTutorialStep < tutorialSteps.lastIndex) {
                         TextButton(onClick = { onEvent(MainScreenEvent.NextTutorialStep) }) {
                             Text(
-                                if (uiState.tutorialType == com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_STATIC || uiState.tutorialType == com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_DYNAMIC) "Next" else "Skip"
+                                if (uiState.tutorialType == com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_STATIC || uiState.tutorialType == com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_DYNAMIC) {
+                                    stringResource(id = R.string.tutorial_next)
+                                } else {
+                                    stringResource(id = R.string.tutorial_skip)
+                                }
                             )
                         }
                     } else {
                         TextButton(onClick = { onEvent(MainScreenEvent.EndTutorial) }) {
-                            Text("Done")
+                            Text(stringResource(id = R.string.tutorial_done))
                         }
                     }
                 }
             }
         }
     }
+}
+
+private sealed class HighlightParams {
+    data class Circle(val center: Offset, val radius: Float) : HighlightParams()
+    data class AimingTriangles(val centers: List<Offset>) : HighlightParams()
+    data class Rect(val topLeft: Offset, val size: Size) : HighlightParams()
 }

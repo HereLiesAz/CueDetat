@@ -37,7 +37,8 @@ enum class TutorialHighlightElement {
     ZOOM_SLIDER,
     SCAN_TABLE,
     RESET_BUTTON,
-    AIMING_LINE
+    AIMING_LINE,
+    TARGET_BALL_AND_ZOOM_SLIDER
 }
 
 enum class InteractionMode {

@@ -35,7 +35,7 @@ class BallRenderer {
 
     private val textRenderer = BallTextRenderer()
 
-    fun draw(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?) {
+    fun draw(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?, labels: Map<String, String>) {
         val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
 
@@ -82,7 +82,7 @@ class BallRenderer {
 
 
         // --- PASS 2: LABELS (Text) ---
-        drawAllLabels(canvas, state, paints, typeface)
+        drawAllLabels(canvas, state, paints, typeface, labels)
 
 
         // --- PASS 3: CENTERS (Dots, Crosshairs, Highest point) ---
@@ -117,10 +117,12 @@ class BallRenderer {
     }
 
     fun drawBeginnerStaticCircles(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
         forEachBeginnerBall(state) { ball, config ->
             val logicalBallMatrix = state.logicalPlaneMatrix ?: return@forEachBeginnerBall
-            val logicalScreenPos = DrawingUtils.mapPoint(ball.center, logicalBallMatrix)
-            val mappedEdge = DrawingUtils.mapPoint(PointF(ball.center.x + ball.radius, ball.center.y), logicalBallMatrix)
+            val drawCenter = ball.center.warpedBy(tps)
+            val logicalScreenPos = DrawingUtils.mapPoint(drawCenter, logicalBallMatrix)
+            val mappedEdge = DrawingUtils.mapPoint(PointF(drawCenter.x + ball.radius, drawCenter.y), logicalBallMatrix)
             val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
 
             val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints, blurType = android.graphics.BlurMaskFilter.Blur.OUTER)
@@ -138,10 +140,12 @@ class BallRenderer {
     }
 
     fun drawBeginnerBubbleElements(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
         forEachBeginnerBall(state) { ball, config ->
             val logicalBallMatrix = state.logicalPlaneMatrix ?: return@forEachBeginnerBall
-            val logicalScreenPos = DrawingUtils.mapPoint(ball.center, logicalBallMatrix)
-            val mappedEdge = DrawingUtils.mapPoint(PointF(ball.center.x + ball.radius, ball.center.y), logicalBallMatrix)
+            val drawCenter = ball.center.warpedBy(tps)
+            val logicalScreenPos = DrawingUtils.mapPoint(drawCenter, logicalBallMatrix)
+            val mappedEdge = DrawingUtils.mapPoint(PointF(drawCenter.x + ball.radius, drawCenter.y), logicalBallMatrix)
             val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
 
             // Calculate bubble position
@@ -173,10 +177,12 @@ class BallRenderer {
     }
 
     fun drawBeginnerStaticCenters(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
         forEachBeginnerBall(state) { ball, _ ->
             val logicalBallMatrix = state.logicalPlaneMatrix ?: return@forEachBeginnerBall
-            val logicalScreenPos = DrawingUtils.mapPoint(ball.center, logicalBallMatrix)
-            val mappedEdge = DrawingUtils.mapPoint(PointF(ball.center.x + ball.radius, ball.center.y), logicalBallMatrix)
+            val drawCenter = ball.center.warpedBy(tps)
+            val logicalScreenPos = DrawingUtils.mapPoint(drawCenter, logicalBallMatrix)
+            val mappedEdge = DrawingUtils.mapPoint(PointF(drawCenter.x + ball.radius, drawCenter.y), logicalBallMatrix)
             val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
 
             val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -188,8 +194,8 @@ class BallRenderer {
         }
     }
 
-    fun drawBeginnerLabels(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?) {
-        drawAllLabels(canvas, state, paints, typeface)
+    fun drawBeginnerLabels(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?, labels: Map<String, String>) {
+        drawAllLabels(canvas, state, paints, typeface, labels)
     }
 
     private inline fun forEachBeginnerBall(state: CueDetatState, action: (LogicalCircular, BallsConfig) -> Unit) {
@@ -497,34 +503,37 @@ class BallRenderer {
         canvas: Canvas,
         state: CueDetatState,
         paints: PaintCache,
-        typeface: Typeface?
+        typeface: Typeface?,
+        labels: Map<String, String>
     ) {
         val textPaint = paints.textPaint.apply { this.typeface = typeface }
 
         state.onPlaneBall?.let {
-            val (label, config) = if (state.isBankingMode) {
-                "Banking Ball" to LabelConfig.bankingBall
+            val (labelKey, config) = if (state.isBankingMode) {
+                "bankingBall" to LabelConfig.bankingBall
             } else {
-                "Actual Cue Ball" to LabelConfig.actualCueBall
+                "actualCueBall" to LabelConfig.actualCueBall
             }
+            val label = labels[labelKey] ?: labelKey
             textRenderer.draw(canvas, textPaint, it, label, config, state)
         }
 
         if (!state.isBankingMode) {
+            val targetLabel = labels["targetBall"] ?: "Target Ball"
             textRenderer.draw(
                 canvas,
                 textPaint,
                 state.protractorUnit,
-                "Target Ball",
+                targetLabel,
                 LabelConfig.targetBall,
                 state
             )
 
             val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
             val ghostCueText = if (isBeginnerLocked) {
-                "Aim the cue ball at\nthe center of the blue circle."
+                labels["ghostCueInstruction"] ?: "Aim the cue ball at\nthe center of the blue circle."
             } else {
-                "Ghost Cue Ball"
+                labels["ghostCueBall"] ?: "Ghost Cue Ball"
             }
 
             textRenderer.draw(canvas, textPaint, object : LogicalCircular {
@@ -534,11 +543,12 @@ class BallRenderer {
         }
 
         state.obstacleBalls.forEachIndexed { index, obstacle ->
+            val obstacleLabel = labels["obstacle"]?.format(index + 1) ?: "Obstacle ${index + 1}"
             textRenderer.draw(
                 canvas,
                 textPaint,
                 obstacle,
-                "Obstacle ${index + 1}",
+                obstacleLabel,
                 LabelConfig.obstacleBall,
                 state
             )

@@ -49,16 +49,18 @@ class MainActivity : ComponentActivity() {
     private val tableScanViewModel: TableScanViewModel by viewModels()
     private val haterViewModel: HaterViewModel by viewModels()
 
+    private var cameraPermissionGranted by mutableStateOf(false)
+
     private val requestPermissionsLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
             if (cameraGranted) {
-                recreate() // Recreate the activity to initialize content
+                cameraPermissionGranted = true
             } else {
                 // Heresy is not tolerated. The user will comply or they will not use the app.
                 Toast.makeText(
                     this,
-                    "Camera permission is required. The app will now close.",
+                    R.string.permission_denied,
                     Toast.LENGTH_LONG
                 ).show()
                 finish()
@@ -69,24 +71,21 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        when {
-            hasCameraPermission() -> {
-                setContent {
-                    AppContent()
-                }
-            }
-            else -> {
-                setContent {
-                    CueDetatTheme {
-                        PermissionExplanationScreen(onConfirm = {
-                            requestPermissionsLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.CAMERA,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                )
+        cameraPermissionGranted = hasCameraPermission()
+
+        setContent {
+            if (cameraPermissionGranted) {
+                AppContent()
+            } else {
+                CueDetatTheme {
+                    PermissionExplanationScreen(onConfirm = {
+                        requestPermissionsLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.CAMERA,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
                             )
-                        })
-                    }
+                        )
+                    })
                 }
             }
         }

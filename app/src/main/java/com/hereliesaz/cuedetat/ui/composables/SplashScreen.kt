@@ -106,7 +106,7 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "How confident do you feel about playing pool or using this app?\n\n\n",
+                    text = stringResource(id = R.string.splash_question),
                     fontSize = 18.sp,
                     color = Color.White,
                     textAlign = TextAlign.Center,
@@ -120,9 +120,9 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(18.dp),
                     modifier = Modifier.padding(8.dp)
                 ) {
-                    QuestionButton("Keep it to the basics, please.") { onRoleSelected(ExperienceMode.BEGINNER) }
-                    QuestionButton("Eff you, Dad. I know everything!") { onRoleSelected(ExperienceMode.EXPERT) }
-                    QuestionButton("I really hate pool.") { onRoleSelected(ExperienceMode.HATER) }
+                    QuestionButton(stringResource(id = R.string.beginner_label)) { onRoleSelected(ExperienceMode.BEGINNER) }
+                    QuestionButton(stringResource(id = R.string.expert_label)) { onRoleSelected(ExperienceMode.EXPERT) }
+                    QuestionButton(stringResource(id = R.string.hater_label)) { onRoleSelected(ExperienceMode.HATER) }
                 }
             }
         }

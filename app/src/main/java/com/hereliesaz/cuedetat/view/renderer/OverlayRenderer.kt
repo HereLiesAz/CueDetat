@@ -2,10 +2,12 @@
 
 package com.hereliesaz.cuedetat.view.renderer
 
+import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Typeface
 import androidx.core.graphics.withMatrix
+import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.view.PaintCache
@@ -22,7 +24,14 @@ class OverlayRenderer {
     private val railRenderer = RailRenderer()
     private val cvDebugRenderer = CvDebugRenderer()
 
-    fun draw(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?, topDownProgress: Float = 0f) {
+    fun draw(
+        canvas: Canvas,
+        state: CueDetatState,
+        paints: PaintCache,
+        typeface: Typeface?,
+        context: Context,
+        topDownProgress: Float = 0f
+    ) {
         if (state.viewWidth == 0 || state.viewHeight == 0) return
 
         if (state.showCvMask) {
@@ -76,6 +85,16 @@ class OverlayRenderer {
         }
 
         val matrixFor2DPlane = interpolatedMatrix
+        val labels = mapOf(
+            "bankingBall" to context.getString(R.string.label_banking_ball),
+            "actualCueBall" to context.getString(R.string.label_actual_cue_ball),
+            "targetBall" to context.getString(R.string.label_target_ball),
+            "ghostCueInstruction" to context.getString(R.string.label_ghost_cue_ball_instruction),
+            "ghostCueBall" to context.getString(R.string.label_ghost_cue_ball),
+            "obstacle" to context.getString(R.string.label_obstacle),
+            "aimPocket" to context.getString(R.string.label_aim_pocket),
+            "tangentLine" to context.getString(R.string.label_tangent_line)
+        )
 
         // Pass 1: Draw elements on the logical plane (Lines drawn UNDER balls)
         // Pass 1: Draw elements on the logical plane (Lines drawn UNDER balls)
@@ -116,14 +135,14 @@ class OverlayRenderer {
             ballRenderer.drawBeginnerStaticCenters(canvas, state, paints)
             
             // 6. ALL Text (Topmost)
-            ballRenderer.drawBeginnerLabels(canvas, state, paints, typeface)
-            lineRenderer.drawBeginnerLabels(canvas, state, paints, typeface, matrixFor2DPlane)
+            ballRenderer.drawBeginnerLabels(canvas, state, paints, typeface, labels)
+            lineRenderer.drawBeginnerLabels(canvas, state, paints, typeface, matrixFor2DPlane, labels["aimPocket"], labels["tangentLine"])
 
         } else {
             // Standard/Expert Mode Passes
             
             // Pass 3: Draw all balls and their associated text
-            ballRenderer.draw(canvas, state, paints, typeface)
+            ballRenderer.draw(canvas, state, paints, typeface, labels)
         }
     }
 }

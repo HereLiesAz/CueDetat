@@ -56,4 +56,72 @@
         <item>HaterIcon03</item>
         <item>HaterIcon04</item>
     </string-array>
+
+    <!-- Splash Screen -->
+    <string name="splash_question">How confident do you feel about playing pool or using this app?\n\n\n</string>
+    <string name="beginner_label">Keep it to the basics, please.</string>
+    <string name="expert_label">Eff you, Dad. I know everything!</string>
+    <string name="hater_label">I really hate pool.</string>
+
+    <!-- Tutorial UI -->
+    <string name="tutorial_over">The tutorial is over. Go away.</string>
+    <string name="tutorial_back">Back</string>
+    <string name="tutorial_next">Next</string>
+    <string name="tutorial_skip">Skip</string>
+    <string name="tutorial_done">Done</string>
+
+    <string-array name="tutorial_dynamic_non_ar">
+        <item>Look at you, breaking free. This is Dynamic Mode. The world is your table.</item>
+        <item>Your phone is now the cue stick. Rotate it horizontally and vertically to aim. The line follows your gaze.</item>
+        <item>Tap anywhere on the \'floor\' to move the Target Ball. It\'s like magic, but with math. Tap Finish when you\'re ready.</item>
+    </string-array>
+
+    <string-array name="tutorial_dynamic_ar">
+        <item>AR mode active. Aim your lens at the table. This is the future, or at least a reasonable approximation.</item>
+        <item>The shot guide line is anchored to the bottom of your screen. Point and shoot, essentially.</item>
+        <item>Tap on a physical ball on the table. The Target Ball will \'Snap\' right to it. Efficiency is the only virtue here. Tap Finish.</item>
+    </string-array>
+
+    <string-array name="tutorial_beginner_static">
+        <item>This is a pool protractor with a bubble leveler.</item>
+        <item>In your head, pick the ball you want to hit in, and the pocket where you want it to go.</item>
+        <item>Hold your phone over the ball you chose to hit in. Fit it inside the YELLOW CIRCLE.</item>
+        <item>Keep it there, and point the YELLOW LINE at the pocket you chose.</item>
+        <item>Put your finger under the center dot of the BLUE CIRCLE. This is where you need to aim the cue ball.</item>
+    </string-array>
+
+    <string-array name="tutorial_beginner_dynamic">
+        <item>This mode is the exact same thing as the protractor, except you don\'t need to hold it over the target ball.</item>
+        <item>Hold your phone upright over the cueball.</item>
+        <item>Drag the yellow circle over the ball you want to hit in.</item>
+        <item>Resize the YELLOW CIRCLE to match the target ball, using the zoom slider.</item>
+        <item>Drag your finger on a clear spot on the screen to aim the YELLOW LINE at your pocket.</item>
+        <item>The center of the BLUE CIRCLE is where you need to aim the cue ball.</item>
+    </string-array>
+
+    <string-array name="tutorial_general">
+        <item>Alright, let\'s get this over with. This isn\'t a toy. It\'s a precision instrument. Try to keep up. Tap \'Next\'.</item>
+        <item>That circle with the dot is the Target Ball. Drag it over your object ball. I\'ll wait.</item>
+        <item>The crosshairs mark the Ghost Ball—that\'s where you *should* hit the cue ball. Drag a single finger *anywhere* to rotate the aim. The line should point to a pocket. You know what a pocket is, I assume.</item>
+        <item>If you insist, you can toggle the \'Cue Ball\' from the menu. Drag it to where your real cue ball is. The line between it and the Ghost Ball is the shot you\'re supposed to be making. It\'s not rocket science. It\'s just physics.</item>
+        <item>The slider on the right zooms. The one on the bottom rotates the table. I\'m not going to hold your hand on this one.</item>
+        <item>In the menu, there\'s a \'Calculate Bank\' option. If you\'re feeling brave, or foolish, press it. We\'ll see how you handle something that requires actual thought.</item>
+        <item>That\'s the crash course. The rest is a test of your character, or lack thereof. Don\'t embarrass us both. Press Finish.</item>
+    </string-array>
+
+    <!-- Permissions -->
+    <string name="permission_explanation_title">We need a couple of things to get started.</string>
+    <string name="permission_camera_explanation">CAMERA: This app works by looking at the table through your lens. Without it, we\'re just a black screen.</string>
+    <string name="permission_location_explanation">LOCATION: This is optional, but it lets us remember which table you\'ve scanned so you don\'t have to re-calibrate every time you come back.</string>
+    <string name="permission_confirm_button">I understand</string>
+
+    <!-- Renderer Labels -->
+    <string name="label_aim_pocket">Aim this line at the pocket.</string>
+    <string name="label_tangent_line">Tangent Line</string>
+    <string name="label_banking_ball">Banking Ball</string>
+    <string name="label_actual_cue_ball">Actual Cue Ball</string>
+    <string name="label_target_ball">Target Ball</string>
+    <string name="label_ghost_cue_ball_instruction">Aim the cue ball at\nthe center of the blue circle.</string>
+    <string name="label_ghost_cue_ball">Ghost Cue Ball</string>
+    <string name="label_obstacle">Obstacle %1$d</string>
 </resources>
