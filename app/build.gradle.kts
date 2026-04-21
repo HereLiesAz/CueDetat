@@ -10,6 +10,13 @@ if (versionPropsFile.exists()) {
     versionPropsFile.inputStream().use { versionProps.load(it) }
 }
 
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.inputStream().use { localProperties.load(it) }
+}
+val playPublicRsa = localProperties.getProperty("PLAY_PUBLIC_RSA") ?: ""
+
 var majorVal = (versionProps.getProperty("MAJOR") ?: "0").toInt()
 var minorVal = (versionProps.getProperty("MINOR") ?: "0").toInt()
 var patchVal = (versionProps.getProperty("PATCH") ?: "0").toInt()
@@ -94,6 +101,8 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        buildConfigField("String", "PLAY_PUBLIC_RSA", "\"$playPublicRsa\"")
     }
 
     signingConfigs {
@@ -131,6 +140,7 @@ android {
     buildFeatures {
         compose = true
         mlModelBinding = true
+        buildConfig = true
     }
     packaging {
         resources {
