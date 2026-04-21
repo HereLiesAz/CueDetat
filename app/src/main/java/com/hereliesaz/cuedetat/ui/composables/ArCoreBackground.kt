@@ -128,9 +128,11 @@ private class ArCoreRenderer(
 
             if (previousTrackingState == TrackingState.TRACKING &&
                 currentTracking == TrackingState.PAUSED) {
-                arDepthSession.clearAnchor()
-                onEvent(MainScreenEvent.ArTrackingLost)
+                // The logical plane shouldn't shatter just because reality blinked.
+                // Let ARCore sweat it out and try to recover.
+                Log.w(TAG, "Tracking paused. Refusing to nuke reality.")
             }
+
             previousTrackingState = currentTracking
 
             if (currentTracking != TrackingState.STOPPED) {

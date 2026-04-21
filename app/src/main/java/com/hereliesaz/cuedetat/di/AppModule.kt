@@ -1,5 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/di/AppModule.kt
-
 package com.hereliesaz.cuedetat.di
 
 import android.content.Context
@@ -16,9 +14,7 @@ import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.hereliesaz.cuedetat.data.MergedTFLiteDetector
 import com.hereliesaz.cuedetat.network.GithubApi
 import com.hereliesaz.cuedetat.network.MyriadApi
-import com.hereliesaz.cuedetat.ui.composables.tablescan.CompositePocketDetector
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
-import com.hereliesaz.cuedetat.ui.composables.tablescan.TfLitePocketDetector
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -98,17 +94,15 @@ object AppModule {
     }
 
     /**
-     * Provides the TFLite/ONNX-backed pocket detector used during table scanning.
-     * Runs TFLite (via MergedDetector) and ONNX (OpenCV DNN) side-by-side.
+     * Provides the singular, surviving TFLite-backed pocket detector.
+     * The composite illusion has been eradicated.
      */
     @Provides
     @Singleton
     fun providePocketDetector(
-        @ApplicationContext context: Context,
         mergedDetector: MergedTFLiteDetector
     ): PocketDetector {
-        val tflite = TfLitePocketDetector(context)
-        return CompositePocketDetector(listOf(mergedDetector, tflite))
+        return mergedDetector
     }
 
     /**

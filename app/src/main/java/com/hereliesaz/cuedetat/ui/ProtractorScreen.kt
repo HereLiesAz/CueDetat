@@ -36,7 +36,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.camera.core.ImageAnalysis
-import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.AzNavRailMenu
 import com.hereliesaz.cuedetat.ui.composables.ArCoreBackground
@@ -45,8 +44,6 @@ import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
 import com.hereliesaz.cuedetat.ui.composables.SpinControl
 import com.hereliesaz.cuedetat.ui.composables.TopControls
 import com.hereliesaz.cuedetat.ui.composables.ZoomControls
-import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationScreen
-import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
 import com.hereliesaz.cuedetat.ui.composables.dialogs.GlowStickDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.LuminanceAdjustmentDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.TableSizeSelectionDialog
@@ -63,14 +60,11 @@ import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanViewModel
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
 
 private const val ROUTE_MAIN = "main"
-private const val ROUTE_CALIBRATION = "calibration"
 
 @Composable
 fun ProtractorScreen(
     mainViewModel: MainViewModel,
-    calibrationViewModel: CalibrationViewModel,
-    tableScanViewModel: TableScanViewModel,
-    calibrationAnalyzer: CalibrationAnalyzer
+    tableScanViewModel: TableScanViewModel
 ) {
     val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
     val systemIsDark = isSystemInDarkTheme()
@@ -79,17 +73,7 @@ fun ProtractorScreen(
     val currentRoute = currentBackStack?.destination?.route
     val tableScanAnalyzer = remember(tableScanViewModel) { TableScanAnalyzer(tableScanViewModel::onFrame, tableScanViewModel::onFeltColorSampled, tableScanViewModel.pocketDetector) }
 
-    LaunchedEffect(uiState.showCalibrationScreen) {
-        val route = navController.currentBackStackEntry?.destination?.route
-        if (uiState.showCalibrationScreen && route != ROUTE_CALIBRATION) {
-            navController.navigate(ROUTE_CALIBRATION) { launchSingleTop = true }
-        } else if (!uiState.showCalibrationScreen && route == ROUTE_CALIBRATION) {
-            navController.popBackStack()
-        }
-    }
-
     val isOnMain = currentRoute == ROUTE_MAIN || currentRoute == null
-    val isOnCalibration = currentRoute == ROUTE_CALIBRATION
 
     // --- Top-level animation for top-down snap view ---
     val topDownProgress by androidx.compose.animation.core.animateFloatAsState(
@@ -131,7 +115,6 @@ fun ProtractorScreen(
                     // Pass null → CameraBackground binds Preview only, no ImageAnalysis use case.
                     val activeAnalyzer: ImageAnalysis.Analyzer? = when {
                         uiState.isBeginnerViewLocked -> null
-                        currentRoute == ROUTE_CALIBRATION -> calibrationAnalyzer
                         uiState.showTableScanScreen -> tableScanAnalyzer
                         else -> mainViewModel.visionAnalyzer
                     }
@@ -144,30 +127,22 @@ fun ProtractorScreen(
         }
 
 
-    background(weight = 1) {
-        if (isOnMain) {
-            ProtractorOverlay(
-                uiState = uiState,
-                systemIsDark = systemIsDark,
-                isTestingCvMask = uiState.isTestingCvMask,
-                onEvent = mainViewModel::onEvent,
-                topDownProgress = topDownProgress
-            )
+        background(weight = 1) {
+            if (isOnMain) {
+                ProtractorOverlay(
+                    uiState = uiState,
+                    systemIsDark = systemIsDark,
+                    isTestingCvMask = uiState.isTestingCvMask,
+                    onEvent = mainViewModel::onEvent,
+                    topDownProgress = topDownProgress
+                )
+            }
         }
-    }
 
         // --- Background layer 2: Navigation host (full-screen screens) ---
         background(weight = 2) {
             NavHost(navController = navController, startDestination = ROUTE_MAIN) {
                 composable(ROUTE_MAIN) { /* AR and HUD handled by background/onscreen blocks */ }
-                composable(ROUTE_CALIBRATION) {
-                    CalibrationScreen(
-                        uiState = uiState,
-                        onEvent = mainViewModel::onEvent,
-                        viewModel = calibrationViewModel,
-                        analyzer = calibrationAnalyzer
-                    )
-                }
             }
         }
 
@@ -255,72 +230,6 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen HUD: Calibration Controls ---
-        onscreen(alignment = Alignment.TopCenter) {
-            if (isOnCalibration) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
-                            RoundedCornerShape(12.dp)
-                        )
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        "Camera Calibration",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Show the camera a 4x11 circle grid pattern from various angles. " +
-                                "Capture at least 10-15 images for an accurate calibration. " +
-                                "A green overlay will indicate a successful pattern detection.",
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        onscreen(alignment = Alignment.BottomCenter) {
-            if (isOnCalibration) {
-                val capturedImageCount by calibrationViewModel.capturedImageCount.collectAsState()
-                val detectedPattern by calibrationViewModel.detectedPattern.collectAsState()
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceAround,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Images: $capturedImageCount/15",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    CuedetatButton(
-                        onClick = { calibrationViewModel.capturePattern() },
-                        text = "Capture",
-                        color = if (detectedPattern != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(
-                            alpha = 0.5f
-                        )
-                    )
-
-                    TextButton(onClick = { calibrationViewModel.onCalibrationFinished() }) {
-                        Text("Finish", color = Color.White)
-                    }
-                }
-            }
-        }
-
         // --- Onscreen: Kinetic warning overlay ---
         onscreen(alignment = Alignment.Center) {
             val showWarning = uiState.warningText != null && !uiState.isMasseModeActive && !uiState.isSpinControlVisible
@@ -330,7 +239,7 @@ fun ProtractorScreen(
         }
 
         // --- Onscreen: Tutorial overlay (main route only) ---
-        onscreen(alignment = Alignment.Center) {
+        onscreen(alignment = Alignment.TopEnd) {
             if (isOnMain) {
                 TutorialOverlay(uiState = uiState, onEvent = mainViewModel::onEvent)
             }
@@ -360,7 +269,6 @@ fun ProtractorScreen(
         }
 
         // --- Onscreen: Dialogs ---
-
 
         onscreen(alignment = Alignment.Center) {
             LuminanceAdjustmentDialog(

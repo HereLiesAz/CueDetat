@@ -113,12 +113,11 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
         is MainScreenEvent.DepthCapabilityDetected ->
             state.copy(depthCapability = action.capability)
 
-        is MainScreenEvent.ArTrackingLost -> state.copy(
-            tableScanModel = null,
-            lensWarpTps = null,
-            arDerivedPitch = null,
-            cameraMode = if (state.cameraMode == CameraMode.AR_ACTIVE) CameraMode.AR_SETUP else state.cameraMode
-        )
+        is MainScreenEvent.ArTrackingLost -> {
+            // The nuclear payload has been disarmed.
+            // If reality stutters, we float on the last known matrix rather than burning the world down.
+            state
+        }
 
         else -> state
     }

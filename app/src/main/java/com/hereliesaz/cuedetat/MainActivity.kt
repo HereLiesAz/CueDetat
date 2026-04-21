@@ -24,15 +24,12 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import com.hereliesaz.cuedetat.data.CalibrationAnalyzer
-import com.hereliesaz.cuedetat.data.CalibrationRepository
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.MainViewModel
 import com.hereliesaz.cuedetat.ui.ProtractorScreen
 import com.hereliesaz.cuedetat.ui.composables.SplashScreen
-import com.hereliesaz.cuedetat.ui.composables.calibration.CalibrationViewModel
 import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanViewModel
 import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
 import com.hereliesaz.cuedetat.ui.hatemode.HaterScreen
@@ -43,20 +40,13 @@ import com.hereliesaz.cuedetat.view.state.SingleEvent
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
-    private val calibrationViewModel: CalibrationViewModel by viewModels()
     private val tableScanViewModel: TableScanViewModel by viewModels()
     private val haterViewModel: HaterViewModel by viewModels()
-
-    @Inject
-    lateinit var calibrationRepository: CalibrationRepository
-
-    private lateinit var calibrationAnalyzer: CalibrationAnalyzer
 
     private val requestCameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
@@ -76,8 +66,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-
-        calibrationAnalyzer = CalibrationAnalyzer(calibrationViewModel)
 
         when {
             hasCameraPermission() -> {
@@ -176,12 +164,10 @@ class MainActivity : ComponentActivity() {
                         uiState = uiState,
                         onEvent = viewModel::onEvent
                     )
-                    else -> { // EXPERT and BEGINNER modes share the main screen
+                    else -> {
                         ProtractorScreen(
                             mainViewModel = viewModel,
-                            calibrationViewModel = calibrationViewModel,
-                            tableScanViewModel = tableScanViewModel,
-                            calibrationAnalyzer = calibrationAnalyzer
+                            tableScanViewModel = tableScanViewModel
                         )
                     }
                 }

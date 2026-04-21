@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -24,7 +25,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -79,8 +79,6 @@ fun TutorialOverlay(
         )
         val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = highlightAlpha)
 
-        // The Kafkaesque nightmare ends here.
-        // We removed the zIndex conceit, sliding the highlight below the gesture interceptors.
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
@@ -155,15 +153,14 @@ fun TutorialOverlay(
 
         Box(
             modifier = Modifier
-                .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(bottom = 96.dp, start = 16.dp, end = 16.dp)
+                .padding(top = 100.dp, end = 24.dp)
                 .zIndex(10f),
-            contentAlignment = Alignment.BottomCenter
+            contentAlignment = Alignment.TopEnd
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .width(280.dp)
                     .background(
                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
                         RoundedCornerShape(12.dp)
@@ -174,7 +171,7 @@ fun TutorialOverlay(
             ) {
                 Text(
                     text = tutorialSteps.getOrNull(uiState.currentTutorialStep) ?: "The tutorial is over. Go away.",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
