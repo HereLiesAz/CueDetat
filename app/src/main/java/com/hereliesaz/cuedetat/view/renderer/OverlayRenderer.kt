@@ -98,17 +98,32 @@ class OverlayRenderer {
             }
         }
 
-        // Pass 2.5: Beginner direction lines + triangles (below balls)
+        // Pass 2.5: Beginner Elements (Ordered Z-Index)
         if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
+            // 1. Triangles (Bottommost)
+            lineRenderer.drawBeginnerTriangles(canvas, state, paints, matrixFor2DPlane)
+            
+            // 2. Lines
             lineRenderer.drawBeginnerLines(canvas, state, paints, matrixFor2DPlane)
-        }
-
-        // Pass 3: Draw all balls and their associated text
-        ballRenderer.draw(canvas, state, paints, typeface)
-
-        // Pass 4: Beginner text labels (above balls)
-        if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
+            
+            // 3. Static Circles
+            ballRenderer.drawBeginnerStaticCircles(canvas, state, paints)
+            
+            // 4. Bubble Centers and Circles
+            ballRenderer.drawBeginnerBubbleElements(canvas, state, paints)
+            
+            // 5. Static Centers
+            ballRenderer.drawBeginnerStaticCenters(canvas, state, paints)
+            
+            // 6. ALL Text (Topmost)
+            ballRenderer.drawBeginnerLabels(canvas, state, paints, typeface)
             lineRenderer.drawBeginnerLabels(canvas, state, paints, typeface, matrixFor2DPlane)
+
+        } else {
+            // Standard/Expert Mode Passes
+            
+            // Pass 3: Draw all balls and their associated text
+            ballRenderer.draw(canvas, state, paints, typeface)
         }
     }
 }

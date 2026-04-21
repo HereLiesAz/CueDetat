@@ -43,7 +43,7 @@ enum class BallSelectionPhase {
 }
 
 enum class TutorialType {
-    GENERAL, DYNAMIC_NON_AR, DYNAMIC_AR
+    GENERAL, DYNAMIC_NON_AR, DYNAMIC_AR, BEGINNER_STATIC, BEGINNER_DYNAMIC
 }
 
 enum class TargetType {
@@ -106,6 +106,8 @@ data class CueDetatState(
     val lingeringSpinOffset: PointF? = null,
     @Transient val spinPathsAlpha: Float = 1.0f,
     val showTutorialOverlay: Boolean = false,
+    val hasSeenBeginnerTutorial: Boolean = false,
+    val hasSeenDynamicBeginnerTutorial: Boolean = false,
     val tutorialType: TutorialType = TutorialType.GENERAL,
     val currentTutorialStep: Int = 0,
     @Transient val tutorialHighlight: TutorialHighlightElement? = TutorialHighlightElement.NONE,

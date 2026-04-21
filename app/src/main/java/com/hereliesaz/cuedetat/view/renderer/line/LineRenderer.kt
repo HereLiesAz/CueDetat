@@ -99,6 +99,17 @@ class LineRenderer {
         drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
     }
 
+    fun drawBeginnerTriangles(
+        canvas: Canvas,
+        state: CueDetatState,
+        paints: PaintCache,
+        activeMatrix: Matrix
+    ) {
+        val (camArray, distArray) = resolveLensArrays(state)
+        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = false, drawTriangles = true)
+        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = false, drawTriangles = true)
+    }
+
     fun drawBeginnerLines(
         canvas: Canvas,
         state: CueDetatState,
@@ -106,8 +117,8 @@ class LineRenderer {
         activeMatrix: Matrix
     ) {
         val (camArray, distArray) = resolveLensArrays(state)
-        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true)
-        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true)
+        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true, drawTriangles = false)
+        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true, drawTriangles = false)
     }
 
     fun drawBeginnerLabels(
@@ -118,8 +129,8 @@ class LineRenderer {
         activeMatrix: Matrix
     ) {
         val (camArray, distArray) = resolveLensArrays(state)
-        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false)
-        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false)
+        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false, drawTriangles = false)
+        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false, drawTriangles = false)
     }
 
     private fun applyTableMask(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix) {
@@ -207,11 +218,12 @@ class LineRenderer {
         }
     }
 
-    private fun drawAimingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true) {
+    private fun drawAimingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true, drawTriangles: Boolean? = null) {
         if (state.isMasseModeActive && !state.masseConnectsTarget) return
         val aimingLineConfig = AimingLine()
         val isPocketed = state.aimedPocketIndex != null
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
+        val shouldDrawTriangles = drawTriangles ?: isBeginnerLocked
 
         val baseAimingColor = if (isPocketed) SulfurDust else aimingLineConfig.strokeColor
         val aimingStrokeWidth = if (isBeginnerLocked) aimingLineConfig.strokeWidth * 4f else aimingLineConfig.strokeWidth
@@ -246,15 +258,16 @@ class LineRenderer {
             canvas.restoreToCount(layer)
         }
 
-        val textToDraw = if (isBeginnerLocked && !drawGeometry) "Aim this line at the pocket." else null
-        drawBankablePath(canvas, path, aimingLinePaint, aimingLineGlow, isPocketed, state, paints, activeMatrix, camArray, distArray, isBeginnerLocked, textToDraw, typeface, drawGeometry)
+        val textToDraw = if (isBeginnerLocked && !drawGeometry && typeface != null) "Aim this line at the pocket." else null
+        drawBankablePath(canvas, path, aimingLinePaint, aimingLineGlow, isPocketed, state, paints, activeMatrix, camArray, distArray, shouldDrawTriangles, textToDraw, typeface, drawGeometry)
     }
 
-    private fun drawTangentLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true) {
+    private fun drawTangentLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true, drawTriangles: Boolean? = null) {
         if (state.isMasseModeActive && !state.masseConnectsTarget) return
         val tangentLineConfig = TangentLine()
         val isPocketed = state.tangentAimedPocketIndex != null
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
+        val shouldDrawTriangles = drawTriangles ?: isBeginnerLocked
 
         val baseTangentColor = if (isPocketed) WarningRed else tangentLineConfig.strokeColor
         val tangentStrokeWidth = if (isBeginnerLocked) tangentLineConfig.strokeWidth * 4f else tangentLineConfig.strokeWidth
@@ -291,9 +304,9 @@ class LineRenderer {
         val start = rawStart.warpedBy(tps)
 
         if (isBeginnerLocked) {
-            val tangentTextToDraw = if (!drawGeometry) "Tangent Line" else null
-            drawClippedLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, true, tangentTextToDraw, typeface, drawGeometry)
-            drawClippedLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, true, tangentTextToDraw, typeface, drawGeometry)
+            val tangentTextToDraw = if (!drawGeometry && typeface != null) "Tangent Line" else null
+            drawClippedLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, shouldDrawTriangles, tangentTextToDraw, typeface, drawGeometry)
+            drawClippedLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, shouldDrawTriangles, tangentTextToDraw, typeface, drawGeometry)
             return
         }
 
@@ -623,94 +636,94 @@ class LineRenderer {
 
         val path = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
 
-        if (drawGeometry) {
-            glowPaint?.let { canvas.drawPath(path, it) }
-            canvas.drawPath(path, paint)
-        }
-
         val needsPathMeasure = (drawTriangles || (textToDraw != null && state.areHelpersVisible))
-        if (!needsPathMeasure) return
+        if (needsPathMeasure) {
+            val measure = android.graphics.PathMeasure(path, false)
+            val pathLen = measure.length
 
-        val measure = android.graphics.PathMeasure(path, false)
-        val pathLen = measure.length
+            var visibleCount = 0
+            var d = 0f
+            val step = 30f // Increased step size for performance
 
-        var visibleCount = 0
-        var d = 0f
-        val step = 30f // Increased step size for performance
+            while (d <= pathLen && visibleCount < 1000) {
+                if (measure.getPosTan(d, posBuffer, tanBuffer)) {
+                    val margin = 20f
+                    if (posBuffer[0] in margin..(state.viewWidth - margin) && posBuffer[1] in margin..(state.viewHeight - margin)) {
+                        val idx = visibleCount * 4
+                        visiblePtsBuffer[idx] = posBuffer[0]
+                        visiblePtsBuffer[idx + 1] = posBuffer[1]
+                        visiblePtsBuffer[idx + 2] = tanBuffer[0]
+                        visiblePtsBuffer[idx + 3] = tanBuffer[1]
+                        visibleCount++
+                    } else if (visibleCount > 0) {
+                        break
+                    }
+                }
+                d += step
+            }
 
-        while (d <= pathLen && visibleCount < 1000) {
-            if (measure.getPosTan(d, posBuffer, tanBuffer)) {
-                val margin = 20f
-                if (posBuffer[0] in margin..(state.viewWidth - margin) && posBuffer[1] in margin..(state.viewHeight - margin)) {
-                    val idx = visibleCount * 4
-                    visiblePtsBuffer[idx] = posBuffer[0]
-                    visiblePtsBuffer[idx + 1] = posBuffer[1]
-                    visiblePtsBuffer[idx + 2] = tanBuffer[0]
-                    visiblePtsBuffer[idx + 3] = tanBuffer[1]
-                    visibleCount++
-                } else if (visibleCount > 0) {
-                    break
+            if (drawTriangles && visibleCount > 5) {
+                val trianglePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    style = Paint.Style.FILL
+                    color = paint.color
+                }
+
+                val spacing = visibleCount / 4
+                for (i in 1..3) {
+                    val ptIdx = (i * spacing).coerceIn(0, visibleCount - 1) * 4
+                    val x = visiblePtsBuffer[ptIdx]
+                    val y = visiblePtsBuffer[ptIdx + 1]
+                    val tx = visiblePtsBuffer[ptIdx + 2]
+                    val ty = visiblePtsBuffer[ptIdx + 3]
+                    val angle = Math.toDegrees(atan2(ty.toDouble(), tx.toDouble())).toFloat()
+
+                    canvas.save()
+                    canvas.translate(x, y)
+                    canvas.rotate(angle)
+
+                    val triPath = Path().apply {
+                        moveTo(80f, 0f)
+                        lineTo(-50f, 120f)
+                        lineTo(-50f, -120f)
+                        close()
+                    }
+                    canvas.drawPath(triPath, trianglePaint)
+                    canvas.restore()
                 }
             }
-            d += step
-        }
 
-        if (drawTriangles && visibleCount > 5) {
-            val trianglePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.FILL
-                color = paint.color
-            }
+            if (textToDraw != null && state.areHelpersVisible && visibleCount > 0) {
+                val midPtIdx = (visibleCount / 2) * 4
+                val x = visiblePtsBuffer[midPtIdx]
+                val y = visiblePtsBuffer[midPtIdx + 1]
+                val tx = visiblePtsBuffer[midPtIdx + 2]
+                val ty = visiblePtsBuffer[midPtIdx + 3]
+                var angle = Math.toDegrees(atan2(ty.toDouble(), tx.toDouble())).toFloat()
+                var yOffset = -35f
+                if (tx < 0) {
+                    angle += 180f
+                    yOffset = 45f
+                }
 
-            val spacing = visibleCount / 4
-            for (i in 1..3) {
-                val ptIdx = (i * spacing).coerceIn(0, visibleCount - 1) * 4
-                val x = visiblePtsBuffer[ptIdx]
-                val y = visiblePtsBuffer[ptIdx + 1]
-                val tx = visiblePtsBuffer[ptIdx + 2]
-                val ty = visiblePtsBuffer[ptIdx + 3]
-                val angle = Math.toDegrees(atan2(ty.toDouble(), tx.toDouble())).toFloat()
+                val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    this.typeface = typeface
+                    textSize = 50f
+                    color = android.graphics.Color.parseColor("#00E5FF") // Cyan
+                    textAlign = Paint.Align.CENTER
+                    setShadowLayer(10f, 0f, 0f, android.graphics.Color.BLACK)
+                }
 
                 canvas.save()
                 canvas.translate(x, y)
                 canvas.rotate(angle)
-
-                val triPath = Path().apply {
-                    moveTo(80f, 0f)
-                    lineTo(-50f, 120f)
-                    lineTo(-50f, -120f)
-                    close()
-                }
-                canvas.drawPath(triPath, trianglePaint)
+                canvas.drawText(textToDraw, 0f, yOffset, textPaint)
                 canvas.restore()
             }
         }
 
-        if (textToDraw != null && state.areHelpersVisible && visibleCount > 0) {
-            val midPtIdx = (visibleCount / 2) * 4
-            val x = visiblePtsBuffer[midPtIdx]
-            val y = visiblePtsBuffer[midPtIdx + 1]
-            val tx = visiblePtsBuffer[midPtIdx + 2]
-            val ty = visiblePtsBuffer[midPtIdx + 3]
-            var angle = Math.toDegrees(atan2(ty.toDouble(), tx.toDouble())).toFloat()
-            var yOffset = -35f
-            if (tx < 0) {
-                angle += 180f
-                yOffset = 45f
-            }
-
-            val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.typeface = typeface
-                textSize = 50f
-                color = android.graphics.Color.parseColor("#00E5FF") // Cyan
-                textAlign = Paint.Align.CENTER
-                setShadowLayer(10f, 0f, 0f, android.graphics.Color.BLACK)
-            }
-
-            canvas.save()
-            canvas.translate(x, y)
-            canvas.rotate(angle)
-            canvas.drawText(textToDraw, 0f, yOffset, textPaint)
-            canvas.restore()
+        if (drawGeometry) {
+            glowPaint?.let { canvas.drawPath(path, it) }
+            canvas.drawPath(path, paint)
         }
     }
 

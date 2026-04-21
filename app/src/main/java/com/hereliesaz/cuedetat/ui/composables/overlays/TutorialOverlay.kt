@@ -55,6 +55,21 @@ fun TutorialOverlay(
             "The shot guide line is anchored to the bottom of your screen. Point and shoot, essentially.",
             "Tap on a physical ball on the table. The Target Ball will 'Snap' right to it. Efficiency is the only virtue here. Tap Finish."
         )
+        com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_STATIC -> listOf(
+            "This is a pool protractor with a bubble leveler.",
+            "In your head, pick the ball you want to hit in, and the pocket where you want it to go.",
+            "Hold your phone over the ball you chose to hit in. Fit it inside the YELLOW CIRCLE.",
+            "Keep it there, and point the YELLOW LINE at the pocket you chose.",
+            "Put your finger under the center dot of the BLUE CIRCLE. This is where you need to aim the cue ball."
+        )
+        com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_DYNAMIC -> listOf(
+            "This mode is the exact same thing as the protractor, except you don't need to hold it over the target ball.",
+            "Hold your phone upright over the cueball.",
+            "Drag the yellow circle over the ball you want to hit in.",
+            "Resize the YELLOW CIRCLE to match the target ball, using the zoom slider.",
+            "Drag your finger on a clear spot on the screen to aim the YELLOW LINE at your pocket.",
+            "The center of the BLUE CIRCLE is where you need to aim the cue ball."
+        )
         else -> listOf(
             "Alright, let's get this over with. This isn't a toy. It's a precision instrument. Try to keep up. Tap 'Next'.",
             "That circle with the dot is the Target Ball. Drag it over your object ball. I'll wait.",
@@ -83,7 +98,7 @@ fun TutorialOverlay(
             modifier = Modifier
                 .fillMaxSize()
         ) {
-            val matrix = uiState.pitchMatrix
+            val matrix = if (uiState.isBeginnerViewLocked) uiState.logicalPlaneMatrix else uiState.pitchMatrix
             if (matrix == null) return@Canvas
 
             when (uiState.tutorialHighlight ?: TutorialHighlightElement.NONE) {
@@ -188,7 +203,7 @@ fun TutorialOverlay(
                     }
                     if (uiState.currentTutorialStep < tutorialSteps.lastIndex) {
                         TextButton(onClick = { onEvent(MainScreenEvent.NextTutorialStep) }) {
-                            Text("Skip")
+                            Text(if (uiState.tutorialType == com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_STATIC || uiState.tutorialType == com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_DYNAMIC) "Next" else "Skip")
                         }
                     } else {
                         TextButton(onClick = { onEvent(MainScreenEvent.EndTutorial) }) {

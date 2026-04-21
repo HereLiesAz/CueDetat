@@ -5,9 +5,13 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.TutorialType
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 
-private const val TUTORIAL_LAST_STEP = 6
+private const val GENERAL_TUTORIAL_LAST_STEP = 6
+private const val BEGINNER_STATIC_TUTORIAL_LAST_STEP = 4
+private const val BEGINNER_DYNAMIC_TUTORIAL_LAST_STEP = 5
+private const val DYNAMIC_TUTORIAL_LAST_STEP = 2
 
 /**
  * Reducer responsible for guiding the user through the interface.
@@ -39,10 +43,18 @@ internal fun reduceTutorialAction(state: CueDetatState, action: MainScreenEvent)
             }
         }
 
-        is MainScreenEvent.EndTutorial -> state.copy(
-            showTutorialOverlay = false,
-            tutorialHighlight = TutorialHighlightElement.NONE
-        )
+        is MainScreenEvent.EndTutorial -> {
+            var hasSeenBeginner = state.hasSeenBeginnerTutorial
+            var hasSeenDynamicBeginner = state.hasSeenDynamicBeginnerTutorial
+            if (state.tutorialType == TutorialType.BEGINNER_STATIC) hasSeenBeginner = true
+            if (state.tutorialType == TutorialType.BEGINNER_DYNAMIC) hasSeenDynamicBeginner = true
+            state.copy(
+                showTutorialOverlay = false,
+                hasSeenBeginnerTutorial = hasSeenBeginner,
+                hasSeenDynamicBeginnerTutorial = hasSeenDynamicBeginner,
+                tutorialHighlight = TutorialHighlightElement.NONE
+            )
+        }
 
         is MainScreenEvent.UpdateHighlightAlpha -> state.copy(highlightAlpha = action.alpha)
 
@@ -58,8 +70,24 @@ internal fun reduceTutorialAction(state: CueDetatState, action: MainScreenEvent)
 
 private fun advanceTutorialStep(state: CueDetatState): CueDetatState {
     val nextStep = state.currentTutorialStep + 1
-    return if (nextStep > TUTORIAL_LAST_STEP) {
-        state.copy(showTutorialOverlay = false, tutorialHighlight = TutorialHighlightElement.NONE)
+    val lastStep = when (state.tutorialType) {
+        TutorialType.BEGINNER_STATIC -> BEGINNER_STATIC_TUTORIAL_LAST_STEP
+        TutorialType.BEGINNER_DYNAMIC -> BEGINNER_DYNAMIC_TUTORIAL_LAST_STEP
+        TutorialType.DYNAMIC_AR, TutorialType.DYNAMIC_NON_AR -> DYNAMIC_TUTORIAL_LAST_STEP
+        else -> GENERAL_TUTORIAL_LAST_STEP
+    }
+
+    return if (nextStep > lastStep) {
+        var hasSeenBeginner = state.hasSeenBeginnerTutorial
+        var hasSeenDynamicBeginner = state.hasSeenDynamicBeginnerTutorial
+        if (state.tutorialType == TutorialType.BEGINNER_STATIC) hasSeenBeginner = true
+        if (state.tutorialType == TutorialType.BEGINNER_DYNAMIC) hasSeenDynamicBeginner = true
+        state.copy(
+            showTutorialOverlay = false,
+            hasSeenBeginnerTutorial = hasSeenBeginner,
+            hasSeenDynamicBeginnerTutorial = hasSeenDynamicBeginner,
+            tutorialHighlight = TutorialHighlightElement.NONE
+        )
     } else {
         state.copy(
             currentTutorialStep = nextStep,
@@ -68,20 +96,40 @@ private fun advanceTutorialStep(state: CueDetatState): CueDetatState {
     }
 }
 
-private fun highlightForStep(step: Int, state: CueDetatState): TutorialHighlightElement = when (step) {
-    0 -> TutorialHighlightElement.NONE
-    1 -> TutorialHighlightElement.TARGET_BALL
-    2 -> TutorialHighlightElement.GHOST_BALL
-    3 -> if (state.experienceMode == ExperienceMode.EXPERT && !state.table.isVisible)
-        TutorialHighlightElement.SCAN_TABLE
-    else
-        TutorialHighlightElement.CUE_BALL
-    4 -> TutorialHighlightElement.ZOOM_SLIDER
-    else -> TutorialHighlightElement.NONE
+private fun highlightForStep(step: Int, state: CueDetatState): TutorialHighlightElement {
+    if (state.tutorialType == TutorialType.BEGINNER_STATIC) {
+        return when (step) {
+            2 -> TutorialHighlightElement.TARGET_BALL // YELLOW CIRCLE
+            4 -> TutorialHighlightElement.GHOST_BALL  // BLUE CIRCLE
+            else -> TutorialHighlightElement.NONE
+        }
+    }
+    if (state.tutorialType == TutorialType.BEGINNER_DYNAMIC) {
+        return when (step) {
+            2 -> TutorialHighlightElement.TARGET_BALL // YELLOW CIRCLE
+            3 -> TutorialHighlightElement.ZOOM_SLIDER
+            5 -> TutorialHighlightElement.GHOST_BALL  // BLUE CIRCLE
+            else -> TutorialHighlightElement.NONE
+        }
+    }
+
+    return when (step) {
+        0 -> TutorialHighlightElement.NONE
+        1 -> TutorialHighlightElement.TARGET_BALL
+        2 -> TutorialHighlightElement.GHOST_BALL
+        3 -> if (state.experienceMode == ExperienceMode.EXPERT && !state.table.isVisible)
+            TutorialHighlightElement.SCAN_TABLE
+        else
+            TutorialHighlightElement.CUE_BALL
+        4 -> TutorialHighlightElement.ZOOM_SLIDER
+        else -> TutorialHighlightElement.NONE
+    }
 }
 
-private fun isTutorialStepCompleted(state: CueDetatState, action: MainScreenEvent): Boolean =
-    when (state.currentTutorialStep) {
+private fun isTutorialStepCompleted(state: CueDetatState, action: MainScreenEvent): Boolean {
+    if (state.tutorialType == TutorialType.BEGINNER_STATIC || state.tutorialType == TutorialType.BEGINNER_DYNAMIC) return false
+
+    return when (state.currentTutorialStep) {
         0 -> action is MainScreenEvent.LogicalDragApplied
         1 -> action is MainScreenEvent.LogicalGestureStarted &&
                 isNearTargetBall(action.logicalPoint, state)
@@ -94,6 +142,7 @@ private fun isTutorialStepCompleted(state: CueDetatState, action: MainScreenEven
         5 -> action is MainScreenEvent.ToggleBankingMode
         else -> false
     }
+}
 
 private fun isNearTargetBall(point: PointF, state: CueDetatState): Boolean {
     val dx = point.x - state.protractorUnit.center.x

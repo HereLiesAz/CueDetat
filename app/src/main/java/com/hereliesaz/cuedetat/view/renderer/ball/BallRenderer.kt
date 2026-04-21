@@ -37,6 +37,12 @@ class BallRenderer {
 
     fun draw(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?) {
         val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+        val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
+
+        if (isBeginnerLocked) {
+            // Replaced by granular calls in OverlayRenderer for Beginner mode
+            return
+        }
 
         // --- PASS 1: BODIES (Bases, Glows, Outlines, Detection Rings) ---
         
@@ -108,6 +114,99 @@ class BallRenderer {
         state.obstacleBalls.forEach { obstacle ->
             drawBallCenter(canvas, obstacle, ObstacleBall(), state, paints, tps)
         }
+    }
+
+    fun drawBeginnerStaticCircles(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
+        forEachBeginnerBall(state) { ball, config ->
+            val logicalBallMatrix = state.logicalPlaneMatrix ?: return@forEachBeginnerBall
+            val logicalScreenPos = DrawingUtils.mapPoint(ball.center, logicalBallMatrix)
+            val mappedEdge = DrawingUtils.mapPoint(PointF(ball.center.x + ball.radius, ball.center.y), logicalBallMatrix)
+            val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
+
+            val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints, blurType = android.graphics.BlurMaskFilter.Blur.OUTER)
+            val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = config.strokeColor.toArgb()
+                strokeWidth = 14f
+                alpha = (config.opacity * 255).toInt()
+                style = Paint.Style.STROKE
+            }
+            val screenInnerRadius = exactScreenRadius - (14f / 2f)
+
+            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, exactScreenRadius, glowPaint)
+            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, screenInnerRadius, strokePaint)
+        }
+    }
+
+    fun drawBeginnerBubbleElements(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
+        forEachBeginnerBall(state) { ball, config ->
+            val logicalBallMatrix = state.logicalPlaneMatrix ?: return@forEachBeginnerBall
+            val logicalScreenPos = DrawingUtils.mapPoint(ball.center, logicalBallMatrix)
+            val mappedEdge = DrawingUtils.mapPoint(PointF(ball.center.x + ball.radius, ball.center.y), logicalBallMatrix)
+            val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
+
+            // Calculate bubble position
+            val sensitivity = 6.0f
+            val screenOffsetX = -state.currentOrientation.roll * sensitivity
+            val screenOffsetY = state.currentOrientation.pitch * sensitivity
+            val offsetDistance = hypot(screenOffsetX, screenOffsetY)
+            val finalOffsetX = if (offsetDistance > exactScreenRadius) screenOffsetX * (exactScreenRadius / offsetDistance) else screenOffsetX
+            val finalOffsetY = if (offsetDistance > exactScreenRadius) screenOffsetY * (exactScreenRadius / offsetDistance) else screenOffsetY
+            val bubbleCenter = PointF(logicalScreenPos.x + finalOffsetX, logicalScreenPos.y + finalOffsetY)
+
+            // Circle Fill
+            val translucentFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = config.strokeColor.toArgb()
+                alpha = (config.opacity * 255 * 0.15f).toInt()
+                style = Paint.Style.FILL
+            }
+            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, exactScreenRadius, translucentFillPaint)
+
+            // Bubble Dot
+            val dotRadius = exactScreenRadius * 0.1f
+            val bubbleDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                style = Paint.Style.STROKE
+                strokeWidth = 3f
+            }
+            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, dotRadius, bubbleDotPaint)
+        }
+    }
+
+    fun drawBeginnerStaticCenters(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
+        forEachBeginnerBall(state) { ball, _ ->
+            val logicalBallMatrix = state.logicalPlaneMatrix ?: return@forEachBeginnerBall
+            val logicalScreenPos = DrawingUtils.mapPoint(ball.center, logicalBallMatrix)
+            val mappedEdge = DrawingUtils.mapPoint(PointF(ball.center.x + ball.radius, ball.center.y), logicalBallMatrix)
+            val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
+
+            val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                style = Paint.Style.FILL
+            }
+            val dotRadius = exactScreenRadius * 0.1f
+            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, dotRadius, dotPaint)
+        }
+    }
+
+    fun drawBeginnerLabels(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?) {
+        drawAllLabels(canvas, state, paints, typeface)
+    }
+
+    private inline fun forEachBeginnerBall(state: CueDetatState, action: (LogicalCircular, BallsConfig) -> Unit) {
+        val protractor = state.protractorUnit
+        action(protractor, TargetBall())
+
+        if (!state.isMasseModeActive || state.masseConnectsTarget) {
+            val ghostCenter = if (state.isMasseModeActive) state.masseGhostBallCenter else null
+            val ghostBall = object : LogicalCircular {
+                override val center = ghostCenter ?: protractor.ghostCueBallCenter
+                override val radius = protractor.radius
+            }
+            action(ghostBall, GhostCueBall())
+        }
+
+        state.onPlaneBall?.let { action(it, ActualCueBall()) }
+        state.obstacleBalls.forEach { action(it, ObstacleBall()) }
     }
 
     private fun drawDetectionRings(canvas: Canvas, state: CueDetatState, paints: PaintCache, tps: com.hereliesaz.cuedetat.domain.TpsWarpData?) {

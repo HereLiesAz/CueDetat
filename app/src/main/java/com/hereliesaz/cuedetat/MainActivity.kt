@@ -34,6 +34,7 @@ import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanViewModel
 import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
 import com.hereliesaz.cuedetat.ui.hatemode.HaterScreen
 import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
+import com.hereliesaz.cuedetat.ui.composables.dialogs.PermissionExplanationScreen
 import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import com.hereliesaz.cuedetat.utils.SecurityUtils
 import com.hereliesaz.cuedetat.view.state.SingleEvent
@@ -48,9 +49,10 @@ class MainActivity : ComponentActivity() {
     private val tableScanViewModel: TableScanViewModel by viewModels()
     private val haterViewModel: HaterViewModel by viewModels()
 
-    private val requestCameraPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-            if (isGranted) {
+    private val requestPermissionsLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
+            if (cameraGranted) {
                 recreate() // Recreate the activity to initialize content
             } else {
                 // Heresy is not tolerated. The user will comply or they will not use the app.
@@ -74,7 +76,18 @@ class MainActivity : ComponentActivity() {
                 }
             }
             else -> {
-                requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                setContent {
+                    CueDetatTheme {
+                        PermissionExplanationScreen(onConfirm = {
+                            requestPermissionsLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.CAMERA,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
+                        })
+                    }
+                }
             }
         }
         observeSingleEvents()
