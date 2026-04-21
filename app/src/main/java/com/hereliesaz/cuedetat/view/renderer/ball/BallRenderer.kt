@@ -30,6 +30,7 @@ import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
 import com.hereliesaz.cuedetat.view.renderer.warpedBy
 import kotlin.math.hypot
+import androidx.core.graphics.withMatrix
 
 class BallRenderer {
 
@@ -216,7 +217,8 @@ class BallRenderer {
     }
 
     private fun drawDetectionRings(canvas: Canvas, state: CueDetatState, paints: PaintCache, tps: com.hereliesaz.cuedetat.domain.TpsWarpData?) {
-        val detectedBalls = (state.visionData?.genericBalls ?: emptyList()) + (state.visionData?.customBalls ?: emptyList())
+        val detectedBalls = (state.visionData?.genericBalls ?: emptyList()) + 
+                           (state.visionData?.balls?.map { it.position } ?: emptyList())
         val snappedPaint = Paint(paints.targetCirclePaint).apply {
             color = SulfurDust.toArgb()
             style = Paint.Style.STROKE
@@ -232,10 +234,14 @@ class BallRenderer {
             if (isSnapped) {
                 state.pitchMatrix?.let { matrix ->
                     val drawCenter = logicalBall.center.warpedBy(tps)
-                    canvas.save()
-                    canvas.concat(matrix)
-                    canvas.drawCircle(drawCenter.x, drawCenter.y, logicalBall.radius * 0.5f, snappedPaint)
-                    canvas.restore()
+                    canvas.withMatrix(matrix) {
+                        drawCircle(
+                            drawCenter.x,
+                            drawCenter.y,
+                            logicalBall.radius * 0.5f,
+                            snappedPaint
+                        )
+                    }
                 }
             }
         }
@@ -259,12 +265,11 @@ class BallRenderer {
                         alpha = if (candidate.isConfirmed) 200 else 80
                     }
                     val drawCenter = candidate.detectedPoint.warpedBy(tps)
-                    canvas.save()
-                    canvas.concat(matrix)
-                    val r = state.protractorUnit.radius * 1.3f
-                    canvas.drawCircle(drawCenter.x, drawCenter.y, r, glowPaint)
-                    canvas.drawCircle(drawCenter.x, drawCenter.y, r, ringPaint)
-                    canvas.restore()
+                    canvas.withMatrix(matrix) {
+                        val r = state.protractorUnit.radius * 1.3f
+                        drawCircle(drawCenter.x, drawCenter.y, r, glowPaint)
+                        drawCircle(drawCenter.x, drawCenter.y, r, ringPaint)
+                    }
                 }
             }
         }
@@ -289,12 +294,11 @@ class BallRenderer {
             state.pitchMatrix?.let { matrix ->
                 candidates.forEach { candidate ->
                     val drawCenter = candidate.detectedPoint.warpedBy(tps)
-                    canvas.save()
-                    canvas.concat(matrix)
-                    val r = state.protractorUnit.radius
-                    canvas.drawCircle(drawCenter.x, drawCenter.y, r * 1.3f, candidateGlowPaint)
-                    canvas.drawCircle(drawCenter.x, drawCenter.y, r * 1.3f, candidateRingPaint)
-                    canvas.restore()
+                    canvas.withMatrix(matrix) {
+                        val r = state.protractorUnit.radius
+                        drawCircle(drawCenter.x, drawCenter.y, r * 1.3f, candidateGlowPaint)
+                        drawCircle(drawCenter.x, drawCenter.y, r * 1.3f, candidateRingPaint)
+                    }
                 }
             }
         }
@@ -377,10 +381,9 @@ class BallRenderer {
             )
 
             // Draw "On-Table" logical outline
-            canvas.save()
-            canvas.concat(positionMatrix)
-            canvas.drawCircle(drawCenter.x, drawCenter.y, ball.radius, logicalStrokePaint)
-            canvas.restore()
+            canvas.withMatrix(positionMatrix) {
+                drawCircle(drawCenter.x, drawCenter.y, ball.radius, logicalStrokePaint)
+            }
 
             // Draw "Lifted" visual body
             canvas.drawCircle(logicalScreenPos.x, yPosLifted, radiusInfo.radius, glowPaint)
@@ -440,10 +443,9 @@ class BallRenderer {
             val dotRadius = ball.radius * 0.1f
 
             // 1. Draw "On-Table" center dot
-            canvas.save()
-            canvas.concat(positionMatrix)
-            canvas.drawCircle(drawCenter.x, drawCenter.y, dotRadius, dotPaint)
-            canvas.restore()
+            canvas.withMatrix(positionMatrix) {
+                drawCircle(drawCenter.x, drawCenter.y, dotRadius, dotPaint)
+            }
 
             // 2. Draw "Lifted" visual center UI (Dot or Crosshair)
             val centerPaint = Paint(paints.fillPaint).apply { color = config.centerColor.toArgb() }

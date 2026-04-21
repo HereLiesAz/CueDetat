@@ -77,7 +77,7 @@ fun ProtractorOverlay(
         // Read the trigger to inform Compose's invalidation tracker
         drawTrigger
         drawIntoCanvas { canvas ->
-            renderer.draw(canvas.nativeCanvas, uiState, paints, barbaroTypeface, topDownProgress)
+            renderer.draw(canvas.nativeCanvas, uiState, paints, barbaroTypeface, context, topDownProgress)
         }
     }
 }

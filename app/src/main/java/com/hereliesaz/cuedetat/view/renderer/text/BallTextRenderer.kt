@@ -54,15 +54,17 @@ class BallTextRenderer {
         val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(drawCenter, ball.radius, state, matrix)
         val screenPos = DrawingUtils.mapPoint(drawCenter, matrix)
 
+        val visualLift = if (isBeginnerLocked) 0f else radiusInfo.lift
+
         val textMetrics = paint.fontMetrics
         val textPadding = 15f
         val lineHeight = textMetrics.descent - textMetrics.ascent
 
         var currentBaseline = if (drawBelow) {
-            val visualBottom = screenPos.y - radiusInfo.lift + radiusInfo.radius
+            val visualBottom = screenPos.y - visualLift + radiusInfo.radius
             visualBottom + textPadding - textMetrics.ascent + config.yOffset
         } else {
-            val visualTop = screenPos.y - radiusInfo.lift - radiusInfo.radius
+            val visualTop = screenPos.y - visualLift - radiusInfo.radius
             visualTop - textPadding - textMetrics.descent + config.yOffset
         }
 
