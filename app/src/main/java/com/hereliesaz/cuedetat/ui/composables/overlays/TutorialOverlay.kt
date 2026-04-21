@@ -32,7 +32,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -110,6 +112,8 @@ fun TutorialOverlay(
                 val p1 = DrawingUtils.mapPoint(ghostWarped, matrix)
                 val p2 = DrawingUtils.mapPoint(endWarped, matrix)
                 
+                val angleDeg = Math.toDegrees(kotlin.math.atan2((p2.y - p1.y).toDouble(), (p2.x - p1.x).toDouble())).toFloat()
+
                 // Use a PathMeasure to find points on the line that are actually on screen
                 val path = android.graphics.Path().apply {
                     moveTo(p1.x, p1.y)
@@ -148,7 +152,7 @@ fun TutorialOverlay(
                     }
                 }
 
-                listOf(HighlightParams.AimingTriangles(centers))
+                listOf(HighlightParams.AimingTriangles(centers, angleDeg))
             }
             TutorialHighlightElement.ZOOM_SLIDER -> {
                 val topLeft = Offset(uiState.viewWidth - 64.dp.value * uiState.screenDensity, uiState.viewHeight * 0.2f)
@@ -186,13 +190,23 @@ fun TutorialOverlay(
                         )
                     }
                     is HighlightParams.AimingTriangles -> {
+                        val triPath = Path().apply {
+                            moveTo(24.dp.toPx(), 0f)
+                            lineTo(-15.dp.toPx(), 20.dp.toPx())
+                            lineTo(-15.dp.toPx(), -20.dp.toPx())
+                            close()
+                        }
                         param.centers.forEach { center ->
-                            drawCircle(
-                                color = highlightColor,
-                                radius = 24.dp.toPx(),
-                                center = center,
-                                style = Stroke(width = 4.dp.toPx())
-                            )
+                            withTransform({
+                                translate(center.x, center.y)
+                                rotate(param.angleDeg)
+                            }) {
+                                drawPath(
+                                    path = triPath,
+                                    color = highlightColor,
+                                    style = Stroke(width = 4.dp.toPx())
+                                )
+                            }
                         }
                     }
                     is HighlightParams.Rect -> {
@@ -211,9 +225,8 @@ fun TutorialOverlay(
         Box(
             modifier = Modifier
                 .navigationBarsPadding()
-                .padding(top = 100.dp, end = 24.dp)
                 .zIndex(10f)
-                .align(Alignment.TopEnd)
+                .align(Alignment.Center)
         ) {
             Column(
                 modifier = Modifier
@@ -267,6 +280,6 @@ fun TutorialOverlay(
 
 private sealed class HighlightParams {
     data class Circle(val center: Offset, val radius: Float) : HighlightParams()
-    data class AimingTriangles(val centers: List<Offset>) : HighlightParams()
+    data class AimingTriangles(val centers: List<Offset>, val angleDeg: Float) : HighlightParams()
     data class Rect(val topLeft: Offset, val size: Size) : HighlightParams()
 }
