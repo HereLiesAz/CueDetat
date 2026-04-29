@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.opencv.calib3d.Calib3d
@@ -61,6 +62,12 @@ class TableScanViewModel @Inject constructor(
     val mlConfidence: StateFlow<Float> = _mlConfidence.asStateFlow()
 
     private val _mlTableBoundary = MutableStateFlow<android.graphics.RectF?>(null)
+
+    private val _darknessConfidence = MutableStateFlow(0f)
+    val darknessConfidence: StateFlow<Float> = _darknessConfidence.asStateFlow()
+
+    @Volatile private var latestCenterHistogram: List<Float> = emptyList()
+    private val capturedHistograms = mutableMapOf<PocketId, List<Float>>()
 
     private val _scanProgress = MutableStateFlow<Map<PocketId, Boolean>>(emptyMap())
 
@@ -161,6 +168,13 @@ class TableScanViewModel @Inject constructor(
 
     /** Called by TableScanAnalyzer each frame with the mean HSV of the centre crop of the felt. */
     fun onFeltColorSampled(hsv: FloatArray) { lastFeltHsv = hsv }
+
+    fun onCenterVSampled(normalizedV: Float, histogram: List<Float>) {
+        latestCenterHistogram = histogram
+        val feltV = _capturedFeltHsv.value?.get(2) ?: lastFeltHsv[2]
+        if (feltV < 0.05f) return
+        _darknessConfidence.value = (1f - (normalizedV / feltV)).coerceIn(0f, 1f)
+    }
 
     /**
      * Called by TableScanAnalyzer on each frame.
@@ -349,7 +363,9 @@ class TableScanViewModel @Inject constructor(
             tableSize = tableSize,
             feltColorHsv = feltColorHsv,
             scanLatitude = location?.first,
-            scanLongitude = location?.second
+            scanLongitude = location?.second,
+            pocketSurroundHistograms = capturedHistograms.toMap(),
+            calibrationTimestamp = System.currentTimeMillis()
         )
         withContext(Dispatchers.IO) {
             tableScanRepository.save(model)
@@ -473,6 +489,7 @@ class TableScanViewModel @Inject constructor(
 
             // Add to clusters (manually)
             clusters.getOrPut(currentId) { mutableListOf() }.add(logicalPt)
+            capturedHistograms[currentId] = latestCenterHistogram.toList()
 
             _scanProgress.value += (currentId to true)
 

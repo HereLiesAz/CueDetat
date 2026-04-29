@@ -72,7 +72,14 @@ fun ProtractorScreen(
     val navController = rememberNavController()
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
-    val tableScanAnalyzer = remember(tableScanViewModel) { TableScanAnalyzer(tableScanViewModel::onFrame, tableScanViewModel::onFeltColorSampled, tableScanViewModel.pocketDetector) }
+    val tableScanAnalyzer = remember(tableScanViewModel) {
+        TableScanAnalyzer(
+            tableScanViewModel::onFrame,
+            tableScanViewModel::onFeltColorSampled,
+            tableScanViewModel::onCenterVSampled,
+            tableScanViewModel.pocketDetector
+        )
+    }
 
     val isOnMain = currentRoute == ROUTE_MAIN || currentRoute == null
 

@@ -129,6 +129,19 @@ class MainViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            ProcessLifecycleOwner.get().lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // Fires once per foreground transition
+                val model = tableScanRepository.load()
+                if (model != null) {
+                    val deltaQ = com.hereliesaz.cuedetat.service.OrientationTrackingService.readDelta(appContext)
+                    onEvent(MainScreenEvent.SeedRelocaliser(deltaQ))
+                }
+                // Hold until lifecycle leaves STARTED, so this fires again on next resume
+                kotlinx.coroutines.awaitCancellation()
+            }
+        }
+
+        viewModelScope.launch {
             metaWearableRepository.videoFrame.collect { bitmap ->
                 if (bitmap != null && _uiState.value.cameraMode == CameraMode.META_GLASSES) {
                     visionAnalyzer.analyze(bitmap, _uiState.value)
@@ -270,6 +283,15 @@ class MainViewModel @Inject constructor(
         visionAnalyzer.updateUiState(derivedState)
         arFrameProcessor.updateUiState(derivedState)
 
+        // Start orientation tracking when AR becomes active; stop when it leaves
+        if (derivedState.cameraMode == CameraMode.AR_ACTIVE &&
+            previousState.cameraMode != CameraMode.AR_ACTIVE) {
+            com.hereliesaz.cuedetat.service.OrientationTrackingService.start(appContext)
+        } else if (derivedState.cameraMode != CameraMode.AR_ACTIVE &&
+            previousState.cameraMode == CameraMode.AR_ACTIVE) {
+            com.hereliesaz.cuedetat.service.OrientationTrackingService.stop(appContext)
+        }
+
         if (derivedState.cameraMode == CameraMode.META_GLASSES) {
             metaWearableRepository.startStreaming()
         } else if (previousState.cameraMode == CameraMode.META_GLASSES) {
@@ -371,5 +393,10 @@ class MainViewModel @Inject constructor(
                 else -> { /* Do nothing for state-changing events */ }
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        com.hereliesaz.cuedetat.service.OrientationTrackingService.stop(appContext)
     }
 }

@@ -54,7 +54,8 @@ import androidx.core.graphics.createBitmap
 class VisionRepository @Inject constructor(
     @GenericDetector private val genericObjectDetector: ObjectDetector,
     private val poolDetector: MergedTFLiteDetector,
-    private val myriadRepository: MyriadRepository
+    private val myriadRepository: MyriadRepository,
+    private val relocaliserUseCase: com.hereliesaz.cuedetat.domain.RelocaliserUseCase
 ) {
     private val _visionDataFlow = MutableStateFlow(VisionData())
     val visionDataFlow = _visionDataFlow.asStateFlow()
@@ -635,13 +636,6 @@ class VisionRepository @Inject constructor(
     }
 
 
-    private fun bhattacharyyaSimilarity(a: List<Float>, b: List<Float>): Float {
-        if (a.size != b.size || a.isEmpty()) return 0f
-        return a.zip(b).sumOf { (ai, bi) ->
-            kotlin.math.sqrt((ai * bi).toDouble())
-        }.toFloat()
-    }
-
     private fun validatePocketSurrounds(
         currentFrame: Mat,
         model: com.hereliesaz.cuedetat.domain.TableScanModel,
@@ -653,9 +647,9 @@ class VisionRepository @Inject constructor(
         if (saved.isEmpty()) return true
 
         val hInv = homography.inv()
-        var matches = 0
+        val currentHistograms = mutableMapOf<com.hereliesaz.cuedetat.domain.PocketId, List<Float>>()
+        
         for (cluster in model.pockets) {
-            val savedHist = saved[cluster.identity] ?: continue
             val logicalPt = MatOfPoint2f(
                 org.opencv.core.Point(cluster.logicalPosition.x.toDouble(), cluster.logicalPosition.y.toDouble())
             )
@@ -688,13 +682,13 @@ class VisionRepository @Inject constructor(
             )
             Core.normalize(hist, hist)
             val currentHist = (0 until 16).map { hist.get(it, 0)[0].toFloat() }
+            currentHistograms[cluster.identity] = currentHist
 
             hsvRoi.release(); roiMat.release(); hist.release()
-
-            if (bhattacharyyaSimilarity(currentHist, savedHist) > 0.7f) matches++
         }
         hInv.release()
-        return matches >= 4
+        
+        return relocaliserUseCase.validateHistograms(saved, currentHistograms)
     }
 
     internal fun runEdgeFallback(

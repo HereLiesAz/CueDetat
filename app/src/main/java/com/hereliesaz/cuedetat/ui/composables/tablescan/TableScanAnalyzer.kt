@@ -29,6 +29,7 @@ import androidx.core.graphics.createBitmap
 class TableScanAnalyzer(
     private val onPocketsDetected: (imagePoints: List<PointF>, edges: List<Pair<PointF, PointF>>?, tableBoundary: android.graphics.RectF?, confidence: Float, imageWidth: Int, imageHeight: Int) -> Unit,
     private val onFeltColorSampled: (FloatArray) -> Unit,
+    private val onCenterVSampled: (normalizedV: Float, histogram: List<Float>) -> Unit = { _, _ -> },
     private val pocketDetector: PocketDetector? = null,
 ) : ImageAnalysis.Analyzer {
 
@@ -98,7 +99,26 @@ class TableScanAnalyzer(
             val roi = org.opencv.core.Rect(roiX, roiY, roiW, roiH)
             val crop = hsvMat.submat(roi)
             val meanHsv = Core.mean(crop)
+
+            // Sample centre region V channel and 16-bin histogram for pocket darkness check
+            val centerVNormalised = (meanHsv.`val`[2] / 255f).toFloat()
+
+            // Compute 16-bin V-channel histogram of centre region
+            val hist = org.opencv.core.Mat()
+            Imgproc.calcHist(
+                listOf(crop),
+                org.opencv.core.MatOfInt(2),
+                Mat(),
+                hist,
+                org.opencv.core.MatOfInt(16),
+                org.opencv.core.MatOfFloat(0f, 256f)
+            )
+            Core.normalize(hist, hist)
+            val centerHistogram = (0 until 16).map { hist.get(it, 0)[0].toFloat() }
+            hist.release()
             crop.release()
+
+            onCenterVSampled(centerVNormalised, centerHistogram)
 
             val sampledHsv = floatArrayOf(
                 meanHsv.`val`[0].toFloat() * 2f, // 0-180 -> 0-360
