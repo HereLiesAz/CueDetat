@@ -25,9 +25,9 @@ import javax.inject.Singleton
 
 @Singleton
 class MetaWearableRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context,
 ) {
-    private val TAG = "MetaWearableRepo"
+    private val tag = "MetaWearableRepo"
     
     private var currentSession: Session? = null
     private var currentStream: Stream? = null
@@ -45,7 +45,7 @@ class MetaWearableRepository @Inject constructor(
         if (_isStreaming.value) return
         
         scope.launch {
-            Log.d(TAG, "Starting Meta glasses session...")
+            Log.d(tag, "Starting Meta glasses session...")
             try {
                 val config = StreamConfiguration(
                     videoQuality = VideoQuality.MEDIUM,
@@ -61,17 +61,17 @@ class MetaWearableRepository @Inject constructor(
                         stream.start()
                         _isStreaming.value = true
                         observeStream(stream)
-                        Log.d(TAG, "Meta stream started successfully")
+                        Log.d(tag, "Meta stream started successfully")
                     }.onFailure { error ->
-                        Log.e(TAG, "Failed to add stream: $error")
+                        Log.e(tag, "Failed to add stream: $error")
                         stopStreaming()
                     }
                 }.onFailure { error ->
-                    Log.e(TAG, "Failed to create session: $error")
+                    Log.e(tag, "Failed to create session: $error")
                     _isStreaming.value = false
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Unexpected error in startStreaming", e)
+                Log.e(tag, "Unexpected error in startStreaming", e)
                 _isStreaming.value = false
                 stopStreaming()
             }
@@ -89,14 +89,14 @@ class MetaWearableRepository @Inject constructor(
 
             launch {
                 stream.state.collect { state ->
-                    Log.d(TAG, "Meta Stream State: $state")
+                    Log.d(tag, "Meta Stream State: $state")
                 }
             }
         }
     }
 
     fun stopStreaming() {
-        Log.d(TAG, "Stopping Meta glasses stream/session")
+        Log.d(tag, "Stopping Meta glasses stream/session")
         sessionJob?.cancel()
         sessionJob = null
         currentStream?.stop()
@@ -110,7 +110,7 @@ class MetaWearableRepository @Inject constructor(
     private fun VideoFrame.toBitmap(): Bitmap? {
         return try {
             val bytes = ByteArray(buffer.remaining())
-            buffer.get(bytes)
+            buffer[bytes]
             buffer.rewind()
 
             val yuvImage = YuvImage(bytes, ImageFormat.NV21, width, height, null)
@@ -119,7 +119,7 @@ class MetaWearableRepository @Inject constructor(
             val imageBytes = out.toByteArray()
             BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
         } catch (e: Exception) {
-            Log.e(TAG, "Error converting VideoFrame to Bitmap", e)
+            Log.e(tag, "Error converting VideoFrame to Bitmap", e)
             null
         }
     }

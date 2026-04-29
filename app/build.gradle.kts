@@ -2,6 +2,7 @@ import java.util.Properties
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 val versionPropsFile = rootProject.file("version.properties")
 val versionPropsPath = versionPropsFile.absolutePath
@@ -46,10 +47,16 @@ val finalIsBuilding = isBuildingTask
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
+    // alias(libs.plugins.kotlin.android) // Removed for AGP 9.0 built-in Kotlin
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_21)
+    }
 }
 
 android {
@@ -133,8 +140,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
     
-
-
     testOptions {
         unitTests {
             isReturnDefaultValues = true
@@ -225,10 +230,10 @@ dependencies {
     implementation(libs.kotlin.stdlib)
 
     constraints {
-        implementation("org.bitbucket.b_c:jose4j:0.9.6") {
+        implementation(libs.jose4j) {
             because("Transitive dependency vulnerability")
         }
-        implementation("com.google.guava:guava:32.1.3-android") {
+        implementation(libs.guava.vulnerability) {
             because("Transitive dependency vulnerability")
         }
     }
@@ -237,7 +242,7 @@ dependencies {
 configurations.all {
     resolutionStrategy.eachDependency {
         if (requested.group == "io.netty") {
-            useVersion("4.1.132.Final")
+            useVersion(libs.versions.netty.get())
             because("Transitive dependency vulnerabilities in testing/grpc")
         }
     }
