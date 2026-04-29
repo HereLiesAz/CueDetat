@@ -1,7 +1,10 @@
 package com.hereliesaz.cuedetat
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.util.Log
+import com.hereliesaz.cuedetat.service.OrientationTrackingService
 import com.meta.wearable.dat.core.Wearables
 import dagger.hilt.android.HiltAndroidApp
 import org.opencv.android.OpenCVLoader
@@ -21,5 +24,14 @@ class MyApplication : Application() {
         } else {
             Log.e("OpenCV", "Unable to load OpenCV!")
         }
+        val channel = NotificationChannel(
+            OrientationTrackingService.CHANNEL_ID,
+            "Table Orientation",
+            NotificationManager.IMPORTANCE_MIN
+        ).apply {
+            description = "Tracks table orientation while screen is off"
+            setShowBadge(false)
+        }
+        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 }
