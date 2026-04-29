@@ -54,12 +54,12 @@ plugins {
 
 android {
     namespace = "com.hereliesaz.cuedetat"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 29
-        targetSdk = 36
+        targetSdk = 37
         
         versionCode = finalBuild
         versionName = finalVersionName
@@ -121,6 +121,7 @@ android {
         release {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -161,6 +162,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.core)
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))
@@ -194,7 +197,7 @@ dependencies {
     implementation(libs.opencv)
 
     // ARCore — Depth API (optional; app degrades gracefully on unsupported devices)
-    implementation("com.google.ar:core:1.44.0")
+    implementation(libs.core)
 
     // TFLite — pocket detection model
     implementation(libs.tensorflow.lite)
@@ -216,6 +219,7 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
     // implementation("cljsjs:liquidfun:1.1.0-0")
     implementation(libs.kotlin.metadata.jvm)
+    implementation(libs.kotlin.stdlib)
 
     constraints {
         implementation("org.bitbucket.b_c:jose4j:0.9.6") {

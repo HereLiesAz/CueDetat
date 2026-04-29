@@ -11,6 +11,7 @@ camera = "1.4.2"
 cameraxVersion = "1.4.2"
 composeBom = "2026.03.01"
 constraintlayout = "2.2.1"
+core = "1.54.0"
 coreKtx = "1.16.0"
 datastorePreferences = "1.2.1"
 espresso = "3.6.1"
@@ -103,6 +104,7 @@ androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-
 androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", version.ref = "lifecycleViewmodelKtx" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
 androidx-multidex = { group = "androidx.multidex", name = "multidex", version.ref = "multidex" }
+core = { module = "com.google.ar:core", version.ref = "core" }
 dagger-hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
 kotlin-metadata-jvm = { module = "org.jetbrains.kotlin:kotlin-metadata-jvm", version.ref = "kotlinMetadataJvm" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesAndroid" }
