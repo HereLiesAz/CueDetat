@@ -79,7 +79,8 @@ fun stateReducer(
         is MainScreenEvent.CvDataUpdated, is MainScreenEvent.LockOrUnlockColor,
         is MainScreenEvent.LockColor, is MainScreenEvent.ClearSamplePoint,
         is MainScreenEvent.AddFeltSample, is MainScreenEvent.DeleteFeltSamples,
-        is MainScreenEvent.MoveFeltSample ->
+        is MainScreenEvent.MoveFeltSample, is MainScreenEvent.AutoCalibrateCv,
+        is MainScreenEvent.ForceArActive, is MainScreenEvent.SeedRelocaliser ->
             reduceCvAction(currentState, action)
 
         // --- OBSTACLES ---

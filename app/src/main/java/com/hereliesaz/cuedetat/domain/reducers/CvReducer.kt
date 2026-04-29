@@ -145,6 +145,22 @@ internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueD
             }
         }
         is MainScreenEvent.ClearSamplePoint -> state.copy(colorSamplePoint = null)
+        is MainScreenEvent.ForceArActive -> {
+            if (state.cameraMode == CameraMode.AR_ACTIVE) return state
+            state.copy(
+                cameraMode = CameraMode.AR_ACTIVE,
+                arConfidenceHistory = emptyList(),
+                arLowConfidenceFrameCount = 0,
+                relocaliserDeltaQ = null,
+                relocaliserAttemptFrames = 0
+            )
+        }
+        is MainScreenEvent.SeedRelocaliser -> {
+            state.copy(
+                relocaliserDeltaQ = action.deltaQ,
+                relocaliserAttemptFrames = 0
+            )
+        }
         else -> state
     }
 }

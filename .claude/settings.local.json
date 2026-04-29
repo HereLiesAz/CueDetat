@@ -108,7 +108,8 @@
       "Bash(ls:*)",
       "Bash(find /home/az/StudioProjects/CueDetat/docs -type f \\\\\\(-name *.md -o -name *.txt \\\\\\))",
       "Bash(tail -3 python3 -c \"import tflite_runtime; print\\(''''ok''''\\)\")",
-      "Bash(find /home/az/StudioProjects/CueDetat/app/src -type f \\\\\\(-name *.kt -o -name *.java \\\\\\))"
+      "Bash(find /home/az/StudioProjects/CueDetat/app/src -type f \\\\\\(-name *.kt -o -name *.java \\\\\\))",
+      "Bash(bash gradlew *)"
     ]
   }
 }

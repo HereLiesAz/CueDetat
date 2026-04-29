@@ -54,9 +54,11 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
                 val buffer = fullChannel.map(FileChannel.MapMode.READ_ONLY, offset, size)
                 interpreters[i] = Interpreter(buffer, Interpreter.Options().setNumThreads(2))
             }
-            Log.d("MergedTFLiteDetector", "Master package loaded: 4 interpreters active.")
+            Log.d("MergedTFLiteDetector", "Master package loaded: ${interpreters.size}/4 interpreters active.")
         } catch (e: Exception) {
-            Log.e("MergedTFLiteDetector", "Failed to load master binary: ${e.message}")
+            Log.e("MergedTFLiteDetector", "Failed to load master binary", e)
+            Log.e("MergedTFLiteDetector",
+                "Hint: if error mentions 'compressed', add androidResources { noCompress += \"tflite\" }")
         }
     }
 

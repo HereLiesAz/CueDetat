@@ -124,6 +124,8 @@ data class CueDetatState(
     @Transient val visionData: VisionData? = null,
     @Transient val arConfidenceHistory: List<Float> = emptyList(),
     @Transient val arLowConfidenceFrameCount: Int = 0,
+    @Transient val relocaliserDeltaQ: FloatArray? = null,
+    @Transient val relocaliserAttemptFrames: Int = 0,
     @Transient val snapCandidates: List<SnapCandidate>? = null,
     @Transient val tableScanModel: TableScanModel? = null,
     @Transient val depthPlane: DepthPlane? = null,
@@ -329,4 +331,8 @@ sealed class MainScreenEvent {
     object ToggleTopDownView : MainScreenEvent()
     object ClearTopDownView : MainScreenEvent()
     data class SetTopDownBitmap(val bitmap: android.graphics.Bitmap?) : MainScreenEvent()
+
+    // Relocalisation events
+    object ForceArActive : MainScreenEvent()
+    data class SeedRelocaliser(val deltaQ: FloatArray?) : MainScreenEvent()
 }
