@@ -23,7 +23,7 @@ import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 import org.opencv.core.Mat
 
 enum class CameraMode {
-    OFF, CAMERA, AR_SETUP, AR_ACTIVE, CAMERA_ONLY, LITE_AR;
+    OFF, CAMERA, AR_SETUP, AR_ACTIVE, CAMERA_ONLY, LITE_AR, META_GLASSES;
     fun next(): CameraMode {
         val nextOrdinal = (this.ordinal + 1) % values().size
         return values()[nextOrdinal]
@@ -239,6 +239,7 @@ sealed class MainScreenEvent {
     object ToggleTableSizeDialog : MainScreenEvent()
     object ToggleForceTheme : MainScreenEvent()
     object CycleCameraMode : MainScreenEvent()
+    data class SetCameraMode(val mode: CameraMode) : MainScreenEvent()
     object ToggleLuminanceDialog : MainScreenEvent()
     data class AdjustLuminance(val adjustment: Float) : MainScreenEvent()
     object ToggleDistanceUnit : MainScreenEvent()

@@ -126,7 +126,8 @@ fun stateReducer(
         is MainScreenEvent.ExitToSplash,
         is MainScreenEvent.ToggleBankingMode, is MainScreenEvent.ToggleTableScanScreen,
         is MainScreenEvent.CancelArSetup,
-        is MainScreenEvent.TurnCameraOff ->
+        is MainScreenEvent.TurnCameraOff,
+        is MainScreenEvent.SetCameraMode ->
             reduceToggleAction(currentState, action, reducerUtils)
 
         // --- ONBOARDING ---

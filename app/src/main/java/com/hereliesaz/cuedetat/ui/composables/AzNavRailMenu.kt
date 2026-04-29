@@ -124,6 +124,21 @@ fun AzNavRailMenu(
                 onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
             )
 
+            azRailToggle(
+                id = "meta_glasses",
+                isChecked = uiState.cameraMode == CameraMode.META_GLASSES,
+                toggleOnText = "phone", toggleOffText = "glasses",
+                fillColor = b5O, textColor = Color.White,
+                onClick = {
+                    if (uiState.cameraMode == CameraMode.META_GLASSES) {
+                        onEvent(MainScreenEvent.TurnCameraOff)
+                    } else {
+                        onEvent(MainScreenEvent.SetExperienceMode(ExperienceMode.EXPERT)) // Ensure expert mode for glasses
+                        onEvent(MainScreenEvent.SetCameraMode(CameraMode.META_GLASSES))
+                    }
+                }
+            )
+
             azRailItemLowerCase(id = "felt", text = "felt", fillColor = b11R, textColor = Color.White, onClick = {
                 onEvent(MainScreenEvent.ToggleTableScanScreen)
             })

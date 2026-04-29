@@ -29,19 +29,22 @@ class VisionAnalyzer @Inject constructor(
     override fun analyze(image: ImageProxy) {
         uiStateRef.get()?.let { state ->
             val bitmap = image.toBitmap()
-            _currentFrameBitmap.value = bitmap
-            if (state.experienceMode == com.hereliesaz.cuedetat.domain.ExperienceMode.HATER) {
-                // HATER mode only needs the frame for display — skip the full CV pipeline.
-                image.close()
-                return@let
-            }
-            val skipProcessing = state.isBeginnerViewLocked
-            if (skipProcessing || bitmap == null) {
-                image.close()
-            } else {
-                visionRepository.processImage(image, bitmap, state)
-            }
-        } ?: image.close() // Close the image if state is not available to prevent leaks
+            analyze(bitmap, state, image)
+        } ?: image.close()
+    }
+
+    fun analyze(bitmap: Bitmap?, state: CueDetatState, imageProxy: ImageProxy? = null) {
+        _currentFrameBitmap.value = bitmap
+        if (state.experienceMode == com.hereliesaz.cuedetat.domain.ExperienceMode.HATER) {
+            imageProxy?.close()
+            return
+        }
+        val skipProcessing = state.isBeginnerViewLocked
+        if (skipProcessing || bitmap == null) {
+            imageProxy?.close()
+        } else {
+            visionRepository.processImage(imageProxy, bitmap, state)
+        }
     }
 
     // Reuse output bitmap and pixel array across frames to avoid per-frame allocation.

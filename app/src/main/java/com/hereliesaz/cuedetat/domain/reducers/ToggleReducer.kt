@@ -58,6 +58,7 @@ internal fun reduceToggleAction(
         }
         is MainScreenEvent.CancelArSetup -> state.copy(cameraMode = CameraMode.CAMERA_ONLY, showTableScanScreen = false)
         is MainScreenEvent.TurnCameraOff -> state.copy(cameraMode = CameraMode.OFF)
+        is MainScreenEvent.SetCameraMode -> state.copy(cameraMode = action.mode)
         is MainScreenEvent.ToggleTargetType -> {
             val nextType = if (state.targetType == com.hereliesaz.cuedetat.domain.TargetType.SOLIDS) {
                 com.hereliesaz.cuedetat.domain.TargetType.STRIPES

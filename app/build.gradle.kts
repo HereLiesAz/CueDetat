@@ -58,7 +58,7 @@ android {
 
     defaultConfig {
         applicationId = "com.hereliesaz.cuedetat"
-        minSdk = 26
+        minSdk = 29
         targetSdk = 36
         
         versionCode = finalBuild
@@ -146,6 +146,9 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        jniLibs {
+            pickFirsts += "**/libc++_shared.so"
+        }
     }
 }
 
@@ -195,6 +198,11 @@ dependencies {
 
     // TFLite — pocket detection model
     implementation(libs.tensorflow.lite)
+
+    // Meta Wearables DAT
+    implementation(libs.mwdat.core)
+    implementation(libs.mwdat.camera)
+    debugImplementation(libs.mwdat.mockdevice)
 
     // Physics
     // implementation(libs.google.liquidfun)

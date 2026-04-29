@@ -40,6 +40,7 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.AzNavRailMenu
 import com.hereliesaz.cuedetat.ui.composables.ArCoreBackground
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
+import com.hereliesaz.cuedetat.ui.composables.MetaWearableBackground
 import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
 import com.hereliesaz.cuedetat.ui.composables.SpinControl
 import com.hereliesaz.cuedetat.ui.composables.TopControls
@@ -100,6 +101,12 @@ fun ProtractorScreen(
         // All other camera modes use the standard CameraX-backed CameraBackground.
         background(weight = 0) {
             when {
+                uiState.cameraMode == CameraMode.META_GLASSES && isOnMain -> {
+                    MetaWearableBackground(
+                        modifier = Modifier.fillMaxSize(),
+                        metaWearableRepository = mainViewModel.metaWearableRepository
+                    )
+                }
                 uiState.cameraMode == CameraMode.AR_ACTIVE
                         && uiState.depthCapability == com.hereliesaz.cuedetat.domain.DepthCapability.DEPTH_API
                         && isOnMain -> {

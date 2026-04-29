@@ -16,8 +16,8 @@ pluginManagement {
 
     }
     plugins {
-        id("com.android.application") version "9.1.1"
-        id("com.android.library") version "9.1.1"
+        id("com.android.application") version "9.2.0"
+        id("com.android.library") version "9.2.0"
         id("com.github.triplet.play") version "4.0.0"
 
     }
@@ -29,6 +29,16 @@ dependencyResolutionManagement {
         mavenCentral()
         mavenLocal()
         maven(url = "https://jitpack.io")
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/facebook/meta-wearables-dat-android")
+            credentials {
+                username = ""
+                password = providers.gradleProperty("github_token")
+                    .orElse(providers.environmentVariable("GITHUB_TOKEN"))
+                    .getOrElse("")
+            }
+        }
     }
 }
 

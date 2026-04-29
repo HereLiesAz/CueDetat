@@ -2,6 +2,7 @@ package com.hereliesaz.cuedetat
 
 import android.app.Application
 import android.util.Log
+import com.meta.wearable.dat.core.Wearables
 import dagger.hilt.android.HiltAndroidApp
 import org.opencv.android.OpenCVLoader
 
@@ -14,6 +15,7 @@ class MyApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        Wearables.initialize(this)
         if (OpenCVLoader.initDebug()) {
             Log.d("OpenCV", "OpenCV loaded successfully!")
         } else {

@@ -54,7 +54,7 @@ kphysics = "master-SNAPSHOT"
 
 
 # Plugins
-androidApplication = "9.1.1" # Example, use your actual AGP version
+androidApplication = "9.2.0" # Example, use your actual AGP version
 kotlinAndroid = "2.3.20"
 kotlinCompose = "2.3.20"
 ksp = "2.3.6"
@@ -81,6 +81,7 @@ androidxMaterial3 = "1.4.0"
 aznavrail = "8.6"
 tensorflowLiteSupport = "0.5.0"
 tensorflowLiteMetadata = "0.2.0"
+metaWearableDat = "0.6.0"
 
 
 [libraries]
@@ -165,7 +166,10 @@ jbox2d-library = { group = "org.jbox2d", name = "jbox2d-library", version.ref = 
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version = "21.3.0" }
 tensorflow-lite-support = { group = "org.tensorflow", name = "tensorflow-lite-support", version.ref = "tensorflowLiteSupport" }
 tensorflow-lite-metadata = { group = "org.tensorflow", name = "tensorflow-lite-metadata", version.ref = "tensorflowLiteMetadata" }
-# androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "androidxMaterial3" } # This is a duplicate of an earlier alias, commented out.
+# Meta Wearables DAT
+mwdat-core = { group = "com.meta.wearable", name = "mwdat-core", version.ref = "metaWearableDat" }
+mwdat-camera = { group = "com.meta.wearable", name = "mwdat-camera", version.ref = "metaWearableDat" }
+mwdat-mockdevice = { group = "com.meta.wearable", name = "mwdat-mockdevice", version.ref = "metaWearableDat" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidApplication" }

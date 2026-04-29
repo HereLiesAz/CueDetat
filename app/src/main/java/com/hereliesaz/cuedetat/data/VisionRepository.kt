@@ -87,9 +87,9 @@ class VisionRepository @Inject constructor(
     private val isProcessing = AtomicBoolean(false)
 
     @SuppressLint("UnsafeOptInUsageError")
-    fun processImage(imageProxy: ImageProxy, bitmap: android.graphics.Bitmap, state: CueDetatState) {
+    fun processImage(imageProxy: ImageProxy?, bitmap: android.graphics.Bitmap, state: CueDetatState) {
         if (isProcessing.get()) {
-            imageProxy.close()
+            imageProxy?.close()
             return
         }
         isProcessing.set(true)
@@ -97,8 +97,7 @@ class VisionRepository @Inject constructor(
         val currentTime = System.currentTimeMillis()
 
         try {
-            val mediaImage = imageProxy.image ?: run { imageProxy.close(); return }
-            val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+            val rotationDegrees = imageProxy?.imageInfo?.rotationDegrees ?: 0
 
             // Downsample the machine's eyes. The silicon torture stops here.
             val scaledWidth = (bitmap.width / 4).coerceAtLeast(1)
@@ -106,7 +105,10 @@ class VisionRepository @Inject constructor(
             val scaledBitmap = android.graphics.Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight, false)
             val inputImage = InputImage.fromBitmap(scaledBitmap, rotationDegrees)
 
-            val fullMat = imageProxy.toMat(reusableFrameMat)
+            val fullMat = if (imageProxy != null) imageProxy.toMat(reusableFrameMat) else {
+                org.opencv.android.Utils.bitmapToMat(bitmap, reusableFrameMat)
+                reusableFrameMat
+            }
             val originalMat = Mat()
             Imgproc.resize(fullMat, originalMat, Size(scaledWidth.toDouble(), scaledHeight.toDouble()))
 
@@ -347,7 +349,7 @@ class VisionRepository @Inject constructor(
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
-            imageProxy.close()
+            imageProxy?.close()
             isProcessing.set(false)
         }
     }

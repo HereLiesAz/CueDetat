@@ -10,6 +10,7 @@ import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.ArDepthSession
 import com.hereliesaz.cuedetat.data.ArFrameProcessor
 import com.hereliesaz.cuedetat.data.GithubRepository
+import com.hereliesaz.cuedetat.data.MetaWearableRepository
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.TableScanRepository
@@ -17,6 +18,7 @@ import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.data.VisionAnalyzer
 import com.hereliesaz.cuedetat.data.VisionRepository
 import com.hereliesaz.cuedetat.domain.BallSelectionPhase
+import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
@@ -59,6 +61,7 @@ class MainViewModel @Inject constructor(
     private val warningManager: WarningManager,
     @ApplicationContext private val appContext: Context,
     private val visionRepository: VisionRepository,
+    val metaWearableRepository: MetaWearableRepository,
     val arDepthSession: ArDepthSession,
     val arFrameProcessor: ArFrameProcessor,
 ) : ViewModel() {
@@ -123,6 +126,14 @@ class MainViewModel @Inject constructor(
 
         viewModelScope.launch {
             visionRepository.arEvents.collect { event -> onEvent(event) }
+        }
+
+        viewModelScope.launch {
+            metaWearableRepository.videoFrame.collect { bitmap ->
+                if (bitmap != null && _uiState.value.cameraMode == CameraMode.META_GLASSES) {
+                    visionAnalyzer.analyze(bitmap, _uiState.value)
+                }
+            }
         }
 
         viewModelScope.launch {
@@ -258,6 +269,12 @@ class MainViewModel @Inject constructor(
         _uiState.value = derivedState
         visionAnalyzer.updateUiState(derivedState)
         arFrameProcessor.updateUiState(derivedState)
+
+        if (derivedState.cameraMode == CameraMode.META_GLASSES) {
+            metaWearableRepository.startStreaming()
+        } else if (previousState.cameraMode == CameraMode.META_GLASSES) {
+            metaWearableRepository.stopStreaming()
+        }
 
         if (type != UpdateType.SPIN_ONLY) {
             val isHighPriority = type == UpdateType.FULL || 
