@@ -46,7 +46,7 @@ val finalIsBuilding = isBuildingTask
 
 plugins {
     alias(libs.plugins.android.application)
-    // alias(libs.plugins.kotlin.android) // Removed for AGP 9.0 built-in Kotlin
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
@@ -132,6 +132,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
+    
+
+
     testOptions {
         unitTests {
             isReturnDefaultValues = true
