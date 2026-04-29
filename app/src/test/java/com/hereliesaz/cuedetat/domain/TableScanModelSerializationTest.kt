@@ -4,7 +4,7 @@ import android.graphics.PointF
 import com.google.gson.Gson
 import com.hereliesaz.cuedetat.view.state.TableSize
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TableScanModelSerializationTest {
@@ -29,7 +29,7 @@ class TableScanModelSerializationTest {
         )
         val json = gson.toJson(model)
         val decoded = gson.fromJson(json, TableScanModel::class.java)
-        assertEquals(2, decoded.pocketSurroundHistograms.size)
+        assertEquals(2, decoded.pocketSurroundHistograms?.size)
         assertEquals(1_700_000_000_000L, decoded.calibrationTimestamp)
     }
 
@@ -37,8 +37,8 @@ class TableScanModelSerializationTest {
     fun oldModelWithoutNewFieldsDeserializesToDefaults() {
         val oldJson = """{"pockets":[],"lensWarpTps":{"srcPoints":[],"dstPoints":[]},"tableSize":"EIGHT_FT","feltColorHsv":[120.0,0.5,0.4]}"""
         val decoded = gson.fromJson(oldJson, TableScanModel::class.java)
-        assertNotNull(decoded.pocketSurroundHistograms)
-        assertEquals(0, decoded.pocketSurroundHistograms.size)
+        // Gson bypasses Kotlin default params; null means "no histogram data" → pass-by-default in wrong-table gate
+        assertTrue(decoded.pocketSurroundHistograms.isNullOrEmpty())
         assertEquals(0L, decoded.calibrationTimestamp)
     }
 }

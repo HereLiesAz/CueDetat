@@ -44,6 +44,6 @@ data class TableScanModel(
     val feltColorHsv: List<Float>,          // 3-element [H, S, V]
     val scanLatitude: Double?,
     val scanLongitude: Double?,
-    val pocketSurroundHistograms: Map<PocketId, List<Float>> = emptyMap(),
+    val pocketSurroundHistograms: Map<PocketId, List<Float>>? = null,
     val calibrationTimestamp: Long = 0L
 )

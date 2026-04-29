@@ -85,6 +85,7 @@ class VisionRepository @Inject constructor(
     }
 
     private val isProcessing = AtomicBoolean(false)
+    private var relocaliserFailFrames = 0
 
     @SuppressLint("UnsafeOptInUsageError")
     fun processImage(imageProxy: ImageProxy?, bitmap: android.graphics.Bitmap, state: CueDetatState) {
@@ -634,7 +635,69 @@ class VisionRepository @Inject constructor(
     }
 
 
-    private fun runEdgeFallback(
+    private fun bhattacharyyaSimilarity(a: List<Float>, b: List<Float>): Float {
+        if (a.size != b.size || a.isEmpty()) return 0f
+        return a.zip(b).sumOf { (ai, bi) ->
+            kotlin.math.sqrt((ai * bi).toDouble())
+        }.toFloat()
+    }
+
+    private fun validatePocketSurrounds(
+        currentFrame: Mat,
+        model: com.hereliesaz.cuedetat.domain.TableScanModel,
+        homography: Mat,
+        imageWidth: Int,
+        imageHeight: Int
+    ): Boolean {
+        val saved = model.pocketSurroundHistograms ?: return true
+        if (saved.isEmpty()) return true
+
+        val hInv = homography.inv()
+        var matches = 0
+        for (cluster in model.pockets) {
+            val savedHist = saved[cluster.identity] ?: continue
+            val logicalPt = MatOfPoint2f(
+                org.opencv.core.Point(cluster.logicalPosition.x.toDouble(), cluster.logicalPosition.y.toDouble())
+            )
+            val imgPt = MatOfPoint2f()
+            Core.perspectiveTransform(logicalPt, imgPt, hInv)
+            val pt = imgPt.toList().firstOrNull() ?: continue
+            imgPt.release()
+            logicalPt.release()
+
+            val px = pt.x.toInt().coerceIn(20, imageWidth - 20)
+            val py = pt.y.toInt().coerceIn(20, imageHeight - 20)
+            val surroundSize = 20
+
+            val roi = org.opencv.core.Rect(px - surroundSize, py - surroundSize, surroundSize * 2, surroundSize * 2)
+            if (roi.x < 0 || roi.y < 0 || roi.x + roi.width > imageWidth ||
+                roi.y + roi.height > imageHeight) continue
+
+            val roiMat = currentFrame.submat(roi)
+            val hsvRoi = Mat()
+            Imgproc.cvtColor(roiMat, hsvRoi, Imgproc.COLOR_BGR2HSV)
+
+            val hist = Mat()
+            Imgproc.calcHist(
+                listOf(hsvRoi),
+                org.opencv.core.MatOfInt(2),
+                Mat(),
+                hist,
+                org.opencv.core.MatOfInt(16),
+                org.opencv.core.MatOfFloat(0f, 256f)
+            )
+            Core.normalize(hist, hist)
+            val currentHist = (0 until 16).map { hist.get(it, 0)[0].toFloat() }
+
+            hsvRoi.release(); roiMat.release(); hist.release()
+
+            if (bhattacharyyaSimilarity(currentHist, savedHist) > 0.7f) matches++
+        }
+        hInv.release()
+        return matches >= 4
+    }
+
+    internal fun runEdgeFallback(
         mat: Mat,
         state: CueDetatState,
         imageWidth: Int,
@@ -724,6 +787,21 @@ class VisionRepository @Inject constructor(
         val (rawT, rawR, rawS) = decomposeHomography(h, imageWidth.toFloat(), imageHeight.toFloat())
 
         applyPoseUpdate(rawT, rawR, rawS, state)
+
+        if (state.relocaliserDeltaQ != null) {
+            val isValidTable = validatePocketSurrounds(mat, model, h, imageWidth, imageHeight)
+            if (isValidTable) {
+                _arEvents.tryEmit(MainScreenEvent.ForceArActive)
+                relocaliserFailFrames = 0
+            } else {
+                relocaliserFailFrames++
+                if (relocaliserFailFrames >= 5) {
+                    relocaliserFailFrames = 0
+                    _arEvents.tryEmit(MainScreenEvent.SeedRelocaliser(null))
+                }
+            }
+        }
+
         h.release()
 
         return confidence
