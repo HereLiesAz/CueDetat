@@ -20,6 +20,7 @@ jobs:
       issues: write
       pull-requests: write
       checks: read
+      packages: read
 
     steps:
       - name: Checkout
@@ -95,6 +96,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e
           export BUILD_NUMBER=$(git rev-list --count HEAD)

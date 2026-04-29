@@ -33,7 +33,9 @@ dependencyResolutionManagement {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/facebook/meta-wearables-dat-android")
             credentials {
-                username = ""
+                username = providers.gradleProperty("github_user")
+                    .orElse(providers.environmentVariable("GITHUB_ACTOR"))
+                    .getOrElse("unknown")
                 password = providers.gradleProperty("github_token")
                     .orElse(providers.environmentVariable("GITHUB_TOKEN"))
                     .getOrElse("")
