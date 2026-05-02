@@ -30,6 +30,7 @@ class OrientationTrackingService : Service(), SensorEventListener {
             }
         }
     }
+    private var receiverRegistered = false
 
     override fun onCreate() {
         super.onCreate()
@@ -41,6 +42,7 @@ class OrientationTrackingService : Service(), SensorEventListener {
             addAction(Intent.ACTION_SCREEN_ON)
         }
         registerReceiver(screenReceiver, filter)
+        receiverRegistered = true
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_help_outline_24)
@@ -55,8 +57,18 @@ class OrientationTrackingService : Service(), SensorEventListener {
 
     override fun onDestroy() {
         super.onDestroy()
-        sensorManager.unregisterListener(this)
-        unregisterReceiver(screenReceiver)
+        runCatching { sensorManager.unregisterListener(this) }
+        if (receiverRegistered) {
+            runCatching { unregisterReceiver(screenReceiver) }
+            receiverRegistered = false
+        }
+    }
+
+    // If the user swipes the app away, stop the service so we don't keep a notification
+    // and sensor listener around for an app the user has dismissed.
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        stopSelf()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

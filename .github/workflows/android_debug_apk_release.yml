@@ -33,7 +33,6 @@ jobs:
           GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
           PROJECT_ID: ${{ secrets.PROJECT_ID }}
           CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
         run: |
           if [ -f "app/google-services.json.template" ]; then
             echo "Template found. Injecting secrets..."
@@ -41,9 +40,10 @@ jobs:
           else
             echo "Warning: google-services.json.template not found. Skipping injection."
           fi
-
-          # Inject ARCore API Key into local.properties for build.gradle.kts to pick up
-          echo "ARCORE_API_KEY=$ARCORE_API_KEY" >> local.properties
+          # ARCORE_API_KEY removed: ARCore is configured via the optional meta-data
+          # tag in AndroidManifest.xml ("com.google.ar.core" / "optional") and does not
+          # need an API key for this app. Persisting the secret to local.properties was
+          # both insecure (cached in artifacts) and unused.
 
       - name: Generate Keystore from Secrets
         env:

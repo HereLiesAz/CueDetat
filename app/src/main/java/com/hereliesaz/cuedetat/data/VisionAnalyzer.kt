@@ -11,7 +11,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class VisionAnalyzer @Inject constructor(
     private val visionRepository: VisionRepository
 ) : ImageAnalysis.Analyzer {

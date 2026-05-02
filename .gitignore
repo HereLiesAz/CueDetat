@@ -2937,3 +2937,9 @@ app-*-release.apk
 /hs_err_pid3.log
 /hs_err_pid*.log
 /project_source_scoped_*.txt
+# Stray dev-server droppings (e.g. brainstorm/preview tooling)
+/[0-9]*-[0-9]*/
+/.server.log
+/.server.pid
+/.server-info
+/.server-stopped

@@ -105,25 +105,16 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystorePath = System.getenv("KEYSTORE_PATH")
-            val isReleaseTask = gradle.startParameter.taskNames.any {
-                val n = it.lowercase()
-                ("release" in n) && ("assemble" in n || "bundle" in n)
-            }
-            if (keystorePath != null) {
-                storeFile = file(keystorePath)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                    ?: error("KEYSTORE_PASSWORD env var is required when KEYSTORE_PATH is set")
-                keyAlias = System.getenv("KEY_ALIAS")
-                    ?: error("KEY_ALIAS env var is required when KEYSTORE_PATH is set")
-                keyPassword = System.getenv("KEY_PASSWORD")
-                    ?: error("KEY_PASSWORD env var is required when KEYSTORE_PATH is set")
-            } else if (isReleaseTask) {
-                error(
-                    "Cannot build release variant: KEYSTORE_PATH is not set. " +
-                    "Set KEYSTORE_PATH/KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD env vars before " +
-                    "running an assembleRelease/bundleRelease task."
-                )
+            val ksPath = providers.gradleProperty("KEYSTORE_PATH").orNull ?: System.getenv("KEYSTORE_PATH")
+            val ksPassword = providers.gradleProperty("KEYSTORE_PASSWORD").orNull ?: System.getenv("KEYSTORE_PASSWORD")
+            val ksAlias = providers.gradleProperty("KEY_ALIAS").orNull ?: System.getenv("KEY_ALIAS")
+            val ksKeyPassword = providers.gradleProperty("KEY_PASSWORD").orNull ?: System.getenv("KEY_PASSWORD")
+
+            if (ksPath != null) {
+                storeFile = file(ksPath)
+                storePassword = ksPassword
+                keyAlias = ksAlias
+                keyPassword = ksKeyPassword
             }
         }
     }
@@ -135,7 +126,12 @@ android {
             buildConfigField("String", "MYRIAD_BASE_URL", "\"http://10.0.2.2:8000/\"")
         }
         release {
-            signingConfig = signingConfigs.getByName("release")
+            val releaseConfig = signingConfigs.getByName("release")
+            if (releaseConfig.storeFile != null) {
+                signingConfig = releaseConfig
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
