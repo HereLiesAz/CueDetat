@@ -98,20 +98,22 @@ class VisionRepository @Inject constructor(
 
         val currentTime = System.currentTimeMillis()
 
+        var scaledBitmap: android.graphics.Bitmap? = null
+        val originalMat = Mat()
+
         try {
             val rotationDegrees = imageProxy?.imageInfo?.rotationDegrees ?: 0
 
             // Downsample the machine's eyes. The silicon torture stops here.
             val scaledWidth = (bitmap.width / 4).coerceAtLeast(1)
             val scaledHeight = (bitmap.height / 4).coerceAtLeast(1)
-            val scaledBitmap = android.graphics.Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight, false)
+            scaledBitmap = android.graphics.Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight, false)
             val inputImage = InputImage.fromBitmap(scaledBitmap, rotationDegrees)
 
             val fullMat = if (imageProxy != null) imageProxy.toMat(reusableFrameMat) else {
                 org.opencv.android.Utils.bitmapToMat(bitmap, reusableFrameMat)
                 reusableFrameMat
             }
-            val originalMat = Mat()
             Imgproc.resize(fullMat, originalMat, Size(scaledWidth.toDouble(), scaledHeight.toDouble()))
 
             val imageToScreenMatrix = getTransformationMatrix(
@@ -142,8 +144,12 @@ class VisionRepository @Inject constructor(
                 val imageY = (it.y * (hsvMat.rows() / state.viewHeight.toFloat())).toInt()
 
                 val patchSize = 5
-                val roiX = (imageX - patchSize / 2).coerceIn(0, hsvMat.cols() - patchSize)
-                val roiY = (imageY - patchSize / 2).coerceIn(0, hsvMat.rows() - patchSize)
+                // Coerce both axes — the original code only clamped X, so a sample
+                // point near the bottom of the frame could send submat() out of bounds.
+                val maxX = (hsvMat.cols() - patchSize).coerceAtLeast(0)
+                val maxY = (hsvMat.rows() - patchSize).coerceAtLeast(0)
+                val roiX = (imageX - patchSize / 2).coerceIn(0, maxX)
+                val roiY = (imageY - patchSize / 2).coerceIn(0, maxY)
                 val roi = OCVRect(roiX, roiY, patchSize, patchSize)
 
                 val sampleRegion = hsvMat.submat(roi)
@@ -351,6 +357,8 @@ class VisionRepository @Inject constructor(
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
+            originalMat.release()
+            scaledBitmap?.let { if (it !== bitmap) it.recycle() }
             imageProxy?.close()
             isProcessing.set(false)
         }
@@ -472,19 +480,22 @@ class VisionRepository @Inject constructor(
             return
         }
         isProcessing.set(true)
+
+        var scaledBitmap: android.graphics.Bitmap? = null
+        var fullBitmap: android.graphics.Bitmap? = null
+        val originalMat = Mat()
+        val rgbaMat = Mat()
+
         try {
             // Downsample the AR silicon torture chamber.
-            val fullBitmap = image.toBitmap() ?: return
+            fullBitmap = image.toBitmap() ?: return
             val scaledWidth = (fullBitmap.width / 4).coerceAtLeast(1)
             val scaledHeight = (fullBitmap.height / 4).coerceAtLeast(1)
-            val scaledBitmap = android.graphics.Bitmap.createScaledBitmap(fullBitmap, scaledWidth, scaledHeight, false)
+            scaledBitmap = android.graphics.Bitmap.createScaledBitmap(fullBitmap, scaledWidth, scaledHeight, false)
             val inputImage = com.google.mlkit.vision.common.InputImage.fromBitmap(scaledBitmap, rotationDegrees)
 
-            val rgbaMat = Mat()
             org.opencv.android.Utils.bitmapToMat(scaledBitmap, rgbaMat)
-            val originalMat = Mat()
             Imgproc.cvtColor(rgbaMat, originalMat, Imgproc.COLOR_RGBA2BGR)
-            rgbaMat.release()
 
             val imageToScreenMatrix = getTransformationMatrix(
                 inputImage.width, inputImage.height,
@@ -567,6 +578,10 @@ class VisionRepository @Inject constructor(
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
+            rgbaMat.release()
+            originalMat.release()
+            // fullBitmap is the cached arOutputBitmap, do not recycle.
+            scaledBitmap?.let { if (it !== fullBitmap) it.recycle() }
             isProcessing.set(false)
         }
     }
@@ -630,6 +645,8 @@ class VisionRepository @Inject constructor(
         val blendedScale = alpha * rawS + (1f - alpha) * currentZoom
 
         val delta = hypot((blendedTranslation.x - state.viewOffset.x).toDouble(), (blendedTranslation.y - state.viewOffset.y).toDouble())
+        // Guard against NaN/Inf propagating from a degenerate homography.
+        if (!delta.isFinite() || !blendedRotation.isFinite() || !blendedScale.isFinite()) return
         if (delta > 0.5) {
             emitEvent(MainScreenEvent.UpdateArPose(blendedTranslation, blendedRotation, blendedScale))
         }
@@ -648,46 +665,63 @@ class VisionRepository @Inject constructor(
 
         val hInv = homography.inv()
         val currentHistograms = mutableMapOf<com.hereliesaz.cuedetat.domain.PocketId, List<Float>>()
-        
-        for (cluster in model.pockets) {
-            val logicalPt = MatOfPoint2f(
-                org.opencv.core.Point(cluster.logicalPosition.x.toDouble(), cluster.logicalPosition.y.toDouble())
-            )
-            val imgPt = MatOfPoint2f()
-            Core.perspectiveTransform(logicalPt, imgPt, hInv)
-            val pt = imgPt.toList().firstOrNull() ?: continue
-            imgPt.release()
-            logicalPt.release()
 
-            val px = pt.x.toInt().coerceIn(20, imageWidth - 20)
-            val py = pt.y.toInt().coerceIn(20, imageHeight - 20)
-            val surroundSize = 20
+        try {
+            for (cluster in model.pockets) {
+                val logicalPt = MatOfPoint2f(
+                    org.opencv.core.Point(cluster.logicalPosition.x.toDouble(), cluster.logicalPosition.y.toDouble())
+                )
+                val imgPt = MatOfPoint2f()
+                try {
+                    Core.perspectiveTransform(logicalPt, imgPt, hInv)
+                    val pt = imgPt.toList().firstOrNull() ?: continue
 
-            val roi = org.opencv.core.Rect(px - surroundSize, py - surroundSize, surroundSize * 2, surroundSize * 2)
-            if (roi.x < 0 || roi.y < 0 || roi.x + roi.width > imageWidth ||
-                roi.y + roi.height > imageHeight) continue
+                    val px = pt.x.toInt().coerceIn(20, imageWidth - 20)
+                    val py = pt.y.toInt().coerceIn(20, imageHeight - 20)
+                    val surroundSize = 20
 
-            val roiMat = currentFrame.submat(roi)
-            val hsvRoi = Mat()
-            Imgproc.cvtColor(roiMat, hsvRoi, Imgproc.COLOR_BGR2HSV)
+                    val roi = org.opencv.core.Rect(px - surroundSize, py - surroundSize, surroundSize * 2, surroundSize * 2)
+                    if (roi.x < 0 || roi.y < 0 || roi.x + roi.width > imageWidth ||
+                        roi.y + roi.height > imageHeight) continue
 
-            val hist = Mat()
-            Imgproc.calcHist(
-                listOf(hsvRoi),
-                org.opencv.core.MatOfInt(2),
-                Mat(),
-                hist,
-                org.opencv.core.MatOfInt(16),
-                org.opencv.core.MatOfFloat(0f, 256f)
-            )
-            Core.normalize(hist, hist)
-            val currentHist = (0 until 16).map { hist.get(it, 0)[0].toFloat() }
-            currentHistograms[cluster.identity] = currentHist
-
-            hsvRoi.release(); roiMat.release(); hist.release()
+                    val roiMat = currentFrame.submat(roi)
+                    val hsvRoi = Mat()
+                    val hist = Mat()
+                    val histChannels = org.opencv.core.MatOfInt(2)
+                    val histBins = org.opencv.core.MatOfInt(16)
+                    val histRanges = org.opencv.core.MatOfFloat(0f, 256f)
+                    val histMask = Mat()
+                    try {
+                        Imgproc.cvtColor(roiMat, hsvRoi, Imgproc.COLOR_BGR2HSV)
+                        Imgproc.calcHist(
+                            listOf(hsvRoi),
+                            histChannels,
+                            histMask,
+                            hist,
+                            histBins,
+                            histRanges
+                        )
+                        Core.normalize(hist, hist)
+                        val currentHist = (0 until 16).map { hist.get(it, 0)[0].toFloat() }
+                        currentHistograms[cluster.identity] = currentHist
+                    } finally {
+                        histMask.release()
+                        histRanges.release()
+                        histBins.release()
+                        histChannels.release()
+                        hist.release()
+                        hsvRoi.release()
+                        roiMat.release()
+                    }
+                } finally {
+                    imgPt.release()
+                    logicalPt.release()
+                }
+            }
+        } finally {
+            hInv.release()
         }
-        hInv.release()
-        
+
         return relocaliserUseCase.validateHistograms(saved, currentHistograms)
     }
 
@@ -723,9 +757,14 @@ class VisionRepository @Inject constructor(
         Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_OPEN, kernel)
 
         val contours = mutableListOf<MatOfPoint>()
-        Imgproc.findContours(mask, contours, Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
-        mask.release()
-        kernel.release()
+        val contourHierarchy = Mat()
+        try {
+            Imgproc.findContours(mask, contours, contourHierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+        } finally {
+            contourHierarchy.release()
+            mask.release()
+            kernel.release()
+        }
 
         val largest = contours.maxByOrNull { Imgproc.contourArea(it) } ?: return 0f
         if (Imgproc.contourArea(largest) < mat.rows() * mat.cols() * 0.05) return 0f

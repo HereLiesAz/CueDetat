@@ -11,13 +11,6 @@ if (versionPropsFile.exists()) {
     versionPropsFile.inputStream().use { versionProps.load(it) }
 }
 
-val localProperties = Properties()
-val localPropertiesFile = rootProject.file("local.properties")
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.inputStream().use { localProperties.load(it) }
-}
-val playPublicRsa = localProperties.getProperty("PLAY_PUBLIC_RSA") ?: ""
-
 var majorVal = (versionProps.getProperty("MAJOR") ?: "0").toInt()
 var minorVal = (versionProps.getProperty("MINOR") ?: "0").toInt()
 var patchVal = (versionProps.getProperty("PATCH") ?: "0").toInt()
@@ -108,23 +101,39 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-
-        buildConfigField("String", "PLAY_PUBLIC_RSA", "\"$playPublicRsa\"")
     }
 
     signingConfigs {
         create("release") {
             val keystorePath = System.getenv("KEYSTORE_PATH")
+            val isReleaseTask = gradle.startParameter.taskNames.any {
+                val n = it.lowercase()
+                ("release" in n) && ("assemble" in n || "bundle" in n)
+            }
             if (keystorePath != null) {
                 storeFile = file(keystorePath)
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
+                    ?: error("KEYSTORE_PASSWORD env var is required when KEYSTORE_PATH is set")
                 keyAlias = System.getenv("KEY_ALIAS")
+                    ?: error("KEY_ALIAS env var is required when KEYSTORE_PATH is set")
                 keyPassword = System.getenv("KEY_PASSWORD")
+                    ?: error("KEY_PASSWORD env var is required when KEYSTORE_PATH is set")
+            } else if (isReleaseTask) {
+                error(
+                    "Cannot build release variant: KEYSTORE_PATH is not set. " +
+                    "Set KEYSTORE_PATH/KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD env vars before " +
+                    "running an assembleRelease/bundleRelease task."
+                )
             }
         }
     }
 
     buildTypes {
+        debug {
+            // Local Myriad backend (emulator loopback) — paired with the cleartext exception
+            // in src/debug/res/xml/network_security_config.xml.
+            buildConfigField("String", "MYRIAD_BASE_URL", "\"http://10.0.2.2:8000/\"")
+        }
         release {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
@@ -133,6 +142,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Empty URL signals AppModule to skip wiring the Myriad client. Override at
+            // CI time via Gradle property -PmyriadBaseUrl=https://… once a real backend
+            // exists.
+            val myriadUrl = providers.gradleProperty("myriadBaseUrl").orNull ?: ""
+            buildConfigField("String", "MYRIAD_BASE_URL", "\"$myriadUrl\"")
         }
     }
     compileOptions {

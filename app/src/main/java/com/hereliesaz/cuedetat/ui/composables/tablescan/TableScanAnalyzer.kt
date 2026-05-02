@@ -6,6 +6,7 @@ import android.graphics.PointF
 import android.util.Log
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
+import com.hereliesaz.cuedetat.BuildConfig
 import org.opencv.android.Utils
 import org.opencv.core.Core
 import org.opencv.core.Mat
@@ -66,13 +67,18 @@ class TableScanAnalyzer(
             // Convert to RGB for detector and sampling
             Imgproc.cvtColor(bgrMat, rgbMat, Imgproc.COLOR_BGR2RGB)
 
-            // Diagnostic: check average brightness and color of the frame
+            // Diagnostic: check average brightness and color of the frame.
+            // Logging is debug-only — at 30fps this is a string allocation in the
+            // camera hot path, which we do not want shipped in release.
             val avgColor = Core.mean(rgbMat)
-            if (frameCounter.incrementAndGet() % 30 == 0) {
-                Log.d("TableScanAnalyzer", "Frame Avg RGB: ${avgColor.`val`[0].toInt()}, ${avgColor.`val`[1].toInt()}, ${avgColor.`val`[2].toInt()}")
-            }
-            if (avgColor.`val`[0] < 5.0 && avgColor.`val`[1] < 5.0 && avgColor.`val`[2] < 5.0) {
-                Log.w("TableScanAnalyzer", "Frame is very dark!")
+            val frameNum = frameCounter.incrementAndGet()
+            if (BuildConfig.DEBUG) {
+                if (frameNum % 30 == 0) {
+                    Log.d("TableScanAnalyzer", "Frame Avg RGB: ${avgColor.`val`[0].toInt()}, ${avgColor.`val`[1].toInt()}, ${avgColor.`val`[2].toInt()}")
+                }
+                if (avgColor.`val`[0] < 5.0 && avgColor.`val`[1] < 5.0 && avgColor.`val`[2] < 5.0) {
+                    Log.w("TableScanAnalyzer", "Frame is very dark!")
+                }
             }
 
             // --- ALWAYS sample felt color from every frame ---
@@ -98,25 +104,42 @@ class TableScanAnalyzer(
 
             val roi = org.opencv.core.Rect(roiX, roiY, roiW, roiH)
             val crop = hsvMat.submat(roi)
-            val meanHsv = Core.mean(crop)
+            val centerVNormalised: Float
+            val centerHistogram: List<Float>
+            val meanHsv: org.opencv.core.Scalar
+            try {
+                meanHsv = Core.mean(crop)
 
-            // Sample centre region V channel and 16-bin histogram for pocket darkness check
-            val centerVNormalised = (meanHsv.`val`[2] / 255f).toFloat()
+                // Sample centre region V channel and 16-bin histogram for pocket darkness check
+                centerVNormalised = (meanHsv.`val`[2] / 255f).toFloat()
 
-            // Compute 16-bin V-channel histogram of centre region
-            val hist = org.opencv.core.Mat()
-            Imgproc.calcHist(
-                listOf(crop),
-                org.opencv.core.MatOfInt(2),
-                Mat(),
-                hist,
-                org.opencv.core.MatOfInt(16),
-                org.opencv.core.MatOfFloat(0f, 256f)
-            )
-            Core.normalize(hist, hist)
-            val centerHistogram = (0 until 16).map { hist.get(it, 0)[0].toFloat() }
-            hist.release()
-            crop.release()
+                // Compute 16-bin V-channel histogram of centre region
+                val hist = org.opencv.core.Mat()
+                val histChannels = org.opencv.core.MatOfInt(2)
+                val histBins = org.opencv.core.MatOfInt(16)
+                val histRanges = org.opencv.core.MatOfFloat(0f, 256f)
+                val histMask = Mat()
+                try {
+                    Imgproc.calcHist(
+                        listOf(crop),
+                        histChannels,
+                        histMask,
+                        hist,
+                        histBins,
+                        histRanges
+                    )
+                    Core.normalize(hist, hist)
+                    centerHistogram = (0 until 16).map { hist.get(it, 0)[0].toFloat() }
+                } finally {
+                    histMask.release()
+                    histRanges.release()
+                    histBins.release()
+                    histChannels.release()
+                    hist.release()
+                }
+            } finally {
+                crop.release()
+            }
 
             onCenterVSampled(centerVNormalised, centerHistogram)
 
@@ -192,50 +215,57 @@ class TableScanAnalyzer(
                     kernel.release()
 
                     val contours = mutableListOf<MatOfPoint>()
-                    Imgproc.findContours(maskMat, contours, Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
+                    val contourHierarchy = Mat()
+                    try {
+                        Imgproc.findContours(maskMat, contours, contourHierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
 
-                    val largestContour = contours.maxByOrNull { Imgproc.contourArea(it) }
+                        val largestContour = contours.maxByOrNull { Imgproc.contourArea(it) }
 
-                    if (largestContour != null && Imgproc.contourArea(largestContour) > (smallWidth * smallHeight * 0.1)) {
-                        val contour2f = MatOfPoint2f(*largestContour.toArray())
-                        val perimeter = Imgproc.arcLength(contour2f, true)
-                        val approx = MatOfPoint2f()
+                        if (largestContour != null && Imgproc.contourArea(largestContour) > (smallWidth * smallHeight * 0.1)) {
+                            val contour2f = MatOfPoint2f(*largestContour.toArray())
+                            val approx = MatOfPoint2f()
+                            try {
+                                val perimeter = Imgproc.arcLength(contour2f, true)
+                                var epsilonCoeff = 0.01
+                                while (epsilonCoeff < 0.1) {
+                                    Imgproc.approxPolyDP(contour2f, approx, epsilonCoeff * perimeter, true)
+                                    if (approx.rows() == 4) break
+                                    epsilonCoeff += 0.01
+                                }
 
-                        var epsilonCoeff = 0.01
-                        while (epsilonCoeff < 0.1) {
-                            Imgproc.approxPolyDP(contour2f, approx, epsilonCoeff * perimeter, true)
-                            if (approx.rows() == 4) break
-                            epsilonCoeff += 0.01
-                        }
+                                if (approx.rows() == 4) {
+                                    val pts = approx.toArray()
+                                    val corners = pts.map { PointF((it.x / scale).toFloat(), (it.y / scale).toFloat()) }
 
-                        if (approx.rows() == 4) {
-                            val pts = approx.toArray()
-                            val corners = pts.map { PointF((it.x / scale).toFloat(), (it.y / scale).toFloat()) }
+                                    val edges = mutableListOf<Pair<PointF, PointF>>()
+                                    for (i in 0..3) {
+                                        edges.add(Pair(corners[i], corners[(i + 1) % 4]))
+                                    }
 
-                            val edges = mutableListOf<Pair<PointF, PointF>>()
-                            for (i in 0..3) {
-                                edges.add(Pair(corners[i], corners[(i + 1) % 4]))
+                                    edges.sortByDescending { (p1, p2) -> hypot((p2.x - p1.x).toDouble(), (p2.y - p1.y).toDouble()) }
+
+                                    val side1 = edges[0]
+                                    val side2 = edges[1]
+
+                                    val mid1 = PointF((side1.first.x + side1.second.x) / 2f, (side1.first.y + side1.second.y) / 2f)
+                                    val mid2 = PointF((side2.first.x + side2.second.x) / 2f, (side2.first.y + side2.second.y) / 2f)
+
+                                    val fallbackDetections = mutableListOf<PointF>()
+                                    fallbackDetections.addAll(corners)
+                                    fallbackDetections.add(mid1)
+                                    fallbackDetections.add(mid2)
+
+                                    onPocketsDetected(fallbackDetections, edges, null, 0.5f, originalWidth, originalHeight)
+                                }
+                            } finally {
+                                approx.release()
+                                contour2f.release()
                             }
-
-                            edges.sortByDescending { (p1, p2) -> hypot((p2.x - p1.x).toDouble(), (p2.y - p1.y).toDouble()) }
-
-                            val side1 = edges[0]
-                            val side2 = edges[1]
-
-                            val mid1 = PointF((side1.first.x + side1.second.x) / 2f, (side1.first.y + side1.second.y) / 2f)
-                            val mid2 = PointF((side2.first.x + side2.second.x) / 2f, (side2.first.y + side2.second.y) / 2f)
-
-                            val fallbackDetections = mutableListOf<PointF>()
-                            fallbackDetections.addAll(corners)
-                            fallbackDetections.add(mid1)
-                            fallbackDetections.add(mid2)
-
-                            onPocketsDetected(fallbackDetections, edges, null, 0.5f, originalWidth, originalHeight)
                         }
-                        approx.release()
-                        contour2f.release()
+                    } finally {
+                        contourHierarchy.release()
+                        contours.forEach { it.release() }
                     }
-                    contours.forEach { it.release() }
 
                 } catch (_: Exception) {}
             }

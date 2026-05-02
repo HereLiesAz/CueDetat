@@ -37,10 +37,12 @@ class ArFlowReducerTest {
     }
 
     @Test
-    fun `CycleCameraMode from AR_ACTIVE turns off`() {
+    fun `CycleCameraMode from AR_ACTIVE transitions to LITE_AR`() {
+        // ToggleReducer:46 — AR_ACTIVE deliberately drops to LITE_AR rather than OFF
+        // so users keep a usable camera view after AR session ends.
         val s = base.copy(cameraMode = CameraMode.AR_ACTIVE)
         val result = reduceToggleAction(s, MainScreenEvent.CycleCameraMode, utils)
-        assertEquals(CameraMode.OFF, result.cameraMode)
+        assertEquals(CameraMode.LITE_AR, result.cameraMode)
     }
 
     @Test
@@ -58,7 +60,11 @@ class ArFlowReducerTest {
     }
 
     @Test
-    fun `ArTrackingLost clears tableScanModel and lensWarpTps and returns to AR_SETUP from AR_ACTIVE`() {
+    fun `ArTrackingLost preserves AR session state (float on last known matrix)`() {
+        // ControlReducer:116 — ArTrackingLost is a deliberate no-op; the app floats on
+        // the last known matrix rather than tearing down the AR session whenever the
+        // tracker hiccups. Test guards against accidentally restoring the old
+        // "nuclear payload" behaviour.
         val tps = TpsWarpData(
             srcPoints = listOf(PointF(0f, 0f)),
             dstPoints = listOf(PointF(1f, 1f))
@@ -77,9 +83,9 @@ class ArFlowReducerTest {
             lensWarpTps = scan.lensWarpTps
         )
         val result = reduceControlAction(s, MainScreenEvent.ArTrackingLost)
-        assertEquals(CameraMode.AR_SETUP, result.cameraMode)
-        assertNull(result.tableScanModel)
-        assertNull(result.lensWarpTps)
+        assertEquals(CameraMode.AR_ACTIVE, result.cameraMode)
+        assertEquals(scan, result.tableScanModel)
+        assertEquals(scan.lensWarpTps, result.lensWarpTps)
     }
 
     @Test
