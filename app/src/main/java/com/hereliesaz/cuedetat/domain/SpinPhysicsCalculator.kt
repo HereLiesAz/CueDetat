@@ -5,11 +5,12 @@ import com.hereliesaz.cuedetat.view.model.Table
 import kotlin.math.*
 
 object SpinPhysicsCalculator {
-    private const val K_SQUIRT = 0.04f   // Side-spin squirt factor
+    private const val K_SQUIRT = 0.04f   // Side-spin squirt factor (initial deflection at cue impact)
     private const val K_THROW = 0.15f    // Rail throw factor
     private const val K_CURVE = 0.015f   // Follow/Draw curve induction rate
+    private const val K_SWERVE = 0.0008f // Per-step lateral curve from side spin (radians per logical unit travelled)
     private const val K_DECAY = 0.005f   // Spin decay rate per logical unit
-    private const val PATH_LENGTH = 2000f 
+    private const val PATH_LENGTH = 2000f
 
     private const val STEP_SIZE = 4f
     private const val PATH_SAMPLING_RATE = 4
@@ -36,11 +37,14 @@ object SpinPhysicsCalculator {
         val tangentAngle = impactAngle + tangentSide * (PI / 2).toFloat()
         
         // 2. Initial State
-        // sideSpin (x) primarily affects rail reflections.
+        // sideSpin (x) deflects the cue ball at impact (squirt) and influences rail throw.
         // verticalSpin (y) causes the post-collision curve.
-        var currentAngle = tangentAngle 
         var sideSpin = spinOffset.x
         var verticalSpin = spinOffset.y
+        // Squirt: side-spin nudges the cue-ball off the tangent line at impact.
+        // The sign matches the tangentSide convention so right english (sideSpin > 0)
+        // and left english (sideSpin < 0) deflect to opposite sides.
+        var currentAngle = tangentAngle - tangentSide * sideSpin * K_SQUIRT
         
         val points = mutableListOf(cueBallPos)
         var currentPos = cueBallPos
@@ -70,6 +74,11 @@ object SpinPhysicsCalculator {
                 val angleDiff = normalizeAngle(naturalAngle - currentAngle)
                 val rotateAmount = angleDiff * K_CURVE * abs(spinEff)
                 currentAngle += rotateAmount
+
+                // Swerve: side spin imparts a small persistent lateral curve as the
+                // ball travels. Decays with totalDistance, like the throw term.
+                val sideSpinSwerve = sideSpin * exp((-K_DECAY * totalDistance).toDouble()).toFloat()
+                currentAngle -= sideSpinSwerve * K_SWERVE * STEP_SIZE
 
                 val nextX = currentPos.x + cos(currentAngle) * STEP_SIZE
                 val nextY = currentPos.y + sin(currentAngle) * STEP_SIZE
