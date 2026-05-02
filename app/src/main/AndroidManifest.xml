@@ -12,8 +12,6 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
         android:name=".MyApplication"
@@ -36,15 +34,6 @@
         <meta-data
             android:name="com.meta.wearable.mwdat.APPLICATION_ID"
             android:value="your_app_id_here" />
-
-        <service
-            android:name=".service.OrientationTrackingService"
-            android:foregroundServiceType="specialUse"
-            android:exported="false">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Track device orientation for table relocalisation" />
-        </service>
 
         <activity
             android:name=".MainActivity"
