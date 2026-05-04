@@ -2,8 +2,10 @@
 
 package com.hereliesaz.cuedetat.domain.reducers
 
+import com.hereliesaz.cuedetat.data.BallType
 import com.hereliesaz.cuedetat.data.VisionData
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.TargetType
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -45,8 +47,14 @@ class SnapReducer @Inject constructor() {
         // Get the current system time to calculate duration.
         val currentTime = System.currentTimeMillis()
 
-        // Combine generic and custom trained balls into a single list of detections.
-        val detectedBalls = visionData.genericBalls + visionData.customBalls
+        // Use typed DetectedBall list when available (has BallType classification),
+        // falling back to the legacy untyped lists for paths that don't populate it.
+        val detectedBalls = if (visionData.balls.isNotEmpty()) {
+            visionData.balls.map { it.position to it.type }
+        } else {
+            @Suppress("DEPRECATION")
+            (visionData.genericBalls + visionData.customBalls).map { it to BallType.UNKNOWN }
+        }
 
         // Create a mutable copy of the previous candidates to track which ones update.
         val previousCandidates = currentState.snapCandidates?.toMutableList() ?: mutableListOf()
@@ -55,20 +63,23 @@ class SnapReducer @Inject constructor() {
         val newCandidates = mutableListOf<SnapCandidate>()
 
         // Iterate through every detected ball in the current frame.
-        for (detectedBall in detectedBalls) {
+        for (ball in detectedBalls) {
+            val point = ball.first
+            val type = ball.second
+
             // Find the closest existing candidate from the previous frame.
             val closestExisting = previousCandidates.minByOrNull {
                 // Calculate Euclidean distance to match detection to candidate.
                 hypot(
-                    (it.detectedPoint.x - detectedBall.x).toDouble(),
-                    (it.detectedPoint.y - detectedBall.y).toDouble()
+                    (it.detectedPoint.x - point.x).toDouble(),
+                    (it.detectedPoint.y - point.y).toDouble()
                 )
             }
 
             // Check if the closest candidate is within the proximity threshold.
             if (closestExisting != null && hypot(
-                    (closestExisting.detectedPoint.x - detectedBall.x).toDouble(),
-                    (closestExisting.detectedPoint.y - detectedBall.y).toDouble()
+                    (closestExisting.detectedPoint.x - point.x).toDouble(),
+                    (closestExisting.detectedPoint.y - point.y).toDouble()
                 ) < SNAP_PROXIMITY_THRESHOLD_PX
             ) {
                 // MATCH FOUND: This detection corresponds to an existing candidate.
@@ -80,11 +91,12 @@ class SnapReducer @Inject constructor() {
                 // It is confirmed if it WAS ALREADY confirmed, OR if it has existed longer than the threshold.
                 val isNowConfirmed = closestExisting.isConfirmed || (currentTime - closestExisting.firstSeenTimestamp > SNAP_THRESHOLD_MS)
 
-                // Update the candidate with the new position and confirmation status.
+                // Update the candidate with the new position, type, and confirmation status.
                 newCandidates.add(
                     closestExisting.copy(
-                        detectedPoint = detectedBall,
-                        isConfirmed = isNowConfirmed
+                        detectedPoint = point,
+                        isConfirmed = isNowConfirmed,
+                        ballType = type
                     )
                 )
             } else {
@@ -92,8 +104,9 @@ class SnapReducer @Inject constructor() {
                 // Create a new candidate with the current timestamp.
                 newCandidates.add(
                     SnapCandidate(
-                        detectedPoint = detectedBall,
-                        firstSeenTimestamp = currentTime
+                        detectedPoint = point,
+                        firstSeenTimestamp = currentTime,
+                        ballType = type
                     )
                 )
             }
@@ -111,6 +124,7 @@ class SnapReducer @Inject constructor() {
         var newCueBallAnchor = currentState.cueBallCvAnchor
         var newTargetAnchor = currentState.targetCvAnchor
 
+        // Cue ball anchor follow — type-agnostic (cue ball is always white)
         currentState.cueBallCvAnchor?.let { anchor ->
             val nearest = newCandidates.minByOrNull {
                 hypot((it.detectedPoint.x - anchor.x).toDouble(), (it.detectedPoint.y - anchor.y).toDouble())
@@ -125,8 +139,14 @@ class SnapReducer @Inject constructor() {
             // else: hold last known position — anchor and virtual ball unchanged
         }
 
+        // Target ball anchor follow — filtered by targetType
         currentState.targetCvAnchor?.let { anchor ->
-            val nearest = newCandidates.minByOrNull {
+            val matchesTarget: (SnapCandidate) -> Boolean = { candidate ->
+                candidate.ballType == BallType.UNKNOWN ||
+                (currentState.targetType == TargetType.STRIPES && candidate.ballType == BallType.STRIPE) ||
+                (currentState.targetType == TargetType.SOLIDS && candidate.ballType == BallType.SOLID)
+            }
+            val nearest = newCandidates.filter(matchesTarget).minByOrNull {
                 hypot((it.detectedPoint.x - anchor.x).toDouble(), (it.detectedPoint.y - anchor.y).toDouble())
             }
             val dist = nearest?.let {

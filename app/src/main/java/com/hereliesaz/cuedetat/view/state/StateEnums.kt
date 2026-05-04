@@ -3,6 +3,7 @@
 package com.hereliesaz.cuedetat.view.state
 
 import android.graphics.PointF
+import com.hereliesaz.cuedetat.data.BallType
 
 enum class TableSize(val feet: Int, val longSideInches: Float, val shortSideInches: Float) {
     SEVEN_FT(7, 78f, 39f),
@@ -54,5 +55,6 @@ enum class InteractionMode {
 data class SnapCandidate(
     val detectedPoint: PointF,
     val firstSeenTimestamp: Long,
-    val isConfirmed: Boolean = false
+    val isConfirmed: Boolean = false,
+    val ballType: BallType = BallType.UNKNOWN
 )
