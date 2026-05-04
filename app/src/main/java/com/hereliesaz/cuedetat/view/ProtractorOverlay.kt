@@ -94,7 +94,16 @@ fun ProtractorOverlay(
         // Read the trigger to inform Compose's invalidation tracker
         drawTrigger
         drawIntoCanvas { canvas ->
-            renderer.draw(canvas.nativeCanvas, uiState, paints, barbaroTypeface, context, topDownProgress)
+            // Renderer crashes here force-close the app because Compose's drawscope
+            // doesn't isolate frame errors. Catch and log so a transient null/NaN
+            // in geometry on the first frame after mode-switch doesn't kill the app.
+            try {
+                renderer.draw(canvas.nativeCanvas, uiState, paints, barbaroTypeface, context, topDownProgress)
+            } catch (e: Exception) {
+                // Catch Exception (not Throwable) so JVM Errors like OutOfMemoryError
+                // still propagate — recovering from those is unsafe.
+                android.util.Log.e("ProtractorOverlay", "renderer.draw failed", e)
+            }
         }
     }
 }
