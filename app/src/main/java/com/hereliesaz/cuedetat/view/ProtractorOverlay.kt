@@ -99,8 +99,10 @@ fun ProtractorOverlay(
             // in geometry on the first frame after mode-switch doesn't kill the app.
             try {
                 renderer.draw(canvas.nativeCanvas, uiState, paints, barbaroTypeface, context, topDownProgress)
-            } catch (t: Throwable) {
-                android.util.Log.e("ProtractorOverlay", "renderer.draw failed", t)
+            } catch (e: Exception) {
+                // Catch Exception (not Throwable) so JVM Errors like OutOfMemoryError
+                // still propagate — recovering from those is unsafe.
+                android.util.Log.e("ProtractorOverlay", "renderer.draw failed", e)
             }
         }
     }

@@ -100,6 +100,9 @@ class MainViewModel @Inject constructor(
                 try {
                     processEvent(event)
                 } catch (t: Throwable) {
+                    // Let cancellation propagate so structured concurrency keeps working
+                    // if processEvent ever becomes suspending.
+                    if (t is kotlinx.coroutines.CancellationException) throw t
                     android.util.Log.e(
                         "MainViewModel",
                         "Reducer crashed processing $event",
@@ -328,6 +331,10 @@ class MainViewModel @Inject constructor(
                     userPreferencesRepository.saveState(derivedState)
                     tableScanRepository.saveFeltSamples(derivedState.savedFeltSamples)
                 } catch (t: Throwable) {
+                    // saveJob is cancelled and replaced on every subsequent state emit,
+                    // so CancellationException is normal here — rethrow to keep
+                    // structured concurrency intact and avoid log spam.
+                    if (t is kotlinx.coroutines.CancellationException) throw t
                     // Persistence failures (gson serialization, datastore IO) must not
                     // crash the app via the global uncaught-exception handler.
                     android.util.Log.e("MainViewModel", "saveState failed", t)
