@@ -3,12 +3,7 @@ package com.hereliesaz.cuedetat.ui.composables.tablescan
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -50,7 +45,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalView
@@ -81,6 +75,8 @@ fun TableScanScreen(
     // Animation state: tracks whether the user has tapped capture (circle expands).
     var isCapturing by remember { mutableStateOf(false) }
     var showGreenFlash by remember { mutableStateOf(false) }
+    var isCapturingPocket by remember { mutableStateOf(false) }
+    var pocketCaptureCount by remember { mutableStateOf(0) }
 
     // Captured felt color from the ViewModel (non-null once captureFeltAndComplete fires).
     val capturedHsv by viewModel.capturedFeltHsv.collectAsState()
@@ -106,6 +102,19 @@ fun TableScanScreen(
         animationSpec = tween(durationMillis = 400),
         label = "magnifyCircle"
     )
+
+    val pocketCircleSize by animateDpAsState(
+        targetValue = if (isCapturingPocket) 240.dp else 120.dp,
+        animationSpec = tween(durationMillis = 400),
+        label = "pocketMagnifyCircle"
+    )
+
+    LaunchedEffect(pocketCaptureCount) {
+        if (pocketCaptureCount > 0) {
+            delay(600L)
+            isCapturingPocket = false
+        }
+    }
 
     // Alpha for the felt display circle: 0 → snap 1 → hold 1s → animate to 0.
     val feltAlpha = remember { Animatable(0f) }
@@ -218,7 +227,12 @@ fun TableScanScreen(
 
         // Magnifying circle: visible while capture hasn't completed yet.
         // Expands from 120dp to 240dp when the user taps, giving tactile feedback.
-        if (capturedHsv == null) {
+        val showReticle = when (scanStep) {
+            ScanStep.FELT_CAPTURE -> capturedHsv == null
+            ScanStep.POCKET_GUIDE -> true
+            ScanStep.AUTO_READY -> false
+        }
+        if (showReticle) {
             if (scanStep == ScanStep.FELT_CAPTURE) {
                 Box(
                     modifier = Modifier
@@ -228,7 +242,6 @@ fun TableScanScreen(
                         .background(Color.Black.copy(alpha = 0.2f))
                         .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
                 ) {
-                    // Hide the crosshair while expanding — it looks odd when stretched.
                     if (!isCapturing) {
                         val crosshairColor = if (mlConfidence > 0.8f) Color.Green else Color.White
                         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -242,43 +255,42 @@ fun TableScanScreen(
                     }
                 }
             } else if (scanStep == ScanStep.POCKET_GUIDE) {
-                // Breathing pulse animation
-                val infiniteTransition = rememberInfiniteTransition(label = "reticle")
-                val pulseScale by infiniteTransition.animateFloat(
-                    initialValue = 0.97f, targetValue = 1.03f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1200, easing = LinearEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ), label = "pulse"
-                )
-
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .size(180.dp * pulseScale)
+                        .size(pocketCircleSize)
                         .clip(CircleShape)
-                        .background(Color.Transparent)
-                        .border(2.dp, Color.White.copy(alpha = 0.7f), CircleShape)
+                        .background(Color.Black.copy(alpha = 0.2f))
+                        .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
                 ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        // Inner crosshair dot
-                        drawCircle(color = Color.White.copy(alpha = 0.9f), radius = 3.dp.toPx(), center = center)
+                    if (!isCapturingPocket) {
+                        val crosshairColor = if (darknessConfidence > 0.8f) Color.Green else Color.White
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            drawCircle(
+                                color = crosshairColor.copy(alpha = 0.3f),
+                                radius = size.minDimension / 2,
+                                style = Stroke(width = 1.dp.toPx())
+                            )
+                            drawCircle(color = crosshairColor, radius = 2.dp.toPx(), center = center)
+                        }
                     }
                 }
             }
         }
 
         // Felt display circle: appears once capture is done, fades out after 1 second.
-        capturedHsv?.let { hsv ->
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .alpha(feltAlpha.value)
-                    .size(240.dp)
-                    .clip(CircleShape)
-                    .background(Color.hsv(hsv[0], hsv[1], hsv[2]))
-                    .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
-            )
+        if (scanStep == ScanStep.FELT_CAPTURE) {
+            capturedHsv?.let { hsv ->
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .alpha(feltAlpha.value)
+                        .size(240.dp)
+                        .clip(CircleShape)
+                        .background(Color.hsv(hsv[0], hsv[1], hsv[2]))
+                        .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
+                )
+            }
         }
 
         // Bottom Controls: hidden once capture is in progress or complete.
@@ -326,7 +338,7 @@ fun TableScanScreen(
                         val targetName = pocketNames[currentPocketTarget] ?: "Pocket"
 
                         Text(
-                            text = "Aim the $targetName pocket into the ring",
+                            text = "Point at the $targetName pocket and tap below",
                             color = Color.White,
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.padding(bottom = 12.dp)
@@ -355,16 +367,16 @@ fun TableScanScreen(
                             Canvas(modifier = Modifier.fillMaxSize()) {
                                 drawCircle(color = Color.White.copy(alpha = 0.2f), style = Stroke(width = 4.dp.toPx()))
                                 drawArc(
-                                    color = if (darknessConfidence > 0.8f) Color.Green else Color.White,
+                                    color = if (darknessConfidence > 0.8f) Color.Green else Color.Yellow,
                                     startAngle = -90f, sweepAngle = 360f * darknessConfidence,
                                     useCenter = false,
-                                    style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
+                                    style = Stroke(width = 4.dp.toPx())
                                 )
                             }
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.Center).size(64.dp).clip(CircleShape)
-                                    .background(if (captureEnabled) Color.White else Color.Gray.copy(alpha = 0.5f))
+                                    .background(Color.White)
                                     .border(4.dp, Color.LightGray, CircleShape)
                                     .clickable(enabled = captureEnabled) {
                                         val haptic = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -373,6 +385,8 @@ fun TableScanScreen(
                                             HapticFeedbackConstants.LONG_PRESS
                                         }
                                         view.performHapticFeedback(haptic)
+                                        isCapturingPocket = true
+                                        pocketCaptureCount++
                                         viewModel.captureCurrentPocket()
                                     }
                             )

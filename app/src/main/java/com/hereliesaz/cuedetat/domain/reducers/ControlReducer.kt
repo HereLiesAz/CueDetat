@@ -108,7 +108,10 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             state.copy(depthPlane = action.plane)
 
         is MainScreenEvent.ArCameraPoseUpdated ->
-            state.copy(arDerivedPitch = action.pitchDegrees)
+            state.copy(
+                arDerivedPitch = action.pitchDegrees,
+                arMeasuredHeightM = action.heightAboveSurfaceM
+            )
 
         is MainScreenEvent.DepthCapabilityDetected ->
             state.copy(depthCapability = action.capability)

@@ -122,6 +122,10 @@ object Perspective {
             // Rotating around X creates the "tilt" effect (top of screen moves away, bottom moves closer).
             // We clamp the final value to -90..90 just to be safe from invalid inputs.
             camera.rotateX(visualPitch.coerceIn(-90f, 90f))
+
+            // Apply gentle roll — 30% of physical roll for subtle tilt without disorientation.
+            val visualRoll = currentOrientation.roll * 0.3f
+            camera.rotateZ(visualRoll)
         }
 
         // Translate the camera in 3D space.

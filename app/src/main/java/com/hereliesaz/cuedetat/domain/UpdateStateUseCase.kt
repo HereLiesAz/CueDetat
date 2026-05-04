@@ -140,9 +140,10 @@ class UpdateStateUseCase @Inject constructor(
             stateWithCoercedPan.depthPlane != null
                     && stateWithCoercedPan.depthPlane!!.confidence > 0.6f -> {
                 val depth = stateWithCoercedPan.depthPlane!!.distanceMeters
-                if (depth > assumedHeightAboveTableM) {
-                    val horizontal = sqrt(depth * depth - assumedHeightAboveTableM * assumedHeightAboveTableM)
-                    Math.toDegrees(atan2(assumedHeightAboveTableM.toDouble(), horizontal.toDouble()))
+                val heightM = stateWithCoercedPan.arMeasuredHeightM ?: assumedHeightAboveTableM
+                if (depth > heightM) {
+                    val horizontal = sqrt(depth * depth - heightM * heightM)
+                    Math.toDegrees(atan2(heightM.toDouble(), horizontal.toDouble()))
                         .toFloat().coerceIn(5f, 85f)
                 } else {
                     stateWithCoercedPan.currentOrientation.pitch

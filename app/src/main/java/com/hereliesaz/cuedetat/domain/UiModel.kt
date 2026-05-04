@@ -130,6 +130,7 @@ data class CueDetatState(
     @Transient val tableScanModel: TableScanModel? = null,
     @Transient val depthPlane: DepthPlane? = null,
     @Transient val arDerivedPitch: Float? = null,
+    @Transient val arMeasuredHeightM: Float? = null,
     val depthCapability: DepthCapability = DepthCapability.NONE,
     val lockedHsvColor: FloatArray? = null,
     val lockedHsvStdDev: FloatArray? = null,
