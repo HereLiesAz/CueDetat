@@ -93,9 +93,19 @@ class MainViewModel @Inject constructor(
     init {
         // Single background coroutine that serially processes all events —
         // keeps heavy computation (matrices, geometry) off the main thread.
+        // Per-event try/catch keeps a single bad event from killing the whole
+        // loop (and the app, since uncaught coroutine exceptions force-close).
         viewModelScope.launch(Dispatchers.Default) {
             for (event in eventChannel) {
-                processEvent(event)
+                try {
+                    processEvent(event)
+                } catch (t: Throwable) {
+                    android.util.Log.e(
+                        "MainViewModel",
+                        "Reducer crashed processing $event",
+                        t
+                    )
+                }
             }
         }
 
@@ -307,15 +317,21 @@ class MainViewModel @Inject constructor(
         }
 
         if (type != UpdateType.SPIN_ONLY) {
-            val isHighPriority = type == UpdateType.FULL || 
+            val isHighPriority = type == UpdateType.FULL ||
                                state.tableScanModel != previousState.tableScanModel ||
                                state.viewOffset != previousState.viewOffset
-                               
+
             saveJob?.cancel()
             saveJob = viewModelScope.launch {
-                if (!isHighPriority) delay(2000L)
-                userPreferencesRepository.saveState(derivedState)
-                tableScanRepository.saveFeltSamples(derivedState.savedFeltSamples)
+                try {
+                    if (!isHighPriority) delay(2000L)
+                    userPreferencesRepository.saveState(derivedState)
+                    tableScanRepository.saveFeltSamples(derivedState.savedFeltSamples)
+                } catch (t: Throwable) {
+                    // Persistence failures (gson serialization, datastore IO) must not
+                    // crash the app via the global uncaught-exception handler.
+                    android.util.Log.e("MainViewModel", "saveState failed", t)
+                }
             }
         }
     }
