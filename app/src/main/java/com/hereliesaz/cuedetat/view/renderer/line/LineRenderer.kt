@@ -461,7 +461,6 @@ class LineRenderer {
 
         val tps = state.lensWarpTps
         val path = rawPath.map { it.warpedBy(tps) }
-        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
 
         val isPocketed = state.pocketedBankShotPocketIndex != null
 
@@ -473,8 +472,10 @@ class LineRenderer {
             val bankLineConfigs = listOf(BankLine1(), BankLine2(), BankLine3(), BankLine4())
             val finalSegmentIndex = path.size - 2
 
-            canvas.save()
-            canvas.concat(inverseMatrix)
+            // No canvas.concat(inverseMatrix) here: buildDistortedLinePath already
+            // produces a Path in screen-space coordinates, so concatenating the inverse
+            // would double-transform the line back into logical space and render it
+            // mirrored across the canvas (the "screen is the table, in reverse" bug).
             for (i in 0 until finalSegmentIndex) {
                 val start = path[i]
                 val rawEnd = path[i + 1]
@@ -491,7 +492,6 @@ class LineRenderer {
                 canvas.drawPath(segmentPath, glowPaint)
                 canvas.drawPath(segmentPath, linePaint)
             }
-            canvas.restore()
 
             if (path.size > 1) {
                 val start = path[finalSegmentIndex]
@@ -554,7 +554,6 @@ class LineRenderer {
     ) {
         if (path.size < 2) return
         val finalSegmentIndex = path.size - 2
-        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
 
         for (i in 0..finalSegmentIndex) {
             val start = path[i]
@@ -579,7 +578,6 @@ class LineRenderer {
 
     private fun drawPath(canvas: Canvas, path: List<PointF>, paint: Paint, glowPaint: Paint? = null, state: CueDetatState, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
         if (path.size < 2) return
-        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
 
         for (i in 0 until path.size - 1) {
             val start = path[i]

@@ -13,6 +13,12 @@ object MassePhysicsSimulator {
     private const val V0 = 60f
     private const val R = LOGICAL_BALL_RADIUS
 
+    // Use the apply form rather than PointF(x, y) so this code is testable under
+    // android.testOptions.unitTests.isReturnDefaultValues = true — that flag makes
+    // the multi-arg PointF constructor return a default-zero instance in JVM tests.
+    // Identical to PointF(x, y) at runtime on Android.
+    private fun pf(x: Float, y: Float): PointF = PointF().apply { this.x = x; this.y = y }
+
     fun simulate(
         contactOffset: PointF,
         elevationDeg: Float,
@@ -35,7 +41,7 @@ object MassePhysicsSimulator {
         var posX = startPos.x * cosR + startPos.y * sinR
         var posY = -startPos.x * sinR + startPos.y * cosR
 
-        val points = mutableListOf(PointF(posX, posY))
+        val points = mutableListOf(pf(posX, posY))
 
         val pocketThreshold = R * 1.3f
         val pocketThresholdSq = pocketThreshold * pocketThreshold
@@ -98,21 +104,21 @@ object MassePhysicsSimulator {
 
             if (table.isVisible) {
                 val railHit = table.findRailIntersectionAndNormal(
-                    PointF(worldCurX, worldCurY),
-                    PointF(worldNextX, worldNextY)
+                    pf(worldCurX, worldCurY),
+                    pf(worldNextX, worldNextY)
                 )
                 if (railHit != null) {
                     val (worldIntersect, worldNormal) = railHit
 
                     val localIx = worldIntersect.x * cosR + worldIntersect.y * sinR
                     val localIy = -worldIntersect.x * sinR + worldIntersect.y * cosR
-                    points.add(PointF(localIx, localIy))
+                    points.add(pf(localIx, localIy))
 
                     val ghostWorldX = worldIntersect.x + worldNormal.x * R
                     val ghostWorldY = worldIntersect.y + worldNormal.y * R
                     val ghostLocalIx = ghostWorldX * cosR + ghostWorldY * sinR
                     val ghostLocalIy = -ghostWorldX * sinR + ghostWorldY * cosR
-                    impactPoints.add(PointF(ghostLocalIx, ghostLocalIy))
+                    impactPoints.add(pf(ghostLocalIx, ghostLocalIy))
 
                     val localNx = worldNormal.x * cosR + worldNormal.y * sinR
                     val localNy = -worldNormal.x * sinR + worldNormal.y * cosR
@@ -134,16 +140,16 @@ object MassePhysicsSimulator {
 
             posX = nextX
             posY = nextY
-            points.add(PointF(posX, posY))
+            points.add(pf(posX, posY))
 
             if (vx * vx + vy * vy < 0.0025f) break // approx 0.05f speed squared
         }
 
         val worldPoints = points.map { p ->
-            PointF(p.x * cosR - p.y * sinR, p.x * sinR + p.y * cosR)
+            pf(p.x * cosR - p.y * sinR, p.x * sinR + p.y * cosR)
         }
         val worldImpacts = impactPoints.map { p ->
-            PointF(p.x * cosR - p.y * sinR, p.x * sinR + p.y * cosR)
+            pf(p.x * cosR - p.y * sinR, p.x * sinR + p.y * cosR)
         }
 
         return MasseResult(

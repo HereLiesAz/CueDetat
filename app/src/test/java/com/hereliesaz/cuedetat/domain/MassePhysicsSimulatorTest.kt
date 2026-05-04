@@ -5,6 +5,7 @@ import com.hereliesaz.cuedetat.view.model.Table
 import com.hereliesaz.cuedetat.view.state.TableSize
 import org.junit.Assert.*
 import org.junit.Test
+import kotlin.math.PI
 import kotlin.math.abs
 
 private fun pf(x: Float, y: Float) = PointF().apply { this.x = x; this.y = y }
@@ -12,7 +13,10 @@ private fun pf(x: Float, y: Float) = PointF().apply { this.x = x; this.y = y }
 class MassePhysicsSimulatorTest {
 
     private val table = Table(size = TableSize.EIGHT_FT, isVisible = true)
-    private val shotAngle = 0f
+    // Aim along +Y so abs(it.x) measures lateral curve perpendicular to the
+    // shot line. masseShotAngleDeg is computed in production as atan2(dy, dx)
+    // (angle from +X axis CCW), so π/2 = "shot pointing up the screen".
+    private val shotAngle = (PI / 2).toFloat()
 
     @Test
     fun `center strike produces straight path`() {

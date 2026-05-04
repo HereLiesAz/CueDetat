@@ -37,6 +37,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,7 +45,10 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -61,6 +65,7 @@ class MainViewModel @Inject constructor(
     private val warningManager: WarningManager,
     @ApplicationContext private val appContext: Context,
     private val visionRepository: VisionRepository,
+    val visionAnalyzer: VisionAnalyzer,
     val metaWearableRepository: MetaWearableRepository,
     val arDepthSession: ArDepthSession,
     val arFrameProcessor: ArFrameProcessor,
@@ -68,14 +73,18 @@ class MainViewModel @Inject constructor(
 
     private var experienceModeUpdateJob: Job? = null
     private var saveJob: Job? = null
-    private val eventChannel = Channel<MainScreenEvent>(Channel.UNLIMITED)
+    // Bounded so an unbounded burst (sensors + vision + gestures) cannot grow without limit.
+    // High-frequency producers (sensors, vision, AR) are conflated upstream so they
+    // contribute at most one in-flight event each.
+    private val eventChannel = Channel<MainScreenEvent>(
+        capacity = 256,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
     private val _uiState = MutableStateFlow(CueDetatState())
     val uiState = _uiState.asStateFlow()
 
     private val _singleEvent = MutableSharedFlow<SingleEvent?>()
     val singleEvent = _singleEvent.asSharedFlow()
-
-    val visionAnalyzer: VisionAnalyzer = VisionAnalyzer(visionRepository)
 
     private val warningMessages: Array<String> by lazy {
         appContext.resources.getStringArray(R.array.insulting_warnings)
@@ -99,25 +108,34 @@ class MainViewModel @Inject constructor(
                 savedFeltSamples = savedFeltSamples
             )
             processAndEmitState(initialState, UpdateType.FULL)
+
+            // Fire the version check only after the initial state has been
+            // committed, so a network response can't be overwritten by the
+            // saved-state load.
+            onEvent(MainScreenEvent.CheckForUpdate)
         }
 
-        // Pipe WarningManager's timed messages into uiState.warningText
+        // Pipe WarningManager's timed messages into uiState.warningText.
+        // update{} is a CAS so it does not race with writes from the event loop.
         viewModelScope.launch {
             warningManager.currentWarning.collect { warning ->
-                _uiState.value = _uiState.value.copy(warningText = warning)
+                _uiState.update { it.copy(warningText = warning) }
             }
         }
 
         // Gate sensor collection on process lifecycle — unregisters the hardware listener
         // automatically when the screen turns off or the app goes to background.
+        // conflate() drops intermediate sensor samples if the reducer falls behind,
+        // bounding event-channel pressure.
         viewModelScope.launch {
             ProcessLifecycleOwner.get().lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                sensorRepository.fullOrientationFlow.collect { orientation ->
+                sensorRepository.fullOrientationFlow.conflate().collect { orientation ->
                     onEvent(MainScreenEvent.FullOrientationChanged(orientation))
                 }
             }
         }
 
+        // visionDataFlow is a StateFlow — it conflates by design.
         viewModelScope.launch {
             visionRepository.visionDataFlow.collect { visionData ->
                 onEvent(MainScreenEvent.CvDataUpdated(visionData))
@@ -130,27 +148,26 @@ class MainViewModel @Inject constructor(
 
         viewModelScope.launch {
             ProcessLifecycleOwner.get().lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                // Fires once per foreground transition
+                // Fires once per foreground transition. Seed the relocaliser with a
+                // null delta — orientation-tracking via foreground service was removed,
+                // so the relocaliser recovers via vision (runEdgeFallback) instead.
                 val model = tableScanRepository.load()
                 if (model != null) {
-                    val deltaQ = com.hereliesaz.cuedetat.service.OrientationTrackingService.readDelta(appContext)
-                    onEvent(MainScreenEvent.SeedRelocaliser(deltaQ))
+                    onEvent(MainScreenEvent.SeedRelocaliser(null))
                 }
                 // Hold until lifecycle leaves STARTED, so this fires again on next resume
                 kotlinx.coroutines.awaitCancellation()
             }
         }
 
-        viewModelScope.launch {
-            metaWearableRepository.videoFrame.collect { bitmap ->
+        // collectLatest drops in-flight analyze() calls when a newer frame arrives,
+        // so the analyzer never gets backlogged on slow devices.
+        viewModelScope.launch(Dispatchers.Default) {
+            metaWearableRepository.videoFrame.collectLatest { bitmap ->
                 if (bitmap != null && _uiState.value.cameraMode == CameraMode.META_GLASSES) {
                     visionAnalyzer.analyze(bitmap, _uiState.value)
                 }
             }
-        }
-
-        viewModelScope.launch {
-            onEvent(MainScreenEvent.CheckForUpdate)
         }
 
         // Detect ARCore depth capability and store in state
@@ -283,15 +300,6 @@ class MainViewModel @Inject constructor(
         visionAnalyzer.updateUiState(derivedState)
         arFrameProcessor.updateUiState(derivedState)
 
-        // Start orientation tracking when AR becomes active; stop when it leaves
-        if (derivedState.cameraMode == CameraMode.AR_ACTIVE &&
-            previousState.cameraMode != CameraMode.AR_ACTIVE) {
-            com.hereliesaz.cuedetat.service.OrientationTrackingService.start(appContext)
-        } else if (derivedState.cameraMode != CameraMode.AR_ACTIVE &&
-            previousState.cameraMode == CameraMode.AR_ACTIVE) {
-            com.hereliesaz.cuedetat.service.OrientationTrackingService.stop(appContext)
-        }
-
         if (derivedState.cameraMode == CameraMode.META_GLASSES) {
             metaWearableRepository.startStreaming()
         } else if (previousState.cameraMode == CameraMode.META_GLASSES) {
@@ -368,7 +376,7 @@ class MainViewModel @Inject constructor(
                 is MainScreenEvent.CheckForUpdate -> {
                     val versionName = githubRepository.getLatestVersionName()
                     if (versionName != null) {
-                        _uiState.value = _uiState.value.copy(latestVersionName = versionName)
+                        _uiState.update { it.copy(latestVersionName = versionName) }
                     }
                 }
 
@@ -395,8 +403,4 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        com.hereliesaz.cuedetat.service.OrientationTrackingService.stop(appContext)
-    }
 }

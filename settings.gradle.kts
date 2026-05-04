@@ -32,13 +32,22 @@ dependencyResolutionManagement {
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/facebook/meta-wearables-dat-android")
+            val ghUser = providers.gradleProperty("github_user")
+                .orElse(providers.environmentVariable("GITHUB_ACTOR"))
+                .orNull
+            val ghToken = providers.gradleProperty("github_token")
+                .orElse(providers.environmentVariable("GITHUB_TOKEN"))
+                .orNull
+            if (ghUser.isNullOrBlank() || ghToken.isNullOrBlank()) {
+                logger.warn(
+                    "⚠ GitHubPackages credentials missing. Set 'github_user' and 'github_token' " +
+                    "in local.properties (or GITHUB_ACTOR/GITHUB_TOKEN env vars). Builds that need " +
+                    "com.facebook.meta-wearables-dat-android artifacts will fail at resolution."
+                )
+            }
             credentials {
-                username = providers.gradleProperty("github_user")
-                    .orElse(providers.environmentVariable("GITHUB_ACTOR"))
-                    .getOrElse("unknown")
-                password = providers.gradleProperty("github_token")
-                    .orElse(providers.environmentVariable("GITHUB_TOKEN"))
-                    .getOrElse("")
+                username = ghUser ?: ""
+                password = ghToken ?: ""
             }
         }
     }

@@ -23,6 +23,21 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.gestures.detectManualGestures
 import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
 
+/**
+ * Subset of state that drives a redraw. data-class equality avoids the per-recomposition
+ * Array allocation + contentHashCode walk the previous trigger used.
+ */
+private data class DrawSignature(
+    val viewOffset: Any?,
+    val arDerivedPitch: Any?,
+    val worldRotationDegrees: Float,
+    val zoomSliderPosition: Float,
+    val tableScanModel: Any?,
+    val tableZOffset: Float,
+    val onPlaneBall: Any?,
+    val topDownProgress: Float,
+)
+
 @Composable
 fun ProtractorOverlay(
     uiState: CueDetatState,
@@ -50,19 +65,21 @@ fun ProtractorOverlay(
     }
 
     // The gatekeeper of the Sisyphean Canvas.
-    // We only force a redraw when the geometry actually shifts.
+    // We only force a redraw when the geometry actually shifts. derivedStateOf
+    // observes the individual fields directly so no per-recomposition allocation
+    // is needed — Compose handles change tracking via structural equality.
     val drawTrigger by remember(uiState) {
         derivedStateOf {
-            arrayOf(
-                uiState.viewOffset,
-                uiState.arDerivedPitch,
-                uiState.worldRotationDegrees,
-                uiState.zoomSliderPosition,
-                uiState.tableScanModel,
-                uiState.tableZOffset,
-                uiState.onPlaneBall,
-                topDownProgress
-            ).contentHashCode()
+            DrawSignature(
+                viewOffset = uiState.viewOffset,
+                arDerivedPitch = uiState.arDerivedPitch,
+                worldRotationDegrees = uiState.worldRotationDegrees,
+                zoomSliderPosition = uiState.zoomSliderPosition,
+                tableScanModel = uiState.tableScanModel,
+                tableZOffset = uiState.tableZOffset,
+                onPlaneBall = uiState.onPlaneBall,
+                topDownProgress = topDownProgress,
+            )
         }
     }
 

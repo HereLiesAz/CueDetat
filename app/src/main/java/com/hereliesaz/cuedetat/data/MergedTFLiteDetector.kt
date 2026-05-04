@@ -43,7 +43,7 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
         try {
             val fd = context.assets.openFd(MASTER_MODEL_FILE)
             val fullChannel = FileInputStream(fd.fileDescriptor).channel
-            
+
             // Offsets from MASTER_POOL_MODEL.tflite.meta
             val modelOffsets = listOf(0L, 6242868L, 12485737L, 18729068L)
             val modelSizes = listOf(6242868L, 6242869L, 6243331L, 6242869L)
@@ -59,7 +59,16 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
             Log.e("MergedTFLiteDetector", "Failed to load master binary", e)
             Log.e("MergedTFLiteDetector",
                 "Hint: if error mentions 'compressed', add androidResources { noCompress += \"tflite\" }")
+            // Close any interpreters that successfully loaded before the failure so
+            // their native buffers don't leak.
+            interpreters.values.forEach { runCatching { it.close() } }
+            interpreters.clear()
         }
+    }
+
+    fun close() {
+        interpreters.values.forEach { runCatching { it.close() } }
+        interpreters.clear()
     }
 
     private val inputBuffer: ByteBuffer by lazy {

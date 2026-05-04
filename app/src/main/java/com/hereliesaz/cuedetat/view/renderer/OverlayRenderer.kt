@@ -24,6 +24,13 @@ class OverlayRenderer {
     private val railRenderer = RailRenderer()
     private val cvDebugRenderer = CvDebugRenderer()
 
+    // Reused across draw() calls to avoid GC pressure at 60 fps.
+    private val orthoMatrix = Matrix()
+    private val interpolatedMatrix = Matrix()
+    private val pValues = FloatArray(9)
+    private val oValues = FloatArray(9)
+    private val iValues = FloatArray(9)
+
     fun draw(
         canvas: Canvas,
         state: CueDetatState,
@@ -45,46 +52,45 @@ class OverlayRenderer {
 
         val pitchMatrix = state.pitchMatrix ?: return
         val railPitchMatrix = state.railPitchMatrix ?: pitchMatrix
-        
-        // Calculate the Orthogonal Matrix to fit the table to screen.
-        val orthoMatrix = Matrix().apply {
-            val scale = (kotlin.math.min(
-                state.viewWidth.toFloat() / state.table.logicalWidth,
-                state.viewHeight.toFloat() / state.table.logicalHeight
-            ) * 0.9f) // 90% fit
-            postScale(scale, scale)
-            postTranslate(state.viewWidth / 2f, state.viewHeight / 2f)
-        }
 
-        // Interpolate between Pitch and Ortho
-        val interpolatedMatrix = if (topDownProgress <= 0f) {
-            pitchMatrix
-        } else if (topDownProgress >= 1f) {
-            orthoMatrix
-        } else {
-            val pValues = FloatArray(9).apply { pitchMatrix.getValues(this) }
-            val oValues = FloatArray(9).apply { orthoMatrix.getValues(this) }
-            val iValues = FloatArray(9)
-            for (i in 0..8) {
-                iValues[i] = pValues[i] + (oValues[i] - pValues[i]) * topDownProgress
+        // Calculate the Orthogonal Matrix to fit the table to screen. Reused.
+        orthoMatrix.reset()
+        val scale = kotlin.math.min(
+            state.viewWidth.toFloat() / state.table.logicalWidth,
+            state.viewHeight.toFloat() / state.table.logicalHeight
+        ) * 0.9f // 90% fit
+        orthoMatrix.postScale(scale, scale)
+        orthoMatrix.postTranslate(state.viewWidth / 2f, state.viewHeight / 2f)
+
+        // Interpolate between Pitch and Ortho.
+        val matrixForPlane: Matrix = when {
+            topDownProgress <= 0f -> pitchMatrix
+            topDownProgress >= 1f -> orthoMatrix
+            else -> {
+                pitchMatrix.getValues(pValues)
+                orthoMatrix.getValues(oValues)
+                for (i in 0..8) {
+                    iValues[i] = pValues[i] + (oValues[i] - pValues[i]) * topDownProgress
+                }
+                interpolatedMatrix.setValues(iValues)
+                interpolatedMatrix
             }
-            Matrix().apply { setValues(iValues) }
         }
 
         // Draw top-down snapshot if available and progress > 0
         if (topDownProgress > 0f && state.topDownBitmap != null) {
-            canvas.withMatrix(interpolatedMatrix) {
+            canvas.withMatrix(matrixForPlane) {
                 val halfW = state.table.logicalWidth / 2f
                 val halfH = state.table.logicalHeight / 2f
                 val destRect = android.graphics.RectF(-halfW, -halfH, halfW, halfH)
-                val paint = paints.ballOverlayPaint.apply { 
-                    this.alpha = (255 * topDownProgress).toInt() 
+                val paint = paints.ballOverlayPaint.apply {
+                    this.alpha = (255 * topDownProgress).toInt()
                 }
                 this.drawBitmap(state.topDownBitmap, null, destRect, paint)
             }
         }
 
-        val matrixFor2DPlane = interpolatedMatrix
+        val matrixFor2DPlane = matrixForPlane
         val labels = mapOf(
             "bankingBall" to context.getString(R.string.label_banking_ball),
             "actualCueBall" to context.getString(R.string.label_actual_cue_ball),

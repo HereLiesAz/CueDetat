@@ -1,30 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <!--
-      Allow cleartext for the local Myriad backend (emulator loopback).
-      This is required because the backend typically runs on HTTP (no SSL) during dev.
-    -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">10.0.2.2</domain>
-        <domain includeSubdomains="true">localhost</domain>
-    </domain-config>
-
-    <!--
-      Default: enforce HTTPS for all other traffic.
-      We include "user" certificates in the base config because some test devices
-      with root/modified ROMs have broken system trust stores or use custom root CAs.
+      Release-build network policy.
+      Cleartext is forbidden for every domain. The dev-only cleartext exception
+      for 10.0.2.2 / localhost lives in src/debug/res/xml/network_security_config.xml
+      and only applies to debug builds.
     -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
         </trust-anchors>
     </base-config>
-
-    <!-- Enable user-installed certificates only in debug builds (e.g., for Proxyman/Charles) -->
-    <debug-overrides>
-        <trust-anchors>
-            <certificates src="user" />
-        </trust-anchors>
-    </debug-overrides>
 </network-security-config>

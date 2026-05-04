@@ -1,5 +1,6 @@
 package com.hereliesaz.cuedetat.ui.hatemode
 
+import androidx.compose.runtime.withFrameNanos
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.data.SensorRepository
@@ -10,7 +11,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -73,16 +76,20 @@ class HaterViewModel @Inject constructor(
     private fun startPhysics() {
         if (physicsJob?.isActive == true) return
         physicsJob = viewModelScope.launch {
-            while (true) {
-                physicsManager.step()
-                _haterState.value = _haterState.value.copy(
-                    diePosition = physicsManager.diePosition,
-                    dieAngle    = physicsManager.dieAngle,
-                    dieScale    = physicsManager.currentDieScale,
-                    rockAngleX  = physicsManager.currentRockX,
-                    rockAngleY  = physicsManager.currentRockY,
-                )
-                delay(16L) // ~60 FPS
+            // Drive physics from the choreographer instead of a fixed delay so the
+            // simulation stays in step with display refresh and pauses cleanly when
+            // the host activity is backgrounded.
+            while (coroutineContext.isActive) {
+                withFrameNanos {
+                    physicsManager.step()
+                    _haterState.value = _haterState.value.copy(
+                        diePosition = physicsManager.diePosition,
+                        dieAngle    = physicsManager.dieAngle,
+                        dieScale    = physicsManager.currentDieScale,
+                        rockAngleX  = physicsManager.currentRockX,
+                        rockAngleY  = physicsManager.currentRockY,
+                    )
+                }
             }
         }
     }

@@ -11,13 +11,6 @@ if (versionPropsFile.exists()) {
     versionPropsFile.inputStream().use { versionProps.load(it) }
 }
 
-val localProperties = Properties()
-val localPropertiesFile = rootProject.file("local.properties")
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.inputStream().use { localProperties.load(it) }
-}
-val playPublicRsa = localProperties.getProperty("PLAY_PUBLIC_RSA") ?: ""
-
 var majorVal = (versionProps.getProperty("MAJOR") ?: "0").toInt()
 var minorVal = (versionProps.getProperty("MINOR") ?: "0").toInt()
 var patchVal = (versionProps.getProperty("PATCH") ?: "0").toInt()
@@ -108,31 +101,48 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-
-        buildConfigField("String", "PLAY_PUBLIC_RSA", "\"$playPublicRsa\"")
     }
 
     signingConfigs {
         create("release") {
-            val keystorePath = System.getenv("KEYSTORE_PATH")
-            if (keystorePath != null) {
-                storeFile = file(keystorePath)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+            val ksPath = providers.gradleProperty("KEYSTORE_PATH").orNull ?: System.getenv("KEYSTORE_PATH")
+            val ksPassword = providers.gradleProperty("KEYSTORE_PASSWORD").orNull ?: System.getenv("KEYSTORE_PASSWORD")
+            val ksAlias = providers.gradleProperty("KEY_ALIAS").orNull ?: System.getenv("KEY_ALIAS")
+            val ksKeyPassword = providers.gradleProperty("KEY_PASSWORD").orNull ?: System.getenv("KEY_PASSWORD")
+
+            if (ksPath != null) {
+                storeFile = file(ksPath)
+                storePassword = ksPassword
+                keyAlias = ksAlias
+                keyPassword = ksKeyPassword
             }
         }
     }
 
     buildTypes {
+        debug {
+            // Local Myriad backend (emulator loopback) — paired with the cleartext exception
+            // in src/debug/res/xml/network_security_config.xml.
+            buildConfigField("String", "MYRIAD_BASE_URL", "\"http://10.0.2.2:8000/\"")
+        }
         release {
-            signingConfig = signingConfigs.getByName("release")
+            val releaseConfig = signingConfigs.getByName("release")
+            if (releaseConfig.storeFile != null) {
+                signingConfig = releaseConfig
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Empty URL signals AppModule to skip wiring the Myriad client. Override at
+            // CI time via Gradle property -PmyriadBaseUrl=https://… once a real backend
+            // exists.
+            val myriadUrl = providers.gradleProperty("myriadBaseUrl").orNull ?: ""
+            buildConfigField("String", "MYRIAD_BASE_URL", "\"$myriadUrl\"")
         }
     }
     compileOptions {
