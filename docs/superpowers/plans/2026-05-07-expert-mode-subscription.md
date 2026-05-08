@@ -2493,8 +2493,8 @@ This task validates the live behavior. Do NOT skip; the unit tests cover mapping
 
 In Google Play Console for `com.hereliesaz.cuedetat`:
 1. Create a subscription product with id `expert_mode`.
-2. Add base plan `monthly` (auto-renewing, monthly billing, your chosen price).
-3. Add base plan `yearly` (auto-renewing, yearly billing, your chosen price, e.g. ~30% less per month equivalent).
+2. Add base plan `monthly` (auto-renewing, monthly billing, **$0.99 USD** in the US base region; let Play auto-convert per region or set per-region prices manually).
+3. Add base plan `yearly` (auto-renewing, yearly billing, **$9.99 USD** in the US base region).
 4. On both base plans, add an offer: 3-day free trial, eligibility "new customers only".
 5. Add license-tester accounts (Settings → License testing).
 6. Activate both base plans.
