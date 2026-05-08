@@ -69,7 +69,19 @@ class MainViewModel @Inject constructor(
     val metaWearableRepository: MetaWearableRepository,
     val arDepthSession: ArDepthSession,
     val arFrameProcessor: ArFrameProcessor,
+    private val entitlementRepository: com.hereliesaz.cuedetat.billing.EntitlementRepository,
 ) : ViewModel() {
+
+    /**
+     * Forces a re-query of the user's Play subscription status. Called from
+     * MainActivity.onResume so we catch state changes (cancel, refund,
+     * just-completed purchase) that happened while the app was backgrounded.
+     */
+    fun refreshEntitlement() {
+        viewModelScope.launch {
+            runCatching { entitlementRepository.refresh() }
+        }
+    }
 
     private var experienceModeUpdateJob: Job? = null
     private var saveJob: Job? = null
@@ -205,6 +217,30 @@ class MainViewModel @Inject constructor(
             if (savedModel != null) {
                 onEvent(MainScreenEvent.LoadTableScan(savedModel))
                 checkLocationAndPromptIfNeeded(savedModel)
+            }
+        }
+
+        // Collect entitlement updates and propagate into the reducer.
+        viewModelScope.launch {
+            entitlementRepository.entitlement.collect { entitlement ->
+                onEvent(MainScreenEvent.EntitlementChanged(entitlement))
+            }
+        }
+
+        // Onboarding paywall: shown once per install if the user is not entitled.
+        // In FOSS builds the entitlement repository emits active=true immediately,
+        // so the second branch is never taken.
+        viewModelScope.launch {
+            if (!userPreferencesRepository.hasSeenOnboardingPaywall()) {
+                val first = entitlementRepository.entitlement.first()
+                userPreferencesRepository.setOnboardingPaywallSeen()
+                if (!first.active) {
+                    onEvent(
+                        MainScreenEvent.ShowPaywall(
+                            com.hereliesaz.cuedetat.billing.PaywallTrigger.ONBOARDING
+                        )
+                    )
+                }
             }
         }
     }

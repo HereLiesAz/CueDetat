@@ -5,6 +5,7 @@ package com.hereliesaz.cuedetat.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -14,6 +15,7 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -34,6 +36,16 @@ class UserPreferencesRepository @Inject constructor(
         val STATE_JSON = stringPreferencesKey("state_json")
         val CAMERA_MATRIX_JSON = stringPreferencesKey("camera_matrix_json")
         val DIST_COEFFS_JSON = stringPreferencesKey("dist_coeffs_json")
+        val HAS_SEEN_ONBOARDING_PAYWALL = booleanPreferencesKey("has_seen_onboarding_paywall")
+    }
+
+    suspend fun hasSeenOnboardingPaywall(): Boolean {
+        val prefs = dataStore.data.first()
+        return prefs[PreferencesKeys.HAS_SEEN_ONBOARDING_PAYWALL] ?: false
+    }
+
+    suspend fun setOnboardingPaywallSeen() {
+        dataStore.edit { it[PreferencesKeys.HAS_SEEN_ONBOARDING_PAYWALL] = true }
     }
 
     val stateFlow: Flow<CueDetatState?> = dataStore.data
