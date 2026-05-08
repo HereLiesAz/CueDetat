@@ -39,7 +39,7 @@ The entitlement is exposed to the rest of the app as a single `Boolean` (`isExpe
 | `ui/MainViewModel.kt` | **Modified.** Collect `EntitlementRepository.entitlement`, dispatch `EntitlementChanged`. Trigger onboarding paywall once. |
 | `ui/composables/AzNavRailMenu.kt` | **Modified.** Show "Get Expert Mode" tile when `!isExpertEntitled` (Play flavor only — naturally hidden in FOSS since flag is always true). |
 | `MainActivity.kt` | **Modified.** Call `EntitlementRepository.refresh()` from `onResume`. |
-| `.github/workflows/*.yml` | **Modified.** CI builds `assembleFossRelease`. |
+| `.github/workflows/android_debug_apk_release.yml` | **Modified.** Build command becomes `assembleFossDebug`; APK lookup path becomes `app/build/outputs/apk/foss/debug`. |
 
 ---
 
@@ -120,7 +120,7 @@ androidx-billing = "7.1.1"  # latest 7.x at time of writing
 androidx-billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "androidx-billing" }
 ```
 
-Local default flavor: `play` (set via Android Studio variant selector + a default in the `defaultConfig` block if needed). CI explicitly builds `foss`.
+Local default flavor: `play` (set via Android Studio variant selector). CI explicitly builds `foss` via `./gradlew assembleFossDebug` in `.github/workflows/android_debug_apk_release.yml`. Because Play Billing is declared `playImplementation` (not `implementation`), it is never resolved when assembling only the `foss` variant — the GitHub-built APK is mathematically incapable of containing billing code.
 
 ### 2.3 Models
 
