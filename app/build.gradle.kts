@@ -103,6 +103,21 @@ android {
         }
     }
 
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("play") {
+            dimension = "distribution"
+            // applicationId stays as "com.hereliesaz.cuedetat" so existing
+            // Play closed-testing installs receive an upgrade rather than a
+            // side-by-side install.
+        }
+        create("foss") {
+            dimension = "distribution"
+            applicationIdSuffix = ".foss"
+            versionNameSuffix = "-foss"
+        }
+    }
+
     signingConfigs {
         create("release") {
             val ksPath = providers.gradleProperty("KEYSTORE_PATH").orNull ?: System.getenv("KEYSTORE_PATH")
