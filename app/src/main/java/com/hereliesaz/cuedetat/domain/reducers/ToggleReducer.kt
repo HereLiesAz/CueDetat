@@ -202,6 +202,14 @@ private fun handleSetExperienceMode(
     mode: ExperienceMode,
     reducerUtils: ReducerUtils
 ): CueDetatState {
+    // Guard: Expert is gated by entitlement. If the caller asks for Expert
+    // when the user is not entitled, leave the state unchanged. UI surfaces
+    // (PaywallSheet, MainViewModel.onEvent) are responsible for triggering
+    // the purchase flow on this path.
+    if (mode == ExperienceMode.EXPERT && !state.isExpertEntitled) {
+        return state
+    }
+
     val newState = state.copy(
         experienceMode = mode,
         protractorUnit = ProtractorUnit(reducerUtils.getDefaultTargetBallPosition(), LOGICAL_BALL_RADIUS, 0f),
