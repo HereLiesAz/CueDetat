@@ -457,6 +457,10 @@ class MainViewModel @Inject constructor(
 
                 is MainScreenEvent.Shake -> _singleEvent.emit(SingleEvent.HaterShake)
 
+                is MainScreenEvent.ShowPaywall -> {
+                    _singleEvent.emit(SingleEvent.ShowPaywall(event.trigger))
+                }
+
                 else -> { /* Do nothing for state-changing events */ }
             }
         }

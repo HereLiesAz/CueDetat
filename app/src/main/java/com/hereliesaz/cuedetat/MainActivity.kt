@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
     private val haterViewModel: HaterViewModel by viewModels()
 
     private var cameraPermissionGranted by mutableStateOf(false)
+    private var paywallTrigger by mutableStateOf<com.hereliesaz.cuedetat.billing.PaywallTrigger?>(null)
 
     private val requestPermissionsLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
@@ -129,6 +130,10 @@ class MainActivity : ComponentActivity() {
                     haterViewModel.onEvent(HaterEvent.ShakeDetected)
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
+                is SingleEvent.ShowPaywall -> {
+                    paywallTrigger = event.trigger
+                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
+                }
                 null -> { /* Do nothing */ }
             }
         }.launchIn(lifecycleScope)
@@ -160,6 +165,16 @@ class MainActivity : ComponentActivity() {
         }
 
         CueDetatTheme(luminanceAdjustment = uiState.luminanceAdjustment) {
+            paywallTrigger?.let { trigger ->
+                com.hereliesaz.cuedetat.ui.composables.paywall.PaywallSheet(
+                    trigger = trigger,
+                    onDismiss = { paywallTrigger = null },
+                    onPurchasedAutoEnterExpert = {
+                        viewModel.onEvent(MainScreenEvent.SetExperienceMode(ExperienceMode.EXPERT))
+                    }
+                )
+            }
+
             if (showSplashScreen) {
                 SplashScreen(onRoleSelected = { selectedMode ->
                     viewModel.onEvent(MainScreenEvent.SetExperienceMode(selectedMode))
