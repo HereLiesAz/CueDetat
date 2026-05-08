@@ -549,10 +549,22 @@ class VisionRepository @Inject constructor(
                 }
             } else emptyList()
 
+            val allBalls = refinedScreenPoints.mapIndexed { idx, sp ->
+                val logical = if (state.hasInverseMatrix) {
+                    val inv = state.inversePitchMatrix ?: android.graphics.Matrix()
+                    val lp = com.hereliesaz.cuedetat.view.model.Perspective.screenToLogical(sp, inv)
+                    if (state.lensWarpTps != null) com.hereliesaz.cuedetat.domain.ThinPlateSpline.applyWarp(state.lensWarpTps, lp) else lp
+                } else sp
+                val box = filteredObjects[idx].boundingBox
+                val ballType = classifyBallType(matToUse, box)
+                com.hereliesaz.cuedetat.data.DetectedBall(position = logical, type = ballType, confidence = 0.9f, boundingBox = box)
+            }
+
             val filteredBalls = if (state.table.isVisible) logicalPoints.filter { state.table.isPointInside(it) } else logicalPoints
 
             _visionDataFlow.value = VisionData(
                 genericBalls = filteredBalls,
+                balls = allBalls,
                 detectedHsvColor = hsv,
                 detectedBoundingBoxes = filteredObjects.map { it.boundingBox },
                 sourceImageWidth = inputImage.width,

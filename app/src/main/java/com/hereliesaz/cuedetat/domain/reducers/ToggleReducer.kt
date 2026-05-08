@@ -9,7 +9,6 @@ import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ReducerUtils
-import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
@@ -133,8 +132,8 @@ internal fun reduceToggleAction(
                 val currentPx = kotlin.math.hypot((pts[2] - pts[0]).toDouble(), (pts[3] - pts[1]).toDouble()).toFloat()
 
                 if (currentPx > 0 && state.viewWidth > 0) {
-                    val (currMin, currMax) = ZoomMapping.getZoomRange(state.experienceMode, false)
-                    val currentZoom = ZoomMapping.sliderToZoom(state.zoomSliderPosition, currMin, currMax)
+                    val (currMin, currMax) = com.hereliesaz.cuedetat.ui.ZoomMapping.getZoomRange(state.experienceMode, false)
+                    val currentZoom = com.hereliesaz.cuedetat.ui.ZoomMapping.sliderToZoom(state.zoomSliderPosition, currMin, currMax)
 
                     // Target margin: 100dp padding on each side = 200dp total
                     val marginPx = 200f * state.screenDensity
@@ -144,8 +143,8 @@ internal fun reduceToggleAction(
                         val unzoomedPx = currentPx / currentZoom
                         val targetZoom = targetPx / unzoomedPx
 
-                        val (newMin, newMax) = ZoomMapping.getZoomRange(ExperienceMode.BEGINNER, true)
-                        autoZoomSlider = ZoomMapping.zoomToSlider(targetZoom, newMin, newMax)
+                        val (newMin, newMax) = com.hereliesaz.cuedetat.ui.ZoomMapping.getZoomRange(ExperienceMode.BEGINNER, true)
+                        autoZoomSlider = com.hereliesaz.cuedetat.ui.ZoomMapping.zoomToSlider(targetZoom, newMin, newMax)
                     }
                 }
             }

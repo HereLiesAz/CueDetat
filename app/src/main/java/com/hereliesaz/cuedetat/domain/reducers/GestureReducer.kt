@@ -3,11 +3,13 @@ package com.hereliesaz.cuedetat.domain.reducers
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import android.graphics.PointF
 import androidx.compose.ui.geometry.Offset
+import com.hereliesaz.cuedetat.data.BallType
 import com.hereliesaz.cuedetat.domain.BallSelectionPhase
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.TargetType
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import javax.inject.Inject
@@ -44,9 +46,20 @@ class GestureReducer @Inject constructor() {
         // 0. Ball Selection Phase: tap near a confirmed snap candidate to attach a virtual ball
         if (currentState.tableScanModel != null &&
             currentState.ballSelectionPhase != BallSelectionPhase.NONE) {
+            
             val confirmed = currentState.snapCandidates?.filter { it.isConfirmed } ?: emptyList()
+            
+            val filteredConfirmed = when (currentState.ballSelectionPhase) {
+                BallSelectionPhase.AWAITING_TARGET -> confirmed.filter {
+                    it.ballType == BallType.UNKNOWN ||
+                    (currentState.targetType == TargetType.STRIPES && it.ballType == BallType.STRIPE) ||
+                    (currentState.targetType == TargetType.SOLIDS && it.ballType == BallType.SOLID)
+                }
+                else -> confirmed
+            }
+
             val snapTapRadius = touchRadius * 2f
-            val closest = confirmed.minByOrNull { getDistance(event.logicalPoint, it.detectedPoint) }
+            val closest = filteredConfirmed.minByOrNull { getDistance(event.logicalPoint, it.detectedPoint) }
             if (closest != null && getDistance(event.logicalPoint, closest.detectedPoint) < snapTapRadius) {
                 return when (currentState.ballSelectionPhase) {
                     BallSelectionPhase.AWAITING_CUE -> currentState.copy(
@@ -68,7 +81,17 @@ class GestureReducer @Inject constructor() {
 
         // LITE AR Snapping (Dynamic Beginner)
         if (currentState.experienceMode == ExperienceMode.BEGINNER && !currentState.isBeginnerViewLocked) {
-            val detectedBalls = (currentState.visionData?.genericBalls ?: emptyList()) + (currentState.visionData?.customBalls ?: emptyList())
+            val visionData = currentState.visionData
+            val detectedBalls = if (visionData != null && visionData.balls.isNotEmpty()) {
+                visionData.balls.filter {
+                    it.type == BallType.UNKNOWN ||
+                    (currentState.targetType == TargetType.STRIPES && it.type == BallType.STRIPE) ||
+                    (currentState.targetType == TargetType.SOLIDS && it.type == BallType.SOLID)
+                }.map { it.position }
+            } else {
+                (visionData?.genericBalls ?: emptyList()) + (visionData?.customBalls ?: emptyList())
+            }
+
             val snapThreshold = LOGICAL_BALL_RADIUS * 2.5f
             val closestBall = detectedBalls.minByOrNull { getDistance(event.logicalPoint, it) }
             if (closestBall != null && getDistance(event.logicalPoint, closestBall) < snapThreshold) {
@@ -172,13 +195,37 @@ class GestureReducer @Inject constructor() {
             InteractionMode.MOVING_PROTRACTOR_UNIT -> {
                 val dx = event.currentLogicalPoint.x - event.previousLogicalPoint.x
                 val dy = event.currentLogicalPoint.y - event.previousLogicalPoint.y
+                val newCenter = PointF(
+                    currentState.protractorUnit.center.x + dx,
+                    currentState.protractorUnit.center.y + dy
+                )
+                
+                // Snapping logic for Dynamic Beginner Mode
+                val snappedCenter = if (currentState.experienceMode == ExperienceMode.BEGINNER && !currentState.isBeginnerViewLocked) {
+                    val visionData = currentState.visionData
+                    val detectedBalls = if (visionData != null && visionData.balls.isNotEmpty()) {
+                        visionData.balls.filter {
+                            it.type == BallType.UNKNOWN ||
+                            (currentState.targetType == TargetType.STRIPES && it.type == BallType.STRIPE) ||
+                            (currentState.targetType == TargetType.SOLIDS && it.type == BallType.SOLID)
+                        }.map { it.position }
+                    } else {
+                        (visionData?.genericBalls ?: emptyList()) + (visionData?.customBalls ?: emptyList())
+                    }
+                    
+                    val snapThreshold = LOGICAL_BALL_RADIUS * 1.5f
+                    val closestBall = detectedBalls.minByOrNull { getDistance(newCenter, it) }
+                    if (closestBall != null && getDistance(newCenter, closestBall) < snapThreshold) {
+                        closestBall
+                    } else {
+                        newCenter
+                    }
+                } else {
+                    newCenter
+                }
+
                 currentState.copy(
-                    protractorUnit = currentState.protractorUnit.copy(
-                        center = PointF(
-                            currentState.protractorUnit.center.x + dx,
-                            currentState.protractorUnit.center.y + dy
-                        )
-                    ),
+                    protractorUnit = currentState.protractorUnit.copy(center = snappedCenter),
                     magnifierSourceCenter = updatedMagnifierCenter,
                     valuesChangedSinceReset = true
                 )

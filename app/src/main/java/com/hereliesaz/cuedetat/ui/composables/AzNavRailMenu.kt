@@ -218,17 +218,17 @@ fun AzNavRailMenu(
 
         if (uiState.experienceMode == ExperienceMode.BEGINNER) {
             azRailToggle(
-                id = "lock_view",
-                isChecked = uiState.isBeginnerViewLocked,
+                id = "view_mode",
+                isChecked = !uiState.isBeginnerViewLocked,
                 toggleOnText = "dynamic", toggleOffText = "static",
-                fillColor = if (uiState.isBeginnerViewLocked) b6G else b7M,
+                fillColor = if (!uiState.isBeginnerViewLocked) b6G else b7M,
                 textColor = Color.White,
                 onClick = {
                     if (uiState.isBeginnerViewLocked) onEvent(MainScreenEvent.UnlockBeginnerView)
                     else onEvent(MainScreenEvent.LockBeginnerView)
                 }
             )
-            
+
             if (inArSubMode) {
                 azRailToggle(
                     id = "target_type",
