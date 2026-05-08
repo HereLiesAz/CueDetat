@@ -10,7 +10,7 @@
 
 Gate `ExperienceMode.EXPERT` behind a Google Play subscription on the Play Store distribution. Ship two product flavors from one codebase: a `play` flavor that includes Play Billing Library and enforces the paywall, and a `foss` flavor (built by GitHub Actions) that has no billing dependency and leaves Expert Mode unlocked. Verification is client-only — tampering is not a concern; users who want Expert Mode for free can build the `foss` APK from source.
 
-The entitlement is exposed to the rest of the app as a single `Boolean` (`isExpertEntitled`) on `OverlayState`, sourced from a flavor-specific `EntitlementRepository`. Reducers stay pure and unaware of the flavor split.
+The entitlement is exposed to the rest of the app as a single `Boolean` (`isExpertEntitled`) on `CueDetatState`, sourced from a flavor-specific `EntitlementRepository`. Reducers stay pure and unaware of the flavor split.
 
 ---
 
@@ -33,7 +33,7 @@ The entitlement is exposed to the rest of the app as a single `Boolean` (`isExpe
 | `di/FossBillingModule.kt` | **New** (`foss/`). |
 | `ui/composables/paywall/PaywallSheet.kt` | **New** (`main/`). Compose modal sheet. |
 | `ui/composables/paywall/PaywallViewModel.kt` | **New** (`main/`). |
-| `domain/UiModel.kt` | **Modified.** Add `isExpertEntitled: Boolean = false` to `OverlayState`. |
+| `domain/UiModel.kt` | **Modified.** Add `isExpertEntitled: Boolean = false` to `CueDetatState`. |
 | `domain/reducers/EntitlementReducer.kt` | **New.** Forces BEGINNER when entitlement drops. |
 | `domain/reducers/ToggleReducer.kt` | **Modified.** Guard `SetExperienceMode(EXPERT)` on `isExpertEntitled`. |
 | `ui/MainViewModel.kt` | **Modified.** Collect `EntitlementRepository.entitlement`, dispatch `EntitlementChanged`. Trigger onboarding paywall once. |
@@ -161,7 +161,7 @@ interface EntitlementRepository {
 
 ### 2.4 MVI Integration
 
-- `OverlayState` gains `val isExpertEntitled: Boolean = false`.
+- `CueDetatState` gains `val isExpertEntitled: Boolean = false`.
 - New event `MainScreenEvent.EntitlementChanged(entitlement: Entitlement)` dispatched by `MainViewModel` whenever the repository emits.
 - New event `MainScreenEvent.ShowPaywall(trigger: PaywallTrigger)` dispatched by reducers and consumed as a side effect to display `PaywallSheet`.
 - New reducer `EntitlementReducer`:
@@ -185,7 +185,7 @@ Reducers do not import any billing code. The flavor split is invisible above the
 3. `BillingClient.startConnection` (async, with retry).
 4. On connected: `queryPurchasesAsync(BillingClient.ProductType.SUBS)`.
 5. Map result to `Entitlement`, write to cache, emit on `entitlement` flow.
-6. `MainViewModel` collects, dispatches `EntitlementChanged`, reducer updates `OverlayState`.
+6. `MainViewModel` collects, dispatches `EntitlementChanged`, reducer updates `CueDetatState`.
 
 The cache-then-refresh sequence ensures a paying user never sees a flash of locked Expert Mode at startup.
 
