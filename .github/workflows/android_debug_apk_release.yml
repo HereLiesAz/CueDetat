@@ -102,7 +102,7 @@ jobs:
           export BUILD_NUMBER=$(git rev-list --count HEAD)
           
           # Build the APK
-          ./gradlew assembleDebug -PversionBuild=$BUILD_NUMBER --build-cache \
+          ./gradlew assembleFossDebug -PversionBuild=$BUILD_NUMBER --build-cache \
             -Pandroid.injected.signing.store.file=$(pwd)/app/keystore.jks \
             -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
             -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
@@ -183,7 +183,7 @@ jobs:
           fi
           
           # Locate built APK
-          APK_ORIGINAL=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          APK_ORIGINAL=$(find app/build/outputs/apk/foss/debug -name "*.apk" | head -n 1)
           
           if [ -z "$APK_ORIGINAL" ]; then
              echo "Error: No APK found to release!"
