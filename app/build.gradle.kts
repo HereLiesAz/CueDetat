@@ -193,6 +193,9 @@ android {
 dependencies {
     implementation(libs.androidx.datastore.preferences)
 
+    // Play Billing — only included in the play flavor APK.
+    "playImplementation"(libs.androidx.billing.ktx)
+
     // Core & Jetpack
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
