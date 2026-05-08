@@ -7,6 +7,7 @@ import com.hereliesaz.cuedetat.domain.reducers.reduceAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceAdvancedOptionsAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceControlAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceCvAction
+import com.hereliesaz.cuedetat.domain.reducers.reduceEntitlementAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceObstacleAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceSpinAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceSystemAction
@@ -141,6 +142,11 @@ fun stateReducer(
         is MainScreenEvent.MyriadTrajectoryReceived -> {
             currentState.copy(myriadTrajectory = action.points)
         }
+
+        // --- ENTITLEMENT ---
+        // Handled by [EntitlementReducer]. Sets isExpertEntitled and may
+        // force-downgrade EXPERT to BEGINNER if entitlement drops.
+        is MainScreenEvent.EntitlementChanged -> reduceEntitlementAction(currentState, action)
 
         // Default catch-all (should ideally never happen for known events).
         else -> currentState
