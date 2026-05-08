@@ -93,6 +93,11 @@ class MainActivity : ComponentActivity() {
         observeSingleEvents()
     }
 
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshEntitlement()
+    }
+
     private fun observeSingleEvents() {
         viewModel.singleEvent.onEach { event ->
             when (event) {
