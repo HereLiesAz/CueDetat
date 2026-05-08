@@ -110,6 +110,25 @@ fun AzNavRailMenu(
         azRailToggle(id = "help", isChecked = uiState.areHelpersVisible, toggleOnText = "Help", toggleOffText = "Help", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleHelp) })
         azMenuItem(id = "tutorial", text = "Tutorial", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.StartTutorial()) })
 
+        // "Get Expert" tile only shows for non-entitled users in the play
+        // flavor. In FOSS the entitlement is permanently active so this tile
+        // never renders.
+        if (!uiState.isExpertEntitled) {
+            azRailItemLowerCase(
+                id = "get_expert",
+                text = "Get Expert",
+                fillColor = b1Y,
+                textColor = Color.White,
+                onClick = {
+                    onEvent(
+                        MainScreenEvent.ShowPaywall(
+                            com.hereliesaz.cuedetat.billing.PaywallTrigger.NAV_TILE
+                        )
+                    )
+                }
+            )
+        }
+
         val inArSubMode = uiState.cameraMode == CameraMode.AR_SETUP || 
                           uiState.cameraMode == CameraMode.AR_ACTIVE || 
                           uiState.cameraMode == CameraMode.LITE_AR
