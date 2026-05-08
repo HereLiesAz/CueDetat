@@ -50,7 +50,7 @@ The entitlement is exposed to the rest of the app as a single `Boolean` (`isExpe
 | Verification | Client-only (Play Billing Library) | Tampering not a concern; FOSS APK is the explicit "free" path. |
 | Build split | Product flavors `play` + `foss` | Standard pattern; IDE-supported; reproducible. |
 | Existing users | Hard cutover | App is in closed testing — no live install base to grandfather. |
-| SKU | One product `expert_mode`, base plans `monthly` + `yearly`, 7-day intro free trial | Standard structure; trial reduces friction. |
+| SKU | One product `expert_mode`, base plans `monthly` + `yearly`, 3-day intro free trial | Standard structure; trial reduces friction. |
 | Lapse | Mirror Play's `queryPurchasesAsync` result | No explicit grace handling code; Play's response is treated as truth. |
 | Paywall surfaces | Onboarding (skippable, once) + on-tap gate + persistent nav rail tile | Triple coverage to maximize discovery. |
 | Offline cache window | 14 days | Tolerates travel; bounded against indefinite use after refund. |
@@ -247,8 +247,8 @@ No flavor check is needed: in FOSS, `isExpertEntitled` is `true` from the first 
 | Section | Content |
 |---|---|
 | Header | "Unlock Expert Mode" — single-line value prop in project voice (e.g., "Full AR table tracking, ball selection, glasses mode, and the ability to feel marginally less bad about yourself.") |
-| Plan cards | Yearly (highlighted "Best Value", "Save ~30%" badge) and Monthly. Each shows live price from `queryProductDetailsAsync` and CTA "Start 7-day free trial". |
-| Trial fine print | "7-day free trial, then [price]. Cancel anytime in Google Play." |
+| Plan cards | Yearly (highlighted "Best Value", "Save ~30%" badge) and Monthly. Each shows live price from `queryProductDetailsAsync` and CTA "Start 3-day free trial". |
+| Trial fine print | "3-day free trial, then [price]. Cancel anytime in Google Play." |
 | Restore purchases | Secondary text button — calls `repository.restorePurchases()`. |
 | Dismiss | "Continue in Beginner Mode" — secondary text button. |
 
@@ -304,7 +304,7 @@ Every purchase must be acknowledged within 3 days. `PlayBillingEntitlementReposi
 - Server-side verification (no backend). May be revisited if tampering becomes a concern post-launch.
 - Real-Time Developer Notifications (RTDN). Not useful without a backend.
 - Multi-tier subscriptions (e.g., a separate "Pro" SKU). One product, two base plans.
-- Promo codes / introductory offers beyond the standard 7-day trial. Can be added later via Play Console without code changes.
+- Promo codes / introductory offers beyond the standard 3-day trial. Can be added later via Play Console without code changes.
 - In-app messaging for upcoming renewals or failed payments. Play handles user-facing notifications; we do not.
 - Analytics implementation. `PaywallTrigger` is wired through but no analytics SDK is added in this spec.
 

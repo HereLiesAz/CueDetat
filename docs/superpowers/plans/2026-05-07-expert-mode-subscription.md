@@ -2495,7 +2495,7 @@ In Google Play Console for `com.hereliesaz.cuedetat`:
 1. Create a subscription product with id `expert_mode`.
 2. Add base plan `monthly` (auto-renewing, monthly billing, your chosen price).
 3. Add base plan `yearly` (auto-renewing, yearly billing, your chosen price, e.g. ~30% less per month equivalent).
-4. On both base plans, add an offer: 7-day free trial, eligibility "new customers only".
+4. On both base plans, add an offer: 3-day free trial, eligibility "new customers only".
 5. Add license-tester accounts (Settings → License testing).
 6. Activate both base plans.
 
@@ -2511,7 +2511,7 @@ Launch the app. Past the splash screen, the PaywallSheet should appear. Tap "Con
 
 - [ ] **Step 4: Yearly purchase with free trial.**
 
-Tap the Yearly card → "Start 7-day free trial". The Play purchase sheet appears. Complete the test purchase. The sheet dismisses; Expert Mode is now active. Verify by toggling — Expert Mode is selectable; the table is visible.
+Tap the Yearly card → "Start 3-day free trial". The Play purchase sheet appears. Complete the test purchase. The sheet dismisses; Expert Mode is now active. Verify by toggling — Expert Mode is selectable; the table is visible.
 
 - [ ] **Step 5: Cancel and verify silent downgrade.**
 
