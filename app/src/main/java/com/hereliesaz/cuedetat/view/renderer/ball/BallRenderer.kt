@@ -473,13 +473,21 @@ class BallRenderer {
 
     private fun drawBoundingBoxes(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
         val visionData = state.visionData ?: return
-        if (visionData.detectedBoundingBoxes.isEmpty() || visionData.sourceImageWidth == 0) return
+        if (visionData.sourceImageWidth == 0) return
 
-        val paint = Paint(paints.cvResultPaint).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 3f
-            alpha = 150
+        // Prefer the typed ball list so we can colour by classification. Fall
+        // back to the untyped boundingBoxes when classification hasn't run yet
+        // (e.g. raw OpenCV path with no per-ball type info).
+        val typedBoxes = visionData.balls.mapNotNull { ball ->
+            ball.boundingBox?.let { it to ball.type }
         }
+        val boxes: List<Pair<android.graphics.Rect, com.hereliesaz.cuedetat.data.BallType>> =
+            if (typedBoxes.isNotEmpty()) {
+                typedBoxes
+            } else {
+                visionData.detectedBoundingBoxes.map { it to com.hereliesaz.cuedetat.data.BallType.UNKNOWN }
+            }
+        if (boxes.isEmpty()) return
 
         val rotation = visionData.sourceImageRotation.toFloat()
         val srcWidth = visionData.sourceImageWidth.toFloat()
@@ -493,12 +501,26 @@ class BallRenderer {
         matrix.setRectToRect(srcRect, destRect, Matrix.ScaleToFit.FILL)
         matrix.postRotate(rotation, canvasWidth / 2f, canvasHeight / 2f)
 
+        val paint = Paint(paints.cvResultPaint).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+            alpha = 200
+        }
 
-        visionData.detectedBoundingBoxes.forEach { box ->
+        boxes.forEach { (box, type) ->
+            paint.color = colorForBallType(type).toArgb()
             val boxRect = RectF(box)
             matrix.mapRect(boxRect)
             canvas.drawRect(boxRect, paint)
         }
+    }
+
+    private fun colorForBallType(type: com.hereliesaz.cuedetat.data.BallType): Color = when (type) {
+        com.hereliesaz.cuedetat.data.BallType.SOLID -> Color(0xFFFFEB3B)   // yellow
+        com.hereliesaz.cuedetat.data.BallType.STRIPE -> Color(0xFF00E5FF)  // cyan
+        com.hereliesaz.cuedetat.data.BallType.CUE -> Color(0xFFFFFFFF)     // white
+        com.hereliesaz.cuedetat.data.BallType.EIGHT -> Color(0xFFE040FB)   // magenta (8-ball is black; magenta reads against the table)
+        com.hereliesaz.cuedetat.data.BallType.UNKNOWN -> Color(0xFF9E9E9E) // gray
     }
 
     private fun drawAllLabels(

@@ -8,7 +8,7 @@ import android.graphics.Rect
 import org.opencv.core.Mat
 
 enum class BallType {
-    UNKNOWN, SOLID, STRIPE
+    UNKNOWN, SOLID, STRIPE, CUE, EIGHT
 }
 
 @Keep
