@@ -17,15 +17,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -36,10 +38,14 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.zIndex
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
@@ -78,6 +84,8 @@ fun TutorialOverlay(
     val isLocked = uiState.isBeginnerViewLocked
     val matrix = if (isLocked) uiState.logicalPlaneMatrix else uiState.pitchMatrix
     val tps = if (uiState.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR || isLocked) null else uiState.lensWarpTps
+
+    var popupOffset by remember { mutableStateOf(Offset.Zero) }
 
     // Optimize: Pre-calculate highlight parameters to avoid redundant math in the draw loop
     val highlightParams = remember(uiState.tutorialHighlight, matrix, tps, uiState.protractorUnit, uiState.onPlaneBall, uiState.aimingLineEndPoint, uiState.viewWidth, uiState.viewHeight, isLocked, uiState.cameraMatrix, uiState.distCoeffs) {
@@ -227,10 +235,57 @@ fun TutorialOverlay(
 
         Box(
             modifier = Modifier
-                .statusBarsPadding()
-                .padding(top = 48.dp)
+                .navigationBarsPadding()
                 .zIndex(10f)
-                .align(Alignment.TopCenter)
+                .offset { IntOffset(popupOffset.x.toInt(), popupOffset.y.toInt()) }
+                .align(Alignment.Center)
+                .onGloballyPositioned { coordinates ->
+                    // positionInRoot includes the current popupOffset, so naïvely
+                    // testing it against highlights flickers: at offset 0 we
+                    // overlap → move up → re-fires with no overlap → reset to 0
+                    // → overlap again. Subtract the current offset to recover
+                    // the popup's natural (Center-aligned) position; the decision
+                    // is then a stable function of the highlights only.
+                    val anchored = coordinates.positionInRoot()
+                    val natural = Offset(
+                        anchored.x - popupOffset.x,
+                        anchored.y - popupOffset.y
+                    )
+                    val popupRect = androidx.compose.ui.geometry.Rect(
+                        natural,
+                        coordinates.size.toSize()
+                    )
+
+                    var shouldMove = false
+                    highlightParams.forEach { param ->
+                        val highlightBounds = when (param) {
+                            is HighlightParams.Circle -> androidx.compose.ui.geometry.Rect(
+                                center = param.center,
+                                radius = param.radius
+                            )
+                            is HighlightParams.AimingTriangles -> {
+                                if (param.triangles.isEmpty()) return@forEach
+                                var minX = Float.MAX_VALUE
+                                var minY = Float.MAX_VALUE
+                                var maxX = Float.MIN_VALUE
+                                var maxY = Float.MIN_VALUE
+                                param.triangles.forEach { tri ->
+                                    minX = minOf(minX, tri.center.x)
+                                    minY = minOf(minY, tri.center.y)
+                                    maxX = maxOf(maxX, tri.center.x)
+                                    maxY = maxOf(maxY, tri.center.y)
+                                }
+                                androidx.compose.ui.geometry.Rect(minX, minY, maxX, maxY)
+                            }
+                            is HighlightParams.Rect -> androidx.compose.ui.geometry.Rect(param.topLeft, param.size)
+                        }
+
+                        if (popupRect.overlaps(highlightBounds.inflate(20f))) {
+                            shouldMove = true
+                        }
+                    }
+                    popupOffset = if (shouldMove) Offset(0f, -uiState.viewHeight * 0.3f) else Offset.Zero
+                }
         ) {
             Column(
                 modifier = Modifier
