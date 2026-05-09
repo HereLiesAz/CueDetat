@@ -128,9 +128,15 @@ class MainViewModel @Inject constructor(
             val savedState = userPreferencesRepository.stateFlow.first()
             val savedFeltSamples = tableScanRepository.loadFeltSamples()
             val currentExperienceMode = _uiState.value.experienceMode
+            // Pull the entitlement live rather than from the JSON snapshot. The
+            // entitlement event may already have set _uiState.isExpertEntitled
+            // by the time this load completes; in any case the StateFlow is the
+            // source of truth.
+            val liveEntitled = entitlementRepository.entitlement.value.active
             val initialState = (savedState ?: CueDetatState()).copy(
                 experienceMode = currentExperienceMode,
-                savedFeltSamples = savedFeltSamples
+                savedFeltSamples = savedFeltSamples,
+                isExpertEntitled = liveEntitled
             )
             processAndEmitState(initialState, UpdateType.FULL)
 

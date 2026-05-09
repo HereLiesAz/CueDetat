@@ -40,14 +40,13 @@ class PaywallViewModel @Inject constructor(
         }
         viewModelScope.launch {
             // StateFlow already deduplicates equal values, so no need for distinctUntilChanged.
+            // Every paywall surface in this app is reached because the user
+            // tried to use Expert. After a successful purchase we should drop
+            // them into Expert automatically; making them tap Expert a second
+            // time looks like the redemption silently failed.
             repository.entitlement.collect { entitlement ->
-                if (entitlement.active &&
-                    triggerSnapshot == PaywallTrigger.EXPERT_TOGGLE_TAP
-                ) {
+                if (entitlement.active && triggerSnapshot != null) {
                     _purchaseFlowResults.emit(PurchaseFlowEvent.PurchasedAutoEnterExpert)
-                    triggerSnapshot = null
-                } else if (entitlement.active && triggerSnapshot != null) {
-                    _purchaseFlowResults.emit(PurchaseFlowEvent.PurchasedNoAutoEnter)
                     triggerSnapshot = null
                 }
             }
