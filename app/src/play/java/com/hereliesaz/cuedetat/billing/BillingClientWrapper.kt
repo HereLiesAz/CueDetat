@@ -4,6 +4,7 @@ package com.hereliesaz.cuedetat.billing
 
 import android.app.Activity
 import android.content.Context
+import android.util.Log
 import com.android.billingclient.api.AcknowledgePurchaseParams
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
@@ -51,6 +52,10 @@ class BillingClientWrapper @Inject constructor(
     val purchaseUpdates: SharedFlow<List<Purchase>> = _purchaseUpdates.asSharedFlow()
 
     private val purchasesListener = PurchasesUpdatedListener { result, purchases ->
+        Log.i(
+            TAG,
+            "purchasesListener responseCode=${result.responseCode} debug='${result.debugMessage}' size=${purchases?.size ?: 0}"
+        )
         if (result.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
             _purchaseUpdates.tryEmit(purchases)
         }
@@ -121,8 +126,15 @@ class BillingClientWrapper @Inject constructor(
             .build()
         val result = client.queryPurchasesAsync(params)
         if (result.billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
-            return emptyList()
+            // Throw rather than returning emptyList() — an empty list is
+            // indistinguishable from "user has no subscriptions" and would
+            // cause the repository to revoke a paying user's entitlement.
+            throw BillingQueryException(
+                result.billingResult.responseCode,
+                result.billingResult.debugMessage
+            )
         }
+        Log.i(TAG, "queryActiveSubscriptions ok size=${result.purchasesList.size}")
         return result.purchasesList
     }
 
@@ -171,5 +183,9 @@ class BillingClientWrapper @Inject constructor(
             .setPurchaseToken(purchase.purchaseToken)
             .build()
         client.acknowledgePurchase(params)
+    }
+
+    companion object {
+        private const val TAG = "PlayBillingEntitlement"
     }
 }

@@ -272,6 +272,25 @@ class MainViewModel @Inject constructor(
             return
         }
 
+        // Intercept the apply step: if the cycle landed on EXPERT and the user
+        // is not entitled, surface the paywall and clear the pending mode so
+        // the next cycle starts fresh. The reducer would otherwise silently
+        // refuse the transition and the user would see no feedback.
+        if (event is MainScreenEvent.ApplyPendingExperienceMode) {
+            val target = _uiState.value.pendingExperienceMode
+            if (target == ExperienceMode.EXPERT && !_uiState.value.isExpertEntitled) {
+                _uiState.value = _uiState.value.copy(pendingExperienceMode = null)
+                viewModelScope.launch {
+                    _singleEvent.emit(
+                        SingleEvent.ShowPaywall(
+                            com.hereliesaz.cuedetat.billing.PaywallTrigger.EXPERT_TOGGLE_TAP
+                        )
+                    )
+                }
+                return
+            }
+        }
+
         val currentState = _uiState.value
 
         val logicalEvent = when (event) {
