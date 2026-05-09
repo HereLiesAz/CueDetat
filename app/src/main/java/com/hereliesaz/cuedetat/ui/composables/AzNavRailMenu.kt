@@ -107,7 +107,6 @@ fun AzNavRailMenu(
         if (inArSubMode) {
             azRailToggle(
                 id = "target_type",
-                route = "target_type",
                 isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
                 toggleOnText = "Stripes", toggleOffText = "Solids",
                 fillColor = if (uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES) b4P else b8K,

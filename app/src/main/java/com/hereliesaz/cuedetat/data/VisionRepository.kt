@@ -953,20 +953,41 @@ class VisionRepository @Inject constructor(
         val roi = OCVRect(x, y, w, h)
         val ballMat = frame.submat(roi)
 
-        val poleHeight = (h * 0.15f).toInt().coerceAtLeast(1)
-        val topPole = ballMat.submat(OCVRect(0, 0, w, poleHeight))
-        val bottomPole = ballMat.submat(OCVRect(0, h - poleHeight, w, poleHeight))
-
         val hsvMat = Mat()
         Imgproc.cvtColor(ballMat, hsvMat, Imgproc.COLOR_BGR2HSV)
+
+        // Sample the ball's middle band (avoids glare/shadow at the poles) for
+        // the whole-ball mean used to spot the cue and the 8 ball. A pure-white
+        // cue ball reads as low saturation + high value across the entire ball;
+        // a pure-black 8 ball reads as low value across the entire ball. Stripes
+        // and solids both have a coloured band in the middle so they fall through.
+        val midTop = (h * 0.30f).toInt().coerceIn(0, h - 1)
+        val midH = (h * 0.40f).toInt().coerceAtLeast(1).coerceAtMost(h - midTop)
+        val midHsv = hsvMat.submat(OCVRect(0, midTop, w, midH))
+        val midMean = Core.mean(midHsv)
+        midHsv.release()
+
+        val isWhole8Ball = midMean.`val`[2] < 60.0
+        val isWholeCueBall = midMean.`val`[1] < 40.0 && midMean.`val`[2] > 190.0
+
+        if (isWhole8Ball) {
+            ballMat.release()
+            hsvMat.release()
+            return BallType.EIGHT
+        }
+        if (isWholeCueBall) {
+            ballMat.release()
+            hsvMat.release()
+            return BallType.CUE
+        }
+
+        val poleHeight = (h * 0.15f).toInt().coerceAtLeast(1)
         val topHsv = hsvMat.submat(OCVRect(0, 0, w, poleHeight))
         val bottomHsv = hsvMat.submat(OCVRect(0, h - poleHeight, w, poleHeight))
 
         val topMean = Core.mean(topHsv)
         val bottomMean = Core.mean(bottomHsv)
 
-        topPole.release()
-        bottomPole.release()
         topHsv.release()
         bottomHsv.release()
         ballMat.release()
