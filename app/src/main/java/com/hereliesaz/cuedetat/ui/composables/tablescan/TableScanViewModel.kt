@@ -85,6 +85,20 @@ class TableScanViewModel @Inject constructor(
     private val _scanComplete = MutableStateFlow(false)
     val scanComplete: StateFlow<Boolean> = _scanComplete.asStateFlow()
 
+    private val _capturedFeltHsv = MutableStateFlow<FloatArray?>(null)
+    val capturedFeltHsv: StateFlow<FloatArray?> = _capturedFeltHsv.asStateFlow()
+
+    private val _selectedSampleIds = MutableStateFlow<Set<String>>(emptySet())
+    val selectedSampleIds: StateFlow<Set<String>> = _selectedSampleIds.asStateFlow()
+
+    // Mutable cluster accumulator: identity → running cluster.
+    // Mutated from onFrame (Default), captureCurrentPocket (Main), resetScan (caller),
+    // and init (Main). All mutations and full reads run under synchronized(clustersLock).
+    // Critical sections are short, so a JVM monitor is sufficient and works from both
+    // suspend and non-suspend callers without coroutine plumbing.
+    private val clusters = mutableMapOf<PocketId, MutableList<PointF>>()
+    private val clustersLock = Any()
+
     init {
         // Resume partial scan if it exists
         viewModelScope.launch {
@@ -110,12 +124,6 @@ class TableScanViewModel @Inject constructor(
         }
     }
 
-    private val _capturedFeltHsv = MutableStateFlow<FloatArray?>(null)
-    val capturedFeltHsv: StateFlow<FloatArray?> = _capturedFeltHsv.asStateFlow()
-
-    private val _selectedSampleIds = MutableStateFlow<Set<String>>(emptySet())
-    val selectedSampleIds: StateFlow<Set<String>> = _selectedSampleIds.asStateFlow()
-
     fun toggleSampleSelection(id: String) {
         val current = _selectedSampleIds.value
         _selectedSampleIds.value = if (current.contains(id)) current - id else current + id
@@ -134,14 +142,6 @@ class TableScanViewModel @Inject constructor(
             }
         }
     }
-
-    // Mutable cluster accumulator: identity → running cluster.
-    // Mutated from onFrame (Default), captureCurrentPocket (Main), resetScan (caller),
-    // and init (Main). All mutations and full reads run under synchronized(clustersLock).
-    // Critical sections are short, so a JVM monitor is sufficient and works from both
-    // suspend and non-suspend callers without coroutine plumbing.
-    private val clusters = mutableMapOf<PocketId, MutableList<PointF>>()
-    private val clustersLock = Any()
 
     // Felt colour sampled from recent frames (rolling mean HSV of centre crop).
     @Volatile private var lastFeltHsv: FloatArray = floatArrayOf(120f, 0.5f, 0.4f)

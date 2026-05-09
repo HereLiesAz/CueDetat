@@ -1,6 +1,7 @@
 package com.hereliesaz.cuedetat.ui.hatemode
 
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.platform.AndroidUiDispatcher
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.data.SensorRepository
@@ -75,7 +76,7 @@ class HaterViewModel @Inject constructor(
 
     private fun startPhysics() {
         if (physicsJob?.isActive == true) return
-        physicsJob = viewModelScope.launch {
+        physicsJob = viewModelScope.launch(AndroidUiDispatcher.Main) {
             // Drive physics from the choreographer instead of a fixed delay so the
             // simulation stays in step with display refresh and pauses cleanly when
             // the host activity is backgrounded.
