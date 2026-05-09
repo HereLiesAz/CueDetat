@@ -100,6 +100,22 @@ fun AzNavRailMenu(
         // [SECTION 3] Extra content from the caller (ProtractorScreen's Camera & Overlays)
         content()
 
+        val inArSubMode = uiState.cameraMode == CameraMode.AR_SETUP || 
+                          uiState.cameraMode == CameraMode.AR_ACTIVE || 
+                          uiState.cameraMode == CameraMode.LITE_AR
+
+        if (inArSubMode) {
+            azRailToggle(
+                id = "target_type",
+                route = "target_type",
+                isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
+                toggleOnText = "Stripes", toggleOffText = "Solids",
+                fillColor = if (uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES) b4P else b8K,
+                textColor = Color.White,
+                onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
+            )
+        }
+
         // [SECTION 4] Mode-specific Rail Items
         if (uiState.experienceMode == ExperienceMode.HATER) {
             azRailItemLowerCase(id = "shake", text = "Shake", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.Shake) })
@@ -128,10 +144,6 @@ fun AzNavRailMenu(
                 }
             )
         }
-
-        val inArSubMode = uiState.cameraMode == CameraMode.AR_SETUP || 
-                          uiState.cameraMode == CameraMode.AR_ACTIVE || 
-                          uiState.cameraMode == CameraMode.LITE_AR
         
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             val isArActive = uiState.cameraMode != CameraMode.OFF
@@ -167,15 +179,6 @@ fun AzNavRailMenu(
             })
 
             if (inArSubMode) {
-                
-                azRailToggle(
-                    id = "target_type",
-                    isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
-                    toggleOnText = "stripes", toggleOffText = "solids",
-                    fillColor = b8K, textColor = Color.White,
-                    onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
-                )
-
                 if (!uiState.myriadTrajectory.isNullOrEmpty()) {
                     azRailToggle(
                         id = "flow",
@@ -230,14 +233,6 @@ fun AzNavRailMenu(
             )
 
             if (inArSubMode) {
-                azRailToggle(
-                    id = "target_type",
-                    isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
-                    toggleOnText = "stripes", toggleOffText = "solids",
-                    fillColor = b8K, textColor = Color.White,
-                    onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
-                )
-
                 if (!uiState.myriadTrajectory.isNullOrEmpty()) {
                     azRailToggle(
                         id = "flow",

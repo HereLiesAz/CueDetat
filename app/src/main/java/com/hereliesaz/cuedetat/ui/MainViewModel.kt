@@ -452,6 +452,8 @@ class MainViewModel @Inject constructor(
                 is MainScreenEvent.SetExperienceMode -> {
                     if (event.mode == ExperienceMode.HATER) {
                         _singleEvent.emit(SingleEvent.InitiateHaterMode)
+                    } else if (event.mode == ExperienceMode.EXPERT && !_uiState.value.isExpertEntitled) {
+                        _singleEvent.emit(SingleEvent.ShowPaywall(com.hereliesaz.cuedetat.billing.PaywallTrigger.SPLASH_SCREEN))
                     }
                 }
 

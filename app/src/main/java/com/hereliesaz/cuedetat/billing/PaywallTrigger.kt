@@ -9,5 +9,6 @@ package com.hereliesaz.cuedetat.billing
 enum class PaywallTrigger {
     ONBOARDING,
     EXPERT_TOGGLE_TAP,
-    NAV_TILE
+    NAV_TILE,
+    SPLASH_SCREEN
 }
