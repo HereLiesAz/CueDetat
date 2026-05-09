@@ -31,7 +31,6 @@ import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
@@ -82,8 +81,7 @@ fun PaywallSheet(
             Text(
                 "Full AR table tracking, ball selection, glasses mode, and the ability to " +
                         "feel marginally less bad about yourself.",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center
+                style = MaterialTheme.typography.bodyMedium
             )
             Spacer(Modifier.height(24.dp))
 
@@ -128,8 +126,7 @@ fun PaywallSheet(
             Spacer(Modifier.height(16.dp))
             Text(
                 "Free trial, then the price shown. Cancel anytime in Google Play.",
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center
+                style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(16.dp))
             TextButton(onClick = { viewModel.restore() }) { Text("Restore Purchases") }
@@ -151,7 +148,6 @@ fun PaywallSheet(
             Text(
                 text = githubFooter,
                 style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp)
             )
         }
@@ -172,7 +168,7 @@ private fun PlanCard(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+            Text(title, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             Row {
                 Text(formattedPrice, style = MaterialTheme.typography.headlineSmall)

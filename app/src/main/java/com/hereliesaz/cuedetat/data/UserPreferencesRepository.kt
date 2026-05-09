@@ -94,7 +94,12 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun saveState(state: CueDetatState) {
         dataStore.edit { preferences ->
-            val stateToSave = state.copy(experienceMode = null)
+            // isExpertEntitled is sourced live from EntitlementRepository on every
+            // launch — persisting it lets stale values clobber the FOSS build's
+            // always-true entitlement (and a Play user's just-redeemed purchase)
+            // when the saved state is reloaded after the entitlement event has
+            // already updated _uiState.
+            val stateToSave = state.copy(experienceMode = null, isExpertEntitled = false)
             val jsonString = gson.toJson(stateToSave)
             preferences[PreferencesKeys.STATE_JSON] = jsonString
         }
