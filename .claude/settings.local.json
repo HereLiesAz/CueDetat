@@ -135,7 +135,9 @@
       "Bash(bash ./gradlew :app:compileFossDebugKotlin)",
       "Bash(bash ./gradlew :app:assembleFossDebug :app:assemblePlayDebug :app:testFossDebugUnitTest :app:testPlayDebugUnitTest)",
       "Bash(bash ./gradlew :app:assemblePlayDebug :app:testPlayDebugUnitTest)",
-      "Bash(awk '{print $4}')"
+      "Bash(awk '{print $4}')",
+      "Bash(curl -sL \"https://repo1.maven.org/maven2/org/tensorflow/tensorflow-lite/maven-metadata.xml\")",
+      "Bash(bash ./gradlew :app:testPlayDebugUnitTest)"
     ]
   }
 }

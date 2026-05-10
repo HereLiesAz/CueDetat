@@ -101,6 +101,17 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        // 16KB-page Android is 64-bit only. The 32-bit ABIs (armeabi-v7a,
+        // x86) ship 4KB-aligned prebuilt .so files and would fail the Play
+        // Console 16KB-page compatibility check. x86_64 is also dropped
+        // because TFLite 2.17.0's libtensorflowlite_jni.so is 4KB-aligned on
+        // x86_64; the next TFLite drop is the LiteRT rebrand and that
+        // migration is out of scope here. Real devices that support 16KB
+        // pages are arm64-v8a; Play has required 64-bit support since 2019.
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
 
     flavorDimensions += "distribution"
