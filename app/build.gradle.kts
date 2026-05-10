@@ -199,6 +199,8 @@ android {
             pickFirsts += "**/libc++_shared.so"
         }
     }
+    buildToolsVersion = "36.1.0"
+    ndkVersion = "29.0.14206865"
 }
 
 

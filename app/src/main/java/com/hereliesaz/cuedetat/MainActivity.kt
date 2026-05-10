@@ -86,12 +86,20 @@ class MainActivity : ComponentActivity() {
             } else {
                 CueDetatTheme {
                     PermissionExplanationScreen(onConfirm = {
-                        requestPermissionsLauncher.launch(
+                        val permissions = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                            arrayOf(
+                                Manifest.permission.CAMERA,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                                Manifest.permission.BLUETOOTH_SCAN,
+                                Manifest.permission.BLUETOOTH_CONNECT
+                            )
+                        } else {
                             arrayOf(
                                 Manifest.permission.CAMERA,
                                 Manifest.permission.ACCESS_COARSE_LOCATION
                             )
-                        )
+                        }
+                        requestPermissionsLauncher.launch(permissions)
                     })
                 }
             }
