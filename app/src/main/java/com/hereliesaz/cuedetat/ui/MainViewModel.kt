@@ -47,7 +47,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -233,21 +235,24 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        // Onboarding paywall: shown once per install if the user is not entitled.
-        // In FOSS builds the entitlement repository emits active=true immediately,
-        // so the second branch is never taken.
+        // Splash paywall: every time the splash screen is showing AND the user
+        // is not entitled to Expert Mode, surface the paywall. This fires on
+        // cold start, on returning from "Exit to splash", and any other path
+        // that lands on the splash. In FOSS builds entitlement is permanently
+        // active so this never fires.
         viewModelScope.launch {
-            if (!userPreferencesRepository.hasSeenOnboardingPaywall()) {
-                val first = entitlementRepository.entitlement.first()
-                userPreferencesRepository.setOnboardingPaywallSeen()
-                if (!first.active) {
-                    onEvent(
-                        MainScreenEvent.ShowPaywall(
-                            com.hereliesaz.cuedetat.billing.PaywallTrigger.ONBOARDING
+            _uiState
+                .map { it.experienceMode == null && !it.isExpertEntitled }
+                .distinctUntilChanged()
+                .collect { onSplashWhileUnentitled ->
+                    if (onSplashWhileUnentitled) {
+                        _singleEvent.emit(
+                            SingleEvent.ShowPaywall(
+                                com.hereliesaz.cuedetat.billing.PaywallTrigger.SPLASH_SCREEN
+                            )
                         )
-                    )
+                    }
                 }
-            }
         }
     }
 

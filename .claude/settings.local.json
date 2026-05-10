@@ -133,7 +133,9 @@
       "Bash(bash ./gradlew :app:testFossDebugUnitTest --tests \"com.hereliesaz.cuedetat.domain.reducers.EntitlementReducerTest\")",
       "Bash(bash ./gradlew :app:testFossDebugUnitTest --tests \"com.hereliesaz.cuedetat.ui.composables.paywall.PaywallViewModelTest\")",
       "Bash(bash ./gradlew :app:compileFossDebugKotlin)",
-      "Bash(bash ./gradlew :app:assembleFossDebug :app:assemblePlayDebug :app:testFossDebugUnitTest :app:testPlayDebugUnitTest)"
+      "Bash(bash ./gradlew :app:assembleFossDebug :app:assemblePlayDebug :app:testFossDebugUnitTest :app:testPlayDebugUnitTest)",
+      "Bash(bash ./gradlew :app:assemblePlayDebug :app:testPlayDebugUnitTest)",
+      "Bash(awk '{print $4}')"
     ]
   }
 }

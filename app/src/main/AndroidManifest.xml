@@ -16,7 +16,6 @@
     <application
         android:name=".MyApplication"
         android:allowBackup="true"
-        android:extractNativeLibs="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:networkSecurityConfig="@xml/network_security_config"

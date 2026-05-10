@@ -1,7 +1,5 @@
 package com.hereliesaz.cuedetat.ui.hatemode
 
-import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.platform.AndroidUiDispatcher
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.data.SensorRepository
@@ -76,21 +74,24 @@ class HaterViewModel @Inject constructor(
 
     private fun startPhysics() {
         if (physicsJob?.isActive == true) return
-        physicsJob = viewModelScope.launch(AndroidUiDispatcher.Main) {
-            // Drive physics from the choreographer instead of a fixed delay so the
-            // simulation stays in step with display refresh and pauses cleanly when
-            // the host activity is backgrounded.
+        physicsJob = viewModelScope.launch {
+            // ~60fps. We previously drove this from withFrameNanos on
+            // AndroidUiDispatcher.Main to align with the choreographer, but in
+            // release builds the dispatched context did not carry a
+            // MonotonicFrameClock and the call crashed on entry to Hater Mode
+            // (IllegalStateException: A MonotonicFrameClock is not available).
+            // A simple delay loop is sufficient for this physics sim and has
+            // no context requirements.
             while (coroutineContext.isActive) {
-                withFrameNanos {
-                    physicsManager.step()
-                    _haterState.value = _haterState.value.copy(
-                        diePosition = physicsManager.diePosition,
-                        dieAngle    = physicsManager.dieAngle,
-                        dieScale    = physicsManager.currentDieScale,
-                        rockAngleX  = physicsManager.currentRockX,
-                        rockAngleY  = physicsManager.currentRockY,
-                    )
-                }
+                physicsManager.step()
+                _haterState.value = _haterState.value.copy(
+                    diePosition = physicsManager.diePosition,
+                    dieAngle    = physicsManager.dieAngle,
+                    dieScale    = physicsManager.currentDieScale,
+                    rockAngleX  = physicsManager.currentRockX,
+                    rockAngleY  = physicsManager.currentRockY,
+                )
+                delay(16)
             }
         }
     }
