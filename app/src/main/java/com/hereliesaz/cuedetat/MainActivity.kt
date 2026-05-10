@@ -61,8 +61,15 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionsLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
+            val bluetoothGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                permissions[Manifest.permission.BLUETOOTH_CONNECT] ?: false
+            } else true
+
             if (cameraGranted) {
                 cameraPermissionGranted = true
+                if (bluetoothGranted) {
+                    (application as? MyApplication)?.initializeWearables()
+                }
             } else {
                 // Heresy is not tolerated. The user will comply or they will not use the app.
                 Toast.makeText(

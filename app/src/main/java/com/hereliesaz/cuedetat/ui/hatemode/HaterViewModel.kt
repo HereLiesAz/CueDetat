@@ -18,7 +18,7 @@ import javax.inject.Inject
 @HiltViewModel
 class HaterViewModel @Inject constructor(
     private val sensorRepository: SensorRepository,
-    private val shakeDetector: ShakeDetector
+    private val shakeDetector: ShakeDetector,
 ) : ViewModel() {
 
     private val _haterState = MutableStateFlow(HaterState())
@@ -102,7 +102,7 @@ class HaterViewModel @Inject constructor(
 
     private fun onShake() {
         val currentState = _haterState.value.triangleState
-        if (currentState == TriangleState.IDLE || currentState == TriangleState.SETTLING) {
+        if ((currentState == TriangleState.IDLE) || (currentState == TriangleState.SETTLING)) {
             viewModelScope.launch {
                 physicsManager.setPhase(TriangleState.SUBMERGING)
                 _haterState.value = _haterState.value.copy(triangleState = TriangleState.SUBMERGING)

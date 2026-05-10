@@ -217,6 +217,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))
@@ -259,6 +260,9 @@ dependencies {
     implementation(libs.mwdat.core)
     implementation(libs.mwdat.camera)
     debugImplementation(libs.mwdat.mockdevice)
+
+    // Security & Integrity
+    implementation(libs.play.integrity)
 
     // Physics
     // implementation(libs.google.liquidfun)
