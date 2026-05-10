@@ -157,6 +157,18 @@ class MainActivity : ComponentActivity() {
         val showSplashScreen = uiState.experienceMode == null
         var haterModeLockedOrientation by rememberSaveable { mutableStateOf(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) }
 
+        // Auto-show the subscription popup whenever the splash screen first
+        // appears in this session. Survives configuration changes; re-fires
+        // after process death (splash always shows on cold launch).
+        var hasAutoShownSplashPaywall by rememberSaveable { mutableStateOf(false) }
+        LaunchedEffect(showSplashScreen) {
+            if (showSplashScreen && !hasAutoShownSplashPaywall) {
+                hasAutoShownSplashPaywall = true
+                paywallShowSequence = paywallShowSequence + 1
+                paywallTrigger = com.hereliesaz.cuedetat.billing.PaywallTrigger.SPLASH_SCREEN
+            }
+        }
+
         LaunchedEffect(uiState.experienceMode, uiState.orientationLock) {
             if (uiState.experienceMode == ExperienceMode.HATER) {
                 if (haterModeLockedOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {

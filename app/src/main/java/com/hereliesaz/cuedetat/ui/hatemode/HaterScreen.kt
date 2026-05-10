@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.hereliesaz.cuedetat.domain.CueDetatState
@@ -68,6 +70,15 @@ fun HaterScreen(
         navController = navController,
         currentDestination = currentRoute
     ) {
+        // Rail items default to route="main"; without a registered destination,
+        // AzNavRail's internal navController.navigate("main") throws
+        // IllegalArgumentException on every rail tap (shake, exit, etc).
+        background(weight = 2) {
+            NavHost(navController = navController, startDestination = "main") {
+                composable("main") { /* HUD lives in background/onscreen layers */ }
+            }
+        }
+
         // --- Background layer: physics / die canvas ---
         background(weight = 0) {
             val answerText = HaterResponses.allAnswers.getOrElse(state.answerIndex) { "" }

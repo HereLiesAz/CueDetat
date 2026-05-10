@@ -4,15 +4,19 @@ package com.hereliesaz.cuedetat.ui.composables.paywall
 
 import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -31,9 +35,12 @@ import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.hereliesaz.cuedetat.billing.BasePlanId
 import com.hereliesaz.cuedetat.billing.PaywallTrigger
@@ -63,6 +70,67 @@ fun PaywallSheet(
                 }
                 is PaywallViewModel.PurchaseFlowEvent.PurchasedNoAutoEnter -> {
                     onDismiss()
+                }
+            }
+        }
+    }
+
+    // Top-half note rendered above the modal sheet's scrim. Composed BEFORE
+    // ModalBottomSheet so the sheet's window stacks above and remains
+    // interactive; the popup is non-focusable so it never steals input.
+    Popup(
+        alignment = Alignment.TopCenter,
+        properties = PopupProperties(focusable = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.5f)
+                    .padding(top = 24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    val supportBlurb = buildAnnotatedString {
+                        append(
+                            "For the price of one game of pool per month, you make sure " +
+                                "this app stays updated and all bugs are addressed quickly. " +
+                                "It's just little ol' me over here. "
+                        )
+                        append("Cue D'etat is always available in its entirety for free on ")
+                        withLink(
+                            LinkAnnotation.Url(
+                                url = "https://github.com/HereLiesAz/CueDetat",
+                                styles = TextLinkStyles(
+                                    style = SpanStyle(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        textDecoration = TextDecoration.Underline
+                                    )
+                                )
+                            )
+                        ) {
+                            append("Github")
+                        }
+                        append(".")
+                    }
+                    Text(
+                        text = supportBlurb,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }
@@ -131,25 +199,6 @@ fun PaywallSheet(
             Spacer(Modifier.height(16.dp))
             TextButton(onClick = { viewModel.restore() }) { Text("Restore Purchases") }
             TextButton(onClick = onDismiss) { Text("Continue in Beginner Mode") }
-
-            Spacer(Modifier.height(16.dp))
-            val githubFooter = buildAnnotatedString {
-                append("Cue D'etat is always available in its entirety for free on ")
-                withLink(
-                    LinkAnnotation.Url(
-                        url = "https://github.com/HereLiesAz/CueDetat",
-                        styles = TextLinkStyles(style = SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline))
-                    )
-                ) {
-                    append("Github")
-                }
-                append(".")
-            }
-            Text(
-                text = githubFooter,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 8.dp)
-            )
         }
     }
 }
