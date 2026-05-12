@@ -33,7 +33,7 @@ private fun AzNavHostScope.azRailItemLowerCase(
     text: String,
     fillColor: Color,
     textColor: Color,
-    route: String = "main",
+    route: String? = null,
     onClick: () -> Unit
 ) {
     azRailItem(id = id, text = text.lowercase(), fillColor = fillColor, textColor = textColor, route = route, onClick = onClick)
@@ -105,7 +105,10 @@ fun AzNavRailMenu(
                           uiState.cameraMode == CameraMode.AR_ACTIVE || 
                           uiState.cameraMode == CameraMode.LITE_AR
 
-        if (inArSubMode) {
+        // For non-Beginner modes the Solids/Stripes toggle stays at the top of
+        // the rail. Beginner mode renders the same toggle inside the Beginner
+        // block below "view" so the related controls cluster together.
+        if (inArSubMode && uiState.experienceMode != ExperienceMode.BEGINNER) {
             azRailToggle(
                 id = "target_type",
                 route = "main",
@@ -253,6 +256,18 @@ fun AzNavRailMenu(
                     else onEvent(MainScreenEvent.LockBeginnerView)
                 }
             )
+
+            if (inArSubMode) {
+                azRailToggle(
+                    id = "target_type",
+                    route = "main",
+                    isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
+                    toggleOnText = "Stripes", toggleOffText = "Solids",
+                    fillColor = if (uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES) b4P else b8K,
+                    textColor = Color.White,
+                    onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
+                )
+            }
 
             if (inArSubMode) {
                 if (!uiState.myriadTrajectory.isNullOrEmpty()) {

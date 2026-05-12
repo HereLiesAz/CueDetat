@@ -503,8 +503,8 @@ class BallRenderer {
 
         val paint = Paint(paints.cvResultPaint).apply {
             style = Paint.Style.STROKE
-            strokeWidth = 3f
-            alpha = 200
+            strokeWidth = 6f
+            alpha = 255
         }
 
         boxes.forEach { (box, type) ->
@@ -516,11 +516,15 @@ class BallRenderer {
     }
 
     private fun colorForBallType(type: com.hereliesaz.cuedetat.data.BallType): Color = when (type) {
-        com.hereliesaz.cuedetat.data.BallType.SOLID -> Color(0xFFFFEB3B)   // yellow
+        // Solids vs stripes are deliberately on opposite sides of the wheel so
+        // they can't be confused at a glance against the green felt.
+        com.hereliesaz.cuedetat.data.BallType.SOLID -> Color(0xFFFFC107)   // amber
         com.hereliesaz.cuedetat.data.BallType.STRIPE -> Color(0xFF00E5FF)  // cyan
         com.hereliesaz.cuedetat.data.BallType.CUE -> Color(0xFFFFFFFF)     // white
-        com.hereliesaz.cuedetat.data.BallType.EIGHT -> Color(0xFFE040FB)   // magenta (8-ball is black; magenta reads against the table)
-        com.hereliesaz.cuedetat.data.BallType.UNKNOWN -> Color(0xFF9E9E9E) // gray
+        com.hereliesaz.cuedetat.data.BallType.EIGHT -> Color(0xFFE040FB)   // magenta (8-ball is black; magenta reads against the felt)
+        // Unclassified balls are drawn in a noticeable color so a misfire of
+        // classifyBallType() is visible instead of looking like background gray.
+        com.hereliesaz.cuedetat.data.BallType.UNKNOWN -> Color(0xFFFF6D00) // orange
     }
 
     private fun drawAllLabels(
