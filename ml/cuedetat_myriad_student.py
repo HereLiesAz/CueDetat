@@ -23,7 +23,10 @@
 # ## Cell 1 — Install + imports
 
 # %%
-!pip install -q torch torchvision pandas pyarrow pillow tqdm \
+# IMPORTANT: do NOT pip install torch/torchvision — Kaggle's preinstalled torch
+# is matched to the GPU's compute capability. Reinstalling triggers
+# "no kernel image is available for execution on the device" errors.
+!pip install -q pandas pyarrow pillow tqdm \
     onnx onnxruntime onnxconverter-common matplotlib
 
 # %%

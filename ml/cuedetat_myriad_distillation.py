@@ -257,6 +257,11 @@ print(f"Saved {len(df)} rows to {PARQUET}")
 # ## Cell 5 — Sanity stats
 
 # %%
+import os
+import pandas as pd
+OUT_DIR = "/kaggle/working/dataset"
+IMG_DIR = os.path.join(OUT_DIR, "images")
+PARQUET = os.path.join(OUT_DIR, "samples.parquet")
 df = pd.read_parquet(PARQUET)
 print(df[["poke_x", "poke_y", "poke_dx", "poke_dy"]].describe())
 print(f"\nTrajectory length consistent: "
@@ -274,7 +279,8 @@ print(f"Total dataset size: "
 # use `version`.
 
 # %%
-import json, subprocess
+import os, json, subprocess
+OUT_DIR = "/kaggle/working/dataset"
 META = {
     "title":   "CueDetat trajectory dataset",
     "id":      "hereliesaz/cuedetat-trajectories",
