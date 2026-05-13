@@ -400,7 +400,7 @@ class VisionRepository @Inject constructor(
 
             val allStructuredBalls = mlBalls + cvFillIns
             val cvFillInPoints = cvFillIns.map { it.position }
-            val genericBalls = refinedScreenPoints + cvFillInPoints
+            val genericBalls = allStructuredBalls.map { it.position }
 
             var finalVisionData = VisionData(
                 genericBalls = genericBalls,
