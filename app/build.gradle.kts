@@ -117,6 +117,48 @@ val finalMinor = minorVal
 val finalVersionName = "$finalMajor.$finalMinor.$finalPatch.$finalBuild"
 val finalIsBuilding = isBuildingTask
 
+val localProps = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+val googleCloudProjectNumber = localProps.getProperty("GOOGLE_CLOUD_PROJECT_NUMBER") ?: "0"
+val githubAccessToken = localProps.getProperty("GH_TOKEN") ?: ""
+
+// Task to write back the updated properties
+tasks.register("updateVersionProperties") {
+    val path = versionPropsPath
+    val b = finalBuild
+    val p = finalPatch
+    val maj = finalMajor
+    val min = finalMinor
+    val vn = finalVersionName
+    val shouldRun = finalIsBuilding
+
+    doLast {
+        if (shouldRun) {
+            val properties = Properties()
+            val f = File(path)
+            if (f.exists()) {
+                FileInputStream(f).use { properties.load(it) }
+            }
+            properties.setProperty("BUILD", b.toString())
+            properties.setProperty("PATCH", p.toString())
+            properties.setProperty("LAST_MAJOR", maj.toString())
+            properties.setProperty("LAST_MINOR", min.toString())
+            properties.setProperty("versionCode", b.toString())
+            properties.setProperty("versionName", vn)
+            FileOutputStream(f).use { properties.store(it, "Automated Version Update") }
+        }
+    }
+}
+
+// Ensure the update happens on every relevant build
+tasks.matching { it.name.contains("assemble") || it.name.contains("bundle") || it.name.contains("install") }.all {
+    dependsOn("updateVersionProperties")
+}
+
 plugins {
     alias(libs.plugins.android.application)
     // alias(libs.plugins.kotlin.android) // Removed for AGP 9.0 built-in Kotlin
@@ -142,39 +184,9 @@ android {
         
         versionCode = finalBuild
         versionName = finalVersionName
-
-        // Task to write back the updated properties
-        tasks.register("updateVersionProperties") {
-            val path = versionPropsPath
-            val b = finalBuild
-            val p = finalPatch
-            val maj = finalMajor
-            val min = finalMinor
-            val vn = finalVersionName
-            val shouldRun = finalIsBuilding
-
-            doLast {
-                if (shouldRun) {
-                    val properties = Properties()
-                    val f = File(path)
-                    if (f.exists()) {
-                        FileInputStream(f).use { properties.load(it) }
-                    }
-                    properties.setProperty("BUILD", b.toString())
-                    properties.setProperty("PATCH", p.toString())
-                    properties.setProperty("LAST_MAJOR", maj.toString())
-                    properties.setProperty("LAST_MINOR", min.toString())
-                    properties.setProperty("versionCode", b.toString())
-                    properties.setProperty("versionName", vn)
-                    FileOutputStream(f).use { properties.store(it, "Automated Version Update") }
-                }
-            }
-        }
         
-        // Ensure the update happens on every relevant build
-        tasks.matching { it.name.contains("assemble") || it.name.contains("bundle") || it.name.contains("install") }.all {
-            dependsOn("updateVersionProperties")
-        }
+        buildConfigField("long", "GOOGLE_CLOUD_PROJECT_NUMBER", "${googleCloudProjectNumber}L")
+        buildConfigField("String", "GH_TOKEN", "\"$githubAccessToken\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -197,8 +209,6 @@ android {
     productFlavors {
         create("play") {
             dimension = "distribution"
-            val projectNumber = providers.gradleProperty("GOOGLE_CLOUD_PROJECT_NUMBER").orNull ?: System.getenv("GOOGLE_CLOUD_PROJECT_NUMBER") ?: "0"
-            buildConfigField("long", "GOOGLE_CLOUD_PROJECT_NUMBER", "${projectNumber}L")
             // applicationId stays as "com.hereliesaz.cuedetat" so existing
             // Play closed-testing installs receive an upgrade rather than a
             // side-by-side install.

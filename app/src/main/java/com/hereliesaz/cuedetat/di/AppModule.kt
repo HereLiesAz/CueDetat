@@ -20,6 +20,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Singleton
@@ -43,8 +44,22 @@ object AppModule {
     @Provides
     @Singleton
     fun provideGithubApi(): GithubApi {
+        val client = if (BuildConfig.GH_TOKEN.isNotBlank()) {
+            OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    val request = chain.request().newBuilder()
+                        .addHeader("Authorization", "token ${BuildConfig.GH_TOKEN}")
+                        .build()
+                    chain.proceed(request)
+                }
+                .build()
+        } else {
+            OkHttpClient.Builder().build()
+        }
+
         return Retrofit.Builder()
             .baseUrl("https://api.github.com/")
+            .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(GithubApi::class.java)
