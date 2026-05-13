@@ -21,14 +21,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -56,6 +62,8 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.PocketId
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
+import android.graphics.PointF as AndroidPointF
 
 /**
  * Full-screen scan UI.
@@ -82,6 +90,7 @@ fun TableScanScreen(
     val capturedHsv by viewModel.capturedFeltHsv.collectAsState()
     val scanStep by viewModel.scanStep.collectAsState()
     val currentPocketTarget by viewModel.currentPocketTarget.collectAsState()
+    val cornerTaps by viewModel.cornerTaps.collectAsState()
 
     val capturedCount = PocketId.entries.count { id ->
         currentPocketTarget != null &&
@@ -230,6 +239,7 @@ fun TableScanScreen(
         val showReticle = when (scanStep) {
             ScanStep.FELT_CAPTURE -> capturedHsv == null
             ScanStep.POCKET_GUIDE -> true
+            ScanStep.CORNER_QUAD -> false
             ScanStep.AUTO_READY -> false
         }
         if (showReticle) {
@@ -278,6 +288,70 @@ fun TableScanScreen(
             }
         }
 
+        // Corner-quad: full-screen tap target + draggable corner handles.
+        if (scanStep == ScanStep.CORNER_QUAD) {
+            val density = LocalDensity.current
+            val handleDp = 32.dp
+            val handlePx = with(density) { handleDp.toPx() }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(cornerTaps.size) {
+                        detectTapGestures { offset ->
+                            if (viewModel.cornerTaps.value.size < 4) {
+                                viewModel.onCornerTap(AndroidPointF(offset.x, offset.y))
+                            }
+                        }
+                    }
+            )
+
+            // Connecting lines between placed corners (light visual guide).
+            if (cornerTaps.isNotEmpty()) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val ordered = cornerTaps
+                    for (i in ordered.indices) {
+                        val a = ordered[i]
+                        val b = ordered[(i + 1) % ordered.size]
+                        if (ordered.size > 1 && i < ordered.size - 1 || ordered.size == 4) {
+                            drawLine(
+                                color = Color.Yellow.copy(alpha = 0.4f),
+                                start = Offset(a.x, a.y),
+                                end = Offset(b.x, b.y),
+                                strokeWidth = 2.dp.toPx()
+                            )
+                        }
+                    }
+                }
+            }
+
+            cornerTaps.forEachIndexed { idx, pt ->
+                Box(
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                (pt.x - handlePx / 2f).roundToInt(),
+                                (pt.y - handlePx / 2f).roundToInt()
+                            )
+                        }
+                        .size(handleDp)
+                        .clip(CircleShape)
+                        .background(Color.Yellow.copy(alpha = 0.5f))
+                        .border(2.dp, Color.White, CircleShape)
+                        .pointerInput(idx) {
+                            detectDragGestures { change, drag ->
+                                change.consume()
+                                val current = viewModel.cornerTaps.value.getOrNull(idx) ?: return@detectDragGestures
+                                viewModel.onCornerDrag(
+                                    idx,
+                                    AndroidPointF(current.x + drag.x, current.y + drag.y)
+                                )
+                            }
+                        }
+                )
+            }
+        }
+
         // Felt display circle: appears once capture is done, fades out after 1 second.
         if (scanStep == ScanStep.FELT_CAPTURE) {
             capturedHsv?.let { hsv ->
@@ -294,7 +368,7 @@ fun TableScanScreen(
         }
 
         // Bottom Controls: hidden once capture is in progress or complete.
-        if (!isCapturing && (capturedHsv == null || scanStep == ScanStep.POCKET_GUIDE)) {
+        if (!isCapturing && (capturedHsv == null || scanStep == ScanStep.POCKET_GUIDE || scanStep == ScanStep.CORNER_QUAD)) {
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -390,6 +464,69 @@ fun TableScanScreen(
                                         viewModel.captureCurrentPocket()
                                     }
                             )
+                        }
+                    }
+
+                    ScanStep.CORNER_QUAD -> {
+                        val placed = cornerTaps.size
+                        Text(
+                            text = when {
+                                placed == 0 -> "Tap the four corner pockets"
+                                placed < 4 -> "Tap the next corner pocket ($placed of 4)"
+                                else -> "Drag a corner to refine, then confirm"
+                            },
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        ) {
+                            repeat(4) { i ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clip(CircleShape)
+                                        .background(if (i < placed) Color.Green else Color.White.copy(alpha = 0.4f))
+                                        .border(1.dp, Color.White, CircleShape)
+                                )
+                            }
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(24.dp)
+                        ) {
+                            TextButton(onClick = { viewModel.clearCornerTaps() }) {
+                                Text("Reset", color = Color.White)
+                            }
+                            Box(modifier = Modifier.size(80.dp).padding(4.dp)) {
+                                Canvas(modifier = Modifier.fillMaxSize()) {
+                                    drawCircle(color = Color.White.copy(alpha = 0.2f), style = Stroke(width = 4.dp.toPx()))
+                                    drawArc(
+                                        color = if (placed == 4) Color.Green else Color.Yellow,
+                                        startAngle = -90f, sweepAngle = 360f * (placed / 4f),
+                                        useCenter = false, style = Stroke(width = 4.dp.toPx())
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.Center).size(64.dp).clip(CircleShape)
+                                        .background(if (placed == 4) Color.White else Color.LightGray.copy(alpha = 0.5f))
+                                        .border(4.dp, Color.LightGray, CircleShape)
+                                        .clickable(enabled = placed == 4) {
+                                            val haptic = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                                HapticFeedbackConstants.CONFIRM
+                                            } else {
+                                                HapticFeedbackConstants.LONG_PRESS
+                                            }
+                                            view.performHapticFeedback(haptic)
+                                            viewModel.completeCornerScan()
+                                        }
+                                )
+                            }
                         }
                     }
 

@@ -42,6 +42,7 @@ private const val CLUSTER_MERGE_DISTANCE = 3.0f
 
 enum class ScanStep {
     FELT_CAPTURE,
+    CORNER_QUAD,
     POCKET_GUIDE,
     AUTO_READY
 }
@@ -87,6 +88,14 @@ class TableScanViewModel @Inject constructor(
 
     private val _capturedFeltHsv = MutableStateFlow<FloatArray?>(null)
     val capturedFeltHsv: StateFlow<FloatArray?> = _capturedFeltHsv.asStateFlow()
+
+    /**
+     * Corner-quad scan: up to 4 screen-space tap positions for the four corner pockets.
+     * Order in the list maps to TL, TR, BR, BL once committed. While the user is tapping,
+     * positions are appended in tap order; on commit they are reordered by screen geometry.
+     */
+    private val _cornerTaps = MutableStateFlow<List<PointF>>(emptyList())
+    val cornerTaps: StateFlow<List<PointF>> = _cornerTaps.asStateFlow()
 
     private val _selectedSampleIds = MutableStateFlow<Set<String>>(emptySet())
     val selectedSampleIds: StateFlow<Set<String>> = _selectedSampleIds.asStateFlow()
@@ -410,6 +419,7 @@ class TableScanViewModel @Inject constructor(
         _currentPocketTarget.value = null
         _mlConfidence.value = 0f
         _mlTableBoundary.value = null
+        _cornerTaps.value = emptyList()
         tableScanRepository.clearPartialScan()
     }
 
@@ -488,9 +498,82 @@ class TableScanViewModel @Inject constructor(
             
             _capturedFeltHsv.value = lastFeltHsv
 
-            // Instead of finishing, transition to Guided Pocket mode
-            _scanStep.value = ScanStep.POCKET_GUIDE
-            _currentPocketTarget.value = PocketId.entries.toTypedArray()[0]
+            // Skip the painful per-pocket wizard; users tap the four corner pockets directly.
+            _cornerTaps.value = emptyList()
+            _scanStep.value = ScanStep.CORNER_QUAD
+            _currentPocketTarget.value = null
+        }
+    }
+
+    fun onCornerTap(screenPoint: PointF) {
+        if (_scanStep.value != ScanStep.CORNER_QUAD) return
+        val current = _cornerTaps.value
+        if (current.size >= 4) return
+        _cornerTaps.value = current + screenPoint
+    }
+
+    fun onCornerDrag(index: Int, screenPoint: PointF) {
+        if (_scanStep.value != ScanStep.CORNER_QUAD) return
+        val current = _cornerTaps.value
+        if (index !in current.indices) return
+        _cornerTaps.value = current.toMutableList().also { it[index] = screenPoint }
+    }
+
+    fun clearCornerTaps() {
+        _cornerTaps.value = emptyList()
+    }
+
+    /**
+     * Sorts four screen-space corner taps into TL/TR/BR/BL order based on their
+     * geometric position relative to the centroid.
+     */
+    private fun sortCornersClockwise(corners: List<PointF>): List<PointF> {
+        if (corners.size != 4) return corners
+        val cx = corners.sumOf { it.x.toDouble() }.toFloat() / 4f
+        val cy = corners.sumOf { it.y.toDouble() }.toFloat() / 4f
+        val top = corners.filter { it.y < cy }.sortedBy { it.x }
+        val bottom = corners.filter { it.y >= cy }.sortedByDescending { it.x }
+        return (top + bottom).take(4)
+    }
+
+    /**
+     * Commit the four corner taps. Maps each screen point to logical space,
+     * derives the two side pockets from the long-side midpoints, fits a homography,
+     * and completes the scan.
+     */
+    fun completeCornerScan() {
+        val inverse = inversePitchMatrix ?: return
+        val taps = _cornerTaps.value
+        if (taps.size != 4) return
+
+        viewModelScope.launch {
+            val sorted = sortCornersClockwise(taps)
+            val tl = Perspective.screenToLogical(sorted[0], inverse)
+            val tr = Perspective.screenToLogical(sorted[1], inverse)
+            val br = Perspective.screenToLogical(sorted[2], inverse)
+            val bl = Perspective.screenToLogical(sorted[3], inverse)
+
+            // Side pockets sit on the long rails. The Table model places them
+            // off the left and right sides of the logical rectangle, so we mirror
+            // that by taking the midpoint of the corresponding short-side corners.
+            val sl = PointF((tl.x + bl.x) / 2f, (tl.y + bl.y) / 2f)
+            val sr = PointF((tr.x + br.x) / 2f, (tr.y + br.y) / 2f)
+
+            val identified = mapOf(
+                PocketId.TL to tl,
+                PocketId.TR to tr,
+                PocketId.BR to br,
+                PocketId.BL to bl,
+                PocketId.SL to sl,
+                PocketId.SR to sr,
+            )
+
+            synchronized(clustersLock) {
+                clusters.clear()
+                identified.forEach { (id, pt) -> clusters[id] = mutableListOf(pt) }
+            }
+            _scanProgress.value = identified.keys.associateWith { true }
+            completeScan(identified)
         }
     }
 
