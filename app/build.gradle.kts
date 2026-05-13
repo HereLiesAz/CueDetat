@@ -197,6 +197,8 @@ android {
     productFlavors {
         create("play") {
             dimension = "distribution"
+            val projectNumber = providers.gradleProperty("GOOGLE_CLOUD_PROJECT_NUMBER").orNull ?: System.getenv("GOOGLE_CLOUD_PROJECT_NUMBER") ?: "0"
+            buildConfigField("long", "GOOGLE_CLOUD_PROJECT_NUMBER", "${projectNumber}L")
             // applicationId stays as "com.hereliesaz.cuedetat" so existing
             // Play closed-testing installs receive an upgrade rather than a
             // side-by-side install.

@@ -94,9 +94,19 @@ class MainViewModel @Inject constructor(
      */
     private fun performIntegrityCheck() {
         viewModelScope.launch(Dispatchers.IO) {
-            // A production implementation would fetch a nonce from the backend.
-            val nonce = java.util.UUID.randomUUID().toString()
-            val token = integrityRepository.fetchSnapshotToken(nonce)
+            val projectNumber = if (com.hereliesaz.cuedetat.BuildConfig.FLAVOR == "play") {
+                com.hereliesaz.cuedetat.BuildConfig.GOOGLE_CLOUD_PROJECT_NUMBER
+            } else 0L
+
+            val token = if (projectNumber != 0L) {
+                android.util.Log.i("MainViewModel", "Using Standard Integrity API with project $projectNumber")
+                val requestHash = java.util.UUID.randomUUID().toString()
+                integrityRepository.fetchStandardToken(projectNumber, requestHash)
+            } else {
+                android.util.Log.i("MainViewModel", "Using Snapshot Integrity API (no project number)")
+                val nonce = java.util.UUID.randomUUID().toString()
+                integrityRepository.fetchSnapshotToken(nonce)
+            }
 
             if (token != null) {
                 android.util.Log.i("MainViewModel", "Play Integrity token retrieved successfully.")
