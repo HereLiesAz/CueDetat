@@ -3,7 +3,85 @@ import java.util.Properties
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import javax.inject.Inject
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.Optional
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
+import org.gradle.process.ExecOperations
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+abstract class FetchTesterEmailsTask : DefaultTask() {
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @get:Input
+    @get:Optional
+    abstract val ggLink: Property<String>
+
+    @get:Input
+    @get:Optional
+    abstract val ggSession: Property<String>
+
+    @get:InputDirectory
+    abstract val scriptDir: DirectoryProperty
+
+    @get:Inject
+    abstract val execOperations: ExecOperations
+
+    @TaskAction
+    fun fetch() {
+        val outFile = outputDir.file("tester_emails.txt").get().asFile
+        outFile.parentFile.mkdirs()
+
+        val link = ggLink.orNull
+        val session = ggSession.orNull
+
+        if (link.isNullOrBlank() || session.isNullOrBlank()) {
+            logger.lifecycle("[testerLicense] GG_LINK or GG_SESSION absent — writing empty allowlist.")
+            outFile.writeText("")
+            return
+        }
+
+        val script = File(scriptDir.get().asFile, "fetch-tester-emails.mjs")
+        if (!script.exists()) {
+            logger.warn("[testerLicense] scraper script missing at $script — writing empty allowlist.")
+            outFile.writeText("")
+            return
+        }
+
+        val nodeModules = File(scriptDir.get().asFile, "node_modules/playwright")
+        if (!nodeModules.exists()) {
+            logger.lifecycle("[testerLicense] installing scraper dependencies (npm ci)…")
+            execOperations.exec {
+                workingDir = scriptDir.get().asFile
+                commandLine = listOf("npm", "ci", "--no-audit", "--no-fund")
+                isIgnoreExitValue = true
+            }
+        }
+
+        val stdoutCollector = ByteArrayOutputStream()
+        val result = execOperations.exec {
+            workingDir = scriptDir.get().asFile
+            commandLine = listOf("node", script.absolutePath)
+            environment("GG_LINK", link)
+            environment("GG_SESSION", session)
+            standardOutput = stdoutCollector
+            isIgnoreExitValue = true
+        }
+
+        val raw = stdoutCollector.toString(Charsets.UTF_8).trim()
+        if (result.exitValue != 0) {
+            logger.warn("[testerLicense] scraper exited ${result.exitValue}; writing whatever it emitted (${raw.lines().size} lines).")
+        }
+        outFile.writeText(raw + if (raw.isEmpty()) "" else "\n")
+        logger.lifecycle("[testerLicense] wrote ${raw.lines().count { it.isNotBlank() }} hashes to ${outFile.name}.")
+    }
+}
 
 val versionPropsFile = rootProject.file("version.properties")
 val versionPropsPath = versionPropsFile.absolutePath
@@ -133,12 +211,6 @@ android {
     // The play-release build pulls a generated tester-email allowlist asset
     // from a gradle task (see fetchTesterEmails below). The file lives outside
     // src/play/assets/ so it is never tracked in git.
-    @Suppress("DEPRECATION")
-    sourceSets {
-        getByName("play") {
-            assets.srcDir(layout.buildDirectory.dir("generated/testerLicense/assets"))
-        }
-    }
 
     signingConfigs {
         create("release") {
@@ -321,70 +393,24 @@ configurations.all {
 //   - GG_LINK or GG_SESSION env vars are missing (local dev / play debug)
 //   - The Node script fails for any reason
 //
-// Hooked only into mergePlayReleaseAssets so other build variants are
-// unaffected, including IDE sync.
+// Hooked into the asset generation pipeline for playRelease so other build
+// variants are unaffected, including IDE sync.
 // ---------------------------------------------------------------------------
-val testerEmailsAssetDir = layout.buildDirectory.dir("generated/testerLicense/assets")
-val testerEmailsAssetFile = testerEmailsAssetDir.map { it.file("tester_emails.txt") }
-
-val fetchTesterEmails by tasks.registering {
+val fetchTesterEmails = tasks.register<FetchTesterEmailsTask>("fetchTesterEmails") {
     description = "Scrape tester Google Group members and emit SHA-256 hashes for the play-release allowlist."
     group = "tester license"
-    outputs.file(testerEmailsAssetFile)
+    outputDir.set(layout.buildDirectory.dir("generated/testerLicense/assets"))
+    scriptDir.set(rootProject.layout.projectDirectory.dir(".github/scripts"))
+    ggLink.set(providers.environmentVariable("GG_LINK"))
+    ggSession.set(providers.environmentVariable("GG_SESSION"))
     outputs.upToDateWhen { false } // env-driven; always re-fetch when invoked
-
-    doLast {
-        val outFile = testerEmailsAssetFile.get().asFile
-        outFile.parentFile.mkdirs()
-
-        val ggLink = System.getenv("GG_LINK")
-        val ggSession = System.getenv("GG_SESSION")
-        if (ggLink.isNullOrBlank() || ggSession.isNullOrBlank()) {
-            logger.lifecycle("[testerLicense] GG_LINK or GG_SESSION absent — writing empty allowlist.")
-            outFile.writeText("")
-            return@doLast
-        }
-
-        val scriptDir = rootProject.file(".github/scripts")
-        val script = File(scriptDir, "fetch-tester-emails.mjs")
-        if (!script.exists()) {
-            logger.warn("[testerLicense] scraper script missing at $script — writing empty allowlist.")
-            outFile.writeText("")
-            return@doLast
-        }
-
-        val nodeModules = File(scriptDir, "node_modules/playwright")
-        if (!nodeModules.exists()) {
-            logger.lifecycle("[testerLicense] installing scraper dependencies (npm ci)…")
-            providers.exec {
-                workingDir = scriptDir
-                commandLine = listOf("npm", "ci", "--no-audit", "--no-fund")
-                isIgnoreExitValue = true
-            }.result.get()
-        }
-
-        val stdoutCollector = ByteArrayOutputStream()
-        val result = providers.exec {
-            workingDir = scriptDir
-            commandLine = listOf("node", script.absolutePath)
-            environment("GG_LINK", ggLink)
-            environment("GG_SESSION", ggSession)
-            standardOutput = stdoutCollector
-            isIgnoreExitValue = true
-        }.result.get()
-
-        val raw = stdoutCollector.toString(Charsets.UTF_8).trim()
-        if (result.exitValue != 0) {
-            logger.warn("[testerLicense] scraper exited ${result.exitValue}; writing whatever it emitted (${raw.lines().size} lines).")
-        }
-        outFile.writeText(raw + if (raw.isEmpty()) "" else "\n")
-        logger.lifecycle("[testerLicense] wrote ${raw.lines().count { it.isNotBlank() }} hashes to ${outFile.relativeTo(rootProject.rootDir)}.")
-    }
 }
 
 androidComponents.onVariants { variant ->
     if (variant.flavorName == "play" && variant.buildType == "release") {
-        tasks.matching { it.name == "merge${variant.name.replaceFirstChar { c -> c.uppercase() }}Assets" }
-            .configureEach { dependsOn(fetchTesterEmails) }
+        variant.sources.assets?.addGeneratedSourceDirectory(
+            fetchTesterEmails,
+            FetchTesterEmailsTask::outputDir
+        )
     }
 }
