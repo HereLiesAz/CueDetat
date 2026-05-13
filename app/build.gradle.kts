@@ -1,3 +1,4 @@
+import java.io.ByteArrayOutputStream
 import java.util.Properties
 import java.io.File
 import java.io.FileInputStream
@@ -126,6 +127,16 @@ android {
             dimension = "distribution"
             applicationIdSuffix = ".foss"
             versionNameSuffix = "-foss"
+        }
+    }
+
+    // The play-release build pulls a generated tester-email allowlist asset
+    // from a gradle task (see fetchTesterEmails below). The file lives outside
+    // src/play/assets/ so it is never tracked in git.
+    @Suppress("DEPRECATION")
+    sourceSets {
+        getByName("play") {
+            assets.srcDir(layout.buildDirectory.dir("generated/testerLicense/assets"))
         }
     }
 
@@ -297,5 +308,83 @@ configurations.all {
             useVersion(libs.versions.netty.get())
             because("Transitive dependency vulnerabilities in testing/grpc")
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tester license allowlist: scrapes the tester Google Group's member list
+// during the play-release pipeline and emits one SHA-256 hex per email into
+// build/generated/testerLicense/assets/tester_emails.txt. The file is then
+// consumed by TestLicenseAllowlist at runtime.
+//
+// Skips silently (writes an empty file) when:
+//   - GG_LINK or GG_SESSION env vars are missing (local dev / play debug)
+//   - The Node script fails for any reason
+//
+// Hooked only into mergePlayReleaseAssets so other build variants are
+// unaffected, including IDE sync.
+// ---------------------------------------------------------------------------
+val testerEmailsAssetDir = layout.buildDirectory.dir("generated/testerLicense/assets")
+val testerEmailsAssetFile = testerEmailsAssetDir.map { it.file("tester_emails.txt") }
+
+val fetchTesterEmails by tasks.registering {
+    description = "Scrape tester Google Group members and emit SHA-256 hashes for the play-release allowlist."
+    group = "tester license"
+    outputs.file(testerEmailsAssetFile)
+    outputs.upToDateWhen { false } // env-driven; always re-fetch when invoked
+
+    doLast {
+        val outFile = testerEmailsAssetFile.get().asFile
+        outFile.parentFile.mkdirs()
+
+        val ggLink = System.getenv("GG_LINK")
+        val ggSession = System.getenv("GG_SESSION")
+        if (ggLink.isNullOrBlank() || ggSession.isNullOrBlank()) {
+            logger.lifecycle("[testerLicense] GG_LINK or GG_SESSION absent — writing empty allowlist.")
+            outFile.writeText("")
+            return@doLast
+        }
+
+        val scriptDir = rootProject.file(".github/scripts")
+        val script = File(scriptDir, "fetch-tester-emails.mjs")
+        if (!script.exists()) {
+            logger.warn("[testerLicense] scraper script missing at $script — writing empty allowlist.")
+            outFile.writeText("")
+            return@doLast
+        }
+
+        val nodeModules = File(scriptDir, "node_modules/playwright")
+        if (!nodeModules.exists()) {
+            logger.lifecycle("[testerLicense] installing scraper dependencies (npm ci)…")
+            providers.exec {
+                workingDir = scriptDir
+                commandLine = listOf("npm", "ci", "--no-audit", "--no-fund")
+                isIgnoreExitValue = true
+            }.result.get()
+        }
+
+        val stdoutCollector = ByteArrayOutputStream()
+        val result = providers.exec {
+            workingDir = scriptDir
+            commandLine = listOf("node", script.absolutePath)
+            environment("GG_LINK", ggLink)
+            environment("GG_SESSION", ggSession)
+            standardOutput = stdoutCollector
+            isIgnoreExitValue = true
+        }.result.get()
+
+        val raw = stdoutCollector.toString(Charsets.UTF_8).trim()
+        if (result.exitValue != 0) {
+            logger.warn("[testerLicense] scraper exited ${result.exitValue}; writing whatever it emitted (${raw.lines().size} lines).")
+        }
+        outFile.writeText(raw + if (raw.isEmpty()) "" else "\n")
+        logger.lifecycle("[testerLicense] wrote ${raw.lines().count { it.isNotBlank() }} hashes to ${outFile.relativeTo(rootProject.rootDir)}.")
+    }
+}
+
+androidComponents.onVariants { variant ->
+    if (variant.flavorName == "play" && variant.buildType == "release") {
+        tasks.matching { it.name == "merge${variant.name.replaceFirstChar { c -> c.uppercase() }}Assets" }
+            .configureEach { dependsOn(fetchTesterEmails) }
     }
 }

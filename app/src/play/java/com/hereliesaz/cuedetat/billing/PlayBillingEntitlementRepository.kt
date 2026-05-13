@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -37,10 +38,20 @@ import javax.inject.Singleton
 @Singleton
 class PlayBillingEntitlementRepository @Inject constructor(
     private val billingClient: BillingClientWrapper,
-    private val cacheStore: EntitlementCacheStore
+    private val cacheStore: EntitlementCacheStore,
+    private val testLicenseAllowlist: TestLicenseAllowlist,
+    private val testLicenseStore: TestLicenseStore,
 ) : EntitlementRepository {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** Last computed Play entitlement. Combined with the tester license to
+     *  produce the public `entitlement` value. */
+    private val playEntitlement = MutableStateFlow(Entitlement.NONE)
+
+    /** Currently-verified tester hash, or null when no tester license. */
+    @Volatile
+    private var verifiedTesterHash: String? = null
 
     private val _entitlement = MutableStateFlow(Entitlement.NONE)
     override val entitlement: StateFlow<Entitlement> = _entitlement.asStateFlow()
@@ -51,12 +62,25 @@ class PlayBillingEntitlementRepository @Inject constructor(
         scope.launch {
             // 1. Load cache so the first emission is correct for returning users.
             val cached = runCatching { cacheStore.read() }.getOrDefault(Entitlement.NONE)
-            _entitlement.value = applyOfflineCap(cached, System.currentTimeMillis())
+            playEntitlement.value = applyOfflineCap(cached, System.currentTimeMillis())
+            republish()
 
-            // 2. Refresh from Play in the background.
+            // 2. Restore any previously-verified tester license. If the
+            //    allowlist no longer contains the stored hash (group membership
+            //    changed between builds) we drop it on the floor and clear it.
+            testLicenseStore.verifiedHash.collect { hash ->
+                verifiedTesterHash = hash?.takeIf(testLicenseAllowlist::containsHash)
+                if (hash != null && verifiedTesterHash == null) {
+                    runCatching { testLicenseStore.clear() }
+                }
+                republish()
+            }
+        }
+        scope.launch {
+            // 3. Refresh from Play in the background.
             refresh()
 
-            // 3. React to purchase updates.
+            // 4. React to purchase updates.
             billingClient.purchaseUpdates.collect { purchases ->
                 purchases.forEach { runCatching { billingClient.acknowledgeIfNeeded(it) } }
                 refresh()
@@ -102,7 +126,8 @@ class PlayBillingEntitlementRepository @Inject constructor(
                 // Transient failure: keep the previous entitlement (subject to
                 // the 14-day offline cap) and do NOT overwrite the cache.
                 Log.w(TAG, "queryActiveSubscriptions failed; preserving cached entitlement", it)
-                _entitlement.value = applyOfflineCap(_entitlement.value, now)
+                playEntitlement.value = applyOfflineCap(playEntitlement.value, now)
+                republish()
                 return
             }
         val snapshots = purchases.flatMap { it.toSnapshots() }
@@ -111,8 +136,54 @@ class PlayBillingEntitlementRepository @Inject constructor(
         }
         val mapped = PurchaseToEntitlementMapper.map(snapshots, now)
         Log.i(TAG, "refresh result active=${mapped.active} source=${mapped.source}")
-        _entitlement.value = mapped
+        playEntitlement.value = mapped
         runCatching { cacheStore.write(mapped) }
+        republish()
+    }
+
+    /**
+     * Attempt to grant a tester license. Returns true if `email` matched the
+     * baked-in allowlist; the verified hash is persisted so future launches
+     * stay entitled without re-entry.
+     */
+    suspend fun tryApplyTesterLicense(email: String): Boolean {
+        if (!testLicenseAllowlist.isAllowed(email)) return false
+        val hash = TestLicenseAllowlist.sha256Hex(email.trim().lowercase())
+        testLicenseStore.setVerifiedHash(hash)
+        // The store collector will pick up the change and call republish(),
+        // but apply immediately so callers see the updated state on return.
+        verifiedTesterHash = hash
+        republish()
+        return true
+    }
+
+    /** Revoke the tester license stored on this device. */
+    suspend fun clearTesterLicense() {
+        testLicenseStore.clear()
+        verifiedTesterHash = null
+        republish()
+    }
+
+    /**
+     * Combine the Play entitlement and the tester license into the public
+     * `entitlement` value. Tester license wins when both are active so the
+     * UI can render an "active tester" badge even if a real subscription
+     * also exists.
+     */
+    private fun republish() {
+        val play = playEntitlement.value
+        val tester = verifiedTesterHash
+        _entitlement.value = if (tester != null) {
+            Entitlement(
+                active = true,
+                source = EntitlementSource.TESTER_LICENSE,
+                expiresAtMillis = null,
+                productId = play.productId,
+                lastVerifiedAtMillis = System.currentTimeMillis(),
+            )
+        } else {
+            play
+        }
     }
 
     override fun productDetails(): Flow<ProductDetailsState> {
