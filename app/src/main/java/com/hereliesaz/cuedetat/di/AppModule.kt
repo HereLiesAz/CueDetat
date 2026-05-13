@@ -14,7 +14,6 @@ import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.data.MergedTFLiteDetector
 import com.hereliesaz.cuedetat.network.GithubApi
-import com.hereliesaz.cuedetat.network.MyriadApi
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
 import dagger.Module
 import dagger.Provides
@@ -49,26 +48,6 @@ object AppModule {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(GithubApi::class.java)
-    }
-
-    /**
-     * Provides the Retrofit interface for the MYRIAD Python backend.
-     * Base URL comes from BuildConfig — debug builds point at the emulator loopback,
-     * release builds get an empty string until a real backend is wired up.
-     */
-    @Provides
-    @Singleton
-    fun provideMyriadApi(gson: Gson): MyriadApi {
-        val baseUrl = BuildConfig.MYRIAD_BASE_URL.ifBlank {
-            // Retrofit refuses to build with an empty URL. Use a sentinel that callers
-            // can check against to short-circuit at the repository layer.
-            "https://disabled.invalid/"
-        }
-        return Retrofit.Builder()
-            .baseUrl(baseUrl)
-            .addConverterFactory(GsonConverterFactory.create(gson))
-            .build()
-            .create(MyriadApi::class.java)
     }
 
     /**

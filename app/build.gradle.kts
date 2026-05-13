@@ -256,6 +256,9 @@ dependencies {
     // TFLite — pocket detection model
     implementation(libs.tensorflow.lite)
 
+    // ONNX Runtime — local trajectory predictor (myriad student)
+    implementation(libs.onnxruntime.android)
+
     // Meta Wearables DAT
     implementation(libs.mwdat.core)
     implementation(libs.mwdat.camera)
