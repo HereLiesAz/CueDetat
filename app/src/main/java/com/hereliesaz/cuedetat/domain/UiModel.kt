@@ -108,6 +108,7 @@ data class CueDetatState(
     val showTutorialOverlay: Boolean = false,
     val hasSeenBeginnerTutorial: Boolean = false,
     val hasSeenDynamicBeginnerTutorial: Boolean = false,
+    val hasSeenExpertTutorial: Boolean = false,
     val tutorialType: TutorialType = TutorialType.GENERAL,
     val currentTutorialStep: Int = 0,
     @Transient val tutorialHighlight: TutorialHighlightElement? = TutorialHighlightElement.NONE,

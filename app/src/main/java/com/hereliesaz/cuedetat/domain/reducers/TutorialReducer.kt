@@ -46,12 +46,15 @@ internal fun reduceTutorialAction(state: CueDetatState, action: MainScreenEvent)
         is MainScreenEvent.EndTutorial -> {
             var hasSeenBeginner = state.hasSeenBeginnerTutorial
             var hasSeenDynamicBeginner = state.hasSeenDynamicBeginnerTutorial
+            var hasSeenExpert = state.hasSeenExpertTutorial
             if (state.tutorialType == TutorialType.BEGINNER_STATIC) hasSeenBeginner = true
             if (state.tutorialType == TutorialType.BEGINNER_DYNAMIC) hasSeenDynamicBeginner = true
+            if (state.tutorialType == TutorialType.GENERAL) hasSeenExpert = true
             state.copy(
                 showTutorialOverlay = false,
                 hasSeenBeginnerTutorial = hasSeenBeginner,
                 hasSeenDynamicBeginnerTutorial = hasSeenDynamicBeginner,
+                hasSeenExpertTutorial = hasSeenExpert,
                 tutorialHighlight = TutorialHighlightElement.NONE
             )
         }
@@ -80,12 +83,15 @@ private fun advanceTutorialStep(state: CueDetatState): CueDetatState {
     return if (nextStep > lastStep) {
         var hasSeenBeginner = state.hasSeenBeginnerTutorial
         var hasSeenDynamicBeginner = state.hasSeenDynamicBeginnerTutorial
+        var hasSeenExpert = state.hasSeenExpertTutorial
         if (state.tutorialType == TutorialType.BEGINNER_STATIC) hasSeenBeginner = true
         if (state.tutorialType == TutorialType.BEGINNER_DYNAMIC) hasSeenDynamicBeginner = true
+        if (state.tutorialType == TutorialType.GENERAL) hasSeenExpert = true
         state.copy(
             showTutorialOverlay = false,
             hasSeenBeginnerTutorial = hasSeenBeginner,
             hasSeenDynamicBeginnerTutorial = hasSeenDynamicBeginner,
+            hasSeenExpertTutorial = hasSeenExpert,
             tutorialHighlight = TutorialHighlightElement.NONE
         )
     } else {

@@ -83,6 +83,13 @@ internal fun reduceToggleAction(
                     currentTutorialStep = 0,
                     tutorialHighlight = com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.NONE
                 )
+            } else if (nextVisible && state.experienceMode == ExperienceMode.EXPERT) {
+                nextState = nextState.copy(
+                    showTutorialOverlay = true,
+                    tutorialType = com.hereliesaz.cuedetat.domain.TutorialType.GENERAL,
+                    currentTutorialStep = 0,
+                    tutorialHighlight = com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.NONE
+                )
             }
             nextState
         }
@@ -223,11 +230,21 @@ private fun handleSetExperienceMode(
 
     return when (mode) {
         ExperienceMode.EXPERT -> {
-            newState.copy(
+            val expertState = newState.copy(
                 table = newState.table.copy(isVisible = true),
                 onPlaneBall = OnPlaneBall(center = reducerUtils.getDefaultCueBallPosition(newState), radius = LOGICAL_BALL_RADIUS),
                 areHelpersVisible = false
             )
+            if (!expertState.hasSeenExpertTutorial) {
+                expertState.copy(
+                    showTutorialOverlay = true,
+                    tutorialType = com.hereliesaz.cuedetat.domain.TutorialType.GENERAL,
+                    currentTutorialStep = 0,
+                    tutorialHighlight = com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.NONE
+                )
+            } else {
+                expertState
+            }
         }
         ExperienceMode.BEGINNER -> {
             val beginnerState = newState.copy(
