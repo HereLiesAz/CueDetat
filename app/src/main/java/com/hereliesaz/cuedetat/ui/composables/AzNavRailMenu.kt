@@ -280,20 +280,6 @@ fun AzNavRailMenu(
                         onClick = { onEvent(MainScreenEvent.ToggleFlowPoke) }
                     )
                 }
-
-                if (uiState.pitchMatrix != null || uiState.topDownBitmap != null) {
-                    azRailToggle(
-                        id = "top_down_view",
-                        route = "main",
-                        isChecked = uiState.isTopDownViewActive,
-                        toggleOnText = "back", toggleOffText = "view",
-                        fillColor = b8K, textColor = Color.White,
-                        onClick = { 
-                            if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
-                            else onEvent(MainScreenEvent.ToggleTopDownView)
-                        }
-                    )
-                }
             }
         } else {
             val resetLabel = when {
