@@ -69,13 +69,13 @@ class CvBallDetector {
         val sdScale = 2.5f
         val lower = Scalar(
             max(0.0, feltHsv[0] - sdScale * feltStdDev[0] - 5.0),
-            max(40.0, feltHsv[1] - sdScale * feltStdDev[1]),
-            max(40.0, feltHsv[2] - sdScale * feltStdDev[2]),
+            max(40.0, (feltHsv[1] - sdScale * feltStdDev[1]).toDouble()),
+            max(40.0, (feltHsv[2] - sdScale * feltStdDev[2]).toDouble()),
         )
         val upper = Scalar(
             min(180.0, feltHsv[0] + sdScale * feltStdDev[0] + 5.0),
-            min(255.0, feltHsv[1] + sdScale * feltStdDev[1]),
-            min(255.0, feltHsv[2] + sdScale * feltStdDev[2]),
+            min(255.0, (feltHsv[1] + sdScale * feltStdDev[1]).toDouble()),
+            min(255.0, (feltHsv[2] + sdScale * feltStdDev[2]).toDouble()),
         )
 
         Core.inRange(hsvMat, lower, upper, feltMask)
