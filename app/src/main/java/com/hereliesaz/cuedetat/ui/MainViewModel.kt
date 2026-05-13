@@ -96,7 +96,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             // A production implementation would fetch a nonce from the backend.
             val nonce = java.util.UUID.randomUUID().toString()
-            val token = integrityRepository.fetchIntegrityToken(nonce)
+            val token = integrityRepository.fetchSnapshotToken(nonce)
 
             if (token != null) {
                 android.util.Log.i("MainViewModel", "Play Integrity token retrieved successfully.")

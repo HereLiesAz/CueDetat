@@ -14,7 +14,8 @@ data class Entitlement(
     val source: EntitlementSource,
     val expiresAtMillis: Long?,
     val productId: String?,
-    val lastVerifiedAtMillis: Long?
+    val lastVerifiedAtMillis: Long?,
+    val isDeviceGenuine: Boolean = true
 ) {
     companion object {
         val NONE = Entitlement(
@@ -22,7 +23,8 @@ data class Entitlement(
             source = EntitlementSource.NONE,
             expiresAtMillis = null,
             productId = null,
-            lastVerifiedAtMillis = null
+            lastVerifiedAtMillis = null,
+            isDeviceGenuine = true
         )
     }
 }

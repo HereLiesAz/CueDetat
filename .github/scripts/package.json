@@ -1,0 +1,12 @@
+{
+  "name": "cuedetat-build-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Build-time helper scripts invoked by Gradle (e.g. tester email scraper).",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

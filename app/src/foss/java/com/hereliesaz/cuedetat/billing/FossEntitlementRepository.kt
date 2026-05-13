@@ -27,7 +27,8 @@ class FossEntitlementRepository @Inject constructor() : EntitlementRepository {
             source = EntitlementSource.FOSS_BUILD,
             expiresAtMillis = null,
             productId = null,
-            lastVerifiedAtMillis = System.currentTimeMillis()
+            lastVerifiedAtMillis = System.currentTimeMillis(),
+            isDeviceGenuine = true
         )
     )
     override val entitlement: StateFlow<Entitlement> = _entitlement.asStateFlow()

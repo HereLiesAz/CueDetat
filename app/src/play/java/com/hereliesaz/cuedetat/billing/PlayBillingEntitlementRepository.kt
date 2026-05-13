@@ -8,6 +8,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.hereliesaz.cuedetat.data.IntegrityRepository
+import com.hereliesaz.cuedetat.data.IntegrityResult
 import com.android.billingclient.api.ProductDetails
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +43,7 @@ class PlayBillingEntitlementRepository @Inject constructor(
     private val cacheStore: EntitlementCacheStore,
     private val testLicenseAllowlist: TestLicenseAllowlist,
     private val testLicenseStore: TestLicenseStore,
+    private val integrityRepository: IntegrityRepository,
 ) : EntitlementRepository {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -52,6 +55,9 @@ class PlayBillingEntitlementRepository @Inject constructor(
     /** Currently-verified tester hash, or null when no tester license. */
     @Volatile
     private var verifiedTesterHash: String? = null
+
+    /** Whether the last integrity check succeeded. */
+    private var isDeviceGenuine = true
 
     private val _entitlement = MutableStateFlow(Entitlement.NONE)
     override val entitlement: StateFlow<Entitlement> = _entitlement.asStateFlow()
@@ -77,7 +83,18 @@ class PlayBillingEntitlementRepository @Inject constructor(
             }
         }
         scope.launch {
-            // 3. Refresh from Play in the background.
+            // 3. Monitor integrity status.
+            integrityRepository.result.collect { result ->
+                isDeviceGenuine = when (result) {
+                    is IntegrityResult.Success -> true
+                    is IntegrityResult.Failure -> false
+                    else -> isDeviceGenuine // Preserve last known state while pending/idle
+                }
+                republish()
+            }
+        }
+        scope.launch {
+            // 4. Refresh from Play in the background.
             refresh()
 
             // 4. React to purchase updates.
@@ -173,6 +190,7 @@ class PlayBillingEntitlementRepository @Inject constructor(
     private fun republish() {
         val play = playEntitlement.value
         val tester = verifiedTesterHash
+        val genuine = isDeviceGenuine
         _entitlement.value = if (tester != null) {
             Entitlement(
                 active = true,
@@ -180,9 +198,10 @@ class PlayBillingEntitlementRepository @Inject constructor(
                 expiresAtMillis = null,
                 productId = play.productId,
                 lastVerifiedAtMillis = System.currentTimeMillis(),
+                isDeviceGenuine = genuine
             )
         } else {
-            play
+            play.copy(isDeviceGenuine = genuine)
         }
     }
 

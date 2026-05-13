@@ -69,6 +69,7 @@ class EntitlementReducerTest {
         source = EntitlementSource.PLAY_LOCAL,
         expiresAtMillis = null,
         productId = "expert_mode",
-        lastVerifiedAtMillis = 0L
+        lastVerifiedAtMillis = 0L,
+        isDeviceGenuine = true
     )
 }
