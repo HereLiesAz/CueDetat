@@ -553,9 +553,12 @@ class TableScanViewModel @Inject constructor(
             val br = Perspective.screenToLogical(sorted[2], inverse)
             val bl = Perspective.screenToLogical(sorted[3], inverse)
 
-            // Side pockets sit on the long rails. The Table model places them
-            // off the left and right sides of the logical rectangle, so we mirror
-            // that by taking the midpoint of the corresponding short-side corners.
+            // SL/SR are the two side pockets, which sit at the midpoints of the
+            // long rails. The left long rail runs TL→BL, so SL is the midpoint of
+            // those two corners; the right long rail runs TR→BR, so SR is the
+            // midpoint of those. (The Table model nudges each side pocket slightly
+            // off-rail for rendering, but that visual offset is not needed here —
+            // the geometry fit only sees the centre lines.)
             val sl = PointF((tl.x + bl.x) / 2f, (tl.y + bl.y) / 2f)
             val sr = PointF((tr.x + br.x) / 2f, (tr.y + br.y) / 2f)
 

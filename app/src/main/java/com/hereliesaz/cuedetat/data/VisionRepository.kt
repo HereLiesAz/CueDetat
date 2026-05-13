@@ -386,9 +386,19 @@ class VisionRepository @Inject constructor(
                 DetectedBall(position = logical, type = d.type, confidence = d.confidence, boundingBox = box)
             }
 
-            val mergeDistanceSq = run {
-                val r = cvDetections.maxOfOrNull { it.radius } ?: 30f
-                (r * 1.5f).let { it * it }
+            // mlBalls.position and cvScreenBalls.position live in the same coord
+            // system as each other (logical inches if hasInverseMatrix, screen pixels
+            // otherwise). The merge threshold must live in that same system, not in
+            // image-pixel units like CvBallDetector.radius. Pick the threshold to match.
+            val mergeDistanceSq = if (state.hasInverseMatrix) {
+                val r = LOGICAL_BALL_RADIUS * 1.5f
+                r * r
+            } else {
+                imageToScreenMatrix.getValues(reusableMatrixValues)
+                val imgToScreen = reusableMatrixValues[Matrix.MSCALE_X]
+                val rImage = cvDetections.maxOfOrNull { it.radius } ?: 30f
+                val rScreen = rImage * imgToScreen * 1.5f
+                rScreen * rScreen
             }
             val cvFillIns = cvScreenBalls.filter { cvBall ->
                 mlBalls.none { mlBall ->
@@ -399,7 +409,11 @@ class VisionRepository @Inject constructor(
             }
 
             val allStructuredBalls = mlBalls + cvFillIns
-            val cvFillInPoints = cvFillIns.map { it.position }
+            // genericBalls must use the same coord system as `balls`. Previously this
+            // path emitted screen-pixel points, which mismatched consumer reducers
+            // (ObstacleReducer, GestureReducer, SnapReducer) that compare against
+            // event.logicalPoint. Use the structured positions, which are logical
+            // when a pose exists and screen otherwise — consistent both ways.
             val genericBalls = allStructuredBalls.map { it.position }
 
             var finalVisionData = VisionData(
@@ -680,9 +694,19 @@ class VisionRepository @Inject constructor(
                 com.hereliesaz.cuedetat.data.DetectedBall(position = logical, type = d.type, confidence = d.confidence, boundingBox = box)
             }
 
-            val mergeDistSq = run {
-                val r = cvDetections.maxOfOrNull { it.radius } ?: 30f
-                (r * 1.5f).let { it * it }
+            // See processImage for the unit-mismatch context: ball positions live in
+            // logical inches when a pose exists, screen pixels otherwise. The AR path
+            // always has a pose, so use logical units, with a screen-pixel fallback
+            // for the degenerate case.
+            val mergeDistSq = if (state.hasInverseMatrix) {
+                val r = LOGICAL_BALL_RADIUS * 1.5f
+                r * r
+            } else {
+                imageToScreenMatrix.getValues(reusableMatrixValues)
+                val imgToScreen = reusableMatrixValues[Matrix.MSCALE_X]
+                val rImage = cvDetections.maxOfOrNull { it.radius } ?: 30f
+                val rScreen = rImage * imgToScreen * 1.5f
+                rScreen * rScreen
             }
             val cvFillIns = cvScreenBalls.filter { cvBall ->
                 mlBalls.none { mlBall ->
