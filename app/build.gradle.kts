@@ -101,6 +101,32 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        // 16KB-page Android is 64-bit only. The 32-bit ABIs (armeabi-v7a,
+        // x86) ship 4KB-aligned prebuilt .so files and would fail the Play
+        // Console 16KB-page compatibility check. x86_64 is also dropped
+        // because TFLite 2.17.0's libtensorflowlite_jni.so is 4KB-aligned on
+        // x86_64; the next TFLite drop is the LiteRT rebrand and that
+        // migration is out of scope here. Real devices that support 16KB
+        // pages are arm64-v8a; Play has required 64-bit support since 2019.
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("play") {
+            dimension = "distribution"
+            // applicationId stays as "com.hereliesaz.cuedetat" so existing
+            // Play closed-testing installs receive an upgrade rather than a
+            // side-by-side install.
+        }
+        create("foss") {
+            dimension = "distribution"
+            applicationIdSuffix = ".foss"
+            versionNameSuffix = "-foss"
+        }
     }
 
     signingConfigs {
@@ -169,14 +195,20 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
         jniLibs {
+            useLegacyPackaging = false
             pickFirsts += "**/libc++_shared.so"
         }
     }
+    buildToolsVersion = "36.1.0"
+    ndkVersion = "29.0.14206865"
 }
 
 
 dependencies {
     implementation(libs.androidx.datastore.preferences)
+
+    // Play Billing — only included in the play flavor APK.
+    "playImplementation"(libs.androidx.billing.ktx)
 
     // Core & Jetpack
     implementation(libs.androidx.core.ktx)
@@ -185,6 +217,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))
@@ -223,10 +256,16 @@ dependencies {
     // TFLite — pocket detection model
     implementation(libs.tensorflow.lite)
 
+    // ONNX Runtime — local trajectory predictor (myriad student)
+    implementation(libs.onnxruntime.android)
+
     // Meta Wearables DAT
     implementation(libs.mwdat.core)
     implementation(libs.mwdat.camera)
     debugImplementation(libs.mwdat.mockdevice)
+
+    // Security & Integrity
+    implementation(libs.play.integrity)
 
     // Physics
     // implementation(libs.google.liquidfun)

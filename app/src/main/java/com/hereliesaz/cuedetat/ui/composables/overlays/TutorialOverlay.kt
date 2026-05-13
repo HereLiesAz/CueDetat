@@ -240,11 +240,22 @@ fun TutorialOverlay(
                 .offset { IntOffset(popupOffset.x.toInt(), popupOffset.y.toInt()) }
                 .align(Alignment.Center)
                 .onGloballyPositioned { coordinates ->
+                    // positionInRoot includes the current popupOffset, so naïvely
+                    // testing it against highlights flickers: at offset 0 we
+                    // overlap → move up → re-fires with no overlap → reset to 0
+                    // → overlap again. Subtract the current offset to recover
+                    // the popup's natural (Center-aligned) position; the decision
+                    // is then a stable function of the highlights only.
+                    val anchored = coordinates.positionInRoot()
+                    val natural = Offset(
+                        anchored.x - popupOffset.x,
+                        anchored.y - popupOffset.y
+                    )
                     val popupRect = androidx.compose.ui.geometry.Rect(
-                        coordinates.positionInRoot(),
+                        natural,
                         coordinates.size.toSize()
                     )
-                    
+
                     var shouldMove = false
                     highlightParams.forEach { param ->
                         val highlightBounds = when (param) {
@@ -268,9 +279,9 @@ fun TutorialOverlay(
                             }
                             is HighlightParams.Rect -> androidx.compose.ui.geometry.Rect(param.topLeft, param.size)
                         }
-                        
+
                         if (popupRect.overlaps(highlightBounds.inflate(20f))) {
-                           shouldMove = true
+                            shouldMove = true
                         }
                     }
                     popupOffset = if (shouldMove) Offset(0f, -uiState.viewHeight * 0.3f) else Offset.Zero

@@ -16,8 +16,8 @@ pluginManagement {
 
     }
     plugins {
-        id("com.android.application") version "9.2.0"
-        id("com.android.library") version "9.2.0"
+        id("com.android.application") version "9.2.1"
+        id("com.android.library") version "9.2.1"
         id("com.github.triplet.play") version "4.0.0"
 
     }
@@ -32,6 +32,13 @@ dependencyResolutionManagement {
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/facebook/meta-wearables-dat-android")
+            // Only serve Meta Wearable artifacts from this repo. Without this
+            // filter Gradle queries GitHub Packages for every dependency, and
+            // any unauthenticated 401 (e.g. for TFLite, which lives on Maven
+            // Central) aborts the whole build instead of falling through.
+            content {
+                includeGroup("com.meta.wearable")
+            }
             val ghUser = providers.gradleProperty("github_user")
                 .orElse(providers.environmentVariable("GITHUB_ACTOR"))
                 .orNull
@@ -42,7 +49,7 @@ dependencyResolutionManagement {
                 logger.warn(
                     "⚠ GitHubPackages credentials missing. Set 'github_user' and 'github_token' " +
                     "in local.properties (or GITHUB_ACTOR/GITHUB_TOKEN env vars). Builds that need " +
-                    "com.facebook.meta-wearables-dat-android artifacts will fail at resolution."
+                    "com.meta.wearable artifacts will fail at resolution."
                 )
             }
             credentials {

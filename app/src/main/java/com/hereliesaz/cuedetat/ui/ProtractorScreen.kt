@@ -99,9 +99,7 @@ fun ProtractorScreen(
             mainViewModel.onEvent(event)
         },
         navController = navController,
-        currentDestination = if (uiState.experienceMode == ExperienceMode.BEGINNER && isOnMain) {
-            if (uiState.isBeginnerViewLocked) "static" else "dynamic"
-        } else currentRoute,
+        currentDestination = currentRoute,
     ) {
         // --- Background layer 0: Camera ---
         // AR mode with ARCore depth uses ArCoreBackground (manages its own GL + session).

@@ -33,9 +33,10 @@ private fun AzNavHostScope.azRailItemLowerCase(
     text: String,
     fillColor: Color,
     textColor: Color,
+    route: String? = null,
     onClick: () -> Unit
 ) {
-    azRailItem(id = id, text = text.lowercase(), fillColor = fillColor, textColor = textColor, onClick = onClick)
+    azRailItem(id = id, text = text.lowercase(), fillColor = fillColor, textColor = textColor, route = route, onClick = onClick)
 }
 
 @Composable
@@ -100,6 +101,25 @@ fun AzNavRailMenu(
         // [SECTION 3] Extra content from the caller (ProtractorScreen's Camera & Overlays)
         content()
 
+        val inArSubMode = uiState.cameraMode == CameraMode.AR_SETUP || 
+                          uiState.cameraMode == CameraMode.AR_ACTIVE || 
+                          uiState.cameraMode == CameraMode.LITE_AR
+
+        // For non-Beginner modes the Solids/Stripes toggle stays at the top of
+        // the rail. Beginner mode renders the same toggle inside the Beginner
+        // block below "view" so the related controls cluster together.
+        if (inArSubMode && uiState.experienceMode != ExperienceMode.BEGINNER) {
+            azRailToggle(
+                id = "target_type",
+                route = "main",
+                isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
+                toggleOnText = "Stripes", toggleOffText = "Solids",
+                fillColor = if (uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES) b4P else b8K,
+                textColor = Color.White,
+                onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
+            )
+        }
+
         // [SECTION 4] Mode-specific Rail Items
         if (uiState.experienceMode == ExperienceMode.HATER) {
             azRailItemLowerCase(id = "shake", text = "Shake", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.Shake) })
@@ -107,17 +127,49 @@ fun AzNavRailMenu(
             return@AzHostActivityLayout // Hater Mode doesn't show standard nav
         }
 
-        azRailToggle(id = "help", isChecked = uiState.areHelpersVisible, toggleOnText = "Help", toggleOffText = "Help", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleHelp) })
-        azMenuItem(id = "tutorial", text = "Tutorial", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.StartTutorial()) })
+        azRailToggle(
+            id = "help",
+            route = "main",
+            isChecked = uiState.areHelpersVisible,
+            toggleOnText = "Help",
+            toggleOffText = "Help",
+            fillColor = b1Y,
+            textColor = Color.White,
+            onClick = { onEvent(MainScreenEvent.ToggleHelp) }
+        )
+        azMenuItem(
+            id = "tutorial",
+            route = "main",
+            text = "Tutorial",
+            fillColor = b2B,
+            textColor = Color.White,
+            onClick = { onEvent(MainScreenEvent.StartTutorial()) }
+        )
 
-        val inArSubMode = uiState.cameraMode == CameraMode.AR_SETUP || 
-                          uiState.cameraMode == CameraMode.AR_ACTIVE || 
-                          uiState.cameraMode == CameraMode.LITE_AR
+        // "Get Expert" tile only shows for non-entitled users in the play
+        // flavor. In FOSS the entitlement is permanently active so this tile
+        // never renders.
+        if (!uiState.isExpertEntitled) {
+            azRailItemLowerCase(
+                id = "get_expert",
+                text = "Get Expert",
+                fillColor = b1Y,
+                textColor = Color.White,
+                onClick = {
+                    onEvent(
+                        MainScreenEvent.ShowPaywall(
+                            com.hereliesaz.cuedetat.billing.PaywallTrigger.NAV_TILE
+                        )
+                    )
+                }
+            )
+        }
         
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             val isArActive = uiState.cameraMode != CameraMode.OFF
             azRailToggle(
                 id = "ar",
+                route = "main",
                 isChecked = isArActive,
                 toggleOnText = "off", toggleOffText = "ar",
                 fillColor = b3R, textColor = Color.White,
@@ -126,6 +178,7 @@ fun AzNavRailMenu(
 
             azRailToggle(
                 id = "meta_glasses",
+                route = "main",
                 isChecked = uiState.cameraMode == CameraMode.META_GLASSES,
                 toggleOnText = "phone", toggleOffText = "glasses",
                 fillColor = b5O, textColor = Color.White,
@@ -148,18 +201,10 @@ fun AzNavRailMenu(
             })
 
             if (inArSubMode) {
-                
-                azRailToggle(
-                    id = "target_type",
-                    isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
-                    toggleOnText = "stripes", toggleOffText = "solids",
-                    fillColor = b8K, textColor = Color.White,
-                    onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
-                )
-
                 if (!uiState.myriadTrajectory.isNullOrEmpty()) {
                     azRailToggle(
                         id = "flow",
+                        route = "main",
                         isChecked = uiState.isFlowPokeEnabled,
                         toggleOnText = "flow", toggleOffText = "flow",
                         fillColor = Color(0xFFE040FB), textColor = Color.White,
@@ -170,6 +215,7 @@ fun AzNavRailMenu(
                 if (uiState.pitchMatrix != null || uiState.topDownBitmap != null) {
                     azRailToggle(
                         id = "top_down_view",
+                        route = "main",
                         isChecked = uiState.isTopDownViewActive,
                         toggleOnText = "back", toggleOffText = "view",
                         fillColor = b8K, textColor = Color.White,
@@ -188,57 +234,50 @@ fun AzNavRailMenu(
         azDivider()
 
         if (uiState.experienceMode != ExperienceMode.BEGINNER) {
-            azRailToggle(id = "spin", isChecked = uiState.isSpinControlVisible, toggleOnText = "Spin", toggleOffText = "Spin", fillColor = b4P, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleSpinControl) })
-            azRailToggle(id = "masse", isChecked = uiState.isMasseModeActive, toggleOnText = "Massé", toggleOffText = "Massé", fillColor = b5O, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleMasseMode) })
+            azRailToggle(id = "spin", route = "main", isChecked = uiState.isSpinControlVisible, toggleOnText = "Spin", toggleOffText = "Spin", fillColor = b4P, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleSpinControl) })
+            azRailToggle(id = "masse", route = "main", isChecked = uiState.isMasseModeActive, toggleOnText = "Massé", toggleOffText = "Massé", fillColor = b5O, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleMasseMode) })
         }
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailToggle(id = "bank", isChecked = uiState.isBankingMode, toggleOnText = "aim", toggleOffText = "bank", fillColor = b6G, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleBankingMode) })
+            azRailToggle(id = "bank", route = "main", isChecked = uiState.isBankingMode, toggleOnText = "aim", toggleOffText = "bank", fillColor = b6G, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleBankingMode) })
             azRailItemLowerCase(id = "add_obstacle", text = "add", fillColor = b7M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.AddObstacleBall) })
         }
 
         if (uiState.experienceMode == ExperienceMode.BEGINNER) {
             azRailToggle(
-                id = "lock_view",
-                isChecked = uiState.isBeginnerViewLocked,
+                id = "view_mode",
+                route = "main",
+                isChecked = !uiState.isBeginnerViewLocked,
                 toggleOnText = "dynamic", toggleOffText = "static",
-                fillColor = if (uiState.isBeginnerViewLocked) b6G else b7M,
+                fillColor = if (!uiState.isBeginnerViewLocked) b6G else b7M,
                 textColor = Color.White,
                 onClick = {
                     if (uiState.isBeginnerViewLocked) onEvent(MainScreenEvent.UnlockBeginnerView)
                     else onEvent(MainScreenEvent.LockBeginnerView)
                 }
             )
-            
+
             if (inArSubMode) {
                 azRailToggle(
                     id = "target_type",
+                    route = "main",
                     isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
-                    toggleOnText = "stripes", toggleOffText = "solids",
-                    fillColor = b8K, textColor = Color.White,
+                    toggleOnText = "Stripes", toggleOffText = "Solids",
+                    fillColor = if (uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES) b4P else b8K,
+                    textColor = Color.White,
                     onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
                 )
+            }
 
+            if (inArSubMode) {
                 if (!uiState.myriadTrajectory.isNullOrEmpty()) {
                     azRailToggle(
                         id = "flow",
+                        route = "main",
                         isChecked = uiState.isFlowPokeEnabled,
                         toggleOnText = "flow", toggleOffText = "flow",
                         fillColor = Color(0xFFE040FB), textColor = Color.White,
                         onClick = { onEvent(MainScreenEvent.ToggleFlowPoke) }
-                    )
-                }
-
-                if (uiState.pitchMatrix != null || uiState.topDownBitmap != null) {
-                    azRailToggle(
-                        id = "top_down_view",
-                        isChecked = uiState.isTopDownViewActive,
-                        toggleOnText = "back", toggleOffText = "view",
-                        fillColor = b8K, textColor = Color.White,
-                        onClick = { 
-                            if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
-                            else onEvent(MainScreenEvent.ToggleTopDownView)
-                        }
                     )
                 }
             }
@@ -255,18 +294,18 @@ fun AzNavRailMenu(
         azDivider()
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azMenuItem(id = "size", text = "Table Size", fillColor = b13O, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) })
-            azMenuItem(id = "units", text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Metric" else "Imperial", fillColor = b14G, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) })
+            azMenuItem(id = "size", route = "main", text = "Table Size", fillColor = b13O, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) })
+            azMenuItem(id = "units", route = "main", text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Metric" else "Imperial", fillColor = b14G, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) })
             azDivider()
         }
 
-        azMenuItem(id = "orientation", text = "Orientation", fillColor = b15M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) })
+        azMenuItem(id = "orientation", route = "main", text = "Orientation", fillColor = b15M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) })
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azMenuItem(id = "advanced", text = "Advanced", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) })
+            azMenuItem(id = "advanced", route = "main", text = "Advanced", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) })
         }
 
         azDivider()
-        azMenuItem(id = "mode", text = "Mode: ${uiState.experienceMode?.name}", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) })
+        azMenuItem(id = "mode", route = "main", text = "Mode: ${uiState.experienceMode?.name}", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) })
     }
 }

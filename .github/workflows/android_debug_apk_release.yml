@@ -102,7 +102,7 @@ jobs:
           export BUILD_NUMBER=$(git rev-list --count HEAD)
           
           # Build the APK
-          ./gradlew assembleDebug -PversionBuild=$BUILD_NUMBER --build-cache \
+          ./gradlew assembleFossDebug -PversionBuild=$BUILD_NUMBER --build-cache \
             -Pandroid.injected.signing.store.file=$(pwd)/app/keystore.jks \
             -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
             -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
@@ -112,6 +112,36 @@ jobs:
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
           cat build.log
           exit $EXIT_CODE
+
+      - name: Verify FOSS APK contains no Play Billing classes
+        if: success() && steps.gradle-build.outcome == 'success'
+        run: |
+          set -e
+          APK=$(find app/build/outputs/apk/foss/debug -name "*.apk" | head -n 1)
+          if [ -z "$APK" ]; then
+            echo "Error: no FOSS APK found to verify."
+            exit 1
+          fi
+          BUILD_TOOLS_DIR=$(ls -d "$ANDROID_HOME"/build-tools/* | tail -n 1)
+          DEXDUMP="$BUILD_TOOLS_DIR/dexdump"
+          if [ ! -x "$DEXDUMP" ]; then
+            echo "Error: dexdump not found at $DEXDUMP"
+            exit 1
+          fi
+          TMPDIR=$(mktemp -d)
+          unzip -q "$APK" -d "$TMPDIR"
+          FOUND=0
+          for DEX in "$TMPDIR"/classes*.dex; do
+            if "$DEXDUMP" "$DEX" 2>/dev/null | grep -q "com/android/billingclient"; then
+              echo "ERROR: billing client class found in $DEX of FOSS APK!"
+              FOUND=1
+            fi
+          done
+          rm -rf "$TMPDIR"
+          if [ "$FOUND" = "1" ]; then
+            exit 1
+          fi
+          echo "OK: FOSS APK contains no com.android.billingclient classes."
 
       # ------------------------------------------------------------------
       # FAILURE HANDLING
@@ -183,7 +213,7 @@ jobs:
           fi
           
           # Locate built APK
-          APK_ORIGINAL=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          APK_ORIGINAL=$(find app/build/outputs/apk/foss/debug -name "*.apk" | head -n 1)
           
           if [ -z "$APK_ORIGINAL" ]; then
              echo "Error: No APK found to release!"

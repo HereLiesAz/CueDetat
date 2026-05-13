@@ -9,7 +9,6 @@ import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ReducerUtils
-import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
@@ -84,6 +83,13 @@ internal fun reduceToggleAction(
                     currentTutorialStep = 0,
                     tutorialHighlight = com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.NONE
                 )
+            } else if (nextVisible && state.experienceMode == ExperienceMode.EXPERT) {
+                nextState = nextState.copy(
+                    showTutorialOverlay = true,
+                    tutorialType = com.hereliesaz.cuedetat.domain.TutorialType.GENERAL,
+                    currentTutorialStep = 0,
+                    tutorialHighlight = com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.NONE
+                )
             }
             nextState
         }
@@ -133,8 +139,8 @@ internal fun reduceToggleAction(
                 val currentPx = kotlin.math.hypot((pts[2] - pts[0]).toDouble(), (pts[3] - pts[1]).toDouble()).toFloat()
 
                 if (currentPx > 0 && state.viewWidth > 0) {
-                    val (currMin, currMax) = ZoomMapping.getZoomRange(state.experienceMode, false)
-                    val currentZoom = ZoomMapping.sliderToZoom(state.zoomSliderPosition, currMin, currMax)
+                    val (currMin, currMax) = com.hereliesaz.cuedetat.ui.ZoomMapping.getZoomRange(state.experienceMode, false)
+                    val currentZoom = com.hereliesaz.cuedetat.ui.ZoomMapping.sliderToZoom(state.zoomSliderPosition, currMin, currMax)
 
                     // Target margin: 100dp padding on each side = 200dp total
                     val marginPx = 200f * state.screenDensity
@@ -144,8 +150,8 @@ internal fun reduceToggleAction(
                         val unzoomedPx = currentPx / currentZoom
                         val targetZoom = targetPx / unzoomedPx
 
-                        val (newMin, newMax) = ZoomMapping.getZoomRange(ExperienceMode.BEGINNER, true)
-                        autoZoomSlider = ZoomMapping.zoomToSlider(targetZoom, newMin, newMax)
+                        val (newMin, newMax) = com.hereliesaz.cuedetat.ui.ZoomMapping.getZoomRange(ExperienceMode.BEGINNER, true)
+                        autoZoomSlider = com.hereliesaz.cuedetat.ui.ZoomMapping.zoomToSlider(targetZoom, newMin, newMax)
                     }
                 }
             }
@@ -202,6 +208,14 @@ private fun handleSetExperienceMode(
     mode: ExperienceMode,
     reducerUtils: ReducerUtils
 ): CueDetatState {
+    // Guard: Expert is gated by entitlement. If the caller asks for Expert
+    // when the user is not entitled, leave the state unchanged. UI surfaces
+    // (PaywallSheet, MainViewModel.onEvent) are responsible for triggering
+    // the purchase flow on this path.
+    if (mode == ExperienceMode.EXPERT && !state.isExpertEntitled) {
+        return state
+    }
+
     val newState = state.copy(
         experienceMode = mode,
         protractorUnit = ProtractorUnit(reducerUtils.getDefaultTargetBallPosition(), LOGICAL_BALL_RADIUS, 0f),
@@ -216,11 +230,21 @@ private fun handleSetExperienceMode(
 
     return when (mode) {
         ExperienceMode.EXPERT -> {
-            newState.copy(
+            val expertState = newState.copy(
                 table = newState.table.copy(isVisible = true),
                 onPlaneBall = OnPlaneBall(center = reducerUtils.getDefaultCueBallPosition(newState), radius = LOGICAL_BALL_RADIUS),
                 areHelpersVisible = false
             )
+            if (!expertState.hasSeenExpertTutorial) {
+                expertState.copy(
+                    showTutorialOverlay = true,
+                    tutorialType = com.hereliesaz.cuedetat.domain.TutorialType.GENERAL,
+                    currentTutorialStep = 0,
+                    tutorialHighlight = com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.NONE
+                )
+            } else {
+                expertState
+            }
         }
         ExperienceMode.BEGINNER -> {
             val beginnerState = newState.copy(

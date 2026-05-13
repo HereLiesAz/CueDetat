@@ -47,7 +47,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -69,7 +71,43 @@ class MainViewModel @Inject constructor(
     val metaWearableRepository: MetaWearableRepository,
     val arDepthSession: ArDepthSession,
     val arFrameProcessor: ArFrameProcessor,
+    private val entitlementRepository: com.hereliesaz.cuedetat.billing.EntitlementRepository,
+    private val integrityRepository: com.hereliesaz.cuedetat.data.IntegrityRepository,
 ) : ViewModel() {
+
+    /**
+     * Forces a re-query of the user's Play subscription status. Called from
+     * MainActivity.onResume so we catch state changes (cancel, refund,
+     * just-completed purchase) that happened while the app was backgrounded.
+     */
+    fun refreshEntitlement() {
+        viewModelScope.launch {
+            runCatching { entitlementRepository.refresh() }
+        }
+    }
+
+    /**
+     * Performs a Play Integrity check to ensure the app is genuine and the
+     * environment is secure. In a production environment, the retrieved
+     * token is sent to a secure backend which verifies it against Google's
+     * servers to decide whether to grant 'Expert' entitlements.
+     */
+    private fun performIntegrityCheck() {
+        viewModelScope.launch(Dispatchers.IO) {
+            // A production implementation would fetch a nonce from the backend.
+            val nonce = java.util.UUID.randomUUID().toString()
+            val token = integrityRepository.fetchIntegrityToken(nonce)
+
+            if (token != null) {
+                android.util.Log.i("MainViewModel", "Play Integrity token retrieved successfully.")
+                // In a production app, we would send this token to our server here.
+                // The server would verify the token and return a cryptographically 
+                // signed verdict that the app can trust.
+            } else {
+                android.util.Log.w("MainViewModel", "Play Integrity check failed to retrieve a token.")
+            }
+        }
+    }
 
     private var experienceModeUpdateJob: Job? = null
     private var saveJob: Job? = null
@@ -116,9 +154,15 @@ class MainViewModel @Inject constructor(
             val savedState = userPreferencesRepository.stateFlow.first()
             val savedFeltSamples = tableScanRepository.loadFeltSamples()
             val currentExperienceMode = _uiState.value.experienceMode
+            // Pull the entitlement live rather than from the JSON snapshot. The
+            // entitlement event may already have set _uiState.isExpertEntitled
+            // by the time this load completes; in any case the StateFlow is the
+            // source of truth.
+            val liveEntitled = entitlementRepository.entitlement.value.active
             val initialState = (savedState ?: CueDetatState()).copy(
                 experienceMode = currentExperienceMode,
-                savedFeltSamples = savedFeltSamples
+                savedFeltSamples = savedFeltSamples,
+                isExpertEntitled = liveEntitled
             )
             processAndEmitState(initialState, UpdateType.FULL)
 
@@ -126,6 +170,9 @@ class MainViewModel @Inject constructor(
             // committed, so a network response can't be overwritten by the
             // saved-state load.
             onEvent(MainScreenEvent.CheckForUpdate)
+            
+            // Perform security integrity check on startup.
+            performIntegrityCheck()
         }
 
         // Pipe WarningManager's timed messages into uiState.warningText.
@@ -207,6 +254,33 @@ class MainViewModel @Inject constructor(
                 checkLocationAndPromptIfNeeded(savedModel)
             }
         }
+
+        // Collect entitlement updates and propagate into the reducer.
+        viewModelScope.launch {
+            entitlementRepository.entitlement.collect { entitlement ->
+                onEvent(MainScreenEvent.EntitlementChanged(entitlement))
+            }
+        }
+
+        // Splash paywall: every time the splash screen is showing AND the user
+        // is not entitled to Expert Mode, surface the paywall. This fires on
+        // cold start, on returning from "Exit to splash", and any other path
+        // that lands on the splash. In FOSS builds entitlement is permanently
+        // active so this never fires.
+        viewModelScope.launch {
+            _uiState
+                .map { it.experienceMode == null && !it.isExpertEntitled }
+                .distinctUntilChanged()
+                .collect { onSplashWhileUnentitled ->
+                    if (onSplashWhileUnentitled) {
+                        _singleEvent.emit(
+                            SingleEvent.ShowPaywall(
+                                com.hereliesaz.cuedetat.billing.PaywallTrigger.SPLASH_SCREEN
+                            )
+                        )
+                    }
+                }
+        }
     }
 
     fun onEvent(event: MainScreenEvent) {
@@ -228,6 +302,25 @@ class MainViewModel @Inject constructor(
                 onEvent(MainScreenEvent.ApplyPendingExperienceMode)
             }
             return
+        }
+
+        // Intercept the apply step: if the cycle landed on EXPERT and the user
+        // is not entitled, surface the paywall and clear the pending mode so
+        // the next cycle starts fresh. The reducer would otherwise silently
+        // refuse the transition and the user would see no feedback.
+        if (event is MainScreenEvent.ApplyPendingExperienceMode) {
+            val target = _uiState.value.pendingExperienceMode
+            if (target == ExperienceMode.EXPERT && !_uiState.value.isExpertEntitled) {
+                _uiState.value = _uiState.value.copy(pendingExperienceMode = null)
+                viewModelScope.launch {
+                    _singleEvent.emit(
+                        SingleEvent.ShowPaywall(
+                            com.hereliesaz.cuedetat.billing.PaywallTrigger.EXPERT_TOGGLE_TAP
+                        )
+                    )
+                }
+                return
+            }
         }
 
         val currentState = _uiState.value
@@ -416,10 +509,16 @@ class MainViewModel @Inject constructor(
                 is MainScreenEvent.SetExperienceMode -> {
                     if (event.mode == ExperienceMode.HATER) {
                         _singleEvent.emit(SingleEvent.InitiateHaterMode)
+                    } else if (event.mode == ExperienceMode.EXPERT && !_uiState.value.isExpertEntitled) {
+                        _singleEvent.emit(SingleEvent.ShowPaywall(com.hereliesaz.cuedetat.billing.PaywallTrigger.SPLASH_SCREEN))
                     }
                 }
 
                 is MainScreenEvent.Shake -> _singleEvent.emit(SingleEvent.HaterShake)
+
+                is MainScreenEvent.ShowPaywall -> {
+                    _singleEvent.emit(SingleEvent.ShowPaywall(event.trigger))
+                }
 
                 else -> { /* Do nothing for state-changing events */ }
             }

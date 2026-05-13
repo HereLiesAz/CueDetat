@@ -85,6 +85,10 @@ class VisionRepository @Inject constructor(
         Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
     }
 
+    private val feltColorDetector = FeltColorDetector()
+    private val cvBallDetector = CvBallDetector()
+    private var lastFeltDetection: FeltColorDetector.Result? = null
+
     private val isProcessing = AtomicBoolean(false)
     private var relocaliserFailFrames = 0
 
@@ -170,7 +174,11 @@ class VisionRepository @Inject constructor(
                 Pair(meanArray, stddevArray)
             }
 
-            val hsv = state.lockedHsvColor ?: hsvTuple?.first ?: run {
+            val autoFelt = if (state.lockedHsvColor == null && hsvTuple == null) {
+                feltColorDetector.detect(hsvMat)?.also { lastFeltDetection = it }
+            } else null
+
+            val hsv = state.lockedHsvColor ?: hsvTuple?.first ?: autoFelt?.hsv ?: run {
                 val roiWidth = 50
                 val roiHeight = 50
                 val roiX = (hsvMat.cols() - roiWidth) / 2
@@ -224,17 +232,25 @@ class VisionRepository @Inject constructor(
                 null
             }
 
+            val hasTablePose = state.hasInverseMatrix && state.pitchMatrix != null
             val filteredDetectedObjects = detectedObjects.filter {
                 val box = it.boundingBox
-                val expectedRadius = getExpectedRadiusAtImageY(
-                    box.centerY().toFloat(), state, imageToScreenMatrix
-                )
-                val maxAllowedArea = 2 * Math.PI * expectedRadius.pow(2)
-                (box.width() * box.height()) <= maxAllowedArea
+                if (!hasTablePose) {
+                    val side = minOf(box.width(), box.height())
+                    side in 10..400
+                } else {
+                    val expectedRadius = getExpectedRadiusAtImageY(
+                        box.centerY().toFloat(), state, imageToScreenMatrix
+                    )
+                    val maxAllowedArea = 2 * Math.PI * expectedRadius.pow(2)
+                    (box.width() * box.height()) <= maxAllowedArea
+                }
             }
 
-            val refinedScreenPoints = filteredDetectedObjects.mapNotNull { detectedObject ->
-                refineBallCenter(detectedObject, matToUse, state, imageToScreenMatrix)
+            val refinedScreenPoints = filteredDetectedObjects.map { detectedObject ->
+                val box = detectedObject.boundingBox
+                val fallback = PointF(box.exactCenterX(), box.exactCenterY())
+                refineBallCenter(detectedObject, matToUse, state, imageToScreenMatrix) ?: fallback
             }.map { pointInImageCoords ->
                 val screenPointArray = floatArrayOf(pointInImageCoords.x, pointInImageCoords.y)
                 imageToScreenMatrix.mapPoints(screenPointArray)
@@ -243,15 +259,22 @@ class VisionRepository @Inject constructor(
 
             val filteredCustomPoolBalls = customPoolBalls.filter {
                 val box = it.rect
-                val expectedRadius = getExpectedRadiusAtImageY(
-                    box.centerY(), state, imageToScreenMatrix
-                )
-                val maxAllowedArea = 2 * Math.PI * expectedRadius.pow(2)
-                (box.width() * box.height()) <= maxAllowedArea
+                if (!hasTablePose) {
+                    val side = minOf(box.width(), box.height())
+                    side in 10f..400f
+                } else {
+                    val expectedRadius = getExpectedRadiusAtImageY(
+                        box.centerY(), state, imageToScreenMatrix
+                    )
+                    val maxAllowedArea = 2 * Math.PI * expectedRadius.pow(2)
+                    (box.width() * box.height()) <= maxAllowedArea
+                }
             }
 
-            val customScreenPoints = filteredCustomPoolBalls.mapNotNull { detectedObject ->
-                refineBallCenterPoolDetection(detectedObject, matToUse, state, imageToScreenMatrix)
+            val customScreenPoints = filteredCustomPoolBalls.map { detectedObject ->
+                val box = detectedObject.rect
+                val fallback = PointF(box.centerX(), box.centerY())
+                refineBallCenterPoolDetection(detectedObject, matToUse, state, imageToScreenMatrix) ?: fallback
             }.map { pointInImageCoords ->
                 val screenPointArray = floatArrayOf(pointInImageCoords.x, pointInImageCoords.y)
                 imageToScreenMatrix.mapPoints(screenPointArray)
@@ -322,10 +345,79 @@ class VisionRepository @Inject constructor(
                 DetectedBall(position = logical, type = ballType, confidence = 0.9f, boundingBox = intBox)
             }
 
-            val allStructuredBalls = genericBallsStructured + customBallsStructured
+            val mlBalls = genericBallsStructured + customBallsStructured
+
+            val feltMean = state.lockedHsvColor
+                ?: autoFelt?.hsv
+                ?: lastFeltDetection?.hsv
+            val feltSd = state.lockedHsvStdDev
+                ?: autoFelt?.stdDev
+                ?: lastFeltDetection?.stdDev
+                ?: floatArrayOf(8f, 40f, 50f)
+
+            val cvDetections = if (feltMean != null) {
+                val mlBoxSides = (filteredDetectedObjects.map {
+                    minOf(it.boundingBox.width(), it.boundingBox.height())
+                } + filteredCustomPoolBalls.map {
+                    minOf(it.rect.width(), it.rect.height()).toInt()
+                }).filter { it > 0 }
+                val medianSide = if (mlBoxSides.isNotEmpty()) {
+                    mlBoxSides.sorted()[mlBoxSides.size / 2].toFloat()
+                } else 0f
+                val expectedRadiusPx = medianSide / 2f
+                cvBallDetector.detect(matToUse, hsvMat, feltMean, feltSd, expectedRadiusPx)
+            } else emptyList()
+
+            val cvScreenBalls = cvDetections.map { d ->
+                val arr = floatArrayOf(d.center.x, d.center.y)
+                imageToScreenMatrix.mapPoints(arr)
+                val sp = PointF(arr[0], arr[1])
+                val logical = if (state.hasInverseMatrix) {
+                    val inv = state.inversePitchMatrix ?: Matrix()
+                    val lp = Perspective.screenToLogical(sp, inv)
+                    if (state.lensWarpTps != null) ThinPlateSpline.applyWarp(state.lensWarpTps, lp) else lp
+                } else sp
+                val box = android.graphics.Rect(
+                    (d.center.x - d.radius).toInt(),
+                    (d.center.y - d.radius).toInt(),
+                    (d.center.x + d.radius).toInt(),
+                    (d.center.y + d.radius).toInt(),
+                )
+                DetectedBall(position = logical, type = d.type, confidence = d.confidence, boundingBox = box)
+            }
+
+            // mlBalls.position and cvScreenBalls.position live in the same coord
+            // system as each other (logical inches if hasInverseMatrix, screen pixels
+            // otherwise). The merge threshold must live in that same system, not in
+            // image-pixel units like CvBallDetector.radius. Pick the threshold to match.
+            val mergeDistanceSq = if (state.hasInverseMatrix) {
+                val r = LOGICAL_BALL_RADIUS * 1.5f
+                r * r
+            } else {
+                imageToScreenMatrix.getValues(reusableMatrixValues)
+                val imgToScreen = reusableMatrixValues[Matrix.MSCALE_X]
+                val rImage = cvDetections.maxOfOrNull { it.radius } ?: 30f
+                val rScreen = rImage * imgToScreen * 1.5f
+                rScreen * rScreen
+            }
+            val cvFillIns = cvScreenBalls.filter { cvBall ->
+                mlBalls.none { mlBall ->
+                    val dx = (mlBall.position.x - cvBall.position.x).toDouble()
+                    val dy = (mlBall.position.y - cvBall.position.y).toDouble()
+                    (dx * dx + dy * dy) < mergeDistanceSq
+                }
+            }
+
+            val allStructuredBalls = mlBalls + cvFillIns
+            // genericBalls must use the same coord system as `balls`. Previously this
+            // path emitted screen-pixel points, which mismatched consumer reducers
+            // (ObstacleReducer, GestureReducer, SnapReducer) that compare against
+            // event.logicalPoint. Use the structured positions, which are logical
+            // when a pose exists and screen otherwise — consistent both ways.
+            val genericBalls = allStructuredBalls.map { it.position }
 
             var finalVisionData = VisionData(
-                genericBalls = refinedScreenPoints,
+                genericBalls = genericBalls,
                 balls = allStructuredBalls,
                 detectedHsvColor = hsvTuple?.first ?: hsv,
                 detectedBoundingBoxes = filteredDetectedObjects.map { it.boundingBox },
@@ -517,23 +609,35 @@ class VisionRepository @Inject constructor(
             }
 
             Imgproc.cvtColor(matToUse, reusableHsvMat, Imgproc.COLOR_BGR2HSV)
-            val hsv = state.lockedHsvColor ?: run {
-                val roiX = (reusableHsvMat.cols() - 50) / 2
-                val roiY = (reusableHsvMat.rows() - 50) / 2
-                val center = reusableHsvMat.submat(OCVRect(roiX, roiY, 50, 50))
+            val hsvMat = reusableHsvMat
+            val autoFelt = if (state.lockedHsvColor == null) {
+                feltColorDetector.detect(hsvMat)?.also { lastFeltDetection = it }
+            } else null
+            val hsv = state.lockedHsvColor ?: autoFelt?.hsv ?: run {
+                val roiX = (hsvMat.cols() - 50) / 2
+                val roiY = (hsvMat.rows() - 50) / 2
+                val center = hsvMat.submat(OCVRect(roiX, roiY, 50, 50))
                 val mean = Core.mean(center)
                 center.release()
                 floatArrayOf(mean.`val`[0].toFloat(), mean.`val`[1].toFloat(), mean.`val`[2].toFloat())
             }
 
+            val hasTablePose = state.hasInverseMatrix && state.pitchMatrix != null
             val filteredObjects = detectedObjects.filter {
                 val box = it.boundingBox
-                val er = getExpectedRadiusAtImageY(box.centerY().toFloat(), state, imageToScreenMatrix)
-                (box.width() * box.height()) <= 2 * Math.PI * er * er
+                if (!hasTablePose) {
+                    val side = minOf(box.width(), box.height())
+                    side in 10..400
+                } else {
+                    val er = getExpectedRadiusAtImageY(box.centerY().toFloat(), state, imageToScreenMatrix)
+                    (box.width() * box.height()) <= 2 * Math.PI * er * er
+                }
             }
 
-            val refinedScreenPoints = filteredObjects.mapNotNull { obj ->
-                refineBallCenter(obj, matToUse, state, imageToScreenMatrix)
+            val refinedScreenPoints = filteredObjects.map { obj ->
+                val box = obj.boundingBox
+                val fallback = PointF(box.exactCenterX(), box.exactCenterY())
+                refineBallCenter(obj, matToUse, state, imageToScreenMatrix) ?: fallback
             }.map { pt ->
                 val arr = floatArrayOf(pt.x, pt.y)
                 imageToScreenMatrix.mapPoints(arr)
@@ -549,10 +653,80 @@ class VisionRepository @Inject constructor(
                 }
             } else emptyList()
 
-            val filteredBalls = if (state.table.isVisible) logicalPoints.filter { state.table.isPointInside(it) } else logicalPoints
+            val mlBalls = refinedScreenPoints.mapIndexed { idx, sp ->
+                val logical = if (state.hasInverseMatrix) {
+                    val inv = state.inversePitchMatrix ?: android.graphics.Matrix()
+                    val lp = com.hereliesaz.cuedetat.view.model.Perspective.screenToLogical(sp, inv)
+                    if (state.lensWarpTps != null) com.hereliesaz.cuedetat.domain.ThinPlateSpline.applyWarp(state.lensWarpTps, lp) else lp
+                } else sp
+                val box = filteredObjects[idx].boundingBox
+                val ballType = classifyBallType(matToUse, box)
+                com.hereliesaz.cuedetat.data.DetectedBall(position = logical, type = ballType, confidence = 0.9f, boundingBox = box)
+            }
+
+            val feltMean = state.lockedHsvColor ?: autoFelt?.hsv ?: lastFeltDetection?.hsv
+            val feltSd = state.lockedHsvStdDev
+                ?: autoFelt?.stdDev
+                ?: lastFeltDetection?.stdDev
+                ?: floatArrayOf(8f, 40f, 50f)
+            val cvDetections = if (feltMean != null) {
+                val sides = filteredObjects.map { minOf(it.boundingBox.width(), it.boundingBox.height()) }
+                    .filter { it > 0 }
+                val medianSide = if (sides.isNotEmpty()) sides.sorted()[sides.size / 2].toFloat() else 0f
+                cvBallDetector.detect(matToUse, hsvMat, feltMean, feltSd, medianSide / 2f)
+            } else emptyList()
+
+            val cvScreenBalls = cvDetections.map { d ->
+                val arr = floatArrayOf(d.center.x, d.center.y)
+                imageToScreenMatrix.mapPoints(arr)
+                val sp = android.graphics.PointF(arr[0], arr[1])
+                val logical = if (state.hasInverseMatrix) {
+                    val inv = state.inversePitchMatrix ?: android.graphics.Matrix()
+                    val lp = com.hereliesaz.cuedetat.view.model.Perspective.screenToLogical(sp, inv)
+                    if (state.lensWarpTps != null) com.hereliesaz.cuedetat.domain.ThinPlateSpline.applyWarp(state.lensWarpTps, lp) else lp
+                } else sp
+                val box = android.graphics.Rect(
+                    (d.center.x - d.radius).toInt(),
+                    (d.center.y - d.radius).toInt(),
+                    (d.center.x + d.radius).toInt(),
+                    (d.center.y + d.radius).toInt(),
+                )
+                com.hereliesaz.cuedetat.data.DetectedBall(position = logical, type = d.type, confidence = d.confidence, boundingBox = box)
+            }
+
+            // See processImage for the unit-mismatch context: ball positions live in
+            // logical inches when a pose exists, screen pixels otherwise. The AR path
+            // always has a pose, so use logical units, with a screen-pixel fallback
+            // for the degenerate case.
+            val mergeDistSq = if (state.hasInverseMatrix) {
+                val r = LOGICAL_BALL_RADIUS * 1.5f
+                r * r
+            } else {
+                imageToScreenMatrix.getValues(reusableMatrixValues)
+                val imgToScreen = reusableMatrixValues[Matrix.MSCALE_X]
+                val rImage = cvDetections.maxOfOrNull { it.radius } ?: 30f
+                val rScreen = rImage * imgToScreen * 1.5f
+                rScreen * rScreen
+            }
+            val cvFillIns = cvScreenBalls.filter { cvBall ->
+                mlBalls.none { mlBall ->
+                    val dx = (mlBall.position.x - cvBall.position.x).toDouble()
+                    val dy = (mlBall.position.y - cvBall.position.y).toDouble()
+                    (dx * dx + dy * dy) < mergeDistSq
+                }
+            }
+
+            val allBalls = mlBalls + cvFillIns
+            val cvFillInPositions = cvFillIns.map { it.position }
+            val filteredBalls = if (state.table.isVisible) {
+                (logicalPoints + cvFillInPositions).filter { state.table.isPointInside(it) }
+            } else {
+                logicalPoints + cvFillInPositions
+            }
 
             _visionDataFlow.value = VisionData(
                 genericBalls = filteredBalls,
+                balls = allBalls,
                 detectedHsvColor = hsv,
                 detectedBoundingBoxes = filteredObjects.map { it.boundingBox },
                 sourceImageWidth = inputImage.width,
@@ -941,20 +1115,41 @@ class VisionRepository @Inject constructor(
         val roi = OCVRect(x, y, w, h)
         val ballMat = frame.submat(roi)
 
-        val poleHeight = (h * 0.15f).toInt().coerceAtLeast(1)
-        val topPole = ballMat.submat(OCVRect(0, 0, w, poleHeight))
-        val bottomPole = ballMat.submat(OCVRect(0, h - poleHeight, w, poleHeight))
-
         val hsvMat = Mat()
         Imgproc.cvtColor(ballMat, hsvMat, Imgproc.COLOR_BGR2HSV)
+
+        // Sample the ball's middle band (avoids glare/shadow at the poles) for
+        // the whole-ball mean used to spot the cue and the 8 ball. A pure-white
+        // cue ball reads as low saturation + high value across the entire ball;
+        // a pure-black 8 ball reads as low value across the entire ball. Stripes
+        // and solids both have a coloured band in the middle so they fall through.
+        val midTop = (h * 0.30f).toInt().coerceIn(0, h - 1)
+        val midH = (h * 0.40f).toInt().coerceAtLeast(1).coerceAtMost(h - midTop)
+        val midHsv = hsvMat.submat(OCVRect(0, midTop, w, midH))
+        val midMean = Core.mean(midHsv)
+        midHsv.release()
+
+        val isWhole8Ball = midMean.`val`[2] < 60.0
+        val isWholeCueBall = midMean.`val`[1] < 40.0 && midMean.`val`[2] > 190.0
+
+        if (isWhole8Ball) {
+            ballMat.release()
+            hsvMat.release()
+            return BallType.EIGHT
+        }
+        if (isWholeCueBall) {
+            ballMat.release()
+            hsvMat.release()
+            return BallType.CUE
+        }
+
+        val poleHeight = (h * 0.15f).toInt().coerceAtLeast(1)
         val topHsv = hsvMat.submat(OCVRect(0, 0, w, poleHeight))
         val bottomHsv = hsvMat.submat(OCVRect(0, h - poleHeight, w, poleHeight))
 
         val topMean = Core.mean(topHsv)
         val bottomMean = Core.mean(bottomHsv)
 
-        topPole.release()
-        bottomPole.release()
         topHsv.release()
         bottomHsv.release()
         ballMat.release()

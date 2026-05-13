@@ -108,6 +108,7 @@ data class CueDetatState(
     val showTutorialOverlay: Boolean = false,
     val hasSeenBeginnerTutorial: Boolean = false,
     val hasSeenDynamicBeginnerTutorial: Boolean = false,
+    val hasSeenExpertTutorial: Boolean = false,
     val tutorialType: TutorialType = TutorialType.GENERAL,
     val currentTutorialStep: Int = 0,
     @Transient val tutorialHighlight: TutorialHighlightElement? = TutorialHighlightElement.NONE,
@@ -187,6 +188,8 @@ data class CueDetatState(
     val isTopDownViewActive: Boolean = false,
     @Transient val topDownBitmap: android.graphics.Bitmap? = null,
     val topDownTransitionProgress: Float = 0f,
+    val isExpertEntitled: Boolean = false,
+    val hasSeenOnboardingPaywall: Boolean = false,
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
@@ -207,6 +210,8 @@ sealed class MainScreenEvent {
     object ToggleExperienceModeSelection : MainScreenEvent()
     object ApplyPendingExperienceMode : MainScreenEvent()
     data class SetExperienceMode(val mode: ExperienceMode) : MainScreenEvent()
+    data class EntitlementChanged(val entitlement: com.hereliesaz.cuedetat.billing.Entitlement) : MainScreenEvent()
+    data class ShowPaywall(val trigger: com.hereliesaz.cuedetat.billing.PaywallTrigger) : MainScreenEvent()
     data class ScreenGestureStarted(val position: PointF) : MainScreenEvent()
     data class Drag(val previousPosition: PointF, val currentPosition: PointF) : MainScreenEvent()
     object GestureEnded : MainScreenEvent()
