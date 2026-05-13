@@ -153,7 +153,8 @@
       "Bash(pgrep -af \"/opt/google/chrome-beta/chrome$\\\\|chrome-beta/chrome \")",
       "Bash(pgrep -af \"/opt/google/chrome-beta/chrome$\\\\|chrome-beta/chrome --\")",
       "Bash(jq '.mcpServers[\"chrome-devtools\"].args = [\"-y\", \"chrome-devtools-mcp@latest\", \"--browserUrl\", \"http://127.0.0.1:9222\"]' ~/.claude.json)",
-      "Bash(bash ./gradlew :app:compileDebugKotlin)"
+      "Bash(bash ./gradlew :app:compileDebugKotlin)",
+      "Bash(kaggle --version)"
     ]
   }
 }
