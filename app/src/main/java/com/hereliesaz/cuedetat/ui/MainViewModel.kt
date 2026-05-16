@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -272,20 +273,26 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        // Splash paywall: every time the splash screen is showing AND the user
-        // is not entitled to Expert Mode, surface the paywall. This fires on
-        // cold start, on returning from "Exit to splash", and any other path
-        // that lands on the splash. In FOSS builds entitlement is permanently
-        // active so this never fires.
+        // Onboarding paywall: fire every time the splash is shown and every
+        // time the user enters HATER mode while not entitled. Entitled users
+        // (including FOSS, which is permanently active) never see it.
         viewModelScope.launch {
+            if (entitlementRepository.entitlement.value.active) return@launch
             _uiState
-                .map { it.experienceMode == null && !it.isExpertEntitled }
+                .map { it.experienceMode to it.isExpertEntitled }
                 .distinctUntilChanged()
-                .collect { onSplashWhileUnentitled ->
-                    if (onSplashWhileUnentitled) {
-                        _singleEvent.emit(
-                            SingleEvent.ShowPaywall(
-                                com.hereliesaz.cuedetat.billing.PaywallTrigger.SPLASH_SCREEN
+                .filter { (mode, entitled) ->
+                    !entitled && (mode == null || mode == ExperienceMode.HATER)
+                }
+                .collect {
+                    // Re-check live entitlement: _uiState.isExpertEntitled may
+                    // still be false on app start if the EntitlementChanged
+                    // event hasn't propagated, but the repository's StateFlow
+                    // is always current.
+                    if (!entitlementRepository.entitlement.value.active) {
+                        onEvent(
+                            MainScreenEvent.ShowPaywall(
+                                com.hereliesaz.cuedetat.billing.PaywallTrigger.ONBOARDING
                             )
                         )
                     }

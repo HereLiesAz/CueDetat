@@ -189,7 +189,6 @@ data class CueDetatState(
     @Transient val topDownBitmap: android.graphics.Bitmap? = null,
     val topDownTransitionProgress: Float = 0f,
     val isExpertEntitled: Boolean = false,
-    val hasSeenOnboardingPaywall: Boolean = false,
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
