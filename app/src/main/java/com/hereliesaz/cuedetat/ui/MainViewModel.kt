@@ -47,7 +47,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -233,21 +236,30 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        // Onboarding paywall: shown once per install if the user is not entitled.
-        // In FOSS builds the entitlement repository emits active=true immediately,
-        // so the second branch is never taken.
+        // Onboarding paywall: fire every time the splash is shown and every
+        // time the user enters HATER mode while not entitled. Entitled users
+        // (including FOSS, which is permanently active) never see it.
         viewModelScope.launch {
-            if (!userPreferencesRepository.hasSeenOnboardingPaywall()) {
-                val first = entitlementRepository.entitlement.first()
-                userPreferencesRepository.setOnboardingPaywallSeen()
-                if (!first.active) {
-                    onEvent(
-                        MainScreenEvent.ShowPaywall(
-                            com.hereliesaz.cuedetat.billing.PaywallTrigger.ONBOARDING
-                        )
-                    )
+            if (entitlementRepository.entitlement.value.active) return@launch
+            _uiState
+                .map { it.experienceMode to it.isExpertEntitled }
+                .distinctUntilChanged()
+                .filter { (mode, entitled) ->
+                    !entitled && (mode == null || mode == ExperienceMode.HATER)
                 }
-            }
+                .collect {
+                    // Re-check live entitlement: _uiState.isExpertEntitled may
+                    // still be false on app start if the EntitlementChanged
+                    // event hasn't propagated, but the repository's StateFlow
+                    // is always current.
+                    if (!entitlementRepository.entitlement.value.active) {
+                        onEvent(
+                            MainScreenEvent.ShowPaywall(
+                                com.hereliesaz.cuedetat.billing.PaywallTrigger.ONBOARDING
+                            )
+                        )
+                    }
+                }
         }
     }
 
