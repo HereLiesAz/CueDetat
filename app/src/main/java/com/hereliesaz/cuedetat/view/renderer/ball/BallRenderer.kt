@@ -475,15 +475,38 @@ class BallRenderer {
         val visionData = state.visionData ?: return
         if (visionData.sourceImageWidth == 0) return
 
-        // Prefer the typed ball list so we can colour by classification. Fall
-        // back to the untyped boundingBoxes when classification hasn't run yet
-        // (e.g. raw OpenCV path with no per-ball type info).
-        val typedBoxes = visionData.balls.mapNotNull { ball ->
-            ball.boundingBox?.let { it to ball.type }
-        }
+        // Every detected ball must show a bounding box. If a ball is missing
+        // one (legacy path), synthesise a square box around its image-space
+        // centre using the median ball box size so the user gets a visible
+        // marker on EVERY ball the ML or CV pipeline produced.
+        val typedBoxesWithFallback: List<Pair<android.graphics.Rect, com.hereliesaz.cuedetat.data.BallType>> =
+            run {
+                val withBoxes = visionData.balls.filter { it.boundingBox != null }
+                val medianSide: Int = withBoxes
+                    .mapNotNull { it.boundingBox }
+                    .map { minOf(it.width(), it.height()) }
+                    .filter { it > 0 }
+                    .sorted()
+                    .let { if (it.isEmpty()) 0 else it[it.size / 2] }
+                val fallbackHalfSide = if (medianSide > 0) medianSide / 2 else 0
+
+                visionData.balls.map { ball ->
+                    val box = ball.boundingBox
+                        ?: if (fallbackHalfSide > 0) {
+                            android.graphics.Rect(
+                                (ball.position.x - fallbackHalfSide).toInt(),
+                                (ball.position.y - fallbackHalfSide).toInt(),
+                                (ball.position.x + fallbackHalfSide).toInt(),
+                                (ball.position.y + fallbackHalfSide).toInt(),
+                            )
+                        } else null
+                    box?.let { it to ball.type }
+                }.filterNotNull()
+            }
+
         val boxes: List<Pair<android.graphics.Rect, com.hereliesaz.cuedetat.data.BallType>> =
-            if (typedBoxes.isNotEmpty()) {
-                typedBoxes
+            if (typedBoxesWithFallback.isNotEmpty()) {
+                typedBoxesWithFallback
             } else {
                 visionData.detectedBoundingBoxes.map { it to com.hereliesaz.cuedetat.data.BallType.UNKNOWN }
             }
@@ -495,11 +518,20 @@ class BallRenderer {
         val canvasWidth = canvas.width.toFloat()
         val canvasHeight = canvas.height.toFloat()
 
-        val matrix = Matrix()
-        val srcRect = RectF(0f, 0f, srcWidth, srcHeight)
-        val destRect = RectF(0f, 0f, canvasWidth, canvasHeight)
-        matrix.setRectToRect(srcRect, destRect, Matrix.ScaleToFit.FILL)
-        matrix.postRotate(rotation, canvasWidth / 2f, canvasHeight / 2f)
+        // CameraBackground uses PreviewView.ScaleType.FILL_CENTER, which is
+        // centre-crop with rotation. Reconstruct the same transform here so
+        // bounding boxes land on top of the visible balls instead of being
+        // stretched by FILL.
+        val rotatedW = if (rotation % 180f == 0f) srcWidth else srcHeight
+        val rotatedH = if (rotation % 180f == 0f) srcHeight else srcWidth
+        val scale = maxOf(canvasWidth / rotatedW, canvasHeight / rotatedH)
+
+        val matrix = Matrix().apply {
+            postTranslate(-srcWidth / 2f, -srcHeight / 2f)
+            postRotate(rotation)
+            postScale(scale, scale)
+            postTranslate(canvasWidth / 2f, canvasHeight / 2f)
+        }
 
         val paint = Paint(paints.cvResultPaint).apply {
             style = Paint.Style.STROKE
