@@ -305,6 +305,15 @@ fun AzNavRailMenu(
             azMenuItem(id = "advanced", route = "main", text = "Advanced", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) })
         }
 
+        azMenuItem(
+            id = "billing-debug",
+            route = "main",
+            text = "Billing & License",
+            fillColor = b1Y,
+            textColor = Color.White,
+            onClick = { onEvent(MainScreenEvent.ToggleBillingDebugDialog) },
+        )
+
         azDivider()
         azMenuItem(id = "mode", route = "main", text = "Mode: ${uiState.experienceMode?.name}", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) })
     }
