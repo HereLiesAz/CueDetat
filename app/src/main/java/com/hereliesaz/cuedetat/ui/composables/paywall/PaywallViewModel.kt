@@ -3,12 +3,15 @@
 package com.hereliesaz.cuedetat.ui.composables.paywall
 
 import android.app.Activity
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.billing.BasePlanId
+import com.hereliesaz.cuedetat.billing.EntitlementDiagnostics
 import com.hereliesaz.cuedetat.billing.EntitlementRepository
 import com.hereliesaz.cuedetat.billing.PaywallTrigger
 import com.hereliesaz.cuedetat.billing.ProductDetailsState
+import com.hereliesaz.cuedetat.billing.TesterLicenseResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,6 +54,7 @@ class PaywallViewModel @Inject constructor(
                 }
             }
         }
+        refreshDiagnostics()
     }
 
     fun setTrigger(trigger: PaywallTrigger) {
@@ -69,7 +73,44 @@ class PaywallViewModel @Inject constructor(
     }
 
     fun restore() {
-        viewModelScope.launch { runCatching { repository.restorePurchases() } }
+        viewModelScope.launch {
+            runCatching { repository.restorePurchases() }
+            refreshDiagnostics()
+        }
+    }
+
+    /** Build the Google Sign-In intent the UI should launch. Null = not available. */
+    fun googleSignInIntent(): Intent? = repository.googleSignInIntent()
+
+    /** Consume the result of the Sign-In flow and attempt the allowlist match. */
+    fun applyTesterLicenseFromSignInResult(data: Intent?) {
+        viewModelScope.launch {
+            val outcome = repository.applyTesterLicenseFromSignInResult(data)
+            _uiState.value = _uiState.value.copy(testerLicenseOutcome = outcome)
+            refreshDiagnostics()
+        }
+    }
+
+    /** Manual email-entry fallback when Sign-In is unavailable / the user declines. */
+    fun applyTesterLicenseManually(email: String) {
+        viewModelScope.launch {
+            val outcome = repository.applyTesterLicense(email)
+            _uiState.value = _uiState.value.copy(testerLicenseOutcome = outcome)
+            refreshDiagnostics()
+        }
+    }
+
+    fun clearTesterLicenseOutcome() {
+        _uiState.value = _uiState.value.copy(testerLicenseOutcome = null)
+    }
+
+    fun toggleDiagnostics() {
+        _uiState.value = _uiState.value.copy(showDiagnostics = !_uiState.value.showDiagnostics)
+        refreshDiagnostics()
+    }
+
+    private fun refreshDiagnostics() {
+        _uiState.value = _uiState.value.copy(diagnostics = repository.diagnostics())
     }
 
     sealed class PurchaseFlowEvent {
@@ -80,5 +121,8 @@ class PaywallViewModel @Inject constructor(
 
 data class PaywallUiState(
     val productDetails: ProductDetailsState = ProductDetailsState.Loading,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val testerLicenseOutcome: TesterLicenseResult? = null,
+    val diagnostics: EntitlementDiagnostics = EntitlementDiagnostics(emptyList(), "not loaded", false),
+    val showDiagnostics: Boolean = false,
 )

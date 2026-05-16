@@ -56,11 +56,29 @@ class BillingClientWrapper @Inject constructor(
             TAG,
             "purchasesListener responseCode=${result.responseCode} debug='${result.debugMessage}' size=${purchases?.size ?: 0}"
         )
+        purchases?.forEach { purchase ->
+            // Log each item so a tester can see in logcat exactly what
+            // products+states Play just reported. The repository will also
+            // record this into its rolling diagnostic buffer.
+            Log.i(
+                TAG,
+                "purchase products=${purchase.products} state=${purchase.purchaseState} " +
+                        "ack=${purchase.isAcknowledged} autoRenew=${purchase.isAutoRenewing}"
+            )
+        }
         if (result.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
             _purchaseUpdates.tryEmit(purchases)
+        } else if (result.responseCode != BillingClient.BillingResponseCode.USER_CANCELED) {
+            // USER_CANCELED is benign — the user backed out of the sheet.
+            // Anything else is a real problem and the user is otherwise
+            // staring at a "nothing happened" paywall. Warn so it is visible
+            // in logcat without needing to dig.
+            Log.w(
+                TAG,
+                "purchase did not result in OK; the user probably saw a failed purchase. " +
+                        "responseCode=${result.responseCode} debug='${result.debugMessage}'"
+            )
         }
-        // Other response codes are surfaced by the suspend functions that
-        // initiate flows; this listener only forwards successful updates.
     }
 
     private val client: BillingClient = BillingClient.newBuilder(context)

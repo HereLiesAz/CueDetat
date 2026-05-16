@@ -89,6 +89,7 @@ guavaVulnerability = "33.6.0-android"
 netty = "4.1.132.Final"
 androidx-billing = "8.3.0"
 play-integrity = "1.6.0"
+playServicesAuth = "21.4.0"
 
 
 [libraries]
@@ -102,6 +103,7 @@ androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = 
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
 androidx-billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "androidx-billing" }
 play-integrity = { group = "com.google.android.play", name = "integrity", version.ref = "play-integrity" }
+play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "playServicesAuth" }
 androidx-datastore-preferences-rxjava2 = { module = "androidx.datastore:datastore-preferences-rxjava2", version.ref = "datastorePreferences" }
 androidx-datastore-preferences-rxjava3 = { module = "androidx.datastore:datastore-preferences-rxjava3", version.ref = "datastorePreferences" }
 androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glanceAppwidget" }

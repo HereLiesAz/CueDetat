@@ -305,6 +305,11 @@ dependencies {
     // Play Billing — only included in the play flavor APK.
     "playImplementation"(libs.androidx.billing.ktx)
 
+    // Google Sign-In — only included in the play flavor APK. Used to read
+    // the device's currently-signed-in Google account email so the app can
+    // match it against the tester-license allowlist baked into the build.
+    "playImplementation"(libs.play.services.auth)
+
     // Core & Jetpack
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
