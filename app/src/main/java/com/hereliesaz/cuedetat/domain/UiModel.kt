@@ -136,6 +136,7 @@ data class CueDetatState(
     val lockedHsvColor: FloatArray? = null,
     val lockedHsvStdDev: FloatArray? = null,
     val showAdvancedOptionsDialog: Boolean = false,
+    val showBillingDebugDialog: Boolean = false,
     val showCalibrationScreen: Boolean = false,
     val showTableScanScreen: Boolean = false,
     val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
@@ -272,6 +273,7 @@ sealed class MainScreenEvent {
     object StartArTracking : MainScreenEvent()
     object ClearSamplePoint : MainScreenEvent()
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
+    object ToggleBillingDebugDialog : MainScreenEvent()
     object ToggleCalibrationScreen : MainScreenEvent()
     data class ApplyQuickAlign(
         val translation: Offset,

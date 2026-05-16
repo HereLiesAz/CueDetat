@@ -2,120 +2,128 @@
 
 package com.hereliesaz.cuedetat.billing
 
+import android.app.Activity
 import android.content.Context
-import android.content.Intent
 import android.util.Log
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
+import com.hereliesaz.cuedetat.BuildConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Resolves the device's Google account email so we can match it against the
- * tester-license allowlist. Two access patterns:
+ * Resolves the device's Google account email via Credential Manager + the
+ * Google ID provider, so we can match it against the tester-license
+ * allowlist. Two access patterns:
  *
- *  - [resolveSilently] — non-interactive. Returns an email if the user is
- *    already signed in with our app's GoogleSignInClient; null otherwise.
- *  - [signInIntent] / [parseSignInResult] — interactive picker. Caller
- *    launches the intent, gets the activity result, and passes it back to
- *    parseSignInResult to extract the email.
+ *  - [resolveAuthorizedSilently] — non-interactive. Returns the email if
+ *    the user has previously authorized our app for this account; null
+ *    otherwise. Safe to call on cold start.
+ *  - [resolveInteractive] — shows the one-tap account picker so a tester
+ *    can pick their account if they haven't authorized us yet.
  *
- * The basic GoogleSignInOptions.DEFAULT_SIGN_IN configuration requests
- * profile + ID, which includes the email address, and does not require any
- * web/OAuth client ID to be configured in Google Cloud Console. This keeps
- * the wiring minimal: as long as the device has a Google account and Play
- * Services available, the silent path returns an email after the first
- * interactive sign-in.
+ * Both require [BuildConfig.GOOGLE_OAUTH_WEB_CLIENT_ID] to be set. When
+ * the build was assembled without it (e.g. local dev without
+ * `GOOGLE_OAUTH_WEB_CLIENT_ID` in local.properties), the methods short-
+ * circuit to null and log a warning, rather than crashing.
+ *
+ * The returned email is the `id` field of [GoogleIdTokenCredential]. We
+ * don't verify the token signature on-device: this email is only used as
+ * input to a sha256 hash compared against a build-baked allowlist. It is
+ * never sent off-device, used as an authn principal, or trusted for
+ * anything else.
  */
 @Singleton
 class GoogleAccountResolver @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
 
-    private val signInOptions: GoogleSignInOptions by lazy {
-        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestEmail()
-            .build()
+    private val credentialManager: CredentialManager by lazy {
+        CredentialManager.create(context)
     }
 
-    private val client: GoogleSignInClient by lazy {
-        GoogleSignIn.getClient(context, signInOptions)
-    }
+    private val webClientId: String? = BuildConfig.GOOGLE_OAUTH_WEB_CLIENT_ID.takeIf { it.isNotBlank() }
+
+    val isConfigured: Boolean get() = webClientId != null
 
     /**
-     * Returns the last cached signed-in account's email without showing UI.
-     * Null if the user has never signed in (with our client) on this device.
+     * Silent (no UI) attempt. Only returns an email if the user has
+     * previously authorized this app for one of their Google accounts.
      */
-    fun resolveSilently(): String? {
-        val account = GoogleSignIn.getLastSignedInAccount(context)
-        val email = account?.email
-        if (email.isNullOrBlank()) {
-            Log.i(TAG, "resolveSilently: no cached account")
+    suspend fun resolveAuthorizedSilently(activity: Activity): String? {
+        val clientId = webClientId ?: run {
+            Log.w(TAG, "resolveAuthorizedSilently: no Web OAuth client id baked in; skipping")
             return null
         }
-        Log.i(TAG, "resolveSilently: cached account hash=${TestLicenseAllowlist.sha256Hex(email.lowercase())}")
-        return email
+        return resolve(activity, clientId, authorizedOnly = true)
     }
 
     /**
-     * Attempts silent sign-in. Unlike [resolveSilently], this re-validates the
-     * cached credentials with Play Services and refreshes the token. Returns
-     * the email on success.
+     * Interactive picker. Shows the one-tap account chooser, returns the
+     * email of the picked account on success.
      */
-    suspend fun resolveSilentlyRefresh(): String? {
-        return try {
-            val account: GoogleSignInAccount = client.silentSignIn().await()
-            val email = account.email
-            if (email.isNullOrBlank()) {
-                Log.i(TAG, "silentSignIn: account present but no email scope granted")
-                null
-            } else {
-                Log.i(TAG, "silentSignIn: hash=${TestLicenseAllowlist.sha256Hex(email.lowercase())}")
-                email
-            }
-        } catch (e: ApiException) {
-            Log.i(TAG, "silentSignIn failed (statusCode=${e.statusCode}); caller should launch interactive picker", e)
-            null
-        } catch (e: Exception) {
-            Log.w(TAG, "silentSignIn threw", e)
-            null
+    suspend fun resolveInteractive(activity: Activity): String? {
+        val clientId = webClientId ?: run {
+            Log.w(TAG, "resolveInteractive: no Web OAuth client id baked in; cannot show picker")
+            return null
         }
+        return resolve(activity, clientId, authorizedOnly = false)
     }
 
-    /** Intent to launch via Activity.startActivityForResult to show the picker. */
-    fun signInIntent(): Intent = client.signInIntent
-
-    /** Extracts the email from a sign-in activity result. Null on failure. */
-    fun parseSignInResult(data: Intent?): String? {
-        if (data == null) return null
+    private suspend fun resolve(
+        activity: Activity,
+        clientId: String,
+        authorizedOnly: Boolean,
+    ): String? {
+        val option = GetGoogleIdOption.Builder()
+            .setServerClientId(clientId)
+            .setFilterByAuthorizedAccounts(authorizedOnly)
+            .setAutoSelectEnabled(authorizedOnly)
+            .build()
+        val request = GetCredentialRequest.Builder()
+            .addCredentialOption(option)
+            .build()
         return try {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(data)
-            val account = task.getResult(ApiException::class.java)
-            val email = account?.email
-            if (email.isNullOrBlank()) {
-                Log.i(TAG, "parseSignInResult: account present but no email scope granted")
-                null
+            val response = credentialManager.getCredential(activity, request)
+            val credential = response.credential
+            if (credential is CustomCredential &&
+                credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+            ) {
+                val gid = GoogleIdTokenCredential.createFrom(credential.data)
+                val email = gid.id
+                if (email.isBlank()) {
+                    Log.w(TAG, "resolve: GoogleIdTokenCredential.id was blank")
+                    null
+                } else {
+                    Log.i(TAG, "resolve: hash=${TestLicenseAllowlist.sha256Hex(email.lowercase())}")
+                    email
+                }
             } else {
-                Log.i(TAG, "parseSignInResult: hash=${TestLicenseAllowlist.sha256Hex(email.lowercase())}")
-                email
+                Log.w(TAG, "resolve: unexpected credential type=${credential::class.java.simpleName}")
+                null
             }
-        } catch (e: ApiException) {
-            Log.w(TAG, "parseSignInResult: ApiException statusCode=${e.statusCode}", e)
+        } catch (e: NoCredentialException) {
+            // Silent path: user has no authorized account. Non-fatal; the
+            // paywall will offer an interactive picker.
+            Log.i(TAG, "resolve(authorizedOnly=$authorizedOnly): no authorized account; ${e.message}")
+            null
+        } catch (e: GetCredentialException) {
+            Log.w(TAG, "resolve(authorizedOnly=$authorizedOnly): GetCredentialException type=${e.type}", e)
+            null
+        } catch (e: GoogleIdTokenParsingException) {
+            Log.w(TAG, "resolve: parsing exception", e)
             null
         } catch (e: Exception) {
-            Log.w(TAG, "parseSignInResult threw", e)
+            Log.w(TAG, "resolve(authorizedOnly=$authorizedOnly): unexpected", e)
             null
         }
-    }
-
-    /** Forgets the cached sign-in so the next interactive call re-prompts. */
-    suspend fun signOut() {
-        runCatching { client.signOut().await() }
     }
 
     companion object {

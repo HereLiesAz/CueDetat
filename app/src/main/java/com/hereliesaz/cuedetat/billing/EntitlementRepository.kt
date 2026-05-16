@@ -3,7 +3,6 @@
 package com.hereliesaz.cuedetat.billing
 
 import android.app.Activity
-import android.content.Intent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -58,22 +57,27 @@ interface EntitlementRepository {
     fun diagnostics(): EntitlementDiagnostics = EntitlementDiagnostics(emptyList(), "n/a", false)
 
     /**
-     * Returns a Google Sign-In intent the caller should launch via
-     * [Activity.startActivityForResult] / `rememberLauncherForActivityResult`,
-     * then feed the result back through [applyTesterLicenseFromSignInResult].
+     * Run the Credential Manager one-tap account picker against the
+     * tester-license allowlist. The picker is shown anchored to
+     * `activity`; the resolved email is hashed in memory, never persisted
+     * in plain text. Returns [TesterLicenseResult.Granted] on a match.
      *
-     * Null in FOSS, and null in play if Sign-In isn't available (e.g. Play
-     * Services missing).
+     * No-op (returns NotApplicable) in FOSS, and in play builds that were
+     * assembled without `GOOGLE_OAUTH_WEB_CLIENT_ID` configured.
      */
-    fun googleSignInIntent(): Intent? = null
+    suspend fun resolveTesterLicenseViaCredentialManager(activity: Activity): TesterLicenseResult =
+        TesterLicenseResult.NotApplicable
 
     /**
-     * Pull the Google account email out of a Sign-In activity result and
-     * try the tester-license allowlist against it. Single call so the UI
-     * doesn't have to mention the email at all.
+     * Best-effort silent variant. Only returns Granted if the user has
+     * previously authorized this app for a Google account that happens to
+     * be on the allowlist. Safe to call on app start without prompting.
      */
-    suspend fun applyTesterLicenseFromSignInResult(data: Intent?): TesterLicenseResult =
+    suspend fun silentlyResolveTesterLicense(activity: Activity): TesterLicenseResult =
         TesterLicenseResult.NotApplicable
+
+    /** Whether the Credential Manager flow is available in this build. */
+    val isCredentialManagerAvailable: Boolean get() = false
 }
 
 sealed class TesterLicenseResult {

@@ -3,7 +3,6 @@
 package com.hereliesaz.cuedetat.ui.composables.paywall
 
 import android.app.Activity
-import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.billing.BasePlanId
@@ -34,6 +33,12 @@ class PaywallViewModel @Inject constructor(
     val purchaseFlowResults: SharedFlow<PurchaseFlowEvent> = _purchaseFlowResults.asSharedFlow()
 
     private var triggerSnapshot: PaywallTrigger? = null
+
+    /** True once we've kicked off the silent Credential Manager resolve for this paywall session. */
+    private var hasAttemptedSilentResolve = false
+
+    val isCredentialManagerAvailable: Boolean
+        get() = repository.isCredentialManagerAvailable
 
     init {
         viewModelScope.launch {
@@ -79,19 +84,36 @@ class PaywallViewModel @Inject constructor(
         }
     }
 
-    /** Build the Google Sign-In intent the UI should launch. Null = not available. */
-    fun googleSignInIntent(): Intent? = repository.googleSignInIntent()
-
-    /** Consume the result of the Sign-In flow and attempt the allowlist match. */
-    fun applyTesterLicenseFromSignInResult(data: Intent?) {
+    /**
+     * Try a silent (no-UI) Credential Manager resolve as soon as the paywall
+     * sheet is composed with an Activity context. If the user has previously
+     * authorized this app for a Google account that's on the allowlist, this
+     * grants Expert without ever showing the picker.
+     */
+    fun attemptSilentResolveOnce(activity: Activity) {
+        if (hasAttemptedSilentResolve) return
+        hasAttemptedSilentResolve = true
         viewModelScope.launch {
-            val outcome = repository.applyTesterLicenseFromSignInResult(data)
+            val outcome = repository.silentlyResolveTesterLicense(activity)
+            // Only surface a UX message for actual grants; silent failures
+            // are expected and the paywall just continues to show plans.
+            if (outcome == TesterLicenseResult.Granted) {
+                _uiState.value = _uiState.value.copy(testerLicenseOutcome = outcome)
+            }
+            refreshDiagnostics()
+        }
+    }
+
+    /** Show the Credential Manager one-tap account picker. */
+    fun runInteractivePicker(activity: Activity) {
+        viewModelScope.launch {
+            val outcome = repository.resolveTesterLicenseViaCredentialManager(activity)
             _uiState.value = _uiState.value.copy(testerLicenseOutcome = outcome)
             refreshDiagnostics()
         }
     }
 
-    /** Manual email-entry fallback when Sign-In is unavailable / the user declines. */
+    /** Manual email-entry fallback (e.g. user prefers not to use Credential Manager). */
     fun applyTesterLicenseManually(email: String) {
         viewModelScope.launch {
             val outcome = repository.applyTesterLicense(email)

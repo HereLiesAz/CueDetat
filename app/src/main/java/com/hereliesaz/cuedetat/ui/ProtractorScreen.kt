@@ -300,5 +300,13 @@ fun ProtractorScreen(
                 onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleTableSizeDialog) }
             )
         }
+
+        onscreen(alignment = Alignment.Center) {
+            if (uiState.showBillingDebugDialog) {
+                com.hereliesaz.cuedetat.ui.composables.dialogs.BillingDebugDialog(
+                    onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleBillingDebugDialog) }
+                )
+            }
+        }
     }
 }

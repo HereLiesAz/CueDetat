@@ -3,8 +3,6 @@
 package com.hereliesaz.cuedetat.ui.composables.paywall
 
 import android.app.Activity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,7 +21,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -66,6 +63,13 @@ fun PaywallSheet(
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(trigger) { viewModel.setTrigger(trigger) }
+
+    // Silent Credential Manager attempt as soon as we have an Activity. If
+    // the user has already authorized us and their account is on the
+    // allowlist, the paywall will auto-close before they ever see plans.
+    LaunchedEffect(activity) {
+        activity?.let { viewModel.attemptSilentResolveOnce(it) }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.purchaseFlowResults.collect { event ->
@@ -147,7 +151,7 @@ fun PaywallSheet(
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
-            TesterLicenseSection(viewModel = viewModel, uiState = uiState)
+            TesterLicenseSection(viewModel = viewModel, uiState = uiState, activity = activity)
 
             Spacer(Modifier.height(16.dp))
             val githubFooter = buildAnnotatedString {
@@ -181,14 +185,8 @@ fun PaywallSheet(
 private fun TesterLicenseSection(
     viewModel: PaywallViewModel,
     uiState: PaywallUiState,
+    activity: Activity?,
 ) {
-    val signInIntent = remember(viewModel) { viewModel.googleSignInIntent() }
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        viewModel.applyTesterLicenseFromSignInResult(result.data)
-    }
-
     var manualEmailExpanded by remember { mutableStateOf(false) }
     var manualEmail by remember { mutableStateOf("") }
 
@@ -202,11 +200,11 @@ private fun TesterLicenseSection(
         )
         Spacer(Modifier.height(8.dp))
 
-        if (signInIntent != null) {
+        if (viewModel.isCredentialManagerAvailable && activity != null) {
             Button(
-                onClick = { launcher.launch(signInIntent) },
+                onClick = { viewModel.runInteractivePicker(activity) },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Check via Google Sign-In") }
+            ) { Text("Check via Google account") }
         }
 
         TextButton(onClick = { manualEmailExpanded = !manualEmailExpanded }) {
@@ -240,9 +238,9 @@ private fun TesterLicenseSection(
                 TesterLicenseResult.AllowlistEmpty ->
                     "This build wasn't assembled with a tester allowlist (local / debug build)."
                 TesterLicenseResult.InvalidEmail ->
-                    "Couldn't read an email from the sign-in response."
+                    "Couldn't read an email from the account picker."
                 TesterLicenseResult.NotApplicable ->
-                    "Tester license isn't available in this build flavor."
+                    "Tester license isn't available in this build (no OAuth Web Client ID configured)."
             }
             val isGood = outcome == TesterLicenseResult.Granted
             Text(

@@ -111,13 +111,12 @@ class PlayBillingEntitlementRepository @Inject constructor(
             // 4. Refresh from Play in the background.
             refresh()
 
-            // 5. Attempt silent tester-license auto-resolution once we know
-            //    nothing is cached. The user is most likely to be a tester
-            //    here, and we don't want them to have to discover the manual
-            //    flow. Quietly noop if there is no cached account.
-            tryAutoResolveTesterLicense()
+            // (Silent tester-license auto-resolve is now Activity-bound and
+            //  triggered by MainActivity once the first activity is alive.
+            //  Credential Manager requires an Activity context; see
+            //  autoResolveOnNextResume.)
 
-            // 6. React to purchase updates.
+            // 5. React to purchase updates.
             billingClient.purchaseUpdates.collect { purchases ->
                 Log.i(TAG, "purchaseUpdates: ${purchases.size} purchases received")
                 purchases.forEach { runCatching { billingClient.acknowledgeIfNeeded(it) } }
@@ -241,40 +240,37 @@ class PlayBillingEntitlementRepository @Inject constructor(
         )
     }
 
-    override fun googleSignInIntent(): android.content.Intent? =
-        runCatching { googleAccountResolver.signInIntent() }.getOrNull()
+    override val isCredentialManagerAvailable: Boolean
+        get() = googleAccountResolver.isConfigured && testLicenseAllowlist.isConfigured
 
-    override suspend fun applyTesterLicenseFromSignInResult(
-        data: android.content.Intent?
+    override suspend fun resolveTesterLicenseViaCredentialManager(
+        activity: android.app.Activity,
     ): TesterLicenseResult {
-        val email = googleAccountResolver.parseSignInResult(data)
+        if (!testLicenseAllowlist.isConfigured) {
+            Log.i(TAG, "resolveTesterLicenseViaCredentialManager: allowlist not configured")
+            return TesterLicenseResult.AllowlistEmpty
+        }
+        if (!googleAccountResolver.isConfigured) {
+            Log.i(TAG, "resolveTesterLicenseViaCredentialManager: Credential Manager not configured")
+            return TesterLicenseResult.NotApplicable
+        }
+        val email = googleAccountResolver.resolveInteractive(activity)
         if (email == null) {
-            Log.i(TAG, "applyTesterLicenseFromSignInResult: no email in result")
+            Log.i(TAG, "resolveTesterLicenseViaCredentialManager: no email returned from picker")
             return TesterLicenseResult.InvalidEmail
         }
         return applyTesterLicense(email)
     }
 
-    /**
-     * Best-effort silent tester-license resolution. Reads the device's
-     * cached Google account email (no UI) and tries the allowlist. If there
-     * is no cached account, returns silently — the paywall will show a
-     * "Sign in with Google" button so the user can opt in interactively.
-     */
-    private suspend fun tryAutoResolveTesterLicense() {
-        if (verifiedTesterHash != null) return
-        if (!testLicenseAllowlist.isConfigured) {
-            Log.i(TAG, "auto tester resolve: allowlist not configured; skipping")
-            return
-        }
-        val cached = googleAccountResolver.resolveSilently()
-        val email = cached ?: googleAccountResolver.resolveSilentlyRefresh()
-        if (email == null) {
-            Log.i(TAG, "auto tester resolve: no cached Google account on device")
-            return
-        }
-        val granted = tryApplyTesterLicense(email)
-        Log.i(TAG, "auto tester resolve: granted=$granted")
+    override suspend fun silentlyResolveTesterLicense(
+        activity: android.app.Activity,
+    ): TesterLicenseResult {
+        if (verifiedTesterHash != null) return TesterLicenseResult.Granted
+        if (!testLicenseAllowlist.isConfigured) return TesterLicenseResult.AllowlistEmpty
+        if (!googleAccountResolver.isConfigured) return TesterLicenseResult.NotApplicable
+        val email = googleAccountResolver.resolveAuthorizedSilently(activity)
+            ?: return TesterLicenseResult.InvalidEmail
+        return applyTesterLicense(email)
     }
 
     private fun recordPurchaseSnapshot(line: String) {
