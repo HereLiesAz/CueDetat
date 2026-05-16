@@ -212,16 +212,12 @@ class GestureReducer @Inject constructor() {
                 // SnapReducer's frame-to-frame follow does not yank the ball
                 // back to a previous selection.
                 val visionData = currentState.visionData
-                val typedCandidates = visionData?.balls
-                    ?.filter {
-                        it.type == BallType.UNKNOWN ||
-                        (currentState.targetType == TargetType.STRIPES && it.type == BallType.STRIPE) ||
-                        (currentState.targetType == TargetType.SOLIDS && it.type == BallType.SOLID)
-                    }
-                    ?: emptyList()
-
                 val snapThreshold = LOGICAL_BALL_RADIUS * 1.5f
-                val closestTyped = typedCandidates.minByOrNull { getDistance(newCenter, it.position) }
+                val closestTyped = visionData?.balls?.asSequence()?.filter {
+                    it.type == BallType.UNKNOWN ||
+                    (currentState.targetType == TargetType.STRIPES && it.type == BallType.STRIPE) ||
+                    (currentState.targetType == TargetType.SOLIDS && it.type == BallType.SOLID)
+                }?.minByOrNull { getDistance(newCenter, it.position) }
                 val snapResult: Triple<PointF, android.graphics.Rect?, PointF?> =
                     if (closestTyped != null && getDistance(newCenter, closestTyped.position) < snapThreshold) {
                         Triple(closestTyped.position, closestTyped.boundingBox, closestTyped.position)
