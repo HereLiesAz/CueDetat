@@ -36,6 +36,11 @@ class BallRenderer {
 
     private val textRenderer = BallTextRenderer()
 
+    // Reused per-frame to avoid GC pressure in the bounding-box draw path,
+    // which runs on every camera frame.
+    private val boundingBoxMatrix = Matrix()
+    private val boundingBoxScratch = RectF()
+
     fun draw(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?, labels: Map<String, String>) {
         val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
@@ -479,29 +484,31 @@ class BallRenderer {
         // one (legacy path), synthesise a square box around its image-space
         // centre using the median ball box size so the user gets a visible
         // marker on EVERY ball the ML or CV pipeline produced.
-        val typedBoxesWithFallback: List<Pair<android.graphics.Rect, com.hereliesaz.cuedetat.data.BallType>> =
-            run {
-                val withBoxes = visionData.balls.filter { it.boundingBox != null }
-                val medianSide: Int = withBoxes
-                    .mapNotNull { it.boundingBox }
-                    .map { minOf(it.width(), it.height()) }
-                    .filter { it > 0 }
-                    .sorted()
-                    .let { if (it.isEmpty()) 0 else it[it.size / 2] }
-                val fallbackHalfSide = if (medianSide > 0) medianSide / 2 else 0
+        //
+        // Hot path: this runs on every CV frame. Use a sequence for the
+        // median pass to avoid the intermediate filter / map / filter list
+        // allocations, and bail to the legacy detectedBoundingBoxes list
+        // before touching the per-ball loop when there are no typed balls.
+        val balls = visionData.balls
+        val sides: List<Int> = balls.asSequence()
+            .mapNotNull { it.boundingBox }
+            .map { minOf(it.width(), it.height()) }
+            .filter { it > 0 }
+            .sorted()
+            .toList()
+        val fallbackHalfSide = if (sides.isEmpty()) 0 else sides[sides.size / 2] / 2
 
-                visionData.balls.map { ball ->
-                    val box = ball.boundingBox
-                        ?: if (fallbackHalfSide > 0) {
-                            android.graphics.Rect(
-                                (ball.position.x - fallbackHalfSide).toInt(),
-                                (ball.position.y - fallbackHalfSide).toInt(),
-                                (ball.position.x + fallbackHalfSide).toInt(),
-                                (ball.position.y + fallbackHalfSide).toInt(),
-                            )
-                        } else null
-                    box?.let { it to ball.type }
-                }.filterNotNull()
+        val typedBoxesWithFallback: List<Pair<android.graphics.Rect, com.hereliesaz.cuedetat.data.BallType>> =
+            balls.mapNotNull { ball ->
+                val box = ball.boundingBox ?: if (fallbackHalfSide > 0) {
+                    android.graphics.Rect(
+                        (ball.position.x - fallbackHalfSide).toInt(),
+                        (ball.position.y - fallbackHalfSide).toInt(),
+                        (ball.position.x + fallbackHalfSide).toInt(),
+                        (ball.position.y + fallbackHalfSide).toInt(),
+                    )
+                } else null
+                box?.let { it to ball.type }
             }
 
         val boxes: List<Pair<android.graphics.Rect, com.hereliesaz.cuedetat.data.BallType>> =
@@ -521,17 +528,16 @@ class BallRenderer {
         // CameraBackground uses PreviewView.ScaleType.FILL_CENTER, which is
         // centre-crop with rotation. Reconstruct the same transform here so
         // bounding boxes land on top of the visible balls instead of being
-        // stretched by FILL.
+        // stretched by FILL. Reuse the same Matrix instance every frame.
         val rotatedW = if (rotation % 180f == 0f) srcWidth else srcHeight
         val rotatedH = if (rotation % 180f == 0f) srcHeight else srcWidth
         val scale = maxOf(canvasWidth / rotatedW, canvasHeight / rotatedH)
 
-        val matrix = Matrix().apply {
-            postTranslate(-srcWidth / 2f, -srcHeight / 2f)
-            postRotate(rotation)
-            postScale(scale, scale)
-            postTranslate(canvasWidth / 2f, canvasHeight / 2f)
-        }
+        boundingBoxMatrix.reset()
+        boundingBoxMatrix.postTranslate(-srcWidth / 2f, -srcHeight / 2f)
+        boundingBoxMatrix.postRotate(rotation)
+        boundingBoxMatrix.postScale(scale, scale)
+        boundingBoxMatrix.postTranslate(canvasWidth / 2f, canvasHeight / 2f)
 
         val paint = Paint(paints.cvResultPaint).apply {
             style = Paint.Style.STROKE
@@ -541,9 +547,9 @@ class BallRenderer {
 
         boxes.forEach { (box, type) ->
             paint.color = colorForBallType(type).toArgb()
-            val boxRect = RectF(box)
-            matrix.mapRect(boxRect)
-            canvas.drawRect(boxRect, paint)
+            boundingBoxScratch.set(box)
+            boundingBoxMatrix.mapRect(boundingBoxScratch)
+            canvas.drawRect(boundingBoxScratch, paint)
         }
     }
 

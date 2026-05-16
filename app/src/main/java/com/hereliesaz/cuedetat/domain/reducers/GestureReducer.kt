@@ -211,24 +211,56 @@ class GestureReducer @Inject constructor() {
                 // releases. The anchor is updated to match so the
                 // SnapReducer's frame-to-frame follow does not yank the ball
                 // back to a previous selection.
+                //
+                // Hot path — runs on every drag delta. Walk the typed-ball
+                // list with a single pass that respects the targetType
+                // filter, then fall back to the untyped lists in place
+                // instead of materialising a concatenated list.
                 val visionData = currentState.visionData
                 val snapThreshold = LOGICAL_BALL_RADIUS * 1.5f
-                val closestTyped = visionData?.balls?.asSequence()?.filter {
-                    it.type == BallType.UNKNOWN ||
-                    (currentState.targetType == TargetType.STRIPES && it.type == BallType.STRIPE) ||
-                    (currentState.targetType == TargetType.SOLIDS && it.type == BallType.SOLID)
-                }?.minByOrNull { getDistance(newCenter, it.position) }
+                var closestTypedPos: PointF? = null
+                var closestTypedBox: android.graphics.Rect? = null
+                var closestTypedDist = Float.MAX_VALUE
+                visionData?.balls?.forEach { ball ->
+                    val matches = ball.type == BallType.UNKNOWN ||
+                        (currentState.targetType == TargetType.STRIPES && ball.type == BallType.STRIPE) ||
+                        (currentState.targetType == TargetType.SOLIDS && ball.type == BallType.SOLID)
+                    if (!matches) return@forEach
+                    val d = getDistance(newCenter, ball.position)
+                    if (d < closestTypedDist) {
+                        closestTypedDist = d
+                        closestTypedPos = ball.position
+                        closestTypedBox = ball.boundingBox
+                    }
+                }
+
+                val typedHit = closestTypedPos
                 val snapResult: Triple<PointF, android.graphics.Rect?, PointF?> =
-                    if (closestTyped != null && getDistance(newCenter, closestTyped.position) < snapThreshold) {
-                        Triple(closestTyped.position, closestTyped.boundingBox, closestTyped.position)
+                    if (typedHit != null && closestTypedDist < snapThreshold) {
+                        Triple(typedHit, closestTypedBox, typedHit)
                     } else {
                         // Fall back to position-only candidates (no bbox / no
-                        // type) and only snap if dragged close.
-                        val positions = (visionData?.genericBalls ?: emptyList()) +
-                                (visionData?.customBalls ?: emptyList())
-                        val closestPos = positions.minByOrNull { getDistance(newCenter, it) }
-                        if (closestPos != null && getDistance(newCenter, closestPos) < snapThreshold) {
-                            Triple(closestPos, null, closestPos)
+                        // type). Walk each list in place.
+                        var closestPos: PointF? = null
+                        var closestDist = Float.MAX_VALUE
+                        visionData?.genericBalls?.forEach { p ->
+                            val d = getDistance(newCenter, p)
+                            if (d < closestDist) {
+                                closestDist = d
+                                closestPos = p
+                            }
+                        }
+                        @Suppress("DEPRECATION")
+                        visionData?.customBalls?.forEach { p ->
+                            val d = getDistance(newCenter, p)
+                            if (d < closestDist) {
+                                closestDist = d
+                                closestPos = p
+                            }
+                        }
+                        val fallbackHit = closestPos
+                        if (fallbackHit != null && closestDist < snapThreshold) {
+                            Triple(fallbackHit, null, fallbackHit)
                         } else {
                             // User dragged away from any detected ball: drop
                             // the anchor entirely so the SnapReducer doesn't
@@ -269,16 +301,41 @@ class GestureReducer @Inject constructor() {
                     // near a detected ball, release on drag-away. The anchor
                     // mirrors the snap decision so the SnapReducer's
                     // frame-to-frame follow respects the user's intent.
-                    val positions = (currentState.visionData?.balls?.map { b -> b.position }
-                        ?: emptyList()) +
-                        (currentState.visionData?.genericBalls ?: emptyList()) +
-                        (currentState.visionData?.customBalls ?: emptyList())
+                    //
+                    // Hot path — runs on every drag delta. Walk the three
+                    // candidate lists in place to avoid the allocations from
+                    // building a concatenated list every frame.
                     val snapThreshold = LOGICAL_BALL_RADIUS * 1.5f
-                    val closest = positions.minByOrNull { p -> getDistance(newCenter, p) }
-                    val (snappedCenter, newAnchor) = if (
-                        closest != null && getDistance(newCenter, closest) < snapThreshold
-                    ) {
-                        closest to closest
+                    var closest: PointF? = null
+                    var minDistance = Float.MAX_VALUE
+                    currentState.visionData?.let { vision ->
+                        vision.balls.forEach { b ->
+                            val d = getDistance(newCenter, b.position)
+                            if (d < minDistance) {
+                                minDistance = d
+                                closest = b.position
+                            }
+                        }
+                        vision.genericBalls.forEach { p ->
+                            val d = getDistance(newCenter, p)
+                            if (d < minDistance) {
+                                minDistance = d
+                                closest = p
+                            }
+                        }
+                        @Suppress("DEPRECATION")
+                        vision.customBalls.forEach { p ->
+                            val d = getDistance(newCenter, p)
+                            if (d < minDistance) {
+                                minDistance = d
+                                closest = p
+                            }
+                        }
+                    }
+
+                    val resolved = closest
+                    val (snappedCenter, newAnchor) = if (resolved != null && minDistance < snapThreshold) {
+                        resolved to resolved
                     } else {
                         newCenter to null
                     }
