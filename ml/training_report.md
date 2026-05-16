@@ -1,29 +1,37 @@
-# Cue d'Etat: Training Analysis Report
-Generated: 2026-03-27 07:33:59
+# Pocket Detector Training Report
 
-## 1. Dataset Inventory
-- **Project Root:** `/content/drive/MyDrive/billiards_training`
-- **Combined Dataset:** `/content/drive/MyDrive/billiards_training/datasets/combined_dataset`
-- **Source Datasets Detected:**
-  - combined_dataset
-- **Kaggle Source:** `N/A`
+Generated: 2026-05-13 08:05:34.507584
 
-## 2. Model Configuration
-- **Architecture:** YOLOv8n
-- **Target Classes:** ['pool-table', 'pool-table-hole', 'pool-table-side']
-- **Input Resolution:** 640x640
-- **Training Schedule:** 100 Epochs / Batch 32
+## Hyperparameters
+- Model: YOLOv8n
+- Epochs: 100 (early stop patience 30)
+- Batch: 32
+- Image size: 640
+- AMP: True
 
-## 3. Artifact Locations
-- **Final Weights:** `/content/drive/MyDrive/billiards_training/pocket_detector/weights/best.pt`
-- **TFLite Export:** `/content/drive/MyDrive/billiards_training/exports/pocket_detector_fp16.tflite`
+## Datasets
+- hereliesaz/cue-detat
+- diveshcrazy/pool-table-balls-classification
+- vedester/pool-table-v3i-yolov8 (YOLO training split)
+- akaliutau/dynavisr (benchmark reference)
+- alizaib001/pool-balls-on-table (smoke-test image)
 
-## 4. Automated Review & Analysis
-### Model Performance Critique
-- **mAP50:** 0.8123
-- **Status:** High confidence model. Ready for edge deployment.
+## Pre-trained model (warm-start)
+- hereliesaz/pocket-detector (TFLite + ONNX previous weights)
 
-### Optimization Suggestions
-1. **Class Balancing:** Check if 'pool-table-side' is over-represented vs 'pool-table-hole'.
-2. **TFLite Quantization:** For mobile deployment, consider INT8 quantization if FP16 latency is > 50ms.
-3. **Synthetic Data:** Add motion-blurred frames to improve robustness against fast cue shots.
+## Classes
+['pool-table', 'pool-table-hole', 'pool-table-side']
+
+## Validation metrics
+- mAP50:    0.9908
+- mAP50-95: 0.8130
+- Precision: 0.9631
+- Recall:    0.9781
+
+## Exports
+- /kaggle/working/exports/pocket_detector_fp16.tflite
+- /kaggle/working/exports/pocket_detector_final.onnx
+
+## Deploy locations (in CueDetat repo)
+- app/src/main/assets/ml/merged_pocket_detector_final_float16.tflite
+- app/src/main/assets/ml/merged_pocket_detector_final.onnx

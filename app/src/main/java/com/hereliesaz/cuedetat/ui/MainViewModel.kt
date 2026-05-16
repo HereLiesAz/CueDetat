@@ -73,6 +73,7 @@ class MainViewModel @Inject constructor(
     val arDepthSession: ArDepthSession,
     val arFrameProcessor: ArFrameProcessor,
     private val entitlementRepository: com.hereliesaz.cuedetat.billing.EntitlementRepository,
+    private val integrityRepository: com.hereliesaz.cuedetat.data.IntegrityRepository,
 ) : ViewModel() {
 
     /**
@@ -83,6 +84,39 @@ class MainViewModel @Inject constructor(
     fun refreshEntitlement() {
         viewModelScope.launch {
             runCatching { entitlementRepository.refresh() }
+        }
+    }
+
+    /**
+     * Performs a Play Integrity check to ensure the app is genuine and the
+     * environment is secure. In a production environment, the retrieved
+     * token is sent to a secure backend which verifies it against Google's
+     * servers to decide whether to grant 'Expert' entitlements.
+     */
+    private fun performIntegrityCheck() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val projectNumber = if (com.hereliesaz.cuedetat.BuildConfig.FLAVOR == "play") {
+                com.hereliesaz.cuedetat.BuildConfig.GOOGLE_CLOUD_PROJECT_NUMBER
+            } else 0L
+
+            val token = if (projectNumber != 0L) {
+                android.util.Log.i("MainViewModel", "Using Standard Integrity API with project $projectNumber")
+                val requestHash = java.util.UUID.randomUUID().toString()
+                integrityRepository.fetchStandardToken(projectNumber, requestHash)
+            } else {
+                android.util.Log.i("MainViewModel", "Using Snapshot Integrity API (no project number)")
+                val nonce = java.util.UUID.randomUUID().toString()
+                integrityRepository.fetchSnapshotToken(nonce)
+            }
+
+            if (token != null) {
+                android.util.Log.i("MainViewModel", "Play Integrity token retrieved successfully.")
+                // In a production app, we would send this token to our server here.
+                // The server would verify the token and return a cryptographically 
+                // signed verdict that the app can trust.
+            } else {
+                android.util.Log.w("MainViewModel", "Play Integrity check failed to retrieve a token.")
+            }
         }
     }
 
@@ -147,6 +181,9 @@ class MainViewModel @Inject constructor(
             // committed, so a network response can't be overwritten by the
             // saved-state load.
             onEvent(MainScreenEvent.CheckForUpdate)
+            
+            // Perform security integrity check on startup.
+            performIntegrityCheck()
         }
 
         // Pipe WarningManager's timed messages into uiState.warningText.
@@ -282,6 +319,25 @@ class MainViewModel @Inject constructor(
                 onEvent(MainScreenEvent.ApplyPendingExperienceMode)
             }
             return
+        }
+
+        // Intercept the apply step: if the cycle landed on EXPERT and the user
+        // is not entitled, surface the paywall and clear the pending mode so
+        // the next cycle starts fresh. The reducer would otherwise silently
+        // refuse the transition and the user would see no feedback.
+        if (event is MainScreenEvent.ApplyPendingExperienceMode) {
+            val target = _uiState.value.pendingExperienceMode
+            if (target == ExperienceMode.EXPERT && !_uiState.value.isExpertEntitled) {
+                _uiState.value = _uiState.value.copy(pendingExperienceMode = null)
+                viewModelScope.launch {
+                    _singleEvent.emit(
+                        SingleEvent.ShowPaywall(
+                            com.hereliesaz.cuedetat.billing.PaywallTrigger.EXPERT_TOGGLE_TAP
+                        )
+                    )
+                }
+                return
+            }
         }
 
         val currentState = _uiState.value

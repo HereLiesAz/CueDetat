@@ -36,6 +36,11 @@ class BallRenderer {
 
     private val textRenderer = BallTextRenderer()
 
+    // Reused per-frame to avoid GC pressure in the bounding-box draw path,
+    // which runs on every camera frame.
+    private val boundingBoxMatrix = Matrix()
+    private val boundingBoxScratch = RectF()
+
     fun draw(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?, labels: Map<String, String>) {
         val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
@@ -475,15 +480,40 @@ class BallRenderer {
         val visionData = state.visionData ?: return
         if (visionData.sourceImageWidth == 0) return
 
-        // Prefer the typed ball list so we can colour by classification. Fall
-        // back to the untyped boundingBoxes when classification hasn't run yet
-        // (e.g. raw OpenCV path with no per-ball type info).
-        val typedBoxes = visionData.balls.mapNotNull { ball ->
-            ball.boundingBox?.let { it to ball.type }
-        }
+        // Every detected ball must show a bounding box. If a ball is missing
+        // one (legacy path), synthesise a square box around its image-space
+        // centre using the median ball box size so the user gets a visible
+        // marker on EVERY ball the ML or CV pipeline produced.
+        //
+        // Hot path: this runs on every CV frame. Use a sequence for the
+        // median pass to avoid the intermediate filter / map / filter list
+        // allocations, and bail to the legacy detectedBoundingBoxes list
+        // before touching the per-ball loop when there are no typed balls.
+        val balls = visionData.balls
+        val sides: List<Int> = balls.asSequence()
+            .mapNotNull { it.boundingBox }
+            .map { minOf(it.width(), it.height()) }
+            .filter { it > 0 }
+            .sorted()
+            .toList()
+        val fallbackHalfSide = if (sides.isEmpty()) 0 else sides[sides.size / 2] / 2
+
+        val typedBoxesWithFallback: List<Pair<android.graphics.Rect, com.hereliesaz.cuedetat.data.BallType>> =
+            balls.mapNotNull { ball ->
+                val box = ball.boundingBox ?: if (fallbackHalfSide > 0) {
+                    android.graphics.Rect(
+                        (ball.position.x - fallbackHalfSide).toInt(),
+                        (ball.position.y - fallbackHalfSide).toInt(),
+                        (ball.position.x + fallbackHalfSide).toInt(),
+                        (ball.position.y + fallbackHalfSide).toInt(),
+                    )
+                } else null
+                box?.let { it to ball.type }
+            }
+
         val boxes: List<Pair<android.graphics.Rect, com.hereliesaz.cuedetat.data.BallType>> =
-            if (typedBoxes.isNotEmpty()) {
-                typedBoxes
+            if (typedBoxesWithFallback.isNotEmpty()) {
+                typedBoxesWithFallback
             } else {
                 visionData.detectedBoundingBoxes.map { it to com.hereliesaz.cuedetat.data.BallType.UNKNOWN }
             }
@@ -495,32 +525,44 @@ class BallRenderer {
         val canvasWidth = canvas.width.toFloat()
         val canvasHeight = canvas.height.toFloat()
 
-        val matrix = Matrix()
-        val srcRect = RectF(0f, 0f, srcWidth, srcHeight)
-        val destRect = RectF(0f, 0f, canvasWidth, canvasHeight)
-        matrix.setRectToRect(srcRect, destRect, Matrix.ScaleToFit.FILL)
-        matrix.postRotate(rotation, canvasWidth / 2f, canvasHeight / 2f)
+        // CameraBackground uses PreviewView.ScaleType.FILL_CENTER, which is
+        // centre-crop with rotation. Reconstruct the same transform here so
+        // bounding boxes land on top of the visible balls instead of being
+        // stretched by FILL. Reuse the same Matrix instance every frame.
+        val rotatedW = if (rotation % 180f == 0f) srcWidth else srcHeight
+        val rotatedH = if (rotation % 180f == 0f) srcHeight else srcWidth
+        val scale = maxOf(canvasWidth / rotatedW, canvasHeight / rotatedH)
+
+        boundingBoxMatrix.reset()
+        boundingBoxMatrix.postTranslate(-srcWidth / 2f, -srcHeight / 2f)
+        boundingBoxMatrix.postRotate(rotation)
+        boundingBoxMatrix.postScale(scale, scale)
+        boundingBoxMatrix.postTranslate(canvasWidth / 2f, canvasHeight / 2f)
 
         val paint = Paint(paints.cvResultPaint).apply {
             style = Paint.Style.STROKE
-            strokeWidth = 3f
-            alpha = 200
+            strokeWidth = 6f
+            alpha = 255
         }
 
         boxes.forEach { (box, type) ->
             paint.color = colorForBallType(type).toArgb()
-            val boxRect = RectF(box)
-            matrix.mapRect(boxRect)
-            canvas.drawRect(boxRect, paint)
+            boundingBoxScratch.set(box)
+            boundingBoxMatrix.mapRect(boundingBoxScratch)
+            canvas.drawRect(boundingBoxScratch, paint)
         }
     }
 
     private fun colorForBallType(type: com.hereliesaz.cuedetat.data.BallType): Color = when (type) {
-        com.hereliesaz.cuedetat.data.BallType.SOLID -> Color(0xFFFFEB3B)   // yellow
+        // Solids vs stripes are deliberately on opposite sides of the wheel so
+        // they can't be confused at a glance against the green felt.
+        com.hereliesaz.cuedetat.data.BallType.SOLID -> Color(0xFFFFC107)   // amber
         com.hereliesaz.cuedetat.data.BallType.STRIPE -> Color(0xFF00E5FF)  // cyan
         com.hereliesaz.cuedetat.data.BallType.CUE -> Color(0xFFFFFFFF)     // white
-        com.hereliesaz.cuedetat.data.BallType.EIGHT -> Color(0xFFE040FB)   // magenta (8-ball is black; magenta reads against the table)
-        com.hereliesaz.cuedetat.data.BallType.UNKNOWN -> Color(0xFF9E9E9E) // gray
+        com.hereliesaz.cuedetat.data.BallType.EIGHT -> Color(0xFFE040FB)   // magenta (8-ball is black; magenta reads against the felt)
+        // Unclassified balls are drawn in a noticeable color so a misfire of
+        // classifyBallType() is visible instead of looking like background gray.
+        com.hereliesaz.cuedetat.data.BallType.UNKNOWN -> Color(0xFFFF6D00) // orange
     }
 
     private fun drawAllLabels(

@@ -167,7 +167,7 @@ class HaterPhysicsManager {
         dieVel     += Offset(rng(-3f, 3f), rng(-3f, 3f))
         angularVel += rng(-3f, 3f)
         scope.launch {
-            delay(1200)
+            delay(1200L)
             onAgitationComplete()
         }
     }

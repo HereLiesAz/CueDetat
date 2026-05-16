@@ -54,6 +54,8 @@ class EntitlementCacheStore @Inject constructor(
                 ?: prefs.remove(KEY_PRODUCT_ID)
             (map[EntitlementCacheSerializer.KEY_VERIFIED_AT] as? Long)?.let { prefs[KEY_VERIFIED_AT] = it }
                 ?: prefs.remove(KEY_VERIFIED_AT)
+            (map[EntitlementCacheSerializer.KEY_GENUINE] as? Boolean)?.let { prefs[KEY_GENUINE] = it }
+                ?: prefs.remove(KEY_GENUINE)
         }
     }
 
@@ -63,6 +65,7 @@ class EntitlementCacheStore @Inject constructor(
         this@toAttributeMap[KEY_EXPIRES_AT]?.let { put(EntitlementCacheSerializer.KEY_EXPIRES_AT, it) }
         this@toAttributeMap[KEY_PRODUCT_ID]?.let { put(EntitlementCacheSerializer.KEY_PRODUCT_ID, it) }
         this@toAttributeMap[KEY_VERIFIED_AT]?.let { put(EntitlementCacheSerializer.KEY_VERIFIED_AT, it) }
+        this@toAttributeMap[KEY_GENUINE]?.let { put(EntitlementCacheSerializer.KEY_GENUINE, it) }
     }
 
     companion object {
@@ -71,6 +74,7 @@ class EntitlementCacheStore @Inject constructor(
         private val KEY_EXPIRES_AT = longPreferencesKey(EntitlementCacheSerializer.KEY_EXPIRES_AT)
         private val KEY_PRODUCT_ID = stringPreferencesKey(EntitlementCacheSerializer.KEY_PRODUCT_ID)
         private val KEY_VERIFIED_AT = longPreferencesKey(EntitlementCacheSerializer.KEY_VERIFIED_AT)
+        private val KEY_GENUINE = booleanPreferencesKey(EntitlementCacheSerializer.KEY_GENUINE)
     }
 }
 
@@ -85,6 +89,7 @@ object EntitlementCacheSerializer {
     const val KEY_EXPIRES_AT = "entitlement_expires_at"
     const val KEY_PRODUCT_ID = "entitlement_product_id"
     const val KEY_VERIFIED_AT = "entitlement_verified_at"
+    const val KEY_GENUINE = "entitlement_genuine"
 
     fun toMap(entitlement: Entitlement): Map<String, Any> = buildMap {
         put(KEY_ACTIVE, entitlement.active)
@@ -92,6 +97,7 @@ object EntitlementCacheSerializer {
         entitlement.expiresAtMillis?.let { put(KEY_EXPIRES_AT, it) }
         entitlement.productId?.let { put(KEY_PRODUCT_ID, it) }
         entitlement.lastVerifiedAtMillis?.let { put(KEY_VERIFIED_AT, it) }
+        put(KEY_GENUINE, entitlement.isDeviceGenuine)
     }
 
     fun fromMap(map: Map<String, Any?>): Entitlement {
@@ -105,7 +111,8 @@ object EntitlementCacheSerializer {
             source = source,
             expiresAtMillis = map[KEY_EXPIRES_AT] as? Long,
             productId = map[KEY_PRODUCT_ID] as? String,
-            lastVerifiedAtMillis = map[KEY_VERIFIED_AT] as? Long
+            lastVerifiedAtMillis = map[KEY_VERIFIED_AT] as? Long,
+            isDeviceGenuine = map[KEY_GENUINE] as? Boolean ?: true
         )
     }
 }

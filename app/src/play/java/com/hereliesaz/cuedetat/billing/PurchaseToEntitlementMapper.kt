@@ -58,7 +58,8 @@ object PurchaseToEntitlementMapper {
                 source = EntitlementSource.PLAY_LOCAL,
                 expiresAtMillis = null,
                 productId = expert.productId,
-                lastVerifiedAtMillis = nowMillis
+                lastVerifiedAtMillis = nowMillis,
+                isDeviceGenuine = true // Default to true here; PlayBillingEntitlementRepository will update it
             )
         } else {
             Entitlement.NONE.copy(lastVerifiedAtMillis = nowMillis)

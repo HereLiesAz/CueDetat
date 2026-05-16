@@ -13,62 +13,61 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 
-private const val MASTER_MODEL_FILE = "ml/MASTER_POOL_MODEL.tflite"
+private const val POCKET_MODEL_FILE = "ml/merged_pocket_detector_final_float16.tflite"
 private const val INPUT_SIZE = 640
 private const val CONFIDENCE_THRESHOLD = 0.30f
+private const val POOL_CONFIDENCE_THRESHOLD = 0.25f
 private const val MAX_DETECTIONS = 300
 
-// Class indices for the pocket detector models
+// Class indices from the YOLOv8n training data.yaml
+//   0: pool-table   1: pool-table-hole   2: pool-table-side
 private const val TABLE_CLASS_ID = 0
 private const val HOLE_CLASS_ID = 1
 private const val SIDE_CLASS_ID = 2
 
 /**
- * A master TFLite detector that runs FOUR models from a single binary package.
- * It maps the file segments to separate interpreters for maximum stability.
+ * TFLite detector for the pocket / pool-table model. Loads
+ * [POCKET_MODEL_FILE] (FP16, NMS in-graph) and serves both:
+ *
+ *  - [detect]: returns [MlTableDetection] with pockets and the table boundary
+ *    (consumed by AR setup / table scan flows).
+ *  - [detectPool]: returns the raw bounding boxes (consumed by VisionRepository
+ *    for ball-region overlays in dynamic beginner mode).
+ *
+ * Class name kept for binary compatibility with existing Hilt bindings; the
+ * "merged" prefix is now historical — there is no multiplexed master file
+ * any more.
  */
 class MergedTFLiteDetector(private val context: Context) : PocketDetector {
 
-    // Head mapping indices based on MASTER_POOL_MODEL.tflite.meta
-    private val HEAD_POCKET_50E = 0 // pocket_detector_50e_fp16
-    private val HEAD_POOL_PIVOT = 2 // pool_detector_pivot_fp16
-
-    private val interpreters = mutableMapOf<Int, Interpreter>()
+    private var interpreter: Interpreter? = null
 
     init {
-        loadMasterPackage()
+        loadModel()
     }
 
-    private fun loadMasterPackage() {
+    private fun loadModel() {
         try {
-            val fd = context.assets.openFd(MASTER_MODEL_FILE)
-            val fullChannel = FileInputStream(fd.fileDescriptor).channel
-
-            // Offsets from MASTER_POOL_MODEL.tflite.meta
-            val modelOffsets = listOf(0L, 6242868L, 12485737L, 18729068L)
-            val modelSizes = listOf(6242868L, 6242869L, 6243331L, 6242869L)
-
-            for (i in 0 until 4) {
-                val offset = fd.startOffset + modelOffsets[i]
-                val size = modelSizes[i]
-                val buffer = fullChannel.map(FileChannel.MapMode.READ_ONLY, offset, size)
-                interpreters[i] = Interpreter(buffer, Interpreter.Options().setNumThreads(2))
-            }
-            Log.d("MergedTFLiteDetector", "Master package loaded: ${interpreters.size}/4 interpreters active.")
+            val fd = context.assets.openFd(POCKET_MODEL_FILE)
+            val channel = FileInputStream(fd.fileDescriptor).channel
+            val buffer = channel.map(
+                FileChannel.MapMode.READ_ONLY,
+                fd.startOffset,
+                fd.declaredLength,
+            )
+            interpreter = Interpreter(buffer, Interpreter.Options().setNumThreads(2))
+            Log.d(TAG, "Loaded $POCKET_MODEL_FILE (${fd.declaredLength / 1024} KB)")
         } catch (e: Exception) {
-            Log.e("MergedTFLiteDetector", "Failed to load master binary", e)
-            Log.e("MergedTFLiteDetector",
+            Log.e(TAG, "Failed to load $POCKET_MODEL_FILE", e)
+            Log.e(TAG,
                 "Hint: if error mentions 'compressed', add androidResources { noCompress += \"tflite\" }")
-            // Close any interpreters that successfully loaded before the failure so
-            // their native buffers don't leak.
-            interpreters.values.forEach { runCatching { it.close() } }
-            interpreters.clear()
+            interpreter = null
         }
     }
 
     fun close() {
-        interpreters.values.forEach { runCatching { it.close() } }
-        interpreters.clear()
+        runCatching { interpreter?.close() }
+        interpreter = null
     }
 
     private val inputBuffer: ByteBuffer by lazy {
@@ -86,7 +85,7 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
         } else {
             Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, true)
         }
-        
+
         inputBuffer.rewind()
         resized.getPixels(intValues, 0, resized.width, 0, 0, resized.width, resized.height)
         for (i in intValues.indices) {
@@ -99,25 +98,25 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
     }
 
     override fun detect(bitmap: Bitmap): MlTableDetection? {
-        val interp = interpreters[HEAD_POCKET_50E] ?: return null
+        val interp = interpreter ?: return null
         return try {
             preprocess(bitmap)
             interp.run(inputBuffer, pocketOutput)
             parsePocketDetections(bitmap.width, bitmap.height)
         } catch (e: Exception) {
-            Log.e("MergedTFLiteDetector", "Pocket inference failed: ${e.message}")
+            Log.e(TAG, "Pocket inference failed: ${e.message}")
             null
         }
     }
 
     fun detectPool(bitmap: Bitmap): List<PoolDetection> {
-        val interp = interpreters[HEAD_POOL_PIVOT] ?: return emptyList()
+        val interp = interpreter ?: return emptyList()
         return try {
             preprocess(bitmap)
             interp.run(inputBuffer, poolOutput)
             parsePoolDetections(bitmap.width, bitmap.height)
         } catch (e: Exception) {
-            Log.e("MergedTFLiteDetector", "Pool inference failed: ${e.message}")
+            Log.e(TAG, "Pool inference failed: ${e.message}")
             emptyList()
         }
     }
@@ -140,7 +139,7 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
                             det[1] * width,
                             det[0] * height,
                             det[3] * width,
-                            det[2] * height
+                            det[2] * height,
                         )
                     }
                 }
@@ -158,7 +157,7 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
         return MlTableDetection(
             tableBoundary = tableBoundary,
             pockets = pockets,
-            confidence = finalConfidence
+            confidence = finalConfidence,
         )
     }
 
@@ -166,16 +165,19 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
         val results = mutableListOf<PoolDetection>()
         for (det in poolOutput[0]) {
             val score = det[4]
-            if (score < 0.25f) continue
+            if (score < POOL_CONFIDENCE_THRESHOLD) continue
             val classId = det[5].toInt()
-            
+
             val top = det[0] * height
             val left = det[1] * width
             val bottom = det[2] * height
             val right = det[3] * width
-            
             results.add(PoolDetection(RectF(left, top, right, bottom), score, classId))
         }
         return results
+    }
+
+    companion object {
+        private const val TAG = "MergedTFLiteDetector"
     }
 }

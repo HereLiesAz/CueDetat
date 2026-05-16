@@ -133,7 +133,31 @@
       "Bash(bash ./gradlew :app:testFossDebugUnitTest --tests \"com.hereliesaz.cuedetat.domain.reducers.EntitlementReducerTest\")",
       "Bash(bash ./gradlew :app:testFossDebugUnitTest --tests \"com.hereliesaz.cuedetat.ui.composables.paywall.PaywallViewModelTest\")",
       "Bash(bash ./gradlew :app:compileFossDebugKotlin)",
-      "Bash(bash ./gradlew :app:assembleFossDebug :app:assemblePlayDebug :app:testFossDebugUnitTest :app:testPlayDebugUnitTest)"
+      "Bash(bash ./gradlew :app:assembleFossDebug :app:assemblePlayDebug :app:testFossDebugUnitTest :app:testPlayDebugUnitTest)",
+      "Bash(bash ./gradlew :app:assemblePlayDebug :app:testPlayDebugUnitTest)",
+      "Bash(awk '{print $4}')",
+      "Bash(curl -sL \"https://repo1.maven.org/maven2/org/tensorflow/tensorflow-lite/maven-metadata.xml\")",
+      "Bash(bash ./gradlew :app:testPlayDebugUnitTest)",
+      "mcp__claude_ai_Hugging_Face__hub_repo_search",
+      "mcp__claude_ai_Hugging_Face__hub_repo_details",
+      "mcp__claude_ai_Hugging_Face__paper_search",
+      "mcp__chrome-devtools__*",
+      "Bash(npx chrome-devtools-mcp@latest --help)",
+      "Bash(/usr/bin/google-chrome --version)",
+      "Bash(jq '.mcpServers[\"chrome-devtools\"].args = [\"-y\", \"chrome-devtools-mcp@latest\", \"--executablePath\", \"/usr/bin/google-chrome\"]' ~/.claude.json)",
+      "Bash(mv ~/.claude.json.tmp ~/.claude.json)",
+      "Read(//home/az/**)",
+      "Bash(jq '.mcpServers[\"chrome-devtools\"].args = [\"-y\", \"chrome-devtools-mcp@latest\", \"--channel\", \"beta\", \"--userDataDir\", \"/home/az/.config/google-chrome-beta\"]' ~/.claude.json)",
+      "Bash(mkdir -p /home/az/.cache/chrome-mcp-profile)",
+      "Bash(jq '.mcpServers[\"chrome-devtools\"].args = [\"-y\", \"chrome-devtools-mcp@latest\", \"--channel\", \"beta\", \"--userDataDir\", \"/home/az/.cache/chrome-mcp-profile\"]' ~/.claude.json)",
+      "Bash(pgrep -af \"/opt/google/chrome-beta/chrome$\\\\|chrome-beta/chrome \")",
+      "Bash(pgrep -af \"/opt/google/chrome-beta/chrome$\\\\|chrome-beta/chrome --\")",
+      "Bash(jq '.mcpServers[\"chrome-devtools\"].args = [\"-y\", \"chrome-devtools-mcp@latest\", \"--browserUrl\", \"http://127.0.0.1:9222\"]' ~/.claude.json)",
+      "Bash(bash ./gradlew :app:compileDebugKotlin)",
+      "Bash(kaggle --version)",
+      "Bash(pip3 show *)",
+      "Bash(bash ./gradlew :app:compilePlayReleaseKotlin)",
+      "Bash(bash ./gradlew :app:kspPlayReleaseKotlin --stacktrace)"
     ]
   }
 }

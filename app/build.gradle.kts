@@ -1,8 +1,87 @@
+import java.io.ByteArrayOutputStream
 import java.util.Properties
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import javax.inject.Inject
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.Optional
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
+import org.gradle.process.ExecOperations
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+abstract class FetchTesterEmailsTask : DefaultTask() {
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @get:Input
+    @get:Optional
+    abstract val ggLink: Property<String>
+
+    @get:Input
+    @get:Optional
+    abstract val ggSession: Property<String>
+
+    @get:InputDirectory
+    abstract val scriptDir: DirectoryProperty
+
+    @get:Inject
+    abstract val execOperations: ExecOperations
+
+    @TaskAction
+    fun fetch() {
+        val outFile = outputDir.file("tester_emails.txt").get().asFile
+        outFile.parentFile.mkdirs()
+
+        val link = ggLink.orNull
+        val session = ggSession.orNull
+
+        if (link.isNullOrBlank() || session.isNullOrBlank()) {
+            logger.lifecycle("[testerLicense] GG_LINK or GG_SESSION absent — writing empty allowlist.")
+            outFile.writeText("")
+            return
+        }
+
+        val script = File(scriptDir.get().asFile, "fetch-tester-emails.mjs")
+        if (!script.exists()) {
+            logger.warn("[testerLicense] scraper script missing at $script — writing empty allowlist.")
+            outFile.writeText("")
+            return
+        }
+
+        val nodeModules = File(scriptDir.get().asFile, "node_modules/playwright")
+        if (!nodeModules.exists()) {
+            logger.lifecycle("[testerLicense] installing scraper dependencies (npm ci)…")
+            execOperations.exec {
+                workingDir = scriptDir.get().asFile
+                commandLine = listOf("npm", "ci", "--no-audit", "--no-fund")
+                isIgnoreExitValue = true
+            }
+        }
+
+        val stdoutCollector = ByteArrayOutputStream()
+        val result = execOperations.exec {
+            workingDir = scriptDir.get().asFile
+            commandLine = listOf("node", script.absolutePath)
+            environment("GG_LINK", link)
+            environment("GG_SESSION", session)
+            standardOutput = stdoutCollector
+            isIgnoreExitValue = true
+        }
+
+        val raw = stdoutCollector.toString(Charsets.UTF_8).trim()
+        if (result.exitValue != 0) {
+            logger.warn("[testerLicense] scraper exited ${result.exitValue}; writing whatever it emitted (${raw.lines().size} lines).")
+        }
+        outFile.writeText(raw + if (raw.isEmpty()) "" else "\n")
+        logger.lifecycle("[testerLicense] wrote ${raw.lines().count { it.isNotBlank() }} hashes to ${outFile.name}.")
+    }
+}
 
 val versionPropsFile = rootProject.file("version.properties")
 val versionPropsPath = versionPropsFile.absolutePath
@@ -38,6 +117,48 @@ val finalMinor = minorVal
 val finalVersionName = "$finalMajor.$finalMinor.$finalPatch.$finalBuild"
 val finalIsBuilding = isBuildingTask
 
+val localProps = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+val googleCloudProjectNumber = localProps.getProperty("GOOGLE_CLOUD_PROJECT_NUMBER") ?: "0"
+val githubAccessToken = localProps.getProperty("GH_TOKEN") ?: ""
+
+// Task to write back the updated properties
+tasks.register("updateVersionProperties") {
+    val path = versionPropsPath
+    val b = finalBuild
+    val p = finalPatch
+    val maj = finalMajor
+    val min = finalMinor
+    val vn = finalVersionName
+    val shouldRun = finalIsBuilding
+
+    doLast {
+        if (shouldRun) {
+            val properties = Properties()
+            val f = File(path)
+            if (f.exists()) {
+                FileInputStream(f).use { properties.load(it) }
+            }
+            properties.setProperty("BUILD", b.toString())
+            properties.setProperty("PATCH", p.toString())
+            properties.setProperty("LAST_MAJOR", maj.toString())
+            properties.setProperty("LAST_MINOR", min.toString())
+            properties.setProperty("versionCode", b.toString())
+            properties.setProperty("versionName", vn)
+            FileOutputStream(f).use { properties.store(it, "Automated Version Update") }
+        }
+    }
+}
+
+// Ensure the update happens on every relevant build
+tasks.matching { it.name.contains("assemble") || it.name.contains("bundle") || it.name.contains("install") }.all {
+    dependsOn("updateVersionProperties")
+}
+
 plugins {
     alias(libs.plugins.android.application)
     // alias(libs.plugins.kotlin.android) // Removed for AGP 9.0 built-in Kotlin
@@ -63,43 +184,24 @@ android {
         
         versionCode = finalBuild
         versionName = finalVersionName
-
-        // Task to write back the updated properties
-        tasks.register("updateVersionProperties") {
-            val path = versionPropsPath
-            val b = finalBuild
-            val p = finalPatch
-            val maj = finalMajor
-            val min = finalMinor
-            val vn = finalVersionName
-            val shouldRun = finalIsBuilding
-
-            doLast {
-                if (shouldRun) {
-                    val properties = Properties()
-                    val f = File(path)
-                    if (f.exists()) {
-                        FileInputStream(f).use { properties.load(it) }
-                    }
-                    properties.setProperty("BUILD", b.toString())
-                    properties.setProperty("PATCH", p.toString())
-                    properties.setProperty("LAST_MAJOR", maj.toString())
-                    properties.setProperty("LAST_MINOR", min.toString())
-                    properties.setProperty("versionCode", b.toString())
-                    properties.setProperty("versionName", vn)
-                    FileOutputStream(f).use { properties.store(it, "Automated Version Update") }
-                }
-            }
-        }
         
-        // Ensure the update happens on every relevant build
-        tasks.matching { it.name.contains("assemble") || it.name.contains("bundle") || it.name.contains("install") }.all {
-            dependsOn("updateVersionProperties")
-        }
+        buildConfigField("long", "GOOGLE_CLOUD_PROJECT_NUMBER", "${googleCloudProjectNumber}L")
+        buildConfigField("String", "GH_TOKEN", "\"$githubAccessToken\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
+        }
+
+        // 16KB-page Android is 64-bit only. The 32-bit ABIs (armeabi-v7a,
+        // x86) ship 4KB-aligned prebuilt .so files and would fail the Play
+        // Console 16KB-page compatibility check. x86_64 is also dropped
+        // because TFLite 2.17.0's libtensorflowlite_jni.so is 4KB-aligned on
+        // x86_64; the next TFLite drop is the LiteRT rebrand and that
+        // migration is out of scope here. Real devices that support 16KB
+        // pages are arm64-v8a; Play has required 64-bit support since 2019.
+        ndk {
+            abiFilters += listOf("arm64-v8a")
         }
     }
 
@@ -117,6 +219,10 @@ android {
             versionNameSuffix = "-foss"
         }
     }
+
+    // The play-release build pulls a generated tester-email allowlist asset
+    // from a gradle task (see fetchTesterEmails below). The file lives outside
+    // src/play/assets/ so it is never tracked in git.
 
     signingConfigs {
         create("release") {
@@ -184,9 +290,12 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
         jniLibs {
+            useLegacyPackaging = false
             pickFirsts += "**/libc++_shared.so"
         }
     }
+    buildToolsVersion = "36.1.0"
+    ndkVersion = "29.0.14206865"
 }
 
 
@@ -203,6 +312,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))
@@ -241,10 +351,16 @@ dependencies {
     // TFLite — pocket detection model
     implementation(libs.tensorflow.lite)
 
+    // ONNX Runtime — local trajectory predictor (myriad student)
+    implementation(libs.onnxruntime.android)
+
     // Meta Wearables DAT
     implementation(libs.mwdat.core)
     implementation(libs.mwdat.camera)
     debugImplementation(libs.mwdat.mockdevice)
+
+    // Security & Integrity
+    implementation(libs.play.integrity)
 
     // Physics
     // implementation(libs.google.liquidfun)
@@ -276,5 +392,37 @@ configurations.all {
             useVersion(libs.versions.netty.get())
             because("Transitive dependency vulnerabilities in testing/grpc")
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tester license allowlist: scrapes the tester Google Group's member list
+// during the play-release pipeline and emits one SHA-256 hex per email into
+// build/generated/testerLicense/assets/tester_emails.txt. The file is then
+// consumed by TestLicenseAllowlist at runtime.
+//
+// Skips silently (writes an empty file) when:
+//   - GG_LINK or GG_SESSION env vars are missing (local dev / play debug)
+//   - The Node script fails for any reason
+//
+// Hooked into the asset generation pipeline for playRelease so other build
+// variants are unaffected, including IDE sync.
+// ---------------------------------------------------------------------------
+val fetchTesterEmails = tasks.register<FetchTesterEmailsTask>("fetchTesterEmails") {
+    description = "Scrape tester Google Group members and emit SHA-256 hashes for the play-release allowlist."
+    group = "tester license"
+    outputDir.set(layout.buildDirectory.dir("generated/testerLicense/assets"))
+    scriptDir.set(rootProject.layout.projectDirectory.dir(".github/scripts"))
+    ggLink.set(providers.environmentVariable("GG_LINK"))
+    ggSession.set(providers.environmentVariable("GG_SESSION"))
+    outputs.upToDateWhen { false } // env-driven; always re-fetch when invoked
+}
+
+androidComponents.onVariants { variant ->
+    if (variant.flavorName == "play" && variant.buildType == "release") {
+        variant.sources.assets?.addGeneratedSourceDirectory(
+            fetchTesterEmails,
+            FetchTesterEmailsTask::outputDir
+        )
     }
 }

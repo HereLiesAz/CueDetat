@@ -51,12 +51,25 @@ class MainActivity : ComponentActivity() {
 
     private var cameraPermissionGranted by mutableStateOf(false)
     private var paywallTrigger by mutableStateOf<com.hereliesaz.cuedetat.billing.PaywallTrigger?>(null)
+    // Bumped on every paywall request so the sheet re-shows even when the
+    // trigger enum value is identical to the previous one. Without this,
+    // setting paywallTrigger from SPLASH_SCREEN to SPLASH_SCREEN does nothing
+    // (mutableStateOf uses structural equality), so a non-null→non-null
+    // transition silently drops the request.
+    private var paywallShowSequence by mutableStateOf(0L)
 
     private val requestPermissionsLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
+            val bluetoothGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                permissions[Manifest.permission.BLUETOOTH_CONNECT] ?: false
+            } else true
+
             if (cameraGranted) {
                 cameraPermissionGranted = true
+                if (bluetoothGranted) {
+                    (application as? MyApplication)?.initializeWearables()
+                }
             } else {
                 // Heresy is not tolerated. The user will comply or they will not use the app.
                 Toast.makeText(
@@ -80,12 +93,20 @@ class MainActivity : ComponentActivity() {
             } else {
                 CueDetatTheme {
                     PermissionExplanationScreen(onConfirm = {
-                        requestPermissionsLauncher.launch(
+                        val permissions = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                            arrayOf(
+                                Manifest.permission.CAMERA,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                                Manifest.permission.BLUETOOTH_SCAN,
+                                Manifest.permission.BLUETOOTH_CONNECT
+                            )
+                        } else {
                             arrayOf(
                                 Manifest.permission.CAMERA,
                                 Manifest.permission.ACCESS_COARSE_LOCATION
                             )
-                        )
+                        }
+                        requestPermissionsLauncher.launch(permissions)
                     })
                 }
             }
@@ -136,6 +157,7 @@ class MainActivity : ComponentActivity() {
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 is SingleEvent.ShowPaywall -> {
+                    paywallShowSequence = paywallShowSequence + 1
                     paywallTrigger = event.trigger
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
@@ -171,18 +193,34 @@ class MainActivity : ComponentActivity() {
 
         CueDetatTheme(luminanceAdjustment = uiState.luminanceAdjustment) {
             paywallTrigger?.let { trigger ->
-                com.hereliesaz.cuedetat.ui.composables.paywall.PaywallSheet(
-                    trigger = trigger,
-                    onDismiss = { paywallTrigger = null },
-                    onPurchasedAutoEnterExpert = {
-                        viewModel.onEvent(MainScreenEvent.SetExperienceMode(ExperienceMode.EXPERT))
-                    }
-                )
+                // key(paywallShowSequence): force a fresh composition (and
+                // fresh ModalBottomSheet animation) on every show request,
+                // even if the trigger enum is identical to the previous one.
+                androidx.compose.runtime.key(paywallShowSequence) {
+                    com.hereliesaz.cuedetat.ui.composables.paywall.PaywallSheet(
+                        trigger = trigger,
+                        onDismiss = { paywallTrigger = null },
+                        onPurchasedAutoEnterExpert = {
+                            viewModel.onEvent(MainScreenEvent.SetExperienceMode(ExperienceMode.EXPERT))
+                        }
+                    )
+                }
             }
 
             if (showSplashScreen) {
                 SplashScreen(onRoleSelected = { selectedMode ->
-                    viewModel.onEvent(MainScreenEvent.SetExperienceMode(selectedMode))
+                    if (selectedMode == ExperienceMode.EXPERT && !uiState.isExpertEntitled) {
+                        // Bypass the SetExperienceMode reducer chain entirely:
+                        // every Expert tap on splash for an unentitled user
+                        // must show the paywall, every single time.
+                        viewModel.onEvent(
+                            MainScreenEvent.ShowPaywall(
+                                com.hereliesaz.cuedetat.billing.PaywallTrigger.SPLASH_SCREEN
+                            )
+                        )
+                    } else {
+                        viewModel.onEvent(MainScreenEvent.SetExperienceMode(selectedMode))
+                    }
                 })
             } else {
                 val currentAppControlColorScheme = MaterialTheme.colorScheme

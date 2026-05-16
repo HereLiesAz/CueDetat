@@ -41,7 +41,11 @@ class GestureReducer @Inject constructor() {
 
         val zoomLimits = ZoomMapping.getZoomRange(currentState.experienceMode, currentState.isBeginnerViewLocked)
         val currentZoom = ZoomMapping.sliderToZoom(currentState.zoomSliderPosition, zoomLimits.first, zoomLimits.second)
-        val touchRadius = (25f * 4.0f) / currentZoom
+        // Generous hit area for ball-drag vs aiming-rotation. The user has the
+        // entire rest of the screen for rotation, so a near-hit on a ball
+        // should pick the ball.
+        val ballDragHitRadius = (LOGICAL_BALL_RADIUS * 8.0f) / currentZoom
+        val touchRadius = ballDragHitRadius
 
         // 0. Ball Selection Phase: tap near a confirmed snap candidate to attach a virtual ball
         if (currentState.tableScanModel != null &&
@@ -97,6 +101,8 @@ class GestureReducer @Inject constructor() {
             if (closestBall != null && getDistance(event.logicalPoint, closestBall) < snapThreshold) {
                 return currentState.copy(
                     protractorUnit = currentState.protractorUnit.copy(center = closestBall),
+                    targetCvAnchor = closestBall,
+                    hasTargetBallBeenMoved = true,
                     interactionMode = InteractionMode.NONE,
                     valuesChangedSinceReset = true
                 )
@@ -199,33 +205,88 @@ class GestureReducer @Inject constructor() {
                     currentState.protractorUnit.center.x + dx,
                     currentState.protractorUnit.center.y + dy
                 )
-                
-                // Snapping logic for Dynamic Beginner Mode
-                val snappedCenter = if (currentState.experienceMode == ExperienceMode.BEGINNER && !currentState.isBeginnerViewLocked) {
-                    val visionData = currentState.visionData
-                    val detectedBalls = if (visionData != null && visionData.balls.isNotEmpty()) {
-                        visionData.balls.filter {
-                            it.type == BallType.UNKNOWN ||
-                            (currentState.targetType == TargetType.STRIPES && it.type == BallType.STRIPE) ||
-                            (currentState.targetType == TargetType.SOLIDS && it.type == BallType.SOLID)
-                        }.map { it.position }
-                    } else {
-                        (visionData?.genericBalls ?: emptyList()) + (visionData?.customBalls ?: emptyList())
+
+                // Drag-driven snap: when the user pulls the target ball near a
+                // detected ball, snap to it. When they pull it away, snap
+                // releases. The anchor is updated to match so the
+                // SnapReducer's frame-to-frame follow does not yank the ball
+                // back to a previous selection.
+                //
+                // Hot path — runs on every drag delta. Walk the typed-ball
+                // list with a single pass that respects the targetType
+                // filter, then fall back to the untyped lists in place
+                // instead of materialising a concatenated list.
+                val visionData = currentState.visionData
+                val snapThreshold = LOGICAL_BALL_RADIUS * 1.5f
+                var closestTypedPos: PointF? = null
+                var closestTypedBox: android.graphics.Rect? = null
+                var closestTypedDist = Float.MAX_VALUE
+                visionData?.balls?.forEach { ball ->
+                    val matches = ball.type == BallType.UNKNOWN ||
+                        (currentState.targetType == TargetType.STRIPES && ball.type == BallType.STRIPE) ||
+                        (currentState.targetType == TargetType.SOLIDS && ball.type == BallType.SOLID)
+                    if (!matches) return@forEach
+                    val d = getDistance(newCenter, ball.position)
+                    if (d < closestTypedDist) {
+                        closestTypedDist = d
+                        closestTypedPos = ball.position
+                        closestTypedBox = ball.boundingBox
                     }
-                    
-                    val snapThreshold = LOGICAL_BALL_RADIUS * 1.5f
-                    val closestBall = detectedBalls.minByOrNull { getDistance(newCenter, it) }
-                    if (closestBall != null && getDistance(newCenter, closestBall) < snapThreshold) {
-                        closestBall
+                }
+
+                val typedHit = closestTypedPos
+                val snapResult: Triple<PointF, android.graphics.Rect?, PointF?> =
+                    if (typedHit != null && closestTypedDist < snapThreshold) {
+                        Triple(typedHit, closestTypedBox, typedHit)
                     } else {
-                        newCenter
+                        // Fall back to position-only candidates (no bbox / no
+                        // type). Walk each list in place.
+                        var closestPos: PointF? = null
+                        var closestDist = Float.MAX_VALUE
+                        visionData?.genericBalls?.forEach { p ->
+                            val d = getDistance(newCenter, p)
+                            if (d < closestDist) {
+                                closestDist = d
+                                closestPos = p
+                            }
+                        }
+                        @Suppress("DEPRECATION")
+                        visionData?.customBalls?.forEach { p ->
+                            val d = getDistance(newCenter, p)
+                            if (d < closestDist) {
+                                closestDist = d
+                                closestPos = p
+                            }
+                        }
+                        val fallbackHit = closestPos
+                        if (fallbackHit != null && closestDist < snapThreshold) {
+                            Triple(fallbackHit, null, fallbackHit)
+                        } else {
+                            // User dragged away from any detected ball: drop
+                            // the anchor entirely so the SnapReducer doesn't
+                            // pull the ball back.
+                            Triple(newCenter, null, null)
+                        }
                     }
+
+                val snappedCenter = snapResult.first
+                val snappedBox = snapResult.second
+                val newAnchor = snapResult.third
+
+                // Adjust zoom only for dynamic beginner snaps with a real bbox.
+                val isDynamicBeginner = currentState.experienceMode == ExperienceMode.BEGINNER &&
+                        !currentState.isBeginnerViewLocked
+                val newZoomSlider = if (isDynamicBeginner && snappedBox != null) {
+                    computeSnapZoomSlider(currentState, snappedCenter, snappedBox)
                 } else {
-                    newCenter
+                    currentState.zoomSliderPosition
                 }
 
                 currentState.copy(
                     protractorUnit = currentState.protractorUnit.copy(center = snappedCenter),
+                    targetCvAnchor = newAnchor,
+                    zoomSliderPosition = newZoomSlider,
+                    hasTargetBallBeenMoved = true,
                     magnifierSourceCenter = updatedMagnifierCenter,
                     valuesChangedSinceReset = true
                 )
@@ -234,8 +295,55 @@ class GestureReducer @Inject constructor() {
                 currentState.onPlaneBall?.let {
                     val dx = event.currentLogicalPoint.x - event.previousLogicalPoint.x
                     val dy = event.currentLogicalPoint.y - event.previousLogicalPoint.y
+                    val newCenter = PointF(it.center.x + dx, it.center.y + dy)
+
+                    // Drag-driven snap for the cue ball: snap when dragged
+                    // near a detected ball, release on drag-away. The anchor
+                    // mirrors the snap decision so the SnapReducer's
+                    // frame-to-frame follow respects the user's intent.
+                    //
+                    // Hot path — runs on every drag delta. Walk the three
+                    // candidate lists in place to avoid the allocations from
+                    // building a concatenated list every frame.
+                    val snapThreshold = LOGICAL_BALL_RADIUS * 1.5f
+                    var closest: PointF? = null
+                    var minDistance = Float.MAX_VALUE
+                    currentState.visionData?.let { vision ->
+                        vision.balls.forEach { b ->
+                            val d = getDistance(newCenter, b.position)
+                            if (d < minDistance) {
+                                minDistance = d
+                                closest = b.position
+                            }
+                        }
+                        vision.genericBalls.forEach { p ->
+                            val d = getDistance(newCenter, p)
+                            if (d < minDistance) {
+                                minDistance = d
+                                closest = p
+                            }
+                        }
+                        @Suppress("DEPRECATION")
+                        vision.customBalls.forEach { p ->
+                            val d = getDistance(newCenter, p)
+                            if (d < minDistance) {
+                                minDistance = d
+                                closest = p
+                            }
+                        }
+                    }
+
+                    val resolved = closest
+                    val (snappedCenter, newAnchor) = if (resolved != null && minDistance < snapThreshold) {
+                        resolved to resolved
+                    } else {
+                        newCenter to null
+                    }
+
                     currentState.copy(
-                        onPlaneBall = it.copy(center = PointF(it.center.x + dx, it.center.y + dy)),
+                        onPlaneBall = it.copy(center = snappedCenter),
+                        cueBallCvAnchor = newAnchor,
+                        hasCueBallBeenMoved = true,
                         magnifierSourceCenter = updatedMagnifierCenter,
                         valuesChangedSinceReset = true
                     )
@@ -299,4 +407,52 @@ class GestureReducer @Inject constructor() {
 
     private fun getDistance(p1: Offset, p2: PointF) = sqrt((p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2))
     private fun getDistance(p1: PointF, p2: PointF) = sqrt((p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2))
+
+    /**
+     * Returns a new zoomSliderPosition that makes the on-screen target ball
+     * (rendered at LOGICAL_BALL_RADIUS through state.pitchMatrix) match the
+     * apparent radius of the snapped detected ball's bounding box.
+     *
+     * The bounding box is in source-image (camera) pixels; we map it to canvas
+     * pixels via the same FILL scaling used by the renderer, then compare to
+     * the target ball's current screen radius derived from pitchMatrix.
+     */
+    private fun computeSnapZoomSlider(
+        state: CueDetatState,
+        snappedCenter: PointF,
+        bbox: android.graphics.Rect,
+    ): Float {
+        val pitchMatrix = state.pitchMatrix ?: return state.zoomSliderPosition
+        val visionData = state.visionData ?: return state.zoomSliderPosition
+        val srcW = visionData.sourceImageWidth
+        val srcH = visionData.sourceImageHeight
+        val canvasW = state.viewWidth
+        val canvasH = state.viewHeight
+        if (srcW <= 0 || srcH <= 0 || canvasW <= 0 || canvasH <= 0) {
+            return state.zoomSliderPosition
+        }
+
+        // Detected ball radius in canvas pixels (avg of x/y scaled half-edges).
+        val xScale = canvasW.toFloat() / srcW.toFloat()
+        val yScale = canvasH.toFloat() / srcH.toFloat()
+        val bboxRadiusCanvas = (bbox.width() * xScale + bbox.height() * yScale) / 4f
+        if (bboxRadiusCanvas <= 0f) return state.zoomSliderPosition
+
+        // Target ball's current on-screen radius via the live pitch matrix.
+        val pts = floatArrayOf(
+            snappedCenter.x, snappedCenter.y,
+            snappedCenter.x + LOGICAL_BALL_RADIUS, snappedCenter.y,
+        )
+        pitchMatrix.mapPoints(pts)
+        val currentTargetRadiusScreen = sqrt(
+            (pts[2] - pts[0]).pow(2) + (pts[3] - pts[1]).pow(2)
+        )
+        if (currentTargetRadiusScreen <= 0f) return state.zoomSliderPosition
+
+        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode)
+        val currentZoom = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom)
+        val ratio = bboxRadiusCanvas / currentTargetRadiusScreen
+        val newZoom = (currentZoom * ratio).coerceIn(minZoom, maxZoom)
+        return ZoomMapping.zoomToSlider(newZoom, minZoom, maxZoom).coerceIn(-50f, 50f)
+    }
 }

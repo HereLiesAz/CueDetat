@@ -14,7 +14,8 @@ data class Entitlement(
     val source: EntitlementSource,
     val expiresAtMillis: Long?,
     val productId: String?,
-    val lastVerifiedAtMillis: Long?
+    val lastVerifiedAtMillis: Long?,
+    val isDeviceGenuine: Boolean = true
 ) {
     companion object {
         val NONE = Entitlement(
@@ -22,7 +23,8 @@ data class Entitlement(
             source = EntitlementSource.NONE,
             expiresAtMillis = null,
             productId = null,
-            lastVerifiedAtMillis = null
+            lastVerifiedAtMillis = null,
+            isDeviceGenuine = true
         )
     }
 }
@@ -35,5 +37,12 @@ enum class EntitlementSource {
     /** Operating from cached entitlement; refresh has not succeeded recently. */
     OFFLINE_CACHED,
     /** FOSS flavor. Permanently active; billing code not present in this APK. */
-    FOSS_BUILD
+    FOSS_BUILD,
+    /**
+     * Granted because the device's verified tester email matched the
+     * build-baked allowlist (sourced from the tester Google Group at CI time).
+     * Coexists with PLAY_LOCAL for diagnostics; tester license wins when both
+     * apply.
+     */
+    TESTER_LICENSE,
 }

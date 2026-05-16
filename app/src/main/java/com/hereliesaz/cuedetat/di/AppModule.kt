@@ -14,13 +14,13 @@ import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.data.MergedTFLiteDetector
 import com.hereliesaz.cuedetat.network.GithubApi
-import com.hereliesaz.cuedetat.network.MyriadApi
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Singleton
@@ -44,31 +44,25 @@ object AppModule {
     @Provides
     @Singleton
     fun provideGithubApi(): GithubApi {
+        val client = if (BuildConfig.GH_TOKEN.isNotBlank()) {
+            OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    val request = chain.request().newBuilder()
+                        .addHeader("Authorization", "token ${BuildConfig.GH_TOKEN}")
+                        .build()
+                    chain.proceed(request)
+                }
+                .build()
+        } else {
+            OkHttpClient.Builder().build()
+        }
+
         return Retrofit.Builder()
             .baseUrl("https://api.github.com/")
+            .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(GithubApi::class.java)
-    }
-
-    /**
-     * Provides the Retrofit interface for the MYRIAD Python backend.
-     * Base URL comes from BuildConfig — debug builds point at the emulator loopback,
-     * release builds get an empty string until a real backend is wired up.
-     */
-    @Provides
-    @Singleton
-    fun provideMyriadApi(gson: Gson): MyriadApi {
-        val baseUrl = BuildConfig.MYRIAD_BASE_URL.ifBlank {
-            // Retrofit refuses to build with an empty URL. Use a sentinel that callers
-            // can check against to short-circuit at the repository layer.
-            "https://disabled.invalid/"
-        }
-        return Retrofit.Builder()
-            .baseUrl(baseUrl)
-            .addConverterFactory(GsonConverterFactory.create(gson))
-            .build()
-            .create(MyriadApi::class.java)
     }
 
     /**
