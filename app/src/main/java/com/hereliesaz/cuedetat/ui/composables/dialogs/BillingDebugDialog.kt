@@ -40,6 +40,8 @@ import com.hereliesaz.cuedetat.billing.EntitlementDiagnostics
 import com.hereliesaz.cuedetat.billing.EntitlementRepository
 import com.hereliesaz.cuedetat.billing.EntitlementSource
 import com.hereliesaz.cuedetat.billing.TesterLicenseResult
+import com.hereliesaz.cuedetat.billing.isPlausibleTesterEmail
+import com.hereliesaz.cuedetat.ui.composables.billing.TesterOutcomeText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -160,25 +162,13 @@ private fun TesterLicenseBlock(
     Spacer(Modifier.height(4.dp))
     Button(
         onClick = onApplyManual,
-        enabled = manualEmail.contains('@'),
+        enabled = isPlausibleTesterEmail(manualEmail),
         modifier = Modifier.fillMaxWidth(),
     ) { Text("Try tester license") }
 
     state.lastTesterOutcome?.let { outcome ->
         Spacer(Modifier.height(8.dp))
-        val msg = when (outcome) {
-            TesterLicenseResult.Granted -> "Granted ✓"
-            TesterLicenseResult.NotOnAllowlist -> "Email is not on this build's allowlist"
-            TesterLicenseResult.AllowlistEmpty -> "Allowlist not configured in this build"
-            TesterLicenseResult.InvalidEmail -> "No email returned / invalid input"
-            TesterLicenseResult.NotApplicable -> "Not applicable (FOSS or no Web Client ID)"
-        }
-        Text(
-            msg,
-            style = MaterialTheme.typography.bodySmall,
-            color = if (outcome == TesterLicenseResult.Granted)
-                MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-        )
+        TesterOutcomeText(outcome)
     }
 }
 
@@ -280,16 +270,24 @@ class BillingDebugViewModel @Inject constructor(
     }
 
     fun refresh() {
+        // Surface the synchronous bits immediately (allowlist + CM
+        // configuration don't change at runtime), then re-read diagnostics
+        // *after* the async refresh so the user sees post-refresh state.
         _uiState.value = _uiState.value.copy(
             credentialManagerAvailable = repository.isCredentialManagerAvailable,
             diagnostics = repository.diagnostics(),
         )
-        viewModelScope.launch { runCatching { repository.refresh() } }
+        viewModelScope.launch {
+            runCatching { repository.refresh() }
+            _uiState.value = _uiState.value.copy(diagnostics = repository.diagnostics())
+        }
     }
 
     fun restorePurchases() {
-        viewModelScope.launch { runCatching { repository.restorePurchases() } }
-        _uiState.value = _uiState.value.copy(diagnostics = repository.diagnostics())
+        viewModelScope.launch {
+            runCatching { repository.restorePurchases() }
+            _uiState.value = _uiState.value.copy(diagnostics = repository.diagnostics())
+        }
     }
 
     fun runInteractivePicker(activity: Activity) {

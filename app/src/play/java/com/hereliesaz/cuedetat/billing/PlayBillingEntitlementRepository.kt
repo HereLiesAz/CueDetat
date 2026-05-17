@@ -208,7 +208,7 @@ class PlayBillingEntitlementRepository @Inject constructor(
     }
 
     override suspend fun applyTesterLicense(email: String): TesterLicenseResult {
-        if (email.trim().isEmpty() || !email.contains('@')) {
+        if (!isPlausibleTesterEmail(email)) {
             Log.i(TAG, "applyTesterLicense: invalid email rejected")
             return TesterLicenseResult.InvalidEmail
         }

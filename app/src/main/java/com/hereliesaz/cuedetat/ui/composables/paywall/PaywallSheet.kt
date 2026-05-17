@@ -47,7 +47,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.hereliesaz.cuedetat.billing.BasePlanId
 import com.hereliesaz.cuedetat.billing.PaywallTrigger
 import com.hereliesaz.cuedetat.billing.ProductDetailsState
-import com.hereliesaz.cuedetat.billing.TesterLicenseResult
+import com.hereliesaz.cuedetat.billing.isPlausibleTesterEmail
+import com.hereliesaz.cuedetat.ui.composables.billing.TesterOutcomeText
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -223,31 +224,14 @@ private fun TesterLicenseSection(
             Button(
                 onClick = { viewModel.applyTesterLicenseManually(manualEmail) },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = manualEmail.contains('@'),
+                enabled = isPlausibleTesterEmail(manualEmail),
             ) { Text("Try tester license") }
         }
 
         val outcome = uiState.testerLicenseOutcome
         if (outcome != null) {
             Spacer(Modifier.height(8.dp))
-            val message = when (outcome) {
-                TesterLicenseResult.Granted ->
-                    "Tester license granted. Expert is unlocked."
-                TesterLicenseResult.NotOnAllowlist ->
-                    "That email is not on this build's tester allowlist."
-                TesterLicenseResult.AllowlistEmpty ->
-                    "This build wasn't assembled with a tester allowlist (local / debug build)."
-                TesterLicenseResult.InvalidEmail ->
-                    "Couldn't read an email from the account picker."
-                TesterLicenseResult.NotApplicable ->
-                    "Tester license isn't available in this build (no OAuth Web Client ID configured)."
-            }
-            val isGood = outcome == TesterLicenseResult.Granted
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (isGood) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-            )
+            TesterOutcomeText(outcome)
         }
 
         Spacer(Modifier.height(8.dp))
