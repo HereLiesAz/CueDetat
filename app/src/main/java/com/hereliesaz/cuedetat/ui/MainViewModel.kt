@@ -170,10 +170,19 @@ class MainViewModel @Inject constructor(
             // by the time this load completes; in any case the StateFlow is the
             // source of truth.
             val liveEntitled = entitlementRepository.entitlement.value.active
+            // Tutorial-seen flags live in their own DataStore keys; the
+            // STATE_JSON copy may be stale if the debounced state save was
+            // cancelled by a sensor event right after the user finished a
+            // tutorial. The dedicated keys are written synchronously on
+            // transition, so they're the authoritative source.
+            val tutorialSeen = userPreferencesRepository.readTutorialSeenFlags()
             val initialState = (savedState ?: CueDetatState()).copy(
                 experienceMode = currentExperienceMode,
                 savedFeltSamples = savedFeltSamples,
-                isExpertEntitled = liveEntitled
+                isExpertEntitled = liveEntitled,
+                hasSeenBeginnerTutorial = tutorialSeen.beginner,
+                hasSeenDynamicBeginnerTutorial = tutorialSeen.dynamicBeginner,
+                hasSeenExpertTutorial = tutorialSeen.expert,
             )
             processAndEmitState(initialState, UpdateType.FULL)
 
@@ -422,6 +431,31 @@ class MainViewModel @Inject constructor(
         _uiState.value = derivedState
         visionAnalyzer.updateUiState(derivedState)
         arFrameProcessor.updateUiState(derivedState)
+
+        // Persist tutorial-seen flags the moment they flip. They live in
+        // dedicated DataStore keys (not STATE_JSON) so they're not subject to
+        // the 2-second debounce on the state save, which can be cancelled
+        // indefinitely by the sensor-driven FullOrientationChanged stream
+        // before it ever lands. Without this, the user finishes a tutorial,
+        // sensor events keep cancelling the save, the app gets killed, and
+        // next launch the tutorial fires again.
+        val seenChanged =
+            derivedState.hasSeenBeginnerTutorial != previousState.hasSeenBeginnerTutorial ||
+            derivedState.hasSeenDynamicBeginnerTutorial != previousState.hasSeenDynamicBeginnerTutorial ||
+            derivedState.hasSeenExpertTutorial != previousState.hasSeenExpertTutorial
+        if (seenChanged) {
+            viewModelScope.launch {
+                runCatching {
+                    userPreferencesRepository.setTutorialSeenFlags(
+                        beginner = derivedState.hasSeenBeginnerTutorial,
+                        dynamicBeginner = derivedState.hasSeenDynamicBeginnerTutorial,
+                        expert = derivedState.hasSeenExpertTutorial,
+                    )
+                }.onFailure {
+                    android.util.Log.e("MainViewModel", "tutorial-seen flag save failed", it)
+                }
+            }
+        }
 
         if (derivedState.cameraMode == CameraMode.META_GLASSES) {
             metaWearableRepository.startStreaming()
