@@ -193,9 +193,6 @@ mwdat-mockdevice = { group = "com.meta.wearable", name = "mwdat-mockdevice", ver
 jose4j = { group = "org.bitbucket.b_c", name = "jose4j", version.ref = "jose4j" }
 guava-vulnerability = { group = "com.google.guava", name = "guava", version.ref = "guavaVulnerability" }
 netty-all = { group = "io.netty", name = "netty-all", version.ref = "netty" }
-bouncycastle-bcprov = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
-bouncycastle-bcpkix = { group = "org.bouncycastle", name = "bcpkix-jdk18on", version.ref = "bouncycastle" }
-bouncycastle-bcutil = { group = "org.bouncycastle", name = "bcutil-jdk18on", version.ref = "bouncycastle" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidApplication" }
