@@ -36,16 +36,48 @@ class UserPreferencesRepository @Inject constructor(
         val STATE_JSON = stringPreferencesKey("state_json")
         val CAMERA_MATRIX_JSON = stringPreferencesKey("camera_matrix_json")
         val DIST_COEFFS_JSON = stringPreferencesKey("dist_coeffs_json")
-        val HAS_SEEN_ONBOARDING_PAYWALL = booleanPreferencesKey("has_seen_onboarding_paywall")
+
+        // Tutorial-seen flags are stored as dedicated keys (not embedded in
+        // STATE_JSON) so they survive the 2-second debounce on the main state
+        // save. The state save can be cancelled indefinitely by the high-rate
+        // FullOrientationChanged sensor events; these flags must reach disk
+        // the moment the user taps "Done", or the tutorial fires again on
+        // every fresh launch.
+        val HAS_SEEN_BEGINNER_TUTORIAL = booleanPreferencesKey("has_seen_beginner_tutorial")
+        val HAS_SEEN_DYNAMIC_BEGINNER_TUTORIAL = booleanPreferencesKey("has_seen_dynamic_beginner_tutorial")
+        val HAS_SEEN_EXPERT_TUTORIAL = booleanPreferencesKey("has_seen_expert_tutorial")
     }
 
-    suspend fun hasSeenOnboardingPaywall(): Boolean {
+    data class TutorialSeenFlags(
+        val beginner: Boolean,
+        val dynamicBeginner: Boolean,
+        val expert: Boolean,
+    )
+
+    suspend fun readTutorialSeenFlags(): TutorialSeenFlags {
         val prefs = dataStore.data.first()
-        return prefs[PreferencesKeys.HAS_SEEN_ONBOARDING_PAYWALL] ?: false
+        return TutorialSeenFlags(
+            beginner = prefs[PreferencesKeys.HAS_SEEN_BEGINNER_TUTORIAL] ?: false,
+            dynamicBeginner = prefs[PreferencesKeys.HAS_SEEN_DYNAMIC_BEGINNER_TUTORIAL] ?: false,
+            expert = prefs[PreferencesKeys.HAS_SEEN_EXPERT_TUTORIAL] ?: false,
+        )
     }
 
-    suspend fun setOnboardingPaywallSeen() {
-        dataStore.edit { it[PreferencesKeys.HAS_SEEN_ONBOARDING_PAYWALL] = true }
+    /**
+     * Persists only the flags that are set to `true`. Designed to be called
+     * with the latest CueDetatState's seen flags whenever any of them flips.
+     * Idempotent — re-writing `true` for an already-true flag is harmless.
+     */
+    suspend fun setTutorialSeenFlags(
+        beginner: Boolean,
+        dynamicBeginner: Boolean,
+        expert: Boolean,
+    ) {
+        dataStore.edit { prefs ->
+            if (beginner) prefs[PreferencesKeys.HAS_SEEN_BEGINNER_TUTORIAL] = true
+            if (dynamicBeginner) prefs[PreferencesKeys.HAS_SEEN_DYNAMIC_BEGINNER_TUTORIAL] = true
+            if (expert) prefs[PreferencesKeys.HAS_SEEN_EXPERT_TUTORIAL] = true
+        }
     }
 
     val stateFlow: Flow<CueDetatState?> = dataStore.data

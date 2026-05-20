@@ -57,7 +57,8 @@ fun stateReducer(
         is MainScreenEvent.EnterCvMaskTestMode, is MainScreenEvent.ExitCvMaskTestMode,
         is MainScreenEvent.StartCalibrationMode, is MainScreenEvent.SampleColorAt,
         is MainScreenEvent.ToggleCvRefinementMethod,
-        is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2 ->
+        is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2,
+        is MainScreenEvent.ToggleBillingDebugDialog ->
             reduceAdvancedOptionsAction(currentState, action)
 
         // --- CONTROLS & TRANSFORMS ---

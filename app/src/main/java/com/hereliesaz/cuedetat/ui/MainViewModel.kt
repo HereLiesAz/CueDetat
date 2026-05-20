@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -169,10 +170,19 @@ class MainViewModel @Inject constructor(
             // by the time this load completes; in any case the StateFlow is the
             // source of truth.
             val liveEntitled = entitlementRepository.entitlement.value.active
+            // Tutorial-seen flags live in their own DataStore keys; the
+            // STATE_JSON copy may be stale if the debounced state save was
+            // cancelled by a sensor event right after the user finished a
+            // tutorial. The dedicated keys are written synchronously on
+            // transition, so they're the authoritative source.
+            val tutorialSeen = userPreferencesRepository.readTutorialSeenFlags()
             val initialState = (savedState ?: CueDetatState()).copy(
                 experienceMode = currentExperienceMode,
                 savedFeltSamples = savedFeltSamples,
-                isExpertEntitled = liveEntitled
+                isExpertEntitled = liveEntitled,
+                hasSeenBeginnerTutorial = tutorialSeen.beginner,
+                hasSeenDynamicBeginnerTutorial = tutorialSeen.dynamicBeginner,
+                hasSeenExpertTutorial = tutorialSeen.expert,
             )
             processAndEmitState(initialState, UpdateType.FULL)
 
@@ -272,20 +282,26 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        // Splash paywall: every time the splash screen is showing AND the user
-        // is not entitled to Expert Mode, surface the paywall. This fires on
-        // cold start, on returning from "Exit to splash", and any other path
-        // that lands on the splash. In FOSS builds entitlement is permanently
-        // active so this never fires.
+        // Onboarding paywall: fire every time the splash is shown and every
+        // time the user enters HATER mode while not entitled. Entitled users
+        // (including FOSS, which is permanently active) never see it.
         viewModelScope.launch {
+            if (entitlementRepository.entitlement.value.active) return@launch
             _uiState
-                .map { it.experienceMode == null && !it.isExpertEntitled }
+                .map { it.experienceMode to it.isExpertEntitled }
                 .distinctUntilChanged()
-                .collect { onSplashWhileUnentitled ->
-                    if (onSplashWhileUnentitled) {
-                        _singleEvent.emit(
-                            SingleEvent.ShowPaywall(
-                                com.hereliesaz.cuedetat.billing.PaywallTrigger.SPLASH_SCREEN
+                .filter { (mode, entitled) ->
+                    !entitled && (mode == null || mode == ExperienceMode.HATER)
+                }
+                .collect {
+                    // Re-check live entitlement: _uiState.isExpertEntitled may
+                    // still be false on app start if the EntitlementChanged
+                    // event hasn't propagated, but the repository's StateFlow
+                    // is always current.
+                    if (!entitlementRepository.entitlement.value.active) {
+                        onEvent(
+                            MainScreenEvent.ShowPaywall(
+                                com.hereliesaz.cuedetat.billing.PaywallTrigger.ONBOARDING
                             )
                         )
                     }
@@ -415,6 +431,31 @@ class MainViewModel @Inject constructor(
         _uiState.value = derivedState
         visionAnalyzer.updateUiState(derivedState)
         arFrameProcessor.updateUiState(derivedState)
+
+        // Persist tutorial-seen flags the moment they flip. They live in
+        // dedicated DataStore keys (not STATE_JSON) so they're not subject to
+        // the 2-second debounce on the state save, which can be cancelled
+        // indefinitely by the sensor-driven FullOrientationChanged stream
+        // before it ever lands. Without this, the user finishes a tutorial,
+        // sensor events keep cancelling the save, the app gets killed, and
+        // next launch the tutorial fires again.
+        val seenChanged =
+            derivedState.hasSeenBeginnerTutorial != previousState.hasSeenBeginnerTutorial ||
+            derivedState.hasSeenDynamicBeginnerTutorial != previousState.hasSeenDynamicBeginnerTutorial ||
+            derivedState.hasSeenExpertTutorial != previousState.hasSeenExpertTutorial
+        if (seenChanged) {
+            viewModelScope.launch {
+                runCatching {
+                    userPreferencesRepository.setTutorialSeenFlags(
+                        beginner = derivedState.hasSeenBeginnerTutorial,
+                        dynamicBeginner = derivedState.hasSeenDynamicBeginnerTutorial,
+                        expert = derivedState.hasSeenExpertTutorial,
+                    )
+                }.onFailure {
+                    android.util.Log.e("MainViewModel", "tutorial-seen flag save failed", it)
+                }
+            }
+        }
 
         if (derivedState.cameraMode == CameraMode.META_GLASSES) {
             metaWearableRepository.startStreaming()

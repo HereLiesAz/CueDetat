@@ -44,6 +44,7 @@ class PlayBillingEntitlementRepository @Inject constructor(
     private val testLicenseAllowlist: TestLicenseAllowlist,
     private val testLicenseStore: TestLicenseStore,
     private val integrityRepository: IntegrityRepository,
+    private val googleAccountResolver: GoogleAccountResolver,
 ) : EntitlementRepository {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -59,6 +60,14 @@ class PlayBillingEntitlementRepository @Inject constructor(
     /** Whether the last integrity check succeeded. */
     private var isDeviceGenuine = true
 
+    /** Rolling log of recent purchase snapshot lines for the in-app diagnostic. */
+    private val recentPurchaseLog = ArrayDeque<String>()
+    private val recentPurchaseLogMaxSize = 30
+
+    /** Human-readable summary of the last refresh outcome for the diagnostic. */
+    @Volatile
+    private var lastRefreshOutcome: String = "not yet attempted"
+
     private val _entitlement = MutableStateFlow(Entitlement.NONE)
     override val entitlement: StateFlow<Entitlement> = _entitlement.asStateFlow()
 
@@ -69,16 +78,21 @@ class PlayBillingEntitlementRepository @Inject constructor(
             // 1. Load cache so the first emission is correct for returning users.
             val cached = runCatching { cacheStore.read() }.getOrDefault(Entitlement.NONE)
             playEntitlement.value = applyOfflineCap(cached, System.currentTimeMillis())
+            Log.i(TAG, "init: cached entitlement active=${cached.active} source=${cached.source}")
             republish()
 
             // 2. Restore any previously-verified tester license. If the
             //    allowlist no longer contains the stored hash (group membership
             //    changed between builds) we drop it on the floor and clear it.
             testLicenseStore.verifiedHash.collect { hash ->
-                verifiedTesterHash = hash?.takeIf(testLicenseAllowlist::containsHash)
-                if (hash != null && verifiedTesterHash == null) {
+                val accepted = hash?.takeIf(testLicenseAllowlist::containsHash)
+                if (hash != null && accepted == null) {
+                    Log.i(TAG, "stored tester hash no longer on allowlist; clearing")
                     runCatching { testLicenseStore.clear() }
+                } else if (accepted != null) {
+                    Log.i(TAG, "tester license restored from store")
                 }
+                verifiedTesterHash = accepted
                 republish()
             }
         }
@@ -97,14 +111,20 @@ class PlayBillingEntitlementRepository @Inject constructor(
             // 4. Refresh from Play in the background.
             refresh()
 
-            // 4. React to purchase updates.
+            // (Silent tester-license auto-resolve is now Activity-bound and
+            //  triggered by MainActivity once the first activity is alive.
+            //  Credential Manager requires an Activity context; see
+            //  autoResolveOnNextResume.)
+
+            // 5. React to purchase updates.
             billingClient.purchaseUpdates.collect { purchases ->
+                Log.i(TAG, "purchaseUpdates: ${purchases.size} purchases received")
                 purchases.forEach { runCatching { billingClient.acknowledgeIfNeeded(it) } }
                 refresh()
             }
         }
 
-        // 4. Re-verify on every process foreground. Recovers from a transient
+        // 7. Re-verify on every process foreground. Recovers from a transient
         //    failure during the cold-start refresh and from races where Play
         //    Store registers a purchase moments after our initial query.
         scope.launch {
@@ -122,17 +142,20 @@ class PlayBillingEntitlementRepository @Inject constructor(
 
     override suspend fun launchPurchase(activity: Activity, basePlan: BasePlanId) {
         val productDetails = billingClient.queryExpertProductDetails() ?: run {
+            Log.w(TAG, "launchPurchase: product details unavailable for ${BillingProductIds.PRODUCT_ID_EXPERT}")
             _productDetails.tryEmit(ProductDetailsState.Error(-1, "Product details unavailable"))
             return
         }
         val offer = productDetails.subscriptionOfferDetails
             ?.firstOrNull { it.basePlanId == basePlan.tag }
             ?: run {
+                Log.w(TAG, "launchPurchase: base plan '${basePlan.tag}' not configured in Play Console")
                 _productDetails.tryEmit(
                     ProductDetailsState.Error(-1, "Base plan ${basePlan.tag} not configured")
                 )
                 return
             }
+        Log.i(TAG, "launchPurchase: basePlan=${basePlan.tag} productId=${productDetails.productId}")
         billingClient.launchBillingFlow(activity, productDetails, offer.offerToken)
     }
 
@@ -143,42 +166,120 @@ class PlayBillingEntitlementRepository @Inject constructor(
                 // Transient failure: keep the previous entitlement (subject to
                 // the 14-day offline cap) and do NOT overwrite the cache.
                 Log.w(TAG, "queryActiveSubscriptions failed; preserving cached entitlement", it)
+                lastRefreshOutcome = "queryActiveSubscriptions failed: ${it.message ?: it::class.java.simpleName}"
                 playEntitlement.value = applyOfflineCap(playEntitlement.value, now)
                 republish()
                 return
             }
         val snapshots = purchases.flatMap { it.toSnapshots() }
         snapshots.forEach {
-            Log.i(TAG, "snapshot productId=${it.productId} state=${it.purchaseState} ack=${it.isAcknowledged}")
+            val line = "snapshot productId=${it.productId} state=${it.purchaseState} ack=${it.isAcknowledged} autoRenew=${it.isAutoRenewing}"
+            Log.i(TAG, line)
+            recordPurchaseSnapshot(line)
+        }
+        if (snapshots.isEmpty()) {
+            val line = "snapshot none — Play returned 0 active subscriptions"
+            Log.i(TAG, line)
+            recordPurchaseSnapshot(line)
         }
         val mapped = PurchaseToEntitlementMapper.map(snapshots, now)
-        Log.i(TAG, "refresh result active=${mapped.active} source=${mapped.source}")
+        val outcome = "active=${mapped.active} source=${mapped.source} productId=${mapped.productId ?: "n/a"} " +
+                "(expected productId=${BillingProductIds.PRODUCT_ID_EXPERT})"
+        Log.i(TAG, "refresh result $outcome")
+        lastRefreshOutcome = outcome
         playEntitlement.value = mapped
         runCatching { cacheStore.write(mapped) }
         republish()
     }
 
     /**
-     * Attempt to grant a tester license. Returns true if `email` matched the
-     * baked-in allowlist; the verified hash is persisted so future launches
-     * stay entitled without re-entry.
+     * Attempt to grant a tester license by hashing `email` and matching the
+     * baked-in allowlist. Public via [EntitlementRepository.applyTesterLicense]
+     * so the paywall can offer a manual fallback.
      */
     suspend fun tryApplyTesterLicense(email: String): Boolean {
         if (!testLicenseAllowlist.isAllowed(email)) return false
         val hash = TestLicenseAllowlist.sha256Hex(email.trim().lowercase())
         testLicenseStore.setVerifiedHash(hash)
-        // The store collector will pick up the change and call republish(),
-        // but apply immediately so callers see the updated state on return.
         verifiedTesterHash = hash
         republish()
+        Log.i(TAG, "tryApplyTesterLicense: granted (hash=$hash)")
         return true
     }
 
-    /** Revoke the tester license stored on this device. */
-    suspend fun clearTesterLicense() {
+    override suspend fun applyTesterLicense(email: String): TesterLicenseResult {
+        if (email.trim().isEmpty() || !email.contains('@')) {
+            Log.i(TAG, "applyTesterLicense: invalid email rejected")
+            return TesterLicenseResult.InvalidEmail
+        }
+        if (!testLicenseAllowlist.isConfigured) {
+            Log.i(TAG, "applyTesterLicense: allowlist not configured in this build")
+            return TesterLicenseResult.AllowlistEmpty
+        }
+        return if (tryApplyTesterLicense(email)) {
+            TesterLicenseResult.Granted
+        } else {
+            Log.i(TAG, "applyTesterLicense: hash not on allowlist")
+            TesterLicenseResult.NotOnAllowlist
+        }
+    }
+
+    override suspend fun clearTesterLicense() {
         testLicenseStore.clear()
         verifiedTesterHash = null
         republish()
+        Log.i(TAG, "clearTesterLicense: revoked")
+    }
+
+    override fun diagnostics(): EntitlementDiagnostics {
+        val snapshots = synchronized(recentPurchaseLog) { recentPurchaseLog.toList() }
+        return EntitlementDiagnostics(
+            recentPurchaseSnapshots = snapshots,
+            lastRefreshOutcome = lastRefreshOutcome,
+            testerAllowlistConfigured = testLicenseAllowlist.isConfigured,
+        )
+    }
+
+    override val isCredentialManagerAvailable: Boolean
+        get() = googleAccountResolver.isConfigured && testLicenseAllowlist.isConfigured
+
+    override suspend fun resolveTesterLicenseViaCredentialManager(
+        activity: android.app.Activity,
+    ): TesterLicenseResult {
+        if (!testLicenseAllowlist.isConfigured) {
+            Log.i(TAG, "resolveTesterLicenseViaCredentialManager: allowlist not configured")
+            return TesterLicenseResult.AllowlistEmpty
+        }
+        if (!googleAccountResolver.isConfigured) {
+            Log.i(TAG, "resolveTesterLicenseViaCredentialManager: Credential Manager not configured")
+            return TesterLicenseResult.NotApplicable
+        }
+        val email = googleAccountResolver.resolveInteractive(activity)
+        if (email == null) {
+            Log.i(TAG, "resolveTesterLicenseViaCredentialManager: no email returned from picker")
+            return TesterLicenseResult.InvalidEmail
+        }
+        return applyTesterLicense(email)
+    }
+
+    override suspend fun silentlyResolveTesterLicense(
+        activity: android.app.Activity,
+    ): TesterLicenseResult {
+        if (verifiedTesterHash != null) return TesterLicenseResult.Granted
+        if (!testLicenseAllowlist.isConfigured) return TesterLicenseResult.AllowlistEmpty
+        if (!googleAccountResolver.isConfigured) return TesterLicenseResult.NotApplicable
+        val email = googleAccountResolver.resolveAuthorizedSilently(activity)
+            ?: return TesterLicenseResult.InvalidEmail
+        return applyTesterLicense(email)
+    }
+
+    private fun recordPurchaseSnapshot(line: String) {
+        synchronized(recentPurchaseLog) {
+            recentPurchaseLog.addLast("${System.currentTimeMillis()}: $line")
+            while (recentPurchaseLog.size > recentPurchaseLogMaxSize) {
+                recentPurchaseLog.removeFirst()
+            }
+        }
     }
 
     /**
@@ -211,6 +312,7 @@ class PlayBillingEntitlementRepository @Inject constructor(
             val details = runCatching { billingClient.queryExpertProductDetails() }
                 .getOrNull()
             if (details == null) {
+                Log.w(TAG, "productDetails: query returned null")
                 _productDetails.tryEmit(
                     ProductDetailsState.Error(-1, "Product details query failed")
                 )
@@ -220,6 +322,7 @@ class PlayBillingEntitlementRepository @Inject constructor(
             val yearly = details.findFormattedPrice(BasePlanId.YEARLY)
             val trialDays = details.findTrialDays()
             if (monthly == null || yearly == null) {
+                Log.w(TAG, "productDetails: missing base plan price (monthly=$monthly yearly=$yearly)")
                 _productDetails.tryEmit(
                     ProductDetailsState.Error(-1, "Configured base plans missing")
                 )

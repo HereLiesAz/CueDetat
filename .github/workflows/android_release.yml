@@ -1,0 +1,306 @@
+name: Android Release Build
+
+# Triggers:
+#  - Manual run (workflow_dispatch) with an optional tag name override.
+#  - Pushing a "v*" tag (e.g. v1.8.0) to create a tagged release automatically.
+#
+# Unlike android_debug_apk_release.yml, this workflow:
+#  - Builds the FOSS *release* APK (assembleFossRelease) with R8/minification.
+#  - Signs the APK with the production keystore.
+#  - Publishes a non-prerelease GitHub Release with the signed APK attached.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the release (e.g. v1.8.0). Leave blank to derive from version.properties.'
+        required: false
+        default: ''
+      release_notes:
+        description: 'Optional release notes. Defaults to commit SHA reference.'
+        required: false
+        default: ''
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      checks: read
+      packages: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Inject Google Services
+        env:
+          GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
+          PROJECT_ID: ${{ secrets.PROJECT_ID }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+        run: |
+          if [ -f "app/google-services.json.template" ]; then
+            echo "Template found. Injecting secrets..."
+            sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
+          else
+            echo "Warning: google-services.json.template not found. Skipping injection."
+          fi
+
+      - name: Generate Keystore from Secrets
+        env:
+          KEYSTORE_PRIVATE: ${{ secrets.KEYSTORE_PRIVATE }}
+          KEYSTORE_CHAIN: ${{ secrets.KEYSTORE_CHAIN }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          echo "Generating keystore from certificate chain and private key..."
+
+          echo "$KEYSTORE_PRIVATE" > private_key.pem
+          echo "$KEYSTORE_CHAIN" > certificate_chain.crt
+
+          openssl pkcs12 -export -in certificate_chain.crt -inkey private_key.pem \
+            -name "$KEY_ALIAS" -out keystore.p12 \
+            -password pass:"$KEYSTORE_PASSWORD"
+
+          keytool -importkeystore -srckeystore keystore.p12 -srcstoretype PKCS12 \
+            -destkeystore app/keystore.jks -deststoretype JKS \
+            -srcstorepass "$KEYSTORE_PASSWORD" \
+            -deststorepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" -noprompt
+
+          echo "Keystore generated successfully at app/keystore.jks"
+
+          rm private_key.pem certificate_chain.crt keystore.p12
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+          dependency-graph: disabled
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Release APK with Gradle
+        id: gradle-build
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          export BUILD_NUMBER=$(git rev-list --count HEAD)
+
+          ./gradlew assembleFossRelease -PversionBuild=$BUILD_NUMBER --build-cache \
+            -Pandroid.injected.signing.store.file=$(pwd)/app/keystore.jks \
+            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$KEY_PASSWORD > build.log 2>&1
+
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          cat build.log
+          exit $EXIT_CODE
+
+      - name: Verify FOSS Release APK contains no Play Billing classes
+        if: success() && steps.gradle-build.outcome == 'success'
+        run: |
+          set -e
+          APK=$(find app/build/outputs/apk/foss/release -name "*.apk" | head -n 1)
+          if [ -z "$APK" ]; then
+            echo "Error: no FOSS release APK found to verify."
+            exit 1
+          fi
+          BUILD_TOOLS_DIR=$(ls -d "$ANDROID_HOME"/build-tools/* | tail -n 1)
+          DEXDUMP="$BUILD_TOOLS_DIR/dexdump"
+          if [ ! -x "$DEXDUMP" ]; then
+            echo "Error: dexdump not found at $DEXDUMP"
+            exit 1
+          fi
+          TMPDIR=$(mktemp -d)
+          unzip -q "$APK" -d "$TMPDIR"
+          FOUND=0
+          for DEX in "$TMPDIR"/classes*.dex; do
+            if "$DEXDUMP" "$DEX" 2>/dev/null | grep -q "com/android/billingclient"; then
+              echo "ERROR: billing client class found in $DEX of FOSS release APK!"
+              FOUND=1
+            fi
+          done
+          rm -rf "$TMPDIR"
+          if [ "$FOUND" = "1" ]; then
+            exit 1
+          fi
+          echo "OK: FOSS release APK contains no com.android.billingclient classes."
+
+      - name: Verify Release APK is signed (not debug)
+        if: success() && steps.gradle-build.outcome == 'success'
+        env:
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -e
+          APK=$(find app/build/outputs/apk/foss/release -name "*.apk" | head -n 1)
+          BUILD_TOOLS_DIR=$(ls -d "$ANDROID_HOME"/build-tools/* | tail -n 1)
+          APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
+          if [ ! -x "$APKSIGNER" ]; then
+            echo "Error: apksigner not found at $APKSIGNER"
+            exit 1
+          fi
+          "$APKSIGNER" verify --verbose "$APK"
+          # Refuse to publish an APK signed by the default Android debug keystore.
+          SIGNER_INFO=$("$APKSIGNER" verify --print-certs "$APK")
+          echo "$SIGNER_INFO"
+          if echo "$SIGNER_INFO" | grep -q "CN=Android Debug"; then
+            echo "ERROR: APK is signed with the Android debug keystore — refusing to publish a debug-signed release."
+            exit 1
+          fi
+          echo "OK: Release APK is signed with a non-debug certificate."
+
+      - name: Report Failure to Jules
+        if: failure() && steps.gradle-build.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            let logTail = 'Log file not found.';
+            try { logTail = fs.readFileSync('build.log', 'utf8').slice(-4000); } catch (e) {}
+
+            const assignee = 'gemini-code-assist';
+
+            try {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `Release Build Failure on ${context.ref}`,
+                body: `@${assignee} /jules debug this release build error\n\n**Log:**\n\`\`\`\n${logTail}\n\`\`\``,
+                labels: ['jules', 'bug', 'release'],
+                assignees: [assignee]
+              });
+            } catch (error) {
+              console.log("Failed to create issue with assignee. Retrying without assignee.");
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `Release Build Failure on ${context.ref}`,
+                body: `@${assignee} /jules debug this release build error\n\n**Log:**\n\`\`\`\n${logTail}\n\`\`\``,
+                labels: ['jules', 'bug', 'release']
+              });
+            }
+
+      - name: Prepare Release Variables
+        if: success()
+        id: release_vars
+        run: |
+          export BUILD_NUMBER=$(git rev-list --count HEAD)
+
+          MAJOR=$(grep '^MAJOR=' version.properties | cut -d'=' -f2)
+          MINOR=$(grep '^MINOR=' version.properties | cut -d'=' -f2)
+
+          MINOR_COMMIT=$(git blame -L '/^MINOR=/',+1 version.properties | awk '{print $1}' | tr -d '^')
+          if [ -n "$MINOR_COMMIT" ]; then
+            PATCH=$(git rev-list --count $MINOR_COMMIT..HEAD)
+          else
+            PATCH=$(grep '^PATCH=' version.properties | cut -d'=' -f2)
+          fi
+
+          VERSION_NAME="$MAJOR.$MINOR.$PATCH.$BUILD_NUMBER"
+
+          # Tag resolution order:
+          #  1) workflow_dispatch input override
+          #  2) the pushed tag (when triggered by a v* tag push)
+          #  3) derived "v<MAJOR>.<MINOR>.<PATCH>" from version.properties
+          INPUT_TAG="${{ github.event.inputs.tag_name }}"
+          if [ -n "$INPUT_TAG" ]; then
+            TAG_NAME="$INPUT_TAG"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+          else
+            TAG_NAME="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+
+          if [ -f "settings.gradle.kts" ]; then
+             APP_NAME=$(grep 'rootProject.name' settings.gradle.kts | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
+          elif [ -f "settings.gradle" ]; then
+             APP_NAME=$(grep 'rootProject.name' settings.gradle | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
+          else
+             APP_NAME="App"
+          fi
+
+          APK_ORIGINAL=$(find app/build/outputs/apk/foss/release -name "*.apk" | head -n 1)
+
+          if [ -z "$APK_ORIGINAL" ]; then
+             echo "Error: No release APK found to release!"
+             exit 1
+          fi
+
+          TARGET_NAME="${APP_NAME}-${VERSION_NAME}-release.apk"
+          mv "$APK_ORIGINAL" "$TARGET_NAME"
+
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "APK_FILE=$TARGET_NAME" >> $GITHUB_ENV
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+
+          mkdir -p build_tools_package/tools build_tools_package/native
+          [ -d "app/src/main/assets/tools" ] && cp -r app/src/main/assets/tools/* build_tools_package/tools/ || true
+          [ -d "app/src/main/jniLibs/arm64-v8a" ] && cp -r app/src/main/jniLibs/arm64-v8a/* build_tools_package/native/ || true
+          cd build_tools_package && zip -r ../build-tools.zip . && cd ..
+
+      - name: Publish Release
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CUSTOM_NOTES: ${{ github.event.inputs.release_notes }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Only create/move the tag when the workflow wasn't itself triggered
+          # by a tag push (otherwise the tag already exists at this commit).
+          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+            git tag -fa "$TAG_NAME" -m "Release $TAG_NAME"
+            git push origin "$TAG_NAME" --force
+          fi
+
+          BUILD_TOOLS="build-tools.zip"
+
+          if [ -n "$CUSTOM_NOTES" ]; then
+            NOTES="$CUSTOM_NOTES"
+          else
+            NOTES="Release $VERSION_NAME built from commit $GITHUB_SHA"
+          fi
+
+          if gh release view "$TAG_NAME" > /dev/null 2>&1; then
+             echo "Updating existing release..."
+             gh release delete-asset "$TAG_NAME" "$BUILD_TOOLS" -y || true
+             gh release edit "$TAG_NAME" --prerelease=false --draft=false \
+               --title "Release $TAG_NAME" \
+               --notes "$NOTES" \
+               --target "$GITHUB_SHA"
+             gh release upload "$TAG_NAME" "$APK_FILE" --clobber
+             [ -f "$BUILD_TOOLS" ] && gh release upload "$TAG_NAME" "$BUILD_TOOLS" --clobber
+          else
+             echo "Creating new release..."
+             gh release create "$TAG_NAME" "$APK_FILE" \
+               --title "Release $TAG_NAME" \
+               --notes "$NOTES" \
+               --target "$GITHUB_SHA"
+             [ -f "$BUILD_TOOLS" ] && gh release upload "$TAG_NAME" "$BUILD_TOOLS" --clobber
+          fi

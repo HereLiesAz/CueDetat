@@ -125,6 +125,11 @@ val localProps = Properties().apply {
 }
 val googleCloudProjectNumber = localProps.getProperty("GOOGLE_CLOUD_PROJECT_NUMBER") ?: "0"
 val githubAccessToken = localProps.getProperty("GH_TOKEN") ?: ""
+// OAuth 2.0 *Web* client ID from Google Cloud Console. Required by
+// Credential Manager's GetGoogleIdOption. Empty when absent: the tester
+// auto-resolve falls back to no-op so the build still works for
+// contributors who don't have credentials configured.
+val googleOauthWebClientId = localProps.getProperty("GOOGLE_OAUTH_WEB_CLIENT_ID") ?: ""
 
 // Task to write back the updated properties
 tasks.register("updateVersionProperties") {
@@ -187,6 +192,7 @@ android {
         
         buildConfigField("long", "GOOGLE_CLOUD_PROJECT_NUMBER", "${googleCloudProjectNumber}L")
         buildConfigField("String", "GH_TOKEN", "\"$githubAccessToken\"")
+        buildConfigField("String", "GOOGLE_OAUTH_WEB_CLIENT_ID", "\"$googleOauthWebClientId\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -305,6 +311,14 @@ dependencies {
     // Play Billing — only included in the play flavor APK.
     "playImplementation"(libs.androidx.billing.ktx)
 
+    // Credential Manager + Google ID — only included in the play flavor APK.
+    // Used to read the device's currently-signed-in Google account email
+    // (via a one-tap account picker on first use) so the app can match it
+    // against the tester-license allowlist baked into the build.
+    "playImplementation"(libs.androidx.credentials)
+    "playImplementation"(libs.androidx.credentials.play.services.auth)
+    "playImplementation"(libs.google.id)
+
     // Core & Jetpack
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -391,6 +405,10 @@ configurations.all {
         if (requested.group == "io.netty") {
             useVersion(libs.versions.netty.get())
             because("Transitive dependency vulnerabilities in testing/grpc")
+        }
+        if (requested.group == "org.bouncycastle") {
+            useVersion(libs.versions.bouncycastle.get())
+            because("Force-upgrade Bouncy Castle modules to fix vulnerabilities and ensure version alignment")
         }
     }
 }
