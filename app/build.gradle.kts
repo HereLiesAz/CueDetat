@@ -406,6 +406,10 @@ configurations.all {
             useVersion(libs.versions.netty.get())
             because("Transitive dependency vulnerabilities in testing/grpc")
         }
+        if (requested.group == "org.bouncycastle") {
+            useVersion(libs.versions.bouncycastle.get())
+            because("Force-upgrade Bouncy Castle modules to fix vulnerabilities and ensure version alignment")
+        }
     }
 }
 
