@@ -397,6 +397,15 @@ dependencies {
         implementation(libs.guava.vulnerability) {
             because("Transitive dependency vulnerability")
         }
+        implementation(libs.bouncycastle.bcprov) {
+            because("CVE-2026-5598 covert timing channel + CVE-2026-0636 LDAP injection in older bcprov-jdk18on")
+        }
+        implementation(libs.bouncycastle.bcpkix) {
+            because("Broken/risky cryptographic algorithm vulnerability in older bcpkix-jdk18on")
+        }
+        implementation(libs.bouncycastle.bcutil) {
+            because("Pin bcutil-jdk18on alongside bcprov/bcpkix to keep Bouncy Castle modules in lockstep")
+        }
     }
 }
 
@@ -405,6 +414,14 @@ configurations.all {
         if (requested.group == "io.netty") {
             useVersion(libs.versions.netty.get())
             because("Transitive dependency vulnerabilities in testing/grpc")
+        }
+        if (requested.group == "org.bouncycastle" &&
+            (requested.name == "bcprov-jdk18on" ||
+                requested.name == "bcpkix-jdk18on" ||
+                requested.name == "bcutil-jdk18on")
+        ) {
+            useVersion(libs.versions.bouncycastle.get())
+            because("Force-upgrade transitive Bouncy Castle modules past CVE-2026-5598 / CVE-2026-0636 / bcpkix algorithm issues")
         }
     }
 }
