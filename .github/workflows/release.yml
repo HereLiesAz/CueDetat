@@ -91,22 +91,19 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: ./gradlew clean assembleRelease -PversionCode=${{ steps.versioning.outputs.new_version_code }} -PversionName=${{ steps.versioning.outputs.new_version_name }}
+        run: ./gradlew clean assembleFossRelease -PversionCode=${{ steps.versioning.outputs.new_version_code }} -PversionName=${{ steps.versioning.outputs.new_version_name }}
 
       - name: Rename APK
         id: rename_apk
         run: |
-          # Find the signed APK
-          APK_PATH=$(find ./app/build/outputs/apk/release -name "app-release.apk")
+          APK_PATH=$(find ./app/build/outputs/apk/foss/release -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: no FOSS release APK found."
+            exit 1
+          fi
           APK_DIR=$(dirname "$APK_PATH")
-          
-          # Create the new filename
           NEW_APK_NAME="Cue-Detat-v${{ steps.versioning.outputs.new_version_name }}.apk"
-          
-          # Rename the file
           mv "$APK_PATH" "$APK_DIR/$NEW_APK_NAME"
-          
-          # Set output for the upload step
           echo "new_path=$APK_DIR/$NEW_APK_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Pre-Release
