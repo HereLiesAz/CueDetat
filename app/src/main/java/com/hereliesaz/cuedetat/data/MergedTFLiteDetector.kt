@@ -130,7 +130,7 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
         inputBuffer.rewind()
     }
 
-    override fun detect(bitmap: Bitmap): List<PointF>? {
+    override fun detect(bitmap: Bitmap): MlTableDetection? {
         val interp = interpreters[HEAD_POCKET_50E] ?: return null
         return try {
             preprocess(bitmap)
@@ -156,12 +156,16 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
         }
     }
 
-    private fun parsePocketDetections(width: Int, height: Int): MlTableDetection {
+    private fun parsePocketDetections(
+        output: Array<Array<FloatArray>>,
+        width: Int,
+        height: Int,
+    ): MlTableDetection {
         val pockets = mutableListOf<PointF>()
         var tableBoundary: RectF? = null
         var maxTableScore = 0f
 
-        for (det in pocketOutput[0]) {
+        for (det in output[0]) {
             val score = det[4]
             if (score < CONFIDENCE_THRESHOLD) continue
             val classId = det[5].toInt()
