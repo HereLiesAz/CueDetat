@@ -44,8 +44,8 @@ import kotlin.math.sin
 @Composable
 fun SpinControl(
     modifier: Modifier = Modifier,
-    selectedSpinOffset: PointF?,
-    lingeringSpinOffset: PointF?,
+    selectedSpinOffset: PointF?, // Normalized -1..1
+    lingeringSpinOffset: PointF?, // Normalized -1..1
     spinPathAlpha: Float,
     onEvent: (MainScreenEvent) -> Unit
 ) {
@@ -81,7 +81,7 @@ fun SpinControl(
         modifier = modifier
             .pointerInput(Unit) {
                 awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
+                    val down = awaitFirstDown(requireUnconsumed = false)
                     val firstUp = waitForUpOrCancellation()
                     if (firstUp != null) {
                         firstUp.consume()
@@ -90,21 +90,33 @@ fun SpinControl(
                         }
                         if (secondDown != null) {
                             secondDown.consume()
-                            isMoveModeActive = true
-                            var pointerId = secondDown.id
-                            try {
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    val dragChange = event.changes.find { it.id == pointerId }
-                                    if (dragChange == null || !dragChange.pressed) break
-                                    val pan = dragChange.positionChange()
-                                    if (pan != Offset.Zero) {
-                                        onEvent(MainScreenEvent.DragSpinControl(PointF(pan.x, pan.y)))
-                                        dragChange.consume()
+                            
+                            val radiusPx = size.width / 2f
+                            val dx = secondDown.position.x - radiusPx
+                            val dy = secondDown.position.y - radiusPx
+                            val distSq = dx * dx + dy * dy
+                            
+                            if (distSq < radiusPx * radiusPx) {
+                                // Double tap INSIDE the wheel: RESET
+                                onEvent(MainScreenEvent.ClearSpinState)
+                            } else {
+                                // Double tap OUTSIDE the wheel: MOVE mode
+                                isMoveModeActive = true
+                                var pointerId = secondDown.id
+                                try {
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        val dragChange = event.changes.find { it.id == pointerId }
+                                        if (dragChange == null || !dragChange.pressed) break
+                                        val pan = dragChange.positionChange()
+                                        if (pan != Offset.Zero) {
+                                            onEvent(MainScreenEvent.DragSpinControl(PointF(pan.x, pan.y)))
+                                            dragChange.consume()
+                                        }
                                     }
+                                } finally {
+                                    isMoveModeActive = false
                                 }
-                            } finally {
-                                isMoveModeActive = false
                             }
                         }
                     }
@@ -115,7 +127,6 @@ fun SpinControl(
             modifier = Modifier
                 .size(120.dp)
                 .pointerInput(Unit) {
-                    val radiusPx = size.width / 2f
                     detectDragGestures(
                         onDragStart = { offset ->
                             onEvent(MainScreenEvent.SpinApplied(PointF(offset.x, offset.y)))
@@ -139,7 +150,22 @@ fun SpinControl(
                 }
 
                 drawImage(colorWheelBitmap, alpha = spinPathAlpha)
-                drawCircle(color = Color.White.copy(alpha = 0.5f * spinPathAlpha), radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
+                
+                // Outer ring
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.5f * spinPathAlpha),
+                    radius = radius,
+                    center = center,
+                    style = Stroke(width = 2.dp.toPx())
+                )
+
+                // Mis-cue boundary (0.85 radius)
+                drawCircle(
+                    color = Color.Red.copy(alpha = 0.3f * spinPathAlpha),
+                    radius = radius * 0.85f,
+                    center = center,
+                    style = Stroke(width = 1.dp.toPx())
+                )
 
                 // Center label
                 val labelTextSize = 12.dp.toPx()
@@ -158,8 +184,12 @@ fun SpinControl(
                     )
                 }
 
-                lingeringSpinOffset?.let { drawLogicalIndicator(it, center, radius, Color.White.copy(alpha = 0.6f * spinPathAlpha)) }
-                selectedSpinOffset?.let { drawLogicalIndicator(it, center, radius, Color.White) }
+                lingeringSpinOffset?.let { 
+                    drawLogicalIndicator(it, center, radius, Color.White.copy(alpha = 0.6f * spinPathAlpha)) 
+                }
+                selectedSpinOffset?.let { 
+                    drawLogicalIndicator(it, center, radius, Color.White) 
+                }
 
                 if (isMoveModeActive) {
                     with(moveIconPainter) {
@@ -173,8 +203,12 @@ fun SpinControl(
     }
 }
 
-private fun DrawScope.drawLogicalIndicator(offset: PointF, center: Offset, radius: Float, color: Color) {
-    val indicatorCenter = Offset(offset.x, offset.y)
+private fun DrawScope.drawLogicalIndicator(normalizedOffset: PointF, center: Offset, radius: Float, color: Color) {
+    // Map normalized -1..1 to local pixels
+    val indicatorX = center.x + (normalizedOffset.x * radius)
+    val indicatorY = center.y + (normalizedOffset.y * radius)
+    val indicatorCenter = Offset(indicatorX, indicatorY)
+    
     drawCircle(color = color, radius = 5.dp.toPx(), center = indicatorCenter)
-    drawCircle(color = color, radius = 5.dp.toPx(), center = indicatorCenter, style = Stroke(width = 2.dp.toPx()))
+    drawCircle(color = Color.Black.copy(alpha = 0.3f), radius = 5.dp.toPx(), center = indicatorCenter, style = Stroke(width = 1.dp.toPx()))
 }

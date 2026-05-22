@@ -93,12 +93,21 @@ class LineRenderer {
             distMat.get(0, 0, distArray)
         }
 
-        // IMPORTANT: Wrap in matrix block because tangent/aiming internally map points
-        canvas.save()
-        canvas.concat(activeMatrix)
+        // IMPORTANT: Tangent/aiming internally map points to screen space using activeMatrix, 
+        // so we must NOT concat activeMatrix here or we will double-project the lines.
         drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
         drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
-        canvas.restore()
+    }
+
+    fun drawBeginnerTriangles(
+        canvas: Canvas,
+        state: CueDetatState,
+        paints: PaintCache,
+        activeMatrix: Matrix
+    ) {
+        val (camArray, distArray) = resolveLensArrays(state)
+        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = false, drawTriangles = true, labelAim = null, labelTangent = null)
+        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = false, drawTriangles = true, labelAim = null, labelTangent = null)
     }
 
     fun drawBeginnerLines(
@@ -108,11 +117,8 @@ class LineRenderer {
         activeMatrix: Matrix
     ) {
         val (camArray, distArray) = resolveLensArrays(state)
-        canvas.save()
-        canvas.concat(activeMatrix)
-        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true)
-        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true)
-        canvas.restore()
+        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true, drawTriangles = false, labelAim = null, labelTangent = null)
+        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, null, drawGeometry = true, drawTriangles = false, labelAim = null, labelTangent = null)
     }
 
     fun drawBeginnerLabels(
@@ -120,14 +126,13 @@ class LineRenderer {
         state: CueDetatState,
         paints: PaintCache,
         typeface: Typeface?,
-        activeMatrix: Matrix
+        activeMatrix: Matrix,
+        labelAim: String?,
+        labelTangent: String?
     ) {
         val (camArray, distArray) = resolveLensArrays(state)
-        canvas.save()
-        canvas.concat(activeMatrix)
-        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false)
-        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false)
-        canvas.restore()
+        drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false, drawTriangles = false, labelAim = labelAim, labelTangent = labelTangent)
+        drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface, drawGeometry = false, drawTriangles = false, labelAim = labelAim, labelTangent = labelTangent)
     }
 
     private fun applyTableMask(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix) {
@@ -155,7 +160,12 @@ class LineRenderer {
         camArray: DoubleArray?, distArray: DoubleArray?
     ) {
         val shotLineAnchor = state.shotLineAnchor ?: return
-        val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
+        val protractor = state.protractorUnit
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+        
+        val warpedShotAnchor = shotLineAnchor.warpedBy(tps)
+        val warpedGhost = protractor.ghostCueBallCenter.warpedBy(tps)
+        
         val shotGuideLineConfig = ShotGuideLine()
 
         val shotLineIsWarning = state.isGeometricallyImpossible || state.isTiltBeyondLimit || state.isObstructed
@@ -170,10 +180,10 @@ class LineRenderer {
             paints = paints
         )
         val obstructionPaint = Paint(paints.pathObstructionPaint).apply {
-            strokeWidth = state.protractorUnit.radius * 2
+            strokeWidth = protractor.radius * 2
         }
 
-        val shotGuideDirection = normalize(PointF(ghostCueCenter.x - shotLineAnchor.x, ghostCueCenter.y - shotLineAnchor.y))
+        val shotGuideDirection = normalize(PointF(warpedGhost.x - warpedShotAnchor.x, warpedGhost.y - warpedShotAnchor.y))
 
         if (state.table.isVisible || state.obstacleBalls.isNotEmpty()) {
             val layer = canvas.saveLayer(null, null)
@@ -181,11 +191,12 @@ class LineRenderer {
             if (state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked) {
                 // Skip pathways in locked
             } else {
-                drawClippedLine(canvas, shotLineAnchor, shotGuideDirection, obstructionPaint, null, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
+                drawClippedLine(canvas, warpedShotAnchor, shotGuideDirection, obstructionPaint, null, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
             }
 
             state.aimingLineBankPath?.let {
-                drawBankablePath(canvas, it, obstructionPaint, null, isPocketed = false, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
+                val warpedPath = it.map { pt -> pt.warpedBy(tps) }
+                drawBankablePath(canvas, warpedPath, obstructionPaint, null, isPocketed = false, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
             }
 
             applyTableMask(canvas, state, paints, activeMatrix)
@@ -196,23 +207,25 @@ class LineRenderer {
             // Skip inner line in Pass 1; it will be drawn in drawBeginnerForeground in Pass 4
         } else {
             if (!state.isMasseModeActive) {
-                drawClippedLine(canvas, shotLineAnchor, shotGuideDirection, shotLinePaint, shotLineGlow, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
+                drawClippedLine(canvas, warpedShotAnchor, shotGuideDirection, shotLinePaint, shotLineGlow, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
             }
             drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
             drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
         }
         drawSpinPaths(canvas, state, paints, activeMatrix, camArray, distArray)
+        drawMyriadTrajectory(canvas, state, paints, activeMatrix, camArray, distArray)
 
         if (state.areHelpersVisible && state.experienceMode != ExperienceMode.BEGINNER) {
             textRenderer.drawProtractorLabels(canvas, state, paints, typeface)
         }
     }
 
-    private fun drawAimingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true) {
+    private fun drawAimingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true, drawTriangles: Boolean? = null, labelAim: String? = null, labelTangent: String? = null) {
         if (state.isMasseModeActive && !state.masseConnectsTarget) return
         val aimingLineConfig = AimingLine()
         val isPocketed = state.aimedPocketIndex != null
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
+        val shouldDrawTriangles = drawTriangles ?: isBeginnerLocked
 
         val baseAimingColor = if (isPocketed) SulfurDust else aimingLineConfig.strokeColor
         val aimingStrokeWidth = if (isBeginnerLocked) aimingLineConfig.strokeWidth * 4f else aimingLineConfig.strokeWidth
@@ -232,7 +245,7 @@ class LineRenderer {
             strokeWidth = state.protractorUnit.radius * 2
         }
 
-        val tps = state.lensWarpTps
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
         val ghostCueCenter = if (state.isMasseModeActive) state.masseGhostBallCenter ?: return
                              else state.protractorUnit.ghostCueBallCenter
         val targetCenter = state.protractorUnit.center
@@ -247,15 +260,16 @@ class LineRenderer {
             canvas.restoreToCount(layer)
         }
 
-        val textToDraw = if (isBeginnerLocked && !drawGeometry) "Aim this line at the pocket." else null
-        drawBankablePath(canvas, path, aimingLinePaint, aimingLineGlow, isPocketed, state, paints, activeMatrix, camArray, distArray, isBeginnerLocked, textToDraw, typeface, drawGeometry)
+        val textToDraw = if (isBeginnerLocked && !drawGeometry && typeface != null) labelAim else null
+        drawBankablePath(canvas, path, aimingLinePaint, aimingLineGlow, isPocketed, state, paints, activeMatrix, camArray, distArray, shouldDrawTriangles, textToDraw, typeface, drawGeometry)
     }
 
-    private fun drawTangentLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true) {
+    private fun drawTangentLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?, typeface: Typeface?, drawGeometry: Boolean = true, drawTriangles: Boolean? = null, labelAim: String? = null, labelTangent: String? = null) {
         if (state.isMasseModeActive && !state.masseConnectsTarget) return
         val tangentLineConfig = TangentLine()
         val isPocketed = state.tangentAimedPocketIndex != null
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
+        val shouldDrawTriangles = drawTriangles ?: isBeginnerLocked
 
         val baseTangentColor = if (isPocketed) WarningRed else tangentLineConfig.strokeColor
         val tangentStrokeWidth = if (isBeginnerLocked) tangentLineConfig.strokeWidth * 4f else tangentLineConfig.strokeWidth
@@ -276,7 +290,7 @@ class LineRenderer {
             paints = paints
         )
 
-        val tps = state.lensWarpTps
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
         val rawStart = if (state.isMasseModeActive) state.masseGhostBallCenter ?: return
                        else state.protractorUnit.ghostCueBallCenter
         val towards = state.protractorUnit.center
@@ -292,9 +306,9 @@ class LineRenderer {
         val start = rawStart.warpedBy(tps)
 
         if (isBeginnerLocked) {
-            val tangentTextToDraw = if (!drawGeometry) "Tangent Line" else null
-            drawClippedLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, true, tangentTextToDraw, typeface, drawGeometry)
-            drawClippedLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, true, tangentTextToDraw, typeface, drawGeometry)
+            val tangentTextToDraw = if (!drawGeometry && typeface != null) labelTangent else null
+            drawClippedLine(canvas, start, normalize(PointF(tangentDx, tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, shouldDrawTriangles, tangentTextToDraw, typeface, drawGeometry)
+            drawClippedLine(canvas, start, normalize(PointF(-tangentDx, -tangentDy)), tangentSolidPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, shouldDrawTriangles, tangentTextToDraw, typeface, drawGeometry)
             return
         }
 
@@ -315,19 +329,19 @@ class LineRenderer {
         val paths = state.spinPaths ?: return
         if (paths.isEmpty()) return
 
-        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
         val alpha = (255 * state.spinPathsAlpha).toInt()
         val spinPathPaint = Paint(paints.shotLinePaint).apply { strokeWidth = 4f }
         val spinGlowPaint = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 8f }
 
-
         val pathColor = paths.keys.firstOrNull() ?: Color.White
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
 
         paths.forEach { (color, points) ->
             if (points.size < 2) return@forEach
 
             val screenPoints = points.map { pt ->
-                val screenPt = DrawingUtils.mapPoint(pt, activeMatrix)
+                val warpedPt = pt.warpedBy(tps)
+                val screenPt = DrawingUtils.mapPoint(warpedPt, activeMatrix)
                 if (camArray != null && distArray != null && camArray.size == 9)
                     DrawingUtils.applyBarrelDistortion(screenPt.x, screenPt.y, camArray, distArray)
                 else screenPt
@@ -395,16 +409,50 @@ class LineRenderer {
                 isAntiAlias = true
             }
             state.masseImpactPoints.forEach { logicalPt ->
-                val screenPt = DrawingUtils.mapPoint(logicalPt, activeMatrix)
+                val warpedPt = logicalPt.warpedBy(tps)
+                val screenPt = DrawingUtils.mapPoint(warpedPt, activeMatrix)
                 val finalPt = if (camArray != null && distArray != null && camArray.size == 9)
                     DrawingUtils.applyBarrelDistortion(screenPt.x, screenPt.y, camArray, distArray)
                 else screenPt
-                val screenRadius = DrawingUtils.getPerspectiveRadiusAndLift(logicalPt, LOGICAL_BALL_RADIUS, state, activeMatrix).radius
+                val screenRadius = DrawingUtils.getPerspectiveRadiusAndLift(warpedPt, LOGICAL_BALL_RADIUS, state, activeMatrix).radius
                 canvas.drawCircle(finalPt.x, finalPt.y, screenRadius, ghostGlow)
                 canvas.drawCircle(finalPt.x, finalPt.y, screenRadius, ghostStroke)
             }
         }
+    }
 
+    private fun drawMyriadTrajectory(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
+        val path = state.myriadTrajectory ?: return
+        if (path.size < 2) return
+
+        val alpha = 255
+        val myriadPathPaint = Paint(paints.shotLinePaint).apply { 
+            strokeWidth = 6f
+            color = android.graphics.Color.parseColor("#E040FB") // Neon purple
+            this.alpha = alpha 
+        }
+        val myriadGlowPaint = createGlowPaint(Color(0xFFE040FB), 12f, state, paints)
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+
+        val screenPath = Path()
+        var first = true
+        path.forEach { logicalPt ->
+            val warpedPt = logicalPt.warpedBy(tps)
+            val screenPt = DrawingUtils.mapPoint(warpedPt, activeMatrix)
+            val finalPt = if (camArray != null && distArray != null && camArray.size == 9)
+                DrawingUtils.applyBarrelDistortion(screenPt.x, screenPt.y, camArray, distArray)
+            else screenPt
+
+            if (first) {
+                screenPath.moveTo(finalPt.x, finalPt.y)
+                first = false
+            } else {
+                screenPath.lineTo(finalPt.x, finalPt.y)
+            }
+        }
+
+        canvas.drawPath(screenPath, myriadGlowPaint)
+        canvas.drawPath(screenPath, myriadPathPaint)
     }
 
     private fun drawBankingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
@@ -413,7 +461,6 @@ class LineRenderer {
 
         val tps = state.lensWarpTps
         val path = rawPath.map { it.warpedBy(tps) }
-        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
 
         val isPocketed = state.pocketedBankShotPocketIndex != null
 
@@ -425,8 +472,10 @@ class LineRenderer {
             val bankLineConfigs = listOf(BankLine1(), BankLine2(), BankLine3(), BankLine4())
             val finalSegmentIndex = path.size - 2
 
-            canvas.save()
-            canvas.concat(inverseMatrix)
+            // No canvas.concat(inverseMatrix) here: buildDistortedLinePath already
+            // produces a Path in screen-space coordinates, so concatenating the inverse
+            // would double-transform the line back into logical space and render it
+            // mirrored across the canvas (the "screen is the table, in reverse" bug).
             for (i in 0 until finalSegmentIndex) {
                 val start = path[i]
                 val rawEnd = path[i + 1]
@@ -443,7 +492,6 @@ class LineRenderer {
                 canvas.drawPath(segmentPath, glowPaint)
                 canvas.drawPath(segmentPath, linePaint)
             }
-            canvas.restore()
 
             if (path.size > 1) {
                 val start = path[finalSegmentIndex]
@@ -461,8 +509,11 @@ class LineRenderer {
 
     private fun drawProtractorGuides(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
         if (state.isMasseModeActive) return
-        val ghostCueCenter = state.protractorUnit.ghostCueBallCenter
-        val targetCenter = state.protractorUnit.center
+        val protractor = state.protractorUnit
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+        val warpedGhost = protractor.ghostCueBallCenter.warpedBy(tps)
+        val warpedTarget = protractor.center.warpedBy(tps)
+        
         val config = ProtractorGuides()
 
         val guidePaint = Paint(paints.angleGuidePaint).apply {
@@ -476,11 +527,11 @@ class LineRenderer {
         }
 
         protractorAngles.forEach { angle ->
-            drawAngleGuide(canvas, ghostCueCenter, targetCenter, angle, guidePaint, state, paints, activeMatrix, camArray, distArray)
-            drawAngleGuide(canvas, ghostCueCenter, targetCenter, -angle, guidePaint, state, paints, activeMatrix, camArray, distArray)
+            drawAngleGuide(canvas, warpedGhost, warpedTarget, angle, guidePaint, state, paints, activeMatrix, camArray, distArray)
+            drawAngleGuide(canvas, warpedGhost, warpedTarget, -angle, guidePaint, state, paints, activeMatrix, camArray, distArray)
             if (state.areHelpersVisible && state.experienceMode != ExperienceMode.BEGINNER) {
-                textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, angle, textPaint, state.protractorUnit.radius)
-                textRenderer.drawAngleLabel(canvas, ghostCueCenter, targetCenter, -angle, textPaint, state.protractorUnit.radius)
+                textRenderer.drawAngleLabel(canvas, warpedGhost, warpedTarget, angle, textPaint, state.protractorUnit.radius)
+                textRenderer.drawAngleLabel(canvas, warpedGhost, warpedTarget, -angle, textPaint, state.protractorUnit.radius)
             }
         }
     }
@@ -503,38 +554,31 @@ class LineRenderer {
     ) {
         if (path.size < 2) return
         val finalSegmentIndex = path.size - 2
-        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
 
         for (i in 0..finalSegmentIndex) {
             val start = path[i]
             val rawEnd = path[i + 1]
             val isLastSegment = i == finalSegmentIndex
 
-            if (isLastSegment) {
+            if (isLastSegment && !isPocketed) {
                 val direction = normalize(PointF(rawEnd.x - start.x, rawEnd.y - start.y))
                 drawClippedLine(canvas, start, direction, primaryPaint, glowPaint, state, paints, activeMatrix, camArray, distArray, drawTriangles, textToDraw, typeface, drawGeometry)
             } else {
-                val truncatedEnd = getTruncatedEnd(start, rawEnd, state)
+                val truncatedEnd = if (isLastSegment && isPocketed) rawEnd else getTruncatedEnd(start, rawEnd, state)
                 val end = getSafeLogicalPoint(start, truncatedEnd, activeMatrix) ?: continue
 
                 val segmentPath = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
-                canvas.save()
-                canvas.concat(inverseMatrix)
                 if (drawGeometry) {
                     glowPaint?.let { canvas.drawPath(segmentPath, it) }
                     canvas.drawPath(segmentPath, primaryPaint)
                 }
-                canvas.restore()
             }
         }
     }
 
     private fun drawPath(canvas: Canvas, path: List<PointF>, paint: Paint, glowPaint: Paint? = null, state: CueDetatState, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
         if (path.size < 2) return
-        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
 
-        canvas.save()
-        canvas.concat(inverseMatrix)
         for (i in 0 until path.size - 1) {
             val start = path[i]
             val rawEnd = path[i + 1]
@@ -546,7 +590,6 @@ class LineRenderer {
             glowPaint?.let { canvas.drawPath(segmentPath, it) }
             canvas.drawPath(segmentPath, paint)
         }
-        canvas.restore()
     }
 
     private fun drawAngleGuide(
@@ -583,9 +626,9 @@ class LineRenderer {
         typeface: Typeface? = null,
         drawGeometry: Boolean = true
     ) {
-        val inverseMatrix = Matrix().apply { activeMatrix.invert(this) }
-
-        val totalLength = state.table.logicalHeight * 4.0f
+        val isDynamicBeginner = state.experienceMode == ExperienceMode.BEGINNER && !state.isBeginnerViewLocked
+        val lengthMultiplier = if (isDynamicBeginner) 20.0f else 4.0f
+        val totalLength = state.table.logicalHeight * lengthMultiplier
         val rawEnd = PointF(start.x + direction.x * totalLength, start.y + direction.y * totalLength)
 
         val truncatedEnd = getTruncatedEnd(start, rawEnd, state)
@@ -593,35 +636,31 @@ class LineRenderer {
 
         val path = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
 
-        canvas.save()
-        canvas.concat(inverseMatrix)
+        val needsPathMeasure = (drawTriangles || (textToDraw != null && state.areHelpersVisible))
+        if (needsPathMeasure) {
+            val measure = android.graphics.PathMeasure(path, false)
+            val pathLen = measure.length
 
-        val measure = android.graphics.PathMeasure(path, false)
-        val pathLen = measure.length
+            var visibleCount = 0
+            var d = 0f
+            val step = 30f // Increased step size for performance
 
-        var visibleCount = 0
-        var d = 0f
-
-        while (d <= pathLen && visibleCount < 1000) {
-            if (measure.getPosTan(d, posBuffer, tanBuffer)) {
-                val margin = 20f
-                if (posBuffer[0] in margin..(state.viewWidth - margin) && posBuffer[1] in margin..(state.viewHeight - margin)) {
-                    val idx = visibleCount * 4
-                    visiblePtsBuffer[idx] = posBuffer[0]
-                    visiblePtsBuffer[idx + 1] = posBuffer[1]
-                    visiblePtsBuffer[idx + 2] = tanBuffer[0]
-                    visiblePtsBuffer[idx + 3] = tanBuffer[1]
-                    visibleCount++
-                } else if (visibleCount > 0) {
-                    break
+            while (d <= pathLen && visibleCount < 1000) {
+                if (measure.getPosTan(d, posBuffer, tanBuffer)) {
+                    val margin = 20f
+                    if (posBuffer[0] in margin..(state.viewWidth - margin) && posBuffer[1] in margin..(state.viewHeight - margin)) {
+                        val idx = visibleCount * 4
+                        visiblePtsBuffer[idx] = posBuffer[0]
+                        visiblePtsBuffer[idx + 1] = posBuffer[1]
+                        visiblePtsBuffer[idx + 2] = tanBuffer[0]
+                        visiblePtsBuffer[idx + 3] = tanBuffer[1]
+                        visibleCount++
+                    } else if (visibleCount > 0) {
+                        break
+                    }
                 }
+                d += step
             }
-            d += 15f
-        }
-
-        if (drawGeometry) {
-            glowPaint?.let { canvas.drawPath(path, it) }
-            canvas.drawPath(path, paint)
 
             if (drawTriangles && visibleCount > 5) {
                 val trianglePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -652,40 +691,44 @@ class LineRenderer {
                     canvas.restore()
                 }
             }
+
+            if (textToDraw != null && state.areHelpersVisible && visibleCount > 0) {
+                val midPtIdx = (visibleCount / 2) * 4
+                val x = visiblePtsBuffer[midPtIdx]
+                val y = visiblePtsBuffer[midPtIdx + 1]
+                val tx = visiblePtsBuffer[midPtIdx + 2]
+                val ty = visiblePtsBuffer[midPtIdx + 3]
+                var angle = Math.toDegrees(atan2(ty.toDouble(), tx.toDouble())).toFloat()
+                var yOffset = -35f
+                if (tx < 0) {
+                    angle += 180f
+                    yOffset = 45f
+                }
+
+                val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    this.typeface = typeface
+                    textSize = 50f
+                    color = android.graphics.Color.parseColor("#00E5FF") // Cyan
+                    textAlign = Paint.Align.CENTER
+                    setShadowLayer(10f, 0f, 0f, android.graphics.Color.BLACK)
+                }
+
+                canvas.save()
+                canvas.translate(x, y)
+                canvas.rotate(angle)
+                canvas.drawText(textToDraw, 0f, yOffset, textPaint)
+                canvas.restore()
+            }
         }
 
-        if (textToDraw != null && state.areHelpersVisible && visibleCount > 0) {
-            val midPtIdx = (visibleCount / 2) * 4
-            val x = visiblePtsBuffer[midPtIdx]
-            val y = visiblePtsBuffer[midPtIdx + 1]
-            val tx = visiblePtsBuffer[midPtIdx + 2]
-            val ty = visiblePtsBuffer[midPtIdx + 3]
-            var angle = Math.toDegrees(atan2(ty.toDouble(), tx.toDouble())).toFloat()
-            var yOffset = -35f
-            if (tx < 0) {
-                angle += 180f
-                yOffset = 45f
-            }
-
-            val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.typeface = typeface
-                textSize = 50f
-                color = android.graphics.Color.parseColor("#00E5FF") // Cyan
-                textAlign = Paint.Align.CENTER
-                setShadowLayer(10f, 0f, 0f, android.graphics.Color.BLACK)
-            }
-
-            canvas.save()
-            canvas.translate(x, y)
-            canvas.rotate(angle)
-            canvas.drawText(textToDraw, 0f, yOffset, textPaint)
-            canvas.restore()
+        if (drawGeometry) {
+            glowPaint?.let { canvas.drawPath(path, it) }
+            canvas.drawPath(path, paint)
         }
-
-        canvas.restore()
     }
 
     private fun resolveLensArrays(state: CueDetatState): Pair<DoubleArray?, DoubleArray?> {
+        if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) return null to null
         val camMat = state.cameraMatrix
         val distMat = state.distCoeffs
         if (camMat == null || camMat.empty() || distMat == null || distMat.empty()) return null to null

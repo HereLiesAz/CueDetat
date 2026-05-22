@@ -1,5 +1,3 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/di/AppModule.kt
-
 package com.hereliesaz.cuedetat.di
 
 import android.content.Context
@@ -13,16 +11,16 @@ import com.google.gson.stream.JsonWriter
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
+import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.data.MergedTFLiteDetector
 import com.hereliesaz.cuedetat.network.GithubApi
-import com.hereliesaz.cuedetat.ui.composables.tablescan.CompositePocketDetector
-import com.hereliesaz.cuedetat.ui.composables.tablescan.OpenCVPocketDetector
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Singleton
@@ -46,8 +44,22 @@ object AppModule {
     @Provides
     @Singleton
     fun provideGithubApi(): GithubApi {
+        val client = if (BuildConfig.GH_TOKEN.isNotBlank()) {
+            OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    val request = chain.request().newBuilder()
+                        .addHeader("Authorization", "token ${BuildConfig.GH_TOKEN}")
+                        .build()
+                    chain.proceed(request)
+                }
+                .build()
+        } else {
+            OkHttpClient.Builder().build()
+        }
+
         return Retrofit.Builder()
             .baseUrl("https://api.github.com/")
+            .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(GithubApi::class.java)
@@ -83,17 +95,15 @@ object AppModule {
     }
 
     /**
-     * Provides the TFLite/ONNX-backed pocket detector used during table scanning.
-     * Runs TFLite (via MergedDetector) and ONNX (OpenCV DNN) side-by-side.
+     * Provides the singular, surviving TFLite-backed pocket detector.
+     * The composite illusion has been eradicated.
      */
     @Provides
     @Singleton
     fun providePocketDetector(
-        @ApplicationContext context: Context,
         mergedDetector: MergedTFLiteDetector
     ): PocketDetector {
-        val onnx = OpenCVPocketDetector(context)
-        return CompositePocketDetector(listOf(mergedDetector, onnx))
+        return mergedDetector
     }
 
     /**

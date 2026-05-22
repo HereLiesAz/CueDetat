@@ -12,8 +12,10 @@ import com.hereliesaz.cuedetat.domain.PocketId
 import com.hereliesaz.cuedetat.domain.TableScanModel
 import com.hereliesaz.cuedetat.domain.TpsWarpData
 import com.hereliesaz.cuedetat.domain.TableGeometryFitter
+import com.hereliesaz.cuedetat.domain.EdgeGeometryFitter
 import com.hereliesaz.cuedetat.domain.decomposeHomography
 import com.hereliesaz.cuedetat.view.model.Table
+import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.TableSize
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -22,13 +24,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.opencv.calib3d.Calib3d
 import org.opencv.core.Core
 import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
 import javax.inject.Inject
+import kotlin.math.sqrt
 
 /** Min observations per cluster before geometry fitting is attempted. */
 private const val MIN_OBSERVATIONS_TO_FIT = 3
@@ -36,17 +40,39 @@ private const val MIN_OBSERVATIONS_TO_FIT = 3
 /** Max distance (logical inches) to merge a new detection into an existing cluster. */
 private const val CLUSTER_MERGE_DISTANCE = 3.0f
 
+enum class ScanStep {
+    FELT_CAPTURE,
+    CORNER_QUAD,
+    POCKET_GUIDE,
+    AUTO_READY
+}
+
 @HiltViewModel
 class TableScanViewModel @Inject constructor(
     private val tableScanRepository: TableScanRepository,
     val pocketDetector: PocketDetector
 ) : ViewModel() {
 
-    private val _scanProgress = MutableStateFlow<Map<PocketId, Boolean>>(emptyMap())
-    val scanProgress: StateFlow<Map<PocketId, Boolean>> = _scanProgress.asStateFlow()
+    private val _scanStep = MutableStateFlow(ScanStep.FELT_CAPTURE)
+    val scanStep: StateFlow<ScanStep> = _scanStep.asStateFlow()
 
-    private val _selectedTableSize = MutableStateFlow<TableSize>(TableSize.EIGHT_FT)
-    val selectedTableSize: StateFlow<TableSize> = _selectedTableSize.asStateFlow()
+    private val _currentPocketTarget = MutableStateFlow<PocketId?>(null)
+    val currentPocketTarget: StateFlow<PocketId?> = _currentPocketTarget.asStateFlow()
+
+    private val _mlConfidence = MutableStateFlow(0f)
+    val mlConfidence: StateFlow<Float> = _mlConfidence.asStateFlow()
+
+    private val _mlTableBoundary = MutableStateFlow<android.graphics.RectF?>(null)
+
+    private val _darknessConfidence = MutableStateFlow(0f)
+    val darknessConfidence: StateFlow<Float> = _darknessConfidence.asStateFlow()
+
+    @Volatile private var latestCenterHistogram: List<Float> = emptyList()
+    private val capturedHistograms = mutableMapOf<PocketId, List<Float>>()
+
+    private val _scanProgress = MutableStateFlow<Map<PocketId, Boolean>>(emptyMap())
+
+    private val _selectedTableSize = MutableStateFlow(TableSize.EIGHT_FT)
 
     /**
      * Emits events when scan is complete. Collected by TableScanScreen.
@@ -63,16 +89,53 @@ class TableScanViewModel @Inject constructor(
     private val _capturedFeltHsv = MutableStateFlow<FloatArray?>(null)
     val capturedFeltHsv: StateFlow<FloatArray?> = _capturedFeltHsv.asStateFlow()
 
+    /**
+     * Corner-quad scan: up to 4 screen-space tap positions for the four corner pockets.
+     * Order in the list maps to TL, TR, BR, BL once committed. While the user is tapping,
+     * positions are appended in tap order; on commit they are reordered by screen geometry.
+     */
+    private val _cornerTaps = MutableStateFlow<List<PointF>>(emptyList())
+    val cornerTaps: StateFlow<List<PointF>> = _cornerTaps.asStateFlow()
+
     private val _selectedSampleIds = MutableStateFlow<Set<String>>(emptySet())
     val selectedSampleIds: StateFlow<Set<String>> = _selectedSampleIds.asStateFlow()
+
+    // Mutable cluster accumulator: identity → running cluster.
+    // Mutated from onFrame (Default), captureCurrentPocket (Main), resetScan (caller),
+    // and init (Main). All mutations and full reads run under synchronized(clustersLock).
+    // Critical sections are short, so a JVM monitor is sufficient and works from both
+    // suspend and non-suspend callers without coroutine plumbing.
+    private val clusters = mutableMapOf<PocketId, MutableList<PointF>>()
+    private val clustersLock = Any()
+
+    init {
+        // Resume partial scan if it exists
+        viewModelScope.launch {
+            val partial = tableScanRepository.loadPartialScan()
+            if (partial != null) {
+                val (step, savedPoints) = partial
+                _scanStep.value = step
+                synchronized(clustersLock) {
+                    savedPoints.forEach { (id, pt) ->
+                        clusters[id] = mutableListOf(pt)
+                        _scanProgress.value += (id to true)
+                    }
+                }
+
+                // If it was POCKET_GUIDE, set the target to the first missing pocket
+                if (step == ScanStep.POCKET_GUIDE) {
+                    val nextIdx = PocketId.entries.toTypedArray().indexOfFirst { !savedPoints.containsKey(it) }
+                    if (nextIdx != -1) {
+                        _currentPocketTarget.value = PocketId.entries.toTypedArray()[nextIdx]
+                    }
+                }
+            }
+        }
+    }
 
     fun toggleSampleSelection(id: String) {
         val current = _selectedSampleIds.value
         _selectedSampleIds.value = if (current.contains(id)) current - id else current + id
-    }
-
-    fun selectSamples(ids: Set<String>) {
-        _selectedSampleIds.value = ids
     }
 
     fun clearSelection() {
@@ -89,36 +152,44 @@ class TableScanViewModel @Inject constructor(
         }
     }
 
-    fun moveSample(fromIndex: Int, toIndex: Int) {
-        viewModelScope.launch {
-            _scanResult.emit(MainScreenEvent.MoveFeltSample(fromIndex, toIndex))
-        }
-    }
-
-    // Mutable cluster accumulator: identity → running cluster.
-    private val clusters = mutableMapOf<PocketId, MutableList<PointF>>()
-
     // Felt colour sampled from recent frames (rolling mean HSV of centre crop).
     @Volatile private var lastFeltHsv: FloatArray = floatArrayOf(120f, 0.5f, 0.4f)
 
-    // Last known inversePitchMatrix from the main state — set by the screen on each recompose.
-    @Volatile private var inversePitchMatrix: Matrix? = null
-    @Volatile private var hasInverseMatrix: Boolean = false
-    @Volatile private var viewWidth: Int = 0
-    @Volatile private var viewHeight: Int = 0
+    @Volatile private var currentViewOffset = PointF(0f, 0f)
+    @Volatile private var currentRotation = 0f
+    @Volatile private var currentZoomSlider = 0f
 
-    fun updateStateSnapshot(inverse: Matrix?, hasInverse: Boolean, vw: Int, vh: Int) {
+    private var inversePitchMatrix: Matrix? = null
+    private var hasInverseMatrix: Boolean = false
+    private var viewWidth: Int = 0
+    private var viewHeight: Int = 0
+
+    fun updateStateSnapshot(
+        inverse: Matrix?, 
+        hasInverse: Boolean, 
+        vw: Int, 
+        vh: Int,
+        viewOffset: PointF,
+        rotation: Float,
+        zoomSlider: Float
+    ) {
         inversePitchMatrix = inverse
         hasInverseMatrix = hasInverse
         viewWidth = vw
         viewHeight = vh
+        currentViewOffset = viewOffset
+        currentRotation = rotation
+        currentZoomSlider = zoomSlider
     }
 
     /** Called by TableScanAnalyzer each frame with the mean HSV of the centre crop of the felt. */
     fun onFeltColorSampled(hsv: FloatArray) { lastFeltHsv = hsv }
 
-    fun onTableSizeSelected(size: TableSize) {
-        _selectedTableSize.value = size
+    fun onCenterVSampled(normalizedV: Float, histogram: List<Float>) {
+        latestCenterHistogram = histogram
+        val feltV = _capturedFeltHsv.value?.get(2) ?: lastFeltHsv[2]
+        if (feltV < 0.05f) return
+        _darknessConfidence.value = (1f - (normalizedV / feltV)).coerceIn(0f, 1f)
     }
 
     /**
@@ -127,14 +198,23 @@ class TableScanViewModel @Inject constructor(
      */
     fun onFrame(
         imagePoints: List<PointF>,
+        edges: List<Pair<PointF, PointF>>?,
+        tableBoundary: android.graphics.RectF?,
+        confidence: Float,
         imageWidth: Int,
-        imageHeight: Int,
-        rotationDegrees: Int
+        imageHeight: Int
     ) {
         if (!hasInverseMatrix) return
         val inverse = inversePitchMatrix ?: return
 
+        _mlConfidence.value = confidence
+        _mlTableBoundary.value = tableBoundary
+
         viewModelScope.launch(Dispatchers.Default) {
+            var stableCount = synchronized(clustersLock) {
+                clusters.count { it.value.size >= MIN_OBSERVATIONS_TO_FIT }
+            }
+
             // Step 1: Build imageToScreenMatrix — mirrors VisionRepository.getTransformationMatrix exactly.
             val imageToScreen = Matrix().apply {
                 postScale(
@@ -150,57 +230,105 @@ class TableScanViewModel @Inject constructor(
 
             val logicalPts = imagePoints.indices.map { i ->
                 val screenPt = PointF(screenPts[i * 2], screenPts[i * 2 + 1])
-                screenToLogical(screenPt, inverse)
+                Perspective.screenToLogical(screenPt, inverse)
             }
 
-            // Step 3: Merge into clusters.
-            logicalPts.forEach { logicalPt -> mergeIntoCluster(logicalPt) }
-
-            // Step 4: Update UI progress (# of stable clusters / 6).
-            val stableCount = clusters.count { it.value.size >= MIN_OBSERVATIONS_TO_FIT }
-            _scanProgress.value = PocketId.values()
-                .take(stableCount)
-                .associateWith { true }
-
-            // Step 5: Auto-fit and complete when 6 clusters are stable.
-            if (stableCount >= 6 && !_scanComplete.value) {
-                val stableClusters = clusters.filter { it.value.size >= MIN_OBSERVATIONS_TO_FIT }
-                val centerPts = stableClusters.values.map { observations ->
-                    PointF(
-                        observations.sumOf { it.x.toDouble() }.toFloat() / observations.size,
-                        observations.sumOf { it.y.toDouble() }.toFloat() / observations.size
-                    )
+            // Step 2.5: Edge-based Alignment Refinement (Fallback Step)
+            if (!edges.isNullOrEmpty() && stableCount < 6) {
+                val edgeLogicalPts = edges.flatMap { listOf(it.first, it.second) }.map { imgPt ->
+                    val sPts = floatArrayOf(imgPt.x, imgPt.y)
+                    imageToScreen.mapPoints(sPts)
+                    Perspective.screenToLogical(PointF(sPts[0], sPts[1]), inverse)
                 }
-                val fitResult = TableGeometryFitter.fit(centerPts) ?: return@launch
+
+                val logicalTable = Table(_selectedTableSize.value, true)
+                val refinement = EdgeGeometryFitter.fitEdges(
+                    edgeLogicalPts, 
+                    logicalTable.logicalWidth, 
+                    logicalTable.logicalHeight
+                )
+
+                if (refinement != null) {
+                    // Pull the table toward the edges with a low-pass filter to prevent jitter.
+                    // We only apply this if we are not yet 'locked' by stable pockets.
+                    
+                    val nextTranslateX = currentViewOffset.x + refinement.translationDelta.x * 0.1f
+                    val nextTranslateY = currentViewOffset.y + refinement.translationDelta.y * 0.1f
+                    val nextRotation = currentRotation + refinement.rotationDelta * 0.1f
+                    
+                    _scanResult.emit(MainScreenEvent.UpdateArPose(
+                        translation = androidx.compose.ui.geometry.Offset(nextTranslateX, nextTranslateY),
+                        rotation = nextRotation,
+                        scale = 1.0f // We keep scale at 1.0 for now as it's primarily handled by ZoomSlider
+                    ))
+                }
+            }
+
+            // Steps 3-5 mutate and read clusters → run under the lock as a single
+            // critical section so the snapshot used for stableCount/auto-fit is
+            // consistent.
+            val centerPtsForFit: List<PointF>? = synchronized(clustersLock) {
+                logicalPts.forEach { logicalPt -> mergeIntoClusterLocked(logicalPt) }
+
+                stableCount = clusters.count { it.value.size >= MIN_OBSERVATIONS_TO_FIT }
+                _scanProgress.value = PocketId.entries.toTypedArray()
+                    .take(stableCount)
+                    .associateWith { true }
+
+                if (stableCount >= 6 && !_scanComplete.value) {
+                    clusters
+                        .filter { it.value.size >= MIN_OBSERVATIONS_TO_FIT }
+                        .values.map { observations ->
+                            PointF(
+                                observations.sumOf { it.x.toDouble() }.toFloat() / observations.size,
+                                observations.sumOf { it.y.toDouble() }.toFloat() / observations.size
+                            )
+                        }
+                } else null
+            }
+
+            if (centerPtsForFit != null) {
+                val fitResult = TableGeometryFitter.fit(centerPtsForFit) ?: return@launch
                 val identifiedCenters = fitResult.associate { (id, pt) -> id to pt }
-                completeScan(identifiedCenters, imageWidth.toFloat(), imageHeight.toFloat())
+                completeScan(identifiedCenters)
             }
         }
     }
 
-    private fun mergeIntoCluster(pt: PointF) {
-        for ((_, observations) in clusters) {
-            val mean = PointF(
-                observations.sumOf { it.x.toDouble() }.toFloat() / observations.size,
-                observations.sumOf { it.y.toDouble() }.toFloat() / observations.size
-            )
-            val dist = kotlin.math.hypot((pt.x - mean.x).toDouble(), (pt.y - mean.y).toDouble()).toFloat()
-            if (dist <= CLUSTER_MERGE_DISTANCE) {
+    /**
+     * Caller must hold synchronized([clustersLock]). The "Locked" suffix makes the
+     * contract explicit and prevents accidental mutation outside the lock.
+     */
+    private fun mergeIntoClusterLocked(pt: PointF) {
+        // Find existing cluster within distance
+        val nearest = clusters.minByOrNull { (_, observations) ->
+            val meanX = observations.map { it.x }.average().toFloat()
+            val meanY = observations.map { it.y }.average().toFloat()
+            val dx = pt.x - meanX
+            val dy = pt.y - meanY
+            dx * dx + dy * dy
+        }
+
+        if (nearest != null) {
+            val observations = nearest.value
+            val meanX = observations.map { it.x }.average().toFloat()
+            val meanY = observations.map { it.y }.average().toFloat()
+            val dist = sqrt(((pt.x - meanX) * (pt.x - meanX) + (pt.y - meanY) * (pt.y - meanY)).toDouble()).toFloat()
+
+            if (dist < CLUSTER_MERGE_DISTANCE) {
                 observations.add(pt)
                 return
             }
         }
         // New cluster — only create up to 6 (one per PocketId).
         // Discard detections beyond 6 to prevent false positives from overwriting real clusters.
-        if (clusters.size < PocketId.values().size) {
-            clusters[PocketId.values()[clusters.size]] = mutableListOf(pt)
+        if (clusters.size < PocketId.entries.size) {
+            clusters[PocketId.entries[clusters.size]] = mutableListOf(pt)
         }
     }
 
     private suspend fun completeScan(
-        identifiedLogical: Map<PocketId, PointF>,
-        imgWidth: Float,
-        imgHeight: Float
+        identifiedLogical: Map<PocketId, PointF>
     ) {
         val tableSize = _selectedTableSize.value
         val logicalTable = Table(tableSize, true)
@@ -246,11 +374,14 @@ class TableScanViewModel @Inject constructor(
         val tpsWarpData = TpsWarpData(srcPoints = estimatedLogical, dstPoints = trueLogical)
 
         // Build PocketClusters with initial observation data.
+        val observationCounts = synchronized(clustersLock) {
+            pocketOrder.associate { (id, _) -> id to (clusters[id]?.size ?: 1) }
+        }
         val pocketClusters = pocketOrder.map { (id, _) ->
             PocketCluster(
                 identity = id,
                 logicalPosition = identifiedLogical[id]!!,
-                observationCount = clusters[id]?.size ?: 1,
+                observationCount = observationCounts[id] ?: 1,
                 variance = 1.0f
             )
         }
@@ -263,9 +394,14 @@ class TableScanViewModel @Inject constructor(
             tableSize = tableSize,
             feltColorHsv = feltColorHsv,
             scanLatitude = location?.first,
-            scanLongitude = location?.second
+            scanLongitude = location?.second,
+            pocketSurroundHistograms = capturedHistograms.toMap(),
+            calibrationTimestamp = System.currentTimeMillis()
         )
-        tableScanRepository.save(model)
+        withContext(Dispatchers.IO) {
+            tableScanRepository.save(model)
+            tableScanRepository.clearPartialScan()
+        }
 
         // Invariant: emit LoadTableScan FIRST so tableScanModel is set in state before pose is applied.
         _scanResult.emit(MainScreenEvent.LoadTableScan(model))
@@ -275,10 +411,27 @@ class TableScanViewModel @Inject constructor(
     }
 
     fun resetScan() {
-        clusters.clear()
+        synchronized(clustersLock) { clusters.clear() }
         _scanProgress.value = emptyMap()
         _scanComplete.value = false
         _capturedFeltHsv.value = null
+        _scanStep.value = ScanStep.FELT_CAPTURE
+        _currentPocketTarget.value = null
+        _mlConfidence.value = 0f
+        _mlTableBoundary.value = null
+        _cornerTaps.value = emptyList()
+        tableScanRepository.clearPartialScan()
+    }
+
+    fun startManualHoleCapture() {
+        synchronized(clustersLock) { clusters.clear() }
+        _scanProgress.value = emptyMap()
+        _scanComplete.value = false
+        _scanStep.value = ScanStep.POCKET_GUIDE
+        _currentPocketTarget.value = PocketId.entries.toTypedArray()[0]
+        _mlConfidence.value = 0f
+        _mlTableBoundary.value = null
+        tableScanRepository.clearPartialScan()
     }
 
     // ------ Coordinate helpers ------
@@ -303,7 +456,7 @@ class TableScanViewModel @Inject constructor(
             val logicalTable = Table(tableSize, true)
             val defaultClusters = logicalTable.pockets.mapIndexed { i, pt ->
                 PocketCluster(
-                    identity = PocketId.values()[i],
+                    identity = PocketId.entries[i],
                     logicalPosition = PointF(pt.x, pt.y),
                     observationCount = 1,
                     variance = 0f
@@ -320,7 +473,10 @@ class TableScanViewModel @Inject constructor(
                 scanLongitude = location?.second
             )
             
-            tableScanRepository.save(model)
+            withContext(Dispatchers.IO) {
+                tableScanRepository.save(model)
+                tableScanRepository.clearPartialScan()
+            }
             
             // Convert Android Compose HSV (0-360, 0-1, 0-1) to OpenCV HSV (0-180, 0-255, 0-255)
             val opencvHsv = floatArrayOf(
@@ -332,20 +488,146 @@ class TableScanViewModel @Inject constructor(
             // Lock the color and place the table immediately with the default pose.
             _scanResult.emit(MainScreenEvent.LockColor(opencvHsv, floatArrayOf(5.0f, 30.0f, 30.0f)))
             _scanResult.emit(MainScreenEvent.LoadTableScan(model))
+            
+            // Explicitly place the table center at the current view center (0,0 translation)
+            _scanResult.emit(MainScreenEvent.UpdateArPose(
+                translation = androidx.compose.ui.geometry.Offset(0f, 0f), 
+                rotation = 0f, 
+                scale = 1.0f
+            ))
+            
             _capturedFeltHsv.value = lastFeltHsv
 
-            // Keep scanning for pockets to refine placement. Close after a timeout if
-            // completeScan() (the pocket-based path) hasn't already fired.
-            delay(4000L)
-            if (!_scanComplete.value) {
-                _scanComplete.value = true
-            }
+            // Skip the painful per-pocket wizard; users tap the four corner pockets directly.
+            _cornerTaps.value = emptyList()
+            _scanStep.value = ScanStep.CORNER_QUAD
+            _currentPocketTarget.value = null
         }
     }
 
-    private fun screenToLogical(screen: PointF, inverse: Matrix): PointF {
-        val arr = floatArrayOf(screen.x, screen.y)
-        inverse.mapPoints(arr)
-        return PointF(arr[0], arr[1])
+    fun onCornerTap(screenPoint: PointF) {
+        if (_scanStep.value != ScanStep.CORNER_QUAD) return
+        val current = _cornerTaps.value
+        if (current.size >= 4) return
+        _cornerTaps.value = current + screenPoint
+    }
+
+    fun onCornerDrag(index: Int, screenPoint: PointF) {
+        if (_scanStep.value != ScanStep.CORNER_QUAD) return
+        val current = _cornerTaps.value
+        if (index !in current.indices) return
+        _cornerTaps.value = current.toMutableList().also { it[index] = screenPoint }
+    }
+
+    fun clearCornerTaps() {
+        _cornerTaps.value = emptyList()
+    }
+
+    /**
+     * Sorts four screen-space corner taps into TL/TR/BR/BL order based on their
+     * geometric position relative to the centroid.
+     */
+    private fun sortCornersClockwise(corners: List<PointF>): List<PointF> {
+        if (corners.size != 4) return corners
+        val cx = corners.sumOf { it.x.toDouble() }.toFloat() / 4f
+        val cy = corners.sumOf { it.y.toDouble() }.toFloat() / 4f
+        val top = corners.filter { it.y < cy }.sortedBy { it.x }
+        val bottom = corners.filter { it.y >= cy }.sortedByDescending { it.x }
+        return (top + bottom).take(4)
+    }
+
+    /**
+     * Commit the four corner taps. Maps each screen point to logical space,
+     * derives the two side pockets from the long-side midpoints, fits a homography,
+     * and completes the scan.
+     */
+    fun completeCornerScan() {
+        val inverse = inversePitchMatrix ?: return
+        val taps = _cornerTaps.value
+        if (taps.size != 4) return
+
+        viewModelScope.launch {
+            val sorted = sortCornersClockwise(taps)
+            val tl = Perspective.screenToLogical(sorted[0], inverse)
+            val tr = Perspective.screenToLogical(sorted[1], inverse)
+            val br = Perspective.screenToLogical(sorted[2], inverse)
+            val bl = Perspective.screenToLogical(sorted[3], inverse)
+
+            // SL/SR are the two side pockets, which sit at the midpoints of the
+            // long rails. The left long rail runs TL→BL, so SL is the midpoint of
+            // those two corners; the right long rail runs TR→BR, so SR is the
+            // midpoint of those. (The Table model nudges each side pocket slightly
+            // off-rail for rendering, but that visual offset is not needed here —
+            // the geometry fit only sees the centre lines.)
+            val sl = PointF((tl.x + bl.x) / 2f, (tl.y + bl.y) / 2f)
+            val sr = PointF((tr.x + br.x) / 2f, (tr.y + br.y) / 2f)
+
+            val identified = mapOf(
+                PocketId.TL to tl,
+                PocketId.TR to tr,
+                PocketId.BR to br,
+                PocketId.BL to bl,
+                PocketId.SL to sl,
+                PocketId.SR to sr,
+            )
+
+            synchronized(clustersLock) {
+                clusters.clear()
+                identified.forEach { (id, pt) -> clusters[id] = mutableListOf(pt) }
+            }
+            _scanProgress.value = identified.keys.associateWith { true }
+            completeScan(identified)
+        }
+    }
+
+    /**
+     * User clicks to capture the pocket currently under the reticle.
+     */
+    fun captureCurrentPocket() {
+        val inverse = inversePitchMatrix ?: return
+        val step = _scanStep.value
+        val currentId = _currentPocketTarget.value ?: return
+
+        if (step != ScanStep.POCKET_GUIDE) return
+
+        viewModelScope.launch {
+            // Screen center is (viewWidth/2, viewHeight/2)
+            val screenCenter = PointF(viewWidth / 2f, viewHeight / 2f)
+            val logicalPt = Perspective.screenToLogical(screenCenter, inverse)
+
+            // Add to clusters and snapshot under the lock so concurrent onFrame
+            // calls cannot interleave.
+            val pointsToSave = synchronized(clustersLock) {
+                clusters.getOrPut(currentId) { mutableListOf() }.add(logicalPt)
+                clusters.mapValues { it.value.first() }
+            }
+            capturedHistograms[currentId] = latestCenterHistogram.toList()
+
+            _scanProgress.value += (currentId to true)
+
+            // Persist progress immediately
+            withContext(Dispatchers.IO) {
+                tableScanRepository.savePartialScan(ScanStep.POCKET_GUIDE, pointsToSave)
+            }
+
+            // Advance Wizard
+            val nextIdx = PocketId.entries.indexOf(currentId) + 1
+            if (nextIdx < PocketId.entries.size) {
+                _currentPocketTarget.value = PocketId.entries.toTypedArray()[nextIdx]
+            } else {
+                // Done capturing all 6!
+                _currentPocketTarget.value = null
+
+                val centerPts = synchronized(clustersLock) {
+                    clusters.mapValues { (_, obs) ->
+                        PointF(obs.map { it.x }.average().toFloat(), obs.map { it.y }.average().toFloat())
+                    }
+                }
+
+                // We don't use TableGeometryFitter here because the user MANUALLY told us which pocket is which.
+                // We trust the identities.
+                completeScan(centerPts)
+            }
+        }
     }
 }

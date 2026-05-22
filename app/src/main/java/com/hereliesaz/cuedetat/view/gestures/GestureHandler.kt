@@ -47,6 +47,7 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
             var lastCentroid: Offset = down.position
 
             // Loop to handle drag/move events until all fingers are lifted.
+            var hasMovedDramatically = false
             do {
                 val event = awaitPointerEvent()
                 val canceled = event.changes.any { it.isConsumed }
@@ -56,6 +57,7 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
 
                     // Check how many pointers are active.
                     if (event.changes.size >= 3) {
+                        hasMovedDramatically = true
                         // THREE-FINGER GESTURE: Z-axis table movement
                         if (uiState.table.isVisible) {
                             val pan = event.calculatePan()
@@ -64,71 +66,51 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                             }
                         }
                     } else if (event.changes.size == 2) {
+                        hasMovedDramatically = true
                         // TWO-FINGER GESTURE: zoom, rotation, pan
-
+                        
                         // 1. Zoom (Pinch)
-                        // Blocked only in Static (Locked) Beginner Mode.
                         if (uiState.experienceMode != ExperienceMode.BEGINNER || !uiState.isBeginnerViewLocked) {
                             val zoom = event.calculateZoom()
-                            if (zoom != 1f) {
-                                onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
-                            }
+                            if (zoom != 1f) onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
                         }
 
-                        // 2. Rotation & Pan (Two-finger drag)
+                        // 2. Rotation & Pan
                         if (uiState.table.isVisible) {
-                            // Table visible (Expert/Banking): allow rotation and pan.
                             val rotation = event.calculateRotation()
-                            if (rotation != 0f) {
-                                onEvent(MainScreenEvent.TableRotationApplied(rotation))
-                            }
-                            // Pan (using two fingers to move the camera view)
+                            if (rotation != 0f) onEvent(MainScreenEvent.TableRotationApplied(rotation))
                             val pan = event.calculatePan()
-                            if (abs(pan.y) > 0.1f || abs(pan.x) > 0.1f) {
-                                onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
-                            }
-                        } else if (isDynamicBeginner) {
-                            // Dynamic beginner: pan suppressed to keep anchor at screen-center-bottom.
+                            if (abs(pan.y) > 0.1f || abs(pan.x) > 0.1f) onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
                         }
                     } else if (event.changes.size == 1) {
-                        // SINGLE-TOUCH DETECTED (1 finger)
-
                         val pan = event.calculatePan()
-                        // Ensure there was actual movement.
+                        if (pan.getDistance() > 2f) hasMovedDramatically = true
+                        
                         if (pan != Offset.Zero) {
-                            // Special Case: "World Locked" mode (AR tracking suspended).
-                            // If world is locked, single finger might PAN the view instead of dragging objects,
-                            // UNLESS we are in dynamic Beginner mode which suppresses pan to keep the anchor fixed.
                             if (uiState.isWorldLocked && !isDynamicBeginner) {
                                 onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
                             } else {
-                                // Standard Case: Dragging virtual objects (Ball, Slider, Spin control).
                                 val previousPosition = lastCentroid
                                 val currentPosition = centroid
-                                onEvent(
-                                    MainScreenEvent.Drag(
-                                        previousPosition = PointF(
-                                            previousPosition.x,
-                                            previousPosition.y
-                                        ),
-                                        currentPosition = PointF(
-                                            currentPosition.x,
-                                            currentPosition.y
-                                        )
-                                    )
-                                )
+                                onEvent(MainScreenEvent.Drag(
+                                    previousPosition = PointF(previousPosition.x, previousPosition.y),
+                                    currentPosition = PointF(currentPosition.x, currentPosition.y)
+                                ))
                             }
                         }
                     }
-                    // Update the last known centroid for the next delta calculation.
                     lastCentroid = centroid
                 }
-
-                // Consume all pointer changes to indicate we handled them.
                 event.changes.forEach { if (it.pressed) it.consume() }
             } while (!canceled && event.changes.any { it.pressed })
 
             // Gesture sequence ended (all fingers up).
+            if (!hasMovedDramatically && uiState.cameraMode != com.hereliesaz.cuedetat.domain.CameraMode.OFF) {
+                // If it was a tap during ball selection phase, handle it
+                if (uiState.ballSelectionPhase != com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE) {
+                    onEvent(MainScreenEvent.ArSurfaceTapped(PointF(down.position.x, down.position.y)))
+                }
+            }
             onEvent(MainScreenEvent.GestureEnded)
         }
     }

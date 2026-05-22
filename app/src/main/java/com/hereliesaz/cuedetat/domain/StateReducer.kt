@@ -7,6 +7,7 @@ import com.hereliesaz.cuedetat.domain.reducers.reduceAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceAdvancedOptionsAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceControlAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceCvAction
+import com.hereliesaz.cuedetat.domain.reducers.reduceEntitlementAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceObstacleAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceSpinAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceSystemAction
@@ -36,7 +37,7 @@ fun stateReducer(
     reducerUtils: ReducerUtils,
     gestureReducer: GestureReducer
 ): CueDetatState {
-    return when (action) {
+    val primaryResult = when (action) {
         // --- GESTURE HANDLING ---
         // Complex interactions like Dragging balls, panning the table, or rotating.
         // These are handled by a stateful helper class [GestureReducer] because they
@@ -54,9 +55,10 @@ fun stateReducer(
         // Covers CV tuning (thresholds), Debug Masks, and hidden developer toggles.
         is MainScreenEvent.ToggleAdvancedOptionsDialog, is MainScreenEvent.ToggleCvMask,
         is MainScreenEvent.EnterCvMaskTestMode, is MainScreenEvent.ExitCvMaskTestMode,
-        is MainScreenEvent.EnterCalibrationMode, is MainScreenEvent.SampleColorAt,
+        is MainScreenEvent.StartCalibrationMode, is MainScreenEvent.SampleColorAt,
         is MainScreenEvent.ToggleCvRefinementMethod,
-        is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2 ->
+        is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2,
+        is MainScreenEvent.ToggleBillingDebugDialog ->
             reduceAdvancedOptionsAction(currentState, action)
 
         // --- CONTROLS & TRANSFORMS ---
@@ -79,7 +81,8 @@ fun stateReducer(
         is MainScreenEvent.CvDataUpdated, is MainScreenEvent.LockOrUnlockColor,
         is MainScreenEvent.LockColor, is MainScreenEvent.ClearSamplePoint,
         is MainScreenEvent.AddFeltSample, is MainScreenEvent.DeleteFeltSamples,
-        is MainScreenEvent.MoveFeltSample ->
+        is MainScreenEvent.MoveFeltSample, is MainScreenEvent.AutoCalibrateCv,
+        is MainScreenEvent.ForceArActive, is MainScreenEvent.SeedRelocaliser ->
             reduceCvAction(currentState, action)
 
         // --- OBSTACLES ---
@@ -98,7 +101,8 @@ fun stateReducer(
         // and visual path decay.
         is MainScreenEvent.SpinApplied, is MainScreenEvent.SpinSelectionEnded,
         is MainScreenEvent.DragSpinControl, is MainScreenEvent.ClearSpinState,
-        is MainScreenEvent.ToggleMasseMode, is MainScreenEvent.SpinPathTick ->
+        is MainScreenEvent.ToggleMasseMode, is MainScreenEvent.SpinPathTick,
+        is MainScreenEvent.ToggleSpinControl ->
             reduceSpinAction(currentState, action)
 
         // --- SYSTEM EVENTS ---
@@ -111,7 +115,6 @@ fun stateReducer(
         // --- UI TOGGLES ---
         // Handled by [ToggleReducer].
         // Simple boolean flips for showing/hiding dialogs and menus.
-        is MainScreenEvent.ToggleSpinControl,
         is MainScreenEvent.CycleTableSize, is MainScreenEvent.SetTableSize,
         is MainScreenEvent.ToggleTableSizeDialog, is MainScreenEvent.ToggleForceTheme,
         is MainScreenEvent.CycleCameraMode, is MainScreenEvent.ToggleDistanceUnit,
@@ -126,16 +129,43 @@ fun stateReducer(
         is MainScreenEvent.ExitToSplash,
         is MainScreenEvent.ToggleBankingMode, is MainScreenEvent.ToggleTableScanScreen,
         is MainScreenEvent.CancelArSetup,
-        is MainScreenEvent.TurnCameraOff ->
+        is MainScreenEvent.TurnCameraOff,
+        is MainScreenEvent.SetCameraMode,
+        is MainScreenEvent.ToggleTargetType, is MainScreenEvent.ToggleFlowPoke,
+        is MainScreenEvent.ToggleTopDownView, is MainScreenEvent.ClearTopDownView,
+        is MainScreenEvent.SetTopDownBitmap ->
             reduceToggleAction(currentState, action, reducerUtils)
 
         // --- ONBOARDING ---
         // Handled by [TutorialReducer].
         is MainScreenEvent.StartTutorial, is MainScreenEvent.NextTutorialStep,
-        is MainScreenEvent.EndTutorial, is MainScreenEvent.UpdateHighlightAlpha ->
+        is MainScreenEvent.EndTutorial, is MainScreenEvent.TutorialBack,
+        is MainScreenEvent.UpdateHighlightAlpha ->
             reduceTutorialAction(currentState, action)
+
+        is MainScreenEvent.MyriadTrajectoryReceived -> {
+            currentState.copy(myriadTrajectory = action.points)
+        }
+
+        // --- ENTITLEMENT ---
+        // Handled by [EntitlementReducer]. Sets isExpertEntitled and may
+        // force-downgrade EXPERT to BEGINNER if entitlement drops.
+        is MainScreenEvent.EntitlementChanged -> reduceEntitlementAction(currentState, action)
 
         // Default catch-all (should ideally never happen for known events).
         else -> currentState
+    }
+
+    // Post-dispatch: let TutorialReducer check whether this event completes a tutorial step.
+    // Tutorial-specific events are excluded — they were already handled above.
+    return if (primaryResult.showTutorialOverlay &&
+        action !is MainScreenEvent.StartTutorial &&
+        action !is MainScreenEvent.NextTutorialStep &&
+        action !is MainScreenEvent.EndTutorial &&
+        action !is MainScreenEvent.TutorialBack &&
+        action !is MainScreenEvent.UpdateHighlightAlpha) {
+        reduceTutorialAction(primaryResult, action)
+    } else {
+        primaryResult
     }
 }

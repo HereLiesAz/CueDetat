@@ -10,7 +10,6 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.core.graphics.withMatrix
 import com.hereliesaz.cuedetat.domain.BallSelectionPhase
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
@@ -29,36 +28,209 @@ import com.hereliesaz.cuedetat.view.model.LogicalCircular
 import com.hereliesaz.cuedetat.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
+import com.hereliesaz.cuedetat.view.renderer.warpedBy
 import kotlin.math.hypot
+import androidx.core.graphics.withMatrix
 
 class BallRenderer {
 
     private val textRenderer = BallTextRenderer()
 
-    fun draw(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?) {
+    // Reused per-frame to avoid GC pressure in the bounding-box draw path,
+    // which runs on every camera frame.
+    private val boundingBoxMatrix = Matrix()
+    private val boundingBoxScratch = RectF()
+
+    fun draw(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?, labels: Map<String, String>) {
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+        val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
+
+        if (isBeginnerLocked) {
+            // Replaced by granular calls in OverlayRenderer for Beginner mode
+            return
+        }
+
+        // --- PASS 1: BODIES (Bases, Glows, Outlines, Detection Rings) ---
+        
+        // 1a. Draw Main Balls (Banking or Protractor)
         if (state.isBankingMode) {
-            state.onPlaneBall?.let { bankingBall ->
-                drawGhostedBall(canvas, bankingBall, BankingBall(), state, paints)
+            state.onPlaneBall?.let { ball ->
+                drawBallBody(canvas, ball, BankingBall(), state, paints, tps)
             }
         } else {
-            drawProtractorAndActual(canvas, state, paints)
+            val protractor = state.protractorUnit
+            drawBallBody(canvas, protractor, TargetBall(), state, paints, tps)
+
+            if (!state.isMasseModeActive || state.masseConnectsTarget) {
+                val ghostCenter = if (state.isMasseModeActive) state.masseGhostBallCenter else null
+                val ghostBall = object : LogicalCircular {
+                    override val center = ghostCenter ?: protractor.ghostCueBallCenter
+                    override val radius = protractor.radius
+                }
+                drawBallBody(canvas, ghostBall, GhostCueBall(), state, paints, tps)
+            }
+
+            state.onPlaneBall?.let { ball ->
+                drawBallBody(canvas, ball, ActualCueBall(), state, paints, tps)
+            }
         }
 
+        // 1b. Draw Obstacle Balls
         state.obstacleBalls.forEach { obstacle ->
-            drawGhostedBall(canvas, obstacle, ObstacleBall(), state, paints)
+            drawBallBody(canvas, obstacle, ObstacleBall(), state, paints, tps)
         }
 
+        // 1c. Draw Detection UI (Snapped rings, passive glows, tap targets)
+        drawDetectionRings(canvas, state, paints, tps)
+
+        // 1d. (Debug) Bounding Boxes - drawn above bodies but below text/centers
         drawBoundingBoxes(canvas, state, paints)
 
-        val detectedBalls =
-            (state.visionData?.genericBalls ?: emptyList()) + (state.visionData?.customBalls
-                ?: emptyList())
+
+        // --- PASS 2: LABELS (Text) ---
+        drawAllLabels(canvas, state, paints, typeface, labels)
+
+
+        // --- PASS 3: CENTERS (Dots, Crosshairs, Highest point) ---
+        
+        // 3a. Draw Main Ball Centers
+        if (state.isBankingMode) {
+            state.onPlaneBall?.let { ball ->
+                drawBallCenter(canvas, ball, BankingBall(), state, paints, tps)
+            }
+        } else {
+            val protractor = state.protractorUnit
+            drawBallCenter(canvas, protractor, TargetBall(), state, paints, tps)
+
+            if (!state.isMasseModeActive || state.masseConnectsTarget) {
+                val ghostCenter = if (state.isMasseModeActive) state.masseGhostBallCenter else null
+                val ghostBall = object : LogicalCircular {
+                    override val center = ghostCenter ?: protractor.ghostCueBallCenter
+                    override val radius = protractor.radius
+                }
+                drawBallCenter(canvas, ghostBall, GhostCueBall(), state, paints, tps)
+            }
+
+            state.onPlaneBall?.let { ball ->
+                drawBallCenter(canvas, ball, ActualCueBall(), state, paints, tps)
+            }
+        }
+
+        // 3b. Draw Obstacle Ball Centers
+        state.obstacleBalls.forEach { obstacle ->
+            drawBallCenter(canvas, obstacle, ObstacleBall(), state, paints, tps)
+        }
+    }
+
+    fun drawBeginnerStaticCircles(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+        forEachBeginnerBall(state) { ball, config ->
+            val logicalBallMatrix = state.logicalPlaneMatrix ?: return@forEachBeginnerBall
+            val drawCenter = ball.center.warpedBy(tps)
+            val logicalScreenPos = DrawingUtils.mapPoint(drawCenter, logicalBallMatrix)
+            val mappedEdge = DrawingUtils.mapPoint(PointF(drawCenter.x + ball.radius, drawCenter.y), logicalBallMatrix)
+            val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
+
+            val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints, blurType = android.graphics.BlurMaskFilter.Blur.OUTER)
+            val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = config.strokeColor.toArgb()
+                strokeWidth = 14f
+                alpha = (config.opacity * 255).toInt()
+                style = Paint.Style.STROKE
+            }
+            val screenInnerRadius = exactScreenRadius - (14f / 2f)
+
+            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, exactScreenRadius, glowPaint)
+            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, screenInnerRadius, strokePaint)
+        }
+    }
+
+    fun drawBeginnerBubbleElements(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+        forEachBeginnerBall(state) { ball, config ->
+            val logicalBallMatrix = state.logicalPlaneMatrix ?: return@forEachBeginnerBall
+            val drawCenter = ball.center.warpedBy(tps)
+            val logicalScreenPos = DrawingUtils.mapPoint(drawCenter, logicalBallMatrix)
+            val mappedEdge = DrawingUtils.mapPoint(PointF(drawCenter.x + ball.radius, drawCenter.y), logicalBallMatrix)
+            val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
+
+            // Calculate bubble position
+            val sensitivity = 6.0f
+            val screenOffsetX = -state.currentOrientation.roll * sensitivity
+            val screenOffsetY = state.currentOrientation.pitch * sensitivity
+            val offsetDistance = hypot(screenOffsetX, screenOffsetY)
+            val finalOffsetX = if (offsetDistance > exactScreenRadius) screenOffsetX * (exactScreenRadius / offsetDistance) else screenOffsetX
+            val finalOffsetY = if (offsetDistance > exactScreenRadius) screenOffsetY * (exactScreenRadius / offsetDistance) else screenOffsetY
+            val bubbleCenter = PointF(logicalScreenPos.x + finalOffsetX, logicalScreenPos.y + finalOffsetY)
+
+            // Circle Fill
+            val translucentFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = config.strokeColor.toArgb()
+                alpha = (config.opacity * 255 * 0.15f).toInt()
+                style = Paint.Style.FILL
+            }
+            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, exactScreenRadius, translucentFillPaint)
+
+            // Bubble Dot
+            val dotRadius = exactScreenRadius * 0.1f
+            val bubbleDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                style = Paint.Style.STROKE
+                strokeWidth = 3f
+            }
+            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, dotRadius, bubbleDotPaint)
+        }
+    }
+
+    fun drawBeginnerStaticCenters(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
+        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+        forEachBeginnerBall(state) { ball, _ ->
+            val logicalBallMatrix = state.logicalPlaneMatrix ?: return@forEachBeginnerBall
+            val drawCenter = ball.center.warpedBy(tps)
+            val logicalScreenPos = DrawingUtils.mapPoint(drawCenter, logicalBallMatrix)
+            val mappedEdge = DrawingUtils.mapPoint(PointF(drawCenter.x + ball.radius, drawCenter.y), logicalBallMatrix)
+            val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
+
+            val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                style = Paint.Style.FILL
+            }
+            val dotRadius = exactScreenRadius * 0.1f
+            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, dotRadius, dotPaint)
+        }
+    }
+
+    fun drawBeginnerLabels(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?, labels: Map<String, String>) {
+        drawAllLabels(canvas, state, paints, typeface, labels)
+    }
+
+    private inline fun forEachBeginnerBall(state: CueDetatState, action: (LogicalCircular, BallsConfig) -> Unit) {
+        val protractor = state.protractorUnit
+        action(protractor, TargetBall())
+
+        if (!state.isMasseModeActive || state.masseConnectsTarget) {
+            val ghostCenter = if (state.isMasseModeActive) state.masseGhostBallCenter else null
+            val ghostBall = object : LogicalCircular {
+                override val center = ghostCenter ?: protractor.ghostCueBallCenter
+                override val radius = protractor.radius
+            }
+            action(ghostBall, GhostCueBall())
+        }
+
+        state.onPlaneBall?.let { action(it, ActualCueBall()) }
+        state.obstacleBalls.forEach { action(it, ObstacleBall()) }
+    }
+
+    private fun drawDetectionRings(canvas: Canvas, state: CueDetatState, paints: PaintCache, tps: com.hereliesaz.cuedetat.domain.TpsWarpData?) {
+        val detectedBalls = (state.visionData?.genericBalls ?: emptyList()) + 
+                           (state.visionData?.balls?.map { it.position } ?: emptyList())
         val snappedPaint = Paint(paints.targetCirclePaint).apply {
             color = SulfurDust.toArgb()
             style = Paint.Style.STROKE
             alpha = 150
         }
 
+        // Snapped Ball Indicators
         val allLogicalBalls = (listOfNotNull(state.onPlaneBall, state.protractorUnit) + state.obstacleBalls)
         allLogicalBalls.forEach { logicalBall ->
             val isSnapped = detectedBalls.any { detected ->
@@ -66,20 +238,20 @@ class BallRenderer {
             }
             if (isSnapped) {
                 state.pitchMatrix?.let { matrix ->
-                    canvas.save()
-                    canvas.concat(matrix)
-                    canvas.drawCircle(
-                        logicalBall.center.x,
-                        logicalBall.center.y,
-                        logicalBall.radius * 0.5f,
-                        snappedPaint
-                    )
-                    canvas.restore()
+                    val drawCenter = logicalBall.center.warpedBy(tps)
+                    canvas.withMatrix(matrix) {
+                        drawCircle(
+                            drawCenter.x,
+                            drawCenter.y,
+                            logicalBall.radius * 0.5f,
+                            snappedPaint
+                        )
+                    }
                 }
             }
         }
 
-        // Passive detection glow: visible before selection phase, signals CV is seeing balls
+        // Passive Detection Glow (Selection mode NONE)
         if (state.tableScanModel != null && state.ballSelectionPhase == BallSelectionPhase.NONE) {
             val candidates = state.snapCandidates ?: emptyList()
             state.pitchMatrix?.let { matrix ->
@@ -97,26 +269,25 @@ class BallRenderer {
                         color = android.graphics.Color.WHITE
                         alpha = if (candidate.isConfirmed) 200 else 80
                     }
-                    canvas.save()
-                    canvas.concat(matrix)
-                    val r = state.protractorUnit.radius * 1.3f
-                    canvas.drawCircle(candidate.detectedPoint.x, candidate.detectedPoint.y, r, glowPaint)
-                    canvas.drawCircle(candidate.detectedPoint.x, candidate.detectedPoint.y, r, ringPaint)
-                    canvas.restore()
+                    val drawCenter = candidate.detectedPoint.warpedBy(tps)
+                    canvas.withMatrix(matrix) {
+                        val r = state.protractorUnit.radius * 1.3f
+                        drawCircle(drawCenter.x, drawCenter.y, r, glowPaint)
+                        drawCircle(drawCenter.x, drawCenter.y, r, ringPaint)
+                    }
                 }
             }
         }
 
-        // Draw tap-target rings on confirmed snap candidates during ball selection phases
+        // Tap-target rings (During selection phases)
         if (state.ballSelectionPhase != BallSelectionPhase.NONE) {
             val candidates = state.snapCandidates?.filter { it.isConfirmed } ?: emptyList()
             val candidateRingPaint = Paint().apply {
                 style = Paint.Style.STROKE
                 strokeWidth = 5f
                 color = when (state.ballSelectionPhase) {
-                    BallSelectionPhase.AWAITING_CUE -> Color(0xFFFFEB3B).toArgb()   // yellow = cue ball color
-                    BallSelectionPhase.AWAITING_TARGET -> Color(0xFF4FC3F7).toArgb() // light blue = target
-                    BallSelectionPhase.NONE -> Color.White.toArgb()
+                    BallSelectionPhase.AWAITING_CUE -> Color(0xFFFFEB3B).toArgb()
+                    else -> Color(0xFF4FC3F7).toArgb()
                 }
                 alpha = 200
             }
@@ -127,154 +298,71 @@ class BallRenderer {
             }
             state.pitchMatrix?.let { matrix ->
                 candidates.forEach { candidate ->
-                    canvas.save()
-                    canvas.concat(matrix)
-                    val r = state.protractorUnit.radius
-                    canvas.drawCircle(candidate.detectedPoint.x, candidate.detectedPoint.y, r * 1.3f, candidateGlowPaint)
-                    canvas.drawCircle(candidate.detectedPoint.x, candidate.detectedPoint.y, r * 1.3f, candidateRingPaint)
-                    canvas.restore()
+                    val drawCenter = candidate.detectedPoint.warpedBy(tps)
+                    canvas.withMatrix(matrix) {
+                        val r = state.protractorUnit.radius
+                        drawCircle(drawCenter.x, drawCenter.y, r * 1.3f, candidateGlowPaint)
+                        drawCircle(drawCenter.x, drawCenter.y, r * 1.3f, candidateRingPaint)
+                    }
                 }
             }
         }
-
-        drawAllLabels(canvas, state, paints, typeface)
     }
 
-    private fun drawBoundingBoxes(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
-        val visionData = state.visionData ?: return
-        if (visionData.detectedBoundingBoxes.isEmpty() || visionData.sourceImageWidth == 0) return
-
-        val paint = Paint(paints.cvResultPaint).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 3f
-            alpha = 150
-        }
-
-        val rotation = visionData.sourceImageRotation.toFloat()
-        val srcWidth = visionData.sourceImageWidth.toFloat()
-        val srcHeight = visionData.sourceImageHeight.toFloat()
-        val canvasWidth = canvas.width.toFloat()
-        val canvasHeight = canvas.height.toFloat()
-
-        val matrix = Matrix()
-        val srcRect = RectF(0f, 0f, srcWidth, srcHeight)
-        val destRect = RectF(0f, 0f, canvasWidth, canvasHeight)
-        matrix.setRectToRect(srcRect, destRect, Matrix.ScaleToFit.FILL)
-        matrix.postRotate(rotation, canvasWidth / 2f, canvasHeight / 2f)
-
-
-        visionData.detectedBoundingBoxes.forEach { box ->
-            val boxRect = RectF(box)
-            matrix.mapRect(boxRect)
-            canvas.drawRect(boxRect, paint)
-        }
-    }
-
-
-    private fun drawProtractorAndActual(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
-        val protractor = state.protractorUnit
-
-        drawGhostedBall(canvas, protractor, TargetBall(), state, paints)
-
-        if (!state.isMasseModeActive || state.masseConnectsTarget) {
-            val ghostCenter = if (state.isMasseModeActive) state.masseGhostBallCenter else null
-            drawGhostedBall(canvas, object : LogicalCircular {
-                override val center = ghostCenter ?: protractor.ghostCueBallCenter
-                override val radius = protractor.radius
-            }, GhostCueBall(), state, paints)
-        }
-
-        state.onPlaneBall?.let {
-            drawGhostedBall(canvas, it, ActualCueBall(), state, paints)
-        }
-    }
-
-    private fun drawGhostedBall(
+    private fun drawBallBody(
         canvas: Canvas,
         ball: LogicalCircular,
         config: BallsConfig,
         state: CueDetatState,
-        paints: PaintCache
+        paints: PaintCache,
+        tps: com.hereliesaz.cuedetat.domain.TpsWarpData?
     ) {
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
 
         if (isBeginnerLocked) {
             val logicalBallMatrix = state.logicalPlaneMatrix ?: return
             val logicalScreenPos = DrawingUtils.mapPoint(ball.center, logicalBallMatrix)
-
-            // Calculate exact on-screen radius to keep everything perfectly synchronized
             val mappedEdge = DrawingUtils.mapPoint(PointF(ball.center.x + ball.radius, ball.center.y), logicalBallMatrix)
             val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
 
-            // 1. CALCULATE BUBBLE PHYSICS
+            // Calculate bubble position
             val sensitivity = 6.0f
-            // INVERTED MATH: Bubble fights gravity and floats UP to the highest point of the phone
             val screenOffsetX = -state.currentOrientation.roll * sensitivity
             val screenOffsetY = state.currentOrientation.pitch * sensitivity
-
             val offsetDistance = hypot(screenOffsetX, screenOffsetY)
-            val finalOffsetX: Float
-            val finalOffsetY: Float
-
-            // Clamp bubble so it never leaves the inside of the circle
-            if (offsetDistance > exactScreenRadius) {
-                val scale = exactScreenRadius / offsetDistance
-                finalOffsetX = screenOffsetX * scale
-                finalOffsetY = screenOffsetY * scale
-            } else {
-                finalOffsetX = screenOffsetX
-                finalOffsetY = screenOffsetY
-            }
-
+            val finalOffsetX = if (offsetDistance > exactScreenRadius) screenOffsetX * (exactScreenRadius / offsetDistance) else screenOffsetX
+            val finalOffsetY = if (offsetDistance > exactScreenRadius) screenOffsetY * (exactScreenRadius / offsetDistance) else screenOffsetY
             val bubbleCenter = PointF(logicalScreenPos.x + finalOffsetX, logicalScreenPos.y + finalOffsetY)
 
-            // 2. PAINTS
+            // Paints
             val translucentFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = config.strokeColor.toArgb()
-                alpha = (config.opacity * 255 * 0.15f).toInt() // Ensure it is distinctly translucent
+                alpha = (config.opacity * 255 * 0.15f).toInt()
                 style = Paint.Style.FILL
             }
-            val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = android.graphics.Color.WHITE
-                style = Paint.Style.FILL
-            }
-            val dotRadius = exactScreenRadius * 0.1f
-
-            val effectiveStrokeWidth = if (config is TargetBall) {
-                GhostCueBall().strokeWidth // Force Target Ball to match Ghost Ball's stroke
-            } else {
-                config.strokeWidth
-            }
-
             val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = config.strokeColor.toArgb()
-                strokeWidth = 14f // Wide stroke for beginner locked mode
+                strokeWidth = 14f
                 alpha = (config.opacity * 255).toInt()
-                style = Paint.Style.STROKE // Outline stroke, no fill
+                style = Paint.Style.STROKE
             }
-            val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints,
-                blurType = android.graphics.BlurMaskFilter.Blur.OUTER)
+            val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints, blurType = android.graphics.BlurMaskFilter.Blur.OUTER)
             val screenInnerRadius = exactScreenRadius - (14f / 2f)
 
-            // 3. DRAW IN CORRECT LAYERED ORDER (bottom to top)
-            // Layer 1: Glow on static circle (outward only, OUTER blur)
-            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, exactScreenRadius, glowPaint)
-            // Layer 2: Static circle stroke ring
-            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, screenInnerRadius, strokePaint)
-            // Layer 3: Bubble fill (translucent, moves with tilt)
+            // Order for Beginner: Bubble fill is the LOWEST.
             canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, exactScreenRadius, translucentFillPaint)
-            // Layer 4: Static center dot (white fill, fixed position)
-            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, dotRadius, dotPaint)
-            // Layer 5: Bubble center dot (white stroke only, moves with bubble)
-            val bubbleDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = android.graphics.Color.WHITE
-                style = Paint.Style.STROKE
-                strokeWidth = 3f
-            }
-            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, dotRadius, bubbleDotPaint)
+            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, exactScreenRadius, glowPaint)
+            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, screenInnerRadius, strokePaint)
 
         } else {
-            // EXPERT MODE LOGIC
+            // Expert/Dynamic Mode logic for Bodies
+            val positionMatrix = state.pitchMatrix ?: return
+            val sizeMatrix = state.sizeCalculationMatrix ?: positionMatrix
+            val drawCenter = ball.center.warpedBy(tps)
+            val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(drawCenter, ball.radius, state, sizeMatrix)
+            val logicalScreenPos = DrawingUtils.mapPoint(drawCenter, positionMatrix)
+            val yPosLifted = logicalScreenPos.y - radiusInfo.lift
+
             val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode, false)
             val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom)
 
@@ -283,24 +371,7 @@ class BallRenderer {
                 color = config.strokeColor.toArgb()
                 alpha = (config.opacity * 255).toInt()
             }
-            val dotPaint = Paint(paints.fillPaint).apply { color = android.graphics.Color.WHITE }
-            val dotRadius = ball.radius * 0.1f
-
-            val positionMatrix = state.pitchMatrix ?: return
-            val sizeMatrix = state.sizeCalculationMatrix ?: positionMatrix
-            val logicalBallMatrix = positionMatrix
-
-            val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(
-                ball.center,
-                ball.radius,
-                state,
-                sizeMatrix
-            )
-            val logicalScreenPos = DrawingUtils.mapPoint(ball.center, logicalBallMatrix)
-            val yPosLifted = logicalScreenPos.y - radiusInfo.lift
-            val isWarning =
-                (state.isGeometricallyImpossible || state.isObstructed) && config is GhostCueBall
-
+            val isWarning = (state.isGeometricallyImpossible || state.isObstructed) && config is GhostCueBall
             val strokePaint = Paint(paints.targetCirclePaint).apply {
                 color = if (isWarning) paints.warningPaint.color else config.strokeColor.toArgb()
                 strokeWidth = config.strokeWidth
@@ -314,104 +385,221 @@ class BallRenderer {
                 paints = paints
             )
 
-            canvas.save()
-            canvas.concat(logicalBallMatrix)
-            canvas.drawCircle(ball.center.x, ball.center.y, ball.radius, logicalStrokePaint)
-            canvas.drawCircle(ball.center.x, ball.center.y, dotRadius, dotPaint)
-            canvas.restore()
+            // Draw "On-Table" logical outline
+            canvas.withMatrix(positionMatrix) {
+                drawCircle(drawCenter.x, drawCenter.y, ball.radius, logicalStrokePaint)
+            }
 
-            canvas.drawCircle(
-                logicalScreenPos.x,
-                yPosLifted,
-                radiusInfo.radius,
-                glowPaint
-            )
+            // Draw "Lifted" visual body
+            canvas.drawCircle(logicalScreenPos.x, yPosLifted, radiusInfo.radius, glowPaint)
             canvas.drawCircle(logicalScreenPos.x, yPosLifted, radiusInfo.radius, strokePaint)
+        }
+    }
 
+    private fun drawBallCenter(
+        canvas: Canvas,
+        ball: LogicalCircular,
+        config: BallsConfig,
+        state: CueDetatState,
+        paints: PaintCache,
+        tps: com.hereliesaz.cuedetat.domain.TpsWarpData?
+    ) {
+        val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
+
+        if (isBeginnerLocked) {
+            val logicalBallMatrix = state.logicalPlaneMatrix ?: return
+            val logicalScreenPos = DrawingUtils.mapPoint(ball.center, logicalBallMatrix)
+            val mappedEdge = DrawingUtils.mapPoint(PointF(ball.center.x + ball.radius, ball.center.y), logicalBallMatrix)
+            val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
+
+            // Bubble physics repeated for position
+            val sensitivity = 6.0f
+            val screenOffsetX = -state.currentOrientation.roll * sensitivity
+            val screenOffsetY = state.currentOrientation.pitch * sensitivity
+            val offsetDistance = hypot(screenOffsetX, screenOffsetY)
+            val finalOffsetX = if (offsetDistance > exactScreenRadius) screenOffsetX * (exactScreenRadius / offsetDistance) else screenOffsetX
+            val finalOffsetY = if (offsetDistance > exactScreenRadius) screenOffsetY * (exactScreenRadius / offsetDistance) else screenOffsetY
+            val bubbleCenter = PointF(logicalScreenPos.x + finalOffsetX, logicalScreenPos.y + finalOffsetY)
+
+            val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                style = Paint.Style.FILL
+            }
+            val dotRadius = exactScreenRadius * 0.1f
+            val bubbleDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                style = Paint.Style.STROKE
+                strokeWidth = 3f
+            }
+
+            // Draw center points on top of text
+            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, dotRadius, dotPaint)
+            canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, dotRadius, bubbleDotPaint)
+
+        } else {
+            // Expert/Dynamic Mode logic for Centers
+            val positionMatrix = state.pitchMatrix ?: return
+            val drawCenter = ball.center.warpedBy(tps)
+            val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(drawCenter, ball.radius, state, state.sizeCalculationMatrix ?: positionMatrix)
+            val logicalScreenPos = DrawingUtils.mapPoint(drawCenter, positionMatrix)
+            val yPosLifted = logicalScreenPos.y - radiusInfo.lift
+
+            val dotPaint = Paint(paints.fillPaint).apply { color = android.graphics.Color.WHITE }
+            val dotRadius = ball.radius * 0.1f
+
+            // 1. Draw "On-Table" center dot
+            canvas.withMatrix(positionMatrix) {
+                drawCircle(drawCenter.x, drawCenter.y, dotRadius, dotPaint)
+            }
+
+            // 2. Draw "Lifted" visual center UI (Dot or Crosshair)
             val centerPaint = Paint(paints.fillPaint).apply { color = config.centerColor.toArgb() }
-            val crosshairPaint = Paint(strokePaint).apply {
-                color = config.centerColor.toArgb(); strokeWidth = config.strokeWidth
+            val crosshairPaint = Paint(paints.targetCirclePaint).apply {
+                color = config.centerColor.toArgb()
+                strokeWidth = config.strokeWidth
             }
             val centerSize = radiusInfo.radius * config.centerSize
 
             when (config.centerShape) {
                 CenterShape.NONE -> {}
-                CenterShape.DOT -> canvas.drawCircle(
-                    logicalScreenPos.x,
-                    yPosLifted,
-                    centerSize,
-                    centerPaint
-                )
-
+                CenterShape.DOT -> canvas.drawCircle(logicalScreenPos.x, yPosLifted, centerSize, centerPaint)
                 CenterShape.CROSSHAIR -> {
                     val circleRadius = centerSize * 0.4f
                     crosshairPaint.style = Paint.Style.STROKE
                     canvas.drawCircle(logicalScreenPos.x, yPosLifted, circleRadius, crosshairPaint)
-                    canvas.drawLine(
-                        logicalScreenPos.x + circleRadius,
-                        yPosLifted,
-                        logicalScreenPos.x + centerSize,
-                        yPosLifted,
-                        crosshairPaint
-                    )
-                    canvas.drawLine(
-                        logicalScreenPos.x - circleRadius,
-                        yPosLifted,
-                        logicalScreenPos.x - centerSize,
-                        yPosLifted,
-                        crosshairPaint
-                    )
-                    canvas.drawLine(
-                        logicalScreenPos.x,
-                        yPosLifted + circleRadius,
-                        logicalScreenPos.x,
-                        yPosLifted + centerSize,
-                        crosshairPaint
-                    )
-                    canvas.drawLine(
-                        logicalScreenPos.x,
-                        yPosLifted - circleRadius,
-                        logicalScreenPos.x,
-                        yPosLifted - centerSize,
-                        crosshairPaint
-                    )
+                    canvas.drawLine(logicalScreenPos.x + circleRadius, yPosLifted, logicalScreenPos.x + centerSize, yPosLifted, crosshairPaint)
+                    canvas.drawLine(logicalScreenPos.x - circleRadius, yPosLifted, logicalScreenPos.x - centerSize, yPosLifted, crosshairPaint)
+                    canvas.drawLine(logicalScreenPos.x, yPosLifted + circleRadius, logicalScreenPos.x, yPosLifted + centerSize, crosshairPaint)
+                    canvas.drawLine(logicalScreenPos.x, yPosLifted - circleRadius, logicalScreenPos.x, yPosLifted - centerSize, crosshairPaint)
                 }
             }
         }
+    }
+
+    private fun drawBoundingBoxes(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
+        val visionData = state.visionData ?: return
+        if (visionData.sourceImageWidth == 0) return
+
+        // Every detected ball must show a bounding box. If a ball is missing
+        // one (legacy path), synthesise a square box around its image-space
+        // centre using the median ball box size so the user gets a visible
+        // marker on EVERY ball the ML or CV pipeline produced.
+        //
+        // Hot path: this runs on every CV frame. Use a sequence for the
+        // median pass to avoid the intermediate filter / map / filter list
+        // allocations, and bail to the legacy detectedBoundingBoxes list
+        // before touching the per-ball loop when there are no typed balls.
+        val balls = visionData.balls
+        val sides: List<Int> = balls.asSequence()
+            .mapNotNull { it.boundingBox }
+            .map { minOf(it.width(), it.height()) }
+            .filter { it > 0 }
+            .sorted()
+            .toList()
+        val fallbackHalfSide = if (sides.isEmpty()) 0 else sides[sides.size / 2] / 2
+
+        val typedBoxesWithFallback: List<Pair<android.graphics.Rect, com.hereliesaz.cuedetat.data.BallType>> =
+            balls.mapNotNull { ball ->
+                val box = ball.boundingBox ?: if (fallbackHalfSide > 0) {
+                    android.graphics.Rect(
+                        (ball.position.x - fallbackHalfSide).toInt(),
+                        (ball.position.y - fallbackHalfSide).toInt(),
+                        (ball.position.x + fallbackHalfSide).toInt(),
+                        (ball.position.y + fallbackHalfSide).toInt(),
+                    )
+                } else null
+                box?.let { it to ball.type }
+            }
+
+        val boxes: List<Pair<android.graphics.Rect, com.hereliesaz.cuedetat.data.BallType>> =
+            if (typedBoxesWithFallback.isNotEmpty()) {
+                typedBoxesWithFallback
+            } else {
+                visionData.detectedBoundingBoxes.map { it to com.hereliesaz.cuedetat.data.BallType.UNKNOWN }
+            }
+        if (boxes.isEmpty()) return
+
+        val rotation = visionData.sourceImageRotation.toFloat()
+        val srcWidth = visionData.sourceImageWidth.toFloat()
+        val srcHeight = visionData.sourceImageHeight.toFloat()
+        val canvasWidth = canvas.width.toFloat()
+        val canvasHeight = canvas.height.toFloat()
+
+        // CameraBackground uses PreviewView.ScaleType.FILL_CENTER, which is
+        // centre-crop with rotation. Reconstruct the same transform here so
+        // bounding boxes land on top of the visible balls instead of being
+        // stretched by FILL. Reuse the same Matrix instance every frame.
+        val rotatedW = if (rotation % 180f == 0f) srcWidth else srcHeight
+        val rotatedH = if (rotation % 180f == 0f) srcHeight else srcWidth
+        val scale = maxOf(canvasWidth / rotatedW, canvasHeight / rotatedH)
+
+        boundingBoxMatrix.reset()
+        boundingBoxMatrix.postTranslate(-srcWidth / 2f, -srcHeight / 2f)
+        boundingBoxMatrix.postRotate(rotation)
+        boundingBoxMatrix.postScale(scale, scale)
+        boundingBoxMatrix.postTranslate(canvasWidth / 2f, canvasHeight / 2f)
+
+        val paint = Paint(paints.cvResultPaint).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 6f
+            alpha = 255
+        }
+
+        boxes.forEach { (box, type) ->
+            paint.color = colorForBallType(type).toArgb()
+            boundingBoxScratch.set(box)
+            boundingBoxMatrix.mapRect(boundingBoxScratch)
+            canvas.drawRect(boundingBoxScratch, paint)
+        }
+    }
+
+    private fun colorForBallType(type: com.hereliesaz.cuedetat.data.BallType): Color = when (type) {
+        // Solids vs stripes are deliberately on opposite sides of the wheel so
+        // they can't be confused at a glance against the green felt.
+        com.hereliesaz.cuedetat.data.BallType.SOLID -> Color(0xFFFFC107)   // amber
+        com.hereliesaz.cuedetat.data.BallType.STRIPE -> Color(0xFF00E5FF)  // cyan
+        com.hereliesaz.cuedetat.data.BallType.CUE -> Color(0xFFFFFFFF)     // white
+        com.hereliesaz.cuedetat.data.BallType.EIGHT -> Color(0xFFE040FB)   // magenta (8-ball is black; magenta reads against the felt)
+        // Unclassified balls are drawn in a noticeable color so a misfire of
+        // classifyBallType() is visible instead of looking like background gray.
+        com.hereliesaz.cuedetat.data.BallType.UNKNOWN -> Color(0xFFFF6D00) // orange
     }
 
     private fun drawAllLabels(
         canvas: Canvas,
         state: CueDetatState,
         paints: PaintCache,
-        typeface: Typeface?
+        typeface: Typeface?,
+        labels: Map<String, String>
     ) {
         val textPaint = paints.textPaint.apply { this.typeface = typeface }
 
         state.onPlaneBall?.let {
-            val (label, config) = if (state.isBankingMode) {
-                "Banking Ball" to LabelConfig.bankingBall
+            val (labelKey, config) = if (state.isBankingMode) {
+                "bankingBall" to LabelConfig.bankingBall
             } else {
-                "Actual Cue Ball" to LabelConfig.actualCueBall
+                "actualCueBall" to LabelConfig.actualCueBall
             }
+            val label = labels[labelKey] ?: labelKey
             textRenderer.draw(canvas, textPaint, it, label, config, state)
         }
 
         if (!state.isBankingMode) {
+            val targetLabel = labels["targetBall"] ?: "Target Ball"
             textRenderer.draw(
                 canvas,
                 textPaint,
                 state.protractorUnit,
-                "Target Ball",
+                targetLabel,
                 LabelConfig.targetBall,
                 state
             )
 
             val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
             val ghostCueText = if (isBeginnerLocked) {
-                "Aim the cue ball at\nthe center of the blue circle."
+                labels["ghostCueInstruction"] ?: "Aim the cue ball at\nthe center of the blue circle."
             } else {
-                "Ghost Cue Ball"
+                labels["ghostCueBall"] ?: "Ghost Cue Ball"
             }
 
             textRenderer.draw(canvas, textPaint, object : LogicalCircular {
@@ -421,11 +609,12 @@ class BallRenderer {
         }
 
         state.obstacleBalls.forEachIndexed { index, obstacle ->
+            val obstacleLabel = labels["obstacle"]?.format(index + 1) ?: "Obstacle ${index + 1}"
             textRenderer.draw(
                 canvas,
                 textPaint,
                 obstacle,
-                "Obstacle ${index + 1}",
+                obstacleLabel,
                 LabelConfig.obstacleBall,
                 state
             )

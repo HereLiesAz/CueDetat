@@ -23,7 +23,7 @@ import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 import org.opencv.core.Mat
 
 enum class CameraMode {
-    OFF, CAMERA, AR_SETUP, AR_ACTIVE, CAMERA_ONLY;
+    OFF, CAMERA, AR_SETUP, AR_ACTIVE, CAMERA_ONLY, LITE_AR, META_GLASSES;
     fun next(): CameraMode {
         val nextOrdinal = (this.ordinal + 1) % values().size
         return values()[nextOrdinal]
@@ -40,6 +40,14 @@ enum class ExperienceMode {
 
 enum class BallSelectionPhase {
     NONE, AWAITING_CUE, AWAITING_TARGET
+}
+
+enum class TutorialType {
+    GENERAL, DYNAMIC_NON_AR, DYNAMIC_AR, BEGINNER_STATIC, BEGINNER_DYNAMIC
+}
+
+enum class TargetType {
+    SOLIDS, STRIPES
 }
 
 @Keep
@@ -87,15 +95,21 @@ data class CueDetatState(
     val isSpinControlVisible: Boolean = false,
     val isMasseModeActive: Boolean = false,
     val masseShotAngleDeg: Float = 0f,
+    /** Normalized spin offset: x = English (side), y = Vertical (draw/follow). Range -1.0..1.0. */
     val selectedSpinOffset: PointF? = null,
     @Transient val spinPaths: Map<Color, List<PointF>>? = null,
     @Transient val masseImpactPoints: List<PointF> = emptyList(),
     @Transient val masseConnectsTarget: Boolean = false,
     @Transient val masseGhostBallCenter: PointF? = null,
     val spinControlCenter: PointF? = null,
+    /** Normalized spin offset: x = English (side), y = Vertical (draw/follow). Range -1.0..1.0. */
     val lingeringSpinOffset: PointF? = null,
     @Transient val spinPathsAlpha: Float = 1.0f,
     val showTutorialOverlay: Boolean = false,
+    val hasSeenBeginnerTutorial: Boolean = false,
+    val hasSeenDynamicBeginnerTutorial: Boolean = false,
+    val hasSeenExpertTutorial: Boolean = false,
+    val tutorialType: TutorialType = TutorialType.GENERAL,
     val currentTutorialStep: Int = 0,
     @Transient val tutorialHighlight: TutorialHighlightElement? = TutorialHighlightElement.NONE,
     @Transient val flashingTutorialElement: TutorialHighlightElement? = null,
@@ -111,14 +125,18 @@ data class CueDetatState(
     @Transient val visionData: VisionData? = null,
     @Transient val arConfidenceHistory: List<Float> = emptyList(),
     @Transient val arLowConfidenceFrameCount: Int = 0,
+    @Transient val relocaliserDeltaQ: FloatArray? = null,
+    @Transient val relocaliserAttemptFrames: Int = 0,
     @Transient val snapCandidates: List<SnapCandidate>? = null,
     @Transient val tableScanModel: TableScanModel? = null,
     @Transient val depthPlane: DepthPlane? = null,
     @Transient val arDerivedPitch: Float? = null,
+    @Transient val arMeasuredHeightM: Float? = null,
     val depthCapability: DepthCapability = DepthCapability.NONE,
     val lockedHsvColor: FloatArray? = null,
     val lockedHsvStdDev: FloatArray? = null,
     val showAdvancedOptionsDialog: Boolean = false,
+    val showBillingDebugDialog: Boolean = false,
     val showCalibrationScreen: Boolean = false,
     val showTableScanScreen: Boolean = false,
     val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
@@ -165,6 +183,13 @@ data class CueDetatState(
     val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
     @Transient val targetBallDistance: Float = 0f,
     val lensWarpTps: TpsWarpData? = null,
+    @Transient val myriadTrajectory: List<PointF>? = null,
+    val targetType: TargetType = TargetType.SOLIDS,
+    val isFlowPokeEnabled: Boolean = true,
+    val isTopDownViewActive: Boolean = false,
+    @Transient val topDownBitmap: android.graphics.Bitmap? = null,
+    val topDownTransitionProgress: Float = 0f,
+    val isExpertEntitled: Boolean = false,
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
@@ -185,6 +210,8 @@ sealed class MainScreenEvent {
     object ToggleExperienceModeSelection : MainScreenEvent()
     object ApplyPendingExperienceMode : MainScreenEvent()
     data class SetExperienceMode(val mode: ExperienceMode) : MainScreenEvent()
+    data class EntitlementChanged(val entitlement: com.hereliesaz.cuedetat.billing.Entitlement) : MainScreenEvent()
+    data class ShowPaywall(val trigger: com.hereliesaz.cuedetat.billing.PaywallTrigger) : MainScreenEvent()
     data class ScreenGestureStarted(val position: PointF) : MainScreenEvent()
     data class Drag(val previousPosition: PointF, val currentPosition: PointF) : MainScreenEvent()
     object GestureEnded : MainScreenEvent()
@@ -220,6 +247,7 @@ sealed class MainScreenEvent {
     object ToggleTableSizeDialog : MainScreenEvent()
     object ToggleForceTheme : MainScreenEvent()
     object CycleCameraMode : MainScreenEvent()
+    data class SetCameraMode(val mode: CameraMode) : MainScreenEvent()
     object ToggleLuminanceDialog : MainScreenEvent()
     data class AdjustLuminance(val adjustment: Float) : MainScreenEvent()
     object ToggleDistanceUnit : MainScreenEvent()
@@ -244,6 +272,7 @@ sealed class MainScreenEvent {
     object StartArTracking : MainScreenEvent()
     object ClearSamplePoint : MainScreenEvent()
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
+    object ToggleBillingDebugDialog : MainScreenEvent()
     object ToggleCalibrationScreen : MainScreenEvent()
     data class ApplyQuickAlign(
         val translation: Offset,
@@ -260,9 +289,9 @@ sealed class MainScreenEvent {
     object ToggleCvMask : MainScreenEvent()
     object EnterCvMaskTestMode : MainScreenEvent()
     object ExitCvMaskTestMode : MainScreenEvent()
-    object EnterCalibrationMode : MainScreenEvent()
+    object StartCalibrationMode : MainScreenEvent()
     data class SampleColorAt(val screenPosition: Offset) : MainScreenEvent()
-    object StartTutorial : MainScreenEvent()
+    data class StartTutorial(val type: TutorialType = TutorialType.GENERAL) : MainScreenEvent()
     object NextTutorialStep : MainScreenEvent()
     object EndTutorial : MainScreenEvent()
     object TutorialBack : MainScreenEvent()
@@ -279,6 +308,7 @@ sealed class MainScreenEvent {
     // Table scan events
     data class LoadTableScan(val model: TableScanModel) : MainScreenEvent()
     object ClearTableScan : MainScreenEvent()
+    object StartManualHoleCapture : MainScreenEvent()
     data class UpdateArPose(
         val translation: Offset,
         val rotation: Float,
@@ -301,4 +331,15 @@ sealed class MainScreenEvent {
     object CancelArSetup : MainScreenEvent()
     object TurnCameraOff : MainScreenEvent()
     object ArTrackingLost : MainScreenEvent()
+    data class MyriadTrajectoryReceived(val points: List<PointF>) : MainScreenEvent()
+    data class ArSurfaceTapped(val screenPoint: PointF) : MainScreenEvent()
+    object ToggleTargetType : MainScreenEvent()
+    object ToggleFlowPoke : MainScreenEvent()
+    object ToggleTopDownView : MainScreenEvent()
+    object ClearTopDownView : MainScreenEvent()
+    data class SetTopDownBitmap(val bitmap: android.graphics.Bitmap?) : MainScreenEvent()
+
+    // Relocalisation events
+    object ForceArActive : MainScreenEvent()
+    data class SeedRelocaliser(val deltaQ: FloatArray?) : MainScreenEvent()
 }

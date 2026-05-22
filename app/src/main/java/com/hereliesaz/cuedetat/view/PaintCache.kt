@@ -101,6 +101,9 @@ class PaintCache {
         xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
     }
 
+    /** Paint for marking ball positions on the top-down snapshot overlay. */
+    val ballOverlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+
     /** Cache for generated glow paints (dynamic based on color/width). */
     val glowPaints = mutableMapOf<String, Paint>()
 
@@ -229,6 +232,10 @@ class PaintCache {
 
         // Pockets
         pocketFillPaint.color = holesConfig.fillColor.toArgb()
+
+        // Top-down snapshot ball markers
+        ballOverlayPaint.color = Color.White.toArgb()
+        ballOverlayPaint.strokeWidth = 3f
 
         // Universal/System Paints
         warningPaint.color = WarningRed.toArgb()

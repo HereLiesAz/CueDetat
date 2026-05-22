@@ -11,7 +11,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class VisionAnalyzer @Inject constructor(
     private val visionRepository: VisionRepository
 ) : ImageAnalysis.Analyzer {
@@ -29,22 +31,27 @@ class VisionAnalyzer @Inject constructor(
     override fun analyze(image: ImageProxy) {
         uiStateRef.get()?.let { state ->
             val bitmap = image.toBitmap()
-            _currentFrameBitmap.value = bitmap
-            if (state.experienceMode == com.hereliesaz.cuedetat.domain.ExperienceMode.HATER) {
-                // HATER mode only needs the frame for display — skip the full CV pipeline.
-                image.close()
-                return@let
-            }
-            if (state.isBeginnerViewLocked || bitmap == null) {
-                image.close()
-            } else {
-                visionRepository.processImage(image, bitmap, state)
-            }
-        } ?: image.close() // Close the image if state is not available to prevent leaks
+            analyze(bitmap, state, image)
+        } ?: image.close()
     }
 
-    // Reuse output bitmap across frames to avoid per-frame allocation.
+    fun analyze(bitmap: Bitmap?, state: CueDetatState, imageProxy: ImageProxy? = null) {
+        _currentFrameBitmap.value = bitmap
+        if (state.experienceMode == com.hereliesaz.cuedetat.domain.ExperienceMode.HATER) {
+            imageProxy?.close()
+            return
+        }
+        val skipProcessing = state.isBeginnerViewLocked
+        if (skipProcessing || bitmap == null) {
+            imageProxy?.close()
+        } else {
+            visionRepository.processImage(imageProxy, bitmap, state)
+        }
+    }
+
+    // Reuse output bitmap and pixel array across frames to avoid per-frame allocation.
     private var outputBitmap: Bitmap? = null
+    private var pixelBuffer: IntArray? = null
 
     @OptIn(ExperimentalGetImage::class)
     private fun ImageProxy.toBitmap(): Bitmap? {
@@ -66,7 +73,10 @@ class VisionAnalyzer @Inject constructor(
         val vBuf = vPlane.buffer
 
         // Reuse pixel array to avoid per-frame allocation.
-        val pixels = IntArray(width * height)
+        if (pixelBuffer?.size != width * height) {
+            pixelBuffer = IntArray(width * height)
+        }
+        val pixels = pixelBuffer!!
         for (row in 0 until height) {
             for (col in 0 until width) {
                 val y = yBuf.get(row * yRowStride + col).toInt() and 0xFF

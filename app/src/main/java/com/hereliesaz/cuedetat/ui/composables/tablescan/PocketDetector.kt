@@ -2,13 +2,17 @@ package com.hereliesaz.cuedetat.ui.composables.tablescan
 
 import android.graphics.Bitmap
 import android.graphics.PointF
+import android.graphics.RectF
+
+data class MlTableDetection(
+    val tableBoundary: RectF? = null,
+    val pockets: List<PointF> = emptyList(),
+    val confidence: Float = 0f
+)
 
 /**
  * TFLite pocket detection interface.
- * * The documentation previously promised a safety net of 1990s circle math.
- * That was a lie. Returning null now mathematically mandates the void by
- * collapsing the felt boundary into a strict quadrilateral prison.
  */
 interface PocketDetector {
-    fun detect(bitmap: Bitmap): List<PointF>?
+    fun detect(bitmap: Bitmap): MlTableDetection?
 }

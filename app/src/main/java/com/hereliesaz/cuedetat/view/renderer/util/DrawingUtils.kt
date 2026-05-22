@@ -20,27 +20,35 @@ object DrawingUtils {
         state: CueDetatState,
         matrix: Matrix
     ): PerspectiveRadiusInfo {
+        synchronized(ptsBuffer) {
+            ptsBuffer[0] = logicalCenter.x
+            ptsBuffer[1] = logicalCenter.y
+            matrix.mapPoints(ptsBuffer)
+            val centerX = ptsBuffer[0]
+            val centerY = ptsBuffer[1]
 
-        val centerPoint = floatArrayOf(logicalCenter.x, logicalCenter.y)
-        matrix.mapPoints(centerPoint)
+            ptsBuffer[0] = logicalCenter.x + logicalRadius
+            ptsBuffer[1] = logicalCenter.y
+            matrix.mapPoints(ptsBuffer)
+            val edgeX = ptsBuffer[0]
+            val edgeY = ptsBuffer[1]
 
-        val edgePoint = floatArrayOf(logicalCenter.x + logicalRadius, logicalCenter.y)
-        matrix.mapPoints(edgePoint)
+            val radiusOnScreen = hypot((centerX - edgeX).toDouble(), (centerY - edgeY).toDouble()).toFloat()
+            val lift = radiusOnScreen * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
 
-        val radiusOnScreen = hypot(
-            (centerPoint[0] - edgePoint[0]).toDouble(),
-            (centerPoint[1] - edgePoint[1]).toDouble()
-        ).toFloat()
-
-        val lift = radiusOnScreen * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat()
-
-        return PerspectiveRadiusInfo(radiusOnScreen, lift)
+            return PerspectiveRadiusInfo(radiusOnScreen, lift)
+        }
     }
 
+    private val ptsBuffer = FloatArray(2)
+
     fun mapPoint(p: PointF, m: Matrix): PointF {
-        val arr = floatArrayOf(p.x, p.y)
-        m.mapPoints(arr)
-        return PointF(arr[0], arr[1])
+        synchronized(ptsBuffer) {
+            ptsBuffer[0] = p.x
+            ptsBuffer[1] = p.y
+            m.mapPoints(ptsBuffer)
+            return PointF(ptsBuffer[0], ptsBuffer[1])
+        }
     }
 
     fun applyBarrelDistortion(
@@ -87,6 +95,8 @@ object DrawingUtils {
         segments: Int = 20
     ): Path {
         val path = Path()
+        val hasDistortion = cameraMatrix != null && distCoeffs != null && cameraMatrix.size == 9
+        val localPts = FloatArray(2)
 
         for (i in 0..segments) {
             val t = i.toFloat() / segments
@@ -94,18 +104,26 @@ object DrawingUtils {
             val currentLogicalX = startLogical.x + (endLogical.x - startLogical.x) * t
             val currentLogicalY = startLogical.y + (endLogical.y - startLogical.y) * t
 
-            val screenPt = mapPoint(PointF(currentLogicalX, currentLogicalY), pitchMatrix)
+            localPts[0] = currentLogicalX
+            localPts[1] = currentLogicalY
+            pitchMatrix.mapPoints(localPts)
 
-            val finalPt = if (cameraMatrix != null && distCoeffs != null && cameraMatrix.size == 9) {
-                applyBarrelDistortion(screenPt.x, screenPt.y, cameraMatrix, distCoeffs)
+            val finalX: Float
+            val finalY: Float
+
+            if (hasDistortion) {
+                val distorted = applyBarrelDistortion(localPts[0], localPts[1], cameraMatrix, distCoeffs)
+                finalX = distorted.x
+                finalY = distorted.y
             } else {
-                screenPt
+                finalX = localPts[0]
+                finalY = localPts[1]
             }
 
             if (i == 0) {
-                path.moveTo(finalPt.x, finalPt.y)
+                path.moveTo(finalX, finalY)
             } else {
-                path.lineTo(finalPt.x, finalPt.y)
+                path.lineTo(finalX, finalY)
             }
         }
         return path

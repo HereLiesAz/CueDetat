@@ -5,6 +5,7 @@ package com.hereliesaz.cuedetat.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -14,6 +15,7 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -34,6 +36,48 @@ class UserPreferencesRepository @Inject constructor(
         val STATE_JSON = stringPreferencesKey("state_json")
         val CAMERA_MATRIX_JSON = stringPreferencesKey("camera_matrix_json")
         val DIST_COEFFS_JSON = stringPreferencesKey("dist_coeffs_json")
+
+        // Tutorial-seen flags are stored as dedicated keys (not embedded in
+        // STATE_JSON) so they survive the 2-second debounce on the main state
+        // save. The state save can be cancelled indefinitely by the high-rate
+        // FullOrientationChanged sensor events; these flags must reach disk
+        // the moment the user taps "Done", or the tutorial fires again on
+        // every fresh launch.
+        val HAS_SEEN_BEGINNER_TUTORIAL = booleanPreferencesKey("has_seen_beginner_tutorial")
+        val HAS_SEEN_DYNAMIC_BEGINNER_TUTORIAL = booleanPreferencesKey("has_seen_dynamic_beginner_tutorial")
+        val HAS_SEEN_EXPERT_TUTORIAL = booleanPreferencesKey("has_seen_expert_tutorial")
+    }
+
+    data class TutorialSeenFlags(
+        val beginner: Boolean,
+        val dynamicBeginner: Boolean,
+        val expert: Boolean,
+    )
+
+    suspend fun readTutorialSeenFlags(): TutorialSeenFlags {
+        val prefs = dataStore.data.first()
+        return TutorialSeenFlags(
+            beginner = prefs[PreferencesKeys.HAS_SEEN_BEGINNER_TUTORIAL] ?: false,
+            dynamicBeginner = prefs[PreferencesKeys.HAS_SEEN_DYNAMIC_BEGINNER_TUTORIAL] ?: false,
+            expert = prefs[PreferencesKeys.HAS_SEEN_EXPERT_TUTORIAL] ?: false,
+        )
+    }
+
+    /**
+     * Persists only the flags that are set to `true`. Designed to be called
+     * with the latest CueDetatState's seen flags whenever any of them flips.
+     * Idempotent — re-writing `true` for an already-true flag is harmless.
+     */
+    suspend fun setTutorialSeenFlags(
+        beginner: Boolean,
+        dynamicBeginner: Boolean,
+        expert: Boolean,
+    ) {
+        dataStore.edit { prefs ->
+            if (beginner) prefs[PreferencesKeys.HAS_SEEN_BEGINNER_TUTORIAL] = true
+            if (dynamicBeginner) prefs[PreferencesKeys.HAS_SEEN_DYNAMIC_BEGINNER_TUTORIAL] = true
+            if (expert) prefs[PreferencesKeys.HAS_SEEN_EXPERT_TUTORIAL] = true
+        }
     }
 
     val stateFlow: Flow<CueDetatState?> = dataStore.data
@@ -82,7 +126,12 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun saveState(state: CueDetatState) {
         dataStore.edit { preferences ->
-            val stateToSave = state.copy(experienceMode = null)
+            // isExpertEntitled is sourced live from EntitlementRepository on every
+            // launch — persisting it lets stale values clobber the FOSS build's
+            // always-true entitlement (and a Play user's just-redeemed purchase)
+            // when the saved state is reloaded after the entitlement event has
+            // already updated _uiState.
+            val stateToSave = state.copy(experienceMode = null, isExpertEntitled = false)
             val jsonString = gson.toJson(stateToSave)
             preferences[PreferencesKeys.STATE_JSON] = jsonString
         }

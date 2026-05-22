@@ -10,6 +10,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <application
         android:name=".MyApplication"
@@ -27,6 +29,12 @@
         tools:targetApi="36">
         <!-- ARCore optional: Play Store will offer ARCore install on supported devices -->
         <meta-data android:name="com.google.ar.core" android:value="optional" />
+
+        <!-- Meta Wearables DAT Required -->
+        <meta-data
+            android:name="com.meta.wearable.mwdat.APPLICATION_ID"
+            android:value="your_app_id_here" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -26,7 +26,8 @@ class WarningManager @Inject constructor() {
         }
     }
 
-    private fun dismissWarning() {
+    fun dismissWarning() {
+        warningDismissJob?.cancel()
         _currentWarning.value = null
     }
 }

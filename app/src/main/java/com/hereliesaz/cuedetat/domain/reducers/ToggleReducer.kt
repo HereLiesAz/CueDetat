@@ -9,7 +9,6 @@ import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ReducerUtils
-import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
@@ -20,19 +19,6 @@ internal fun reduceToggleAction(
     reducerUtils: ReducerUtils
 ): CueDetatState {
     return when (action) {
-        is MainScreenEvent.ToggleSpinControl -> {
-            val isNowVisible = !state.isSpinControlVisible
-            if (isNowVisible) {
-                state.copy(isSpinControlVisible = true)
-            } else {
-                state.copy(
-                    isSpinControlVisible = false,
-                    selectedSpinOffset = null,
-                    lingeringSpinOffset = null,
-                    spinPaths = null
-                )
-            }
-        }
         is MainScreenEvent.ToggleBankingMode -> handleToggleBankingMode(state, reducerUtils)
         is MainScreenEvent.CycleTableSize -> {
             val newState = state.copy(table = state.table.copy(size = state.table.size.next()), valuesChangedSinceReset = true)
@@ -56,15 +42,57 @@ internal fun reduceToggleAction(
                 tableScanModel = null,
                 lensWarpTps = null
             )
+            CameraMode.AR_ACTIVE -> state.copy(cameraMode = CameraMode.LITE_AR)
             else -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false)
         }
-        is MainScreenEvent.StartArTracking -> state.copy(cameraMode = CameraMode.AR_ACTIVE, showTableScanScreen = false)
+        is MainScreenEvent.StartArTracking -> {
+            val phase = if (state.experienceMode == ExperienceMode.EXPERT) {
+                com.hereliesaz.cuedetat.domain.BallSelectionPhase.AWAITING_CUE
+            } else com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE
+            state.copy(
+                cameraMode = CameraMode.AR_ACTIVE,
+                showTableScanScreen = false,
+                ballSelectionPhase = phase
+            )
+        }
         is MainScreenEvent.CancelArSetup -> state.copy(cameraMode = CameraMode.CAMERA_ONLY, showTableScanScreen = false)
         is MainScreenEvent.TurnCameraOff -> state.copy(cameraMode = CameraMode.OFF)
+        is MainScreenEvent.SetCameraMode -> state.copy(cameraMode = action.mode)
+        is MainScreenEvent.ToggleTargetType -> {
+            val nextType = if (state.targetType == com.hereliesaz.cuedetat.domain.TargetType.SOLIDS) {
+                com.hereliesaz.cuedetat.domain.TargetType.STRIPES
+            } else com.hereliesaz.cuedetat.domain.TargetType.SOLIDS
+            state.copy(targetType = nextType)
+        }
+        is MainScreenEvent.ToggleFlowPoke -> state.copy(isFlowPokeEnabled = !state.isFlowPokeEnabled)
         is MainScreenEvent.ToggleDistanceUnit -> state.copy(distanceUnit = if (state.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC, valuesChangedSinceReset = true)
         is MainScreenEvent.ToggleLuminanceDialog -> state.copy(showLuminanceDialog = !state.showLuminanceDialog)
         is MainScreenEvent.ToggleGlowStickDialog -> state.copy(showGlowStickDialog = !state.showGlowStickDialog)
-        is MainScreenEvent.ToggleHelp -> state.copy(areHelpersVisible = !state.areHelpersVisible)
+        is MainScreenEvent.ToggleHelp -> {
+            val nextVisible = !state.areHelpersVisible
+            var nextState = state.copy(areHelpersVisible = nextVisible)
+            if (nextVisible && state.experienceMode == ExperienceMode.BEGINNER) {
+                val tutorialType = if (state.isBeginnerViewLocked) {
+                    com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_STATIC
+                } else {
+                    com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_DYNAMIC
+                }
+                nextState = nextState.copy(
+                    showTutorialOverlay = true,
+                    tutorialType = tutorialType,
+                    currentTutorialStep = 0,
+                    tutorialHighlight = com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.NONE
+                )
+            } else if (nextVisible && state.experienceMode == ExperienceMode.EXPERT) {
+                nextState = nextState.copy(
+                    showTutorialOverlay = true,
+                    tutorialType = com.hereliesaz.cuedetat.domain.TutorialType.GENERAL,
+                    currentTutorialStep = 0,
+                    tutorialHighlight = com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.NONE
+                )
+            }
+            nextState
+        }
         is MainScreenEvent.ToggleSnapping -> state.copy(isSnappingEnabled = !state.isSnappingEnabled)
         is MainScreenEvent.ToggleCvModel -> state.copy(useCustomModel = !state.useCustomModel)
         is MainScreenEvent.ToggleOrientationLock -> {
@@ -79,9 +107,25 @@ internal fun reduceToggleAction(
         is MainScreenEvent.SetExperienceMode -> handleSetExperienceMode(state, action.mode, reducerUtils)
         is MainScreenEvent.ApplyPendingExperienceMode -> {
             if (state.pendingExperienceMode == null) return state
-            return handleSetExperienceMode(state, state.pendingExperienceMode, reducerUtils).copy(pendingExperienceMode = null)
+            handleSetExperienceMode(state, state.pendingExperienceMode, reducerUtils).copy(pendingExperienceMode = null)
         }
-        is MainScreenEvent.UnlockBeginnerView -> state.copy(isBeginnerViewLocked = false)
+        is MainScreenEvent.StartTutorial -> {
+            val nextCameraMode = if (state.cameraMode == CameraMode.OFF) CameraMode.CAMERA else state.cameraMode
+            val tutorialType = if (nextCameraMode == CameraMode.LITE_AR) {
+                com.hereliesaz.cuedetat.domain.TutorialType.DYNAMIC_AR
+            } else {
+                com.hereliesaz.cuedetat.domain.TutorialType.DYNAMIC_NON_AR
+            }
+
+            state.copy(
+                isBeginnerViewLocked = false,
+                cameraMode = nextCameraMode,
+                showTutorialOverlay = true,
+                tutorialType = tutorialType,
+                currentTutorialStep = 0,
+                tutorialHighlight = com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.NONE
+            )
+        }
         is MainScreenEvent.LockBeginnerView -> {
 
             // DYNAMIC DEVICE-AGNOSTIC ZOOM: Calculate slider value to fit within screen width minus 200dp total margin
@@ -95,8 +139,8 @@ internal fun reduceToggleAction(
                 val currentPx = kotlin.math.hypot((pts[2] - pts[0]).toDouble(), (pts[3] - pts[1]).toDouble()).toFloat()
 
                 if (currentPx > 0 && state.viewWidth > 0) {
-                    val (currMin, currMax) = ZoomMapping.getZoomRange(state.experienceMode, false)
-                    val currentZoom = ZoomMapping.sliderToZoom(state.zoomSliderPosition, currMin, currMax)
+                    val (currMin, currMax) = com.hereliesaz.cuedetat.ui.ZoomMapping.getZoomRange(state.experienceMode, false)
+                    val currentZoom = com.hereliesaz.cuedetat.ui.ZoomMapping.sliderToZoom(state.zoomSliderPosition, currMin, currMax)
 
                     // Target margin: 100dp padding on each side = 200dp total
                     val marginPx = 200f * state.screenDensity
@@ -106,8 +150,8 @@ internal fun reduceToggleAction(
                         val unzoomedPx = currentPx / currentZoom
                         val targetZoom = targetPx / unzoomedPx
 
-                        val (newMin, newMax) = ZoomMapping.getZoomRange(ExperienceMode.BEGINNER, true)
-                        autoZoomSlider = ZoomMapping.zoomToSlider(targetZoom, newMin, newMax)
+                        val (newMin, newMax) = com.hereliesaz.cuedetat.ui.ZoomMapping.getZoomRange(ExperienceMode.BEGINNER, true)
+                        autoZoomSlider = com.hereliesaz.cuedetat.ui.ZoomMapping.zoomToSlider(targetZoom, newMin, newMax)
                     }
                 }
             }
@@ -125,12 +169,37 @@ internal fun reduceToggleAction(
                 valuesChangedSinceReset = false
             )
         }
+        is MainScreenEvent.UnlockBeginnerView -> {
+            val unlockedState = state.copy(
+                isBeginnerViewLocked = false,
+                cameraMode = CameraMode.LITE_AR,
+                zoomSliderPosition = 0f,
+                viewOffset = PointF(0f, 0f),
+                worldRotationDegrees = 0f
+            )
+            if (!unlockedState.hasSeenDynamicBeginnerTutorial) {
+                unlockedState.copy(
+                    showTutorialOverlay = true,
+                    tutorialType = com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_DYNAMIC,
+                    currentTutorialStep = 0,
+                    tutorialHighlight = com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.NONE
+                )
+            } else {
+                unlockedState
+            }
+        }
         is MainScreenEvent.ToggleCalibrationScreen -> state.copy(showCalibrationScreen = !state.showCalibrationScreen)
         is MainScreenEvent.ToggleTableScanScreen ->
             state.copy(showTableScanScreen = !state.showTableScanScreen)
 
+        is MainScreenEvent.StartManualHoleCapture ->
+            state.copy(showTableScanScreen = true)
+
         is MainScreenEvent.ExitToSplash -> state.copy(experienceMode = null)
-        else -> state
+        is MainScreenEvent.ToggleTopDownView -> state.copy(isTopDownViewActive = !state.isTopDownViewActive)
+        is MainScreenEvent.ClearTopDownView -> state.copy(isTopDownViewActive = false, topDownBitmap = null)
+        is MainScreenEvent.SetTopDownBitmap -> state.copy(topDownBitmap = action.bitmap)
+        else -> state // All other events handled by specialized reducers
     }
 }
 
@@ -139,6 +208,14 @@ private fun handleSetExperienceMode(
     mode: ExperienceMode,
     reducerUtils: ReducerUtils
 ): CueDetatState {
+    // Guard: Expert is gated by entitlement. If the caller asks for Expert
+    // when the user is not entitled, leave the state unchanged. UI surfaces
+    // (PaywallSheet, MainViewModel.onEvent) are responsible for triggering
+    // the purchase flow on this path.
+    if (mode == ExperienceMode.EXPERT && !state.isExpertEntitled) {
+        return state
+    }
+
     val newState = state.copy(
         experienceMode = mode,
         protractorUnit = ProtractorUnit(reducerUtils.getDefaultTargetBallPosition(), LOGICAL_BALL_RADIUS, 0f),
@@ -153,14 +230,24 @@ private fun handleSetExperienceMode(
 
     return when (mode) {
         ExperienceMode.EXPERT -> {
-            newState.copy(
+            val expertState = newState.copy(
                 table = newState.table.copy(isVisible = true),
                 onPlaneBall = OnPlaneBall(center = reducerUtils.getDefaultCueBallPosition(newState), radius = LOGICAL_BALL_RADIUS),
                 areHelpersVisible = false
             )
+            if (!expertState.hasSeenExpertTutorial) {
+                expertState.copy(
+                    showTutorialOverlay = true,
+                    tutorialType = com.hereliesaz.cuedetat.domain.TutorialType.GENERAL,
+                    currentTutorialStep = 0,
+                    tutorialHighlight = com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.NONE
+                )
+            } else {
+                expertState
+            }
         }
         ExperienceMode.BEGINNER -> {
-            newState.copy(
+            val beginnerState = newState.copy(
                 table = newState.table.copy(isVisible = false),
                 onPlaneBall = null,
                 isBankingMode = false,
@@ -169,6 +256,16 @@ private fun handleSetExperienceMode(
                 cameraMode = if (state.cameraMode == CameraMode.OFF) CameraMode.CAMERA else state.cameraMode,
                 zoomSliderPosition = 0f
             )
+            if (!beginnerState.hasSeenBeginnerTutorial) {
+                beginnerState.copy(
+                    showTutorialOverlay = true,
+                    tutorialType = com.hereliesaz.cuedetat.domain.TutorialType.BEGINNER_STATIC,
+                    currentTutorialStep = 0,
+                    tutorialHighlight = com.hereliesaz.cuedetat.view.state.TutorialHighlightElement.NONE
+                )
+            } else {
+                beginnerState
+            }
         }
         ExperienceMode.HATER -> newState
     }

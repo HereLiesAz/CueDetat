@@ -10,6 +10,7 @@ import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.ArDepthSession
 import com.hereliesaz.cuedetat.data.ArFrameProcessor
 import com.hereliesaz.cuedetat.data.GithubRepository
+import com.hereliesaz.cuedetat.data.MetaWearableRepository
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.SensorRepository
 import com.hereliesaz.cuedetat.data.TableScanRepository
@@ -17,6 +18,7 @@ import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.data.VisionAnalyzer
 import com.hereliesaz.cuedetat.data.VisionRepository
 import com.hereliesaz.cuedetat.domain.BallSelectionPhase
+import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
@@ -35,6 +37,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,7 +45,13 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -59,20 +68,72 @@ class MainViewModel @Inject constructor(
     private val warningManager: WarningManager,
     @ApplicationContext private val appContext: Context,
     private val visionRepository: VisionRepository,
+    val visionAnalyzer: VisionAnalyzer,
+    val metaWearableRepository: MetaWearableRepository,
     val arDepthSession: ArDepthSession,
     val arFrameProcessor: ArFrameProcessor,
+    private val entitlementRepository: com.hereliesaz.cuedetat.billing.EntitlementRepository,
+    private val integrityRepository: com.hereliesaz.cuedetat.data.IntegrityRepository,
 ) : ViewModel() {
+
+    /**
+     * Forces a re-query of the user's Play subscription status. Called from
+     * MainActivity.onResume so we catch state changes (cancel, refund,
+     * just-completed purchase) that happened while the app was backgrounded.
+     */
+    fun refreshEntitlement() {
+        viewModelScope.launch {
+            runCatching { entitlementRepository.refresh() }
+        }
+    }
+
+    /**
+     * Performs a Play Integrity check to ensure the app is genuine and the
+     * environment is secure. In a production environment, the retrieved
+     * token is sent to a secure backend which verifies it against Google's
+     * servers to decide whether to grant 'Expert' entitlements.
+     */
+    private fun performIntegrityCheck() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val projectNumber = if (com.hereliesaz.cuedetat.BuildConfig.FLAVOR == "play") {
+                com.hereliesaz.cuedetat.BuildConfig.GOOGLE_CLOUD_PROJECT_NUMBER
+            } else 0L
+
+            val token = if (projectNumber != 0L) {
+                android.util.Log.i("MainViewModel", "Using Standard Integrity API with project $projectNumber")
+                val requestHash = java.util.UUID.randomUUID().toString()
+                integrityRepository.fetchStandardToken(projectNumber, requestHash)
+            } else {
+                android.util.Log.i("MainViewModel", "Using Snapshot Integrity API (no project number)")
+                val nonce = java.util.UUID.randomUUID().toString()
+                integrityRepository.fetchSnapshotToken(nonce)
+            }
+
+            if (token != null) {
+                android.util.Log.i("MainViewModel", "Play Integrity token retrieved successfully.")
+                // In a production app, we would send this token to our server here.
+                // The server would verify the token and return a cryptographically 
+                // signed verdict that the app can trust.
+            } else {
+                android.util.Log.w("MainViewModel", "Play Integrity check failed to retrieve a token.")
+            }
+        }
+    }
 
     private var experienceModeUpdateJob: Job? = null
     private var saveJob: Job? = null
-    private val eventChannel = Channel<MainScreenEvent>(Channel.UNLIMITED)
+    // Bounded so an unbounded burst (sensors + vision + gestures) cannot grow without limit.
+    // High-frequency producers (sensors, vision, AR) are conflated upstream so they
+    // contribute at most one in-flight event each.
+    private val eventChannel = Channel<MainScreenEvent>(
+        capacity = 256,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
     private val _uiState = MutableStateFlow(CueDetatState())
     val uiState = _uiState.asStateFlow()
 
     private val _singleEvent = MutableSharedFlow<SingleEvent?>()
     val singleEvent = _singleEvent.asSharedFlow()
-
-    val visionAnalyzer: VisionAnalyzer = VisionAnalyzer(visionRepository)
 
     private val warningMessages: Array<String> by lazy {
         appContext.resources.getStringArray(R.array.insulting_warnings)
@@ -81,9 +142,22 @@ class MainViewModel @Inject constructor(
     init {
         // Single background coroutine that serially processes all events —
         // keeps heavy computation (matrices, geometry) off the main thread.
+        // Per-event try/catch keeps a single bad event from killing the whole
+        // loop (and the app, since uncaught coroutine exceptions force-close).
         viewModelScope.launch(Dispatchers.Default) {
             for (event in eventChannel) {
-                processEvent(event)
+                try {
+                    processEvent(event)
+                } catch (t: Throwable) {
+                    // Let cancellation propagate so structured concurrency keeps working
+                    // if processEvent ever becomes suspending.
+                    if (t is kotlinx.coroutines.CancellationException) throw t
+                    android.util.Log.e(
+                        "MainViewModel",
+                        "Reducer crashed processing $event",
+                        t
+                    )
+                }
             }
         }
 
@@ -91,30 +165,57 @@ class MainViewModel @Inject constructor(
             val savedState = userPreferencesRepository.stateFlow.first()
             val savedFeltSamples = tableScanRepository.loadFeltSamples()
             val currentExperienceMode = _uiState.value.experienceMode
+            // Pull the entitlement live rather than from the JSON snapshot. The
+            // entitlement event may already have set _uiState.isExpertEntitled
+            // by the time this load completes; in any case the StateFlow is the
+            // source of truth.
+            val liveEntitled = entitlementRepository.entitlement.value.active
+            // Tutorial-seen flags live in their own DataStore keys; the
+            // STATE_JSON copy may be stale if the debounced state save was
+            // cancelled by a sensor event right after the user finished a
+            // tutorial. The dedicated keys are written synchronously on
+            // transition, so they're the authoritative source.
+            val tutorialSeen = userPreferencesRepository.readTutorialSeenFlags()
             val initialState = (savedState ?: CueDetatState()).copy(
                 experienceMode = currentExperienceMode,
-                savedFeltSamples = savedFeltSamples
+                savedFeltSamples = savedFeltSamples,
+                isExpertEntitled = liveEntitled,
+                hasSeenBeginnerTutorial = tutorialSeen.beginner,
+                hasSeenDynamicBeginnerTutorial = tutorialSeen.dynamicBeginner,
+                hasSeenExpertTutorial = tutorialSeen.expert,
             )
             processAndEmitState(initialState, UpdateType.FULL)
+
+            // Fire the version check only after the initial state has been
+            // committed, so a network response can't be overwritten by the
+            // saved-state load.
+            onEvent(MainScreenEvent.CheckForUpdate)
+            
+            // Perform security integrity check on startup.
+            performIntegrityCheck()
         }
 
-        // Pipe WarningManager's timed messages into uiState.warningText
+        // Pipe WarningManager's timed messages into uiState.warningText.
+        // update{} is a CAS so it does not race with writes from the event loop.
         viewModelScope.launch {
             warningManager.currentWarning.collect { warning ->
-                _uiState.value = _uiState.value.copy(warningText = warning)
+                _uiState.update { it.copy(warningText = warning) }
             }
         }
 
         // Gate sensor collection on process lifecycle — unregisters the hardware listener
         // automatically when the screen turns off or the app goes to background.
+        // conflate() drops intermediate sensor samples if the reducer falls behind,
+        // bounding event-channel pressure.
         viewModelScope.launch {
             ProcessLifecycleOwner.get().lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                sensorRepository.fullOrientationFlow.collect { orientation ->
+                sensorRepository.fullOrientationFlow.conflate().collect { orientation ->
                     onEvent(MainScreenEvent.FullOrientationChanged(orientation))
                 }
             }
         }
 
+        // visionDataFlow is a StateFlow — it conflates by design.
         viewModelScope.launch {
             visionRepository.visionDataFlow.collect { visionData ->
                 onEvent(MainScreenEvent.CvDataUpdated(visionData))
@@ -126,7 +227,27 @@ class MainViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            onEvent(MainScreenEvent.CheckForUpdate)
+            ProcessLifecycleOwner.get().lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // Fires once per foreground transition. Seed the relocaliser with a
+                // null delta — orientation-tracking via foreground service was removed,
+                // so the relocaliser recovers via vision (runEdgeFallback) instead.
+                val model = tableScanRepository.load()
+                if (model != null) {
+                    onEvent(MainScreenEvent.SeedRelocaliser(null))
+                }
+                // Hold until lifecycle leaves STARTED, so this fires again on next resume
+                kotlinx.coroutines.awaitCancellation()
+            }
+        }
+
+        // collectLatest drops in-flight analyze() calls when a newer frame arrives,
+        // so the analyzer never gets backlogged on slow devices.
+        viewModelScope.launch(Dispatchers.Default) {
+            metaWearableRepository.videoFrame.collectLatest { bitmap ->
+                if (bitmap != null && _uiState.value.cameraMode == CameraMode.META_GLASSES) {
+                    visionAnalyzer.analyze(bitmap, _uiState.value)
+                }
+            }
         }
 
         // Detect ARCore depth capability and store in state
@@ -153,13 +274,50 @@ class MainViewModel @Inject constructor(
                 checkLocationAndPromptIfNeeded(savedModel)
             }
         }
+
+        // Collect entitlement updates and propagate into the reducer.
+        viewModelScope.launch {
+            entitlementRepository.entitlement.collect { entitlement ->
+                onEvent(MainScreenEvent.EntitlementChanged(entitlement))
+            }
+        }
+
+        // Onboarding paywall: fire every time the splash is shown and every
+        // time the user enters HATER mode while not entitled. Entitled users
+        // (including FOSS, which is permanently active) never see it.
+        viewModelScope.launch {
+            if (entitlementRepository.entitlement.value.active) return@launch
+            _uiState
+                .map { it.experienceMode to it.isExpertEntitled }
+                .distinctUntilChanged()
+                .filter { (mode, entitled) ->
+                    !entitled && (mode == null || mode == ExperienceMode.HATER)
+                }
+                .collect {
+                    // Re-check live entitlement: _uiState.isExpertEntitled may
+                    // still be false on app start if the EntitlementChanged
+                    // event hasn't propagated, but the repository's StateFlow
+                    // is always current.
+                    if (!entitlementRepository.entitlement.value.active) {
+                        onEvent(
+                            MainScreenEvent.ShowPaywall(
+                                com.hereliesaz.cuedetat.billing.PaywallTrigger.ONBOARDING
+                            )
+                        )
+                    }
+                }
+        }
     }
 
     fun onEvent(event: MainScreenEvent) {
         eventChannel.trySend(event)
     }
 
-    private suspend fun processEvent(event: MainScreenEvent) {
+    private fun processEvent(event: MainScreenEvent) {
+        if (event is MainScreenEvent.ScreenGestureStarted || event is MainScreenEvent.LogicalGestureStarted) {
+            warningManager.dismissWarning()
+        }
+
         if (event is MainScreenEvent.ToggleExperienceModeSelection) {
             experienceModeUpdateJob?.cancel()
             val currentState = _uiState.value
@@ -170,6 +328,25 @@ class MainViewModel @Inject constructor(
                 onEvent(MainScreenEvent.ApplyPendingExperienceMode)
             }
             return
+        }
+
+        // Intercept the apply step: if the cycle landed on EXPERT and the user
+        // is not entitled, surface the paywall and clear the pending mode so
+        // the next cycle starts fresh. The reducer would otherwise silently
+        // refuse the transition and the user would see no feedback.
+        if (event is MainScreenEvent.ApplyPendingExperienceMode) {
+            val target = _uiState.value.pendingExperienceMode
+            if (target == ExperienceMode.EXPERT && !_uiState.value.isExpertEntitled) {
+                _uiState.value = _uiState.value.copy(pendingExperienceMode = null)
+                viewModelScope.launch {
+                    _singleEvent.emit(
+                        SingleEvent.ShowPaywall(
+                            com.hereliesaz.cuedetat.billing.PaywallTrigger.EXPERT_TOGGLE_TAP
+                        )
+                    )
+                }
+                return
+            }
         }
 
         val currentState = _uiState.value
@@ -209,19 +386,28 @@ class MainViewModel @Inject constructor(
             stateReducer(currentState, logicalEvent, reducerUtils, gestureReducer)
 
         // After CV data is integrated into state, update snap candidates.
-        val finalState = if (logicalEvent is MainScreenEvent.CvDataUpdated) {
-            val stateAfterSnap = snapReducer.reduce(reducedState, logicalEvent.visionData)
-            if (stateAfterSnap.tableScanModel != null &&
-                stateAfterSnap.experienceMode == ExperienceMode.EXPERT &&
-                stateAfterSnap.ballSelectionPhase == BallSelectionPhase.NONE &&
-                stateAfterSnap.snapCandidates?.any { it.isConfirmed } == true
-            ) {
-                stateAfterSnap.copy(ballSelectionPhase = BallSelectionPhase.AWAITING_CUE)
-            } else {
-                stateAfterSnap
+        val finalState = when (logicalEvent) {
+            is MainScreenEvent.CvDataUpdated -> {
+                val stateAfterSnap = snapReducer.reduce(reducedState, logicalEvent.visionData)
+                if (stateAfterSnap.tableScanModel != null &&
+                    stateAfterSnap.experienceMode == ExperienceMode.EXPERT &&
+                    stateAfterSnap.ballSelectionPhase == BallSelectionPhase.NONE &&
+                    stateAfterSnap.snapCandidates?.any { it.isConfirmed } == true
+                ) {
+                    stateAfterSnap.copy(ballSelectionPhase = BallSelectionPhase.AWAITING_CUE)
+                } else {
+                    stateAfterSnap
+                }
             }
-        } else {
-            reducedState
+            is MainScreenEvent.SetTopDownBitmap -> reducedState.copy(topDownBitmap = logicalEvent.bitmap)
+            else -> reducedState
+        }
+
+        // Side-effects for Top-Down view
+        if (logicalEvent is MainScreenEvent.ToggleTopDownView) {
+            if (finalState.isTopDownViewActive) {
+                visionRepository.captureRectifiedSnapshot(finalState)
+            }
         }
 
         val updateType = determineUpdateType(currentState, finalState, logicalEvent)
@@ -246,12 +432,57 @@ class MainViewModel @Inject constructor(
         visionAnalyzer.updateUiState(derivedState)
         arFrameProcessor.updateUiState(derivedState)
 
+        // Persist tutorial-seen flags the moment they flip. They live in
+        // dedicated DataStore keys (not STATE_JSON) so they're not subject to
+        // the 2-second debounce on the state save, which can be cancelled
+        // indefinitely by the sensor-driven FullOrientationChanged stream
+        // before it ever lands. Without this, the user finishes a tutorial,
+        // sensor events keep cancelling the save, the app gets killed, and
+        // next launch the tutorial fires again.
+        val seenChanged =
+            derivedState.hasSeenBeginnerTutorial != previousState.hasSeenBeginnerTutorial ||
+            derivedState.hasSeenDynamicBeginnerTutorial != previousState.hasSeenDynamicBeginnerTutorial ||
+            derivedState.hasSeenExpertTutorial != previousState.hasSeenExpertTutorial
+        if (seenChanged) {
+            viewModelScope.launch {
+                runCatching {
+                    userPreferencesRepository.setTutorialSeenFlags(
+                        beginner = derivedState.hasSeenBeginnerTutorial,
+                        dynamicBeginner = derivedState.hasSeenDynamicBeginnerTutorial,
+                        expert = derivedState.hasSeenExpertTutorial,
+                    )
+                }.onFailure {
+                    android.util.Log.e("MainViewModel", "tutorial-seen flag save failed", it)
+                }
+            }
+        }
+
+        if (derivedState.cameraMode == CameraMode.META_GLASSES) {
+            metaWearableRepository.startStreaming()
+        } else if (previousState.cameraMode == CameraMode.META_GLASSES) {
+            metaWearableRepository.stopStreaming()
+        }
+
         if (type != UpdateType.SPIN_ONLY) {
+            val isHighPriority = type == UpdateType.FULL ||
+                               state.tableScanModel != previousState.tableScanModel ||
+                               state.viewOffset != previousState.viewOffset
+
             saveJob?.cancel()
             saveJob = viewModelScope.launch {
-                delay(2000L)
-                userPreferencesRepository.saveState(derivedState)
-                tableScanRepository.saveFeltSamples(derivedState.savedFeltSamples)
+                try {
+                    if (!isHighPriority) delay(2000L)
+                    userPreferencesRepository.saveState(derivedState)
+                    tableScanRepository.saveFeltSamples(derivedState.savedFeltSamples)
+                } catch (t: Throwable) {
+                    // saveJob is cancelled and replaced on every subsequent state emit,
+                    // so CancellationException is normal here — rethrow to keep
+                    // structured concurrency intact and avoid log spam.
+                    if (t is kotlinx.coroutines.CancellationException) throw t
+                    // Persistence failures (gson serialization, datastore IO) must not
+                    // crash the app via the global uncaught-exception handler.
+                    android.util.Log.e("MainViewModel", "saveState failed", t)
+                }
             }
         }
     }
@@ -312,7 +543,7 @@ class MainViewModel @Inject constructor(
                 is MainScreenEvent.CheckForUpdate -> {
                     val versionName = githubRepository.getLatestVersionName()
                     if (versionName != null) {
-                        _uiState.value = _uiState.value.copy(latestVersionName = versionName)
+                        _uiState.update { it.copy(latestVersionName = versionName) }
                     }
                 }
 
@@ -329,13 +560,20 @@ class MainViewModel @Inject constructor(
                 is MainScreenEvent.SetExperienceMode -> {
                     if (event.mode == ExperienceMode.HATER) {
                         _singleEvent.emit(SingleEvent.InitiateHaterMode)
+                    } else if (event.mode == ExperienceMode.EXPERT && !_uiState.value.isExpertEntitled) {
+                        _singleEvent.emit(SingleEvent.ShowPaywall(com.hereliesaz.cuedetat.billing.PaywallTrigger.SPLASH_SCREEN))
                     }
                 }
 
                 is MainScreenEvent.Shake -> _singleEvent.emit(SingleEvent.HaterShake)
 
+                is MainScreenEvent.ShowPaywall -> {
+                    _singleEvent.emit(SingleEvent.ShowPaywall(event.trigger))
+                }
+
                 else -> { /* Do nothing for state-changing events */ }
             }
         }
     }
+
 }

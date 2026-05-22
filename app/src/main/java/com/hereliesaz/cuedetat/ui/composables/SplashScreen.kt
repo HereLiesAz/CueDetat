@@ -106,20 +106,23 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "What's your relationship to pool?",
-                    fontSize = 20.sp,
+                    text = stringResource(id = R.string.splash_question),
+                    fontSize = 18.sp,
                     color = Color.White,
-                    modifier = Modifier.padding(16.dp)
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
                 )
                 // Vertical list of choice buttons.
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
                     modifier = Modifier.padding(8.dp)
                 ) {
-                    QuestionButton("Beginner") { onRoleSelected(ExperienceMode.BEGINNER) }
-                    QuestionButton("Expert") { onRoleSelected(ExperienceMode.EXPERT) }
-                    QuestionButton("Hater") { onRoleSelected(ExperienceMode.HATER) }
+                    QuestionButton(stringResource(id = R.string.beginner_label)) { onRoleSelected(ExperienceMode.BEGINNER) }
+                    QuestionButton(stringResource(id = R.string.expert_label)) { onRoleSelected(ExperienceMode.EXPERT) }
+                    QuestionButton(stringResource(id = R.string.hater_label)) { onRoleSelected(ExperienceMode.HATER) }
                 }
             }
         }
@@ -133,7 +136,7 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
 private fun QuestionButton(label: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .fillMaxWidth(0.6f) // Consistent width (60% of screen).
+            .fillMaxWidth(0.8f) // Increased width to 80% for longer text.
             .clickable { onClick() }
             .padding(horizontal = 24.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
@@ -141,7 +144,8 @@ private fun QuestionButton(label: String, onClick: () -> Unit) {
         Text(
             text = label,
             color = Color.White,
-            fontSize = 24.sp
+            fontSize = 24.sp, // Reduced font size slightly to fit longer sentences.
+            textAlign = TextAlign.Center
         )
     }
 }

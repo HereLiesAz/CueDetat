@@ -21,6 +21,10 @@ internal fun reduceAdvancedOptionsAction(state: CueDetatState, action: MainScree
             state.copy(showAdvancedOptionsDialog = !state.showAdvancedOptionsDialog)
         }
 
+        is MainScreenEvent.ToggleBillingDebugDialog -> {
+            state.copy(showBillingDebugDialog = !state.showBillingDebugDialog)
+        }
+
         // Enable/Disable the CV mask overlay (seeing the world as the AI does).
         is MainScreenEvent.ToggleCvMask -> {
             state.copy(showCvMask = !state.showCvMask)
@@ -36,9 +40,7 @@ internal fun reduceAdvancedOptionsAction(state: CueDetatState, action: MainScree
         }
 
         // The 'Felt Sacrifice' phase: defining the color of the table.
-        is MainScreenEvent.EnterCalibrationMode -> {
-            state.copy(isCalibratingColor = true)
-        }
+        is MainScreenEvent.StartCalibrationMode -> state.copy(showCalibrationScreen = true, showAdvancedOptionsDialog = false)
 
         is MainScreenEvent.SampleColorAt -> {
             state.copy(
