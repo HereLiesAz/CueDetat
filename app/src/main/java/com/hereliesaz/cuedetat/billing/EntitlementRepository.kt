@@ -94,6 +94,19 @@ sealed class TesterLicenseResult {
 }
 
 /**
+ * Single source of truth for tester-email validation. Matches what the
+ * repository's [EntitlementRepository.applyTesterLicense] accepts as
+ * "well-formed enough to bother hashing", so UI Submit buttons enable/
+ * disable consistently with the actual accept/reject behavior. This is
+ * not a full RFC 5322 check — the allowlist is just a sha256 compare,
+ * so we only need a basic shape gate.
+ */
+fun isPlausibleTesterEmail(email: String): Boolean {
+    val trimmed = email.trim()
+    return trimmed.isNotEmpty() && trimmed.contains('@')
+}
+
+/**
  * Snapshot of recent billing state for the in-app diagnostic surface. Strings
  * only — this is rendered as-is for the user to copy into a bug report.
  */
