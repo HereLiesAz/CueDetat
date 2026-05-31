@@ -18,7 +18,6 @@ import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 import kotlin.math.min
 
-private const val POCKET_MODEL_FILE = "ml/merged_pocket_detector_final_float16.tflite"
 private const val MASTER_MODEL_FILE = "ml/MASTER_POOL_MODEL.tflite"
 private const val INPUT_SIZE = 640
 private const val CONFIDENCE_THRESHOLD = 0.30f
@@ -32,19 +31,18 @@ private const val HOLE_CLASS_ID = 1
 private const val SIDE_CLASS_ID = 2
 
 /**
- * A master TFLite detector that runs FOUR models from a single binary package.
- * It maps the file segments to separate interpreters for maximum stability.
- * TFLite detector for the pocket / pool-table model. Loads
- * [POCKET_MODEL_FILE] (FP16, NMS in-graph) and serves both:
+ * TFLite detector backed by [MASTER_MODEL_FILE], a single binary that concatenates
+ * several sub-models (FP16, NMS in-graph). Only the two heads that are actually used
+ * are loaded into interpreters:
  *
- *  - [detect]: returns [MlTableDetection] with pockets and the table boundary
- *    (consumed by AR setup / table scan flows).
- *  - [detectPool]: returns the raw bounding boxes (consumed by VisionRepository
- *    for ball-region overlays in dynamic beginner mode).
+ *  - [detect] (segment [HEAD_POCKET_50E]): returns [MlTableDetection] with pockets and
+ *    the table boundary (consumed by AR setup / table scan flows).
+ *  - [detectPool] (segment [HEAD_POOL_PIVOT]): returns the raw ball/cue bounding boxes
+ *    (consumed by VisionRepository).
  *
- * Class name kept for binary compatibility with existing Hilt bindings; the
- * "merged" prefix is now historical — there is no multiplexed master file
- * any more.
+ * Class name kept for binary compatibility with existing Hilt bindings; the "merged"
+ * prefix is historical. The standalone single-model file was removed — it duplicated
+ * segment 0 and was loaded but never run.
  */
 class MergedTFLiteDetector(private val context: Context) : PocketDetector {
 
@@ -53,7 +51,6 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
     private val HEAD_POOL_PIVOT = 2
 
     private val interpreters = mutableMapOf<Int, Interpreter>()
-    private var interpreter: Interpreter? = null
 
     // Hardware-acceleration delegates we created, kept so they can be released in close().
     private val delegates = mutableListOf<AutoCloseable>()
@@ -126,10 +123,6 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
     }
 
     init {
-        loadModel()
-    }
-
-    init {
         loadMasterPackage()
     }
 
@@ -138,44 +131,31 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
             val fd = context.assets.openFd(MASTER_MODEL_FILE)
             val fullChannel = FileInputStream(fd.fileDescriptor).channel
 
-            // Physical offsets of the models within the single file
+            // The master file concatenates 4 sub-models. Only two are ever run —
+            // segment 0 (pocket/table) by detect() and segment 2 (pool/ball) by
+            // detectPool(). We still walk every offset so segment 2 maps correctly,
+            // but only build interpreters for the heads we use: segments 1 and 3 used
+            // to be loaded into TFLite interpreters at startup and never invoked,
+            // wasting ~12 MB of RAM and the load-time CPU.
             val modelSizes = listOf(6242868L, 6242869L, 6243331L, 6242869L)
+            val usedHeads = setOf(HEAD_POCKET_50E, HEAD_POOL_PIVOT)
             var currentOffset = fd.startOffset
 
             for (i in 0 until 4) {
                 val size = modelSizes[i]
-                val buffer = fullChannel.map(FileChannel.MapMode.READ_ONLY, currentOffset, size)
-                interpreters[i] = newInterpreter(buffer)
+                if (i in usedHeads) {
+                    val buffer = fullChannel.map(FileChannel.MapMode.READ_ONLY, currentOffset, size)
+                    interpreters[i] = newInterpreter(buffer)
+                }
                 currentOffset += size
             }
-            Log.d("MergedTFLiteDetector", "Master package loaded: 4 interpreters active.")
+            Log.d("MergedTFLiteDetector", "Master package loaded: ${interpreters.size} interpreters active (segments ${usedHeads.sorted()}).")
         } catch (e: Exception) {
             Log.e("MergedTFLiteDetector", "Failed to load master binary: ${e.message}")
         }
     }
 
-    private fun loadModel() {
-        try {
-            val fd = context.assets.openFd(POCKET_MODEL_FILE)
-            val channel = FileInputStream(fd.fileDescriptor).channel
-            val buffer = channel.map(
-                FileChannel.MapMode.READ_ONLY,
-                fd.startOffset,
-                fd.declaredLength,
-            )
-            interpreter = newInterpreter(buffer)
-            Log.d(TAG, "Loaded $POCKET_MODEL_FILE (${fd.declaredLength / 1024} KB)")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load $POCKET_MODEL_FILE", e)
-            Log.e(TAG,
-                "Hint: if error mentions 'compressed', add androidResources { noCompress += \"tflite\" }")
-            interpreter = null
-        }
-    }
-
     fun close() {
-        runCatching { interpreter?.close() }
-        interpreter = null
         interpreters.values.forEach { runCatching { it.close() } }
         interpreters.clear()
         // Delegates must be closed after the interpreters that use them.
