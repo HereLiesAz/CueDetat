@@ -33,7 +33,7 @@ class FossEntitlementRepository @Inject constructor() : EntitlementRepository {
     )
     override val entitlement: StateFlow<Entitlement> = _entitlement.asStateFlow()
 
-    override suspend fun launchPurchase(activity: Activity, basePlan: BasePlanId) {
+    override suspend fun launchPurchase(activity: Activity) {
         // No-op. The FOSS APK has no billing UI.
     }
 

@@ -5,7 +5,6 @@ package com.hereliesaz.cuedetat.ui.composables.paywall
 import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.hereliesaz.cuedetat.billing.BasePlanId
 import com.hereliesaz.cuedetat.billing.EntitlementDiagnostics
 import com.hereliesaz.cuedetat.billing.EntitlementRepository
 import com.hereliesaz.cuedetat.billing.PaywallTrigger
@@ -66,9 +65,9 @@ class PaywallViewModel @Inject constructor(
         triggerSnapshot = trigger
     }
 
-    fun purchase(activity: Activity, basePlan: BasePlanId) {
+    fun purchase(activity: Activity) {
         viewModelScope.launch {
-            runCatching { repository.launchPurchase(activity, basePlan) }
+            runCatching { repository.launchPurchase(activity) }
                 .onFailure {
                     _uiState.value = _uiState.value.copy(
                         errorMessage = it.message ?: "Unable to start purchase"

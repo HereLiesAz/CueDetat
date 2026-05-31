@@ -35,7 +35,16 @@ class SensorRepository @Inject constructor(
     private var smoothedRoll: Float? = null
 
     val fullOrientationFlow: Flow<FullOrientation> = callbackFlow {
-        val listener = object : SensorEventListener {
+        // Battery: register at the slow UI rate (~15Hz) by default and bump to the fast
+        // GAME rate (~50Hz) only while the phone is actually being moved, dropping back
+        // once it has been still for STILL_TIMEOUT_MS. A still phone is the common case
+        // (lining up a shot), so this cuts sensor callbacks ~3x without costing
+        // responsiveness during a deliberate tilt.
+        var currentDelay = SensorManager.SENSOR_DELAY_UI
+        var lastMovementTime = 0L
+        lateinit var listener: SensorEventListener
+
+        listener = object : SensorEventListener {
             private val rotationMatrix = FloatArray(9)
             private val orientationAngles = FloatArray(3) // For yaw, pitch, roll
 
@@ -52,14 +61,27 @@ class SensorRepository @Inject constructor(
                     // lighter smoothing when deliberately tilted (responsiveness).
                     val deltaP = abs(rawPitch - (smoothedPitch ?: rawPitch))
                     val deltaR = abs(rawRoll - (smoothedRoll ?: rawRoll))
+                    val movement = maxOf(deltaP, deltaR)
                     val alpha = when {
-                        maxOf(deltaP, deltaR) > 4f -> 0.20f  // deliberate tilt
-                        maxOf(deltaP, deltaR) > 1.5f -> 0.07f // moderate movement
+                        movement > 4f -> 0.20f  // deliberate tilt
+                        movement > 1.5f -> 0.07f // moderate movement
                         else -> 0.025f                         // near-still: maximum stabilization
                     }
                     smoothedYaw = smoothedYaw?.let { (rawYaw * alpha) + (it * (1 - alpha)) } ?: rawYaw
                     smoothedPitch = smoothedPitch?.let { (rawPitch * alpha) + (it * (1 - alpha)) } ?: rawPitch
                     smoothedRoll = smoothedRoll?.let { (rawRoll * alpha) + (it * (1 - alpha)) } ?: rawRoll
+
+                    // Adaptive sampling rate: speed up while moving, slow down when still.
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    if (movement > 1.5f) lastMovementTime = now
+                    val desiredDelay =
+                        if (now - lastMovementTime < STILL_TIMEOUT_MS) SensorManager.SENSOR_DELAY_GAME
+                        else SensorManager.SENSOR_DELAY_UI
+                    if (desiredDelay != currentDelay && rotationVectorSensor != null) {
+                        currentDelay = desiredDelay
+                        sensorManager.unregisterListener(listener)
+                        sensorManager.registerListener(listener, rotationVectorSensor, desiredDelay)
+                    }
 
                     // Send pitch as negative to match existing convention for `pitchAngle` in state.
                     trySend(FullOrientation(yaw = smoothedYaw!!, pitch = -smoothedPitch!!, roll = smoothedRoll!!))
@@ -72,7 +94,7 @@ class SensorRepository @Inject constructor(
             sensorManager.registerListener(
                 listener,
                 rotationVectorSensor,
-                SensorManager.SENSOR_DELAY_GAME
+                currentDelay
             )
         }
         awaitClose {
@@ -82,5 +104,9 @@ class SensorRepository @Inject constructor(
             smoothedPitch = null
             smoothedRoll = null
         }
+    }
+
+    private companion object {
+        const val STILL_TIMEOUT_MS = 1000L // drop to the slow rate after this long without movement
     }
 }

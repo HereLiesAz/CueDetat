@@ -61,7 +61,9 @@ class ShakeDetector @Inject constructor(
         }
 
         if (accelerometer != null) {
-            sensorManager.registerListener(listener, accelerometer, SensorManager.SENSOR_DELAY_GAME)
+            // Battery: UI rate (~15Hz) is ample for detecting a deliberate shake; the
+            // old GAME rate (~50Hz) sampled the accelerometer 3x more often for no gain.
+            sensorManager.registerListener(listener, accelerometer, SensorManager.SENSOR_DELAY_UI)
         }
 
         awaitClose {

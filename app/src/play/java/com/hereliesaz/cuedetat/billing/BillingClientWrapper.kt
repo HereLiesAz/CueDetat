@@ -137,22 +137,22 @@ class BillingClientWrapper @Inject constructor(
         })
     }
 
-    suspend fun queryActiveSubscriptions(): List<Purchase> {
+    suspend fun queryOwnedPurchases(): List<Purchase> {
         ensureConnected()
         val params = QueryPurchasesParams.newBuilder()
-            .setProductType(BillingClient.ProductType.SUBS)
+            .setProductType(BillingClient.ProductType.INAPP)
             .build()
         val result = client.queryPurchasesAsync(params)
         if (result.billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
             // Throw rather than returning emptyList() — an empty list is
-            // indistinguishable from "user has no subscriptions" and would
-            // cause the repository to revoke a paying user's entitlement.
+            // indistinguishable from "user owns nothing" and would cause the
+            // repository to revoke a paying user's entitlement.
             throw BillingQueryException(
                 result.billingResult.responseCode,
                 result.billingResult.debugMessage
             )
         }
-        Log.i(TAG, "queryActiveSubscriptions ok size=${result.purchasesList.size}")
+        Log.i(TAG, "queryOwnedPurchases ok size=${result.purchasesList.size}")
         return result.purchasesList
     }
 
@@ -163,7 +163,7 @@ class BillingClientWrapper @Inject constructor(
                 listOf(
                     QueryProductDetailsParams.Product.newBuilder()
                         .setProductId(BillingProductIds.PRODUCT_ID_EXPERT)
-                        .setProductType(BillingClient.ProductType.SUBS)
+                        .setProductType(BillingClient.ProductType.INAPP)
                         .build()
                 )
             )
@@ -177,15 +177,14 @@ class BillingClientWrapper @Inject constructor(
 
     fun launchBillingFlow(
         activity: Activity,
-        productDetails: ProductDetails,
-        offerToken: String
+        productDetails: ProductDetails
     ): BillingResult {
+        // One-time products carry no offer token (that is a subscription concept).
         val params = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(
                 listOf(
                     BillingFlowParams.ProductDetailsParams.newBuilder()
                         .setProductDetails(productDetails)
-                        .setOfferToken(offerToken)
                         .build()
                 )
             )

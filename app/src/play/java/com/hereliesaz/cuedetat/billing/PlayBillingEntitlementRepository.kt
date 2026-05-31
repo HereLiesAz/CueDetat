@@ -4,10 +4,6 @@ package com.hereliesaz.cuedetat.billing
 
 import android.app.Activity
 import android.util.Log
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ProcessLifecycleOwner
 import com.hereliesaz.cuedetat.data.IntegrityRepository
 import com.hereliesaz.cuedetat.data.IntegrityResult
 import com.android.billingclient.api.ProductDetails
@@ -22,7 +18,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -76,8 +71,10 @@ class PlayBillingEntitlementRepository @Inject constructor(
     init {
         scope.launch {
             // 1. Load cache so the first emission is correct for returning users.
+            // A one-time unlock never expires, so the cached value is used as-is
+            // (no offline cap). Play will still re-confirm ownership when reachable.
             val cached = runCatching { cacheStore.read() }.getOrDefault(Entitlement.NONE)
-            playEntitlement.value = applyOfflineCap(cached, System.currentTimeMillis())
+            playEntitlement.value = cached
             Log.i(TAG, "init: cached entitlement active=${cached.active} source=${cached.source}")
             republish()
 
@@ -124,61 +121,48 @@ class PlayBillingEntitlementRepository @Inject constructor(
             }
         }
 
-        // 7. Re-verify on every process foreground. Recovers from a transient
-        //    failure during the cold-start refresh and from races where Play
-        //    Store registers a purchase moments after our initial query.
-        scope.launch {
-            withContext(Dispatchers.Main) {
-                ProcessLifecycleOwner.get().lifecycle.addObserver(
-                    LifecycleEventObserver { _: LifecycleOwner, event: Lifecycle.Event ->
-                        if (event == Lifecycle.Event.ON_START) {
-                            scope.launch { refresh() }
-                        }
-                    }
-                )
-            }
-        }
+        // Foreground re-verification is driven solely by MainActivity.onResume →
+        // MainViewModel.refreshEntitlement() (TTL-coalesced). A second ON_START observer
+        // here used to double the Play query on every resume; removed. Purchase races are
+        // still covered by the purchaseUpdates collector above and the cold-start refresh.
     }
 
-    override suspend fun launchPurchase(activity: Activity, basePlan: BasePlanId) {
+    override suspend fun launchPurchase(activity: Activity) {
         val productDetails = billingClient.queryExpertProductDetails() ?: run {
             Log.w(TAG, "launchPurchase: product details unavailable for ${BillingProductIds.PRODUCT_ID_EXPERT}")
             _productDetails.tryEmit(ProductDetailsState.Error(-1, "Product details unavailable"))
             return
         }
-        val offer = productDetails.subscriptionOfferDetails
-            ?.firstOrNull { it.basePlanId == basePlan.tag }
-            ?: run {
-                Log.w(TAG, "launchPurchase: base plan '${basePlan.tag}' not configured in Play Console")
-                _productDetails.tryEmit(
-                    ProductDetailsState.Error(-1, "Base plan ${basePlan.tag} not configured")
-                )
-                return
-            }
-        Log.i(TAG, "launchPurchase: basePlan=${basePlan.tag} productId=${productDetails.productId}")
-        billingClient.launchBillingFlow(activity, productDetails, offer.offerToken)
+        if (productDetails.oneTimePurchaseOfferDetails == null) {
+            Log.w(TAG, "launchPurchase: '${productDetails.productId}' is not configured as a one-time product")
+            _productDetails.tryEmit(
+                ProductDetailsState.Error(-1, "Product not configured as a one-time purchase")
+            )
+            return
+        }
+        Log.i(TAG, "launchPurchase: productId=${productDetails.productId}")
+        billingClient.launchBillingFlow(activity, productDetails)
     }
 
     override suspend fun refresh() {
         val now = System.currentTimeMillis()
-        val purchases = runCatching { billingClient.queryActiveSubscriptions() }
+        val purchases = runCatching { billingClient.queryOwnedPurchases() }
             .getOrElse {
-                // Transient failure: keep the previous entitlement (subject to
-                // the 14-day offline cap) and do NOT overwrite the cache.
-                Log.w(TAG, "queryActiveSubscriptions failed; preserving cached entitlement", it)
-                lastRefreshOutcome = "queryActiveSubscriptions failed: ${it.message ?: it::class.java.simpleName}"
-                playEntitlement.value = applyOfflineCap(playEntitlement.value, now)
+                // Transient failure: keep the previous (owned, never-expiring)
+                // entitlement and do NOT overwrite the cache.
+                Log.w(TAG, "queryOwnedPurchases failed; preserving cached entitlement", it)
+                lastRefreshOutcome = "queryOwnedPurchases failed: ${it.message ?: it::class.java.simpleName}"
                 republish()
                 return
             }
         val snapshots = purchases.flatMap { it.toSnapshots() }
         snapshots.forEach {
-            val line = "snapshot productId=${it.productId} state=${it.purchaseState} ack=${it.isAcknowledged} autoRenew=${it.isAutoRenewing}"
+            val line = "snapshot productId=${it.productId} state=${it.purchaseState} ack=${it.isAcknowledged}"
             Log.i(TAG, line)
             recordPurchaseSnapshot(line)
         }
         if (snapshots.isEmpty()) {
-            val line = "snapshot none — Play returned 0 active subscriptions"
+            val line = "snapshot none — Play returned 0 owned products"
             Log.i(TAG, line)
             recordPurchaseSnapshot(line)
         }
@@ -318,55 +302,22 @@ class PlayBillingEntitlementRepository @Inject constructor(
                 )
                 return@launch
             }
-            val monthly = details.findFormattedPrice(BasePlanId.MONTHLY)
-            val yearly = details.findFormattedPrice(BasePlanId.YEARLY)
-            val trialDays = details.findTrialDays()
-            if (monthly == null || yearly == null) {
-                Log.w(TAG, "productDetails: missing base plan price (monthly=$monthly yearly=$yearly)")
+            val price = details.oneTimePurchaseOfferDetails?.formattedPrice
+            if (price == null) {
+                Log.w(TAG, "productDetails: no one-time price on ${details.productId}")
                 _productDetails.tryEmit(
-                    ProductDetailsState.Error(-1, "Configured base plans missing")
+                    ProductDetailsState.Error(-1, "One-time price missing")
                 )
                 return@launch
             }
             _productDetails.tryEmit(
-                ProductDetailsState.Loaded(monthly, yearly, trialDays)
+                ProductDetailsState.Loaded(price)
             )
         }
         return _productDetails.asSharedFlow()
     }
 
-    private fun ProductDetails.findFormattedPrice(basePlan: BasePlanId): String? {
-        val offer = subscriptionOfferDetails?.firstOrNull { it.basePlanId == basePlan.tag }
-            ?: return null
-        return offer.pricingPhases.pricingPhaseList.lastOrNull()?.formattedPrice
-    }
-
-    private fun ProductDetails.findTrialDays(): Int {
-        val offer = subscriptionOfferDetails?.firstOrNull() ?: return 0
-        val trial = offer.pricingPhases.pricingPhaseList
-            .firstOrNull { it.priceAmountMicros == 0L }
-            ?: return 0
-        val period = trial.billingPeriod
-        return runCatching {
-            period.removePrefix("P").removeSuffix("D").toInt()
-        }.getOrDefault(0)
-    }
-
     companion object {
         private const val TAG = "PlayBillingEntitlement"
-    }
-}
-
-internal const val OFFLINE_CAP_MILLIS: Long = 14L * 24L * 60L * 60L * 1000L // 14 days
-
-internal fun applyOfflineCap(entitlement: Entitlement, nowMillis: Long): Entitlement {
-    val verified = entitlement.lastVerifiedAtMillis ?: return entitlement
-    val ageMillis = nowMillis - verified
-    return if (ageMillis > OFFLINE_CAP_MILLIS) {
-        Entitlement.NONE.copy(lastVerifiedAtMillis = verified)
-    } else if (entitlement.active && entitlement.source != EntitlementSource.OFFLINE_CACHED) {
-        entitlement.copy(source = EntitlementSource.OFFLINE_CACHED)
-    } else {
-        entitlement
     }
 }

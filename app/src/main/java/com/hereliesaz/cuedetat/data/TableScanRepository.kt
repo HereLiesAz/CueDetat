@@ -3,6 +3,8 @@ package com.hereliesaz.cuedetat.data
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.location.Location
+import android.os.SystemClock
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -10,6 +12,8 @@ import com.google.gson.Gson
 import com.hereliesaz.cuedetat.domain.TableScanModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -67,20 +71,48 @@ class TableScanRepository @Inject constructor(
     }
 
     /**
-     * Attempts to get the device's current GPS coordinates.
+     * Attempts to get the device's current coordinates for coarse "am I at a different
+     * table?" matching.
+     *
+     * Battery: prefers the cached last fix (which never powers up GPS) and only requests
+     * an active fix when there is no recent cache. The active request is bounded by
+     * [LOCATION_TIMEOUT_MS] so a failed fix can't keep the location radio warm.
      * Returns Pair(lat, lon) or null if location is unavailable or permission is denied.
      * Must be called after the user has granted ACCESS_COARSE_LOCATION.
      */
     @SuppressLint("MissingPermission")
-    suspend fun getCurrentLocation(): Pair<Double, Double>? =
-        suspendCancellableCoroutine { cont ->
-            val cts = CancellationTokenSource()
-            cont.invokeOnCancellation { cts.cancel() }
-            val client = LocationServices.getFusedLocationProviderClient(context)
-            client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
-                .addOnSuccessListener { location ->
-                    cont.resume(location?.let { Pair(it.latitude, it.longitude) })
-                }
-                .addOnFailureListener { cont.resume(null) }
+    suspend fun getCurrentLocation(): Pair<Double, Double>? {
+        val client = LocationServices.getFusedLocationProviderClient(context)
+
+        // Cheap path: a recent cached fix is plenty for venue-level matching.
+        val cached = runCatching { client.lastLocation.await() }.getOrNull()
+        if (cached != null && cached.isFresh()) {
+            return Pair(cached.latitude, cached.longitude)
         }
+
+        // No usable cache: request one active fix, time-bounded.
+        val fresh = withTimeoutOrNull(LOCATION_TIMEOUT_MS) {
+            suspendCancellableCoroutine { cont ->
+                val cts = CancellationTokenSource()
+                cont.invokeOnCancellation { cts.cancel() }
+                client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
+                    .addOnSuccessListener { location ->
+                        cont.resume(location?.let { Pair(it.latitude, it.longitude) })
+                    }
+                    .addOnFailureListener { cont.resume(null) }
+            }
+        }
+        // Fall back to a stale cache rather than nothing if the active fix timed out.
+        return fresh ?: cached?.let { Pair(it.latitude, it.longitude) }
+    }
+
+    private fun Location.isFresh(): Boolean {
+        val ageMs = (SystemClock.elapsedRealtimeNanos() - elapsedRealtimeNanos) / 1_000_000L
+        return ageMs in 0..LOCATION_FRESH_MS
+    }
+
+    private companion object {
+        const val LOCATION_FRESH_MS = 10 * 60 * 1000L // cached fix considered usable for 10 min
+        const val LOCATION_TIMEOUT_MS = 5_000L        // cap on an active GPS request
+    }
 }

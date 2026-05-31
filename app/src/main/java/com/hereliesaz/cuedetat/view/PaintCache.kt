@@ -104,8 +104,14 @@ class PaintCache {
     /** Paint for marking ball positions on the top-down snapshot overlay. */
     val ballOverlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
 
-    /** Cache for generated glow paints (dynamic based on color/width). */
-    val glowPaints = mutableMapOf<String, Paint>()
+    /**
+     * Cache for generated glow paints (dynamic based on color/width). LRU-bounded: the
+     * glow-stick key embeds a continuous slider value, so an unbounded map would grow one
+     * entry per slider position over a session. Capped to the most-recently-used entries.
+     */
+    val glowPaints = object : LinkedHashMap<String, Paint>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<String, Paint>): Boolean = size > GLOW_CACHE_MAX
+    }
 
     // --- Bank Line Paints ---
     // Paints for each segment of a bank shot to allow distinct styling if needed.
@@ -242,5 +248,9 @@ class PaintCache {
         warningPaint.strokeWidth = 6f // Keep warning stroke consistent and thick.
         textPaint.color = Color.White.toArgb() // Debug text is always white for contrast.
         fillPaint.color = Color.White.toArgb() // Default fill is white.
+    }
+
+    private companion object {
+        const val GLOW_CACHE_MAX = 32
     }
 }

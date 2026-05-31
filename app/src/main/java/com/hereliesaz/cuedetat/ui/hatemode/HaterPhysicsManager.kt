@@ -3,6 +3,7 @@
 package com.hereliesaz.cuedetat.ui.hatemode
 
 import androidx.compose.ui.geometry.Offset
+import kotlin.math.abs
 import kotlin.math.sin
 import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
@@ -56,6 +57,21 @@ class HaterPhysicsManager {
     var currentRockY: Float = 0f   // perspective tilt degrees, Y-axis
         private set
 
+    /**
+     * True when the simulation has fully settled and nothing can move it: the die is not
+     * mid-transition, all velocities have decayed, the bob has faded, and the phone is held
+     * roughly level (no gravity drift). The driving loop pauses stepping while this holds
+     * and resumes on the next perturbing input, so a settled die costs zero CPU.
+     */
+    val isAtRest: Boolean
+        get() = (phase == TriangleState.IDLE || phase == TriangleState.SETTLING) &&
+                dieVel.getDistance() < REST_VELOCITY &&
+                abs(angularVel) < REST_ANGULAR &&
+                abs(scaleVel) < REST_SCALE_VEL &&
+                abs(targetScale - dieScale) < REST_SCALE_VEL &&
+                bobAmplitude < REST_BOB &&
+                gravityVec.getDistance() < REST_GRAVITY
+
     companion object {
         private const val GRAVITY_SCALE = 0.010f  // ice-cube drift: barely moves unless tilted hard
         private const val DAMPING       = 0.93f   // stops within a few hundred ms when tilt removed
@@ -68,6 +84,13 @@ class HaterPhysicsManager {
         private const val MAX_ROCK_X    = 2.5f    // peak X-axis tilt (degrees) — very subtle
         private const val MAX_ROCK_Y    = 1.5f    // peak Y-axis tilt (degrees) — very subtle
         private const val BOB_DECAY     = 0.988f  // ~2.5 s to 10% — fades after emergence/touch
+
+        // --- Rest thresholds (battery idle-pause) ---
+        private const val REST_VELOCITY  = 0.05f  // die XY speed below this counts as stopped
+        private const val REST_ANGULAR   = 0.05f  // spin below this counts as stopped
+        private const val REST_SCALE_VEL = 0.001f // Z-scale spring settled
+        private const val REST_BOB       = 0.01f  // bob shimmer faded out
+        private const val REST_GRAVITY   = 0.05f  // phone held ~level (no drift to animate)
     }
 
     private fun rng(min: Float, max: Float) = Random.nextFloat() * (max - min) + min

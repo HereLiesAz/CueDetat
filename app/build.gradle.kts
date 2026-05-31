@@ -364,6 +364,10 @@ dependencies {
 
     // TFLite — pocket detection model
     implementation(libs.tensorflow.lite)
+    // GPU delegate — offloads FP16 inference to the GPU when the device supports it,
+    // with a CPU/NNAPI fallback handled in MergedTFLiteDetector.
+    implementation(libs.tensorflow.lite.gpu)
+    implementation(libs.tensorflow.lite.gpu.api)
 
     // ONNX Runtime — local trajectory predictor (myriad student)
     implementation(libs.onnxruntime.android)

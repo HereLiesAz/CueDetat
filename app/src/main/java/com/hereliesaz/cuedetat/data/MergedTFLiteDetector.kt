@@ -4,14 +4,19 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.PointF
 import android.graphics.RectF
+import android.os.Build
 import android.util.Log
 import com.hereliesaz.cuedetat.ui.composables.tablescan.MlTableDetection
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
 import org.tensorflow.lite.Interpreter
+import org.tensorflow.lite.gpu.CompatibilityList
+import org.tensorflow.lite.gpu.GpuDelegate
+import org.tensorflow.lite.nnapi.NnApiDelegate
 import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
+import kotlin.math.min
 
 private const val POCKET_MODEL_FILE = "ml/merged_pocket_detector_final_float16.tflite"
 private const val MASTER_MODEL_FILE = "ml/MASTER_POOL_MODEL.tflite"
@@ -50,6 +55,76 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
     private val interpreters = mutableMapOf<Int, Interpreter>()
     private var interpreter: Interpreter? = null
 
+    // Hardware-acceleration delegates we created, kept so they can be released in close().
+    private val delegates = mutableListOf<AutoCloseable>()
+    private val compatList by lazy { CompatibilityList() }
+    private val cpuThreads = min(4, Runtime.getRuntime().availableProcessors())
+
+    /**
+     * Build an [Interpreter] for [buffer], preferring hardware acceleration but never
+     * letting a bad delegate break detection: GPU → NNAPI (older APIs) → CPU. If the
+     * delegated interpreter fails to construct (e.g. the in-graph NMS op the GPU delegate
+     * can't run), we discard the delegate and rebuild on CPU. CPU uses device-scaled
+     * threads instead of the old hardcoded 2.
+     *
+     * Hardware delegation is gated behind [USE_HARDWARE_DELEGATE] (default off) for two
+     * reasons that need on-device validation before it can be enabled safely:
+     *   1. The GPU delegate is thread-affine — inference must run on the thread that
+     *      created the delegate. These interpreters are built at construction time but
+     *      [detect]/[detectPool] run on the CameraX executor and the Dispatchers.Default
+     *      pool, so the delegate would have to be confined to a single inference thread.
+     *   2. The pocket model has in-graph NMS, an op the GPU delegate cannot run; partial
+     *      delegation must be verified for detection parity vs CPU.
+     * The device-scaled CPU path below is always safe and is the real default win here.
+     */
+    private fun newInterpreter(buffer: ByteBuffer): Interpreter {
+        if (!USE_HARDWARE_DELEGATE) {
+            Log.d(TAG, "TFLite: CPU inference ($cpuThreads threads)")
+            return Interpreter(buffer, Interpreter.Options().setNumThreads(cpuThreads))
+        }
+        // 1) GPU delegate — best for these FP16 models when the device supports it.
+        try {
+            if (compatList.isDelegateSupportedOnThisDevice) {
+                val gpu = GpuDelegate(compatList.bestOptionsForThisDevice)
+                try {
+                    val interp = Interpreter(buffer, Interpreter.Options().addDelegate(gpu))
+                    delegates.add(gpu)
+                    Log.d(TAG, "TFLite: GPU delegate active")
+                    return interp
+                } catch (t: Throwable) {
+                    Log.w(TAG, "TFLite: GPU interpreter failed (${t.message}); falling back")
+                    runCatching { gpu.close() }
+                    buffer.rewind()
+                }
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "TFLite: GPU delegate unavailable (${t.message})")
+        }
+
+        // 2) NNAPI — only on API levels where it is healthy (deprecated from API 35).
+        if (Build.VERSION.SDK_INT in Build.VERSION_CODES.Q..Build.VERSION_CODES.TIRAMISU) {
+            try {
+                val nn = NnApiDelegate()
+                try {
+                    val interp = Interpreter(buffer, Interpreter.Options().addDelegate(nn))
+                    delegates.add(nn)
+                    Log.d(TAG, "TFLite: NNAPI delegate active")
+                    return interp
+                } catch (t: Throwable) {
+                    Log.w(TAG, "TFLite: NNAPI interpreter failed (${t.message}); falling back to CPU")
+                    runCatching { nn.close() }
+                    buffer.rewind()
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "TFLite: NNAPI delegate unavailable (${t.message})")
+            }
+        }
+
+        // 3) CPU fallback with device-scaled threads.
+        Log.d(TAG, "TFLite: CPU inference ($cpuThreads threads)")
+        return Interpreter(buffer, Interpreter.Options().setNumThreads(cpuThreads))
+    }
+
     init {
         loadModel()
     }
@@ -70,7 +145,7 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
             for (i in 0 until 4) {
                 val size = modelSizes[i]
                 val buffer = fullChannel.map(FileChannel.MapMode.READ_ONLY, currentOffset, size)
-                interpreters[i] = Interpreter(buffer, Interpreter.Options().setNumThreads(2))
+                interpreters[i] = newInterpreter(buffer)
                 currentOffset += size
             }
             Log.d("MergedTFLiteDetector", "Master package loaded: 4 interpreters active.")
@@ -88,7 +163,7 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
                 fd.startOffset,
                 fd.declaredLength,
             )
-            interpreter = Interpreter(buffer, Interpreter.Options().setNumThreads(2))
+            interpreter = newInterpreter(buffer)
             Log.d(TAG, "Loaded $POCKET_MODEL_FILE (${fd.declaredLength / 1024} KB)")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load $POCKET_MODEL_FILE", e)
@@ -101,6 +176,11 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
     fun close() {
         runCatching { interpreter?.close() }
         interpreter = null
+        interpreters.values.forEach { runCatching { it.close() } }
+        interpreters.clear()
+        // Delegates must be closed after the interpreters that use them.
+        delegates.forEach { runCatching { it.close() } }
+        delegates.clear()
     }
 
     private val inputBuffer: ByteBuffer by lazy {
@@ -218,5 +298,10 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
 
     companion object {
         private const val TAG = "MergedTFLiteDetector"
+
+        // Hardware (GPU/NNAPI) delegation. Off until the thread-affinity + in-graph-NMS
+        // blockers documented on newInterpreter() are validated on real devices. Flip to
+        // true (and confine inference to one thread) to evaluate GPU acceleration.
+        private const val USE_HARDWARE_DELEGATE = false
     }
 }

@@ -22,13 +22,13 @@ interface EntitlementRepository {
     val entitlement: StateFlow<Entitlement>
 
     /**
-     * Launches the Google Play purchase flow for the given base plan.
+     * Launches the Google Play purchase flow for the one-time Expert Mode unlock.
      * No-op in the FOSS flavor.
      *
      * Must be called from the UI thread because BillingClient.launchBillingFlow
      * requires an Activity reference.
      */
-    suspend fun launchPurchase(activity: Activity, basePlan: BasePlanId)
+    suspend fun launchPurchase(activity: Activity)
 
     /** Force a re-query of purchases from Google Play. No-op in FOSS. */
     suspend fun refresh()
@@ -118,10 +118,9 @@ data class EntitlementDiagnostics(
 
 sealed class ProductDetailsState {
     object Loading : ProductDetailsState()
+    /** The one-time unlock price, already localized/formatted by Play. */
     data class Loaded(
-        val monthlyFormattedPrice: String,
-        val yearlyFormattedPrice: String,
-        val trialDays: Int
+        val formattedPrice: String
     ) : ProductDetailsState()
     data class Error(val responseCode: Int, val message: String) : ProductDetailsState()
     /** FOSS only: paywall would never be shown so product details are not loaded. */

@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.abs
 
 @HiltViewModel
 class HaterViewModel @Inject constructor(
@@ -50,13 +51,34 @@ class HaterViewModel @Inject constructor(
         physicsManager.destroy()
     }
 
+    // Last orientation we reacted to, so a near-still phone (tiny EMA jitter) doesn't
+    // wake the paused physics loop on every sensor sample.
+    private var lastWakeRoll = 0f
+    private var lastWakePitch = 0f
+
     fun onEvent(event: HaterEvent) {
         when (event) {
             is HaterEvent.EnterHaterMode -> enterHaterMode()
             is HaterEvent.ShakeDetected -> onShake()
-            is HaterEvent.Dragging -> physicsManager.pushDie(event.delta, event.position)
-            is HaterEvent.SensorChanged -> physicsManager.applyGravity(event.roll, event.pitch)
-            is HaterEvent.DragEnd -> physicsManager.onDragEnd()
+            is HaterEvent.Dragging -> {
+                physicsManager.pushDie(event.delta, event.position)
+                ensurePhysicsRunning()
+            }
+            is HaterEvent.SensorChanged -> {
+                physicsManager.applyGravity(event.roll, event.pitch)
+                // Only wake the loop when the phone was actually tilted, not on jitter.
+                if (abs(event.roll - lastWakeRoll) > WAKE_TILT_DEGREES ||
+                    abs(event.pitch - lastWakePitch) > WAKE_TILT_DEGREES
+                ) {
+                    lastWakeRoll = event.roll
+                    lastWakePitch = event.pitch
+                    ensurePhysicsRunning()
+                }
+            }
+            is HaterEvent.DragEnd -> {
+                physicsManager.onDragEnd()
+                ensurePhysicsRunning()
+            }
         }
     }
 
@@ -72,16 +94,20 @@ class HaterViewModel @Inject constructor(
         }
     }
 
+    /** Restart the physics loop if it has paused (settled). No-op while already running. */
+    private fun ensurePhysicsRunning() = startPhysics()
+
     private fun startPhysics() {
         if (physicsJob?.isActive == true) return
         physicsJob = viewModelScope.launch(Dispatchers.Default) {
-            // ~60fps. We previously drove this from withFrameNanos on
+            // ~30fps. We previously drove this from withFrameNanos on
             // AndroidUiDispatcher.Main to align with the choreographer, but in
             // release builds the dispatched context did not carry a
             // MonotonicFrameClock and the call crashed on entry to Hater Mode
             // (IllegalStateException: A MonotonicFrameClock is not available).
             // A simple delay loop on Dispatchers.Default is sufficient for this
-            // physics sim and has no frame clock requirements.
+            // physics sim and has no frame clock requirements. 30fps is plenty for
+            // a floating die and halves the per-frame CPU vs the old 60fps.
             while (isActive) {
                 physicsManager.step()
                 _haterState.value = _haterState.value.copy(
@@ -91,7 +117,10 @@ class HaterViewModel @Inject constructor(
                     rockAngleX  = physicsManager.currentRockX,
                     rockAngleY  = physicsManager.currentRockY,
                 )
-                delay(16L)
+                // Battery: stop stepping once everything has settled. A perturbing input
+                // (drag, shake, tilt, phase change) relaunches the loop via ensurePhysicsRunning().
+                if (physicsManager.isAtRest) break
+                delay(FRAME_DELAY_MS)
             }
         }
     }
@@ -104,6 +133,7 @@ class HaterViewModel @Inject constructor(
         val currentState = _haterState.value.triangleState
         if ((currentState == TriangleState.IDLE) || (currentState == TriangleState.SETTLING)) {
             viewModelScope.launch {
+                ensurePhysicsRunning() // loop may have paused while settled
                 physicsManager.setPhase(TriangleState.SUBMERGING)
                 _haterState.value = _haterState.value.copy(triangleState = TriangleState.SUBMERGING)
 
@@ -130,5 +160,10 @@ class HaterViewModel @Inject constructor(
                 _haterState.value = _haterState.value.copy(triangleState = TriangleState.SETTLING)
             }
         }
+    }
+
+    private companion object {
+        const val FRAME_DELAY_MS = 33L      // ~30fps physics step
+        const val WAKE_TILT_DEGREES = 0.5f  // orientation change that resumes a paused loop
     }
 }

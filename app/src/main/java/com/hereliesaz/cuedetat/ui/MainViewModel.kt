@@ -81,7 +81,16 @@ class MainViewModel @Inject constructor(
      * MainActivity.onResume so we catch state changes (cancel, refund,
      * just-completed purchase) that happened while the app was backgrounded.
      */
+    private var lastEntitlementRefresh = 0L
+
     fun refreshEntitlement() {
+        // Battery/network: this fires on every foreground. A just-completed purchase is
+        // reflected immediately via the billing client's purchaseUpdates flow, so the
+        // foreground re-verification only needs to run occasionally. Coalesce calls within
+        // the TTL to avoid a redundant Play query on every resume.
+        val now = System.currentTimeMillis()
+        if (now - lastEntitlementRefresh < ENTITLEMENT_REFRESH_TTL_MS) return
+        lastEntitlementRefresh = now
         viewModelScope.launch {
             runCatching { entitlementRepository.refresh() }
         }
@@ -275,10 +284,14 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        // Collect entitlement updates and propagate into the reducer.
+        // Collect entitlement updates and propagate into the reducer. Gated on process
+        // lifecycle so it isn't live while backgrounded; entitlement is a StateFlow, so
+        // re-collecting on the next foreground immediately replays the current value.
         viewModelScope.launch {
-            entitlementRepository.entitlement.collect { entitlement ->
-                onEvent(MainScreenEvent.EntitlementChanged(entitlement))
+            ProcessLifecycleOwner.get().lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                entitlementRepository.entitlement.collect { entitlement ->
+                    onEvent(MainScreenEvent.EntitlementChanged(entitlement))
+                }
             }
         }
 
@@ -576,4 +589,9 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    private companion object {
+        // Coalesce foreground entitlement re-verifications. Purchases still reflect
+        // immediately via the billing client's purchaseUpdates flow.
+        const val ENTITLEMENT_REFRESH_TTL_MS = 30 * 60 * 1000L // 30 minutes
+    }
 }

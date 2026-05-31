@@ -41,6 +41,30 @@ class BallRenderer {
     private val boundingBoxMatrix = Matrix()
     private val boundingBoxScratch = RectF()
 
+    // Hoisted Paints — previously allocated inside draw methods on every redraw. Each is
+    // fully reconfigured on every use (reset()+flags, or set(base) to copy a cached paint),
+    // so behavior is identical to the old `Paint(...).apply { }` and theme-driven color
+    // changes on the base paints still propagate.
+    private val beginnerCircleStroke = Paint()
+    private val beginnerBubbleFill = Paint()
+    private val beginnerBubbleDot = Paint()
+    private val beginnerCenterDot = Paint()
+    private val snappedRingPaint = Paint()
+    private val passiveGlowPaint = Paint()
+    private val passiveRingPaint = Paint()
+    private val candidateRingPaint = Paint()
+    private val candidateGlowPaint = Paint()
+    private val bodyLogicalStroke = Paint()
+    private val bodyStroke = Paint()
+    private val bodyBeginnerFill = Paint()
+    private val bodyBeginnerStroke = Paint()
+    private val centerBeginnerDot = Paint()
+    private val centerBeginnerBubbleDot = Paint()
+    private val centerOnTableDot = Paint()
+    private val centerLiftedDot = Paint()
+    private val centerCrosshair = Paint()
+    private val boundingBoxPaint = Paint()
+
     fun draw(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?, labels: Map<String, String>) {
         val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
@@ -132,7 +156,9 @@ class BallRenderer {
             val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
 
             val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints, blurType = android.graphics.BlurMaskFilter.Blur.OUTER)
-            val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            val strokePaint = beginnerCircleStroke.apply {
+                reset()
+                isAntiAlias = true
                 color = config.strokeColor.toArgb()
                 strokeWidth = 14f
                 alpha = (config.opacity * 255).toInt()
@@ -164,7 +190,9 @@ class BallRenderer {
             val bubbleCenter = PointF(logicalScreenPos.x + finalOffsetX, logicalScreenPos.y + finalOffsetY)
 
             // Circle Fill
-            val translucentFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            val translucentFillPaint = beginnerBubbleFill.apply {
+                reset()
+                isAntiAlias = true
                 color = config.strokeColor.toArgb()
                 alpha = (config.opacity * 255 * 0.15f).toInt()
                 style = Paint.Style.FILL
@@ -173,7 +201,9 @@ class BallRenderer {
 
             // Bubble Dot
             val dotRadius = exactScreenRadius * 0.1f
-            val bubbleDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            val bubbleDotPaint = beginnerBubbleDot.apply {
+                reset()
+                isAntiAlias = true
                 color = android.graphics.Color.WHITE
                 style = Paint.Style.STROKE
                 strokeWidth = 3f
@@ -191,7 +221,9 @@ class BallRenderer {
             val mappedEdge = DrawingUtils.mapPoint(PointF(drawCenter.x + ball.radius, drawCenter.y), logicalBallMatrix)
             val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
 
-            val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            val dotPaint = beginnerCenterDot.apply {
+                reset()
+                isAntiAlias = true
                 color = android.graphics.Color.WHITE
                 style = Paint.Style.FILL
             }
@@ -224,7 +256,8 @@ class BallRenderer {
     private fun drawDetectionRings(canvas: Canvas, state: CueDetatState, paints: PaintCache, tps: com.hereliesaz.cuedetat.domain.TpsWarpData?) {
         val detectedBalls = (state.visionData?.genericBalls ?: emptyList()) + 
                            (state.visionData?.balls?.map { it.position } ?: emptyList())
-        val snappedPaint = Paint(paints.targetCirclePaint).apply {
+        val snappedPaint = snappedRingPaint.apply {
+            set(paints.targetCirclePaint)
             color = SulfurDust.toArgb()
             style = Paint.Style.STROKE
             alpha = 150
@@ -256,14 +289,16 @@ class BallRenderer {
             val candidates = state.snapCandidates ?: emptyList()
             state.pitchMatrix?.let { matrix ->
                 candidates.forEach { candidate ->
-                    val glowPaint = Paint().apply {
+                    val glowPaint = passiveGlowPaint.apply {
+                        reset()
                         style = Paint.Style.STROKE
                         strokeWidth = 14f
                         color = android.graphics.Color.WHITE
                         alpha = if (candidate.isConfirmed) 180 else 40
                         maskFilter = android.graphics.BlurMaskFilter(18f, android.graphics.BlurMaskFilter.Blur.NORMAL)
                     }
-                    val ringPaint = Paint().apply {
+                    val ringPaint = passiveRingPaint.apply {
+                        reset()
                         style = Paint.Style.STROKE
                         strokeWidth = 5f
                         color = android.graphics.Color.WHITE
@@ -282,7 +317,8 @@ class BallRenderer {
         // Tap-target rings (During selection phases)
         if (state.ballSelectionPhase != BallSelectionPhase.NONE) {
             val candidates = state.snapCandidates?.filter { it.isConfirmed } ?: emptyList()
-            val candidateRingPaint = Paint().apply {
+            val candidateRingPaint = this.candidateRingPaint.apply {
+                reset()
                 style = Paint.Style.STROKE
                 strokeWidth = 5f
                 color = when (state.ballSelectionPhase) {
@@ -291,7 +327,8 @@ class BallRenderer {
                 }
                 alpha = 200
             }
-            val candidateGlowPaint = Paint(candidateRingPaint).apply {
+            val candidateGlowPaint = this.candidateGlowPaint.apply {
+                set(candidateRingPaint)
                 strokeWidth = 14f
                 alpha = 60
                 maskFilter = android.graphics.BlurMaskFilter(18f, android.graphics.BlurMaskFilter.Blur.NORMAL)
@@ -335,12 +372,16 @@ class BallRenderer {
             val bubbleCenter = PointF(logicalScreenPos.x + finalOffsetX, logicalScreenPos.y + finalOffsetY)
 
             // Paints
-            val translucentFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            val translucentFillPaint = bodyBeginnerFill.apply {
+                reset()
+                isAntiAlias = true
                 color = config.strokeColor.toArgb()
                 alpha = (config.opacity * 255 * 0.15f).toInt()
                 style = Paint.Style.FILL
             }
-            val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            val strokePaint = bodyBeginnerStroke.apply {
+                reset()
+                isAntiAlias = true
                 color = config.strokeColor.toArgb()
                 strokeWidth = 14f
                 alpha = (config.opacity * 255).toInt()
@@ -366,13 +407,15 @@ class BallRenderer {
             val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode, false)
             val zoomFactor = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom)
 
-            val logicalStrokePaint = Paint(paints.targetCirclePaint).apply {
+            val logicalStrokePaint = bodyLogicalStroke.apply {
+                set(paints.targetCirclePaint)
                 strokeWidth = config.strokeWidth / zoomFactor
                 color = config.strokeColor.toArgb()
                 alpha = (config.opacity * 255).toInt()
             }
             val isWarning = (state.isGeometricallyImpossible || state.isObstructed) && config is GhostCueBall
-            val strokePaint = Paint(paints.targetCirclePaint).apply {
+            val strokePaint = bodyStroke.apply {
+                set(paints.targetCirclePaint)
                 color = if (isWarning) paints.warningPaint.color else config.strokeColor.toArgb()
                 strokeWidth = config.strokeWidth
                 alpha = (config.opacity * 255).toInt()
@@ -421,12 +464,16 @@ class BallRenderer {
             val finalOffsetY = if (offsetDistance > exactScreenRadius) screenOffsetY * (exactScreenRadius / offsetDistance) else screenOffsetY
             val bubbleCenter = PointF(logicalScreenPos.x + finalOffsetX, logicalScreenPos.y + finalOffsetY)
 
-            val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            val dotPaint = centerBeginnerDot.apply {
+                reset()
+                isAntiAlias = true
                 color = android.graphics.Color.WHITE
                 style = Paint.Style.FILL
             }
             val dotRadius = exactScreenRadius * 0.1f
-            val bubbleDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            val bubbleDotPaint = centerBeginnerBubbleDot.apply {
+                reset()
+                isAntiAlias = true
                 color = android.graphics.Color.WHITE
                 style = Paint.Style.STROKE
                 strokeWidth = 3f
@@ -444,7 +491,7 @@ class BallRenderer {
             val logicalScreenPos = DrawingUtils.mapPoint(drawCenter, positionMatrix)
             val yPosLifted = logicalScreenPos.y - radiusInfo.lift
 
-            val dotPaint = Paint(paints.fillPaint).apply { color = android.graphics.Color.WHITE }
+            val dotPaint = centerOnTableDot.apply { set(paints.fillPaint); color = android.graphics.Color.WHITE }
             val dotRadius = ball.radius * 0.1f
 
             // 1. Draw "On-Table" center dot
@@ -453,8 +500,9 @@ class BallRenderer {
             }
 
             // 2. Draw "Lifted" visual center UI (Dot or Crosshair)
-            val centerPaint = Paint(paints.fillPaint).apply { color = config.centerColor.toArgb() }
-            val crosshairPaint = Paint(paints.targetCirclePaint).apply {
+            val centerPaint = centerLiftedDot.apply { set(paints.fillPaint); color = config.centerColor.toArgb() }
+            val crosshairPaint = centerCrosshair.apply {
+                set(paints.targetCirclePaint)
                 color = config.centerColor.toArgb()
                 strokeWidth = config.strokeWidth
             }
@@ -539,7 +587,8 @@ class BallRenderer {
         boundingBoxMatrix.postScale(scale, scale)
         boundingBoxMatrix.postTranslate(canvasWidth / 2f, canvasHeight / 2f)
 
-        val paint = Paint(paints.cvResultPaint).apply {
+        val paint = boundingBoxPaint.apply {
+            set(paints.cvResultPaint)
             style = Paint.Style.STROKE
             strokeWidth = 6f
             alpha = 255

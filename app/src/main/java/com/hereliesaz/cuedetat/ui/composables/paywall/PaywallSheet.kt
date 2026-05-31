@@ -3,15 +3,12 @@
 package com.hereliesaz.cuedetat.ui.composables.paywall
 
 import android.app.Activity
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -44,7 +41,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.hereliesaz.cuedetat.billing.BasePlanId
 import com.hereliesaz.cuedetat.billing.PaywallTrigger
 import com.hereliesaz.cuedetat.billing.ProductDetailsState
 import com.hereliesaz.cuedetat.billing.isPlausibleTesterEmail
@@ -105,37 +101,13 @@ fun PaywallSheet(
 
             when (val pd = uiState.productDetails) {
                 is ProductDetailsState.Loading -> CircularProgressIndicator()
-                is ProductDetailsState.Loaded -> Row(
+                is ProductDetailsState.Loaded -> UnlockCard(
+                    formattedPrice = pd.formattedPrice,
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    PlanCard(
-                        title = "Yearly — Best Value",
-                        formattedPrice = pd.yearlyFormattedPrice,
-                        period = "/year",
-                        ctaText = if (pd.trialDays > 0)
-                            "Start ${pd.trialDays}-day free trial"
-                        else "Subscribe",
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            activity?.let { viewModel.purchase(it, BasePlanId.YEARLY) }
-                        }
-                    )
-                    PlanCard(
-                        title = "Monthly",
-                        formattedPrice = pd.monthlyFormattedPrice,
-                        period = "/month",
-                        ctaText = if (pd.trialDays > 0)
-                            "Start ${pd.trialDays}-day free trial"
-                        else "Subscribe",
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            activity?.let { viewModel.purchase(it, BasePlanId.MONTHLY) }
-                        }
-                    )
-                }
+                    onClick = { activity?.let { viewModel.purchase(it) } }
+                )
                 is ProductDetailsState.Error -> Text(
-                    "Couldn't load plans: ${pd.message}",
+                    "Couldn't load the price: ${pd.message}",
                     color = MaterialTheme.colorScheme.error
                 )
                 is ProductDetailsState.NotApplicable -> Text("Expert Mode is unlocked.")
@@ -143,7 +115,7 @@ fun PaywallSheet(
 
             Spacer(Modifier.height(16.dp))
             Text(
-                "Free trial, then the price shown. Cancel anytime in Google Play.",
+                "One-time purchase. No subscription, billed once through Google Play.",
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(16.dp))
@@ -275,28 +247,23 @@ private fun TesterLicenseSection(
 }
 
 @Composable
-private fun PlanCard(
-    title: String,
+private fun UnlockCard(
     formattedPrice: String,
-    period: String,
-    ctaText: String,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Card(modifier = modifier) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text("Lifetime unlock", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
-            Row {
-                Text(formattedPrice, style = MaterialTheme.typography.headlineSmall)
-                Spacer(Modifier.width(2.dp))
-                Text(period, style = MaterialTheme.typography.bodyMedium)
-            }
+            Text(formattedPrice, style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(12.dp))
-            Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) { Text(ctaText) }
+            Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+                Text("Unlock Expert Mode — $formattedPrice")
+            }
         }
     }
 }

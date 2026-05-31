@@ -85,6 +85,27 @@ class VisionRepository @Inject constructor(
         Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
     }
 
+    // Battery: pooled destination for the per-frame downscaled ML bitmap, plus the Canvas,
+    // Paint and Rects to scale into it — replaces a createScaledBitmap allocation (and a
+    // recycle) every frame. Safe to reuse: both ML consumers read it synchronously before
+    // processImage returns.
+    private var pooledScaledBitmap: android.graphics.Bitmap? = null
+    private val scaleCanvas = android.graphics.Canvas()
+    private val scalePaint = android.graphics.Paint().apply { isFilterBitmap = false }
+    private val scaleSrcRect = android.graphics.Rect()
+    private val scaleDstRect = android.graphics.Rect()
+
+    private fun scaleIntoPool(src: android.graphics.Bitmap, w: Int, h: Int): android.graphics.Bitmap {
+        val dst = pooledScaledBitmap?.takeIf { it.width == w && it.height == h && !it.isRecycled }
+            ?: android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+                .also { pooledScaledBitmap = it }
+        scaleSrcRect.set(0, 0, src.width, src.height)
+        scaleDstRect.set(0, 0, w, h)
+        scaleCanvas.setBitmap(dst)
+        scaleCanvas.drawBitmap(src, scaleSrcRect, scaleDstRect, scalePaint)
+        return dst
+    }
+
     private val feltColorDetector = FeltColorDetector()
     private val cvBallDetector = CvBallDetector()
     private var lastFeltDetection: FeltColorDetector.Result? = null
@@ -92,15 +113,71 @@ class VisionRepository @Inject constructor(
     private val isProcessing = AtomicBoolean(false)
     private var relocaliserFailFrames = 0
 
+    // --- Adaptive battery throttle ---------------------------------------------------
+    // The heavy CV/ML pass used to run on every delivered camera frame (~30fps). It now
+    // runs at ACTIVE_INTERVAL while the scene is moving and widens toward IDLE_INTERVAL
+    // once detections have been stable for MOTION_HOLD_MS, so a static table costs far
+    // less without hurting live aiming. AR tracking never widens.
+    private var lastFrameAcceptedTime = 0L
+    private var adaptiveIntervalMs = ACTIVE_INTERVAL_MS
+    private var lastMotionTime = 0L
+    private var lastBallSignature = Long.MIN_VALUE
+
+    private companion object {
+        const val ACTIVE_INTERVAL_MS = 33L    // ~30fps while the scene is moving / AR tracking
+        const val IDLE_INTERVAL_MS = 80L      // ~12fps once detections have been stable
+        const val MOTION_HOLD_MS = 1500L      // stay responsive this long after the last change
+        const val SIGNATURE_EPSILON = 6.0f    // scaled px a detection must move to count as motion
+    }
+
+    /**
+     * Cheap, allocation-free gate the analyzer calls *before* the expensive YUV→bitmap
+     * conversion. Returns true when enough time has elapsed to process this frame under
+     * the current adaptive interval. Read-only: it does not advance the clock — only a
+     * committed [processImage] call does.
+     */
+    fun shouldAcceptFrame(now: Long): Boolean =
+        now - lastFrameAcceptedTime >= adaptiveIntervalMs
+
+    /**
+     * Recompute the adaptive interval from a cheap fingerprint of the current detections.
+     * Any change (a ball moved / appeared / vanished), or being in AR tracking, resets the
+     * motion timer and keeps us at the responsive rate; a scene that has been still for
+     * MOTION_HOLD_MS drops to the idle rate.
+     */
+    private fun updateAdaptiveInterval(state: CueDetatState, now: Long, detections: List<PoolDetection>) {
+        val isArTracking = state.cameraMode == CameraMode.AR_ACTIVE || state.cameraMode == CameraMode.AR_SETUP
+        var sig = 1L
+        for (d in detections) {
+            sig = sig * 31 + (d.rect.centerX() / SIGNATURE_EPSILON).toLong()
+            sig = sig * 31 + (d.rect.centerY() / SIGNATURE_EPSILON).toLong()
+        }
+        if (sig != lastBallSignature || isArTracking) {
+            lastBallSignature = sig
+            lastMotionTime = now
+        }
+        adaptiveIntervalMs = if (isArTracking || now - lastMotionTime < MOTION_HOLD_MS) {
+            ACTIVE_INTERVAL_MS
+        } else {
+            IDLE_INTERVAL_MS
+        }
+    }
+
     @SuppressLint("UnsafeOptInUsageError")
     fun processImage(imageProxy: ImageProxy?, bitmap: android.graphics.Bitmap, state: CueDetatState) {
         if (isProcessing.get()) {
             imageProxy?.close()
             return
         }
-        isProcessing.set(true)
 
         val currentTime = System.currentTimeMillis()
+        // Battery: drop frames that arrive faster than the adaptive interval allows.
+        if (!shouldAcceptFrame(currentTime)) {
+            imageProxy?.close()
+            return
+        }
+        isProcessing.set(true)
+        lastFrameAcceptedTime = currentTime
 
         var scaledBitmap: android.graphics.Bitmap? = null
         val originalMat = Mat()
@@ -111,7 +188,7 @@ class VisionRepository @Inject constructor(
             // Downsample the machine's eyes. The silicon torture stops here.
             val scaledWidth = (bitmap.width / 4).coerceAtLeast(1)
             val scaledHeight = (bitmap.height / 4).coerceAtLeast(1)
-            scaledBitmap = android.graphics.Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight, false)
+            scaledBitmap = scaleIntoPool(bitmap, scaledWidth, scaledHeight)
             val inputImage = InputImage.fromBitmap(scaledBitmap, rotationDegrees)
 
             val fullMat = if (imageProxy != null) imageProxy.toMat(reusableFrameMat) else {
@@ -127,6 +204,8 @@ class VisionRepository @Inject constructor(
 
             val detectedObjects = Tasks.await(genericObjectDetector.process(inputImage))
             val rawDetections = poolDetector.detectPool(scaledBitmap)
+            // Battery: widen/narrow the frame interval based on detection stability.
+            updateAdaptiveInterval(state, currentTime, rawDetections)
             val customPoolBalls = rawDetections.filter { it.classId == 1 }
             val detectedCues = rawDetections.filter { it.classId == 2 }.map {
                 android.graphics.Rect(it.rect.left.toInt(), it.rect.top.toInt(), it.rect.right.toInt(), it.rect.bottom.toInt())
@@ -450,7 +529,7 @@ class VisionRepository @Inject constructor(
             e.printStackTrace()
         } finally {
             originalMat.release()
-            scaledBitmap?.let { if (it !== bitmap) it.recycle() }
+            // scaledBitmap is the pooled bitmap — do NOT recycle; it is reused next frame.
             imageProxy?.close()
             isProcessing.set(false)
         }

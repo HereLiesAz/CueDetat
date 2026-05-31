@@ -172,6 +172,8 @@ androidx-palette = { group = "androidx.palette", name = "palette-ktx", version.r
 compose-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "composeMaterial3" } # This is for Wear Compose, likely not what's needed for ExpressiveNavigationRail
 slf4j-bom = { module = "org.slf4j:slf4j-bom", version.ref = "slf4jBom" }
 tensorflow-lite = { module = "org.tensorflow:tensorflow-lite", version.ref = "tensorflowLite" }
+tensorflow-lite-gpu = { module = "org.tensorflow:tensorflow-lite-gpu", version.ref = "tensorflowLite" }
+tensorflow-lite-gpu-api = { module = "org.tensorflow:tensorflow-lite-gpu-api", version.ref = "tensorflowLite" }
 tensorflow-lite-task-vision = { module = "org.tensorflow:tensorflow-lite-task-vision", version.ref = "tensorflowLiteTaskVision" }
 vision-common = { module = "com.google.mlkit:vision-common", version.ref = "visionCommon" }
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }

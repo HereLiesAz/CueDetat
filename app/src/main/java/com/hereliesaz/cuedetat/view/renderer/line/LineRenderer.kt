@@ -47,6 +47,35 @@ class LineRenderer {
     private val posBuffer = FloatArray(2)
     private val tanBuffer = FloatArray(2)
 
+    // Hoisted Paths/Paints — previously allocated inside draw methods on every redraw.
+    // Each is fully rebuilt/reconfigured on every use (Path.reset(); Paint.reset()+flags or
+    // Paint.set(base)), so behavior is identical to the old per-call allocation and theme
+    // colors on the base paints still propagate. One distinct field per source value, so no
+    // two logical paints ever alias.
+    private val maskPath = Path()
+    private val masseSpinPath = Path()
+    private val screenSpinPath = Path()
+    private val myriadPath = Path()
+    private val trianglePath = Path()
+
+    private val shotLinePaintField = Paint()
+    private val protractorObstructionField = Paint()
+    private val aimingLinePaintField = Paint()
+    private val aimingObstructionField = Paint()
+    private val tangentSolidPaintField = Paint()
+    private val tangentDottedPaintField = Paint()
+    private val spinPathPaintField = Paint()
+    private val spinGlowPaintField = Paint()
+    private val ghostStrokeField = Paint()
+    private val ghostGlowField = Paint()
+    private val myriadPathPaintField = Paint()
+    private val whitePaintField = Paint()
+    private val bankSegmentPaintField = Paint()
+    private val guidePaintField = Paint()
+    private val guideTextPaintField = Paint()
+    private val triangleFillField = Paint()
+    private val clippedTextField = Paint()
+
     fun drawLogicalLines(
         canvas: Canvas,
         state: CueDetatState,
@@ -139,7 +168,7 @@ class LineRenderer {
         paints.gradientMaskPaint.shader = null
         paints.gradientMaskPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
 
-        val maskPath = Path()
+        val maskPath = this.maskPath.apply { reset() }
         maskPath.fillType = Path.FillType.INVERSE_WINDING
         val halfW = state.table.logicalWidth / 2f
         val halfH = state.table.logicalHeight / 2f
@@ -169,7 +198,8 @@ class LineRenderer {
         val shotGuideLineConfig = ShotGuideLine()
 
         val shotLineIsWarning = state.isGeometricallyImpossible || state.isTiltBeyondLimit || state.isObstructed
-        val shotLinePaint = Paint(paints.shotLinePaint).apply {
+        val shotLinePaint = shotLinePaintField.apply {
+            set(paints.shotLinePaint)
             color = if (shotLineIsWarning) paints.warningPaint.color else shotGuideLineConfig.strokeColor.toArgb()
             strokeWidth = shotGuideLineConfig.strokeWidth
         }
@@ -179,7 +209,8 @@ class LineRenderer {
             state = state,
             paints = paints
         )
-        val obstructionPaint = Paint(paints.pathObstructionPaint).apply {
+        val obstructionPaint = protractorObstructionField.apply {
+            set(paints.pathObstructionPaint)
             strokeWidth = protractor.radius * 2
         }
 
@@ -230,7 +261,8 @@ class LineRenderer {
         val baseAimingColor = if (isPocketed) SulfurDust else aimingLineConfig.strokeColor
         val aimingStrokeWidth = if (isBeginnerLocked) aimingLineConfig.strokeWidth * 4f else aimingLineConfig.strokeWidth
 
-        val aimingLinePaint = Paint(paints.targetCirclePaint).apply {
+        val aimingLinePaint = aimingLinePaintField.apply {
+            set(paints.targetCirclePaint)
             color = baseAimingColor.toArgb()
             strokeWidth = aimingStrokeWidth
         }
@@ -241,7 +273,8 @@ class LineRenderer {
             paints = paints
         )
 
-        val obstructionPaint = Paint(paints.pathObstructionPaint).apply {
+        val obstructionPaint = aimingObstructionField.apply {
+            set(paints.pathObstructionPaint)
             strokeWidth = state.protractorUnit.radius * 2
         }
 
@@ -274,11 +307,13 @@ class LineRenderer {
         val baseTangentColor = if (isPocketed) WarningRed else tangentLineConfig.strokeColor
         val tangentStrokeWidth = if (isBeginnerLocked) tangentLineConfig.strokeWidth * 4f else tangentLineConfig.strokeWidth
 
-        val tangentSolidPaint = Paint(paints.tangentLineSolidPaint).apply {
+        val tangentSolidPaint = tangentSolidPaintField.apply {
+            set(paints.tangentLineSolidPaint)
             color = baseTangentColor.toArgb()
             strokeWidth = tangentStrokeWidth
         }
-        val tangentDottedPaint = Paint(paints.tangentLineDottedPaint).apply {
+        val tangentDottedPaint = tangentDottedPaintField.apply {
+            set(paints.tangentLineDottedPaint)
             color = tangentLineConfig.strokeColor.toArgb()
             strokeWidth = tangentStrokeWidth
             alpha = (tangentLineConfig.opacity * 255).toInt()
@@ -330,8 +365,8 @@ class LineRenderer {
         if (paths.isEmpty()) return
 
         val alpha = (255 * state.spinPathsAlpha).toInt()
-        val spinPathPaint = Paint(paints.shotLinePaint).apply { strokeWidth = 4f }
-        val spinGlowPaint = Paint().apply { style = Paint.Style.STROKE; strokeWidth = 8f }
+        val spinPathPaint = spinPathPaintField.apply { set(paints.shotLinePaint); strokeWidth = 4f }
+        val spinGlowPaint = spinGlowPaintField.apply { reset(); style = Paint.Style.STROKE; strokeWidth = 8f }
 
         val pathColor = paths.keys.firstOrNull() ?: Color.White
         val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
@@ -364,7 +399,7 @@ class LineRenderer {
                     null,
                     Shader.TileMode.CLAMP
                 )
-                val massePath = Path()
+                val massePath = masseSpinPath.apply { reset() }
                 screenPoints.forEachIndexed { index, pt ->
                     if (index == 0) massePath.moveTo(pt.x, pt.y)
                     else massePath.lineTo(pt.x, pt.y)
@@ -378,7 +413,7 @@ class LineRenderer {
                 spinPathPaint.shader = null
                 spinGlowPaint.shader = null
             } else {
-                val screenPath = Path()
+                val screenPath = screenSpinPath.apply { reset() }
                 screenPoints.forEachIndexed { index, finalPt ->
                     if (index == 0) screenPath.moveTo(finalPt.x, finalPt.y)
                     else screenPath.lineTo(finalPt.x, finalPt.y)
@@ -394,14 +429,16 @@ class LineRenderer {
 
         // Ghost balls at rail/ball impact points along the masse path
         if (state.isMasseModeActive && state.masseImpactPoints.isNotEmpty()) {
-            val ghostStroke = Paint().apply {
+            val ghostStroke = ghostStrokeField.apply {
+                reset()
                 style = Paint.Style.STROKE
                 strokeWidth = 3f
                 color = android.graphics.Color.WHITE
                 this.alpha = (alpha * 0.75f).toInt().coerceIn(0, 255)
                 isAntiAlias = true
             }
-            val ghostGlow = Paint().apply {
+            val ghostGlow = ghostGlowField.apply {
+                reset()
                 style = Paint.Style.STROKE
                 strokeWidth = 7f
                 color = android.graphics.Color.WHITE
@@ -426,15 +463,16 @@ class LineRenderer {
         if (path.size < 2) return
 
         val alpha = 255
-        val myriadPathPaint = Paint(paints.shotLinePaint).apply { 
+        val myriadPathPaint = myriadPathPaintField.apply {
+            set(paints.shotLinePaint)
             strokeWidth = 6f
             color = android.graphics.Color.parseColor("#E040FB") // Neon purple
-            this.alpha = alpha 
+            this.alpha = alpha
         }
         val myriadGlowPaint = createGlowPaint(Color(0xFFE040FB), 12f, state, paints)
         val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
 
-        val screenPath = Path()
+        val screenPath = myriadPath.apply { reset() }
         var first = true
         path.forEach { logicalPt ->
             val warpedPt = logicalPt.warpedBy(tps)
@@ -465,7 +503,7 @@ class LineRenderer {
         val isPocketed = state.pocketedBankShotPocketIndex != null
 
         if (isPocketed) {
-            val whitePaint = Paint(paints.shotLinePaint).apply { color = Color.White.toArgb() }
+            val whitePaint = whitePaintField.apply { set(paints.shotLinePaint); color = Color.White.toArgb() }
             val whiteGlowPaint = createGlowPaint(Color.White, 12f, state, paints)
             drawPath(canvas, path, whitePaint, whiteGlowPaint, state, activeMatrix, camArray, distArray)
         } else {
@@ -485,7 +523,7 @@ class LineRenderer {
 
                 val config = bankLineConfigs.getOrElse(i) { bankLineConfigs.last() }
 
-                val linePaint = Paint(paints.bankLine1Paint).apply { color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
+                val linePaint = bankSegmentPaintField.apply { set(paints.bankLine1Paint); color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
                 val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints)
 
                 val segmentPath = DrawingUtils.buildDistortedLinePath(start, end, activeMatrix, camArray, distArray)
@@ -499,7 +537,7 @@ class LineRenderer {
                 val direction = normalize(PointF(end.x - start.x, end.y - start.y))
                 val config = bankLineConfigs.getOrElse(finalSegmentIndex) { bankLineConfigs.last() }
 
-                val linePaint = Paint(paints.bankLine1Paint).apply { color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
+                val linePaint = bankSegmentPaintField.apply { set(paints.bankLine1Paint); color = config.strokeColor.toArgb(); strokeWidth = config.strokeWidth }
                 val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints)
 
                 drawClippedLine(canvas, start, direction, linePaint, glowPaint, state, paints, activeMatrix, camArray, distArray, false, null, null)
@@ -516,12 +554,14 @@ class LineRenderer {
         
         val config = ProtractorGuides()
 
-        val guidePaint = Paint(paints.angleGuidePaint).apply {
+        val guidePaint = guidePaintField.apply {
+            set(paints.angleGuidePaint)
             color = config.strokeColor.toArgb()
             strokeWidth = config.strokeWidth
             alpha = (config.opacity * 255).toInt()
         }
-        val textPaint = Paint(paints.textPaint).apply {
+        val textPaint = guideTextPaintField.apply {
+            set(paints.textPaint)
             alpha = (config.opacity * 255).toInt()
             textSize = 30f
         }
@@ -663,7 +703,9 @@ class LineRenderer {
             }
 
             if (drawTriangles && visibleCount > 5) {
-                val trianglePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                val trianglePaint = triangleFillField.apply {
+                    reset()
+                    isAntiAlias = true
                     style = Paint.Style.FILL
                     color = paint.color
                 }
@@ -681,7 +723,8 @@ class LineRenderer {
                     canvas.translate(x, y)
                     canvas.rotate(angle)
 
-                    val triPath = Path().apply {
+                    val triPath = trianglePath.apply {
+                        reset()
                         moveTo(80f, 0f)
                         lineTo(-50f, 120f)
                         lineTo(-50f, -120f)
@@ -705,7 +748,9 @@ class LineRenderer {
                     yOffset = 45f
                 }
 
-                val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                val textPaint = clippedTextField.apply {
+                    reset()
+                    isAntiAlias = true
                     this.typeface = typeface
                     textSize = 50f
                     color = android.graphics.Color.parseColor("#00E5FF") // Cyan
