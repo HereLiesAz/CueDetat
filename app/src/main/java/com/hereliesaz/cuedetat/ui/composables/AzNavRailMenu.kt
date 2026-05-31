@@ -201,17 +201,6 @@ fun AzNavRailMenu(
             })
 
             if (inArSubMode) {
-                if (!uiState.myriadTrajectory.isNullOrEmpty()) {
-                    azRailToggle(
-                        id = "flow",
-                        route = "main",
-                        isChecked = uiState.isFlowPokeEnabled,
-                        toggleOnText = "flow", toggleOffText = "flow",
-                        fillColor = Color(0xFFE040FB), textColor = Color.White,
-                        onClick = { onEvent(MainScreenEvent.ToggleFlowPoke) }
-                    )
-                }
-
                 if (uiState.pitchMatrix != null || uiState.topDownBitmap != null) {
                     azRailToggle(
                         id = "top_down_view",
@@ -267,19 +256,6 @@ fun AzNavRailMenu(
                     textColor = Color.White,
                     onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
                 )
-            }
-
-            if (inArSubMode) {
-                if (!uiState.myriadTrajectory.isNullOrEmpty()) {
-                    azRailToggle(
-                        id = "flow",
-                        route = "main",
-                        isChecked = uiState.isFlowPokeEnabled,
-                        toggleOnText = "flow", toggleOffText = "flow",
-                        fillColor = Color(0xFFE040FB), textColor = Color.White,
-                        onClick = { onEvent(MainScreenEvent.ToggleFlowPoke) }
-                    )
-                }
             }
         } else {
             val resetLabel = when {

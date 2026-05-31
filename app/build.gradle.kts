@@ -369,9 +369,6 @@ dependencies {
     implementation(libs.tensorflow.lite.gpu)
     implementation(libs.tensorflow.lite.gpu.api)
 
-    // ONNX Runtime — local trajectory predictor (myriad student)
-    implementation(libs.onnxruntime.android)
-
     // Meta Wearables DAT
     implementation(libs.mwdat.core)
     implementation(libs.mwdat.camera)

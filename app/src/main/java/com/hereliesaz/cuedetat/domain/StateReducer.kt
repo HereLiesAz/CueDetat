@@ -131,7 +131,7 @@ fun stateReducer(
         is MainScreenEvent.CancelArSetup,
         is MainScreenEvent.TurnCameraOff,
         is MainScreenEvent.SetCameraMode,
-        is MainScreenEvent.ToggleTargetType, is MainScreenEvent.ToggleFlowPoke,
+        is MainScreenEvent.ToggleTargetType,
         is MainScreenEvent.ToggleTopDownView, is MainScreenEvent.ClearTopDownView,
         is MainScreenEvent.SetTopDownBitmap ->
             reduceToggleAction(currentState, action, reducerUtils)
@@ -142,10 +142,6 @@ fun stateReducer(
         is MainScreenEvent.EndTutorial, is MainScreenEvent.TutorialBack,
         is MainScreenEvent.UpdateHighlightAlpha ->
             reduceTutorialAction(currentState, action)
-
-        is MainScreenEvent.MyriadTrajectoryReceived -> {
-            currentState.copy(myriadTrajectory = action.points)
-        }
 
         // --- ENTITLEMENT ---
         // Handled by [EntitlementReducer]. Sets isExpertEntitled and may

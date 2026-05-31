@@ -45,16 +45,15 @@ import kotlin.math.hypot
 import kotlin.math.pow
 import org.opencv.core.Rect as OCVRect
 
+import androidx.core.graphics.createBitmap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import androidx.core.graphics.createBitmap
 
 @Singleton
 class VisionRepository @Inject constructor(
     @GenericDetector private val genericObjectDetector: ObjectDetector,
     private val poolDetector: MergedTFLiteDetector,
-    private val myriadRepository: MyriadRepository,
     private val relocaliserUseCase: com.hereliesaz.cuedetat.domain.RelocaliserUseCase
 ) {
     private val _visionDataFlow = MutableStateFlow(VisionData())
@@ -63,8 +62,6 @@ class VisionRepository @Inject constructor(
     private var arFrameCounter = 0
     private val _arEvents = MutableSharedFlow<MainScreenEvent>(extraBufferCapacity = 16)
     val arEvents: SharedFlow<MainScreenEvent> = _arEvents.asSharedFlow()
-
-    private var lastMyriadTime = 0L
 
     private var reusableMask: Mat? = null
     private val maskRingBuffer = Array(3) { Mat() }
@@ -360,44 +357,6 @@ class VisionRepository @Inject constructor(
                 PointF(screenPointArray[0], screenPointArray[1])
             }
 
-            // MYRIAD PREDICTION: Automatically track physical cue stick
-            if (detectedCues.isNotEmpty() && filteredCustomPoolBalls.isNotEmpty()) {
-                if (currentTime - lastMyriadTime > 2000L) {
-                    lastMyriadTime = currentTime
-
-                    val cueRect = detectedCues.first()
-                    val poolBall = filteredCustomPoolBalls.first()
-                    val cueCenter = PointF(cueRect.centerX().toFloat(), cueRect.centerY().toFloat())
-                    val ballCenter = PointF(poolBall.rect.centerX(), poolBall.rect.centerY())
-
-                    val pokeDx = ballCenter.x - cueCenter.x
-                    val pokeDy = ballCenter.y - cueCenter.y
-
-                    val currentMatrix = Matrix(imageToScreenMatrix)
-                    val invMat = state.inversePitchMatrix ?: Matrix()
-                    val tps = state.lensWarpTps
-                    val hasInverse = state.hasInverseMatrix
-
-                    val bmpCopy = scaledBitmap.copy(scaledBitmap.config ?: android.graphics.Bitmap.Config.ARGB_8888, false)
-
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val result = myriadRepository.fetchTrajectory(bmpCopy, ballCenter, PointF(pokeDx, pokeDy))
-                        result.onSuccess { response ->
-                            val mappedPoints = response.points.mapNotNull { pt ->
-                                val screenPoint = floatArrayOf(pt.x, pt.y)
-                                currentMatrix.mapPoints(screenPoint)
-                                val sp = PointF(screenPoint[0], screenPoint[1])
-                                if (hasInverse) {
-                                    val logical = Perspective.screenToLogical(sp, invMat)
-                                    if (tps != null) ThinPlateSpline.applyWarp(tps, logical) else logical
-                                } else sp
-                            }
-                            emitEvent(MainScreenEvent.MyriadTrajectoryReceived(mappedPoints))
-                        }
-                        bmpCopy.recycle()
-                    }
-                }
-            }
 
             val genericBallsStructured = refinedScreenPoints.mapIndexed { idx, sp ->
                 val logical = if (state.hasInverseMatrix) {

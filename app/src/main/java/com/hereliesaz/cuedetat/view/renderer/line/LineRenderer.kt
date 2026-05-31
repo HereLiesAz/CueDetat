@@ -55,7 +55,6 @@ class LineRenderer {
     private val maskPath = Path()
     private val masseSpinPath = Path()
     private val screenSpinPath = Path()
-    private val myriadPath = Path()
     private val trianglePath = Path()
 
     private val shotLinePaintField = Paint()
@@ -68,7 +67,6 @@ class LineRenderer {
     private val spinGlowPaintField = Paint()
     private val ghostStrokeField = Paint()
     private val ghostGlowField = Paint()
-    private val myriadPathPaintField = Paint()
     private val whitePaintField = Paint()
     private val bankSegmentPaintField = Paint()
     private val guidePaintField = Paint()
@@ -244,7 +242,6 @@ class LineRenderer {
             drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
         }
         drawSpinPaths(canvas, state, paints, activeMatrix, camArray, distArray)
-        drawMyriadTrajectory(canvas, state, paints, activeMatrix, camArray, distArray)
 
         if (state.areHelpersVisible && state.experienceMode != ExperienceMode.BEGINNER) {
             textRenderer.drawProtractorLabels(canvas, state, paints, typeface)
@@ -458,40 +455,6 @@ class LineRenderer {
         }
     }
 
-    private fun drawMyriadTrajectory(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
-        val path = state.myriadTrajectory ?: return
-        if (path.size < 2) return
-
-        val alpha = 255
-        val myriadPathPaint = myriadPathPaintField.apply {
-            set(paints.shotLinePaint)
-            strokeWidth = 6f
-            color = android.graphics.Color.parseColor("#E040FB") // Neon purple
-            this.alpha = alpha
-        }
-        val myriadGlowPaint = createGlowPaint(Color(0xFFE040FB), 12f, state, paints)
-        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
-
-        val screenPath = myriadPath.apply { reset() }
-        var first = true
-        path.forEach { logicalPt ->
-            val warpedPt = logicalPt.warpedBy(tps)
-            val screenPt = DrawingUtils.mapPoint(warpedPt, activeMatrix)
-            val finalPt = if (camArray != null && distArray != null && camArray.size == 9)
-                DrawingUtils.applyBarrelDistortion(screenPt.x, screenPt.y, camArray, distArray)
-            else screenPt
-
-            if (first) {
-                screenPath.moveTo(finalPt.x, finalPt.y)
-                first = false
-            } else {
-                screenPath.lineTo(finalPt.x, finalPt.y)
-            }
-        }
-
-        canvas.drawPath(screenPath, myriadGlowPaint)
-        canvas.drawPath(screenPath, myriadPathPaint)
-    }
 
     private fun drawBankingLines(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
         val rawPath = state.bankShotPath ?: return

@@ -64,7 +64,6 @@ internal fun reduceToggleAction(
             } else com.hereliesaz.cuedetat.domain.TargetType.SOLIDS
             state.copy(targetType = nextType)
         }
-        is MainScreenEvent.ToggleFlowPoke -> state.copy(isFlowPokeEnabled = !state.isFlowPokeEnabled)
         is MainScreenEvent.ToggleDistanceUnit -> state.copy(distanceUnit = if (state.distanceUnit == DistanceUnit.METRIC) DistanceUnit.IMPERIAL else DistanceUnit.METRIC, valuesChangedSinceReset = true)
         is MainScreenEvent.ToggleLuminanceDialog -> state.copy(showLuminanceDialog = !state.showLuminanceDialog)
         is MainScreenEvent.ToggleGlowStickDialog -> state.copy(showGlowStickDialog = !state.showGlowStickDialog)

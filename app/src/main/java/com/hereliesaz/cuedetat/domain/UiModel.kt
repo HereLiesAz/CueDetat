@@ -183,9 +183,7 @@ data class CueDetatState(
     val distanceUnit: DistanceUnit = DistanceUnit.IMPERIAL,
     @Transient val targetBallDistance: Float = 0f,
     val lensWarpTps: TpsWarpData? = null,
-    @Transient val myriadTrajectory: List<PointF>? = null,
     val targetType: TargetType = TargetType.SOLIDS,
-    val isFlowPokeEnabled: Boolean = true,
     val isTopDownViewActive: Boolean = false,
     @Transient val topDownBitmap: android.graphics.Bitmap? = null,
     val topDownTransitionProgress: Float = 0f,
@@ -331,10 +329,8 @@ sealed class MainScreenEvent {
     object CancelArSetup : MainScreenEvent()
     object TurnCameraOff : MainScreenEvent()
     object ArTrackingLost : MainScreenEvent()
-    data class MyriadTrajectoryReceived(val points: List<PointF>) : MainScreenEvent()
     data class ArSurfaceTapped(val screenPoint: PointF) : MainScreenEvent()
     object ToggleTargetType : MainScreenEvent()
-    object ToggleFlowPoke : MainScreenEvent()
     object ToggleTopDownView : MainScreenEvent()
     object ClearTopDownView : MainScreenEvent()
     data class SetTopDownBitmap(val bitmap: android.graphics.Bitmap?) : MainScreenEvent()

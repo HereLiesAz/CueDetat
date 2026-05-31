@@ -30,8 +30,7 @@ enum class UpdateType {
 
 class UpdateStateUseCase @Inject constructor(
     private val reducerUtils: ReducerUtils,
-    private val calculateBankShot: CalculateBankShot,
-    private val myriadPredictor: MyriadPredictor
+    private val calculateBankShot: CalculateBankShot
 ) {
 
     private val railHeightToTableHeightRatio = 0.025f
@@ -345,17 +344,6 @@ class UpdateStateUseCase @Inject constructor(
         if (isStraightShot) {
             tangentAimedPocketIndex = null
         }
-
-        // Myriad (Flow-Poke) Envisioning
-        val impactAngleRad = atan2(targetCenter.y - ghostCueCenter.y, targetCenter.x - ghostCueCenter.x)
-        val myriadTrajectory = if (state.isFlowPokeEnabled && aimedPocketIndex != null) {
-            myriadPredictor.envisionFuture(
-                targetBall = targetCenter,
-                impactAngleRad = impactAngleRad,
-                velocity = 1.0f, // Normalized velocity for envisioning
-                state = state
-            )
-        } else null
 
         return state.copy(
             shotLineAnchor = logicalShotLineAnchor,
