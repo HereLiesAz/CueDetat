@@ -58,12 +58,12 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                     // Check how many pointers are active.
                     if (event.changes.size >= 3) {
                         hasMovedDramatically = true
-                        // THREE-FINGER GESTURE: Z-axis table movement
-                        if (uiState.table.isVisible) {
-                            val pan = event.calculatePan()
-                            if (abs(pan.y) > 0.1f) {
-                                onEvent(MainScreenEvent.MoveTableZ(-pan.y * 0.05f))
-                            }
+                        // THREE-FINGER GESTURE: Z-axis table movement. Not gated on
+                        // table.isVisible (that is EXPERT-only) so it also works in
+                        // dynamic beginner mode.
+                        val pan = event.calculatePan()
+                        if (abs(pan.y) > 0.1f) {
+                            onEvent(MainScreenEvent.MoveTableZ(-pan.y * 0.05f))
                         }
                     } else if (event.changes.size == 2) {
                         hasMovedDramatically = true

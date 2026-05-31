@@ -3,6 +3,7 @@
 package com.hereliesaz.cuedetat.ui.composables
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -28,20 +29,24 @@ import androidx.compose.ui.unit.dp
 
 
 /**
- * A dedicated vertical slider component for controlling zoom levels.
+ * The right-edge control column: a zoom slider (with +/- buttons) on top and a table-height
+ * (Z) slider below it, splitting the available vertical space evenly.
  *
- * Includes +/- buttons for fine adjustment and a vertical slider for coarse adjustment.
- * Note: Material3 Slider is horizontal by default. We rotate it 270 degrees to make it vertical,
- * and adjust layout measurement to compensate for the rotation.
+ * Material3 Slider is horizontal by default; [VerticalSlider] rotates it 270° and swaps its
+ * layout constraints to render vertically.
  *
- * @param zoomSliderPosition Current zoom value (normalized -50 to 50).
- * @param onZoomChange Callback for value changes.
+ * @param zoomSliderPosition Current zoom value (-50..50).
+ * @param onZoomChange Callback for zoom changes.
+ * @param tableHeight Current table Z offset (-50..50).
+ * @param onTableHeightChange Callback for table-height changes (absolute value).
  * @param modifier Styling modifier.
  */
 @Composable
 fun ZoomControls(
     zoomSliderPosition: Float,
     onZoomChange: (Float) -> Unit,
+    tableHeight: Float,
+    onTableHeightChange: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -57,46 +62,15 @@ fun ZoomControls(
                 tint = MaterialTheme.colorScheme.onSurface
             )
         }
-        Spacer(modifier = Modifier.height(16.dp))
 
-        // Vertical Slider.
-        Slider(
-            value = zoomSliderPosition,
-            onValueChange = { onZoomChange(it) },
-            valueRange = -50f..50f,
-            colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary,
-                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-            ),
-            modifier = Modifier
-                .semantics {
-                    contentDescription = "Zoom Level"
-                }
-                .graphicsLayer {
-                    // Rotate the horizontal slider to be vertical.
-                    rotationZ = 270f
-                    transformOrigin = TransformOrigin(0f, 0f)
-                }
-                .layout { measurable, constraints ->
-                    // Swap width and height constraints to accommodate the rotation.
-                    val placeable = measurable.measure(
-                        Constraints(
-                            minWidth = constraints.minHeight,
-                            maxWidth = constraints.maxHeight,
-                            minHeight = constraints.minWidth,
-                            maxHeight = constraints.maxHeight,
-                        )
-                    )
-                    // Layout the component with swapped dimensions and offset.
-                    layout(placeable.height, placeable.width) {
-                        placeable.place(-placeable.width, 0)
-                    }
-                }
-                .fillMaxHeight(0.7f) // Occupy 70% of the available height.
-                .height(32.dp) // Thickness of the slider track/thumb area.
-        )
-        Spacer(modifier = Modifier.height(16.dp))
+        // Zoom slider — takes half of the remaining space.
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            VerticalSlider(
+                value = zoomSliderPosition,
+                onValueChange = onZoomChange,
+                description = "Zoom Level"
+            )
+        }
 
         // Zoom Out Button (-).
         IconButton(onClick = { onZoomChange(zoomSliderPosition - 1) }) {
@@ -106,5 +80,61 @@ fun ZoomControls(
                 tint = MaterialTheme.colorScheme.onSurface
             )
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Table-height (Z) slider — takes the other half of the remaining space.
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            VerticalSlider(
+                value = tableHeight,
+                onValueChange = onTableHeightChange,
+                description = "Table Height"
+            )
+        }
     }
+}
+
+/**
+ * A vertical Material3 [Slider] (rotated 270°), filling the height of its parent box.
+ * Value range is fixed to -50..50 to match the zoom and table-Z clamps.
+ */
+@Composable
+private fun VerticalSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    description: String,
+) {
+    Slider(
+        value = value,
+        onValueChange = onValueChange,
+        valueRange = -50f..50f,
+        colors = SliderDefaults.colors(
+            thumbColor = MaterialTheme.colorScheme.primary,
+            activeTrackColor = MaterialTheme.colorScheme.primary,
+            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        modifier = Modifier
+            .semantics { contentDescription = description }
+            .graphicsLayer {
+                // Rotate the horizontal slider to be vertical.
+                rotationZ = 270f
+                transformOrigin = TransformOrigin(0f, 0f)
+            }
+            .layout { measurable, constraints ->
+                // Swap width and height constraints to accommodate the rotation.
+                val placeable = measurable.measure(
+                    Constraints(
+                        minWidth = constraints.minHeight,
+                        maxWidth = constraints.maxHeight,
+                        minHeight = constraints.minWidth,
+                        maxHeight = constraints.maxHeight,
+                    )
+                )
+                layout(placeable.height, placeable.width) {
+                    placeable.place(-placeable.width, 0)
+                }
+            }
+            .fillMaxHeight()
+            .height(32.dp) // Thickness of the slider track/thumb area.
+    )
 }

@@ -180,6 +180,8 @@ fun ProtractorScreen(
                 ZoomControls(
                     zoomSliderPosition = uiState.zoomSliderPosition,
                     onZoomChange = { mainViewModel.onEvent(MainScreenEvent.ZoomSliderChanged(it)) },
+                    tableHeight = uiState.tableZOffset,
+                    onTableHeightChange = { mainViewModel.onEvent(MainScreenEvent.MoveTableZ(it - uiState.tableZOffset)) },
                     modifier = Modifier
                         .fillMaxHeight(0.6f)
                         .padding(end = 12.dp)
