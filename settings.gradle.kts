@@ -39,15 +39,15 @@ dependencyResolutionManagement {
             content {
                 includeGroup("com.meta.wearable")
             }
-            val ghUser = providers.gradleProperty("github_user")
-                .orElse(providers.environmentVariable("GITHUB_ACTOR"))
+            val ghUser = providers.gradleProperty("gh_user")
+                .orElse(providers.environmentVariable("GH_ACTOR"))
                 .orNull
-            val ghToken = providers.gradleProperty("github_token")
-                .orElse(providers.environmentVariable("GITHUB_TOKEN"))
+            val ghToken = providers.gradleProperty("gh_token")
+                .orElse(providers.environmentVariable("GH_TOKEN"))
                 .orNull
             if (ghUser.isNullOrBlank() || ghToken.isNullOrBlank()) {
                 logger.warn(
-                    "⚠ GitHubPackages credentials missing. Set 'github_user' and 'github_token' " +
+                    "⚠ GitHubPackages credentials missing. Set 'gh_user' and 'gh_token' " +
                     "in local.properties (or GITHUB_ACTOR/GITHUB_TOKEN env vars). Builds that need " +
                     "com.meta.wearable artifacts will fail at resolution."
                 )
