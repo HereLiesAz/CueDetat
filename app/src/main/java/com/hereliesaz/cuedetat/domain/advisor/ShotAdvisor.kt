@@ -37,6 +37,12 @@ class ShotAdvisor @Inject constructor() {
             return candidates.maxByOrNull { it.makeProbability }
                 ?.takeIf { it.makeProbability >= MIN_MAKE_PROBABILITY }
 
+        // Phase 3: add bank / kick / combo candidates (each carries a lower per-type confidence,
+        // so they only win when no good direct pot exists).
+        addBankCandidates(candidates, input, table, r)
+        addKickCandidates(candidates, input, table, r)
+        addComboCandidates(candidates, input, r)
+
         // Phase 2: position-aware. For the strongest pots, choose the spin whose predicted cue
         // leave best sets up the next shot (avoiding scratches), then rank by a combined score.
         val topK = candidates.sortedByDescending { it.makeProbability }.take(POSITION_TOP_K)
@@ -55,6 +61,9 @@ class ShotAdvisor @Inject constructor() {
 
     /** Pick the spin offset whose predicted cue leave best sets up the next shot; attach it. */
     private fun withPositionSpin(shot: RecommendedShot, input: AdvisorInput, table: Table, r: Float): RecommendedShot {
+        // The leave simulation models the cue contacting the target directly; for combos the cue
+        // strikes a different ball, so skip spin refinement there.
+        if (shot.type == ShotType.COMBO) return shot
         val cueV = Vector2(input.cue.x, input.cue.y)
         val targetV = Vector2(shot.targetPos.x, shot.targetPos.y)
         val shotAngle = atan2(shot.ghostCuePos.y - input.cue.y, shot.ghostCuePos.x - input.cue.x)
@@ -148,6 +157,171 @@ class ShotAdvisor @Inject constructor() {
         )
     }
 
+    // --- Phase 3 generators: banks, kicks, combos (mirror method) -----------------------------
+
+    private data class RailLine(val vertical: Boolean, val coord: Float, val lo: Float, val hi: Float)
+
+    private fun railsOf(table: Table): List<RailLine> {
+        val hw = table.logicalWidth / 2f
+        val hh = table.logicalHeight / 2f
+        return listOf(
+            RailLine(vertical = true, coord = -hw, lo = -hh, hi = hh),   // left
+            RailLine(vertical = true, coord = hw, lo = -hh, hi = hh),    // right
+            RailLine(vertical = false, coord = -hh, lo = -hw, hi = hw),  // top
+            RailLine(vertical = false, coord = hh, lo = -hw, hi = hw),   // bottom
+        )
+    }
+
+    private fun reflectAcross(p: PointF, rail: RailLine): PointF =
+        if (rail.vertical) PointF(2f * rail.coord - p.x, p.y) else PointF(p.x, 2f * rail.coord - p.y)
+
+    /** Intersection of segment a→b with the rail line, within the segment and the rail's extent; else null. */
+    private fun segmentRailHit(a: PointF, b: PointF, rail: RailLine): PointF? {
+        if (rail.vertical) {
+            val dx = b.x - a.x
+            if (kotlin.math.abs(dx) < 1e-4f) return null
+            val t = (rail.coord - a.x) / dx
+            if (t <= 1e-3f || t >= 1f - 1e-3f) return null
+            val y = a.y + t * (b.y - a.y)
+            if (y < rail.lo || y > rail.hi) return null
+            return PointF(rail.coord, y)
+        } else {
+            val dy = b.y - a.y
+            if (kotlin.math.abs(dy) < 1e-4f) return null
+            val t = (rail.coord - a.y) / dy
+            if (t <= 1e-3f || t >= 1f - 1e-3f) return null
+            val x = a.x + t * (b.x - a.x)
+            if (x < rail.lo || x > rail.hi) return null
+            return PointF(x, rail.coord)
+        }
+    }
+
+    private fun sub(a: PointF, b: PointF) = PointF(a.x - b.x, a.y - b.y)
+    private fun len(a: PointF) = hypot(a.x, a.y)
+    private fun unit(a: PointF): PointF { val l = len(a); return if (l > 1e-4f) PointF(a.x / l, a.y / l) else PointF(0f, 0f) }
+    private fun dot(a: PointF, b: PointF) = a.x * b.x + a.y * b.y
+    private fun back(from: PointF, dir: PointF, d: Float) = PointF(from.x - dir.x * d, from.y - dir.y * d)
+
+    /**
+     * Build a pot where the cue contacts [target] directly at [ghost] and the object then travels
+     * through [objectPath] (ending at the pocket; multiple points = a bank). DIRECT and BANK only.
+     */
+    private fun makePot(
+        type: ShotType, cue: PointF, target: PointF, ghost: PointF,
+        objectPath: List<PointF>, pocket: PointF, input: AdvisorInput, r: Float, conf: Float,
+    ): RecommendedShot? {
+        val toGhost = sub(ghost, cue)
+        val toGhostLen = len(toGhost)
+        if (toGhostLen < 1e-2f) return null
+        val aim = PointF(toGhost.x / toGhostLen, toGhost.y / toGhostLen)
+        val objDir = unit(sub(objectPath.first(), target))
+        val cutRad = acos(dot(aim, objDir).coerceIn(-1f, 1f))
+        if (cutRad >= MAX_CUT_RAD) return null
+
+        if (isBlocked(cue, ghost, input.allBalls, listOf(cue, target), r)) return null
+        var prev = target
+        objectPath.forEach { pt ->
+            val exclude = if (prev === target) listOf(target) else emptyList()
+            if (isBlocked(prev, pt, input.allBalls, exclude, r)) return null
+            prev = pt
+        }
+
+        val cutFactor = cos(cutRad).coerceAtLeast(0f).let { it * it }
+        var dist = toGhostLen
+        prev = target
+        objectPath.forEach { dist += len(sub(it, prev)); prev = it }
+        val distFactor = (1f - dist / input.tableDiagonal).coerceIn(0.15f, 1f)
+
+        val sp = ArrayList<PointF>(objectPath.size + 3)
+        sp.add(cue); sp.add(ghost); sp.add(target); sp.addAll(objectPath)
+        return RecommendedShot(
+            type = type, targetPos = target, pocketPos = pocket, ghostCuePos = ghost,
+            cutAngleDeg = Math.toDegrees(cutRad.toDouble()).toFloat(),
+            hardness = hardnessFor(dist, input.tableDiagonal), spin = PointF(0f, 0f),
+            makeProbability = cutFactor * distFactor * conf, confidence = cutFactor * distFactor * conf,
+            shotPath = sp,
+        )
+    }
+
+    /** One-rail banks of the object ball into a pocket (mirror the pocket across each rail). */
+    private fun addBankCandidates(out: MutableList<RecommendedShot>, input: AdvisorInput, table: Table, r: Float) {
+        val rails = railsOf(table)
+        for (target in input.targetBalls) for (pocket in input.pockets) for (rail in rails) {
+            val railPt = segmentRailHit(target, reflectAcross(pocket, rail), rail) ?: continue
+            if (len(sub(railPt, target)) < 1e-2f) continue
+            val ghost = back(target, unit(sub(railPt, target)), 2f * r)
+            makePot(ShotType.BANK, input.cue, target, ghost, listOf(railPt, pocket), pocket, input, r, BANK_CONF)
+                ?.let { out.add(it) }
+        }
+    }
+
+    /** Kicks: cue banks off a rail to reach the ghost when the direct cue→ghost path is blocked. */
+    private fun addKickCandidates(out: MutableList<RecommendedShot>, input: AdvisorInput, table: Table, r: Float) {
+        val rails = railsOf(table)
+        val cue = input.cue
+        for (target in input.targetBalls) for (pocket in input.pockets) {
+            if (len(sub(pocket, target)) < 1e-3f) continue
+            val objDir = unit(sub(pocket, target))
+            val ghost = back(target, objDir, 2f * r)
+            if (!isBlocked(cue, ghost, input.allBalls, listOf(cue, target), r)) continue // direct works; no kick needed
+            for (rail in rails) {
+                val railPt = segmentRailHit(cue, reflectAcross(ghost, rail), rail) ?: continue
+                val aim = unit(sub(ghost, railPt))
+                val cutRad = acos(dot(aim, objDir).coerceIn(-1f, 1f))
+                if (cutRad >= MAX_CUT_RAD) continue
+                if (isBlocked(cue, railPt, input.allBalls, listOf(cue), r)) continue
+                if (isBlocked(railPt, ghost, input.allBalls, listOf(target), r)) continue
+                if (isBlocked(target, pocket, input.allBalls, listOf(target), r)) continue
+                val cutFactor = cos(cutRad).coerceAtLeast(0f).let { it * it }
+                val dist = len(sub(railPt, cue)) + len(sub(ghost, railPt)) + len(sub(pocket, target))
+                val distFactor = (1f - dist / input.tableDiagonal).coerceIn(0.15f, 1f)
+                out.add(
+                    RecommendedShot(
+                        ShotType.KICK, target, pocket, ghost,
+                        Math.toDegrees(cutRad.toDouble()).toFloat(),
+                        hardnessFor(dist, input.tableDiagonal), PointF(0f, 0f),
+                        cutFactor * distFactor * KICK_CONF, confidence = cutFactor * distFactor * KICK_CONF,
+                        shotPath = listOf(cue, railPt, ghost, target, pocket),
+                    )
+                )
+            }
+        }
+    }
+
+    /** Two-ball combos: cue strikes ball A, A drives the group ball B into a pocket. */
+    private fun addComboCandidates(out: MutableList<RecommendedShot>, input: AdvisorInput, r: Float) {
+        val cue = input.cue
+        for (b in input.targetBalls) for (pocket in input.pockets) {
+            if (len(sub(pocket, b)) < 1e-3f) continue
+            val ghostB = back(b, unit(sub(pocket, b)), 2f * r)
+            for (a in input.allBalls) {
+                if (isSamePoint(a, b) || isSamePoint(a, cue)) continue
+                if (len(sub(ghostB, a)) < 1e-2f) continue
+                val ghostA = back(a, unit(sub(ghostB, a)), 2f * r)
+                val toGhostA = sub(ghostA, cue)
+                if (len(toGhostA) < 1e-2f) continue
+                val aim = unit(toGhostA)
+                val cutRad = acos(dot(aim, unit(sub(ghostB, a))).coerceIn(-1f, 1f))
+                if (cutRad >= MAX_CUT_RAD) continue
+                if (isBlocked(cue, ghostA, input.allBalls, listOf(cue, a), r)) continue
+                if (isBlocked(a, ghostB, input.allBalls, listOf(a, b), r)) continue
+                if (isBlocked(b, pocket, input.allBalls, listOf(b), r)) continue
+                val cutFactor = cos(cutRad).coerceAtLeast(0f).let { it * it }
+                val dist = len(toGhostA) + len(sub(ghostB, a)) + len(sub(pocket, b))
+                val distFactor = (1f - dist / input.tableDiagonal).coerceIn(0.1f, 1f)
+                out.add(
+                    RecommendedShot(
+                        ShotType.COMBO, b, pocket, ghostA,
+                        Math.toDegrees(cutRad.toDouble()).toFloat(),
+                        hardnessFor(dist, input.tableDiagonal), PointF(0f, 0f),
+                        cutFactor * distFactor * COMBO_CONF, confidence = cutFactor * distFactor * COMBO_CONF,
+                        shotPath = listOf(cue, ghostA, a, b, pocket),
+                    )
+                )
+            }
+        }
+    }
+
     /** True if any ball (excluding the shot's own endpoints) lies within ~a ball-diameter of the segment. */
     private fun isBlocked(a: PointF, b: PointF, balls: List<PointF>, exclude: List<PointF>, r: Float): Boolean {
         val clearance = 2f * r * 0.9f // slightly under a diameter so near-grazes aren't over-rejected
@@ -188,6 +362,11 @@ class ShotAdvisor @Inject constructor() {
         private const val POSITION_TOP_K = 5      // refine spin/leave for the strongest pots only
         private const val POSITION_WEIGHT = 0.6f  // how much the leave influences ranking
         private const val SCRATCH_PENALTY = 0.1f  // multiplier when the cue scratches
+
+        // Phase 3 per-type confidence: directs (1.0) win unless geometry strongly favors these.
+        private const val BANK_CONF = 0.55f
+        private const val KICK_CONF = 0.4f
+        private const val COMBO_CONF = 0.4f
         private val SPIN_GRID = listOf(
             Vector2(0f, 0f),    // stun
             Vector2(0f, 0.8f),  // follow

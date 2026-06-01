@@ -1,11 +1,14 @@
 package com.hereliesaz.cuedetat.domain.advisor
 
 import android.graphics.PointF
+import com.hereliesaz.cuedetat.view.model.Table
+import com.hereliesaz.cuedetat.view.state.TableSize
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.hypot
 
 class ShotAdvisorTest {
 
@@ -60,6 +63,26 @@ class ShotAdvisorTest {
             )
         )
         assertNull(rec)
+    }
+
+    @Test fun `with a table a clear straight pot is recommended as DIRECT`() {
+        val table = Table(TableSize.NINE_FT, isVisible = false)
+        val pocket = table.pockets[3] // BR corner
+        // Target partway from center toward the pocket; cue lined up straight behind it.
+        val target = p(pocket.x * 0.5f, pocket.y * 0.5f)
+        val odLen = hypot(pocket.x - target.x, pocket.y - target.y)
+        val odx = (pocket.x - target.x) / odLen
+        val ody = (pocket.y - target.y) / odLen
+        val cue = p(target.x - odx * (2f * R + 300f), target.y - ody * (2f * R + 300f))
+        val rec = advisor.recommend(
+            AdvisorInput(
+                cue = cue, targetBalls = listOf(target), allBalls = listOf(cue, target),
+                pockets = table.pockets, ballRadius = R,
+                tableDiagonal = hypot(table.logicalWidth, table.logicalHeight), table = table,
+            )
+        )
+        assertNotNull(rec)
+        assertEquals(ShotType.DIRECT, rec!!.type)
     }
 
     @Test fun `prefers the straighter of two pockets`() {
