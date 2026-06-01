@@ -52,6 +52,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import com.hereliesaz.cuedetat.domain.advisor.toAdvisorInput
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -74,6 +75,7 @@ class MainViewModel @Inject constructor(
     val arFrameProcessor: ArFrameProcessor,
     private val entitlementRepository: com.hereliesaz.cuedetat.billing.EntitlementRepository,
     private val integrityRepository: com.hereliesaz.cuedetat.data.IntegrityRepository,
+    private val shotAdvisor: com.hereliesaz.cuedetat.domain.advisor.ShotAdvisor,
 ) : ViewModel() {
 
     /**
@@ -168,6 +170,29 @@ class MainViewModel @Inject constructor(
                     )
                 }
             }
+        }
+
+        // Shot advisor driver: recompute the recommendation off-main whenever the advisor is
+        // enabled and the detected ball layout changes. collectLatest cancels superseded work;
+        // the quantized key avoids recomputing on sub-pixel CV jitter.
+        viewModelScope.launch(Dispatchers.Default) {
+            _uiState
+                .map { s ->
+                    if (!s.isAdvisorEnabled) "off"
+                    else buildString {
+                        append(s.targetType).append('|').append(s.hasInverseMatrix).append('|')
+                        s.visionData?.balls?.forEach {
+                            append(it.type).append(it.position.x.toInt()).append(',')
+                                .append(it.position.y.toInt()).append(';')
+                        }
+                    }
+                }
+                .distinctUntilChanged()
+                .collectLatest {
+                    val st = _uiState.value
+                    val shot = if (st.isAdvisorEnabled) st.toAdvisorInput()?.let { shotAdvisor.recommend(it) } else null
+                    onEvent(com.hereliesaz.cuedetat.domain.MainScreenEvent.RecommendationComputed(shot))
+                }
         }
 
         viewModelScope.launch {

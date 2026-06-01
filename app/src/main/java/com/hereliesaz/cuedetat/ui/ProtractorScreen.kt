@@ -174,6 +174,18 @@ fun ProtractorScreen(
             }
         }
 
+        // --- Onscreen HUD: Shot advisor readout ---
+        onscreen(alignment = Alignment.TopStart) {
+            if (isOnMain && uiState.isAdvisorEnabled) {
+                uiState.recommendedShot?.let { shot ->
+                    com.hereliesaz.cuedetat.ui.composables.overlays.AdvisorHud(
+                        shot = shot,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+        }
+
         // --- Onscreen HUD: Zoom slider (main route only, hidden during felt capture) ---
         onscreen(alignment = Alignment.CenterEnd) {
             if (isOnMain && !uiState.showTableScanScreen && !(uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked)) {

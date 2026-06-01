@@ -188,6 +188,8 @@ data class CueDetatState(
     @Transient val topDownBitmap: android.graphics.Bitmap? = null,
     val topDownTransitionProgress: Float = 0f,
     val isExpertEntitled: Boolean = false,
+    val isAdvisorEnabled: Boolean = false,
+    @Transient val recommendedShot: com.hereliesaz.cuedetat.domain.advisor.RecommendedShot? = null,
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
@@ -334,6 +336,10 @@ sealed class MainScreenEvent {
     object ToggleTopDownView : MainScreenEvent()
     object ClearTopDownView : MainScreenEvent()
     data class SetTopDownBitmap(val bitmap: android.graphics.Bitmap?) : MainScreenEvent()
+
+    // Shot advisor
+    object ToggleAdvisor : MainScreenEvent()
+    data class RecommendationComputed(val shot: com.hereliesaz.cuedetat.domain.advisor.RecommendedShot?) : MainScreenEvent()
 
     // Relocalisation events
     object ForceArActive : MainScreenEvent()

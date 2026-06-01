@@ -225,6 +225,7 @@ fun AzNavRailMenu(
         if (uiState.experienceMode != ExperienceMode.BEGINNER) {
             azRailToggle(id = "spin", route = "main", isChecked = uiState.isSpinControlVisible, toggleOnText = "Spin", toggleOffText = "Spin", fillColor = b4P, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleSpinControl) })
             azRailToggle(id = "masse", route = "main", isChecked = uiState.isMasseModeActive, toggleOnText = "Massé", toggleOffText = "Massé", fillColor = b5O, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleMasseMode) })
+            azRailToggle(id = "advisor", route = "main", isChecked = uiState.isAdvisorEnabled, toggleOnText = "Advisor", toggleOffText = "Advisor", fillColor = b13O, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleAdvisor) })
         }
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {

@@ -131,10 +131,13 @@ fun stateReducer(
         is MainScreenEvent.CancelArSetup,
         is MainScreenEvent.TurnCameraOff,
         is MainScreenEvent.SetCameraMode,
-        is MainScreenEvent.ToggleTargetType,
+        is MainScreenEvent.ToggleTargetType, is MainScreenEvent.ToggleAdvisor,
         is MainScreenEvent.ToggleTopDownView, is MainScreenEvent.ClearTopDownView,
         is MainScreenEvent.SetTopDownBitmap ->
             reduceToggleAction(currentState, action, reducerUtils)
+
+        is MainScreenEvent.RecommendationComputed ->
+            currentState.copy(recommendedShot = action.shot)
 
         // --- ONBOARDING ---
         // Handled by [TutorialReducer].
