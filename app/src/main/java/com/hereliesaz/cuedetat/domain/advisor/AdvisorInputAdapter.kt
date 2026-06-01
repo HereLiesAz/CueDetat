@@ -21,6 +21,8 @@ fun CueDetatState.toAdvisorInput(): AdvisorInput? {
         ?: return null
 
     val groupType = if (targetType == TargetType.STRIPES) BallType.STRIPE else BallType.SOLID
+    val opponentType = if (groupType == BallType.STRIPE) BallType.SOLID else BallType.STRIPE
+    val opponentBalls = detected.filter { it.type == opponentType }.map { it.position }
     var targets = detected.filter { it.type == groupType }.map { it.position }
     if (targets.isEmpty()) {
         // Group cleared (or unclassified): fall back to the 8-ball if it's on the table.
@@ -34,6 +36,7 @@ fun CueDetatState.toAdvisorInput(): AdvisorInput? {
     return AdvisorInput(
         cue = cue,
         targetBalls = targets,
+        opponentBalls = opponentBalls,
         allBalls = detected.map { it.position },
         pockets = pockets,
         ballRadius = LOGICAL_BALL_RADIUS,

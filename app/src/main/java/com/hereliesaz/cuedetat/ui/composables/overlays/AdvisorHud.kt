@@ -21,12 +21,19 @@ import kotlin.math.roundToInt
  */
 @Composable
 fun AdvisorHud(shot: RecommendedShot, modifier: Modifier = Modifier) {
-    val pct = (shot.makeProbability * 100f).roundToInt()
-    val cut = shot.cutAngleDeg.roundToInt()
-    val prefix = if (shot.type == ShotType.DIRECT) "" else shot.type.name.lowercase() + " · "
     val spin = spinLabel(shot.spin)?.let { " · $it" } ?: ""
+    val label = if (shot.type == ShotType.SAFETY) {
+        // A defensive shot — no pocket / make%; show how good the leave is for us.
+        val safe = (shot.positionScore * 100f).roundToInt()
+        "Advisor: safety · ${shot.hardness.name.lowercase()}$spin · leaves opp. ${100 - safe}%"
+    } else {
+        val pct = (shot.makeProbability * 100f).roundToInt()
+        val cut = shot.cutAngleDeg.roundToInt()
+        val prefix = if (shot.type == ShotType.DIRECT) "" else shot.type.name.lowercase() + " · "
+        "Advisor: $prefix${shot.hardness.name.lowercase()} · ${cut}° cut$spin · $pct%"
+    }
     Text(
-        text = "Advisor: $prefix${shot.hardness.name.lowercase()} · ${cut}° cut$spin · $pct%",
+        text = label,
         color = Color.White,
         fontSize = 13.sp,
         modifier = modifier

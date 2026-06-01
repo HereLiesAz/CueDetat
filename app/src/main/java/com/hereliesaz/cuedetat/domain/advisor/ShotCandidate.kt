@@ -42,6 +42,7 @@ data class RecommendedShot(
 data class AdvisorInput(
     val cue: PointF,
     val targetBalls: List<PointF>,
+    val opponentBalls: List<PointF> = emptyList(), // the other group, for safety scoring
     val allBalls: List<PointF>,
     val pockets: List<PointF>,
     val ballRadius: Float,

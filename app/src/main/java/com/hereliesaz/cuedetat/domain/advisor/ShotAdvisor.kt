@@ -30,10 +30,9 @@ class ShotAdvisor @Inject constructor() {
                 evaluateDirect(input.cue, target, pocket, input, r)?.let { candidates.add(it) }
             }
         }
-        if (candidates.isEmpty()) return null
 
         val table = input.table
-            ?: // Phase 1: no table → rank by make-probability only (stun).
+            ?: // Phase 1: no table → rank by make-probability only (stun). Null when no pot exists.
             return candidates.maxByOrNull { it.makeProbability }
                 ?.takeIf { it.makeProbability >= MIN_MAKE_PROBABILITY }
 
@@ -56,7 +55,71 @@ class ShotAdvisor @Inject constructor() {
                 best = refined
             }
         }
+
+        // Phase 4: if the best pot isn't confident enough, recommend a safety instead.
+        best?.takeIf { it.makeProbability >= SAFETY_POT_FLOOR }?.let { return it }
+        bestSafety(input, table, r)?.let { return it }
         return best?.takeIf { it.makeProbability >= MIN_MAKE_PROBABILITY }
+    }
+
+    /** When no pot is confident, leave the cue where the opponent's group has no good shot. */
+    private fun bestSafety(input: AdvisorInput, table: Table, r: Float): RecommendedShot? {
+        if (input.targetBalls.isEmpty()) return null
+        var best: RecommendedShot? = null
+        var bestScore = 0f
+        for (target in input.targetBalls) {
+            val toT = sub(target, input.cue)
+            val dToT = len(toT)
+            if (dToT < 1e-2f) continue
+            val dir = PointF(toT.x / dToT, toT.y / dToT)
+            val ghost = back(target, dir, 2f * r) // legal soft contact on our own group ball
+            if (isBlocked(input.cue, ghost, input.allBalls, listOf(input.cue, target), r)) continue
+            val shotAngle = atan2(dir.y, dir.x)
+
+            var localBest = -1f
+            var localSpin = PointF(0f, 0f)
+            var localPath: List<PointF> = emptyList()
+            for (spin in SPIN_GRID) {
+                val pathV = SpinPhysicsCalculator.calculatePath(
+                    spin, Vector2(input.cue.x, input.cue.y), Vector2(target.x, target.y),
+                    shotAngle, table, velocity = SAFETY_VELOCITY,
+                )
+                if (pathV.isEmpty()) continue
+                val resting = pathV.last()
+                val scratched = pathV.any { pv -> input.pockets.any { hypot(pv.x - it.x, pv.y - it.y) < r * 1.8f } }
+                val oppBest = opponentBestPot(PointF(resting.x, resting.y), input, r)
+                val score = (1f - oppBest) * (if (scratched) SCRATCH_PENALTY else 1f)
+                if (score > localBest) {
+                    localBest = score
+                    localSpin = PointF(spin.x, spin.y)
+                    localPath = pathV.map { PointF(it.x, it.y) }
+                }
+            }
+            if (localBest > bestScore) {
+                bestScore = localBest
+                best = RecommendedShot(
+                    type = ShotType.SAFETY, targetPos = target, pocketPos = null, ghostCuePos = ghost,
+                    cutAngleDeg = 0f, hardness = Hardness.SOFT, spin = localSpin,
+                    makeProbability = 0f, positionScore = localBest.coerceIn(0f, 1f),
+                    confidence = localBest.coerceIn(0f, 1f),
+                    shotPath = listOf(PointF(input.cue.x, input.cue.y), ghost, PointF(target.x, target.y)),
+                    cueLeavePath = localPath,
+                )
+            }
+        }
+        return best?.takeIf { bestScore > 0f }
+    }
+
+    /** Best make-probability of any direct pot the opponent has from a hypothetical cue position. */
+    private fun opponentBestPot(cue: PointF, input: AdvisorInput, r: Float): Float {
+        var best = 0f
+        for (target in input.opponentBalls) {
+            for (pocket in input.pockets) {
+                val c = evaluateDirect(cue, target, pocket, input, r) ?: continue
+                if (c.makeProbability > best) best = c.makeProbability
+            }
+        }
+        return best
     }
 
     /** Pick the spin offset whose predicted cue leave best sets up the next shot; attach it. */
@@ -367,6 +430,10 @@ class ShotAdvisor @Inject constructor() {
         private const val BANK_CONF = 0.55f
         private const val KICK_CONF = 0.4f
         private const val COMBO_CONF = 0.4f
+
+        // Phase 4 safety: below this best-pot probability, recommend a defensive shot instead.
+        private const val SAFETY_POT_FLOOR = 0.25f
+        private const val SAFETY_VELOCITY = 0.5f // soft tap, so the cue stays controllable
         private val SPIN_GRID = listOf(
             Vector2(0f, 0f),    // stun
             Vector2(0f, 0.8f),  // follow
