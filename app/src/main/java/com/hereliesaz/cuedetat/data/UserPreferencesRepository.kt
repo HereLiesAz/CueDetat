@@ -7,6 +7,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
@@ -46,6 +47,20 @@ class UserPreferencesRepository @Inject constructor(
         val HAS_SEEN_BEGINNER_TUTORIAL = booleanPreferencesKey("has_seen_beginner_tutorial")
         val HAS_SEEN_DYNAMIC_BEGINNER_TUTORIAL = booleanPreferencesKey("has_seen_dynamic_beginner_tutorial")
         val HAS_SEEN_EXPERT_TUTORIAL = booleanPreferencesKey("has_seen_expert_tutorial")
+
+        // Epoch millis the one-time Expert preview/trial was started. 0 (absent)
+        // means the trial has never been used. A non-zero value both gates the
+        // trial (one per install) and lets the entitlement repo compute expiry.
+        val EXPERT_TRIAL_STARTED_AT = longPreferencesKey("expert_trial_started_at")
+    }
+
+    /** Epoch millis the Expert trial was started, or 0 if it never was. */
+    suspend fun readExpertTrialStartedAt(): Long =
+        dataStore.data.first()[PreferencesKeys.EXPERT_TRIAL_STARTED_AT] ?: 0L
+
+    /** Records the Expert trial start time. Persisted immediately so a kill mid-trial can't reset it. */
+    suspend fun setExpertTrialStartedAt(millis: Long) {
+        dataStore.edit { prefs -> prefs[PreferencesKeys.EXPERT_TRIAL_STARTED_AT] = millis }
     }
 
     data class TutorialSeenFlags(

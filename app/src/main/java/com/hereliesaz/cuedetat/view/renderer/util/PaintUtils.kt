@@ -3,11 +3,82 @@
 package com.hereliesaz.cuedetat.view.renderer.util
 
 import android.graphics.BlurMaskFilter
+import android.graphics.Canvas
+import android.graphics.Color as AndroidColor
 import android.graphics.Paint
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.view.PaintCache
 import kotlin.math.abs
+
+/**
+ * Draws a soft glow halo around a ball ring of [ringRadius] at ([cx], [cy]),
+ * using a hardware-accelerated [RadialGradient] instead of a
+ * [BlurMaskFilter].
+ *
+ * Why: the overlay is drawn into Compose's hardware-accelerated canvas. A
+ * `BlurMaskFilter` is not supported in hardware, so each blurred circle forces
+ * a software-rendered intermediate whose cost scales with the drawn circle's
+ * AREA. As the user zooms in, on-screen balls grow and the per-frame blur cost
+ * grows quadratically — the source of the "laggier the closer the balls" jank
+ * in dynamic basic mode. A RadialGradient stays on the GPU and is effectively
+ * free at any zoom.
+ *
+ * The halo peaks at the ring and fades to transparent both inward and outward,
+ * with the spread scaled to the ring so the glow looks consistent at every
+ * zoom level (a fixed-pixel blur, by contrast, vanished when zoomed in).
+ */
+fun drawGlowCircle(
+    canvas: Canvas,
+    cx: Float,
+    cy: Float,
+    ringRadius: Float,
+    baseGlowColor: Color,
+    state: CueDetatState,
+    paints: PaintCache,
+) {
+    if (ringRadius <= 0f) return
+
+    val glowValue = state.glowStickValue
+    val colorInt: Int
+    val peakAlpha: Int
+    if (abs(glowValue) > 0.05f) {
+        // Glow Stick override: positive = white, negative = black.
+        peakAlpha = (abs(glowValue) * 255).toInt().coerceIn(0, 255)
+        colorInt = if (glowValue > 0) AndroidColor.WHITE else AndroidColor.BLACK
+    } else {
+        colorInt = baseGlowColor.toArgb()
+        peakAlpha = (baseGlowColor.alpha * 255 * 0.7f).toInt().coerceIn(0, 255)
+    }
+    if (peakAlpha == 0) return
+
+    // Spread scales with the ring so the glow is proportional at any zoom.
+    val spread = (ringRadius * 0.35f).coerceAtLeast(6f)
+    val outer = ringRadius + spread
+
+    val peak = (colorInt and 0x00FFFFFF) or (peakAlpha shl 24)
+    val transparent = colorInt and 0x00FFFFFF // alpha 0
+
+    val innerStop = ((ringRadius - spread) / outer).coerceIn(0f, 0.98f)
+    val ringStop = (ringRadius / outer).coerceIn(innerStop + 0.001f, 0.999f)
+
+    val shader = RadialGradient(
+        cx, cy, outer,
+        intArrayOf(transparent, peak, transparent),
+        floatArrayOf(innerStop, ringStop, 1f),
+        Shader.TileMode.CLAMP,
+    )
+    val paint = paints.glowHaloPaint.apply {
+        this.shader = shader
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    canvas.drawCircle(cx, cy, outer, paint)
+    paint.shader = null
+}
 
 /**
  * Creates and configures a [Paint] object for glow effects.

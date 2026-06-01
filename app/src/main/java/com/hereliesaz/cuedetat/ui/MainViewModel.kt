@@ -76,7 +76,38 @@ class MainViewModel @Inject constructor(
     private val entitlementRepository: com.hereliesaz.cuedetat.billing.EntitlementRepository,
     private val integrityRepository: com.hereliesaz.cuedetat.data.IntegrityRepository,
     private val shotAdvisor: com.hereliesaz.cuedetat.domain.advisor.ShotAdvisor,
+    private val appUpdater: com.hereliesaz.cuedetat.update.AppUpdater,
 ) : ViewModel() {
+
+    /**
+     * FOSS self-update. Non-null when a newer GitHub release is available; the
+     * UI shows a one-tap "download & install" popup. Always null in Play
+     * (store-managed updates).
+     */
+    private val _updateInfo = kotlinx.coroutines.flow.MutableStateFlow<com.hereliesaz.cuedetat.update.UpdateInfo?>(null)
+    val updateInfo: kotlinx.coroutines.flow.StateFlow<com.hereliesaz.cuedetat.update.UpdateInfo?> =
+        _updateInfo.asStateFlow()
+
+    init {
+        if (appUpdater.isSupported) {
+            viewModelScope.launch {
+                runCatching { appUpdater.checkForUpdate() }.getOrNull()?.let { _updateInfo.value = it }
+            }
+        }
+    }
+
+    /** Download the available update APK and launch the system installer (FOSS only). */
+    fun installUpdate(activity: android.app.Activity) {
+        val info = _updateInfo.value ?: return
+        viewModelScope.launch {
+            runCatching { appUpdater.downloadAndInstall(activity, info) }
+        }
+    }
+
+    /** Dismiss the update popup for this session. */
+    fun dismissUpdate() {
+        _updateInfo.value = null
+    }
 
     /**
      * Forces a re-query of the user's Play subscription status. Called from
@@ -95,6 +126,30 @@ class MainViewModel @Inject constructor(
         lastEntitlementRefresh = now
         viewModelScope.launch {
             runCatching { entitlementRepository.refresh() }
+        }
+    }
+
+    /** Guards [attemptTesterAutoUnlock] so we only try the silent picker once per process. */
+    private var attemptedTesterAutoUnlock = false
+
+    /**
+     * Best-effort, no-prompt tester unlock on app start. If the user's Google
+     * account is already authorized for this app and is on the build-baked
+     * tester allowlist, this grants Expert Mode without them ever having to
+     * open the paywall and walk through the tester section. Previously the
+     * silent resolve only ran when the paywall sheet was opened, so an
+     * allowlisted tester who never opened it never got unlocked.
+     *
+     * Credential Manager requires an Activity, so this is Activity-bound and
+     * invoked from MainActivity. Safe to call on every resume — it self-guards
+     * (already entitled / already attempted) and never shows UI.
+     */
+    fun attemptTesterAutoUnlock(activity: android.app.Activity) {
+        if (attemptedTesterAutoUnlock) return
+        if (entitlementRepository.entitlement.value.active) return
+        attemptedTesterAutoUnlock = true
+        viewModelScope.launch {
+            runCatching { entitlementRepository.silentlyResolveTesterLicense(activity) }
         }
     }
 

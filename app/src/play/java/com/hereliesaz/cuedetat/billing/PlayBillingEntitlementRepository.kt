@@ -6,10 +6,12 @@ import android.app.Activity
 import android.util.Log
 import com.hereliesaz.cuedetat.data.IntegrityRepository
 import com.hereliesaz.cuedetat.data.IntegrityResult
+import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.android.billingclient.api.ProductDetails
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,9 +42,17 @@ class PlayBillingEntitlementRepository @Inject constructor(
     private val testLicenseStore: TestLicenseStore,
     private val integrityRepository: IntegrityRepository,
     private val googleAccountResolver: GoogleAccountResolver,
+    private val userPreferencesRepository: UserPreferencesRepository,
 ) : EntitlementRepository {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** Epoch millis the Expert trial was started; 0 = never used. */
+    @Volatile
+    private var trialStartedAt: Long = 0L
+
+    private fun trialActiveNow(now: Long): Boolean =
+        trialStartedAt > 0L && now < trialStartedAt + TRIAL_DURATION_MS
 
     /** Last computed Play entitlement. Combined with the tester license to
      *  produce the public `entitlement` value. */
@@ -76,7 +86,12 @@ class PlayBillingEntitlementRepository @Inject constructor(
             val cached = runCatching { cacheStore.read() }.getOrDefault(Entitlement.NONE)
             playEntitlement.value = cached
             Log.i(TAG, "init: cached entitlement active=${cached.active} source=${cached.source}")
+
+            // Restore any in-flight Expert trial so a still-valid preview keeps
+            // working across process restarts, and schedule its expiry.
+            trialStartedAt = runCatching { userPreferencesRepository.readExpertTrialStartedAt() }.getOrDefault(0L)
             republish()
+            if (trialActiveNow(System.currentTimeMillis())) scheduleTrialExpiry()
 
             // 2. Restore any previously-verified tester license. If the
             //    allowlist no longer contains the stored hash (group membership
@@ -276,17 +291,66 @@ class PlayBillingEntitlementRepository @Inject constructor(
         val play = playEntitlement.value
         val tester = verifiedTesterHash
         val genuine = isDeviceGenuine
-        _entitlement.value = if (tester != null) {
-            Entitlement(
+        val now = System.currentTimeMillis()
+        _entitlement.value = when {
+            tester != null -> Entitlement(
                 active = true,
                 source = EntitlementSource.TESTER_LICENSE,
                 expiresAtMillis = null,
                 productId = play.productId,
-                lastVerifiedAtMillis = System.currentTimeMillis(),
+                lastVerifiedAtMillis = now,
                 isDeviceGenuine = genuine
             )
-        } else {
-            play.copy(isDeviceGenuine = genuine)
+            play.active -> play.copy(isDeviceGenuine = genuine)
+            trialActiveNow(now) -> Entitlement(
+                active = true,
+                source = EntitlementSource.TRIAL,
+                expiresAtMillis = trialStartedAt + TRIAL_DURATION_MS,
+                productId = play.productId,
+                lastVerifiedAtMillis = now,
+                isDeviceGenuine = genuine
+            )
+            else -> play.copy(isDeviceGenuine = genuine)
+        }
+    }
+
+    override val isExpertTrialAvailable: Boolean
+        get() = trialStartedAt == 0L
+
+    override suspend fun startExpertTrial(): Boolean {
+        if (trialStartedAt != 0L) {
+            Log.i(TAG, "startExpertTrial: trial already used")
+            return false
+        }
+        if (_entitlement.value.active) {
+            Log.i(TAG, "startExpertTrial: already entitled; not starting trial")
+            return false
+        }
+        val now = System.currentTimeMillis()
+        trialStartedAt = now
+        runCatching { userPreferencesRepository.setExpertTrialStartedAt(now) }
+        Log.i(TAG, "startExpertTrial: started 1h Expert preview")
+        republish()
+        scheduleTrialExpiry()
+        return true
+    }
+
+    /**
+     * Re-publishes the entitlement once the active trial elapses, so the app
+     * downgrades EXPERT→BEGINNER on time even if it stays in the foreground.
+     * Resumes/refreshes also re-evaluate via [republish], so this is a
+     * best-effort timer, not the sole expiry mechanism.
+     */
+    private fun scheduleTrialExpiry() {
+        val remaining = (trialStartedAt + TRIAL_DURATION_MS) - System.currentTimeMillis()
+        if (remaining <= 0L) {
+            republish()
+            return
+        }
+        scope.launch {
+            delay(remaining)
+            Log.i(TAG, "Expert trial expired; revoking")
+            republish()
         }
     }
 
@@ -319,5 +383,8 @@ class PlayBillingEntitlementRepository @Inject constructor(
 
     companion object {
         private const val TAG = "PlayBillingEntitlement"
+
+        /** One-time Expert preview length: one hour. */
+        private const val TRIAL_DURATION_MS = 60L * 60L * 1000L
     }
 }

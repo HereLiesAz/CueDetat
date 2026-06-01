@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.billing.PaywallTrigger
 import com.hereliesaz.cuedetat.billing.ProductDetailsState
 import com.hereliesaz.cuedetat.billing.isPlausibleTesterEmail
@@ -97,7 +99,27 @@ fun PaywallSheet(
                         "feel marginally less bad about yourself.",
                 style = MaterialTheme.typography.bodyMedium
             )
+            Spacer(Modifier.height(16.dp))
+            // A note to whoever's reading this. Same sentiment as the old
+            // "free trial, cancel anytime" copy — honest about why it costs money.
+            Text(
+                text = stringResource(id = R.string.paywall_personal_note),
+                style = MaterialTheme.typography.bodySmall
+            )
             Spacer(Modifier.height(24.dp))
+
+            if (uiState.trialAvailable) {
+                Button(
+                    onClick = { viewModel.startTrial() },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(stringResource(id = R.string.paywall_trial_cta)) }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    stringResource(id = R.string.paywall_trial_subtitle),
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(Modifier.height(16.dp))
+            }
 
             when (val pd = uiState.productDetails) {
                 is ProductDetailsState.Loading -> CircularProgressIndicator()
