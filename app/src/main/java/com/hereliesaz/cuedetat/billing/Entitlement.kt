@@ -45,4 +45,11 @@ enum class EntitlementSource {
      * apply.
      */
     TESTER_LICENSE,
+
+    /**
+     * Temporary, time-limited Expert access from the one-time free preview.
+     * `expiresAtMillis` is set; once it passes the entitlement reverts to
+     * inactive. One per install.
+     */
+    TRIAL,
 }

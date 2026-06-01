@@ -298,6 +298,19 @@ fun TutorialOverlay(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
+                // Always-available dismiss. The tutorial must be escapable at any
+                // step and in any tutorial type, not only on the final "Done" step.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = { onEvent(MainScreenEvent.EndTutorial) }) {
+                        Text(
+                            text = "${stringResource(id = R.string.tutorial_dismiss)}  ✕",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
                 Text(
                     text = tutorialSteps.getOrNull(uiState.currentTutorialStep)
                         ?: stringResource(id = R.string.tutorial_over),

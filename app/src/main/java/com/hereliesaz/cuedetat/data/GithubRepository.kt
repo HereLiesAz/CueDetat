@@ -32,4 +32,18 @@ class GithubRepository @Inject constructor(private val githubApi: GithubApi) {
             null
         }
     }
+
+    /**
+     * Fetches the full latest release (tag, name, html_url, and downloadable
+     * assets), or null on any failure. Used by the FOSS in-app updater to
+     * locate the APK to download.
+     */
+    suspend fun getLatestRelease(): com.hereliesaz.cuedetat.network.GithubRelease? {
+        return try {
+            val response = githubApi.getLatestRelease(REPO_OWNER, REPO_NAME)
+            if (response.isSuccessful) response.body() else null
+        } catch (e: Exception) {
+            null
+        }
+    }
 }

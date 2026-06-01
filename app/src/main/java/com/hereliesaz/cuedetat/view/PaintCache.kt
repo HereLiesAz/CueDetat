@@ -124,6 +124,14 @@ class PaintCache {
     val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     /**
+     * Reusable paint for the hardware-accelerated RadialGradient glow halo
+     * (see [com.hereliesaz.cuedetat.view.renderer.util.drawGlowCircle]). A
+     * fresh shader is assigned per draw; the Paint itself is reused to avoid
+     * per-frame allocation.
+     */
+    val glowHaloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+
+    /**
      * Configures and returns the reused [glowPaint] object for the current frame.
      *
      * Handles the "Glow Stick" feature logic:

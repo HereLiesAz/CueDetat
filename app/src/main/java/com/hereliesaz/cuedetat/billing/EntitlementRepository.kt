@@ -78,6 +78,20 @@ interface EntitlementRepository {
 
     /** Whether the Credential Manager flow is available in this build. */
     val isCredentialManagerAvailable: Boolean get() = false
+
+    /**
+     * Start the one-time, time-limited Expert preview. Returns true if a fresh
+     * trial was started, false if it was already used or the user is already
+     * entitled. Grants a [EntitlementSource.TRIAL] entitlement that expires
+     * automatically. No-op in FOSS (already entitled).
+     */
+    suspend fun startExpertTrial(): Boolean = false
+
+    /**
+     * Whether the one-time Expert preview has not yet been used and could be
+     * started. False in FOSS (no paywall) and once the trial has been consumed.
+     */
+    val isExpertTrialAvailable: Boolean get() = false
 }
 
 sealed class TesterLicenseResult {

@@ -117,6 +117,9 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refreshEntitlement()
+        // Silently unlock Expert for allowlisted testers without requiring them
+        // to open the paywall. Self-guards and never prompts.
+        viewModel.attemptTesterAutoUnlock(this)
     }
 
     private fun observeSingleEvents() {
@@ -169,6 +172,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun AppContent() {
         val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+        val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
         val showSplashScreen = uiState.experienceMode == null
         var haterModeLockedOrientation by rememberSaveable { mutableStateOf(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) }
 
@@ -192,6 +196,14 @@ class MainActivity : ComponentActivity() {
         }
 
         CueDetatTheme(luminanceAdjustment = uiState.luminanceAdjustment) {
+            updateInfo?.let { info ->
+                com.hereliesaz.cuedetat.ui.composables.dialogs.AppUpdateDialog(
+                    versionName = info.versionName,
+                    onInstall = { viewModel.installUpdate(this@MainActivity) },
+                    onDismiss = { viewModel.dismissUpdate() }
+                )
+            }
+
             paywallTrigger?.let { trigger ->
                 // key(paywallShowSequence): force a fresh composition (and
                 // fresh ModalBottomSheet animation) on every show request,

@@ -69,6 +69,7 @@
     <string name="tutorial_next">Next</string>
     <string name="tutorial_skip">Skip</string>
     <string name="tutorial_done">Done</string>
+    <string name="tutorial_dismiss">Skip tutorial</string>
 
     <string-array name="tutorial_dynamic_non_ar">
         <item>Look at you, breaking free. This is Dynamic Mode. The world is your table.</item>
@@ -124,4 +125,9 @@
     <string name="label_ghost_cue_ball_instruction">Aim the cue ball at\nthe center of the blue circle.</string>
     <string name="label_ghost_cue_ball">Ghost Cue Ball</string>
     <string name="label_obstacle">Obstacle %1$d</string>
+
+    <!-- Paywall -->
+    <string name="paywall_personal_note">Look — it\'s just me building this, and the lights cost money. Expert Mode is how Cue D\'état keeps existing. If you can spare it, the one-time unlock below funds the next feature. If you can\'t, the whole thing is free on GitHub, no hard feelings. Either way, thanks for actually using the thing I made.</string>
+    <string name="paywall_trial_cta">Try Expert free for 1 hour</string>
+    <string name="paywall_trial_subtitle">One-time, one-hour preview. No card, no strings — see what it does, then decide.</string>
 </resources>

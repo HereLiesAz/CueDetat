@@ -40,6 +40,7 @@ class PaywallViewModel @Inject constructor(
         get() = repository.isCredentialManagerAvailable
 
     init {
+        _uiState.value = _uiState.value.copy(trialAvailable = repository.isExpertTrialAvailable)
         viewModelScope.launch {
             repository.productDetails().collect { state ->
                 _uiState.value = _uiState.value.copy(productDetails = state)
@@ -80,6 +81,18 @@ class PaywallViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { repository.restorePurchases() }
             refreshDiagnostics()
+        }
+    }
+
+    /**
+     * Start the one-time, one-hour Expert preview. On success the entitlement
+     * flow flips active and the existing collector above auto-enters Expert and
+     * dismisses the sheet — same path as a completed purchase.
+     */
+    fun startTrial() {
+        viewModelScope.launch {
+            runCatching { repository.startExpertTrial() }
+            _uiState.value = _uiState.value.copy(trialAvailable = repository.isExpertTrialAvailable)
         }
     }
 
@@ -146,4 +159,5 @@ data class PaywallUiState(
     val testerLicenseOutcome: TesterLicenseResult? = null,
     val diagnostics: EntitlementDiagnostics = EntitlementDiagnostics(emptyList(), "not loaded", false),
     val showDiagnostics: Boolean = false,
+    val trialAvailable: Boolean = false,
 )

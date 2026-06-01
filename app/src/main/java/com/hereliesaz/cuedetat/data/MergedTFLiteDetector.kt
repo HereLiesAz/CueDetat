@@ -6,6 +6,7 @@ import android.graphics.PointF
 import android.graphics.RectF
 import android.os.Build
 import android.util.Log
+import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.ui.composables.tablescan.MlTableDetection
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
 import org.tensorflow.lite.Interpreter
@@ -209,10 +210,35 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
             preprocess(bitmap)
             val output = Array(1) { Array(MAX_DETECTIONS) { FloatArray(6) } }
             interp.run(inputBuffer, output)
+            if (BuildConfig.DEBUG) logRawOutput("pool", output)
             parsePoolDetections(output, bitmap.width, bitmap.height)
         } catch (e: Exception) {
             Log.e(TAG, "Pool inference failed: ${e.message}")
             emptyList()
+        }
+    }
+
+    /**
+     * Detection coordinate convention auto-detect. TFLite_Detection_PostProcess
+     * (the in-graph NMS these models use) emits normalized [0,1] box edges, but
+     * some YOLO TFLite exports emit input-pixel coordinates (0..[INPUT_SIZE])
+     * instead. If the largest edge looks like a pixel value, normalize by the
+     * input size so downstream width/height scaling lands the box on the ball
+     * either way. Without this, a pixel-coordinate export draws boxes ~640×
+     * too large and entirely off-screen — i.e. "the model does nothing".
+     */
+    private fun coordScale(det: FloatArray): Float {
+        val maxEdge = maxOf(det[0], det[1], det[2], det[3])
+        return if (maxEdge > 1.5f) 1f / INPUT_SIZE else 1f
+    }
+
+    /** Debug-only dump of the first few non-empty detection rows + tensor shape. */
+    private fun logRawOutput(tag: String, output: Array<Array<FloatArray>>) {
+        val rows = output[0]
+        val nonEmpty = rows.count { it[4] > 0f }
+        Log.d(TAG, "$tag raw output: [1, ${rows.size}, ${rows.firstOrNull()?.size ?: 0}], rows with score>0 = $nonEmpty")
+        rows.asSequence().filter { it[4] > 0.05f }.take(5).forEach {
+            Log.d(TAG, "  $tag det = [${it[0]}, ${it[1]}, ${it[2]}, ${it[3]}, score=${it[4]}, cls=${it[5]}]")
         }
     }
 
@@ -229,22 +255,23 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
             val score = det[4]
             if (score < CONFIDENCE_THRESHOLD) continue
             val classId = det[5].toInt()
+            val s = coordScale(det)
 
             when (classId) {
                 TABLE_CLASS_ID -> {
                     if (score > maxTableScore) {
                         maxTableScore = score
                         tableBoundary = RectF(
-                            det[1] * width,
-                            det[0] * height,
-                            det[3] * width,
-                            det[2] * height,
+                            det[1] * s * width,
+                            det[0] * s * height,
+                            det[3] * s * width,
+                            det[2] * s * height,
                         )
                     }
                 }
                 HOLE_CLASS_ID, SIDE_CLASS_ID -> {
-                    val cx = ((det[1] + det[3]) / 2f * width)
-                    val cy = ((det[0] + det[2]) / 2f * height)
+                    val cx = ((det[1] + det[3]) / 2f * s * width)
+                    val cy = ((det[0] + det[2]) / 2f * s * height)
                     pockets.add(PointF(cx, cy))
                 }
             }
@@ -266,11 +293,12 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
             val score = det[4]
             if (score < POOL_CONFIDENCE_THRESHOLD) continue
             val classId = det[5].toInt()
-            
-            val top = det[0] * height
-            val left = det[1] * width
-            val bottom = det[2] * height
-            val right = det[3] * width
+            val s = coordScale(det)
+
+            val top = det[0] * s * height
+            val left = det[1] * s * width
+            val bottom = det[2] * s * height
+            val right = det[3] * s * width
             results.add(PoolDetection(RectF(left, top, right, bottom), score, classId))
         }
         return results

@@ -27,7 +27,7 @@ import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.LogicalCircular
 import com.hereliesaz.cuedetat.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
-import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
+import com.hereliesaz.cuedetat.view.renderer.util.drawGlowCircle
 import com.hereliesaz.cuedetat.view.renderer.warpedBy
 import kotlin.math.hypot
 import androidx.core.graphics.withMatrix
@@ -155,7 +155,6 @@ class BallRenderer {
             val mappedEdge = DrawingUtils.mapPoint(PointF(drawCenter.x + ball.radius, drawCenter.y), logicalBallMatrix)
             val exactScreenRadius = hypot((mappedEdge.x - logicalScreenPos.x).toDouble(), (mappedEdge.y - logicalScreenPos.y).toDouble()).toFloat()
 
-            val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints, blurType = android.graphics.BlurMaskFilter.Blur.OUTER)
             val strokePaint = beginnerCircleStroke.apply {
                 reset()
                 isAntiAlias = true
@@ -166,7 +165,7 @@ class BallRenderer {
             }
             val screenInnerRadius = exactScreenRadius - (14f / 2f)
 
-            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, exactScreenRadius, glowPaint)
+            drawGlowCircle(canvas, logicalScreenPos.x, logicalScreenPos.y, exactScreenRadius, config.glowColor, state, paints)
             canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, screenInnerRadius, strokePaint)
         }
     }
@@ -387,12 +386,11 @@ class BallRenderer {
                 alpha = (config.opacity * 255).toInt()
                 style = Paint.Style.STROKE
             }
-            val glowPaint = createGlowPaint(config.glowColor, config.glowWidth, state, paints, blurType = android.graphics.BlurMaskFilter.Blur.OUTER)
             val screenInnerRadius = exactScreenRadius - (14f / 2f)
 
             // Order for Beginner: Bubble fill is the LOWEST.
             canvas.drawCircle(bubbleCenter.x, bubbleCenter.y, exactScreenRadius, translucentFillPaint)
-            canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, exactScreenRadius, glowPaint)
+            drawGlowCircle(canvas, logicalScreenPos.x, logicalScreenPos.y, exactScreenRadius, config.glowColor, state, paints)
             canvas.drawCircle(logicalScreenPos.x, logicalScreenPos.y, screenInnerRadius, strokePaint)
 
         } else {
@@ -421,12 +419,7 @@ class BallRenderer {
                 alpha = (config.opacity * 255).toInt()
                 style = Paint.Style.STROKE
             }
-            val glowPaint = createGlowPaint(
-                baseGlowColor = if (isWarning) Color(paints.warningPaint.color) else config.glowColor,
-                baseGlowWidth = config.glowWidth,
-                state = state,
-                paints = paints
-            )
+            val glowColor = if (isWarning) Color(paints.warningPaint.color) else config.glowColor
 
             // Draw "On-Table" logical outline
             canvas.withMatrix(positionMatrix) {
@@ -434,7 +427,7 @@ class BallRenderer {
             }
 
             // Draw "Lifted" visual body
-            canvas.drawCircle(logicalScreenPos.x, yPosLifted, radiusInfo.radius, glowPaint)
+            drawGlowCircle(canvas, logicalScreenPos.x, yPosLifted, radiusInfo.radius, glowColor, state, paints)
             canvas.drawCircle(logicalScreenPos.x, yPosLifted, radiusInfo.radius, strokePaint)
         }
     }
