@@ -41,9 +41,11 @@ dependencyResolutionManagement {
             }
             val ghUser = providers.gradleProperty("gh_user")
                 .orElse(providers.environmentVariable("GH_ACTOR"))
+                .orElse(providers.environmentVariable("GITHUB_ACTOR"))
                 .orNull
             val ghToken = providers.gradleProperty("gh_token")
                 .orElse(providers.environmentVariable("GH_TOKEN"))
+                .orElse(providers.environmentVariable("GITHUB_TOKEN"))
                 .orNull
             if (ghUser.isNullOrBlank() || ghToken.isNullOrBlank()) {
                 logger.warn(
