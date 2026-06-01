@@ -10,6 +10,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.graphics.PointF
 import com.hereliesaz.cuedetat.domain.advisor.RecommendedShot
 import com.hereliesaz.cuedetat.domain.advisor.ShotType
 import kotlin.math.roundToInt
@@ -23,8 +24,9 @@ fun AdvisorHud(shot: RecommendedShot, modifier: Modifier = Modifier) {
     val pct = (shot.makeProbability * 100f).roundToInt()
     val cut = shot.cutAngleDeg.roundToInt()
     val prefix = if (shot.type == ShotType.DIRECT) "" else shot.type.name.lowercase() + " · "
+    val spin = spinLabel(shot.spin)?.let { " · $it" } ?: ""
     Text(
-        text = "Advisor: $prefix${shot.hardness.name.lowercase()} · ${cut}° cut · $pct%",
+        text = "Advisor: $prefix${shot.hardness.name.lowercase()} · ${cut}° cut$spin · $pct%",
         color = Color.White,
         fontSize = 13.sp,
         modifier = modifier
@@ -32,4 +34,20 @@ fun AdvisorHud(shot: RecommendedShot, modifier: Modifier = Modifier) {
             .background(Color.Black.copy(alpha = 0.6f))
             .padding(horizontal = 12.dp, vertical = 6.dp),
     )
+}
+
+/** "follow", "draw", "left/right english", or combinations; null for a centre-ball (stun) hit. */
+private fun spinLabel(spin: PointF): String? {
+    val vertical = when {
+        spin.y > 0.2f -> "follow"
+        spin.y < -0.2f -> "draw"
+        else -> null
+    }
+    val english = when {
+        spin.x > 0.2f -> "right english"
+        spin.x < -0.2f -> "left english"
+        else -> null
+    }
+    if (vertical == null && english == null) return null
+    return listOfNotNull(vertical, english).joinToString(" + ")
 }

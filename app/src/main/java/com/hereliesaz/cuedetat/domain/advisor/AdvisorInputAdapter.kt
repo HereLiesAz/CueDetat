@@ -38,5 +38,6 @@ fun CueDetatState.toAdvisorInput(): AdvisorInput? {
         pockets = pockets,
         ballRadius = LOGICAL_BALL_RADIUS,
         tableDiagonal = hypot(table.logicalWidth, table.logicalHeight).coerceAtLeast(1f),
+        table = table,
     )
 }

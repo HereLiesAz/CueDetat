@@ -3,6 +3,7 @@ package com.hereliesaz.cuedetat.view.renderer.line
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
@@ -48,6 +49,13 @@ class RecommendationRenderer {
         color = gold
         alpha = 170
     }
+    private val leavePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 4f
+        color = Color.WHITE
+        alpha = 120
+        pathEffect = DashPathEffect(floatArrayOf(12f, 10f), 0f)
+    }
 
     fun draw(canvas: Canvas, state: CueDetatState, matrix: Matrix) {
         if (!state.isAdvisorEnabled) return
@@ -63,6 +71,17 @@ class RecommendationRenderer {
         }
         canvas.drawPath(path, glowPaint)
         canvas.drawPath(path, linePaint)
+
+        // Predicted cue-ball leave (dashed white), so the position recommendation is visible.
+        val leave = shot.cueLeavePath
+        if (leave.size >= 2) {
+            path.reset()
+            leave.forEachIndexed { i, lp ->
+                val sp = DrawingUtils.mapPoint(lp, matrix)
+                if (i == 0) path.moveTo(sp.x, sp.y) else path.lineTo(sp.x, sp.y)
+            }
+            canvas.drawPath(path, leavePaint)
+        }
 
         // Ring around the recommended object ball, then a faint ghost-ball ring.
         drawRing(canvas, shot.targetPos, LOGICAL_BALL_RADIUS * 1.4f, ringPaint, matrix)

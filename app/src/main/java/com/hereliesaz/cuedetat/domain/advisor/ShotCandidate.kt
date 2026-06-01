@@ -23,8 +23,10 @@ data class RecommendedShot(
     val hardness: Hardness,
     val spin: PointF,              // recommended english/draw offset, -1..1; (0,0) = center/stun
     val makeProbability: Float,    // 0..1
+    val positionScore: Float = 0f, // 0..1, quality of the resulting cue leave (Phase 2)
     val confidence: Float,         // 0..1, gates whether we surface anything
     val shotPath: List<PointF>,    // polyline for rendering: cue → ghost → target → pocket (+ banks)
+    val cueLeavePath: List<PointF> = emptyList(), // predicted cue path after contact (Phase 2)
 )
 
 /**
@@ -44,4 +46,6 @@ data class AdvisorInput(
     val pockets: List<PointF>,
     val ballRadius: Float,
     val tableDiagonal: Float,
+    /** Table geometry for the cue-leave simulation. When null, spin/position is skipped (stun). */
+    val table: com.hereliesaz.cuedetat.view.model.Table? = null,
 )
