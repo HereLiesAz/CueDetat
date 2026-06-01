@@ -36,6 +36,7 @@ private data class DrawSignature(
     val tableZOffset: Float,
     val onPlaneBall: Any?,
     val topDownProgress: Float,
+    val recommendedShot: Any?,
 )
 
 @Composable
@@ -79,6 +80,7 @@ fun ProtractorOverlay(
                 tableZOffset = uiState.tableZOffset,
                 onPlaneBall = uiState.onPlaneBall,
                 topDownProgress = topDownProgress,
+                recommendedShot = uiState.recommendedShot,
             )
         }
     }

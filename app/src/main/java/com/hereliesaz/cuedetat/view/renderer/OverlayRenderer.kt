@@ -23,6 +23,7 @@ class OverlayRenderer {
     private val tableRenderer = TableRenderer()
     private val railRenderer = RailRenderer()
     private val cvDebugRenderer = CvDebugRenderer()
+    private val recommendationRenderer = com.hereliesaz.cuedetat.view.renderer.line.RecommendationRenderer()
 
     // Reused across draw() calls to avoid GC pressure at 60 fps.
     private val orthoMatrix = Matrix()
@@ -150,5 +151,8 @@ class OverlayRenderer {
             // Pass 3: Draw all balls and their associated text
             ballRenderer.draw(canvas, state, paints, typeface, labels)
         }
+
+        // Pass 4 (topmost): the advisor's recommended shot, when enabled.
+        recommendationRenderer.draw(canvas, state, matrixFor2DPlane)
     }
 }
