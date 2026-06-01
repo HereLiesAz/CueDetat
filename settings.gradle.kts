@@ -39,14 +39,25 @@ dependencyResolutionManagement {
             content {
                 includeGroup("com.meta.wearable")
             }
+            val localProps = java.util.Properties().apply {
+                val file = settingsDir.resolve("local.properties")
+                if (file.exists()) {
+                    file.inputStream().use { load(it) }
+                }
+            }
+
             val ghUser = providers.gradleProperty("gh_user")
+                .orElse(providers.gradleProperty("GH_USER"))
                 .orElse(providers.environmentVariable("GH_ACTOR"))
                 .orElse(providers.environmentVariable("GITHUB_ACTOR"))
-                .orNull
+                .orNull ?: localProps.getProperty("gh_user") ?: localProps.getProperty("GH_USER") ?: localProps.getProperty("GH_ACTOR")
+
             val ghToken = providers.gradleProperty("gh_token")
+                .orElse(providers.gradleProperty("GH_TOKEN"))
                 .orElse(providers.environmentVariable("GH_TOKEN"))
                 .orElse(providers.environmentVariable("GITHUB_TOKEN"))
-                .orNull
+                .orNull ?: localProps.getProperty("gh_token") ?: localProps.getProperty("GH_TOKEN")
+
             if (ghUser.isNullOrBlank() || ghToken.isNullOrBlank()) {
                 logger.warn(
                     "⚠ GitHubPackages credentials missing. Set 'gh_user' and 'gh_token' " +
