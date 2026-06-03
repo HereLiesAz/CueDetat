@@ -306,6 +306,21 @@ android {
 
 
 dependencies {
+    // Bouncy Castle is pulled in transitively. The resolutionStrategy below
+    // (configurations.all) force-upgrades it at resolution time, but Dependabot
+    // parses build files statically and does not evaluate that dynamic override,
+    // so it keeps flagging the vulnerable transitive versions (CVE-2026-5598 and
+    // the older bcpkix/LDAP-injection advisories). These explicit constraints
+    // pin the patched 1.84 in a form static analysis recognizes, so the alerts
+    // resolve. Keep the version in sync with libs.versions.bouncycastle.
+    constraints {
+        val bcVersion = libs.versions.bouncycastle.get()
+        implementation("org.bouncycastle:bcprov-jdk18on:$bcVersion")
+        implementation("org.bouncycastle:bcpkix-jdk18on:$bcVersion")
+        implementation("org.bouncycastle:bcutil-jdk18on:$bcVersion")
+        implementation("org.bouncycastle:bctls-jdk18on:$bcVersion")
+    }
+
     implementation(libs.androidx.datastore.preferences)
 
     // Play Billing — only included in the play flavor APK.
