@@ -23,27 +23,48 @@ import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Coarse connection state for the Meta glasses stream, surfaced to the UI so the
+ * "glasses" toggle gives visible feedback instead of failing silently.
+ */
+enum class MetaConnectionStatus {
+    IDLE,
+    CONNECTING,
+    STREAMING,
+    NO_DEVICE,
+    ERROR
+}
+
 @Singleton
 class MetaWearableRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) {
     private val tag = "MetaWearableRepo"
-    
+
     private var currentSession: Session? = null
     private var currentStream: Stream? = null
     private var sessionJob: Job? = null
-    
+
     private val _videoFrame = MutableStateFlow<Bitmap?>(null)
     val videoFrame = _videoFrame.asStateFlow()
-    
+
     private val _isStreaming = MutableStateFlow(false)
     val isStreaming = _isStreaming.asStateFlow()
+
+    private val _connectionStatus = MutableStateFlow(MetaConnectionStatus.IDLE)
+    val connectionStatus = _connectionStatus.asStateFlow()
+
+    /** Human-readable detail of the most recent failure, for diagnostics. */
+    private val _lastError = MutableStateFlow<String?>(null)
+    val lastError = _lastError.asStateFlow()
 
     private val scope = CoroutineScope(Dispatchers.Default)
 
     fun startStreaming() {
         if (_isStreaming.value) return
-        
+
+        _connectionStatus.value = MetaConnectionStatus.CONNECTING
+        _lastError.value = null
         scope.launch {
             Log.d(tag, "Starting Meta glasses session...")
             try {
@@ -60,18 +81,27 @@ class MetaWearableRepository @Inject constructor(
                         currentStream = stream
                         stream.start()
                         _isStreaming.value = true
+                        _connectionStatus.value = MetaConnectionStatus.STREAMING
                         observeStream(stream)
                         Log.d(tag, "Meta stream started successfully")
                     }.onFailure { error ->
                         Log.e(tag, "Failed to add stream: $error")
+                        _lastError.value = "Stream error: $error"
+                        _connectionStatus.value = MetaConnectionStatus.ERROR
                         stopStreaming()
                     }
                 }.onFailure { error ->
+                    // No paired/available device is the common case here; surface it
+                    // distinctly so the UI can tell the user to pair their glasses.
                     Log.e(tag, "Failed to create session: $error")
+                    _lastError.value = "Session error: $error"
+                    _connectionStatus.value = MetaConnectionStatus.NO_DEVICE
                     _isStreaming.value = false
                 }
             } catch (e: Exception) {
                 Log.e(tag, "Unexpected error in startStreaming", e)
+                _lastError.value = e.message ?: e.toString()
+                _connectionStatus.value = MetaConnectionStatus.ERROR
                 _isStreaming.value = false
                 stopStreaming()
             }
@@ -105,6 +135,12 @@ class MetaWearableRepository @Inject constructor(
         currentSession = null
         _isStreaming.value = false
         _videoFrame.value = null
+        // Preserve a freshly-set failure status; only reset to IDLE on a clean stop.
+        if (_connectionStatus.value == MetaConnectionStatus.STREAMING ||
+            _connectionStatus.value == MetaConnectionStatus.CONNECTING
+        ) {
+            _connectionStatus.value = MetaConnectionStatus.IDLE
+        }
     }
 
     private fun VideoFrame.toBitmap(): Bitmap? {
