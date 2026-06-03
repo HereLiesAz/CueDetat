@@ -90,9 +90,16 @@ class TableScanViewModel @Inject constructor(
     val capturedFeltHsv: StateFlow<FloatArray?> = _capturedFeltHsv.asStateFlow()
 
     /**
-     * Corner-quad scan: up to 4 screen-space tap positions for the four corner pockets.
-     * Order in the list maps to TL, TR, BR, BL once committed. While the user is tapping,
-     * positions are appended in tap order; on commit they are reordered by screen geometry.
+     * Corner-quad scan: up to 4 *logical-space* points for the four corner pockets.
+     *
+     * Each point is captured by aiming the centre crosshair at a corner pocket and
+     * tapping Capture, exactly like felt-colour capture. At capture time the screen
+     * centre is projected to logical space via the current inverse pitch matrix, so
+     * the points stay anchored to the table plane as the device tilts. The UI projects
+     * them back to screen space (via the live pitch matrix) to draw the polygon.
+     *
+     * Order in the list is capture order; on commit they are reordered by geometry
+     * into TL, TR, BR, BL.
      */
     private val _cornerTaps = MutableStateFlow<List<PointF>>(emptyList())
     val cornerTaps: StateFlow<List<PointF>> = _cornerTaps.asStateFlow()
@@ -505,18 +512,21 @@ class TableScanViewModel @Inject constructor(
         }
     }
 
-    fun onCornerTap(screenPoint: PointF) {
+    /**
+     * Capture the corner pocket currently under the centre crosshair.
+     *
+     * Mirrors felt-colour capture: the user aims the centre of the screen at a corner
+     * pocket and taps. The screen centre is projected to logical space (anchored to the
+     * table plane) and appended to the running list. A maximum of four corners are kept.
+     */
+    fun captureCornerAtCrosshair() {
         if (_scanStep.value != ScanStep.CORNER_QUAD) return
-        val current = _cornerTaps.value
-        if (current.size >= 4) return
-        _cornerTaps.value = current + screenPoint
-    }
-
-    fun onCornerDrag(index: Int, screenPoint: PointF) {
-        if (_scanStep.value != ScanStep.CORNER_QUAD) return
-        val current = _cornerTaps.value
-        if (index !in current.indices) return
-        _cornerTaps.value = current.toMutableList().also { it[index] = screenPoint }
+        val inverse = inversePitchMatrix ?: return
+        if (_cornerTaps.value.size >= 4) return
+        if (viewWidth <= 0 || viewHeight <= 0) return
+        val screenCenter = PointF(viewWidth / 2f, viewHeight / 2f)
+        val logicalPt = Perspective.screenToLogical(screenCenter, inverse)
+        _cornerTaps.value = _cornerTaps.value + logicalPt
     }
 
     fun clearCornerTaps() {
@@ -524,8 +534,10 @@ class TableScanViewModel @Inject constructor(
     }
 
     /**
-     * Sorts four screen-space corner taps into TL/TR/BR/BL order based on their
-     * geometric position relative to the centroid.
+     * Sorts four logical-space corner points into TL/TR/BR/BL order based on their
+     * geometric position relative to the centroid. Logical space shares the screen's
+     * y-convention (smaller y = top / far rail), matching Table.kt where the top
+     * pockets sit at -halfH, so a top/bottom split by centroid is correct.
      */
     private fun sortCornersClockwise(corners: List<PointF>): List<PointF> {
         if (corners.size != 4) return corners
@@ -537,21 +549,23 @@ class TableScanViewModel @Inject constructor(
     }
 
     /**
-     * Commit the four corner taps. Maps each screen point to logical space,
-     * derives the two side pockets from the long-side midpoints, fits a homography,
-     * and completes the scan.
+     * Commit the four captured corner pockets. The taps are already logical-space
+     * points (captured under the crosshair). This derives the two side pockets from
+     * the long-side midpoints, fits a homography, and completes the scan.
+     *
+     * Unlike the old flow this does not depend on a live inverse matrix at commit
+     * time, so the confirm button works regardless of the current device pose.
      */
     fun completeCornerScan() {
-        val inverse = inversePitchMatrix ?: return
         val taps = _cornerTaps.value
         if (taps.size != 4) return
 
         viewModelScope.launch {
             val sorted = sortCornersClockwise(taps)
-            val tl = Perspective.screenToLogical(sorted[0], inverse)
-            val tr = Perspective.screenToLogical(sorted[1], inverse)
-            val br = Perspective.screenToLogical(sorted[2], inverse)
-            val bl = Perspective.screenToLogical(sorted[3], inverse)
+            val tl = sorted[0]
+            val tr = sorted[1]
+            val br = sorted[2]
+            val bl = sorted[3]
 
             // SL/SR are the two side pockets, which sit at the midpoints of the
             // long rails. The left long rail runs TL→BL, so SL is the midpoint of

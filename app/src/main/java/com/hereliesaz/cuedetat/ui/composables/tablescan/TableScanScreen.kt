@@ -21,20 +21,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,7 +56,6 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.PocketId
 import kotlinx.coroutines.delay
-import kotlin.math.roundToInt
 import android.graphics.PointF as AndroidPointF
 
 /**
@@ -85,6 +78,8 @@ fun TableScanScreen(
     var showGreenFlash by remember { mutableStateOf(false) }
     var isCapturingPocket by remember { mutableStateOf(false) }
     var pocketCaptureCount by remember { mutableStateOf(0) }
+    var isCapturingCorner by remember { mutableStateOf(false) }
+    var cornerCaptureCount by remember { mutableStateOf(0) }
 
     // Captured felt color from the ViewModel (non-null once captureFeltAndComplete fires).
     val capturedHsv by viewModel.capturedFeltHsv.collectAsState()
@@ -118,10 +113,23 @@ fun TableScanScreen(
         label = "pocketMagnifyCircle"
     )
 
+    val cornerCircleSize by animateDpAsState(
+        targetValue = if (isCapturingCorner) 240.dp else 120.dp,
+        animationSpec = tween(durationMillis = 400),
+        label = "cornerMagnifyCircle"
+    )
+
     LaunchedEffect(pocketCaptureCount) {
         if (pocketCaptureCount > 0) {
             delay(600L)
             isCapturingPocket = false
+        }
+    }
+
+    LaunchedEffect(cornerCaptureCount) {
+        if (cornerCaptureCount > 0) {
+            delay(600L)
+            isCapturingCorner = false
         }
     }
 
@@ -239,7 +247,7 @@ fun TableScanScreen(
         val showReticle = when (scanStep) {
             ScanStep.FELT_CAPTURE -> capturedHsv == null
             ScanStep.POCKET_GUIDE -> true
-            ScanStep.CORNER_QUAD -> false
+            ScanStep.CORNER_QUAD -> true
             ScanStep.AUTO_READY -> false
         }
         if (showReticle) {
@@ -285,70 +293,103 @@ fun TableScanScreen(
                         }
                     }
                 }
-            }
-        }
-
-        // Corner-quad: full-screen tap target + draggable corner handles.
-        if (scanStep == ScanStep.CORNER_QUAD) {
-            val density = LocalDensity.current
-            val handleDp = 32.dp
-            val handlePx = with(density) { handleDp.toPx() }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(cornerTaps.size) {
-                        detectTapGestures { offset ->
-                            if (viewModel.cornerTaps.value.size < 4) {
-                                viewModel.onCornerTap(AndroidPointF(offset.x, offset.y))
-                            }
-                        }
-                    }
-            )
-
-            // Connecting lines between placed corners (light visual guide).
-            if (cornerTaps.isNotEmpty()) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val ordered = cornerTaps
-                    for (i in ordered.indices) {
-                        val a = ordered[i]
-                        val b = ordered[(i + 1) % ordered.size]
-                        if (ordered.size > 1 && i < ordered.size - 1 || ordered.size == 4) {
-                            drawLine(
-                                color = Color.Yellow.copy(alpha = 0.4f),
-                                start = Offset(a.x, a.y),
-                                end = Offset(b.x, b.y),
-                                strokeWidth = 2.dp.toPx()
+            } else if (scanStep == ScanStep.CORNER_QUAD) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(cornerCircleSize)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.2f))
+                        .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
+                ) {
+                    if (!isCapturingCorner) {
+                        val crosshairColor = if (cornerTaps.size >= 4) Color.Green else Color.White
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            drawCircle(
+                                color = crosshairColor.copy(alpha = 0.3f),
+                                radius = size.minDimension / 2,
+                                style = Stroke(width = 1.dp.toPx())
                             )
+                            // Crosshair lines for precise aiming at the pocket.
+                            drawLine(
+                                color = crosshairColor,
+                                start = Offset(center.x - 12.dp.toPx(), center.y),
+                                end = Offset(center.x + 12.dp.toPx(), center.y),
+                                strokeWidth = 1.5.dp.toPx()
+                            )
+                            drawLine(
+                                color = crosshairColor,
+                                start = Offset(center.x, center.y - 12.dp.toPx()),
+                                end = Offset(center.x, center.y + 12.dp.toPx()),
+                                strokeWidth = 1.5.dp.toPx()
+                            )
+                            drawCircle(color = crosshairColor, radius = 2.dp.toPx(), center = center)
                         }
                     }
                 }
             }
+        }
 
-            cornerTaps.forEachIndexed { idx, pt ->
-                Box(
-                    modifier = Modifier
-                        .offset {
-                            IntOffset(
-                                (pt.x - handlePx / 2f).roundToInt(),
-                                (pt.y - handlePx / 2f).roundToInt()
-                            )
-                        }
-                        .size(handleDp)
-                        .clip(CircleShape)
-                        .background(Color.Yellow.copy(alpha = 0.5f))
-                        .border(2.dp, Color.White, CircleShape)
-                        .pointerInput(idx) {
-                            detectDragGestures { change, drag ->
-                                change.consume()
-                                val current = viewModel.cornerTaps.value.getOrNull(idx) ?: return@detectDragGestures
-                                viewModel.onCornerDrag(
-                                    idx,
-                                    AndroidPointF(current.x + drag.x, current.y + drag.y)
-                                )
-                            }
-                        }
-                )
+        // Corner-quad polygon overlay.
+        //
+        // The captured corners are logical-space points anchored to the table plane.
+        // We project them back to screen space through the live pitch matrix every
+        // frame, so each marked pocket stays glued to its spot as the device tilts.
+        // A trailing line runs from the last marked pocket to the centre crosshair,
+        // so the user visibly "draws" the table polygon as they capture each corner.
+        if (scanStep == ScanStep.CORNER_QUAD) {
+            val pitchMatrix = uiState.pitchMatrix
+            // Project a logical point to screen pixels via the current pitch matrix.
+            fun project(pt: AndroidPointF): Offset? {
+                pitchMatrix ?: return null
+                val arr = floatArrayOf(pt.x, pt.y)
+                pitchMatrix.mapPoints(arr)
+                return Offset(arr[0], arr[1])
+            }
+
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val projected = cornerTaps.mapNotNull { project(it) }
+                val crosshair = Offset(size.width / 2f, size.height / 2f)
+                val isClosed = cornerTaps.size >= 4
+
+                // Polygon edges between consecutive captured corners.
+                for (i in 0 until projected.size - 1) {
+                    drawLine(
+                        color = Color.Yellow.copy(alpha = 0.6f),
+                        start = projected[i],
+                        end = projected[i + 1],
+                        strokeWidth = 2.dp.toPx()
+                    )
+                }
+
+                if (isClosed && projected.size == 4) {
+                    // Close the quad: last corner back to the first.
+                    drawLine(
+                        color = Color.Green.copy(alpha = 0.7f),
+                        start = projected[3],
+                        end = projected[0],
+                        strokeWidth = 2.dp.toPx()
+                    )
+                } else if (projected.isNotEmpty()) {
+                    // Trailing rubber-band line from the last marked pocket to the crosshair.
+                    drawLine(
+                        color = Color.White.copy(alpha = 0.5f),
+                        start = projected.last(),
+                        end = crosshair,
+                        strokeWidth = 2.dp.toPx()
+                    )
+                }
+
+                // Marker dots on each captured corner.
+                projected.forEach { p ->
+                    drawCircle(color = Color.Yellow, radius = 6.dp.toPx(), center = p)
+                    drawCircle(
+                        color = Color.White,
+                        radius = 6.dp.toPx(),
+                        center = p,
+                        style = Stroke(width = 1.5.dp.toPx())
+                    )
+                }
             }
         }
 
@@ -471,9 +512,9 @@ fun TableScanScreen(
                         val placed = cornerTaps.size
                         Text(
                             text = when {
-                                placed == 0 -> "Tap the four corner pockets"
-                                placed < 4 -> "Tap the next corner pocket ($placed of 4)"
-                                else -> "Drag a corner to refine, then confirm"
+                                placed == 0 -> "Aim the crosshair at a corner pocket and tap Capture"
+                                placed < 4 -> "Aim at the next corner pocket and tap Capture ($placed of 4)"
+                                else -> "All four corners marked — tap the check to confirm"
                             },
                             color = Color.White,
                             style = MaterialTheme.typography.bodyLarge,
@@ -502,6 +543,9 @@ fun TableScanScreen(
                             TextButton(onClick = { viewModel.clearCornerTaps() }) {
                                 Text("Reset", color = Color.White)
                             }
+
+                            // Capture shutter — marks the pocket under the crosshair.
+                            val captureEnabled = placed < 4
                             Box(modifier = Modifier.size(80.dp).padding(4.dp)) {
                                 Canvas(modifier = Modifier.fillMaxSize()) {
                                     drawCircle(color = Color.White.copy(alpha = 0.2f), style = Stroke(width = 4.dp.toPx()))
@@ -514,9 +558,31 @@ fun TableScanScreen(
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.Center).size(64.dp).clip(CircleShape)
-                                        .background(if (placed == 4) Color.White else Color.LightGray.copy(alpha = 0.5f))
+                                        .background(if (captureEnabled) Color.White else Color.LightGray.copy(alpha = 0.5f))
                                         .border(4.dp, Color.LightGray, CircleShape)
-                                        .clickable(enabled = placed == 4) {
+                                        .clickable(enabled = captureEnabled) {
+                                            val haptic = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                                HapticFeedbackConstants.CONFIRM
+                                            } else {
+                                                HapticFeedbackConstants.LONG_PRESS
+                                            }
+                                            view.performHapticFeedback(haptic)
+                                            isCapturingCorner = true
+                                            cornerCaptureCount++
+                                            viewModel.captureCornerAtCrosshair()
+                                        }
+                                )
+                            }
+
+                            // Confirm — commits the polygon once all four corners are placed.
+                            val confirmEnabled = placed == 4
+                            Box(modifier = Modifier.size(64.dp).padding(4.dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.Center).size(56.dp).clip(CircleShape)
+                                        .background(if (confirmEnabled) Color.Green else Color.DarkGray.copy(alpha = 0.5f))
+                                        .border(2.dp, Color.White, CircleShape)
+                                        .clickable(enabled = confirmEnabled) {
                                             val haptic = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                                                 HapticFeedbackConstants.CONFIRM
                                             } else {
@@ -525,7 +591,14 @@ fun TableScanScreen(
                                             view.performHapticFeedback(haptic)
                                             viewModel.completeCornerScan()
                                         }
-                                )
+                                ) {
+                                    Text(
+                                        text = "✓",
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        modifier = Modifier.align(Alignment.Center)
+                                    )
+                                }
                             }
                         }
                     }
