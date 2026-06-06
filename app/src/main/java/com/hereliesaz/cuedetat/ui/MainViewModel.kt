@@ -588,6 +588,11 @@ class MainViewModel @Inject constructor(
         return when (event) {
             is MainScreenEvent.FullOrientationChanged -> UpdateType.MATRICES_ONLY
 
+            // World-anchored table pose arrives ~30-60Hz from the ARCore GL thread. It must
+            // recompute the matrices each frame so the overlay tracks as the user walks; routing it
+            // to AIMING (the default) would silently freeze the table at its first pose.
+            is MainScreenEvent.ArTableMatrixUpdated -> UpdateType.MATRICES_ONLY
+
             is MainScreenEvent.SizeChanged, is MainScreenEvent.ZoomScaleChanged, is MainScreenEvent.ZoomSliderChanged,
             is MainScreenEvent.PanView, is MainScreenEvent.TableRotationChanged,
             is MainScreenEvent.TableRotationApplied, is MainScreenEvent.SetExperienceMode, is MainScreenEvent.ToggleBankingMode,

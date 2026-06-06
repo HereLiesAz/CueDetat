@@ -132,6 +132,13 @@ data class CueDetatState(
     @Transient val depthPlane: DepthPlane? = null,
     @Transient val arDerivedPitch: Float? = null,
     @Transient val arMeasuredHeightM: Float? = null,
+    // World-anchored table (ARCore). arTableMatrix maps logical table space -> screen pixels,
+    // recomputed every AR frame from the camera pose + corner anchors, so the overlay tracks in
+    // full 6DoF as the user walks around. Null until 4 corners are captured / tracking is valid.
+    @Transient val arTableMatrix: Matrix? = null,
+    // Live screen positions of the captured corner anchors, projected each AR frame. Drives the
+    // capture-feedback line from the last captured pocket to the centre reticle.
+    @Transient val arCapturedCorners: List<PointF> = emptyList(),
     val depthCapability: DepthCapability = DepthCapability.NONE,
     val lockedHsvColor: FloatArray? = null,
     val lockedHsvStdDev: FloatArray? = null,
@@ -326,6 +333,18 @@ sealed class MainScreenEvent {
         val pitchDegrees: Float,
         val heightAboveSurfaceM: Float
     ) : MainScreenEvent()
+
+    // World-anchored table events (emitted from the ARCore GL thread each frame).
+    // [matrix] is the logical->screen homography (null until 4 corners are tracked);
+    // [capturedCorners] are the live projected screen positions of the captured anchors.
+    data class ArTableMatrixUpdated(
+        val matrix: Matrix?,
+        val capturedCorners: List<PointF>
+    ) : MainScreenEvent()
+    // Result of a corner-capture hit-test. [hit] is false when the centre reticle did not land on
+    // a tracked plane (the user is shown guidance and the capture is a no-op). [count] is the new
+    // number of captured corners.
+    data class ArCornerCaptured(val hit: Boolean, val count: Int) : MainScreenEvent()
 
     // AR setup / lifecycle events
     object CancelArSetup : MainScreenEvent()
