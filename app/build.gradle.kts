@@ -356,6 +356,9 @@ dependencies {
     implementation(libs.tensorflow.lite.metadata)
     implementation(libs.tensorflow.lite.support)
     ksp(libs.hilt.compiler)
+    // Override the older kotlin-metadata-jvm that hilt-compiler bundles so the
+    // KSP processor can parse Kotlin 2.4.0 metadata (highest-version wins).
+    ksp(libs.kotlin.metadata.jvm)
     implementation(libs.androidx.hilt.navigation.compose)
 
     // CameraX
