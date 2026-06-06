@@ -600,7 +600,12 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.SizeChanged, is MainScreenEvent.ZoomScaleChanged, is MainScreenEvent.ZoomSliderChanged,
             is MainScreenEvent.PanView, is MainScreenEvent.TableRotationChanged,
             is MainScreenEvent.TableRotationApplied, is MainScreenEvent.SetExperienceMode, is MainScreenEvent.ToggleBankingMode,
-            is MainScreenEvent.SetTableSize, is MainScreenEvent.RestoreState -> UpdateType.FULL
+            is MainScreenEvent.SetTableSize, is MainScreenEvent.RestoreState,
+            // MoveTableZ (table-height slider) feeds the rendering matrices in
+            // UpdateStateUseCase.updateMatricesAndTransforms (screen-space vertical lift). Without a
+            // FULL recompute the new tableZOffset is stored but never applied, so the table doesn't
+            // move until some other event happens to recompute the matrices.
+            is MainScreenEvent.MoveTableZ -> UpdateType.FULL
 
             is MainScreenEvent.Reset, is MainScreenEvent.LogicalGestureStarted, is MainScreenEvent.LogicalDragApplied,
             is MainScreenEvent.GestureEnded, is MainScreenEvent.AddObstacleBall -> UpdateType.AIMING
