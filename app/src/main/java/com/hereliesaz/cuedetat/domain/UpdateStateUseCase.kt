@@ -37,6 +37,10 @@ class UpdateStateUseCase @Inject constructor(
     private val distanceReferenceConstant = 1200f
     private val lineExtensionFactor = 5000f
 
+    // Screen fraction the table-height slider moves per tableZOffset unit. tableZOffset is ±50, so
+    // ±50 * 0.008 = ±0.4 -> the table slides up to ~40% of the screen height each way. Tunable.
+    private val HEIGHT_SCREEN_FACTOR = 0.008f
+
     // Assumed camera height above the table surface when no ARCore anchor is available.
     // Derived from: user eye height ≈ 4.5 ft above floor, pool table ≈ 3 ft above floor → 1.5 ft ≈ 0.45 m.
     private val assumedHeightAboveTableM = 0.45f
@@ -178,7 +182,10 @@ class UpdateStateUseCase @Inject constructor(
         val perspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = orientationForPerspective,
             camera = camera,
-            lift = stateWithCoercedPan.tableZOffset,
+            // tableZOffset no longer feeds the 3D camera lift (that just pushed the table into the
+            // screen). The height slider is applied as a screen-space vertical translate in
+            // createFullMatrix instead; only the genuine rail lift stays a 3D effect.
+            lift = 0f,
             applyPitch = isPitchApplied
         )
 
@@ -195,7 +202,8 @@ class UpdateStateUseCase @Inject constructor(
         val railPerspectiveMatrix = Perspective.createPerspectiveMatrix(
             currentOrientation = orientationForPerspective,
             camera = camera,
-            lift = railLiftAmount + stateWithCoercedPan.tableZOffset,
+            // Rails keep their genuine 3D lift; tableZOffset is handled in screen space (below).
+            lift = railLiftAmount,
             applyPitch = isPitchApplied
         )
         val finalRailPitchMatrix =
@@ -510,6 +518,15 @@ class UpdateStateUseCase @Inject constructor(
         finalMatrix.set(worldMatrix)
         finalMatrix.postConcat(perspectiveMatrix)
         finalMatrix.postTranslate(centerX, centerY)
+
+        // Table-height slider: slide the WHOLE projected table straight up/down the screen, through
+        // its centre, keeping its perspective shape (the user wants it to translate along a vertical
+        // line, not get pushed into the distance). A uniform screen-space translate on every matrix
+        // built here keeps the table rigid and keeps the derived inverse consistent for hit-testing.
+        // Positive tableZOffset raises the table on screen (negative Y); flip the sign here if the
+        // slider direction feels inverted. Computed from viewHeight (not zoom) so all matrices agree.
+        val heightOffsetY = -state.tableZOffset * state.viewHeight * HEIGHT_SCREEN_FACTOR
+        finalMatrix.postTranslate(0f, heightOffsetY)
         return finalMatrix
     }
 
