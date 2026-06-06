@@ -425,6 +425,14 @@ configurations.all {
             useVersion(libs.versions.bouncycastle.get())
             because("Force-upgrade Bouncy Castle modules to fix vulnerabilities and ensure version alignment")
         }
+        // Hilt/Dagger's annotation processor bundles an older kotlin-metadata-jvm that can't parse
+        // metadata emitted by the Kotlin 2.4.0 compiler ("version 2.4.0, max supported 2.3.0"),
+        // which fails hiltJavaCompile. Force it to match the Kotlin version on every configuration
+        // (incl. the annotation-processor classpath, which a plain implementation() dep doesn't cover).
+        if (requested.group == "org.jetbrains.kotlin" && requested.name == "kotlin-metadata-jvm") {
+            useVersion(libs.versions.kotlinMetadataJvm.get())
+            because("Hilt's processor must support the Kotlin compiler's metadata version")
+        }
     }
 }
 
