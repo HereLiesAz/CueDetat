@@ -50,8 +50,13 @@ enum class ScanStep {
 @HiltViewModel
 class TableScanViewModel @Inject constructor(
     private val tableScanRepository: TableScanRepository,
-    val pocketDetector: PocketDetector
+    val pocketDetector: PocketDetector,
+    private val arTableSession: com.hereliesaz.cuedetat.data.ArTableSession,
+    private val arFrameProcessor: com.hereliesaz.cuedetat.data.ArFrameProcessor,
 ) : ViewModel() {
+
+    /** Number of corner anchors captured via ARCore hit-tests (0..4). Drives the corner-quad UI. */
+    val capturedCornerCount: StateFlow<Int> = arTableSession.capturedCount
 
     private val _scanStep = MutableStateFlow(ScanStep.FELT_CAPTURE)
     val scanStep: StateFlow<ScanStep> = _scanStep.asStateFlow()
@@ -116,6 +121,14 @@ class TableScanViewModel @Inject constructor(
     private val clustersLock = Any()
 
     init {
+        // ARCore owns the camera during the AR scan, so felt colour is sampled from the AR frames
+        // (ArFrameProcessor) rather than the CameraX analyzer.
+        viewModelScope.launch {
+            arFrameProcessor.latestFeltHsv.collect { hsv ->
+                if (hsv != null) lastFeltHsv = hsv
+            }
+        }
+
         // Resume partial scan if it exists
         viewModelScope.launch {
             val partial = tableScanRepository.loadPartialScan()
@@ -427,6 +440,7 @@ class TableScanViewModel @Inject constructor(
         _mlConfidence.value = 0f
         _mlTableBoundary.value = null
         _cornerTaps.value = emptyList()
+        arTableSession.clearAnchors()
         tableScanRepository.clearPartialScan()
     }
 
@@ -506,30 +520,42 @@ class TableScanViewModel @Inject constructor(
             _capturedFeltHsv.value = lastFeltHsv
 
             // Skip the painful per-pocket wizard; users tap the four corner pockets directly.
+            // Each tap drops a world anchor via an ARCore hit-test (see captureCornerAtCrosshair).
             _cornerTaps.value = emptyList()
+            beginCornerCapture(tableSize)
             _scanStep.value = ScanStep.CORNER_QUAD
             _currentPocketTarget.value = null
         }
     }
 
     /**
-     * Capture the corner pocket currently under the centre crosshair.
+     * Primes the AR session for corner capture: clears any prior anchors and hands ARCore the ideal
+     * logical corner layout (TL, TR, BR, BL) for the selected table size, which the per-frame
+     * homography maps onto the captured anchors.
+     */
+    private fun beginCornerCapture(tableSize: TableSize) {
+        arTableSession.clearAnchors()
+        val table = Table(tableSize, true)
+        // Table.pockets order is TL, TR, BL, BR -> reorder to TL, TR, BR, BL.
+        val ideal = listOf(table.pockets[0], table.pockets[1], table.pockets[3], table.pockets[2])
+            .map { com.hereliesaz.cuedetat.domain.TableFrameHomography.Pt(it.x, it.y) }
+        arTableSession.setIdealCorners(ideal)
+    }
+
+    /**
+     * Capture the corner pocket currently under the centre reticle.
      *
-     * Mirrors felt-colour capture: the user aims the centre of the screen at a corner
-     * pocket and taps. The screen centre is projected to logical space (anchored to the
-     * table plane) and appended to the running list. A maximum of four corners are kept.
+     * Queues an ARCore hit-test at the screen centre on the next GL frame; the resulting world
+     * anchor defines that corner in 6DoF. The anchor count comes back via [capturedCornerCount].
      */
     fun captureCornerAtCrosshair() {
         if (_scanStep.value != ScanStep.CORNER_QUAD) return
-        val inverse = inversePitchMatrix ?: return
-        if (_cornerTaps.value.size >= 4) return
-        if (viewWidth <= 0 || viewHeight <= 0) return
-        val screenCenter = PointF(viewWidth / 2f, viewHeight / 2f)
-        val logicalPt = Perspective.screenToLogical(screenCenter, inverse)
-        _cornerTaps.value = _cornerTaps.value + logicalPt
+        if (arTableSession.capturedCount.value >= 4) return
+        arTableSession.requestCapture()
     }
 
     fun clearCornerTaps() {
+        arTableSession.clearAnchors()
         _cornerTaps.value = emptyList()
     }
 
@@ -549,48 +575,29 @@ class TableScanViewModel @Inject constructor(
     }
 
     /**
-     * Commit the four captured corner pockets. The taps are already logical-space
-     * points (captured under the crosshair). This derives the two side pockets from
-     * the long-side midpoints, fits a homography, and completes the scan.
+     * Commit the four captured corner pockets.
      *
-     * Unlike the old flow this does not depend on a live inverse matrix at commit
-     * time, so the confirm button works regardless of the current device pose.
+     * In the world-anchored flow the corners' *placement* lives in ARCore (the anchors drive the
+     * per-frame homography), so the persisted [TableScanModel] simply stores the ideal logical
+     * pocket layout for the selected table size — which is what downstream aiming geometry
+     * (AdvisorInputAdapter) consumes. No homography/decompose pose is needed here anymore.
      */
     fun completeCornerScan() {
-        val taps = _cornerTaps.value
-        if (taps.size != 4) return
+        if (arTableSession.capturedCount.value != 4) return
 
         viewModelScope.launch {
-            val sorted = sortCornersClockwise(taps)
-            val tl = sorted[0]
-            val tr = sorted[1]
-            val br = sorted[2]
-            val bl = sorted[3]
-
-            // SL/SR are the two side pockets, which sit at the midpoints of the
-            // long rails. The left long rail runs TL→BL, so SL is the midpoint of
-            // those two corners; the right long rail runs TR→BR, so SR is the
-            // midpoint of those. (The Table model nudges each side pocket slightly
-            // off-rail for rendering, but that visual offset is not needed here —
-            // the geometry fit only sees the centre lines.)
-            val sl = PointF((tl.x + bl.x) / 2f, (tl.y + bl.y) / 2f)
-            val sr = PointF((tr.x + br.x) / 2f, (tr.y + br.y) / 2f)
-
-            val identified = mapOf(
-                PocketId.TL to tl,
-                PocketId.TR to tr,
-                PocketId.BR to br,
-                PocketId.BL to bl,
-                PocketId.SL to sl,
-                PocketId.SR to sr,
-            )
+            val tableSize = _selectedTableSize.value
+            val table = Table(tableSize, true)
+            val ideal = PocketId.entries.mapIndexed { i, id ->
+                id to PointF(table.pockets[i].x, table.pockets[i].y)
+            }.toMap()
 
             synchronized(clustersLock) {
                 clusters.clear()
-                identified.forEach { (id, pt) -> clusters[id] = mutableListOf(pt) }
+                ideal.forEach { (id, pt) -> clusters[id] = mutableListOf(pt) }
             }
-            _scanProgress.value = identified.keys.associateWith { true }
-            completeScan(identified)
+            _scanProgress.value = ideal.keys.associateWith { true }
+            completeScan(ideal)
         }
     }
 

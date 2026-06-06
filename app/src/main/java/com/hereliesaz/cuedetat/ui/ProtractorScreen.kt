@@ -112,12 +112,17 @@ fun ProtractorScreen(
                         metaWearableRepository = mainViewModel.metaWearableRepository
                     )
                 }
-                uiState.cameraMode == CameraMode.AR_ACTIVE
+                // ARCore owns the camera for the whole AR flow: the corner-capture scan (AR_SETUP
+                // with the scan overlay) needs live ARCore frames for hit-testing, and AR_ACTIVE
+                // needs them for 6DoF tracking. depthCapability == DEPTH_API now means "ARCore
+                // world tracking is available" (the Depth API itself is disabled).
+                (uiState.cameraMode == CameraMode.AR_ACTIVE
+                        || (uiState.cameraMode == CameraMode.AR_SETUP && uiState.showTableScanScreen))
                         && uiState.depthCapability == com.hereliesaz.cuedetat.domain.DepthCapability.DEPTH_API
                         && isOnMain -> {
                     ArCoreBackground(
                         modifier = Modifier.fillMaxSize(),
-                        arDepthSession = mainViewModel.arDepthSession,
+                        arTableSession = mainViewModel.arTableSession,
                         arFrameProcessor = mainViewModel.arFrameProcessor,
                         onEvent = mainViewModel::onEvent,
                     )

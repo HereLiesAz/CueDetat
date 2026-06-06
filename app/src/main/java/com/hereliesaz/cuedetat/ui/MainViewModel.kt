@@ -7,7 +7,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.R
-import com.hereliesaz.cuedetat.data.ArDepthSession
+import com.hereliesaz.cuedetat.data.ArTableSession
 import com.hereliesaz.cuedetat.data.ArFrameProcessor
 import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.MetaWearableRepository
@@ -71,7 +71,7 @@ class MainViewModel @Inject constructor(
     private val visionRepository: VisionRepository,
     val visionAnalyzer: VisionAnalyzer,
     val metaWearableRepository: MetaWearableRepository,
-    val arDepthSession: ArDepthSession,
+    val arTableSession: ArTableSession,
     val arFrameProcessor: ArFrameProcessor,
     private val entitlementRepository: com.hereliesaz.cuedetat.billing.EntitlementRepository,
     private val integrityRepository: com.hereliesaz.cuedetat.data.IntegrityRepository,
@@ -341,13 +341,13 @@ class MainViewModel @Inject constructor(
 
         // Detect ARCore depth capability and store in state
         viewModelScope.launch {
-            val capability = if (arDepthSession.isArCoreAvailable()) {
+            val capability = if (arTableSession.isArCoreAvailable()) {
                 // Probe depth support by creating (and immediately closing) a test session
-                val testSession = arDepthSession.createSession()
-                val cap = arDepthSession.capability
-                if (testSession == null) arDepthSession.capability
+                val testSession = arTableSession.createSession()
+                val cap = arTableSession.capability
+                if (testSession == null) arTableSession.capability
                 else {
-                    arDepthSession.close()
+                    arTableSession.close()
                     cap
                 }
             } else {
@@ -587,6 +587,11 @@ class MainViewModel @Inject constructor(
     ): UpdateType {
         return when (event) {
             is MainScreenEvent.FullOrientationChanged -> UpdateType.MATRICES_ONLY
+
+            // World-anchored table pose arrives ~30-60Hz from the ARCore GL thread. It must
+            // recompute the matrices each frame so the overlay tracks as the user walks; routing it
+            // to AIMING (the default) would silently freeze the table at its first pose.
+            is MainScreenEvent.ArTableMatrixUpdated -> UpdateType.MATRICES_ONLY
 
             is MainScreenEvent.SizeChanged, is MainScreenEvent.ZoomScaleChanged, is MainScreenEvent.ZoomSliderChanged,
             is MainScreenEvent.PanView, is MainScreenEvent.TableRotationChanged,

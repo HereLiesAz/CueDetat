@@ -56,7 +56,6 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.PocketId
 import kotlinx.coroutines.delay
-import android.graphics.PointF as AndroidPointF
 
 /**
  * Full-screen scan UI.
@@ -85,7 +84,9 @@ fun TableScanScreen(
     val capturedHsv by viewModel.capturedFeltHsv.collectAsState()
     val scanStep by viewModel.scanStep.collectAsState()
     val currentPocketTarget by viewModel.currentPocketTarget.collectAsState()
-    val cornerTaps by viewModel.cornerTaps.collectAsState()
+    // Corner capture is now ARCore-anchored: the count comes from the session and the live
+    // on-screen positions arrive via uiState.arCapturedCorners (projected every AR frame).
+    val capturedCornerCount by viewModel.capturedCornerCount.collectAsState()
 
     val capturedCount = PocketId.entries.count { id ->
         currentPocketTarget != null &&
@@ -303,7 +304,7 @@ fun TableScanScreen(
                         .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
                 ) {
                     if (!isCapturingCorner) {
-                        val crosshairColor = if (cornerTaps.size >= 4) Color.Green else Color.White
+                        val crosshairColor = if (capturedCornerCount >= 4) Color.Green else Color.White
                         Canvas(modifier = Modifier.fillMaxSize()) {
                             drawCircle(
                                 color = crosshairColor.copy(alpha = 0.3f),
@@ -332,25 +333,16 @@ fun TableScanScreen(
 
         // Corner-quad polygon overlay.
         //
-        // The captured corners are logical-space points anchored to the table plane.
-        // We project them back to screen space through the live pitch matrix every
-        // frame, so each marked pocket stays glued to its spot as the device tilts.
-        // A trailing line runs from the last marked pocket to the centre crosshair,
-        // so the user visibly "draws" the table polygon as they capture each corner.
+        // Each captured corner is a world anchor (ARCore), re-projected to screen every frame and
+        // delivered as uiState.arCapturedCorners. Because the anchors are tracked in 6DoF, each
+        // marked pocket stays glued to its real-world spot as the user moves. A trailing line runs
+        // from the last marked pocket to the centre reticle, so the user visibly "draws" the table
+        // polygon as they capture each corner.
         if (scanStep == ScanStep.CORNER_QUAD) {
-            val pitchMatrix = uiState.pitchMatrix
-            // Project a logical point to screen pixels via the current pitch matrix.
-            fun project(pt: AndroidPointF): Offset? {
-                pitchMatrix ?: return null
-                val arr = floatArrayOf(pt.x, pt.y)
-                pitchMatrix.mapPoints(arr)
-                return Offset(arr[0], arr[1])
-            }
-
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val projected = cornerTaps.mapNotNull { project(it) }
+                val projected = uiState.arCapturedCorners.map { Offset(it.x, it.y) }
                 val crosshair = Offset(size.width / 2f, size.height / 2f)
-                val isClosed = cornerTaps.size >= 4
+                val isClosed = projected.size >= 4
 
                 // Polygon edges between consecutive captured corners.
                 for (i in 0 until projected.size - 1) {
@@ -509,7 +501,7 @@ fun TableScanScreen(
                     }
 
                     ScanStep.CORNER_QUAD -> {
-                        val placed = cornerTaps.size
+                        val placed = capturedCornerCount
                         Text(
                             text = when {
                                 placed == 0 -> "Aim the crosshair at a corner pocket and tap Capture"

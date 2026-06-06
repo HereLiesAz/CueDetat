@@ -79,6 +79,27 @@ class UpdateStateUseCase @Inject constructor(
     }
 
     private fun updateMatricesAndTransforms(state: CueDetatState): CueDetatState {
+        // World-anchored AR table: ARCore supplies the full logical->screen homography each frame
+        // (computed from the live camera pose + corner anchors). Use it directly as the table matrix
+        // and skip the sensor-perspective / world-rotation / zoom pipeline entirely. The 2D Canvas
+        // renderer is unchanged — only the source of the matrix differs — so the overlay tracks the
+        // real table in full 6DoF as the user walks around it. Every other mode falls through to the
+        // unchanged sensor-pitch path below, so non-AR rendering is untouched.
+        val arMatrix = state.arTableMatrix
+        if (state.cameraMode == CameraMode.AR_ACTIVE && arMatrix != null) {
+            val inverse = Matrix()
+            val hasInverse = arMatrix.invert(inverse)
+            return state.copy(
+                pitchMatrix = arMatrix,
+                railPitchMatrix = arMatrix,
+                sizeCalculationMatrix = arMatrix,
+                inversePitchMatrix = inverse,
+                hasInverseMatrix = hasInverse,
+                flatMatrix = arMatrix,
+                logicalPlaneMatrix = arMatrix
+            )
+        }
+
         val targetPoint = state.protractorUnit.center
         val cuePoint = state.onPlaneBall?.center ?: PointF(targetPoint.x, targetPoint.y + 30f)
 
