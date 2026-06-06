@@ -300,7 +300,6 @@ android {
             pickFirsts += "**/libc++_shared.so"
         }
     }
-    buildToolsVersion = "37.0.0 rc2"
     ndkVersion = "29.0.14206865"
 }
 
