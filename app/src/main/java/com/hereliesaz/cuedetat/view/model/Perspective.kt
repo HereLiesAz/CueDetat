@@ -123,19 +123,27 @@ object Perspective {
             // We clamp the final value to -90..90 just to be safe from invalid inputs.
             camera.rotateX(visualPitch.coerceIn(-90f, 90f))
 
+            // Apply the height lift HERE — in the pitch-tilted frame but BEFORE the roll rotation.
+            // Previously the lift was applied after rotateZ(roll), so any device roll rotated the
+            // vertical lift sideways and the table height leaked onto the X axis instead of rising
+            // straight out of the table plane. Applying it before the roll keeps height aligned with
+            // the table's own "up" regardless of how the phone is rolled. (At lift == 0 this is a
+            // no-op, so the flat/no-height case renders identically to before.)
+            camera.translate(0f, lift, 0f)
+
             // Apply gentle roll — 30% of physical roll for subtle tilt without disorientation.
             val visualRoll = currentOrientation.roll * 0.3f
             camera.rotateZ(visualRoll)
-        }
 
-        // Translate the camera in 3D space.
-        // 1. x=0f: No horizontal shift.
-        // 2. y=lift: Apply the "lift" argument. Positive values move the object down (or camera up),
-        //    simulating height (used for rail tops).
-        // 3. z=-32f: Move the camera back along the Z-axis.
-        //    The value -32f is a "magic number" standard in Android's Camera class that roughly approximates
-        //    a standard viewing distance. Without this, the perspective distortion would be too extreme or inverted.
-        camera.translate(0f, lift, -32f)
+            // Move the camera back along the Z-axis. The value -32f is a "magic number" standard in
+            // Android's Camera class that roughly approximates a standard viewing distance. Without
+            // this, the perspective distortion would be too extreme or inverted.
+            camera.translate(0f, 0f, -32f)
+        } else {
+            // No perspective tilt: keep the original single translate (lift + viewing distance).
+            // Height is not visually meaningful in the flat/top-down view, so this is unchanged.
+            camera.translate(0f, lift, -32f)
+        }
 
         // Compute the matrix for the current Camera state and store it in our `matrix` object.
         camera.getMatrix(matrix)

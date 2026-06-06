@@ -63,6 +63,11 @@ class ArTableSession @Inject constructor(
     // Ideal logical corner positions (TL, TR, BR, BL), set when a scan begins.
     @Volatile private var idealCorners: List<Pt> = emptyList()
 
+    // Height of the table plane above the captured anchors, in metres, driven by the tableZOffset
+    // slider. Lets the user nudge the virtual table up off the floor-plane hit-test to sit on the
+    // rail (the hit-test lands on the floor under the pocket, ~rail-height below the real pocket).
+    @Volatile private var tableHeightMeters: Float = 0f
+
     private val _capturedCount = MutableStateFlow(0)
     /** Number of corner anchors captured so far (0..4). Observed by the scan UI. */
     val capturedCount: StateFlow<Int> = _capturedCount.asStateFlow()
@@ -109,6 +114,11 @@ class ArTableSession @Inject constructor(
     /** Sets the ideal logical corner layout (TL, TR, BR, BL) for the table being scanned. */
     fun setIdealCorners(corners: List<Pt>) {
         idealCorners = corners
+    }
+
+    /** Sets the table-plane lift above the captured anchors (tableZOffset slider, in metres). */
+    fun setTableHeightMeters(meters: Float) {
+        tableHeightMeters = meters
     }
 
     /** Queues a corner capture; the next GL frame performs the hit-test at screen centre. */
@@ -219,7 +229,7 @@ class ArTableSession @Inject constructor(
         if (ordered.any { it.trackingState != TrackingState.TRACKING }) return null
         val cornersWorld = ordered.map { anchorWorld(it) ?: return null }
         val h = TableFrameHomography.computeLogicalToScreen(
-            view, proj, cornersWorld, idealCorners, vpW, vpH
+            view, proj, cornersWorld, idealCorners, vpW, vpH, heightMeters = tableHeightMeters
         ) ?: return null
         return Matrix().apply { setValues(h) }
     }

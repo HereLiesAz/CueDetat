@@ -524,6 +524,10 @@ class MainViewModel @Inject constructor(
         _uiState.value = derivedState
         visionAnalyzer.updateUiState(derivedState)
         arFrameProcessor.updateUiState(derivedState)
+        // tableZOffset is in logical units; convert to metres for the AR plane lift.
+        arTableSession.setTableHeightMeters(
+            derivedState.tableZOffset / com.hereliesaz.cuedetat.domain.TableFrameHomography.LOGICAL_UNITS_PER_METER
+        )
 
         // Persist tutorial-seen flags the moment they flip. They live in
         // dedicated DataStore keys (not STATE_JSON) so they're not subject to
