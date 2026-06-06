@@ -15,8 +15,8 @@ import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.hereliesaz.cuedetat.data.ArBackgroundRenderer
-import com.hereliesaz.cuedetat.data.ArDepthSession
 import com.hereliesaz.cuedetat.data.ArFrameProcessor
+import com.hereliesaz.cuedetat.data.ArTableSession
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -24,21 +24,25 @@ import javax.microedition.khronos.opengles.GL10
 private const val TAG = "ArCoreBackground"
 
 /**
- * Full-screen camera background powered by ARCore.
+ * Full-screen camera background powered by ARCore, used for the whole expert-mode AR flow (corner
+ * capture during AR_SETUP and live tracking during AR_ACTIVE).
  *
- * Replaces [CameraBackground] when [CameraMode.AR_ACTIVE] is active. Uses a [GLSurfaceView] to:
- * 1. Allocate an OES texture and hand its ID to the ARCore session.
- * 2. Render the camera feed as a fullscreen quad each frame.
- * 3. Feed the CPU camera image to [ArFrameProcessor] for OpenCV ball detection.
- * 4. Extract a depth plane and emit [MainScreenEvent.DepthPlaneUpdated].
+ * Each frame the GL renderer:
+ * 1. Draws the camera feed as a fullscreen quad.
+ * 2. Feeds the CPU image to [ArFrameProcessor] for ball detection and felt-colour sampling.
+ * 3. Runs [ArTableSession.computeFrameUpdate]: performs any queued corner capture (hit-test at the
+ *    screen centre), re-projects the captured anchors, and fits the logical->screen homography,
+ *    then emits [MainScreenEvent.ArTableMatrixUpdated] (and [MainScreenEvent.ArCornerCaptured]).
+ * 4. Emits a geometry-derived viewing pitch via [MainScreenEvent.ArCameraPoseUpdated] (used as the
+ *    perspective hint before four corners are captured).
  *
- * Lifecycle: the composable's [DisposableEffect] drives session resume/pause/close, ensuring
- * the ARCore camera session is released before CameraX can re-acquire it on mode switch.
+ * Lifecycle: the [DisposableEffect] drives session resume/pause/close so the ARCore camera is
+ * released before CameraX can re-acquire it on a mode switch.
  */
 @Composable
 fun ArCoreBackground(
     modifier: Modifier = Modifier,
-    arDepthSession: ArDepthSession,
+    arTableSession: ArTableSession,
     arFrameProcessor: ArFrameProcessor,
     onEvent: (MainScreenEvent) -> Unit,
 ) {
@@ -47,8 +51,8 @@ fun ArCoreBackground(
     val glSurfaceView = remember { GLSurfaceView(context) }
 
     DisposableEffect(lifecycleOwner) {
-        val session = arDepthSession.createSession() ?: run {
-            Log.w(TAG, "ARCore session unavailable — depth not supported on this device")
+        val session = arTableSession.createSession() ?: run {
+            Log.w(TAG, "ARCore session unavailable on this device")
             return@DisposableEffect onDispose {}
         }
 
@@ -60,7 +64,7 @@ fun ArCoreBackground(
 
         val renderer = ArCoreRenderer(
             session = session,
-            arDepthSession = arDepthSession,
+            arTableSession = arTableSession,
             arFrameProcessor = arFrameProcessor,
             onEvent = onEvent,
         )
@@ -69,24 +73,23 @@ fun ArCoreBackground(
 
         val observer = object : DefaultLifecycleObserver {
             override fun onResume(owner: LifecycleOwner) {
-                arDepthSession.resume()
+                arTableSession.resume()
                 glSurfaceView.onResume()
             }
             override fun onPause(owner: LifecycleOwner) {
                 glSurfaceView.onPause()
-                arDepthSession.pause()
+                arTableSession.pause()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
 
-        // Trigger initial resume if already in resumed state
-        arDepthSession.resume()
+        arTableSession.resume()
         glSurfaceView.onResume()
 
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             glSurfaceView.onPause()
-            arDepthSession.close()
+            arTableSession.close()
             Log.d(TAG, "ARCore session closed — camera released")
         }
     }
@@ -98,7 +101,7 @@ fun ArCoreBackground(
 
 private class ArCoreRenderer(
     private val session: Session,
-    private val arDepthSession: ArDepthSession,
+    private val arTableSession: ArTableSession,
     private val arFrameProcessor: ArFrameProcessor,
     private val onEvent: (MainScreenEvent) -> Unit,
 ) : GLSurfaceView.Renderer {
@@ -116,7 +119,7 @@ private class ArCoreRenderer(
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         surfaceWidth = width
         surfaceHeight = height
-        // 0 = natural display rotation; ARCore will query the display internally
+        // 0 = natural display rotation; ARCore queries the display internally.
         session.setDisplayGeometry(0, width, height)
     }
 
@@ -129,35 +132,40 @@ private class ArCoreRenderer(
             if (previousTrackingState == TrackingState.TRACKING &&
                 currentTracking == TrackingState.PAUSED) {
                 // The logical plane shouldn't shatter just because reality blinked.
-                // Let ARCore sweat it out and try to recover.
-                Log.w(TAG, "Tracking paused. Refusing to nuke reality.")
+                // Let ARCore recover; the anchors are retained.
+                Log.w(TAG, "Tracking paused. Holding anchors.")
             }
-
             previousTrackingState = currentTracking
 
             if (currentTracking != TrackingState.STOPPED) {
                 background.draw(frame)
             }
 
-            // Feed camera image to OpenCV ball detection pipeline
+            // Ball detection + felt-colour sampling from the ARCore CPU image.
             arFrameProcessor.processFrame(frame)
 
-            // Extract depth plane and emit to state machine
-            val plane = arDepthSession.processFrame(frame)
-            if (plane != null) {
-                onEvent(MainScreenEvent.DepthPlaneUpdated(plane))
-            }
-
-            // Plane anchoring + geometry-derived viewing pitch
             if (currentTracking == TrackingState.TRACKING) {
-                arDepthSession.findAndAnchorTablePlane(frame, plane?.distanceMeters ?: 0f)
+                // World-anchored table: capture, re-project, fit the homography.
+                val update = arTableSession.computeFrameUpdate(frame, surfaceWidth, surfaceHeight)
+                onEvent(
+                    MainScreenEvent.ArTableMatrixUpdated(
+                        matrix = update.matrix,
+                        capturedCorners = update.capturedCorners
+                    )
+                )
+                update.capture?.let { c ->
+                    onEvent(MainScreenEvent.ArCornerCaptured(hit = c.hit, count = c.count))
+                }
 
-                val abovePlane = arDepthSession.computeCameraAbovePlane(frame)
-                if (abovePlane != null) {
-                    onEvent(MainScreenEvent.ArCameraPoseUpdated(
-                        pitchDegrees = abovePlane.pitchDegrees,
-                        heightAboveSurfaceM = abovePlane.heightM
-                    ))
+                // Pitch hint from plane geometry (used before four corners exist).
+                arTableSession.findAndAnchorTablePlane(frame)
+                arTableSession.computeCameraAbovePlane(frame)?.let { abovePlane ->
+                    onEvent(
+                        MainScreenEvent.ArCameraPoseUpdated(
+                            pitchDegrees = abovePlane.pitchDegrees,
+                            heightAboveSurfaceM = abovePlane.heightM
+                        )
+                    )
                 }
             }
         } catch (e: Exception) {
