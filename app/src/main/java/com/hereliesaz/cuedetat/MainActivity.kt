@@ -28,7 +28,8 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.MainViewModel
-import com.hereliesaz.cuedetat.ui.ProtractorScreenimport com.hereliesaz.cuedetat.ui.composables.SplashScreen
+import com.hereliesaz.cuedetat.ui.ProtractorScreen
+import com.hereliesaz.cuedetat.ui.composables.SplashScreen
 import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
 import com.hereliesaz.cuedetat.ui.hatemode.HaterScreen
 import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
