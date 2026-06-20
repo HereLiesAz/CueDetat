@@ -267,6 +267,19 @@ fun ProtractorScreen(
             }
         }
 
+        // --- Onscreen: Expert-AR module download progress / retry overlay ---
+        // Only while in the AR flow, so a lingering FAILED state doesn't show the
+        // overlay after the user has cancelled back out to a non-AR camera mode.
+        onscreen(alignment = Alignment.Center) {
+            if (isOnMain && (uiState.cameraMode == CameraMode.AR_SETUP
+                    || uiState.cameraMode == CameraMode.AR_ACTIVE)) {
+                com.hereliesaz.cuedetat.ui.composables.ArModuleLoadingOverlay(
+                    uiState = uiState,
+                    onEvent = mainViewModel::onEvent,
+                )
+            }
+        }
+
         // --- Onscreen: AR tracking badge (bottom-start, when AR is actively tracking) ---
         onscreen(alignment = Alignment.BottomStart) {
             if (isOnMain && uiState.cameraMode == CameraMode.AR_ACTIVE

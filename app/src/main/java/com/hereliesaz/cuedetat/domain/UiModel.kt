@@ -140,6 +140,10 @@ data class CueDetatState(
     // capture-feedback line from the last captured pocket to the centre reticle.
     @Transient val arCapturedCorners: List<PointF> = emptyList(),
     val depthCapability: DepthCapability = DepthCapability.NONE,
+    // Download/load lifecycle of the on-demand Expert-AR module. Transient: it is
+    // runtime-only and must not survive process death (a LOADING snapshot would
+    // be stale on restart).
+    @Transient val arModuleState: ArModuleState = ArModuleState.IDLE,
     val lockedHsvColor: FloatArray? = null,
     val lockedHsvStdDev: FloatArray? = null,
     val showAdvancedOptionsDialog: Boolean = false,
@@ -325,6 +329,13 @@ sealed class MainScreenEvent {
         val updatedClusters: List<PocketCluster>
     ) : MainScreenEvent()
     object ToggleTableScanScreen : MainScreenEvent()
+
+    // On-demand Expert-AR module delivery (see ArControllerFacade / MainViewModel).
+    object ArModuleLoadStarted : MainScreenEvent()
+    object ArModuleLoadSucceeded : MainScreenEvent()
+    object ArModuleLoadFailed : MainScreenEvent()
+    /** User tapped "Retry" on the download-failed overlay. */
+    object RetryArModuleLoad : MainScreenEvent()
 
     // Depth / ARCore events
     data class DepthPlaneUpdated(val plane: DepthPlane) : MainScreenEvent()
