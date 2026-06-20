@@ -3,8 +3,6 @@ package com.hereliesaz.cuedetat.ui.composables.tablescan
 
 import android.graphics.Matrix
 import android.graphics.PointF
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.data.TableScanRepository
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.PocketCluster
@@ -17,8 +15,9 @@ import com.hereliesaz.cuedetat.domain.decomposeHomography
 import com.hereliesaz.cuedetat.view.model.Table
 import com.hereliesaz.cuedetat.view.model.Perspective
 import com.hereliesaz.cuedetat.view.state.TableSize
-import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +31,7 @@ import org.opencv.core.Core
 import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
 import javax.inject.Inject
+import javax.inject.Singleton
 import kotlin.math.sqrt
 
 /** Min observations per cluster before geometry fitting is attempted. */
@@ -47,13 +47,21 @@ enum class ScanStep {
     AUTO_READY
 }
 
-@HiltViewModel
+/**
+ * Drives the table-scan flow. Formerly a @HiltViewModel; now an app-scoped
+ * @Singleton owned by the AR controller, so it can be relocated into the
+ * on-demand `:feature_expert_ar` dynamic feature module (where @HiltViewModel /
+ * hiltViewModel() are unavailable). Lifecycle is the application's; [scope]
+ * replaces the old scope.
+ */
+@Singleton
 class TableScanViewModel @Inject constructor(
     private val tableScanRepository: TableScanRepository,
     val pocketDetector: PocketDetector,
     private val arTableSession: com.hereliesaz.cuedetat.data.ArTableSession,
     private val arFrameProcessor: com.hereliesaz.cuedetat.data.ArFrameProcessor,
-) : ViewModel() {
+) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     /** Number of corner anchors captured via ARCore hit-tests (0..4). Drives the corner-quad UI. */
     val capturedCornerCount: StateFlow<Int> = arTableSession.capturedCount
@@ -125,20 +133,20 @@ class TableScanViewModel @Inject constructor(
         // flow opens, so the (~24 MB) Play feature split is downloading/installed
         // by the time the user actually points the camera at a table. No-op for
         // foss (model bundled) and for play once the split is already installed.
-        viewModelScope.launch {
+        scope.launch {
             runCatching { pocketDetector.ensureModelReady() }
         }
 
         // ARCore owns the camera during the AR scan, so felt colour is sampled from the AR frames
         // (ArFrameProcessor) rather than the CameraX analyzer.
-        viewModelScope.launch {
+        scope.launch {
             arFrameProcessor.latestFeltHsv.collect { hsv ->
                 if (hsv != null) lastFeltHsv = hsv
             }
         }
 
         // Resume partial scan if it exists
-        viewModelScope.launch {
+        scope.launch {
             val partial = tableScanRepository.loadPartialScan()
             if (partial != null) {
                 val (step, savedPoints) = partial
@@ -173,7 +181,7 @@ class TableScanViewModel @Inject constructor(
     fun deleteSelectedSamples() {
         val ids = _selectedSampleIds.value
         if (ids.isNotEmpty()) {
-            viewModelScope.launch {
+            scope.launch {
                 _scanResult.emit(MainScreenEvent.DeleteFeltSamples(ids))
                 clearSelection()
             }
@@ -238,7 +246,7 @@ class TableScanViewModel @Inject constructor(
         _mlConfidence.value = confidence
         _mlTableBoundary.value = tableBoundary
 
-        viewModelScope.launch(Dispatchers.Default) {
+        scope.launch(Dispatchers.Default) {
             var stableCount = synchronized(clustersLock) {
                 clusters.count { it.value.size >= MIN_OBSERVATIONS_TO_FIT }
             }
@@ -470,7 +478,7 @@ class TableScanViewModel @Inject constructor(
      * Immediately completes the scan using the captured felt color and a default table pose.
      */
     fun captureFeltAndComplete() {
-        viewModelScope.launch {
+        scope.launch {
             val hsv = lastFeltHsv.toList()
             _scanResult.emit(MainScreenEvent.AddFeltSample(hsv))
 
@@ -593,7 +601,7 @@ class TableScanViewModel @Inject constructor(
     fun completeCornerScan() {
         if (arTableSession.capturedCount.value != 4) return
 
-        viewModelScope.launch {
+        scope.launch {
             val tableSize = _selectedTableSize.value
             val table = Table(tableSize, true)
             val ideal = PocketId.entries.mapIndexed { i, id ->
@@ -619,7 +627,7 @@ class TableScanViewModel @Inject constructor(
 
         if (step != ScanStep.POCKET_GUIDE) return
 
-        viewModelScope.launch {
+        scope.launch {
             // Screen center is (viewWidth/2, viewHeight/2)
             val screenCenter = PointF(viewWidth / 2f, viewHeight / 2f)
             val logicalPt = Perspective.screenToLogical(screenCenter, inverse)

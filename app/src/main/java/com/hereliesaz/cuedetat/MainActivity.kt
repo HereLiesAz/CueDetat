@@ -28,9 +28,7 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.MainViewModel
-import com.hereliesaz.cuedetat.ui.ProtractorScreen
-import com.hereliesaz.cuedetat.ui.composables.SplashScreen
-import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanViewModel
+import com.hereliesaz.cuedetat.ui.ProtractorScreenimport com.hereliesaz.cuedetat.ui.composables.SplashScreen
 import com.hereliesaz.cuedetat.ui.hatemode.HaterEvent
 import com.hereliesaz.cuedetat.ui.hatemode.HaterScreen
 import com.hereliesaz.cuedetat.ui.hatemode.HaterViewModel
@@ -46,7 +44,6 @@ import kotlinx.coroutines.flow.onEach
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
-    private val tableScanViewModel: TableScanViewModel by viewModels()
     private val haterViewModel: HaterViewModel by viewModels()
 
     private var cameraPermissionGranted by mutableStateOf(false)
@@ -248,8 +245,7 @@ class MainActivity : ComponentActivity() {
                     )
                     else -> {
                         ProtractorScreen(
-                            mainViewModel = viewModel,
-                            tableScanViewModel = tableScanViewModel
+                            mainViewModel = viewModel
                         )
                     }
                 }

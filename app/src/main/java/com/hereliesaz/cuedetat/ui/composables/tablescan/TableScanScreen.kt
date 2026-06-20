@@ -51,7 +51,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import android.os.Build
 import android.view.HapticFeedbackConstants
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.PocketId
@@ -70,7 +69,7 @@ import kotlinx.coroutines.delay
 fun TableScanScreen(
     onEvent: (MainScreenEvent) -> Unit,
     uiState: CueDetatState,
-    viewModel: TableScanViewModel = hiltViewModel()
+    viewModel: TableScanViewModel
 ) {
     // Animation state: tracks whether the user has tapped capture (circle expands).
     var isCapturing by remember { mutableStateOf(false) }

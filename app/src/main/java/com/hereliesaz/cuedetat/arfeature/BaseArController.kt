@@ -2,6 +2,7 @@
 
 package com.hereliesaz.cuedetat.arfeature
 
+import androidx.camera.core.ImageAnalysis
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.hereliesaz.cuedetat.data.ArFrameProcessor
@@ -11,6 +12,9 @@ import com.hereliesaz.cuedetat.domain.DepthCapability
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.TableFrameHomography
 import com.hereliesaz.cuedetat.ui.composables.ArCoreBackground
+import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanAnalyzer
+import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanScreen
+import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanViewModel
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,7 +28,18 @@ import javax.inject.Singleton
 class BaseArController @Inject constructor(
     private val arTableSession: ArTableSession,
     private val arFrameProcessor: ArFrameProcessor,
+    private val tableScanViewModel: TableScanViewModel,
 ) : ArController {
+
+    // Single shared analyzer instance wrapping the scan controller's callbacks.
+    private val analyzer: ImageAnalysis.Analyzer by lazy {
+        TableScanAnalyzer(
+            tableScanViewModel::onFrame,
+            tableScanViewModel::onFeltColorSampled,
+            tableScanViewModel::onCenterVSampled,
+            tableScanViewModel.pocketDetector,
+        )
+    }
 
     override fun probeCapability(): DepthCapability =
         if (arTableSession.isArCoreAvailable()) {
@@ -56,5 +71,20 @@ class BaseArController @Inject constructor(
             arFrameProcessor = arFrameProcessor,
             onEvent = onEvent,
         )
+    }
+
+    override fun scanAnalyzer(): ImageAnalysis.Analyzer = analyzer
+
+    @Composable
+    override fun ScanOverlay(uiState: CueDetatState, onEvent: (MainScreenEvent) -> Unit) {
+        TableScanScreen(
+            onEvent = onEvent,
+            uiState = uiState,
+            viewModel = tableScanViewModel,
+        )
+    }
+
+    override fun startManualHoleCapture() {
+        tableScanViewModel.startManualHoleCapture()
     }
 }

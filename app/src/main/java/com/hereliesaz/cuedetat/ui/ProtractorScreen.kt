@@ -54,31 +54,20 @@ import com.hereliesaz.cuedetat.ui.composables.overlays.ArTrackingBadge
 import com.hereliesaz.cuedetat.ui.composables.overlays.KineticWarningOverlay
 import com.hereliesaz.cuedetat.ui.composables.overlays.TutorialOverlay
 import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
-import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanAnalyzer
-import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanScreen
-import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanViewModel
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
 
 private const val ROUTE_MAIN = "main"
 
 @Composable
 fun ProtractorScreen(
-    mainViewModel: MainViewModel,
-    tableScanViewModel: TableScanViewModel
+    mainViewModel: MainViewModel
 ) {
     val uiState by mainViewModel.uiState.collectAsStateWithLifecycle()
     val systemIsDark = isSystemInDarkTheme()
     val navController = rememberNavController()
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
-    val tableScanAnalyzer = remember(tableScanViewModel) {
-        TableScanAnalyzer(
-            tableScanViewModel::onFrame,
-            tableScanViewModel::onFeltColorSampled,
-            tableScanViewModel::onCenterVSampled,
-            tableScanViewModel.pocketDetector
-        )
-    }
+    val tableScanAnalyzer = remember(mainViewModel) { mainViewModel.arController.scanAnalyzer() }
 
     val isOnMain = currentRoute == ROUTE_MAIN || currentRoute == null
 
@@ -93,7 +82,7 @@ fun ProtractorScreen(
         uiState = uiState,
         onEvent = { event ->
             if (event is MainScreenEvent.StartManualHoleCapture) {
-                tableScanViewModel.startManualHoleCapture()
+                mainViewModel.arController.startManualHoleCapture()
             }
             mainViewModel.onEvent(event)
         },
@@ -271,10 +260,9 @@ fun ProtractorScreen(
         // --- Onscreen: Inline felt capture overlay ---
         onscreen(alignment = Alignment.TopStart) {
             if (isOnMain && uiState.showTableScanScreen) {
-                TableScanScreen(
-                    onEvent = mainViewModel::onEvent,
+                mainViewModel.arController.ScanOverlay(
                     uiState = uiState,
-                    viewModel = tableScanViewModel
+                    onEvent = mainViewModel::onEvent,
                 )
             }
         }

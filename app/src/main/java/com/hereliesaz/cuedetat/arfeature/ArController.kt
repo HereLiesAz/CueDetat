@@ -2,6 +2,7 @@
 
 package com.hereliesaz.cuedetat.arfeature
 
+import androidx.camera.core.ImageAnalysis
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.hereliesaz.cuedetat.domain.CueDetatState
@@ -36,4 +37,14 @@ interface ArController {
     /** Full-screen ARCore camera background (corner capture during setup + 6DoF tracking). */
     @Composable
     fun ArBackground(modifier: Modifier, onEvent: (MainScreenEvent) -> Unit)
+
+    /** CameraX analyzer that feeds the (non-AR) table-scan pocket detector. */
+    fun scanAnalyzer(): ImageAnalysis.Analyzer
+
+    /** The full-screen table-scan overlay UI. */
+    @Composable
+    fun ScanOverlay(uiState: CueDetatState, onEvent: (MainScreenEvent) -> Unit)
+
+    /** Begin a manual hole capture (driven from the nav menu). */
+    fun startManualHoleCapture()
 }
