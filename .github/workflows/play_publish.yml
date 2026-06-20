@@ -1,0 +1,163 @@
+name: Play Publish (AAB)
+
+# Builds a signed Android App Bundle of the `play` flavor and (optionally)
+# publishes it to the Google Play Console.
+#
+# Safe by default: manual trigger only, internal track, draft status, and
+# publishing OFF (build + upload the .aab as a workflow artifact only). Flip the
+# `publish` input to actually push to Play.
+#
+# Signing reuses the same secrets and injected-signing approach as
+# android_release.yml; versioning reuses the -PversionBuild override
+# (git commit count) wired into app/build.gradle.kts.
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Play track to publish to'
+        type: choice
+        options: [internal, alpha, beta, production]
+        default: internal
+        required: true
+      status:
+        description: 'Release status on the chosen track'
+        type: choice
+        options: [draft, completed]
+        default: draft
+        required: true
+      publish:
+        description: 'Publish to Play? (off = build + upload the .aab artifact only)'
+        type: boolean
+        default: false
+        required: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so `git rev-list --count HEAD` is the real commit count
+
+      - name: Inject Google Services
+        env:
+          GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
+          PROJECT_ID: ${{ secrets.PROJECT_ID }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+        run: |
+          if [ -f "app/google-services.json.template" ]; then
+            echo "Template found. Injecting secrets..."
+            sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
+          else
+            echo "Warning: google-services.json.template not found. Skipping injection."
+          fi
+
+      - name: Generate Keystore from Secrets
+        env:
+          KEYSTORE_PRIVATE: ${{ secrets.KEYSTORE_PRIVATE }}
+          KEYSTORE_CHAIN: ${{ secrets.KEYSTORE_CHAIN }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          echo "Generating keystore from certificate chain and private key..."
+          echo "$KEYSTORE_PRIVATE" > private_key.pem
+          echo "$KEYSTORE_CHAIN" > certificate_chain.crt
+
+          openssl pkcs12 -export -in certificate_chain.crt -inkey private_key.pem \
+            -name "$KEY_ALIAS" -out keystore.p12 \
+            -password pass:"$KEYSTORE_PASSWORD"
+
+          keytool -importkeystore -srckeystore keystore.p12 -srcstoretype PKCS12 \
+            -destkeystore app/keystore.jks -deststoretype JKS \
+            -srcstorepass "$KEYSTORE_PASSWORD" \
+            -deststorepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" -noprompt
+
+          rm private_key.pem certificate_chain.crt keystore.p12
+          echo "Keystore generated at app/keystore.jks"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+          dependency-graph: disabled
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Resolve package name
+        id: pkg
+        run: |
+          # Read applicationId from the version catalog (single source of truth),
+          # falling back to the namespace in app/build.gradle.kts.
+          PKG=$(grep -E '^[[:space:]]*applicationId[[:space:]]*=' gradle/libs.versions.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          if [ -z "$PKG" ]; then
+            PKG=$(grep -E 'applicationId[[:space:]]*=' app/build.gradle.kts | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          fi
+          echo "Resolved packageName: $PKG"
+          echo "package_name=$PKG" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed Play AAB
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_ACTOR: ${{ secrets.GH_ACTOR }}
+          # Optional tester-license allowlist scrape (writes an empty allowlist when absent).
+          GG_LINK: ${{ secrets.GG_LINK }}
+          GG_SESSION: ${{ secrets.GG_SESSION }}
+        run: |
+          BUILD_NUMBER=$(git rev-list --count HEAD)
+          echo "versionCode (commit count) = $BUILD_NUMBER"
+
+          ./gradlew bundlePlayRelease -PversionBuild="$BUILD_NUMBER" --build-cache \
+            -Pandroid.injected.signing.store.file="$(pwd)/app/keystore.jks" \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+
+      - name: Locate AAB
+        id: aab
+        run: |
+          AAB=$(find app/build/outputs/bundle/playRelease -name "*.aab" | head -n 1)
+          if [ -z "$AAB" ]; then
+            echo "Error: no Play release AAB found."
+            exit 1
+          fi
+          echo "Found AAB: $AAB"
+          echo "aab_path=$AAB" >> "$GITHUB_OUTPUT"
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: play-release-aab
+          path: ${{ steps.aab.outputs.aab_path }}
+          if-no-files-found: error
+
+      - name: Publish to Google Play
+        if: ${{ github.event.inputs.publish == 'true' }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ steps.pkg.outputs.package_name }}
+          releaseFiles: app/build/outputs/bundle/playRelease/*.aab
+          track: ${{ github.event.inputs.track }}
+          status: ${{ github.event.inputs.status }}
+          mappingFile: app/build/outputs/mapping/playRelease/mapping.txt

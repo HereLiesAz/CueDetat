@@ -18,6 +18,7 @@ pluginManagement {
     plugins {
         id("com.android.application") version "9.2.1"
         id("com.android.library") version "9.2.1"
+        id("com.android.dynamic-feature") version "9.2.1"
         id("com.github.triplet.play") version "4.0.0"
 
     }
@@ -75,3 +76,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "CueDetat"
 include(":app")
+// On-demand dynamic feature module carrying the 24 MB TFLite master model.
+// Delivered via Play Feature Delivery for the `play` AAB; the `foss` flavor
+// bundles the same asset directly (see app/build.gradle.kts), since standalone
+// FOSS APKs have no Play split-install channel.
+include(":feature_mlmodel")

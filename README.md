@@ -83,6 +83,31 @@ Unidirectional Data Flow is the master of the master of the universe. State flow
 * **Insulting Warnings:** The pool of sarcastic remarks is finite. Contributions welcome if they tickle me the required level of pink.
 * **Performance:** Drawing many complex paths and text elements on every frame can be demanding. Optimizations are an ongoing battle. And yet, somehow, it feels more like a you-problem.
 
+## Building & Releasing
+
+Two distribution channels share one codebase via product flavors:
+
+* **`play`** → Google Play, shipped as a **signed Android App Bundle (AAB)**.
+* **`foss`** → standalone APK on GitHub Releases.
+
+Quick local builds (`versionCode` = git commit count, kept monotonic for Play):
+
+```bash
+./gradlew bundlePlayRelease  -PversionBuild=$(git rev-list --count HEAD)   # signed Play AAB
+./gradlew assembleFossRelease -PversionBuild=$(git rev-list --count HEAD)  # signed FOSS APK
+```
+
+Publishing to Play is automated by the **“Play Publish (AAB)”** GitHub Actions
+workflow (`workflow_dispatch`): inputs `track` (default `internal`), `status`
+(default `draft`), and `publish` (default `false` = upload the `.aab` artifact
+only). The ~24 MB TFLite model is delivered to Play as an **on-demand dynamic
+feature module** (`:feature_mlmodel`) and bundled directly into the FOSS APK.
+
+Required repo secrets: `KEYSTORE_PRIVATE`, `KEYSTORE_CHAIN`, `KEYSTORE_PASSWORD`,
+`KEY_ALIAS`, `KEY_PASSWORD` (signing) and `PLAY_SERVICE_ACCOUNT_JSON` (Play
+publishing). **Full details, one-time Play Console setup, and the Data-safety
+checklist are in [`docs/RELEASE.md`](docs/RELEASE.md).**
+
 ## License
 
 Distributed under the MIT License. Basically, completely free to use however you'd like, just gimme a shoutout. I make money making art. So, like this:

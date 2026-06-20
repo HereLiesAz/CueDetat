@@ -59,6 +59,19 @@ class VisionRepository @Inject constructor(
     private val _visionDataFlow = MutableStateFlow(VisionData())
     val visionDataFlow = _visionDataFlow.asStateFlow()
 
+    // Fire-once on-demand model fetch (Play). The aiming/ball-detection path
+    // can be reached without opening table-scan, so the first processed frame
+    // also kicks off model delivery. No-op for foss (model bundled) and after
+    // the first call. detectPool() degrades gracefully until the model loads.
+    private val modelRequested = AtomicBoolean(false)
+    private fun ensureModelOnce() {
+        if (modelRequested.compareAndSet(false, true)) {
+            CoroutineScope(Dispatchers.IO).launch {
+                runCatching { poolDetector.ensureModelReady() }
+            }
+        }
+    }
+
     private var arFrameCounter = 0
     private val _arEvents = MutableSharedFlow<MainScreenEvent>(extraBufferCapacity = 16)
     val arEvents: SharedFlow<MainScreenEvent> = _arEvents.asSharedFlow()
@@ -162,6 +175,7 @@ class VisionRepository @Inject constructor(
 
     @SuppressLint("UnsafeOptInUsageError")
     fun processImage(imageProxy: ImageProxy?, bitmap: android.graphics.Bitmap, state: CueDetatState) {
+        ensureModelOnce()
         if (isProcessing.get()) {
             imageProxy?.close()
             return
@@ -606,6 +620,7 @@ class VisionRepository @Inject constructor(
 
     @SuppressLint("UnsafeOptInUsageError")
     fun processArCpuImage(image: MediaImage, rotationDegrees: Int, state: CueDetatState) {
+        ensureModelOnce()
         if (isProcessing.get()) {
             return
         }

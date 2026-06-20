@@ -15,4 +15,12 @@ data class MlTableDetection(
  */
 interface PocketDetector {
     fun detect(bitmap: Bitmap): MlTableDetection?
+
+    /**
+     * Ensures the backing model is installed and loaded, requesting the
+     * on-demand dynamic feature split if necessary (Play builds). Returns true
+     * when the model is ready. Default no-op (true) for detectors that have no
+     * model to fetch. Safe to call repeatedly; cheap once loaded.
+     */
+    suspend fun ensureModelReady(): Boolean = true
 }
