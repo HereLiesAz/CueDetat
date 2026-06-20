@@ -406,7 +406,16 @@ class MainViewModel @Inject constructor(
         if (arModuleLoadJob?.isActive == true) return
         arModuleLoadJob = viewModelScope.launch {
             onEvent(MainScreenEvent.ArModuleLoadStarted)
-            val loaded = runCatching { arController.ensureLoaded() }.getOrDefault(false)
+            // Don't use runCatching: it would swallow CancellationException and
+            // (e.g. on Retry, which cancels this job) post a spurious
+            // ArModuleLoadFailed that races the freshly started load.
+            val loaded = try {
+                arController.ensureLoaded()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                false
+            }
             if (loaded) {
                 onEvent(MainScreenEvent.DepthCapabilityDetected(arController.probeCapability()))
                 onEvent(MainScreenEvent.ArModuleLoadSucceeded)
