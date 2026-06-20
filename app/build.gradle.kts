@@ -353,22 +353,22 @@ android {
 // would package the :feature_expert_ar classes twice — once from the java.srcDir
 // compiled into the base (see the foss sourceSet above), once from the fused
 // on-demand split (dist:fusing include="true") — producing duplicate classes.
-// The assemble path doesn't package dynamic-feature code, so it's safe; fail the
-// bundle path fast with an explanation instead of emitting a broken artifact.
+// The assemble path doesn't package dynamic-feature code, so it's safe; abort the
+// bundle path with an explanation instead of emitting a broken artifact.
 //
-// Checked against the requested task names (configuration-cache friendly, no
-// taskGraph access). bundleFoss* is a leaf publishing task nothing depends on
-// transitively, so inspecting requested names is sufficient.
-run {
-    val requestsFossBundle = gradle.startParameter.taskNames.any {
-        it.substringAfterLast(':').startsWith("bundleFoss")
-    }
-    if (requestsFossBundle) {
-        throw GradleException(
-            "Refusing to build a FOSS App Bundle. FOSS ships as a standalone APK — use " +
-                "assembleFossRelease. A fused FOSS bundle would duplicate the :feature_expert_ar " +
-                "classes (java.srcDir + dist:fusing). See docs/RELEASE.md §4.4."
-        )
+// Keyed on the *resolved* task name (not the requested arg) so it can't be
+// bypassed by Gradle's camelCase abbreviations (e.g. `bFR`) or by transitive
+// inclusion. configureEach stays lazy/configuration-cache friendly: the doFirst
+// is only attached if a bundleFoss* task is actually realized into the graph.
+tasks.configureEach {
+    if (name.matches(Regex("bundleFoss.*"))) {
+        doFirst {
+            throw GradleException(
+                "Refusing to build a FOSS App Bundle ($name). FOSS ships as a standalone APK — " +
+                    "use assembleFossRelease. A fused FOSS bundle would duplicate the " +
+                    ":feature_expert_ar classes (java.srcDir + dist:fusing). See docs/RELEASE.md §4.4."
+            )
+        }
     }
 }
 
