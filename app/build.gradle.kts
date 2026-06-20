@@ -359,9 +359,14 @@ android {
 // Keyed on the *resolved* task name (not the requested arg) so it can't be
 // bypassed by Gradle's camelCase abbreviations (e.g. `bFR`) or by transitive
 // inclusion. configureEach stays lazy/configuration-cache friendly: the doFirst
-// is only attached if a bundleFoss* task is actually realized into the graph.
+// is only attached if the AAB task is actually realized into the graph.
+//
+// Match ONLY the per-variant AAB lifecycle tasks (bundleFossDebug /
+// bundleFossRelease). A broad `bundleFoss.*` is wrong: it also matches internal
+// AGP tasks like `bundleFossDebugClassesToCompileJar` that run during a normal
+// assembleFoss* build, which would block the standalone-APK path we rely on.
 tasks.configureEach {
-    if (name.matches(Regex("bundleFoss.*"))) {
+    if (name == "bundleFossDebug" || name == "bundleFossRelease") {
         doFirst {
             throw GradleException(
                 "Refusing to build a FOSS App Bundle ($name). FOSS ships as a standalone APK — " +
