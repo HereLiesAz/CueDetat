@@ -40,11 +40,17 @@ class PlayModelDelivery @Inject constructor(
         }
         return suspendCancellableCoroutine { cont ->
             val request = SplitInstallRequest.newBuilder().addModule(MODULE_NAME).build()
-            // Only one module install is ever in flight, so react to terminal
-            // states without strict session-id filtering (avoids a race where
-            // INSTALLED can arrive before startInstall's id callback returns).
+            // React to terminal states for *our* session/module only, so a
+            // concurrent install of some other split can't resume this
+            // continuation. We match on module name immediately and, once the
+            // session id is known, on session id too. Matching by module name
+            // first also avoids a race where INSTALLED can arrive before
+            // startInstall's id callback returns.
+            var mySessionId: Int? = null
             val listener = object : SplitInstallStateUpdatedListener {
                 override fun onStateUpdate(state: com.google.android.play.core.splitinstall.SplitInstallSessionState) {
+                    if (mySessionId != null && state.sessionId() != mySessionId) return
+                    if (!state.moduleNames().contains(MODULE_NAME)) return
                     when (state.status()) {
                         SplitInstallSessionStatus.INSTALLED -> {
                             manager.unregisterListener(this)
@@ -64,12 +70,21 @@ class PlayModelDelivery @Inject constructor(
                 }
             }
             manager.registerListener(listener)
-            manager.startInstall(request)
-                .addOnFailureListener { e ->
-                    Log.e(TAG, "Model split install failed to start", e)
-                    runCatching { manager.unregisterListener(listener) }
-                    if (cont.isActive) cont.resume(false)
-                }
+            // startInstall can fail both synchronously (throw) and asynchronously
+            // (failure listener); cover both so the continuation always resumes.
+            try {
+                manager.startInstall(request)
+                    .addOnSuccessListener { id -> mySessionId = id }
+                    .addOnFailureListener { e ->
+                        Log.e(TAG, "Model split install failed to start", e)
+                        runCatching { manager.unregisterListener(listener) }
+                        if (cont.isActive) cont.resume(false)
+                    }
+            } catch (t: Throwable) {
+                Log.e(TAG, "Model split install threw on start", t)
+                runCatching { manager.unregisterListener(listener) }
+                if (cont.isActive) cont.resume(false)
+            }
             cont.invokeOnCancellation { runCatching { manager.unregisterListener(listener) } }
         }
     }

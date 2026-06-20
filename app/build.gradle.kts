@@ -106,7 +106,7 @@ val isBuildingTask = gradle.startParameter.taskNames.any {
 // This guarantees a strictly-increasing versionCode for Play uploads without
 // relying on the committed version.properties value. When the property is absent
 // the original local auto-increment behaviour is preserved untouched.
-val versionBuildOverride = (project.findProperty("versionBuild") as String?)?.trim()?.toIntOrNull()
+val versionBuildOverride = project.findProperty("versionBuild")?.toString()?.trim()?.toIntOrNull()
 
 if (versionBuildOverride != null) {
     buildVal = versionBuildOverride
@@ -124,7 +124,7 @@ if (versionBuildOverride != null) {
 
 // Optional explicit versionName override (e.g. -PversionName=1.10.2.999); when
 // absent the name is derived from the components below.
-val versionNameOverride = (project.findProperty("versionName") as String?)?.trim()?.takeIf { it.isNotEmpty() }
+val versionNameOverride = project.findProperty("versionName")?.toString()?.trim()?.takeIf { it.isNotEmpty() }
 
 val finalBuild = buildVal
 val finalPatch = patchVal
