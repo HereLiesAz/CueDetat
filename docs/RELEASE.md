@@ -140,7 +140,58 @@ and usable on its own. `ensureModelReady()` triggers the install and reloads.
 > issues arise, the safe fallback is to move the model back into
 > `app/src/main/assets/ml/` (revert the module) — both flavors work unchanged.
 
-### 4.4 Play In-App Updates (optional follow-up)
+### 4.4 Dynamic feature module: `:feature_expert_ar` (on-demand, entitlement-gated)
+
+The Expert-only ARCore table-scan flow — **and the ARCore dependency itself**
+(`com.google.ar:core`) — live in a second on-demand module, `:feature_expert_ar`.
+Unlike `:feature_mlmodel` (asset-only), this module ships **Kotlin + Compose
+code**, so the base never references its classes at compile time: it talks to the
+`ArController` interface and loads `ArControllerImpl` **reflectively** once the
+split is available.
+
+- **Size win.** The base `play` AAB no longer carries ARCore (its arm64 native
+  client lib is the bulk of the saving) or the AR/scan code. Free users — and
+  entitled users who never open AR — never download it. To measure the delta,
+  build the AAB and compare `bundletool get-size total` before/after, or inspect
+  per-split sizes in `bundletool build-apks`.
+- **Delivery is lazy *and* entitlement-gated.** `ArControllerFacade` starts as a
+  no-op and only installs the split + loads the impl when an **entitled** user
+  first enters the AR camera flow (`CycleCameraMode` → `AR_SETUP`, reachable only
+  in paywall-gated EXPERT mode). Download progress / retry is surfaced by
+  `ArModuleLoadingOverlay` via `CueDetatState.arModuleState`.
+- **FOSS (`foss` APK):** the `foss` flavor compiles the module’s **sources**
+  directly in via `java.srcDir(feature_expert_ar/src/main/java)`, with ARCore as
+  a `fossImplementation` dependency. `Class.forName` then resolves the impl from
+  the app’s own dex.
+
+Delivery is behind the flavor-abstracted `ArFeatureDelivery` interface
+(mirroring `ModelDelivery`):
+
+- `app/src/main/.../delivery/ArFeatureDelivery.kt` — interface (defaults: present).
+- `app/src/foss/.../delivery/FossArFeatureDelivery.kt` — no-op (code compiled in).
+- `app/src/play/.../delivery/PlayArFeatureDelivery.kt` — `SplitInstallManager` +
+  `SplitCompat` on-demand install.
+
+Hilt does not extend into a dynamic feature module, so `ArControllerImpl` pulls
+its base singletons through the `ArFeatureEntryPoint` Hilt entry point.
+
+> ⚠️ **FOSS must be built as an APK, never a bundle.** Because this module is
+> code-bearing **and** `dist:fusing include="true"`, a *fused* FOSS artifact
+> (`bundleFossRelease` or a foss universal APK) would contain the AR classes
+> **twice** — once from the `java.srcDir` compiled into the base, once from the
+> fused split — i.e. duplicate classes. The standalone APK path
+> (`assembleFossRelease`, the only path the project uses) does **not** package
+> dynamic-feature code, so it’s safe. `app/build.gradle.kts` enforces this with a
+> task-graph guard that fails any `bundleFoss*` build with this explanation.
+
+> ⚠️ **Needs device verification.** Same caveat as the model module: CI proves
+> the build wiring (`assembleFossRelease` / `bundlePlayRelease`), but the actual
+> Play on-demand install, the reflective cross-split class load, and the live
+> ARCore session can only be verified on a real device. If issues arise, the safe
+> fallback is to move the AR sources back into `app/src/main/` and ARCore back to
+> a base `implementation` (revert the module).
+
+### 4.5 Play In-App Updates (optional follow-up)
 
 The `play` flavor’s `PlayAppUpdater` is currently a no-op (Play manages store
 updates). If you later want in-app update prompts (flexible/immediate), add the

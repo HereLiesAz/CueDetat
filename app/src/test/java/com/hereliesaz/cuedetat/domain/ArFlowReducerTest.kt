@@ -142,4 +142,51 @@ class ArFlowReducerTest {
         val result = reduceCvAction(s, MainScreenEvent.CvDataUpdated(visionData))
         assertEquals(CameraMode.AR_SETUP, result.cameraMode)
     }
+
+    // --- On-demand Expert-AR module load lifecycle (arModuleState) ---
+
+    @Test
+    fun `arModuleState defaults to IDLE`() {
+        assertEquals(ArModuleState.IDLE, base.arModuleState)
+    }
+
+    @Test
+    fun `ArModuleLoadStarted sets arModuleState to LOADING`() {
+        val result = reduceControlAction(base, MainScreenEvent.ArModuleLoadStarted)
+        assertEquals(ArModuleState.LOADING, result.arModuleState)
+    }
+
+    @Test
+    fun `ArModuleLoadSucceeded sets arModuleState to READY`() {
+        val s = base.copy(arModuleState = ArModuleState.LOADING)
+        val result = reduceControlAction(s, MainScreenEvent.ArModuleLoadSucceeded)
+        assertEquals(ArModuleState.READY, result.arModuleState)
+    }
+
+    @Test
+    fun `ArModuleLoadFailed sets arModuleState to FAILED`() {
+        val s = base.copy(arModuleState = ArModuleState.LOADING)
+        val result = reduceControlAction(s, MainScreenEvent.ArModuleLoadFailed)
+        assertEquals(ArModuleState.FAILED, result.arModuleState)
+    }
+
+    @Test
+    fun `module load events do not disturb camera mode`() {
+        // The load lifecycle runs while the user sits in AR_SETUP; the transition
+        // must not clobber the camera mode the reducer already put them in.
+        val s = base.copy(cameraMode = CameraMode.AR_SETUP)
+        val started = reduceControlAction(s, MainScreenEvent.ArModuleLoadStarted)
+        assertEquals(CameraMode.AR_SETUP, started.cameraMode)
+        val ready = reduceControlAction(started, MainScreenEvent.ArModuleLoadSucceeded)
+        assertEquals(CameraMode.AR_SETUP, ready.cameraMode)
+    }
+
+    @Test
+    fun `retry path FAILED then LOADING is representable`() {
+        // After a failed load, starting again returns to LOADING (the UI's Retry
+        // re-runs ensureArModuleLoaded, which dispatches ArModuleLoadStarted).
+        val failed = base.copy(arModuleState = ArModuleState.FAILED)
+        val result = reduceControlAction(failed, MainScreenEvent.ArModuleLoadStarted)
+        assertEquals(ArModuleState.LOADING, result.arModuleState)
+    }
 }
