@@ -121,6 +121,14 @@ class TableScanViewModel @Inject constructor(
     private val clustersLock = Any()
 
     init {
+        // Kick off on-demand delivery of the TFLite model the moment the scan
+        // flow opens, so the (~24 MB) Play feature split is downloading/installed
+        // by the time the user actually points the camera at a table. No-op for
+        // foss (model bundled) and for play once the split is already installed.
+        viewModelScope.launch {
+            runCatching { pocketDetector.ensureModelReady() }
+        }
+
         // ARCore owns the camera during the AR scan, so felt colour is sampled from the AR frames
         // (ArFrameProcessor) rather than the CameraX analyzer.
         viewModelScope.launch {

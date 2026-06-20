@@ -13,6 +13,7 @@ import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.data.MergedTFLiteDetector
+import com.hereliesaz.cuedetat.delivery.ModelDelivery
 import com.hereliesaz.cuedetat.network.GithubApi
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
 import dagger.Module
@@ -90,8 +91,11 @@ object AppModule {
      */
     @Provides
     @Singleton
-    fun provideMergedTFLiteDetector(@ApplicationContext context: Context): MergedTFLiteDetector {
-        return MergedTFLiteDetector(context)
+    fun provideMergedTFLiteDetector(
+        @ApplicationContext context: Context,
+        modelDelivery: ModelDelivery,
+    ): MergedTFLiteDetector {
+        return MergedTFLiteDetector(context, modelDelivery)
     }
 
     /**

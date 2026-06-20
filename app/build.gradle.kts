@@ -101,7 +101,19 @@ val isBuildingTask = gradle.startParameter.taskNames.any {
     it.contains("assemble") || it.contains("bundle") || it.contains("install")
 }
 
-if (isBuildingTask) {
+// CI override: when -PversionBuild=<n> is passed (e.g. the git commit count via
+// `git rev-list --count HEAD`), it becomes the authoritative BUILD/versionCode.
+// This guarantees a strictly-increasing versionCode for Play uploads without
+// relying on the committed version.properties value. When the property is absent
+// the original local auto-increment behaviour is preserved untouched.
+val versionBuildOverride = (project.findProperty("versionBuild") as String?)?.trim()?.toIntOrNull()
+
+if (versionBuildOverride != null) {
+    buildVal = versionBuildOverride
+    if (majorVal != lastMajorVal || minorVal != lastMinorVal) {
+        patchVal = 0
+    }
+} else if (isBuildingTask) {
     buildVal++
     if (majorVal != lastMajorVal || minorVal != lastMinorVal) {
         patchVal = 0
@@ -110,12 +122,20 @@ if (isBuildingTask) {
     }
 }
 
+// Optional explicit versionName override (e.g. -PversionName=1.10.2.999); when
+// absent the name is derived from the components below.
+val versionNameOverride = (project.findProperty("versionName") as String?)?.trim()?.takeIf { it.isNotEmpty() }
+
 val finalBuild = buildVal
 val finalPatch = patchVal
 val finalMajor = majorVal
 val finalMinor = minorVal
-val finalVersionName = "$finalMajor.$finalMinor.$finalPatch.$finalBuild"
-val finalIsBuilding = isBuildingTask
+val finalVersionName = versionNameOverride ?: "$finalMajor.$finalMinor.$finalPatch.$finalBuild"
+// Only write the computed values back into version.properties for ordinary local
+// builds. When CI supplies -PversionBuild we must NOT persist its commit-count
+// number into the tracked file (it would clobber the local sequence on the next
+// commit). The override is ephemeral and lives only for that build.
+val finalIsBuilding = isBuildingTask && versionBuildOverride == null
 
 val localProps = Properties().apply {
     val file = rootProject.file("local.properties")
@@ -182,6 +202,13 @@ android {
     namespace = "com.hereliesaz.cuedetat"
     compileSdk = 37
 
+    // The ~24 MB TFLite master model lives in this on-demand dynamic feature
+    // module instead of the base install. For the `play` AAB it is delivered
+    // via Play Feature Delivery; the `foss` flavor pulls the same asset directly
+    // (see the sourceSets block below) because standalone FOSS APKs cannot use
+    // split installs.
+    dynamicFeatures += setOf(":feature_mlmodel")
+
     defaultConfig {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 29
@@ -223,6 +250,18 @@ android {
             dimension = "distribution"
             applicationIdSuffix = ".foss"
             versionNameSuffix = "-foss"
+        }
+    }
+
+    // FOSS APKs are distributed standalone (GitHub Releases) and have no Play
+    // split-install channel, so they must bundle the TFLite master model
+    // directly. Point the foss asset source set at the dynamic feature module's
+    // assets so the same physical file is reused with no duplication in git.
+    // The `play` flavor deliberately omits this srcDir — its base ships without
+    // the model and fetches it on demand from the :feature_mlmodel split.
+    sourceSets {
+        getByName("foss") {
+            assets.srcDir(rootProject.file("feature_mlmodel/src/main/assets"))
         }
     }
 
@@ -321,6 +360,11 @@ dependencies {
     }
 
     implementation(libs.androidx.datastore.preferences)
+
+    // Play Feature Delivery — drives on-demand SplitInstall of the
+    // :feature_mlmodel dynamic feature. Play-flavor only: the foss flavor
+    // bundles the model directly and never performs split installs.
+    "playImplementation"(libs.play.feature.delivery)
 
     // Play Billing — only included in the play flavor APK.
     "playImplementation"(libs.androidx.billing.ktx)

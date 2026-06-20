@@ -7,6 +7,7 @@ import android.graphics.RectF
 import android.os.Build
 import android.util.Log
 import com.hereliesaz.cuedetat.BuildConfig
+import com.hereliesaz.cuedetat.delivery.ModelDelivery
 import com.hereliesaz.cuedetat.ui.composables.tablescan.MlTableDetection
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
 import org.tensorflow.lite.Interpreter
@@ -45,7 +46,10 @@ private const val SIDE_CLASS_ID = 2
  * prefix is historical. The standalone single-model file was removed — it duplicated
  * segment 0 and was loaded but never run.
  */
-class MergedTFLiteDetector(private val context: Context) : PocketDetector {
+class MergedTFLiteDetector(
+    private val context: Context,
+    private val modelDelivery: ModelDelivery = object : ModelDelivery {},
+) : PocketDetector {
 
     // Head mapping indices
     private val HEAD_POCKET_50E = 0
@@ -124,12 +128,42 @@ class MergedTFLiteDetector(private val context: Context) : PocketDetector {
     }
 
     init {
-        loadMasterPackage()
+        // Eager attempt: succeeds immediately when the model is in the base
+        // assets (foss APK, or play debug where the feature is merged in). For a
+        // play release the model lives in an on-demand split that isn't present
+        // yet — this fails gracefully (logged, no interpreters) and is retried
+        // by [ensureModelReady] once the split is installed.
+        loadMasterPackage(context)
     }
 
-    private fun loadMasterPackage() {
+    /** True once at least one interpreter (i.e. the model) is loaded. */
+    private val isLoaded: Boolean get() = interpreters.isNotEmpty()
+
+    /**
+     * Ensures the model is installed and loaded. Requests the on-demand split
+     * via [ModelDelivery] when needed, then loads from the split-aware context.
+     * Idempotent and cheap once loaded.
+     */
+    override suspend fun ensureModelReady(): Boolean {
+        if (isLoaded) return true
+        val installed = modelDelivery.ensureInstalled()
+        if (!installed) {
+            Log.w(TAG, "Model delivery unavailable; detection disabled until installed.")
+            return false
+        }
+        loadMasterPackage(modelDelivery.assetContext(context))
+        return isLoaded
+    }
+
+    private fun loadMasterPackage(ctx: Context) {
+        // Re-runnable: drop any interpreters from a previous (failed) attempt so
+        // a retry after an on-demand install starts clean.
+        if (interpreters.isNotEmpty()) {
+            interpreters.values.forEach { runCatching { it.close() } }
+            interpreters.clear()
+        }
         try {
-            val fd = context.assets.openFd(MASTER_MODEL_FILE)
+            val fd = ctx.assets.openFd(MASTER_MODEL_FILE)
             val fullChannel = FileInputStream(fd.fileDescriptor).channel
 
             // The master file concatenates 4 sub-models. Only two are ever run —

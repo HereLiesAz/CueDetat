@@ -130,4 +130,7 @@
     <string name="paywall_personal_note">Look — it\'s just me building this, and the lights cost money. Expert Mode is how Cue D\'état keeps existing. If you can spare it, the one-time unlock below funds the next feature. If you can\'t, the whole thing is free on GitHub, no hard feelings. Either way, thanks for actually using the thing I made.</string>
     <string name="paywall_trial_cta">Try Expert free for 1 hour</string>
     <string name="paywall_trial_subtitle">One-time, one-hour preview. No card, no strings — see what it does, then decide.</string>
+
+    <!-- Dynamic feature delivery -->
+    <string name="mlmodel_feature_title">Pool vision model</string>
 </resources>
