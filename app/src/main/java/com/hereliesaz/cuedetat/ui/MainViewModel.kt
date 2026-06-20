@@ -16,6 +16,7 @@ import com.hereliesaz.cuedetat.data.TableScanRepository
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.data.VisionAnalyzer
 import com.hereliesaz.cuedetat.data.VisionRepository
+import com.hereliesaz.cuedetat.domain.ArModuleState
 import com.hereliesaz.cuedetat.domain.BallSelectionPhase
 import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
@@ -186,6 +187,7 @@ class MainViewModel @Inject constructor(
 
     private var experienceModeUpdateJob: Job? = null
     private var saveJob: Job? = null
+    private var arModuleLoadJob: Job? = null
     // Bounded so an unbounded burst (sensors + vision + gestures) cannot grow without limit.
     // High-frequency producers (sensors, vision, AR) are conflated upstream so they
     // contribute at most one in-flight event each.
@@ -337,17 +339,10 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        // Expert-AR is delivered on demand. Once the user is entitled, ensure the
-        // `:feature_expert_ar` split is installed/loaded, then probe ARCore
-        // capability through it. Until then the controller is a no-op (capability
-        // NONE), so the AR/scan UI never composes for free users.
-        viewModelScope.launch {
-            entitlementRepository.entitlement.collect { entitlement ->
-                if (entitlement.active && arController.ensureLoaded()) {
-                    onEvent(MainScreenEvent.DepthCapabilityDetected(arController.probeCapability()))
-                }
-            }
-        }
+        // Expert-AR is delivered on demand and loaded lazily: the split is only
+        // fetched the first time an (already entitled, since AR is expert-only and
+        // paywall-gated) user actually enters the AR camera flow. See the
+        // CycleCameraMode interception in processEvent + ensureArModuleLoaded().
 
         viewModelScope.launch {
             val savedModel = tableScanRepository.load()
@@ -399,9 +394,54 @@ class MainViewModel @Inject constructor(
         eventChannel.trySend(event)
     }
 
+    /**
+     * Fetch + load the on-demand Expert-AR module if it isn't already, driving the
+     * [CueDetatState.arModuleState] lifecycle so the UI can show progress / retry.
+     * Idempotent: a no-op once READY or while a load is already in flight.
+     * `arController.ensureLoaded()` is itself entitlement-gated and installs the
+     * split (play) before reflectively loading the implementation.
+     */
+    private fun ensureArModuleLoaded() {
+        if (_uiState.value.arModuleState == ArModuleState.READY) return
+        if (arModuleLoadJob?.isActive == true) return
+        arModuleLoadJob = viewModelScope.launch {
+            onEvent(MainScreenEvent.ArModuleLoadStarted)
+            // Don't use runCatching: it would swallow CancellationException and
+            // (e.g. on Retry, which cancels this job) post a spurious
+            // ArModuleLoadFailed that races the freshly started load.
+            val loaded = try {
+                arController.ensureLoaded()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                false
+            }
+            if (loaded) {
+                onEvent(MainScreenEvent.DepthCapabilityDetected(arController.probeCapability()))
+                onEvent(MainScreenEvent.ArModuleLoadSucceeded)
+            } else {
+                onEvent(MainScreenEvent.ArModuleLoadFailed)
+            }
+        }
+    }
+
     private fun processEvent(event: MainScreenEvent) {
         if (event is MainScreenEvent.ScreenGestureStarted || event is MainScreenEvent.LogicalGestureStarted) {
             warningManager.dismissWarning()
+        }
+
+        // Lazy Expert-AR delivery. Entering the AR camera flow (CycleCameraMode
+        // from OFF) is the trigger to fetch/load the on-demand module; the reducer
+        // still performs the camera-mode transition, and the UI shows a download
+        // overlay while arModuleState == LOADING. Retry re-runs the same load.
+        if (event is MainScreenEvent.CycleCameraMode && _uiState.value.cameraMode == CameraMode.OFF) {
+            ensureArModuleLoaded()
+        }
+        if (event is MainScreenEvent.RetryArModuleLoad) {
+            arModuleLoadJob?.cancel()
+            arModuleLoadJob = null
+            ensureArModuleLoaded()
+            return
         }
 
         if (event is MainScreenEvent.ToggleExperienceModeSelection) {

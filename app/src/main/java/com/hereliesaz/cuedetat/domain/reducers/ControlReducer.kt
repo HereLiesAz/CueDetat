@@ -126,6 +126,15 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
         is MainScreenEvent.DepthCapabilityDetected ->
             state.copy(depthCapability = action.capability)
 
+        is MainScreenEvent.ArModuleLoadStarted ->
+            state.copy(arModuleState = com.hereliesaz.cuedetat.domain.ArModuleState.LOADING)
+
+        is MainScreenEvent.ArModuleLoadSucceeded ->
+            state.copy(arModuleState = com.hereliesaz.cuedetat.domain.ArModuleState.READY)
+
+        is MainScreenEvent.ArModuleLoadFailed ->
+            state.copy(arModuleState = com.hereliesaz.cuedetat.domain.ArModuleState.FAILED)
+
         is MainScreenEvent.ArTrackingLost -> {
             // The nuclear payload has been disarmed.
             // If reality stutters, we float on the last known matrix rather than burning the world down.
