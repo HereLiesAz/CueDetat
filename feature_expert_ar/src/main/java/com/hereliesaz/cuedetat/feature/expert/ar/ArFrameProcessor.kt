@@ -1,17 +1,15 @@
-// app/src/main/java/com/hereliesaz/cuedetat/data/ArFrameProcessor.kt
-package com.hereliesaz.cuedetat.data
+package com.hereliesaz.cuedetat.feature.expert.ar
 
 import android.graphics.Color
 import android.media.Image
 import com.google.ar.core.Frame
+import com.hereliesaz.cuedetat.data.VisionRepository
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Bridges ARCore frames to [VisionRepository] and samples the felt colour from the AR camera image.
@@ -25,8 +23,8 @@ import javax.inject.Singleton
  * [updateUiState] is called from the main thread; [processFrame] from the GL thread. The
  * [AtomicReference]/[StateFlow] hand-offs keep a consistent snapshot without blocking either thread.
  */
-@Singleton
-class ArFrameProcessor @Inject constructor(
+/** Manually constructed by ArControllerImpl (lives in the on-demand module; no Hilt here). */
+class ArFrameProcessor(
     private val visionRepository: VisionRepository,
 ) {
     private val stateRef = AtomicReference<CueDetatState?>(null)

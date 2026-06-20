@@ -81,3 +81,9 @@ include(":app")
 // bundles the same asset directly (see app/build.gradle.kts), since standalone
 // FOSS APKs have no Play split-install channel.
 include(":feature_mlmodel")
+// On-demand dynamic feature module carrying the Expert-only ARCore table-scan
+// flow + the ARCore dependency. Delivered via Play Feature Delivery for the
+// `play` AAB (entitlement-gated); the `foss` flavor compiles the module's
+// sources directly in (see app/build.gradle.kts), since standalone FOSS APKs
+// have no Play split-install channel.
+include(":feature_expert_ar")

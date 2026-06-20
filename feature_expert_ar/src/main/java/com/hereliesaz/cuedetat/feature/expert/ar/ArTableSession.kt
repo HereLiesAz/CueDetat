@@ -1,4 +1,4 @@
-package com.hereliesaz.cuedetat.data
+package com.hereliesaz.cuedetat.feature.expert.ar
 
 import android.content.Context
 import android.graphics.Matrix
@@ -14,13 +14,10 @@ import com.hereliesaz.cuedetat.domain.DepthCapability
 import com.hereliesaz.cuedetat.domain.TableFrameHomography
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Pt
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Vec3
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.math.atan2
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -45,9 +42,9 @@ data class CameraAbovePlane(val pitchDegrees: Float, val heightM: Float)
  * which is the only mutator of [anchors] and [orderedAnchors]. The exposed [StateFlow]s are
  * updated from the GL thread and observed on the main thread.
  */
-@Singleton
-class ArTableSession @Inject constructor(
-    @ApplicationContext private val context: Context,
+/** Manually constructed by ArControllerImpl (lives in the on-demand module; no Hilt here). */
+class ArTableSession(
+    private val context: Context,
 ) {
     private var session: Session? = null
     private var tableAnchor: Anchor? = null

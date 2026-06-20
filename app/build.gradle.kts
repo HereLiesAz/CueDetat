@@ -207,7 +207,7 @@ android {
     // via Play Feature Delivery; the `foss` flavor pulls the same asset directly
     // (see the sourceSets block below) because standalone FOSS APKs cannot use
     // split installs.
-    dynamicFeatures += setOf(":feature_mlmodel")
+    dynamicFeatures += setOf(":feature_mlmodel", ":feature_expert_ar")
 
     defaultConfig {
         applicationId = "com.hereliesaz.cuedetat"
@@ -262,6 +262,11 @@ android {
     sourceSets {
         getByName("foss") {
             assets.srcDir(rootProject.file("feature_mlmodel/src/main/assets"))
+            // FOSS APKs have no Play split channel, so the Expert-AR module's
+            // sources are compiled directly into the foss APK (ARCore is added as
+            // a fossImplementation dependency below). The play flavor omits this
+            // and fetches the :feature_expert_ar split on demand instead.
+            java.srcDir(rootProject.file("feature_expert_ar/src/main/java"))
         }
     }
 
@@ -420,8 +425,11 @@ dependencies {
     implementation(libs.mlkit)
     implementation(libs.opencv)
 
-    // ARCore — Depth API (optional; app degrades gracefully on unsupported devices)
-    implementation(libs.core)
+    // ARCore now lives in the on-demand :feature_expert_ar dynamic feature, so
+    // the play base AAB ships without it. The foss flavor compiles that module's
+    // sources directly into the APK (see the foss sourceSet above), so it needs
+    // ARCore on its own classpath.
+    "fossImplementation"(libs.core)
 
     // TFLite — pocket detection model
     implementation(libs.tensorflow.lite)

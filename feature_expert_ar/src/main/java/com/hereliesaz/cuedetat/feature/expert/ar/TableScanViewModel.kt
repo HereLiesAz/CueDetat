@@ -1,9 +1,11 @@
 // app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanViewModel.kt
-package com.hereliesaz.cuedetat.ui.composables.tablescan
+package com.hereliesaz.cuedetat.feature.expert.ar
 
 import android.graphics.Matrix
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.data.TableScanRepository
+import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
+import com.hereliesaz.cuedetat.ui.composables.tablescan.ScanStep
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.PocketCluster
 import com.hereliesaz.cuedetat.domain.PocketId
@@ -30,8 +32,6 @@ import org.opencv.calib3d.Calib3d
 import org.opencv.core.Core
 import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlin.math.sqrt
 
 /** Min observations per cluster before geometry fitting is attempted. */
@@ -40,13 +40,6 @@ private const val MIN_OBSERVATIONS_TO_FIT = 3
 /** Max distance (logical inches) to merge a new detection into an existing cluster. */
 private const val CLUSTER_MERGE_DISTANCE = 3.0f
 
-enum class ScanStep {
-    FELT_CAPTURE,
-    CORNER_QUAD,
-    POCKET_GUIDE,
-    AUTO_READY
-}
-
 /**
  * Drives the table-scan flow. Formerly a @HiltViewModel; now an app-scoped
  * @Singleton owned by the AR controller, so it can be relocated into the
@@ -54,12 +47,11 @@ enum class ScanStep {
  * hiltViewModel() are unavailable). Lifecycle is the application's; [scope]
  * replaces the old scope.
  */
-@Singleton
-class TableScanViewModel @Inject constructor(
+class TableScanViewModel(
     private val tableScanRepository: TableScanRepository,
     val pocketDetector: PocketDetector,
-    private val arTableSession: com.hereliesaz.cuedetat.data.ArTableSession,
-    private val arFrameProcessor: com.hereliesaz.cuedetat.data.ArFrameProcessor,
+    private val arTableSession: ArTableSession,
+    private val arFrameProcessor: ArFrameProcessor,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 

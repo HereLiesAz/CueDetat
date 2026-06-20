@@ -1,4 +1,4 @@
-package com.hereliesaz.cuedetat.ui.composables
+package com.hereliesaz.cuedetat.feature.expert.ar
 
 import android.opengl.GLSurfaceView
 import android.util.Log
@@ -14,9 +14,6 @@ import androidx.lifecycle.LifecycleOwner
 import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
-import com.hereliesaz.cuedetat.data.ArBackgroundRenderer
-import com.hereliesaz.cuedetat.data.ArFrameProcessor
-import com.hereliesaz.cuedetat.data.ArTableSession
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10

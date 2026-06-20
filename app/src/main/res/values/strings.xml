@@ -133,4 +133,5 @@
 
     <!-- Dynamic feature delivery -->
     <string name="mlmodel_feature_title">Pool vision model</string>
+    <string name="expert_ar_feature_title">Expert AR table scan</string>
 </resources>
