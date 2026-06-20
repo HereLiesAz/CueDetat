@@ -38,7 +38,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.camera.core.ImageAnalysis
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.composables.AzNavRailMenu
-import com.hereliesaz.cuedetat.ui.composables.ArCoreBackground
 import com.hereliesaz.cuedetat.ui.composables.CameraBackground
 import com.hereliesaz.cuedetat.ui.composables.MetaWearableBackground
 import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
@@ -120,10 +119,8 @@ fun ProtractorScreen(
                         || (uiState.cameraMode == CameraMode.AR_SETUP && uiState.showTableScanScreen))
                         && uiState.depthCapability == com.hereliesaz.cuedetat.domain.DepthCapability.DEPTH_API
                         && isOnMain -> {
-                    ArCoreBackground(
+                    mainViewModel.arController.ArBackground(
                         modifier = Modifier.fillMaxSize(),
-                        arTableSession = mainViewModel.arTableSession,
-                        arFrameProcessor = mainViewModel.arFrameProcessor,
                         onEvent = mainViewModel::onEvent,
                     )
                 }
