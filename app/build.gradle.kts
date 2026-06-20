@@ -348,6 +348,36 @@ android {
 }
 
 
+// Guard: FOSS is distributed as a standalone APK (assembleFossRelease) only.
+// Building a *fused* FOSS artifact (bundleFossRelease or a foss universal APK)
+// would package the :feature_expert_ar classes twice — once from the java.srcDir
+// compiled into the base (see the foss sourceSet above), once from the fused
+// on-demand split (dist:fusing include="true") — producing duplicate classes.
+// The assemble path doesn't package dynamic-feature code, so it's safe; abort the
+// bundle path with an explanation instead of emitting a broken artifact.
+//
+// Keyed on the *resolved* task name (not the requested arg) so it can't be
+// bypassed by Gradle's camelCase abbreviations (e.g. `bFR`) or by transitive
+// inclusion. configureEach stays lazy/configuration-cache friendly: the doFirst
+// is only attached if the AAB task is actually realized into the graph.
+//
+// Match ONLY the per-variant AAB lifecycle tasks (bundleFossDebug /
+// bundleFossRelease). A broad `bundleFoss.*` is wrong: it also matches internal
+// AGP tasks like `bundleFossDebugClassesToCompileJar` that run during a normal
+// assembleFoss* build, which would block the standalone-APK path we rely on.
+tasks.configureEach {
+    if (name == "bundleFossDebug" || name == "bundleFossRelease") {
+        doFirst {
+            throw GradleException(
+                "Refusing to build a FOSS App Bundle ($name). FOSS ships as a standalone APK — " +
+                    "use assembleFossRelease. A fused FOSS bundle would duplicate the " +
+                    ":feature_expert_ar classes (java.srcDir + dist:fusing). See docs/RELEASE.md §4.4."
+            )
+        }
+    }
+}
+
+
 dependencies {
     // Bouncy Castle is pulled in transitively. The resolutionStrategy below
     // (configurations.all) force-upgrades it at resolution time, but Dependabot
