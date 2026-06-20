@@ -1,37 +1,44 @@
-// FILE: app/src/main/java/com/hereliesaz/cuedetat/arfeature/BaseArController.kt
+package com.hereliesaz.cuedetat.feature.expert.ar
 
-package com.hereliesaz.cuedetat.arfeature
-
+import android.content.Context
 import androidx.camera.core.ImageAnalysis
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.hereliesaz.cuedetat.data.ArFrameProcessor
-import com.hereliesaz.cuedetat.data.ArTableSession
+import com.hereliesaz.cuedetat.arfeature.ArController
+import com.hereliesaz.cuedetat.arfeature.ArFeatureEntryPoint
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.DepthCapability
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.TableFrameHomography
-import com.hereliesaz.cuedetat.ui.composables.ArCoreBackground
-import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanAnalyzer
-import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanScreen
-import com.hereliesaz.cuedetat.ui.composables.tablescan.TableScanViewModel
-import javax.inject.Inject
-import javax.inject.Singleton
+import dagger.hilt.android.EntryPointAccessors
 
 /**
- * In-base [ArController] implementation. Wraps the existing AR singletons so the
- * rest of the base talks only to the [ArController] interface. Step 2 of the
- * extraction replaces this binding with a reflection-loaded implementation that
- * lives in the on-demand `:feature_expert_ar` module.
+ * The on-demand-module implementation of the base [ArController] interface.
+ *
+ * Instantiated reflectively by ArControllerFacade once the `:feature_expert_ar`
+ * split is installed (play) or compiled in (foss). It owns the AR singletons and
+ * the scan controller, building them manually — Hilt does not extend into a
+ * dynamic feature module, so base dependencies are pulled through the
+ * [ArFeatureEntryPoint] Hilt entry point instead of constructor injection.
+ *
+ * Must expose a single public constructor taking a [Context] (that is the
+ * contract the facade's reflection relies on).
  */
-@Singleton
-class BaseArController @Inject constructor(
-    private val arTableSession: ArTableSession,
-    private val arFrameProcessor: ArFrameProcessor,
-    private val tableScanViewModel: TableScanViewModel,
-) : ArController {
+@Suppress("unused")
+class ArControllerImpl(context: Context) : ArController {
 
-    // Single shared analyzer instance wrapping the scan controller's callbacks.
+    private val appContext = context.applicationContext
+    private val deps = EntryPointAccessors.fromApplication(appContext, ArFeatureEntryPoint::class.java)
+
+    private val arTableSession = ArTableSession(appContext)
+    private val arFrameProcessor = ArFrameProcessor(deps.visionRepository())
+    private val tableScanViewModel = TableScanViewModel(
+        deps.tableScanRepository(),
+        deps.pocketDetector(),
+        arTableSession,
+        arFrameProcessor,
+    )
+
     private val analyzer: ImageAnalysis.Analyzer by lazy {
         TableScanAnalyzer(
             tableScanViewModel::onFrame,
@@ -43,7 +50,6 @@ class BaseArController @Inject constructor(
 
     override fun probeCapability(): DepthCapability =
         if (arTableSession.isArCoreAvailable()) {
-            // Probe depth support by creating (and immediately closing) a test session.
             val testSession = arTableSession.createSession()
             val cap = arTableSession.capability
             if (testSession != null) arTableSession.close()
@@ -57,7 +63,6 @@ class BaseArController @Inject constructor(
     }
 
     override fun setTableZOffsetLogical(tableZOffsetLogical: Float) {
-        // tableZOffset is in logical units; convert to metres for the AR plane lift.
         arTableSession.setTableHeightMeters(
             tableZOffsetLogical / TableFrameHomography.LOGICAL_UNITS_PER_METER
         )

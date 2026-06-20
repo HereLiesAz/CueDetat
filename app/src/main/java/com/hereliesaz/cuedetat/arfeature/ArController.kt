@@ -25,6 +25,14 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
  */
 interface ArController {
 
+    /**
+     * Ensure the Expert-AR implementation is available, requesting the on-demand
+     * `:feature_expert_ar` split if necessary. Entitlement-gated: returns false
+     * (and stays a no-op) for users who are not entitled. Implemented by the
+     * facade; the loaded implementation and the no-op both use the default.
+     */
+    suspend fun ensureLoaded(): Boolean = true
+
     /** Detect ARCore world-tracking capability (creates and closes a probe session). */
     fun probeCapability(): DepthCapability
 

@@ -1,5 +1,5 @@
 // app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanScreen.kt
-package com.hereliesaz.cuedetat.ui.composables.tablescan
+package com.hereliesaz.cuedetat.feature.expert.ar
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -54,6 +54,7 @@ import android.view.HapticFeedbackConstants
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.PocketId
+import com.hereliesaz.cuedetat.ui.composables.tablescan.ScanStep
 import kotlinx.coroutines.delay
 
 /**

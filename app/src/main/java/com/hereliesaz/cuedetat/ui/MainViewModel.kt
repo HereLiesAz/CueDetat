@@ -337,9 +337,16 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        // Detect ARCore depth capability and store in state
+        // Expert-AR is delivered on demand. Once the user is entitled, ensure the
+        // `:feature_expert_ar` split is installed/loaded, then probe ARCore
+        // capability through it. Until then the controller is a no-op (capability
+        // NONE), so the AR/scan UI never composes for free users.
         viewModelScope.launch {
-            onEvent(MainScreenEvent.DepthCapabilityDetected(arController.probeCapability()))
+            entitlementRepository.entitlement.collect { entitlement ->
+                if (entitlement.active && arController.ensureLoaded()) {
+                    onEvent(MainScreenEvent.DepthCapabilityDetected(arController.probeCapability()))
+                }
+            }
         }
 
         viewModelScope.launch {

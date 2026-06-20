@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:dist="http://schemas.android.com/apk/distribution">
+
+    <!--
+      On-demand delivery: the Expert-AR split is NOT installed with the base app.
+      The base requests it at runtime via SplitInstallManager (PlayArFeatureDelivery),
+      gated on entitlement, the first time an entitled user enters Expert AR.
+
+      dist:fusing include="true" keeps the module available in fused/standalone
+      APKs (universal APK / bundletool standalone) so non-Play distributions of
+      the bundle still contain the AR flow.
+    -->
+    <dist:module
+        dist:instant="false"
+        dist:title="@string/expert_ar_feature_title">
+        <dist:delivery>
+            <dist:on-demand />
+        </dist:delivery>
+        <dist:fusing dist:include="true" />
+    </dist:module>
+
+    <application />
+</manifest>

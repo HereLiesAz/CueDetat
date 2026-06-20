@@ -1,5 +1,5 @@
 // app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanAnalyzer.kt
-package com.hereliesaz.cuedetat.ui.composables.tablescan
+package com.hereliesaz.cuedetat.feature.expert.ar
 
 import android.graphics.Bitmap
 import android.graphics.PointF
@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import com.hereliesaz.cuedetat.BuildConfig
+import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
 import org.opencv.android.Utils
 import org.opencv.core.Core
 import org.opencv.core.Mat
