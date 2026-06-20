@@ -5,10 +5,12 @@
 // at runtime through Play Feature Delivery (see ModelModuleManager) and, once
 // installed, MergedTFLiteDetector mmaps the model from the installed split.
 //
-// Flavors (play/foss) are inherited automatically from the :app module; do not
-// redeclare them here. The `foss` flavor never consumes this split — it bundles
-// the same asset directly via an assets.srcDir in app/build.gradle.kts, because
-// standalone FOSS APKs have no Play split-install channel.
+// The base (:app) uses a `distribution` flavor dimension (play/foss), so this
+// dynamic feature must declare the same dimension/flavors — otherwise resolving
+// `implementation(project(":app"))` is ambiguous between the base's flavors. The
+// `foss` flavor never actually consumes this split (standalone FOSS APKs have no
+// Play split-install channel); it bundles the model directly via an assets.srcDir
+// in app/build.gradle.kts.
 plugins {
     alias(libs.plugins.android.dynamic.feature)
 }
@@ -19,6 +21,12 @@ android {
 
     defaultConfig {
         minSdk = 29
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("play") { dimension = "distribution" }
+        create("foss") { dimension = "distribution" }
     }
 
     compileOptions {
