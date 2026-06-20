@@ -12,8 +12,10 @@ import com.hereliesaz.cuedetat.delivery.ArFeatureDelivery
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -48,13 +50,17 @@ class ArControllerFacade @Inject constructor(
         if (!delivery.ensureInstalled()) return false
         return loadMutex.withLock {
             if (loaded) return@withLock true
-            val impl = runCatching {
-                Class.forName(
-                    "com.hereliesaz.cuedetat.feature.expert.ar.ArControllerImpl",
-                    true,
-                    context.classLoader,
-                ).getConstructor(Context::class.java).newInstance(context) as ArController
-            }.getOrNull() ?: return@withLock false
+            // Reflective class loading + instantiation can touch disk (loading a
+            // freshly installed split's dex), so keep it off the main thread.
+            val impl = withContext(Dispatchers.IO) {
+                runCatching {
+                    Class.forName(
+                        "com.hereliesaz.cuedetat.feature.expert.ar.ArControllerImpl",
+                        true,
+                        context.classLoader,
+                    ).getConstructor(Context::class.java).newInstance(context) as ArController
+                }.getOrNull()
+            } ?: return@withLock false
             delegate = impl
             loaded = true
             true
