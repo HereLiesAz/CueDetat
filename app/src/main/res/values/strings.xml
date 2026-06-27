@@ -63,14 +63,7 @@
     <string name="expert_label">Eff you, Dad. I know everything!</string>
     <string name="hater_label">I really hate pool.</string>
 
-    <!-- Tutorial UI -->
-    <string name="tutorial_over">The tutorial is over. Go away.</string>
-    <string name="tutorial_back">Back</string>
-    <string name="tutorial_next">Next</string>
-    <string name="tutorial_skip">Skip</string>
-    <string name="tutorial_done">Done</string>
-    <string name="tutorial_dismiss">Skip tutorial</string>
-
+    <!-- Tutorial step text — reused verbatim by the AzNavRail 10.18 guidance framework -->
     <string-array name="tutorial_dynamic_non_ar">
         <item>Look at you, breaking free. This is Dynamic Mode. The world is your table.</item>
         <item>Your phone is now the cue stick. Rotate it horizontally and vertically to aim. The line follows your gaze.</item>

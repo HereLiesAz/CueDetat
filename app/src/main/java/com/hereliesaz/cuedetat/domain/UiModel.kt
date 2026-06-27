@@ -19,7 +19,6 @@ import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
 import com.hereliesaz.cuedetat.view.state.TableSize
-import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 import org.opencv.core.Mat
 
 enum class CameraMode {
@@ -40,10 +39,6 @@ enum class ExperienceMode {
 
 enum class BallSelectionPhase {
     NONE, AWAITING_CUE, AWAITING_TARGET
-}
-
-enum class TutorialType {
-    GENERAL, DYNAMIC_NON_AR, DYNAMIC_AR, BEGINNER_STATIC, BEGINNER_DYNAMIC
 }
 
 enum class TargetType {
@@ -105,15 +100,6 @@ data class CueDetatState(
     /** Normalized spin offset: x = English (side), y = Vertical (draw/follow). Range -1.0..1.0. */
     val lingeringSpinOffset: PointF? = null,
     @Transient val spinPathsAlpha: Float = 1.0f,
-    val showTutorialOverlay: Boolean = false,
-    val hasSeenBeginnerTutorial: Boolean = false,
-    val hasSeenDynamicBeginnerTutorial: Boolean = false,
-    val hasSeenExpertTutorial: Boolean = false,
-    val tutorialType: TutorialType = TutorialType.GENERAL,
-    val currentTutorialStep: Int = 0,
-    @Transient val tutorialHighlight: TutorialHighlightElement? = TutorialHighlightElement.NONE,
-    @Transient val flashingTutorialElement: TutorialHighlightElement? = null,
-    @Transient val highlightAlpha: Float = 0f,
     val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f),
     @Transient val pitchMatrix: Matrix? = null,
     @Transient val railPitchMatrix: Matrix? = null,
@@ -302,11 +288,6 @@ sealed class MainScreenEvent {
     object ExitCvMaskTestMode : MainScreenEvent()
     object StartCalibrationMode : MainScreenEvent()
     data class SampleColorAt(val screenPosition: Offset) : MainScreenEvent()
-    data class StartTutorial(val type: TutorialType = TutorialType.GENERAL) : MainScreenEvent()
-    object NextTutorialStep : MainScreenEvent()
-    object EndTutorial : MainScreenEvent()
-    object TutorialBack : MainScreenEvent()
-    data class UpdateHighlightAlpha(val alpha: Float) : MainScreenEvent()
     object CheckForUpdate : MainScreenEvent()
     object ViewArt : MainScreenEvent()
     object ViewAboutPage : MainScreenEvent()

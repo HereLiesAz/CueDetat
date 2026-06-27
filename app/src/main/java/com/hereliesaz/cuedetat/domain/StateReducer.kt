@@ -12,7 +12,6 @@ import com.hereliesaz.cuedetat.domain.reducers.reduceObstacleAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceSpinAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceSystemAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceToggleAction
-import com.hereliesaz.cuedetat.domain.reducers.reduceTutorialAction
 
 /**
  * The Root Reducer for the application's Model-View-Intent (MVI) architecture.
@@ -142,13 +141,6 @@ fun stateReducer(
         is MainScreenEvent.RecommendationComputed ->
             currentState.copy(recommendedShot = action.shot)
 
-        // --- ONBOARDING ---
-        // Handled by [TutorialReducer].
-        is MainScreenEvent.StartTutorial, is MainScreenEvent.NextTutorialStep,
-        is MainScreenEvent.EndTutorial, is MainScreenEvent.TutorialBack,
-        is MainScreenEvent.UpdateHighlightAlpha ->
-            reduceTutorialAction(currentState, action)
-
         // --- ENTITLEMENT ---
         // Handled by [EntitlementReducer]. Sets isExpertEntitled and may
         // force-downgrade EXPERT to BEGINNER if entitlement drops.
@@ -158,16 +150,5 @@ fun stateReducer(
         else -> currentState
     }
 
-    // Post-dispatch: let TutorialReducer check whether this event completes a tutorial step.
-    // Tutorial-specific events are excluded — they were already handled above.
-    return if (primaryResult.showTutorialOverlay &&
-        action !is MainScreenEvent.StartTutorial &&
-        action !is MainScreenEvent.NextTutorialStep &&
-        action !is MainScreenEvent.EndTutorial &&
-        action !is MainScreenEvent.TutorialBack &&
-        action !is MainScreenEvent.UpdateHighlightAlpha) {
-        reduceTutorialAction(primaryResult, action)
-    } else {
-        primaryResult
-    }
+    return primaryResult
 }
