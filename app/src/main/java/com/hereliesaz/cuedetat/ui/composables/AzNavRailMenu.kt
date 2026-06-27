@@ -31,11 +31,11 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringArrayResource
+import com.hereliesaz.aznavrail.tutorial.AzGuidanceController
 import com.hereliesaz.aznavrail.tutorial.AzInstructionStep
 import com.hereliesaz.aznavrail.tutorial.LocalAzGuidanceController
 import com.hereliesaz.cuedetat.R
@@ -112,7 +112,9 @@ fun AzNavRailMenu(
             mapOf(2 to "cue.targetBall"),
         ),
     )
-    var tutorialRequested by remember { mutableStateOf(false) }
+    // Holds the controller returned by AzHostActivityLayout so the "Tutorial" rail item's onClick —
+    // defined inside the non-@Composable content lambda, before `guidance` is assigned — can reach it.
+    val guidanceHolder = remember { mutableStateOf<AzGuidanceController?>(null) }
 
     val guidance = AzHostActivityLayout(
         navController = navController,
@@ -245,7 +247,8 @@ fun AzNavRailMenu(
                 if (uiState.cameraMode == CameraMode.OFF) {
                     onEvent(MainScreenEvent.SetCameraMode(CameraMode.CAMERA))
                 }
-                tutorialRequested = true
+                val goal = if (uiState.cameraMode == CameraMode.LITE_AR) "tutorial.dynamicAr" else "tutorial.dynamicNonAr"
+                guidanceHolder.value?.let { it.enable(); it.activate(goal) }
             }
         )
 
@@ -398,9 +401,12 @@ fun AzNavRailMenu(
         azMenuItem(id = "mode", route = "main", text = "Mode: ${uiState.experienceMode?.name}", fillColor = b2B, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) })
     }
 
+    // Cache the controller for the manual "Tutorial" rail item (see guidanceHolder above).
+    SideEffect { guidanceHolder.value = guidance }
+
     // Auto-start onboarding on first entry into a mode. Framework-persisted completion replaces the
     // old hasSeen* flags: a goal that has been finished once never re-activates.
-    LaunchedEffect(uiState.experienceMode, uiState.isBeginnerViewLocked) {
+    LaunchedEffect(guidance, uiState.experienceMode, uiState.isBeginnerViewLocked) {
         when (uiState.experienceMode) {
             ExperienceMode.BEGINNER -> {
                 val goal = if (uiState.isBeginnerViewLocked) "tutorial.beginnerStatic" else "tutorial.beginnerDynamic"
@@ -414,15 +420,6 @@ fun AzNavRailMenu(
                 }
             }
             else -> {}
-        }
-    }
-
-    // Manual re-launch from the "Tutorial" rail item (replays regardless of prior completion).
-    LaunchedEffect(tutorialRequested) {
-        if (tutorialRequested) {
-            tutorialRequested = false
-            val goal = if (uiState.cameraMode == CameraMode.LITE_AR) "tutorial.dynamicAr" else "tutorial.dynamicNonAr"
-            guidance.enable(); guidance.activate(goal)
         }
     }
 }

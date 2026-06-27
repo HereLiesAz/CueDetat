@@ -2936,3 +2936,6 @@ app-*-release.apk
 /hs_err_pid9440.log
 /hs_err_pid3.log
 /hs_err_pid*.log
+
+# Claude Code scheduler runtime lock (not a source artifact)
+.claude/scheduled_tasks.lock
