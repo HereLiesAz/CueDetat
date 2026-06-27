@@ -52,7 +52,6 @@ import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.ui.composables.MasseControl
 import com.hereliesaz.cuedetat.ui.composables.overlays.ArTrackingBadge
 import com.hereliesaz.cuedetat.ui.composables.overlays.KineticWarningOverlay
-import com.hereliesaz.cuedetat.ui.composables.overlays.TutorialOverlay
 import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
 
@@ -139,7 +138,6 @@ fun ProtractorScreen(
                     onEvent = mainViewModel::onEvent,
                     topDownProgress = topDownProgress
                 )
-                TutorialOverlay(uiState = uiState, onEvent = mainViewModel::onEvent)
             }
         }
 

@@ -13,7 +13,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.hereliesaz.cuedetat.domain.CueDetatState
-import com.hereliesaz.cuedetat.view.state.TutorialHighlightElement
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -38,16 +37,6 @@ class UserPreferencesRepository @Inject constructor(
         val CAMERA_MATRIX_JSON = stringPreferencesKey("camera_matrix_json")
         val DIST_COEFFS_JSON = stringPreferencesKey("dist_coeffs_json")
 
-        // Tutorial-seen flags are stored as dedicated keys (not embedded in
-        // STATE_JSON) so they survive the 2-second debounce on the main state
-        // save. The state save can be cancelled indefinitely by the high-rate
-        // FullOrientationChanged sensor events; these flags must reach disk
-        // the moment the user taps "Done", or the tutorial fires again on
-        // every fresh launch.
-        val HAS_SEEN_BEGINNER_TUTORIAL = booleanPreferencesKey("has_seen_beginner_tutorial")
-        val HAS_SEEN_DYNAMIC_BEGINNER_TUTORIAL = booleanPreferencesKey("has_seen_dynamic_beginner_tutorial")
-        val HAS_SEEN_EXPERT_TUTORIAL = booleanPreferencesKey("has_seen_expert_tutorial")
-
         // Epoch millis the one-time Expert preview/trial was started. 0 (absent)
         // means the trial has never been used. A non-zero value both gates the
         // trial (one per install) and lets the entitlement repo compute expiry.
@@ -63,51 +52,11 @@ class UserPreferencesRepository @Inject constructor(
         dataStore.edit { prefs -> prefs[PreferencesKeys.EXPERT_TRIAL_STARTED_AT] = millis }
     }
 
-    data class TutorialSeenFlags(
-        val beginner: Boolean,
-        val dynamicBeginner: Boolean,
-        val expert: Boolean,
-    )
-
-    suspend fun readTutorialSeenFlags(): TutorialSeenFlags {
-        val prefs = dataStore.data.first()
-        return TutorialSeenFlags(
-            beginner = prefs[PreferencesKeys.HAS_SEEN_BEGINNER_TUTORIAL] ?: false,
-            dynamicBeginner = prefs[PreferencesKeys.HAS_SEEN_DYNAMIC_BEGINNER_TUTORIAL] ?: false,
-            expert = prefs[PreferencesKeys.HAS_SEEN_EXPERT_TUTORIAL] ?: false,
-        )
-    }
-
-    /**
-     * Persists only the flags that are set to `true`. Designed to be called
-     * with the latest CueDetatState's seen flags whenever any of them flips.
-     * Idempotent — re-writing `true` for an already-true flag is harmless.
-     */
-    suspend fun setTutorialSeenFlags(
-        beginner: Boolean,
-        dynamicBeginner: Boolean,
-        expert: Boolean,
-    ) {
-        dataStore.edit { prefs ->
-            if (beginner) prefs[PreferencesKeys.HAS_SEEN_BEGINNER_TUTORIAL] = true
-            if (dynamicBeginner) prefs[PreferencesKeys.HAS_SEEN_DYNAMIC_BEGINNER_TUTORIAL] = true
-            if (expert) prefs[PreferencesKeys.HAS_SEEN_EXPERT_TUTORIAL] = true
-        }
-    }
-
     val stateFlow: Flow<CueDetatState?> = dataStore.data
         .map { preferences ->
             preferences[PreferencesKeys.STATE_JSON]?.let { jsonString ->
                 try {
-                    var deserializedState = gson.fromJson(jsonString, CueDetatState::class.java)
-
-                    deserializedState?.let { state ->
-                        if (state.tutorialHighlight == null) {
-                            deserializedState =
-                                deserializedState.copy(tutorialHighlight = TutorialHighlightElement.NONE)
-                        }
-                        deserializedState
-                    }
+                    gson.fromJson(jsonString, CueDetatState::class.java)
                 } catch (e: Exception) {
                     null
                 }
