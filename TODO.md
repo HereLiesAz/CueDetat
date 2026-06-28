@@ -5,9 +5,9 @@ project.
 
 ## High Priority
 
-- Implement a non-blocking interactive tutorial overlay as specified in
-  `03_UX_UI_Guide/05_Windows.md`. The current implementation is a blocking placeholder and prevents
-  user interaction.
+- ~~Implement a non-blocking interactive tutorial overlay.~~ **Done (PR #249):** reimplemented on
+  AzNavRail 10.18's status-driven guidance framework (see `Changelog.md`). Non-blocking spotlight,
+  tap-to-advance, Finish affordance, framework-persisted completion.
 
 ## Features
 

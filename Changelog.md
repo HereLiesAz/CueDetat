@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Navigation & Tutorial
+
+- **AzNavRail upgraded 10.1 → 10.18.**
+- **Tutorial rebuilt on AzNavRail's status-driven guidance framework.** The bespoke scripted tutorial
+  (`TutorialOverlay` canvas highlights, `TutorialReducer` step machine, tutorial state/events, and the
+  `HAS_SEEN_*` DataStore flags) was removed and reimplemented with AzNavRail 10.18's guidance DSL
+  (`azStatus`/`azEdge`/`azGoal`/`azGuidanceTarget`) in `AzNavRailMenu`, with a new
+  `TutorialGuidanceTargets.kt` mapping app state to the on-screen highlight shapes (target/ghost/cue
+  ball, aiming line, zoom slider). All five flows reuse their existing step text verbatim; the
+  framework draws the spotlight and persists completion (`az_navrail_completed_goals`). The tutorial is
+  now non-blocking.
+
+### Security — Dependencies
+
+- **Netty forced to 4.1.135.Final** across all modules to clear transitive CVEs (HTTP/2
+  CONTINUATION-flood / MadeYouReset DoS, SNI 16 MiB allocation, decompression bombs, request
+  smuggling, IPv6 subnet-filter bypass, TLS hostname-verification bypass, and more).
+
 ### Changed — Billing
 
 - **Expert Mode is now a one-time purchase instead of a subscription.** New non-consumable

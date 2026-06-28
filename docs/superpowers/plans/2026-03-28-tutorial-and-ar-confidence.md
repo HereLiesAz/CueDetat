@@ -1,5 +1,7 @@
 # Tutorial & AR Confidence Implementation Plan
 
+> **SUPERSEDED (PR #249):** The tutorial described below was reimplemented on AzNavRail 10.18's status-driven guidance framework (`azStatus`/`azEdge`/`azGoal`/`azGuidanceTarget` in `AzNavRailMenu` + `TutorialGuidanceTargets.kt`). The `TutorialReducer`/`TutorialOverlay`/`NextTutorialStep` design here is historical.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the blocking Next-button tutorial with an action-gated transparent overlay, and implement `tableOverlayConfidence` so the AR_SETUP → AR_ACTIVE auto-advance actually triggers.

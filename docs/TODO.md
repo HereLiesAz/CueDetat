@@ -7,10 +7,8 @@ Last updated: 2026-03-28
 ## Priority 1 — Incomplete Implementations (Documented But Not Done)
 
 ### 1.1 Non-Blocking Tutorial Redesign
-- **Status: DONE**
-- **File:** `ui/composables/overlays/TutorialOverlay.kt`, `domain/reducers/TutorialReducer.kt`
-- **Problem:** Current tutorial is a full-screen blocking canvas that prevents user interaction with the UI elements being described. The spec (`docs/03_UI_UX_Guide/05_Dialogs_And_Overlays.md`) explicitly calls this a placeholder that must be replaced.
-- **Required:** Non-blocking transparent overlay that highlights specific UI elements while leaving them interactive, so the user can actually perform the described action during the tutorial.
+- **Status: DONE (PR #249)**
+- **Resolution:** Rebuilt on AzNavRail 10.18's status-driven guidance framework (`azStatus`/`azEdge`/`azGoal`/`azGuidanceTarget` in `AzNavRailMenu` + `TutorialGuidanceTargets.kt`). The old blocking `TutorialOverlay`/`TutorialReducer` were removed; the framework draws a non-blocking spotlight, steps advance on tap with a bottom Finish affordance, and completion is framework-persisted (`az_navrail_completed_goals`).
 
 ### 1.2 `tableOverlayConfidence` Never Calculated
 - **Status: DONE**

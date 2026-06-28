@@ -5,6 +5,12 @@ This document tracks notable changes and known issues for the project.
 The format is based on [Keep a Changelog](httpshttps://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Tutorial reimplemented on AzNavRail 10.18's status-driven guidance framework** (`azStatus`/`azEdge`/`azGoal`/`azGuidanceTarget` in `AzNavRailMenu` + `TutorialGuidanceTargets.kt`), replacing the blocking `TutorialOverlay`/`TutorialReducer` placeholder. The tutorial is now non-blocking and completion is framework-persisted. Resolves the "Interactive Tutorial is Blocking" issue.
+
 ## [0.9.3] - 2026-03-25
 
 ### Added
@@ -63,5 +69,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Known Issues
 
-*   **Interactive Tutorial is Blocking:** The current implementation of the interactive tutorial is a placeholder that blocks interaction with the UI elements it is supposed to be explaining. It needs to be replaced with a non-blocking overlay.
 *   **Lens Distortion:** The "Quick Align" feature provides perspective correction but does not account for non-linear lens distortion, which can lead to inaccuracies away from the four alignment points. A full camera calibration is required to fix this.

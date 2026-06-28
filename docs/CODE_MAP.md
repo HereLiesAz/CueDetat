@@ -85,5 +85,7 @@ This document serves as an index, mapping high-level concepts to their concrete 
 ## UI (Jetpack Compose)
 *   **Main Screen:** `app/src/main/java/com/hereliesaz/cuedetat/ui/ProtractorScreen.kt`
 *   **Nav Rail:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/AzNavRailMenu.kt`
-    *   *Responsibility:* All mode-aware menu buttons. Routes AR setup/cancel/off events; gates controls by `experienceMode` and `cameraMode`.
+    *   *Responsibility:* All mode-aware menu buttons. Routes AR setup/cancel/off events; gates controls by `experienceMode` and `cameraMode`. Also declares the AzNavRail 10.18 tutorial guidance (`azStatus`/`azEdge`/`azGoal`/`azGuidanceTarget`).
+*   **Tutorial guidance targets:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/TutorialGuidanceTargets.kt`
+    *   *Responsibility:* Maps `CueDetatState` to `AzGuideShape` spotlight targets (target/ghost/cue ball, aiming line, zoom slider) for the guidance tutorial.
 *   **Top Controls:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/TopControls.kt`
