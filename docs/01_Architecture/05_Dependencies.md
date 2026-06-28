@@ -73,3 +73,13 @@ essential libraries and their purpose:
       mode.
 * **Physics Engine:**
     * `com.google.liquidfun:liquidfun:1.1.0`: The physics engine used for Hater Mode.
+
+* **Navigation:**
+    * `com.github.HereLiesAz:AzNavRail` (**10.18**): The expandable navigation rail / menu. Its 10.18
+      status-driven guidance framework (`azStatus`/`azEdge`/`azGoal`/`azGuidanceTarget`) backs the
+      in-app tutorial (see `AzNavRailMenu` + `TutorialGuidanceTargets.kt`).
+
+* **Security-pinned transitive dependencies:**
+    * `io.netty:*` is force-pinned to **4.1.135.Final** (catalog `netty`; forced via
+      `resolutionStrategy.eachDependency` in `app/build.gradle.kts` and a root `subprojects {}` block).
+      Netty is pulled transitively (grpc/testing); the pin clears the Dependabot CVE advisories.

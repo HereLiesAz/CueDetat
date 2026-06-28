@@ -1,5 +1,7 @@
 # Design: Non-Blocking Tutorial & AR Confidence Calculation
 
+> **SUPERSEDED (PR #249):** The tutorial described below was reimplemented on AzNavRail 10.18's status-driven guidance framework (`azStatus`/`azEdge`/`azGoal`/`azGuidanceTarget` in `AzNavRailMenu` + `TutorialGuidanceTargets.kt`). The `TutorialReducer`/`TutorialOverlay`/`NextTutorialStep` design here is historical.
+
 **Date:** 2026-03-28
 **Status:** Approved
 **Addresses:** TODO.md §1.1 (tutorial redesign) and §1.2 (tableOverlayConfidence never calculated)

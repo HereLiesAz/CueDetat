@@ -1,5 +1,8 @@
 # 00. Introduction to the Cue d'Etat Development Guide
 
+> **Legacy:** This `Dev_Guide/` tree is superseded by the canonical docs in `docs/`. Update
+> `docs/` first; `Dev_Guide/` is retained for historical reference only.
+
 This guide contains the mandatory specifications and architectural principles for the Cue d'Etat
 project. Adherence to these documents is required to maintain codebase consistency, clarity, and
 stability.

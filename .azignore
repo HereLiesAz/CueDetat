@@ -1,0 +1,18 @@
+# .azignore — documentation hidden from the in-app About (AzNavRail `azAbout` reader).
+#
+# AzNavRail's About reader auto-discovers every *.md in the repo root and under docs/.
+# List patterns here to exclude developer/internal docs from the in-app About TOC.
+# Format (like .gitignore): one pattern per line; `#` comments; exact paths
+# (CHANGELOG.md), directory prefixes (docs/internal/), or globs (*.draft.md).
+#
+# Kept visible to end users: README.md, Changelog.md, PrivacyPolicy.md.
+
+# Developer / AI-agent / internal root docs
+AGENTS.md
+GEMINI.md
+BACKLOG.md
+TODO.md
+
+# The entire docs/ tree is developer-facing: architecture, code maps, algorithms,
+# agent guidelines, release/CI runbooks, internal feature specs, and superpowers plans.
+docs/

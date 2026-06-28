@@ -36,5 +36,6 @@ The AR-related controls live in the navigation rail (`AzNavRailMenu`), not the d
   camera feed active.
 
 - All rail controls are gated by `experienceMode`.
+- **Tutorial item**: re-launches the in-app tutorial, now driven by AzNavRail 10.18's status-driven guidance framework (`azStatus`/`azEdge`/`azGoal`/`azGuidanceTarget`). Highlights are framework-drawn spotlights on the in-camera target/ghost/cue ball, aiming line, and zoom slider; a bottom "Finish" affordance completes the flow.
 
 There are no "Recalibrate Felt", "Felt Capture", or equivalent advanced menu items for felt re-sampling. The Felt rail button is the sole entry point for opening the table scan overlay.
