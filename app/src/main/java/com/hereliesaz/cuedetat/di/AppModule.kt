@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.PointF
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import com.google.gson.InstanceCreator
 import com.google.gson.TypeAdapter
 import com.google.gson.stream.JsonReader
 import com.google.gson.stream.JsonToken
@@ -14,6 +15,7 @@ import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.data.MergedTFLiteDetector
 import com.hereliesaz.cuedetat.delivery.ModelDelivery
+import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.network.GithubApi
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
 import dagger.Module
@@ -118,6 +120,19 @@ object AppModule {
     @Singleton
     fun provideGson(): Gson {
         return GsonBuilder()
+            // Gson normally instantiates via Unsafe, which bypasses the Kotlin
+            // constructor entirely: default values AND non-null checks are skipped,
+            // so any field absent from an older persisted JSON (a newly-added field,
+            // or any @Transient field, which Gson never writes) is left as raw null.
+            // That null survives silently in the restored state until the first
+            // .copy(), whose regenerated constructor runs checkNotNullParameter
+            // (R8-lowered to Object.getClass()) and throws an NPE. Seeding a fully
+            // default-constructed instance makes Gson overwrite only the fields
+            // present in the JSON and keep the Kotlin defaults for the rest.
+            .registerTypeAdapter(
+                CueDetatState::class.java,
+                InstanceCreator<CueDetatState> { CueDetatState() }
+            )
             .registerTypeAdapter(PointF::class.java, object : TypeAdapter<PointF>() {
                 override fun write(out: JsonWriter, value: PointF?) {
                     if (value == null) { out.nullValue(); return }
