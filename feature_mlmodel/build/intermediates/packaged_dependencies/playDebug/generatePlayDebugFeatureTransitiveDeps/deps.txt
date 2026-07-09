@@ -1,0 +1,1 @@
+:feature_mlmodel::playDebug;Capability: group='CueDetat', name='feature_mlmodel'

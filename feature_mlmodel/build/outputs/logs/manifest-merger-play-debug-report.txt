@@ -1,0 +1,43 @@
+-- Merging decision tree log ---
+manifest
+ADDED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml:2:1-24:12
+INJECTED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml:2:1-24:12
+INJECTED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml:2:1-24:12
+INJECTED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml:2:1-24:12
+	package
+		INJECTED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml
+	android:versionName
+		INJECTED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml
+	xmlns:dist
+		ADDED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml:3:5-61
+	android:versionCode
+		INJECTED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml
+	xmlns:android
+		ADDED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml:2:11-69
+dist:module
+ADDED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml:14:5-21:19
+	dist:instant
+		ADDED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml:15:9-29
+	dist:title
+		ADDED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml:16:9-51
+dist:delivery
+ADDED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml:17:9-19:25
+dist:on-demand
+ADDED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml:18:13-31
+dist:fusing
+ADDED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml:20:9-44
+	dist:include
+		ADDED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml:20:22-41
+application
+ADDED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml:23:5-20
+INJECTED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml:23:5-20
+	android:extractNativeLibs
+		INJECTED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml
+uses-sdk
+INJECTED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml
+INJECTED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from C:\Users\azrie\StudioProjects\CueDetat\feature_mlmodel\src\main\AndroidManifest.xml

@@ -76,6 +76,7 @@ class MainViewModel @Inject constructor(
     private val integrityRepository: com.hereliesaz.cuedetat.data.IntegrityRepository,
     private val shotAdvisor: com.hereliesaz.cuedetat.domain.advisor.ShotAdvisor,
     private val appUpdater: com.hereliesaz.cuedetat.update.AppUpdater,
+    val wristWearableRepository: com.hereliesaz.cuedetat.data.WristWearableRepository,
 ) : ViewModel() {
 
     /**
@@ -378,6 +379,13 @@ class MainViewModel @Inject constructor(
                         )
                     }
                 }
+        }
+
+        // Collect Wrist Wearable state
+        viewModelScope.launch {
+            wristWearableRepository.wearableState.collect { wearableState ->
+                onEvent(MainScreenEvent.WearableStateUpdated(wearableState))
+            }
         }
     }
 

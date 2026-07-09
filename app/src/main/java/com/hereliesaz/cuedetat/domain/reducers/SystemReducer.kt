@@ -40,6 +40,9 @@ internal fun reduceSystemAction(state: CueDetatState, action: MainScreenEvent): 
         // Case: A warning message needs to be displayed or cleared.
         is MainScreenEvent.SetWarning -> state.copy(warningText = action.warning)
 
+        // Case: Wear OS state updated
+        is MainScreenEvent.WearableStateUpdated -> state.copy(wearableState = action.state)
+
         // Fallback: Return state unchanged for unknown actions.
         else -> state
     }

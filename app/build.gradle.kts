@@ -473,6 +473,9 @@ dependencies {
     implementation(libs.mwdat.camera)
     debugImplementation(libs.mwdat.mockdevice)
 
+    // Wear OS Data Layer
+    implementation(libs.play.services.wearable)
+
     // Security & Integrity
     implementation(libs.play.integrity)
 

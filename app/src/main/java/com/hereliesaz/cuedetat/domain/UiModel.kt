@@ -187,6 +187,7 @@ data class CueDetatState(
     val isExpertEntitled: Boolean = false,
     val isAdvisorEnabled: Boolean = false,
     @Transient val recommendedShot: com.hereliesaz.cuedetat.domain.advisor.RecommendedShot? = null,
+    val wearableState: com.hereliesaz.cuedetat.data.WearableState = com.hereliesaz.cuedetat.data.WearableState(),
 ) {
     val pitchAngle: Float
         get() = currentOrientation.pitch
@@ -355,4 +356,7 @@ sealed class MainScreenEvent {
     // Relocalisation events
     object ForceArActive : MainScreenEvent()
     data class SeedRelocaliser(val deltaQ: FloatArray?) : MainScreenEvent()
+
+    // Wear OS events
+    data class WearableStateUpdated(val state: com.hereliesaz.cuedetat.data.WearableState) : MainScreenEvent()
 }
