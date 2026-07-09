@@ -25,7 +25,7 @@ jobs:
           USERNAME: ${{ secrets.FTP_USERNAME }}
           PASSWORD: ${{ secrets.FTP_PASSWORD }}
           PORT: ${{ vars.SFTP_PORT || '22' }}
-          REMOTE_DIR: ${{ vars.FTP_SERVER_DIR || '/' }}
+          REMOTE_DIR: ${{ vars.FTP_SERVER_DIR || '/cuedetat' }}
         run: |
           set -e
           sudo apt-get install -y lftp
