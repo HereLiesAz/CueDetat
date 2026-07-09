@@ -1,0 +1,43 @@
+name: Deploy Docs over FTP
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: sftp-deploy
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        
+      - name: Deploy via lftp (SFTP)
+        env:
+          HOST: ${{ secrets.FTP_SERVER }}
+          USERNAME: ${{ secrets.FTP_USERNAME }}
+          PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          PORT: ${{ vars.SFTP_PORT || '22' }}
+          REMOTE_DIR: ${{ vars.FTP_SERVER_DIR || '/' }}
+        run: |
+          set -e
+          sudo apt-get install -y lftp
+
+          USER_TRIMMED=$(printf '%s' "$USERNAME" | tr -d ' \t\r\n')
+          PW_TRIMMED=$(printf '%s' "$PASSWORD" | tr -d '\r\n')
+          echo "[diag] username length raw=$(printf '%s' "$USERNAME" | wc -c) trimmed=$(printf '%s' "$USER_TRIMMED" | wc -c)"
+          echo "[diag] password length raw=$(printf '%s' "$PASSWORD" | wc -c) trimmed=$(printf '%s' "$PW_TRIMMED" | wc -c)"
+          echo "[diag] host: $(printf '%s' "$HOST" | wc -c) chars, port: $PORT"
+
+          # Sync the docs folder to the remote host using lftp
+          lftp -u "$USER_TRIMMED","$PW_TRIMMED" \
+            -p "$PORT" \
+            -e "set sftp:auto-confirm yes; set ssl:verify-certificate no; mirror -R --verbose ./docs $REMOTE_DIR; quit" \
+            sftp://"$HOST"
