@@ -254,6 +254,17 @@ fun ProtractorScreen(
             }
         }
 
+        // --- Onscreen HUD: Consistency Trainer Overlay ---
+        onscreen(alignment = Alignment.BottomEnd) {
+            if (isOnMain && !uiState.showTableScanScreen && 
+                (uiState.experienceMode == ExperienceMode.EXPERT || uiState.experienceMode == ExperienceMode.BEGINNER)) {
+                ConsistencyOverlay(
+                    wearableState = uiState.wearableState,
+                    modifier = Modifier.padding(bottom = 90.dp, end = 16.dp)
+                )
+            }
+        }
+
 
         // --- Onscreen: Inline felt capture overlay ---
         onscreen(alignment = Alignment.TopStart) {

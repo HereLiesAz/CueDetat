@@ -3,8 +3,8 @@
 3    xmlns:dist="http://schemas.android.com/apk/distribution"
 4    featureSplit="feature_mlmodel"
 5    package="com.hereliesaz.cuedetat.foss"
-6    android:versionCode="561"
-7    android:versionName="1.10.3.561-foss" >
+6    android:versionCode="562"
+7    android:versionName="1.10.4.562-foss" >
 8
 9    <uses-sdk
 9-->INJECTED

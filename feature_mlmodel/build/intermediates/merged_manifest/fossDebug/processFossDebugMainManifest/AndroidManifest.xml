@@ -3,8 +3,8 @@
     xmlns:dist="http://schemas.android.com/apk/distribution"
     featureSplit="feature_mlmodel"
     package="com.hereliesaz.cuedetat.foss"
-    android:versionCode="561"
-    android:versionName="1.10.3.561-foss" >
+    android:versionCode="562"
+    android:versionName="1.10.4.562-foss" >
 
     <uses-sdk
         android:minSdkVersion="29"

@@ -3,8 +3,8 @@
     xmlns:dist="http://schemas.android.com/apk/distribution"
     featureSplit="feature_expert_ar"
     package="com.hereliesaz.cuedetat"
-    android:versionCode="561"
-    android:versionName="1.10.3.561" >
+    android:versionCode="562"
+    android:versionName="1.10.4.562" >
 
     <uses-sdk
         android:minSdkVersion="29"
