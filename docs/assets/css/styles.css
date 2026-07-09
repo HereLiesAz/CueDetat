@@ -356,6 +356,22 @@ a {
 .showcase {
     background-color: var(--color-void-black);
     position: relative;
+    overflow: hidden; /* Prevent parallax from extending outside */
+}
+
+/* Base style for JS parallax backgrounds */
+.parallax-bg {
+    position: absolute;
+    top: -20%; left: -10%;
+    width: 120%; height: 140%;
+    z-index: 0;
+    pointer-events: none;
+    will-change: transform;
+}
+
+.showcase-bg {
+    background: radial-gradient(circle at 70% 30%, rgba(69, 115, 121, 0.15) 0%, transparent 60%);
+    background-size: cover;
 }
 
 /* Diagonal slice background effect */
@@ -365,13 +381,15 @@ a {
     top: -50px; left: 0; right: 0; bottom: -50px;
     background: linear-gradient(135deg, rgba(69, 115, 121, 0.05) 0%, rgba(102, 26, 100, 0.05) 100%);
     transform: skewY(-3deg);
-    z-index: -1;
+    z-index: 1;
 }
 
 .showcase-container {
     display: flex;
     align-items: center;
     gap: 6rem;
+    position: relative;
+    z-index: 2;
 }
 
 .showcase-text {
@@ -473,6 +491,12 @@ a {
 /* CTA Section */
 .cta {
     text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.cta-bg {
+    background: radial-gradient(circle at 30% 70%, rgba(102, 26, 100, 0.2) 0%, transparent 60%);
 }
 
 .cta-content {
@@ -481,6 +505,8 @@ a {
     padding: 5rem 3rem;
     border-color: rgba(175, 138, 9, 0.2);
     background: linear-gradient(180deg, rgba(20,20,25,0.6) 0%, rgba(40, 30, 10, 0.4) 100%);
+    position: relative;
+    z-index: 2;
 }
 
 .cta-icon {

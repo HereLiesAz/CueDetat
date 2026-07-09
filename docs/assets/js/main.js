@@ -61,6 +61,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /*
+     * Parallax Scrolling Effect
+     */
+    const parallaxElements = document.querySelectorAll('.parallax-bg, .parallax-fast, .parallax-slow');
+    
+    window.addEventListener('scroll', () => {
+        const scrolled = window.scrollY;
+        
+        requestAnimationFrame(() => {
+            parallaxElements.forEach(el => {
+                let speed = 0.5; // default slow background parallax
+                if (el.classList.contains('parallax-fast')) speed = 1.2;
+                if (el.classList.contains('parallax-slow')) speed = 0.2;
+                
+                // For backgrounds, we might want slower, for floating elements, faster
+                const yPos = -(scrolled * speed);
+                el.style.transform = `translateY(${yPos}px)`;
+            });
+        });
+    }, { passive: true });
+
+    /*
      * Initial triggering for elements already in view (like Hero)
      */
     setTimeout(() => {
