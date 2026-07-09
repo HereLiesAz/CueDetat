@@ -3,101 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CueDetat - Precision Billiards Assistant</title>
+    <meta name="description" content="CueDetat - Precision Billiards Assistant with Augmented Reality and Physics Engine">
+    <title>Cue d'État - Run The Table</title>
+    <!-- Modern Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/styles.css">
 </head>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-QEVWXVQY66"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-QEVWXVQY66');
-</script>
 <body>
-    <div class="parallax-wrapper">
-        <header class="hero section parallax-group" id="group-hero">
-            <div class="parallax-layer parallax-layer-base">
-                <div class="hero-content fade-in">
-                    <h1 class="title">CueDetat</h1>
-                    <p class="subtitle">Elevate Your Game. Master the Angles.</p>
-                    <a href="#features" class="cta-button">Explore Features</a>
+    <!-- Abstract particles/stars background -->
+    <div class="particles" id="particles"></div>
+    
+    <nav class="navbar" id="navbar">
+        <div class="nav-content container">
+            <div class="logo">
+                <img src="assets/img/ic_launcher_monochrome.webp" alt="CueDetat Logo" class="logo-img">
+                <span class="logo-text">Cue d'État</span>
+            </div>
+            <a href="#download" class="nav-cta">Get Early Access</a>
+        </div>
+    </nav>
+
+    <header class="hero" id="home">
+        <!-- Background uses the header image -->
+        <div class="hero-bg" style="background-image: url('assets/img/cue_detat_header.jpg');"></div>
+        <div class="hero-overlay"></div>
+        
+        <div class="container hero-content fade-in">
+            <div class="hero-text">
+                <h1 class="title">Command<br><span class="highlight">The Table.</span></h1>
+                <p class="subtitle">Next-generation AR billiards training. Real-time physics, spin mechanics, and precision computer vision.</p>
+                <div class="hero-buttons">
+                    <a href="#features" class="btn btn-outline">Explore Tech</a>
+                    <a href="#download" class="btn btn-primary glow-effect">Download App</a>
                 </div>
             </div>
-            <div class="parallax-layer parallax-layer-back">
-                <div class="hero-background"></div>
-            </div>
-            <div class="parallax-layer parallax-layer-deep">
-                <div class="billiard-balls-bg"></div>
-            </div>
-        </header>
+        </div>
+        <div class="scroll-indicator">
+            <div class="mouse"></div>
+        </div>
+    </header>
 
-        <main>
-            <section id="features" class="features section parallax-group">
-                <div class="parallax-layer parallax-layer-base">
-                    <div class="container">
-                        <h2 class="section-title slide-up">Unleash Your Potential</h2>
-                        <div class="feature-grid">
-                            <div class="feature-card slide-up" style="transition-delay: 0.1s;">
-                                <div class="feature-icon" role="img" aria-label="Billiard ball icon">🎱</div>
-                                <h3>AR Aiming Lines</h3>
-                                <p>Project precise trajectories directly onto your table, calculating banks and caroms in real-time.</p>
-                            </div>
-                            <div class="feature-card slide-up" style="transition-delay: 0.2s;">
-                                <div class="feature-icon">🎯</div>
-                                <h3>Spin Physics Engine</h3>
-                                <p>Visualize the impact of English, draw, and follow with our advanced physics simulation.</p>
-                            </div>
-                            <div class="feature-card slide-up" style="transition-delay: 0.3s;">
-                                <div class="feature-icon">📱</div>
-                                <h3>Computer Vision</h3>
-                                <p>Instant table recognition and alignment using state-of-the-art on-device ML models.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="parallax-layer parallax-layer-back">
-                    <div class="features-background"></div>
-                </div>
-            </section>
-
-            <section class="showcase section parallax-group" id="group-showcase">
-                <div class="parallax-layer parallax-layer-base">
-                    <div class="container showcase-container">
-                        <div class="showcase-text fade-in-left">
-                            <h2>Precision Meets Technology</h2>
-                            <p>CueDetat blends a dark, industrial aesthetic with cutting-edge augmented reality to provide an unparalleled training experience. No more guessing—know the shot before you take it.</p>
-                        </div>
-                        <div class="showcase-image fade-in-right dynamic-tilt">
-                            <div class="mockup-frame">
-                                <div class="mockup-screen"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="cta section parallax-group" id="group-cta">
-                <div class="parallax-layer parallax-layer-base">
-                    <div class="cta-content scale-up">
-                        <h2>Ready to Run the Table?</h2>
-                        <p>Join the revolution in billiards training.</p>
-                        <a href="#!" class="cta-button primary">Download Now</a>
-                    </div>
-                </div>
-                <div class="parallax-layer parallax-layer-back">
-                    <div class="cta-background"></div>
-                </div>
-            </section>
-        </main>
-
-        <footer>
+    <main>
+        <section id="features" class="features section">
             <div class="container">
-                <p>&copy; 2024 CueDetat. All rights reserved.</p>
+                <h2 class="section-title slide-up">Tactical Advantage</h2>
+                <div class="feature-grid">
+                    <div class="feature-card glass-panel slide-up">
+                        <div class="feature-icon">👁️‍🗨️</div>
+                        <h3>CV Hybrid Eye</h3>
+                        <p>State-of-the-art computer vision accurately maps your physical table, snapping augmented reality anchors precisely onto pockets and rails in real-time.</p>
+                    </div>
+                    <div class="feature-card glass-panel slide-up" style="transition-delay: 0.1s;">
+                        <div class="feature-icon">📐</div>
+                        <h3>AR Aiming Lines</h3>
+                        <p>Project true-to-life trajectory vectors directly onto the felt. See complex banks and caroms before you ever strike the cue ball.</p>
+                    </div>
+                    <div class="feature-card glass-panel slide-up" style="transition-delay: 0.2s;">
+                        <div class="feature-icon">🌀</div>
+                        <h3>Massé & Spin Physics</h3>
+                        <p>Visualize the radical impact of English, draw, and follow. Our physics engine calculates cloth friction and extreme cue elevations.</p>
+                    </div>
+                </div>
             </div>
-        </footer>
-    </div>
+        </section>
+
+        <section class="showcase section" id="showcase">
+            <div class="container showcase-container">
+                <div class="showcase-text fade-in-left">
+                    <h2 class="section-title">See The Invisible</h2>
+                    <p class="lead-text">Cue d'État blends a dark, industrial aesthetic with cutting-edge augmented reality. Designed for players who demand absolute precision.</p>
+                    <ul class="feature-list">
+                        <li><span class="check">✓</span> <strong>Protractor Mode:</strong> Exact cut angles and ghost ball positioning.</li>
+                        <li><span class="check">✓</span> <strong>Hater Mode:</strong> Physics so realistic it punishes sloppy strokes.</li>
+                        <li><span class="check">✓</span> <strong>Shot Consistency:</strong> Wearable integration to analyze your stroke mechanics.</li>
+                    </ul>
+                </div>
+                <div class="showcase-image fade-in-right">
+                    <!-- Glassmorphism phone mockup -->
+                    <div class="phone-mockup dynamic-tilt">
+                        <div class="phone-frame">
+                            <img src="assets/img/cue_detat_expert_mode.png" alt="CueDetat Expert Mode UI" class="screen-img">
+                        </div>
+                        <div class="glow-behind"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="download" class="cta section">
+            <div class="container">
+                <div class="cta-content glass-panel scale-up">
+                    <img src="assets/img/ic_launcher_monochrome.webp" alt="CueDetat Icon" class="cta-icon">
+                    <h2>Ready to Run the Table?</h2>
+                    <p>Join the revolution in billiards training. Your game will never be the same.</p>
+                    <a href="#" class="btn btn-primary btn-large glow-effect">Download APK (Alpha)</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">
+                    <img src="assets/img/ic_launcher_monochrome.webp" alt="Logo" class="logo-img-small">
+                    <span>Cue d'État</span>
+                </div>
+                <p class="copyright">&copy; 2026 HereLiesAz. All rights reserved. MVI Architecture.</p>
+            </div>
+        </div>
+    </footer>
+
     <script src="assets/js/main.js"></script>
 </body>
 </html>
