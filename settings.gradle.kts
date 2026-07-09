@@ -87,3 +87,5 @@ include(":feature_mlmodel")
 // sources directly in (see app/build.gradle.kts), since standalone FOSS APKs
 // have no Play split-install channel.
 include(":feature_expert_ar")
+
+include(":wear")
