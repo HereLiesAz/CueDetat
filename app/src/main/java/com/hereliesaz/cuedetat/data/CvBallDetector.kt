@@ -6,6 +6,7 @@ import android.graphics.Rect
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
+import org.opencv.core.Scalar
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import kotlin.math.PI
@@ -65,7 +66,19 @@ class CvBallDetector {
         if (bgrMat.empty() || hsvMat.empty()) return emptyList()
         if (bgrMat.rows() != hsvMat.rows() || bgrMat.cols() != hsvMat.cols()) return emptyList()
 
-        FeltMask.build(hsvMat, feltHsv, feltStdDev, feltMask)
+        val sdScale = 2.5f
+        val lower = Scalar(
+            max(0.0, feltHsv[0] - sdScale * feltStdDev[0] - 5.0),
+            max(40.0, (feltHsv[1] - sdScale * feltStdDev[1]).toDouble()),
+            max(40.0, (feltHsv[2] - sdScale * feltStdDev[2]).toDouble()),
+        )
+        val upper = Scalar(
+            min(180.0, feltHsv[0] + sdScale * feltStdDev[0] + 5.0),
+            min(255.0, (feltHsv[1] + sdScale * feltStdDev[1]).toDouble()),
+            min(255.0, (feltHsv[2] + sdScale * feltStdDev[2]).toDouble()),
+        )
+
+        Core.inRange(hsvMat, lower, upper, feltMask)
 
         val frameSide = min(bgrMat.cols(), bgrMat.rows())
         val estRadius = if (expectedBallRadiusPx > 0f) {
