@@ -4,7 +4,8 @@
 
     <!--
       On-demand delivery: the model split is NOT installed with the base app.
-      The base requests it at runtime via SplitInstallManager (ModelModuleManager)
+      The base requests it at runtime via SplitInstallManager (PlayModelDelivery,
+      see app/src/play/java/com/hereliesaz/cuedetat/delivery/PlayModelDelivery.kt)
       the first time ML detection is needed.
 
       dist:fusing include="true" keeps the module available in fused/standalone

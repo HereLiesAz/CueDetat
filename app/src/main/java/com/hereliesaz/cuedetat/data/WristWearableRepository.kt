@@ -5,8 +5,8 @@ import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import dagger.hilt.android.qualifiers.ApplicationContext
-import com.hereliesaz.cuedetat.domain.StrokeAnalyzer
 import com.hereliesaz.cuedetat.domain.StrokeProfile
+import com.hereliesaz.cuedetat.domain.StrokeSessionTracker
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,12 +28,12 @@ class WristWearableRepository @Inject constructor(
 ) : MessageClient.OnMessageReceivedListener {
 
     private val messageClient = Wearable.getMessageClient(context)
-    private val strokeAnalyzer = StrokeAnalyzer()
-    
-    // Simplistic rolling buffer for stroke profiles
-    private val currentProfiles = mutableListOf<StrokeProfile>()
-    private val baselineProfiles = mutableListOf<StrokeProfile>() // Ideally populated from a successful calibration stroke
-    
+
+    // Buffers IMU samples into stroke-sized windows and owns baseline calibration.
+    // The first completed stroke window in a session becomes the baseline that
+    // subsequent strokes are compared against (see StrokeSessionTracker).
+    val sessionTracker = StrokeSessionTracker()
+
     private val _wearableState = MutableStateFlow(WearableState())
     val wearableState: StateFlow<WearableState> = _wearableState.asStateFlow()
 
@@ -56,29 +56,7 @@ class WristWearableRepository @Inject constructor(
                 )
             }
             "/trainer/imu" -> {
-                // Parse 6 floats (3 accel, 3 gyro) + 1 timestamp
-                if (payload.size >= 32) {
-                    val buffer = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN)
-                    val time = buffer.long
-                    val ax = buffer.float
-                    val ay = buffer.float
-                    val az = buffer.float
-                    val gx = buffer.float
-                    val gy = buffer.float
-                    val gz = buffer.float
-                    
-                    val profile = StrokeProfile(time, floatArrayOf(ax, ay, az), floatArrayOf(gx, gy, gz))
-                    currentProfiles.add(profile)
-                    
-                    if (currentProfiles.size > 50) { // arbitrary window size
-                        val result = strokeAnalyzer.analyzeStroke(baselineProfiles, currentProfiles, _wearableState.value.heartRate)
-                        _wearableState.value = _wearableState.value.copy(
-                            consistencyScore = result.fluidityScore,
-                            isShaking = result.isErratic || _wearableState.value.heartRate > 120f
-                        )
-                        currentProfiles.removeAt(0)
-                    }
-                }
+                _wearableState.value = processImuSample(payload, sessionTracker, _wearableState.value)
             }
             "/trainer/connected" -> {
                 _wearableState.value = _wearableState.value.copy(isConnected = true)
@@ -91,6 +69,9 @@ class WristWearableRepository @Inject constructor(
 
     // Helper to send command to the watch
     fun startTrainerSession() {
+        // Starting a new session discards any previous baseline so the first
+        // stroke of this session is re-calibrated as the new baseline.
+        sessionTracker.reset()
         // Broadcast to all connected nodes
         Wearable.getNodeClient(context).connectedNodes.addOnSuccessListener { nodes ->
             nodes.forEach { node ->
@@ -106,4 +87,48 @@ class WristWearableRepository @Inject constructor(
             }
         }
     }
+
+    companion object {
+        /** Wire format: 1 little-endian long timestamp + 6 little-endian floats (3-axis accel, 3-axis gyro). */
+        const val IMU_PAYLOAD_MIN_SIZE = 32
+
+        /**
+         * Parses a raw `/trainer/imu` message payload into a [StrokeProfile].
+         * Returns null if the payload is too small to contain a full sample.
+         */
+        fun parseImuPayload(payload: ByteArray): StrokeProfile? {
+            if (payload.size < IMU_PAYLOAD_MIN_SIZE) return null
+            val buffer = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN)
+            val time = buffer.long
+            val ax = buffer.float
+            val ay = buffer.float
+            val az = buffer.float
+            val gx = buffer.float
+            val gy = buffer.float
+            val gz = buffer.float
+            return StrokeProfile(time, floatArrayOf(ax, ay, az), floatArrayOf(gx, gy, gz))
+        }
+    }
+}
+
+/**
+ * Parses [payload] and feeds it into [tracker], returning the updated
+ * [WearableState] reflecting the latest analysis (or [currentState] unchanged
+ * if the payload was malformed or the stroke window hasn't completed yet).
+ *
+ * Extracted as a top-level function (rather than a private method) so it can
+ * be unit tested without needing to construct [WristWearableRepository] and
+ * its Android/Play-Services dependencies (Context, MessageClient).
+ */
+fun processImuSample(
+    payload: ByteArray,
+    tracker: StrokeSessionTracker,
+    currentState: WearableState
+): WearableState {
+    val profile = WristWearableRepository.parseImuPayload(payload) ?: return currentState
+    val result = tracker.addSample(profile, currentState.heartRate) ?: return currentState
+    return currentState.copy(
+        consistencyScore = result.fluidityScore,
+        isShaking = result.isErratic || currentState.heartRate > 120f
+    )
 }

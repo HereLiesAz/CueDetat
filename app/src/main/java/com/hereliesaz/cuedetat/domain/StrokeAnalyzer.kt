@@ -77,3 +77,63 @@ class StrokeAnalyzer {
         )
     }
 }
+
+/**
+ * Buffers incoming IMU samples into fixed-size "stroke" windows and manages
+ * baseline calibration.
+ *
+ * There is no explicit calibration UI/trigger for the wrist trainer yet, so the
+ * first completed stroke window observed in a session is used as the baseline
+ * profile. Every subsequent stroke window is then compared against that fixed
+ * baseline via [StrokeAnalyzer.analyzeStroke], so the fluidity score reflects a
+ * genuine similarity measurement instead of always defaulting to a perfect score.
+ *
+ * Call [reset] (e.g. when a new trainer session starts) to discard the current
+ * baseline and buffered samples, allowing the next stroke to become the new
+ * baseline.
+ */
+class StrokeSessionTracker(
+    private val strokeAnalyzer: StrokeAnalyzer = StrokeAnalyzer(),
+    private val windowSize: Int = 50
+) {
+    private val currentProfiles = mutableListOf<StrokeProfile>()
+    private val _baselineProfiles = mutableListOf<StrokeProfile>()
+
+    /** The stroke profile currently used as the calibration baseline, if any. */
+    val baselineProfiles: List<StrokeProfile> get() = _baselineProfiles
+
+    /** True once a baseline stroke has been captured. */
+    val hasBaseline: Boolean get() = _baselineProfiles.isNotEmpty()
+
+    /** Clears the baseline and any in-progress stroke buffer. */
+    fun reset() {
+        currentProfiles.clear()
+        _baselineProfiles.clear()
+    }
+
+    /**
+     * Adds a single IMU sample to the in-progress stroke window.
+     *
+     * Returns null while the window is still filling. Once a full window
+     * ([windowSize] samples) has been collected, the window is consumed
+     * (the internal buffer resets for the next stroke) and either:
+     *  - becomes the new baseline (if none exists yet), returning a perfect
+     *    [AnalyticsResult] for that calibration stroke, or
+     *  - is compared against the existing baseline via DTW, returning the
+     *    real analysis result.
+     */
+    fun addSample(profile: StrokeProfile, heartRate: Float): AnalyticsResult? {
+        currentProfiles.add(profile)
+        if (currentProfiles.size < windowSize) return null
+
+        val strokeSnapshot = currentProfiles.toList()
+        currentProfiles.clear()
+
+        if (_baselineProfiles.isEmpty()) {
+            _baselineProfiles.addAll(strokeSnapshot)
+            return AnalyticsResult(fluidityScore = 1.0f, twistPenalty = 0f, isErratic = false)
+        }
+
+        return strokeAnalyzer.analyzeStroke(_baselineProfiles, strokeSnapshot, heartRate)
+    }
+}

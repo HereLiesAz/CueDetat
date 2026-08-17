@@ -90,6 +90,15 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      # TODO(ci): No workflow in this repo currently runs unit tests OR instrumented
+      # tests (e.g. app/src/androidTest/.../MergedTFLiteDetectorTest.kt, which exercises
+      # the real TFLite ML pipeline via detect()/detectPool()). Unit tests could run
+      # here via `./gradlew testFossDebugUnitTest`; instrumented tests need a device —
+      # e.g. reactivecircus/android-emulator-runner — to run
+      # `./gradlew connectedFossDebugAndroidTest`. Left as a TODO rather than wiring an
+      # emulator job silently/incompletely, since headless-emulator CI is a nontrivial
+      # infra addition (API level matrix, snapshot caching, flakiness handling) beyond
+      # the scope of the change that added this note.
       - name: Build with Gradle
         id: gradle-build
         env:

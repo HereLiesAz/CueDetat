@@ -229,9 +229,9 @@ class MergedTFLiteDetector(
         val interp = interpreters[HEAD_POCKET_50E] ?: return null
         return try {
             preprocess(bitmap)
-            val output = Array(1) { Array(MAX_DETECTIONS) { FloatArray(6) } }
-            interp.run(inputBuffer, output)
-            parsePocketDetections(output, bitmap.width, bitmap.height)
+            clearOutput(pocketOutput)
+            interp.run(inputBuffer, pocketOutput)
+            parsePocketDetections(pocketOutput, bitmap.width, bitmap.height)
         } catch (e: Exception) {
             Log.e(TAG, "Pocket inference failed: ${e.message}")
             null
@@ -242,14 +242,26 @@ class MergedTFLiteDetector(
         val interp = interpreters[HEAD_POOL_PIVOT] ?: return emptyList()
         return try {
             preprocess(bitmap)
-            val output = Array(1) { Array(MAX_DETECTIONS) { FloatArray(6) } }
-            interp.run(inputBuffer, output)
-            if (BuildConfig.DEBUG) logRawOutput("pool", output)
-            parsePoolDetections(output, bitmap.width, bitmap.height)
+            clearOutput(poolOutput)
+            interp.run(inputBuffer, poolOutput)
+            if (BuildConfig.DEBUG) logRawOutput("pool", poolOutput)
+            parsePoolDetections(poolOutput, bitmap.width, bitmap.height)
         } catch (e: Exception) {
             Log.e(TAG, "Pool inference failed: ${e.message}")
             emptyList()
         }
+    }
+
+    /**
+     * Zero out a pre-allocated output tensor before reuse. TFLite's `run()` always
+     * writes every row up to the model's real detection count, but rows the model
+     * leaves unfilled from a *previous* call (i.e. beyond this call's live detection
+     * count) would otherwise retain stale scores/classes from that previous call —
+     * only clearing the score column (index 4) is enough since parsePocketDetections
+     * / parsePoolDetections both gate entirely on `score < THRESHOLD`.
+     */
+    private fun clearOutput(output: Array<Array<FloatArray>>) {
+        for (row in output[0]) row[4] = 0f
     }
 
     /**

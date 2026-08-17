@@ -214,13 +214,22 @@ class VisionRepository @Inject constructor(
             )
 
             val detectedObjects = Tasks.await(genericObjectDetector.process(inputImage))
+            // NOTE: detectPool() (HEAD_POOL_PIVOT / segment 2) is trained on the same
+            // 3-class table/hole/side scheme documented in PoolDetection.kt and
+            // ml/metadata.yaml — see ml/cuedetat_pocket_detector_kaggle.py, where the
+            // ball/cue source datasets are merged with MASTER_CLASSES = ["pool-table",
+            // "pool-table-hole", "pool-table-side"] and are always skipped for having
+            // no class-name overlap. There is no trained ball/cue head anywhere in this
+            // model. rawDetections is therefore only used below as a cheap, classId-
+            // agnostic motion signal for the adaptive frame-rate throttle; real ball
+            // detection comes from genericObjectDetector (ML) + cvBallDetector (CV
+            // Hough-circle refinement) below.
+            // TODO(ml): if a real ball/cue-trained detector head is ever added, wire
+            // its output in here instead of relying solely on genericObjectDetector +
+            // cvBallDetector.
             val rawDetections = poolDetector.detectPool(scaledBitmap)
             // Battery: widen/narrow the frame interval based on detection stability.
             updateAdaptiveInterval(state, currentTime, rawDetections)
-            val customPoolBalls = rawDetections.filter { it.classId == 1 }
-            val detectedCues = rawDetections.filter { it.classId == 2 }.map {
-                android.graphics.Rect(it.rect.left.toInt(), it.rect.top.toInt(), it.rect.right.toInt(), it.rect.bottom.toInt())
-            }
 
             var matToUse: Mat
             when (rotationDegrees) {
@@ -347,31 +356,6 @@ class VisionRepository @Inject constructor(
                 PointF(screenPointArray[0], screenPointArray[1])
             }
 
-            val filteredCustomPoolBalls = customPoolBalls.filter {
-                val box = it.rect
-                if (!hasTablePose) {
-                    val side = minOf(box.width(), box.height())
-                    side in 10f..400f
-                } else {
-                    val expectedRadius = getExpectedRadiusAtImageY(
-                        box.centerY(), state, imageToScreenMatrix
-                    )
-                    val maxAllowedArea = 2 * Math.PI * expectedRadius.pow(2)
-                    (box.width() * box.height()) <= maxAllowedArea
-                }
-            }
-
-            val customScreenPoints = filteredCustomPoolBalls.map { detectedObject ->
-                val box = detectedObject.rect
-                val fallback = PointF(box.centerX(), box.centerY())
-                refineBallCenterPoolDetection(detectedObject, matToUse, state, imageToScreenMatrix) ?: fallback
-            }.map { pointInImageCoords ->
-                val screenPointArray = floatArrayOf(pointInImageCoords.x, pointInImageCoords.y)
-                imageToScreenMatrix.mapPoints(screenPointArray)
-                PointF(screenPointArray[0], screenPointArray[1])
-            }
-
-
             val genericBallsStructured = refinedScreenPoints.mapIndexed { idx, sp ->
                 val logical = if (state.hasInverseMatrix) {
                     val inv = state.inversePitchMatrix ?: Matrix()
@@ -384,20 +368,7 @@ class VisionRepository @Inject constructor(
                 DetectedBall(position = logical, type = ballType, confidence = 0.9f, boundingBox = box)
             }
 
-            val customBallsStructured = customScreenPoints.mapIndexed { idx, sp ->
-                val logical = if (state.hasInverseMatrix) {
-                    val inv = state.inversePitchMatrix ?: Matrix()
-                    val lp = Perspective.screenToLogical(sp, inv)
-                    if (state.lensWarpTps != null) ThinPlateSpline.applyWarp(state.lensWarpTps, lp) else lp
-                } else sp
-
-                val box = filteredCustomPoolBalls[idx].rect
-                val intBox = android.graphics.Rect(box.left.toInt(), box.top.toInt(), box.right.toInt(), box.bottom.toInt())
-                val ballType = classifyBallType(matToUse, intBox)
-                DetectedBall(position = logical, type = ballType, confidence = 0.9f, boundingBox = intBox)
-            }
-
-            val mlBalls = genericBallsStructured + customBallsStructured
+            val mlBalls = genericBallsStructured
 
             val feltMean = state.lockedHsvColor
                 ?: autoFelt?.hsv
@@ -408,11 +379,9 @@ class VisionRepository @Inject constructor(
                 ?: floatArrayOf(8f, 40f, 50f)
 
             val cvDetections = if (feltMean != null) {
-                val mlBoxSides = (filteredDetectedObjects.map {
+                val mlBoxSides = filteredDetectedObjects.map {
                     minOf(it.boundingBox.width(), it.boundingBox.height())
-                } + filteredCustomPoolBalls.map {
-                    minOf(it.rect.width(), it.rect.height()).toInt()
-                }).filter { it > 0 }
+                }.filter { it > 0 }
                 val medianSide = if (mlBoxSides.isNotEmpty()) {
                     mlBoxSides.sorted()[mlBoxSides.size / 2].toFloat()
                 } else 0f
@@ -473,7 +442,9 @@ class VisionRepository @Inject constructor(
                 balls = allStructuredBalls,
                 detectedHsvColor = hsvTuple?.first ?: hsv,
                 detectedBoundingBoxes = filteredDetectedObjects.map { it.boundingBox },
-                detectedCues = detectedCues,
+                // detectedCues intentionally left at its default (empty): there is no
+                // trained cue-detecting head — see the note above where rawDetections
+                // is computed.
                 cvMask = cvMask,
                 sourceImageWidth = inputImage.width,
                 sourceImageHeight = inputImage.height,
@@ -648,11 +619,14 @@ class VisionRepository @Inject constructor(
             )
 
             val detectedObjects = com.google.android.gms.tasks.Tasks.await(genericObjectDetector.process(inputImage))
-            val rawDetections = poolDetector.detectPool(scaledBitmap)
-            val customPoolBalls = rawDetections.filter { it.classId == 1 }
-            val detectedCues = rawDetections.filter { it.classId == 2 }.map {
-                android.graphics.Rect(it.rect.left.toInt(), it.rect.top.toInt(), it.rect.right.toInt(), it.rect.bottom.toInt())
-            }
+            // Unlike processImage(), the AR path never consumed detectPool() output for
+            // anything (it was previously misinterpreted here as ball/cue detections —
+            // see the note in processImage() — but even the misinterpreted result was
+            // discarded, unused, in this function). detectPool() is the same 3-class
+            // table/hole/side detector documented in PoolDetection.kt; there is no
+            // trained ball/cue head. Real ball detection in the AR path comes from
+            // genericObjectDetector + cvBallDetector below, so the call is dropped here
+            // entirely to avoid a wasted inference pass.
 
             var matToUse: Mat = originalMat
             when (rotationDegrees) {
@@ -1127,36 +1101,6 @@ class VisionRepository @Inject constructor(
 
     private fun android.graphics.Bitmap.takeIn(w: Int, h: Int): android.graphics.Bitmap? {
         return if (width == w && height == h) this else null
-    }
-
-    private fun refineBallCenterPoolDetection(
-        detectedObject: com.hereliesaz.cuedetat.data.PoolDetection,
-        frame: org.opencv.core.Mat,
-        state: CueDetatState,
-        imageToScreenMatrix: android.graphics.Matrix
-    ): android.graphics.PointF? {
-        val box = detectedObject.rect
-        val roi = OCVRect(box.left.toInt(), box.top.toInt(), box.width().toInt(), box.height().toInt())
-
-        if (roi.x < 0 || roi.y < 0 || roi.x + roi.width > frame.cols() || roi.y + roi.height > frame.rows()) {
-            return null
-        }
-
-        val expectedRadiusInImageCoords = getExpectedRadiusAtImageY(box.centerY(), state, imageToScreenMatrix)
-        val tolerance = 0.5f
-        val minRadius = expectedRadiusInImageCoords * (1 - tolerance)
-        val maxRadius = expectedRadiusInImageCoords * (1 + tolerance)
-
-        val roiMat = frame.submat(roi)
-        org.opencv.imgproc.Imgproc.morphologyEx(roiMat, roiMat, org.opencv.imgproc.Imgproc.MORPH_OPEN, reusableMorphKernel)
-
-        val refinedCenterInRoi = findBallByContour(
-            roiMat, minRadius, maxRadius,
-            state.cannyThreshold1.toDouble(), state.cannyThreshold2.toDouble()
-        )
-
-        roiMat.release()
-        return refinedCenterInRoi?.let { android.graphics.PointF(it.x.toFloat() + roi.x, it.y.toFloat() + roi.y) }
     }
 
     private fun classifyBallType(frame: Mat, box: android.graphics.Rect): BallType {
