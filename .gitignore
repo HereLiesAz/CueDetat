@@ -17,6 +17,12 @@
 /app/build/*
 /app/build/
 
+# Every Gradle module's build output (app/, feature_mlmodel/, feature_expert_ar/,
+# wear/, opencv/, ml/, ...). The specific /app/build/ and /opencv/build/... rules
+# above/below predate this and are kept for safety, but this is the rule that
+# actually covers every module going forward without needing one per module.
+/*/build/
+
 /captures
 .externalNativeBuild
 .cxx
