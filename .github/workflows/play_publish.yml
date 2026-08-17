@@ -12,6 +12,8 @@ name: Play Publish (AAB)
 # (git commit count) wired into app/build.gradle.kts.
 
 on:
+  push: 
+    branches: 'main'
   workflow_dispatch:
     inputs:
       track:
@@ -24,12 +26,12 @@ on:
         description: 'Release status on the chosen track'
         type: choice
         options: [draft, completed]
-        default: draft
+        default: completed
         required: true
       publish:
         description: 'Publish to Play? (off = build + upload the .aab artifact only)'
         type: boolean
-        default: false
+        default: true
         required: true
 
 concurrency:
