@@ -1,2 +1,0 @@
-:feature_expert_ar::playDebug;Capability: group='CueDetat', name='feature_expert_ar'
-com.google.ar:core;Capability: group='com.google.ar', name='core'
