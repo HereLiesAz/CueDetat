@@ -118,6 +118,7 @@ class VisionRepository @Inject constructor(
 
     private val feltColorDetector = FeltColorDetector()
     private val cvBallDetector = CvBallDetector()
+    private val cvCueDetector = CvCueDetector()
     private var lastFeltDetection: FeltColorDetector.Result? = null
 
     private val isProcessing = AtomicBoolean(false)
@@ -389,6 +390,10 @@ class VisionRepository @Inject constructor(
                 cvBallDetector.detect(matToUse, hsvMat, feltMean, feltSd, expectedRadiusPx)
             } else emptyList()
 
+            val cueDetections = if (feltMean != null) {
+                cvCueDetector.detect(matToUse, hsvMat, feltMean, feltSd)
+            } else emptyList()
+
             val cvScreenBalls = cvDetections.map { d ->
                 val arr = floatArrayOf(d.center.x, d.center.y)
                 imageToScreenMatrix.mapPoints(arr)
@@ -442,9 +447,10 @@ class VisionRepository @Inject constructor(
                 balls = allStructuredBalls,
                 detectedHsvColor = hsvTuple?.first ?: hsv,
                 detectedBoundingBoxes = filteredDetectedObjects.map { it.boundingBox },
-                // detectedCues intentionally left at its default (empty): there is no
-                // trained cue-detecting head — see the note above where rawDetections
-                // is computed.
+                // No trained cue-detecting ML head exists (see the note above where
+                // rawDetections is computed), so cues come from CvCueDetector's
+                // classical Hough-line pipeline instead.
+                detectedCues = cueDetections.map { it.rect },
                 cvMask = cvMask,
                 sourceImageWidth = inputImage.width,
                 sourceImageHeight = inputImage.height,
@@ -703,6 +709,10 @@ class VisionRepository @Inject constructor(
                 cvBallDetector.detect(matToUse, hsvMat, feltMean, feltSd, medianSide / 2f)
             } else emptyList()
 
+            val cueDetections = if (feltMean != null) {
+                cvCueDetector.detect(matToUse, hsvMat, feltMean, feltSd)
+            } else emptyList()
+
             val cvScreenBalls = cvDetections.map { d ->
                 val arr = floatArrayOf(d.center.x, d.center.y)
                 imageToScreenMatrix.mapPoints(arr)
@@ -756,6 +766,7 @@ class VisionRepository @Inject constructor(
                 balls = allBalls,
                 detectedHsvColor = hsv,
                 detectedBoundingBoxes = filteredObjects.map { it.boundingBox },
+                detectedCues = cueDetections.map { it.rect },
                 sourceImageWidth = inputImage.width,
                 sourceImageHeight = inputImage.height,
                 sourceImageRotation = rotationDegrees,
