@@ -82,7 +82,11 @@ class PlayBillingEntitlementRepository @Inject constructor(
         scope.launch {
             // 1. Load cache so the first emission is correct for returning users.
             // A one-time unlock never expires, so the cached value is used as-is
-            // (no offline cap). Play will still re-confirm ownership when reachable.
+            // here. Play will still re-confirm ownership when reachable; the
+            // 14-day offline cap (see class doc) is enforced from refresh()'s
+            // failure branch, not at load time, so a single cold start right
+            // after the cap boundary doesn't need to guess — the very next
+            // refresh attempt (successful or not) settles it.
             val cached = runCatching { cacheStore.read() }.getOrDefault(Entitlement.NONE)
             playEntitlement.value = cached
             Log.i(TAG, "init: cached entitlement active=${cached.active} source=${cached.source}")
@@ -164,12 +168,21 @@ class PlayBillingEntitlementRepository @Inject constructor(
         val purchases = runCatching { billingClient.queryOwnedPurchases() }
             .getOrElse {
                 // Transient failure: keep the previous (owned, never-expiring)
-                // entitlement and do NOT overwrite the cache.
+                // entitlement and do NOT overwrite the cache, unless it has
+                // been stale for more than the offline cap — see class doc.
                 Log.w(TAG, "queryOwnedPurchases failed; preserving cached entitlement", it)
                 lastRefreshOutcome = "queryOwnedPurchases failed: ${it.message ?: it::class.java.simpleName}"
+                applyOfflineCapIfStale(now)
                 republish()
                 return
             }
+        // Acknowledge any owned-but-unacknowledged purchases found here too, not
+        // just the ones delivered live via purchaseUpdates below. Google
+        // auto-refunds a purchase left unacknowledged for 3 days, so a cold
+        // start that reconciles via queryOwnedPurchases (e.g. the purchase
+        // succeeded while the app was killed, or the live listener callback
+        // was missed) must also acknowledge, not just observe.
+        purchases.forEach { runCatching { billingClient.acknowledgeIfNeeded(it) } }
         val snapshots = purchases.flatMap { it.toSnapshots() }
         snapshots.forEach {
             val line = "snapshot productId=${it.productId} state=${it.purchaseState} ack=${it.isAcknowledged}"
@@ -189,6 +202,33 @@ class PlayBillingEntitlementRepository @Inject constructor(
         playEntitlement.value = mapped
         runCatching { cacheStore.write(mapped) }
         republish()
+    }
+
+    /**
+     * When `refresh()` cannot reach Play, the cached entitlement is normally
+     * preserved untouched (see class doc) so a briefly-offline paying user
+     * isn't punished. But if refresh keeps failing for longer than
+     * [OFFLINE_CACHE_MAX_AGE_MS] since the entitlement was last actually
+     * verified against Play, we stop trusting the cache: downgrade it to
+     * [EntitlementSource.OFFLINE_CACHED] and treat it as inactive until a
+     * refresh succeeds again. No-op for entitlements that are already
+     * inactive or that have never been verified (nothing to compare against).
+     */
+    private suspend fun applyOfflineCapIfStale(now: Long) {
+        val cached = playEntitlement.value
+        if (!cached.active) return
+        val lastVerified = cached.lastVerifiedAtMillis ?: return
+        val staleFor = now - lastVerified
+        if (staleFor <= OFFLINE_CACHE_MAX_AGE_MS) return
+        Log.w(
+            TAG,
+            "cached entitlement unverified for ${staleFor}ms (> ${OFFLINE_CACHE_MAX_AGE_MS}ms cap); " +
+                    "downgrading to OFFLINE_CACHED/inactive"
+        )
+        val downgraded = cached.copy(active = false, source = EntitlementSource.OFFLINE_CACHED)
+        playEntitlement.value = downgraded
+        runCatching { cacheStore.write(downgraded) }
+        lastRefreshOutcome += " (14-day offline cap applied; entitlement downgraded)"
     }
 
     /**
@@ -386,5 +426,12 @@ class PlayBillingEntitlementRepository @Inject constructor(
 
         /** One-time Expert preview length: one hour. */
         private const val TRIAL_DURATION_MS = 60L * 60L * 1000L
+
+        /**
+         * How long a cached entitlement is trusted without a successful Play
+         * re-verification before it is downgraded to OFFLINE_CACHED/inactive.
+         * See [applyOfflineCapIfStale] and the class doc.
+         */
+        private const val OFFLINE_CACHE_MAX_AGE_MS = 14L * 24L * 60L * 60L * 1000L
     }
 }

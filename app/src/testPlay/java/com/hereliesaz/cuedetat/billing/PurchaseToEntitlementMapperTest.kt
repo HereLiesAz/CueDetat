@@ -35,6 +35,27 @@ class PurchaseToEntitlementMapperTest {
     }
 
     @Test
+    fun activePurchaseUnacknowledged_stillReturnsActive() {
+        // Acknowledgement state must not gate entitlement: Google has already
+        // accepted the payment by the time purchaseState == PURCHASED. The
+        // acknowledge step only prevents Google's 3-day auto-refund; it is
+        // handled separately by BillingClientWrapper.acknowledgeIfNeeded().
+        val result = PurchaseToEntitlementMapper.map(
+            purchases = listOf(
+                FakePurchaseSnapshot(
+                    productId = BillingProductIds.PRODUCT_ID_EXPERT,
+                    purchaseState = PurchaseSnapshot.STATE_PURCHASED,
+                    isAcknowledged = false,
+                    isAutoRenewing = true
+                )
+            ),
+            nowMillis = 1_700_000_000_000L
+        )
+        assertTrue(result.active)
+        assertEquals(EntitlementSource.PLAY_LOCAL, result.source)
+    }
+
+    @Test
     fun pendingPurchase_returnsNotActive() {
         val result = PurchaseToEntitlementMapper.map(
             purchases = listOf(
