@@ -38,8 +38,7 @@ android {
 
 dependencies {
     implementation(libs.play.services.wearable)
-    implementation("androidx.health:health-services-client:1.0.0-rc02")
-    
+
     // Compose for Wear OS
     implementation("androidx.wear.compose:compose-material:1.4.0")
     implementation("androidx.wear.compose:compose-foundation:1.4.0")

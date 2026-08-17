@@ -377,6 +377,33 @@ tasks.configureEach {
     }
 }
 
+// ---------------------------------------------------------------------------
+// :wear companion module wiring.
+//
+// The legacy `dependencies { wearApp project(":wear") }` DSL (which embedded a
+// Wear 1.x "unbundled" APK inside the phone APK's resources for automatic push
+// install) no longer exists in this project's AGP version — the `wearApp`
+// configuration is not registered by AGP 9.2.1 (confirmed: declaring it fails
+// with "Configuration with name 'wearApp' not found", and no such configuration
+// name appears anywhere in the AGP 9.2.1 jar). This tracks upstream AGP/Wear OS
+// guidance: standalone Wear OS 3+ apps like :wear (minSdk 30, its own
+// applicationId) are no longer packaged *inside* the phone APK/AAB by Gradle at
+// all. Instead they're uploaded as a separate artifact under the *same* Play
+// Console app listing (Play Console → App bundle explorer → Wear release
+// track), and Play associates/pushes the watch app to the paired device based
+// on the shared package name + signing key — see
+// https://developer.android.com/training/wearables/apps/creating#embed-app-in-phone-app-module
+// for the pattern this superseded.
+//
+// Because there's no Gradle dependency to declare, it's easy for the watch
+// module to silently bit-rot unbuilt and unnoticed. To prevent that, make sure
+// :wear is at least compiled/assembled every time this app is assembled or
+// bundled, so a broken watch app fails the phone app's build too instead of
+// going unnoticed until a manual Play upload.
+tasks.matching { it.name.startsWith("assemble") || it.name.startsWith("bundle") }.configureEach {
+    dependsOn(":wear:assembleDebug")
+}
+
 
 dependencies {
     // Bouncy Castle is pulled in transitively. The resolutionStrategy below
@@ -475,6 +502,7 @@ dependencies {
 
     // Wear OS Data Layer
     implementation(libs.play.services.wearable)
+
 
     // Security & Integrity
     implementation(libs.play.integrity)

@@ -14,7 +14,9 @@ class WearableMessageService : WearableListenerService() {
         
         when (path) {
             "/trainer/start" -> {
-                val intent = Intent(this, SensorService::class.java)
+                val intent = Intent(this, SensorService::class.java).apply {
+                    putExtra(SensorService.EXTRA_NODE_ID, messageEvent.sourceNodeId)
+                }
                 startForegroundService(intent)
             }
             "/trainer/stop" -> {

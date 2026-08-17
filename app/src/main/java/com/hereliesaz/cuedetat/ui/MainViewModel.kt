@@ -154,10 +154,17 @@ class MainViewModel @Inject constructor(
     }
 
     /**
-     * Performs a Play Integrity check to ensure the app is genuine and the
-     * environment is secure. In a production environment, the retrieved
-     * token is sent to a secure backend which verifies it against Google's
-     * servers to decide whether to grant 'Expert' entitlements.
+     * Fetches a Play Integrity token as an on-device, best-effort diagnostic
+     * signal only. No backend exists to verify this token against Google's
+     * servers. The `IntegrityRepository.result` this call produces is
+     * separately observed by `PlayBillingEntitlementRepository`, but only to
+     * set a cosmetic `isDeviceGenuine` flag shown in the in-app debug dialog
+     * (see [com.hereliesaz.cuedetat.ui.composables.dialogs.BillingDebugDialog]) —
+     * that flag is NOT consulted anywhere Expert-mode entitlement is granted
+     * or checked. Entitlement is decided solely by purchase/tester/trial
+     * state in `EntitlementRepository`. Treat a failed/missing token here as
+     * "diagnostic unavailable", not as proof of tampering, since there is no
+     * server-side verdict backing it.
      */
     private fun performIntegrityCheck() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -176,10 +183,10 @@ class MainViewModel @Inject constructor(
             }
 
             if (token != null) {
-                android.util.Log.i("MainViewModel", "Play Integrity token retrieved successfully.")
-                // In a production app, we would send this token to our server here.
-                // The server would verify the token and return a cryptographically 
-                // signed verdict that the app can trust.
+                android.util.Log.i(
+                    "MainViewModel",
+                    "Play Integrity token retrieved successfully (diagnostic only; not verified server-side)."
+                )
             } else {
                 android.util.Log.w("MainViewModel", "Play Integrity check failed to retrieve a token.")
             }
@@ -386,6 +393,24 @@ class MainViewModel @Inject constructor(
             wristWearableRepository.wearableState.collect { wearableState ->
                 onEvent(MainScreenEvent.WearableStateUpdated(wearableState))
             }
+        }
+
+        // Start/stop the watch's stroke-consistency trainer session in lockstep with the
+        // ConsistencyOverlay's own visibility condition (EXPERT/BEGINNER mode, not on the
+        // table-scan screen) — see ProtractorScreen's ConsistencyOverlay onscreen block.
+        viewModelScope.launch {
+            _uiState
+                .map { it.experienceMode to it.showTableScanScreen }
+                .distinctUntilChanged()
+                .collect { (mode, showTableScanScreen) ->
+                    val shouldTrain = !showTableScanScreen &&
+                        (mode == ExperienceMode.EXPERT || mode == ExperienceMode.BEGINNER)
+                    if (shouldTrain) {
+                        wristWearableRepository.startTrainerSession()
+                    } else {
+                        wristWearableRepository.stopTrainerSession()
+                    }
+                }
         }
     }
 
@@ -655,6 +680,23 @@ class MainViewModel @Inject constructor(
                     val versionName = githubRepository.getLatestVersionName()
                     if (versionName != null) {
                         _uiState.update { it.copy(latestVersionName = versionName) }
+                    } else {
+                        // Null here is ambiguous (network/API failure vs. a
+                        // genuinely-empty response), but silently doing
+                        // nothing leaves the user thinking "no update
+                        // available" when the check may simply have failed.
+                        // Reuse the existing transient-warning HUD surface
+                        // (same one used for e.g. the stale-table-location
+                        // notice) rather than adding a new UI mechanism.
+                        android.util.Log.w(
+                            "MainViewModel",
+                            "CheckForUpdate: getLatestVersionName() returned null; " +
+                                    "update check may have failed (see GithubRepository logs)"
+                        )
+                        warningManager.triggerWarning(
+                            arrayOf("Couldn't check for updates — check your connection."),
+                            viewModelScope
+                        )
                     }
                 }
 

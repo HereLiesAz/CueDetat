@@ -2,17 +2,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-feature android:name="android.hardware.type.watch" />
-    
+
     <!-- Required for IMU access (Accelerometer, Gyroscope) -->
     <uses-feature android:name="android.hardware.sensor.accelerometer" />
     <uses-feature android:name="android.hardware.sensor.gyroscope" />
-    
-    <!-- Required for Heart Rate monitoring -->
-    <uses-permission android:name="android.permission.BODY_SENSORS" />
-    <!-- Required to use Health Services in background -->
-    <uses-permission android:name="android.permission.BODY_SENSORS_BACKGROUND" />
 
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Required to display the "Recording stroke data" foreground service notification on API 33+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Required to start a foreground service of type dataSync on API 34+ -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:allowBackup="true"
@@ -20,11 +20,11 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault">
-        
+
         <uses-library
             android:name="com.google.android.wearable"
             android:required="true" />
-            
+
         <meta-data
             android:name="com.google.android.wearable.standalone"
             android:value="false" />
@@ -40,10 +40,18 @@
             </intent-filter>
         </activity>
 
+        <!--
+             dataSync fits what this service actually does: stream captured IMU samples to the
+             phone over the Wearable Data Layer. It previously declared foregroundServiceType
+             "health", but that type requires the BODY_SENSORS permission (accelerometer/gyroscope
+             do not) and this service performs no heart-rate/health-sensor reads, so "health" was
+             both inaccurate and would have forced back a permission tied to a feature that isn't
+             implemented (see the removed heart-rate scaffolding below).
+        -->
         <service
             android:name=".service.SensorService"
             android:exported="false"
-            android:foregroundServiceType="health" />
+            android:foregroundServiceType="dataSync" />
 
         <service
             android:name=".service.WearableMessageService"
