@@ -21,5 +21,9 @@
         <dist:fusing dist:include="true" />
     </dist:module>
 
-    <application />
+    <!-- This module is assets-only (the .tflite model files) — no Kotlin/Java source,
+         so it produces no dex files. Without hasCode="false", bundletool rejects the
+         AAB at packagePlayReleaseBundle with "has no dex files but hasCode is not
+         set to false". -->
+    <application android:hasCode="false" />
 </manifest>
