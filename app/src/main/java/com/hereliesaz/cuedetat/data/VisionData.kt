@@ -45,6 +45,7 @@ data class VisionData(
 
         if (genericBalls != other.genericBalls) return false
         if (customBalls != other.customBalls) return false
+        if (balls != other.balls) return false
         if (detectedHsvColor != null) {
             if (other.detectedHsvColor == null) return false
             if (!detectedHsvColor.contentEquals(other.detectedHsvColor)) return false
@@ -63,6 +64,7 @@ data class VisionData(
     override fun hashCode(): Int {
         var result = genericBalls.hashCode()
         result = 31 * result + customBalls.hashCode()
+        result = 31 * result + balls.hashCode()
         result = 31 * result + (detectedHsvColor?.contentHashCode() ?: 0)
         result = 31 * result + detectedBoundingBoxes.hashCode()
         result = 31 * result + detectedCues.hashCode()

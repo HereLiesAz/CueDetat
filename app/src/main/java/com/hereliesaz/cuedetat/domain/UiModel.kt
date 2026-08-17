@@ -192,6 +192,52 @@ data class CueDetatState(
     val pitchAngle: Float
         get() = currentOrientation.pitch
 
+    // CueDetatState has three FloatArray? fields (relocaliserDeltaQ, lockedHsvColor,
+    // lockedHsvStdDev). Kotlin's compiler-generated data class equals()/hashCode() would
+    // compare FloatArray fields by reference, not content, silently breaking equality
+    // (and thus StateFlow update suppression / distinctUntilChanged-style checks) whenever
+    // only ball classification / locked color / relocaliser data changed. Rather than
+    // hand-writing per-field comparisons for all ~120 properties (error-prone to keep in
+    // sync as fields are added), we build a single comparable snapshot list where the
+    // FloatArray fields are converted to List<Float> (structural equality) and everything
+    // else is compared exactly as the synthesized equals would compare it.
+    private fun comparableFields(): List<Any?> = listOf(
+        experienceMode, pendingExperienceMode, haterState, viewWidth, viewHeight, screenDensity,
+        protractorUnit, onPlaneBall, obstacleBalls, savedFeltSamples, table, zoomSliderPosition,
+        worldRotationDegrees, areHelpersVisible, valuesChangedSinceReset, cameraMode, viewOffset,
+        tableZOffset, orientationLock, pendingOrientationLock, isBeginnerViewLocked, isBankingMode,
+        bankingAimTarget, bankShotPath, pocketedBankShotPocketIndex, showTableSizeDialog,
+        isForceLightMode, luminanceAdjustment, showLuminanceDialog, glowStickValue, showGlowStickDialog,
+        isSpinControlVisible, isMasseModeActive, masseShotAngleDeg, selectedSpinOffset, spinPaths,
+        masseImpactPoints, masseConnectsTarget, masseGhostBallCenter, spinControlCenter,
+        lingeringSpinOffset, spinPathsAlpha, currentOrientation, pitchMatrix, railPitchMatrix,
+        sizeCalculationMatrix, inversePitchMatrix, flatMatrix, logicalPlaneMatrix, hasInverseMatrix,
+        visionData, arConfidenceHistory, arLowConfidenceFrameCount, relocaliserDeltaQ?.toList(),
+        relocaliserAttemptFrames, snapCandidates, tableScanModel, depthPlane, arDerivedPitch,
+        arMeasuredHeightM, arTableMatrix, arCapturedCorners, depthCapability, arModuleState,
+        lockedHsvColor?.toList(), lockedHsvStdDev?.toList(), showAdvancedOptionsDialog,
+        showBillingDebugDialog, showCalibrationScreen, showTableScanScreen, cvRefinementMethod,
+        useCustomModel, isSnappingEnabled, hasTargetBallBeenMoved, hasCueBallBeenMoved,
+        cannyThreshold1, cannyThreshold2, isAutoCalibrating, showCvMask, isTestingCvMask,
+        isCalibratingColor, colorSamplePoint, cameraMatrix, distCoeffs, shotLineAnchor,
+        tangentDirection, isGeometricallyImpossible, isStraightShot, isObstructed, isTiltBeyondLimit,
+        warningText, shotGuideImpactPoint, aimedPocketIndex, aimingLineBankPath, tangentLineBankPath,
+        inactiveTangentLineBankPath, tangentAimedPocketIndex, aimingLineEndPoint, appControlColorScheme,
+        interactionMode, movingObstacleBallIndex, isMagnifierVisible, magnifierSourceCenter,
+        isWorldLocked, preResetState, postResetState, ballSelectionPhase, cueBallCvAnchor,
+        targetCvAnchor, obstacleCvAnchors, latestVersionName, distanceUnit, targetBallDistance,
+        lensWarpTps, targetType, isTopDownViewActive, topDownBitmap, topDownTransitionProgress,
+        isExpertEntitled, isAdvisorEnabled, recommendedShot, wearableState,
+    )
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is CueDetatState) return false
+        return comparableFields() == other.comparableFields()
+    }
+
+    override fun hashCode(): Int = comparableFields().hashCode()
+
     enum class OrientationLock {
         AUTOMATIC, PORTRAIT, LANDSCAPE;
         fun next(): OrientationLock = when (this) {

@@ -16,6 +16,8 @@ import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -47,14 +49,23 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
     private val haterViewModel: HaterViewModel by viewModels()
 
-    private var cameraPermissionGranted by mutableStateOf(false)
-    private var paywallTrigger by mutableStateOf<com.hereliesaz.cuedetat.billing.PaywallTrigger?>(null)
+    // Backed by rememberSaveable-created MutableStates (assigned once composition starts,
+    // see AppContent/setContent below) instead of plain mutableStateOf Activity fields, so
+    // an in-progress paywall / permission-gate survives Activity recreation on a
+    // configuration change (e.g. system dark-mode toggle) instead of silently resetting and
+    // dismissing an open paywall sheet with no callback. Written to from non-composable
+    // callbacks (requestPermissionsLauncher, observeSingleEvents' flow collector) via
+    // `.value`, which is safe: Compose's snapshot system observes such writes regardless of
+    // whether they originate inside composition.
+    private lateinit var cameraPermissionGrantedState: MutableState<Boolean>
+    private lateinit var paywallTriggerState: MutableState<com.hereliesaz.cuedetat.billing.PaywallTrigger?>
+
     // Bumped on every paywall request so the sheet re-shows even when the
     // trigger enum value is identical to the previous one. Without this,
     // setting paywallTrigger from SPLASH_SCREEN to SPLASH_SCREEN does nothing
     // (mutableStateOf uses structural equality), so a non-null→non-null
     // transition silently drops the request.
-    private var paywallShowSequence by mutableStateOf(0L)
+    private lateinit var paywallShowSequenceState: MutableState<Long>
 
     private val requestPermissionsLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
@@ -64,7 +75,7 @@ class MainActivity : ComponentActivity() {
             } else true
 
             if (cameraGranted) {
-                cameraPermissionGranted = true
+                cameraPermissionGrantedState.value = true
                 if (bluetoothGranted) {
                     (application as? MyApplication)?.initializeWearables()
                 }
@@ -83,10 +94,22 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        cameraPermissionGranted = hasCameraPermission()
-
         setContent {
-            if (cameraPermissionGranted) {
+            val cameraGranted = rememberSaveable { mutableStateOf(hasCameraPermission()) }
+            val trigger =
+                rememberSaveable { mutableStateOf<com.hereliesaz.cuedetat.billing.PaywallTrigger?>(null) }
+            val showSequence = rememberSaveable { mutableStateOf(0L) }
+            // Publish the saveable MutableState instances to the Activity fields once per
+            // composition commit so the non-composable callbacks above/below can write to
+            // them. SideEffect (rather than a bare assignment) avoids re-publishing during a
+            // composition that gets discarded before being committed.
+            SideEffect {
+                cameraPermissionGrantedState = cameraGranted
+                paywallTriggerState = trigger
+                paywallShowSequenceState = showSequence
+            }
+
+            if (cameraGranted.value) {
                 AppContent()
             } else {
                 CueDetatTheme {
@@ -118,6 +141,18 @@ class MainActivity : ComponentActivity() {
         // Silently unlock Expert for allowlisted testers without requiring them
         // to open the paywall. Self-guards and never prompts.
         viewModel.attemptTesterAutoUnlock(this)
+
+        // Camera permission is only checked once up front in onCreate; if the user revokes
+        // it from system Settings while the app is backgrounded, CameraX fails silently
+        // inside a swallowed catch(Exception) in CameraBackground, leaving a frozen blank
+        // camera feed with no recovery UI. Re-check on every resume and, if it was revoked,
+        // flip back to the permission-gate screen (same mechanism as the initial request).
+        if (::cameraPermissionGrantedState.isInitialized) {
+            val currentlyGranted = hasCameraPermission()
+            if (cameraPermissionGrantedState.value != currentlyGranted) {
+                cameraPermissionGrantedState.value = currentlyGranted
+            }
+        }
     }
 
     private fun observeSingleEvents() {
@@ -158,8 +193,8 @@ class MainActivity : ComponentActivity() {
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 is SingleEvent.ShowPaywall -> {
-                    paywallShowSequence = paywallShowSequence + 1
-                    paywallTrigger = event.trigger
+                    paywallShowSequenceState.value = paywallShowSequenceState.value + 1
+                    paywallTriggerState.value = event.trigger
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 null -> { /* Do nothing */ }
@@ -202,14 +237,14 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            paywallTrigger?.let { trigger ->
+            paywallTriggerState.value?.let { trigger ->
                 // key(paywallShowSequence): force a fresh composition (and
                 // fresh ModalBottomSheet animation) on every show request,
                 // even if the trigger enum is identical to the previous one.
-                androidx.compose.runtime.key(paywallShowSequence) {
+                androidx.compose.runtime.key(paywallShowSequenceState.value) {
                     com.hereliesaz.cuedetat.ui.composables.paywall.PaywallSheet(
                         trigger = trigger,
-                        onDismiss = { paywallTrigger = null },
+                        onDismiss = { paywallTriggerState.value = null },
                         onPurchasedAutoEnterExpert = {
                             viewModel.onEvent(MainScreenEvent.SetExperienceMode(ExperienceMode.EXPERT))
                         }

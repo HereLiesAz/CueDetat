@@ -414,8 +414,9 @@ class GestureReducer @Inject constructor() {
      * apparent radius of the snapped detected ball's bounding box.
      *
      * The bounding box is in source-image (camera) pixels; we map it to canvas
-     * pixels via the same FILL scaling used by the renderer, then compare to
-     * the target ball's current screen radius derived from pitchMatrix.
+     * pixels via the same uniform FILL_CENTER scale-with-rotation transform used
+     * by the renderer (BallRenderer.drawBoundingBoxes), then compare to the
+     * target ball's current screen radius derived from pitchMatrix.
      */
     private fun computeSnapZoomSlider(
         state: CueDetatState,
@@ -432,10 +433,18 @@ class GestureReducer @Inject constructor() {
             return state.zoomSliderPosition
         }
 
-        // Detected ball radius in canvas pixels (avg of x/y scaled half-edges).
-        val xScale = canvasW.toFloat() / srcW.toFloat()
-        val yScale = canvasH.toFloat() / srcH.toFloat()
-        val bboxRadiusCanvas = (bbox.width() * xScale + bbox.height() * yScale) / 4f
+        // Detected ball radius in canvas pixels, using the same uniform FILL_CENTER
+        // scale-with-rotation transform as BallRenderer.drawBoundingBoxes (see that
+        // file's boundingBoxMatrix construction): the source image is rotated into
+        // display orientation, then uniformly scaled up by max(canvasW/rotatedW,
+        // canvasH/rotatedH) so it fully covers the canvas (centre-crop). A
+        // non-uniform per-axis scale here would disagree with what's actually drawn
+        // whenever the source aspect ratio differs from the canvas's.
+        val rotation = visionData.sourceImageRotation.toFloat()
+        val rotatedW = if (rotation % 180f == 0f) srcW.toFloat() else srcH.toFloat()
+        val rotatedH = if (rotation % 180f == 0f) srcH.toFloat() else srcW.toFloat()
+        val scale = maxOf(canvasW.toFloat() / rotatedW, canvasH.toFloat() / rotatedH)
+        val bboxRadiusCanvas = (bbox.width() + bbox.height()) * scale / 4f
         if (bboxRadiusCanvas <= 0f) return state.zoomSliderPosition
 
         // Target ball's current on-screen radius via the live pitch matrix.

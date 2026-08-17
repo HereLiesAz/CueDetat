@@ -30,11 +30,16 @@ class SensorRepository @Inject constructor(
     private val rotationVectorSensor: Sensor? =
         sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
 
-    private var smoothedYaw: Float? = null
-    private var smoothedPitch: Float? = null
-    private var smoothedRoll: Float? = null
-
     val fullOrientationFlow: Flow<FullOrientation> = callbackFlow {
+        // Smoothing state is local to this collector (closure-captured), not a shared
+        // instance field. MainViewModel and HaterViewModel each collect this flow
+        // concurrently via independent callbackFlow invocations; sharing smoothing state
+        // across them meant one collector's cancellation (awaitClose) reset the other's
+        // in-progress smoothing, causing a visible orientation jump.
+        var smoothedYaw: Float? = null
+        var smoothedPitch: Float? = null
+        var smoothedRoll: Float? = null
+
         // Battery: register at the slow UI rate (~15Hz) by default and bump to the fast
         // GAME rate (~50Hz) only while the phone is actually being moved, dropping back
         // once it has been still for STILL_TIMEOUT_MS. A still phone is the common case
@@ -99,10 +104,6 @@ class SensorRepository @Inject constructor(
         }
         awaitClose {
             sensorManager.unregisterListener(listener)
-            // Reset smoothed values when listener is unregistered
-            smoothedYaw = null
-            smoothedPitch = null
-            smoothedRoll = null
         }
     }
 
