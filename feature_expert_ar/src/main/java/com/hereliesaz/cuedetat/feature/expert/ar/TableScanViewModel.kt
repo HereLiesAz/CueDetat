@@ -568,21 +568,6 @@ class TableScanViewModel(
     }
 
     /**
-     * Sorts four logical-space corner points into TL/TR/BR/BL order based on their
-     * geometric position relative to the centroid. Logical space shares the screen's
-     * y-convention (smaller y = top / far rail), matching Table.kt where the top
-     * pockets sit at -halfH, so a top/bottom split by centroid is correct.
-     */
-    private fun sortCornersClockwise(corners: List<PointF>): List<PointF> {
-        if (corners.size != 4) return corners
-        val cx = corners.sumOf { it.x.toDouble() }.toFloat() / 4f
-        val cy = corners.sumOf { it.y.toDouble() }.toFloat() / 4f
-        val top = corners.filter { it.y < cy }.sortedBy { it.x }
-        val bottom = corners.filter { it.y >= cy }.sortedByDescending { it.x }
-        return (top + bottom).take(4)
-    }
-
-    /**
      * Commit the four captured corner pockets.
      *
      * In the world-anchored flow the corners' *placement* lives in ARCore (the anchors drive the

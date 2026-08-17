@@ -45,6 +45,16 @@ android {
         compose = true
     }
 
+    buildTypes {
+        release {
+            // Merged into the base app's single R8 pass; protects
+            // ArControllerImpl, which is only reachable via reflection from
+            // :app (see ArControllerFacade). Without this, R8 may strip or
+            // rename the class since nothing references it at compile time.
+            proguardFiles("proguard-rules.pro")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
