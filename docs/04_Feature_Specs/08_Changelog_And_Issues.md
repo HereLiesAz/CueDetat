@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Tutorial reimplemented on AzNavRail 10.18's status-driven guidance framework** (`azStatus`/`azEdge`/`azGoal`/`azGuidanceTarget` in `AzNavRailMenu` + `TutorialGuidanceTargets.kt`), replacing the blocking `TutorialOverlay`/`TutorialReducer` placeholder. The tutorial is now non-blocking and completion is framework-persisted. Resolves the "Interactive Tutorial is Blocking" issue.
+- **Table-scan wizard grew from three steps to four.** The `ArSetupPrompt` three-step wizard (Lock Felt Color → Scan Table → Verify) described below under `[0.9.3]` no longer exists — `ArSetupPrompt` was deleted. The live flow is now the `ScanStep` state machine (`FELT_CAPTURE`, `CORNER_QUAD`, `POCKET_GUIDE`, `AUTO_READY`) driven by `TableScanViewModel`/`TableScanScreen`: felt-color capture, world-anchored corner-pocket tapping, an alternate manual per-pocket guide, and a legacy `AUTO_READY` fallback superseded by the wizard's own geometry validation.
+- **`ArTrackingLost` is now a deliberate no-op**, not a reset. `ArCoreBackground` no longer dispatches it when tracking pauses (it just logs a warning and holds anchors), and `ControlReducer`'s handler for the event does nothing regardless — an earlier version that reset `tableScanModel`/`lensWarpTps` and bounced the user back to `AR_SETUP` on every brief tracking blip was disruptive enough to be scrapped. See `ArFlowReducerTest.kt`.
 
 ## [0.9.3] - 2026-03-25
 

@@ -58,8 +58,8 @@ This document serves as an index, mapping high-level concepts to their concrete 
 ### AR / Camera
 *   **Standard Camera:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/CameraBackground.kt`
     *   *Responsibility:* CameraX preview + `ImageAnalysis` composable. Used when `cameraMode` is `CAMERA` or `CAMERA_ONLY`.
-*   **AR Camera:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/ArCoreBackground.kt`
-    *   *Responsibility:* ARCore-powered `GLSurfaceView` composable. Allocates the OES texture, renders the camera feed as a fullscreen quad, feeds CPU frames to `ArFrameProcessor`, and dispatches `ArTrackingLost` when tracking drops from `TRACKING` to `PAUSED`.
+*   **AR Camera:** `feature_expert_ar/src/main/java/com/hereliesaz/cuedetat/feature/expert/ar/ArCoreBackground.kt`
+    *   *Responsibility:* ARCore-powered `GLSurfaceView` composable. Allocates the OES texture, renders the camera feed as a fullscreen quad, feeds CPU frames to `ArFrameProcessor`. When tracking drops from `TRACKING` to `PAUSED` it only logs a warning and holds the existing anchors — it does **not** dispatch `ArTrackingLost` (that event is a deliberate no-op elsewhere anyway; see `ControlReducer`).
 *   **AR Frame Bridge:** `app/src/main/java/com/hereliesaz/cuedetat/data/ArFrameProcessor.kt`
     *   *Responsibility:* Thread-safe bridge from GL-thread ARCore `Frame` objects to `VisionRepository`, using `AtomicReference` so neither thread blocks.
 *   **ARCore Session:** `app/src/main/java/com/hereliesaz/cuedetat/data/ArDepthSession.kt`
@@ -70,15 +70,17 @@ This document serves as an index, mapping high-level concepts to their concrete 
     *   *Key composables:* `ArTrackingBadge` (pulsing indicator when AR is active). `ArSetupPrompt` has been deleted.
 
 ### Table Scan
-*   **Table Scan Screen:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanScreen.kt`
-    *   Rendered as an **inline overlay** inside `ProtractorScreen`, shown when `uiState.showTableScanScreen` is `true`. It is not a navigated route; `ROUTE_SCAN` has been removed from the `NavHost`. No GPS permission request, no Cancel button. Calls `viewModel.resetScan()` on entry via `LaunchedEffect`.
-*   **Table Scan ViewModel:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanViewModel.kt`
-    *   *Responsibility:* Accumulates pocket detections into `PocketCluster`s, fits geometry via `TableGeometryFitter`, computes homography and residual TPS warp, and persists the resulting `TableScanModel`. Pocket-detection auto-complete has been removed from `onFrame()`; only `captureFeltAndComplete()` can complete a scan.
-*   **Table Scan Analyzer:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanAnalyzer.kt`
+*   **Scan Step State Machine:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/ScanStep.kt`
+    *   *Responsibility:* Four-step enum (`FELT_CAPTURE`, `CORNER_QUAD`, `POCKET_GUIDE`, `AUTO_READY`) driving the scan wizard. Lives in the base module (not `:feature_expert_ar`) because `TableScanRepository` persists/restores it.
+*   **Table Scan Screen:** `feature_expert_ar/src/main/java/com/hereliesaz/cuedetat/feature/expert/ar/TableScanScreen.kt`
+    *   Rendered as an **inline overlay** inside `ProtractorScreen`, shown when `uiState.showTableScanScreen` is `true`. It is not a navigated route; `ROUTE_SCAN` has been removed from the `NavHost`. No GPS permission request, no Cancel button. Calls `viewModel.resetScan()` on entry via `LaunchedEffect`. Renders UI for all four `ScanStep`s: felt-color capture, world-anchored corner-pocket tapping, the (alternate/manual) per-pocket guide, and the legacy `AUTO_READY` fallback.
+*   **Table Scan ViewModel:** `feature_expert_ar/src/main/java/com/hereliesaz/cuedetat/feature/expert/ar/TableScanViewModel.kt`
+    *   *Responsibility:* Drives the `ScanStep` wizard. `captureFeltAndComplete()` locks the felt color, loads a default table model, and advances `FELT_CAPTURE → CORNER_QUAD` (world-anchored corner capture via `ArTableSession`). `startManualHoleCapture()` instead advances into `POCKET_GUIDE`, the manual per-pocket capture path, accumulating pocket detections into `PocketCluster`s and fitting geometry via `TableGeometryFitter`. `AUTO_READY` is a legacy/safety-fallback step superseded by the wizard's own geometry validation. Persists the resulting `TableScanModel`.
+*   **Table Scan Analyzer:** `feature_expert_ar/src/main/java/com/hereliesaz/cuedetat/feature/expert/ar/TableScanAnalyzer.kt`
     *   *Responsibility:* CameraX `ImageAnalysis.Analyzer` that detects pocket-sized blobs using `PocketDetector` (TFLite) or a Hough-circle fallback.
 *   **Pocket Detector Interface:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/PocketDetector.kt`
-*   **TFLite Pocket Detector:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TFLitePocketDetector.kt`
-    *   *Responsibility:* YOLOv5 TFLite model (640×640 input) for pocket detection; falls back gracefully if the model file is absent.
+*   **TFLite Pocket Detector:** `app/src/main/java/com/hereliesaz/cuedetat/data/MergedTFLiteDetector.kt`
+    *   *Responsibility:* `PocketDetector` implementation backed by the merged `MASTER_POOL_MODEL.tflite` (YOLOv8n, multiple heads packed into one binary); falls back gracefully if the model asset is absent.
 *   **Table Scan Repository:** `app/src/main/java/com/hereliesaz/cuedetat/data/TableScanRepository.kt`
     *   *Responsibility:* Persists `TableScanModel` to disk as JSON; optionally attaches GPS coordinates for location-based table identification.
 

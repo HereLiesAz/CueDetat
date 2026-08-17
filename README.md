@@ -18,7 +18,7 @@ This is an Android application that uses your device's camera and a frankly exce
 * **Live Camera Augmented Reality Overlay:**
     * See the guides directly on your pool game.
     * Designed for easy one or two-handed use.
-    * **Guided AR Table Setup Wizard:** A three-step wizard (lock felt color → scan pockets → verify alignment) walks you through calibrating the AR overlay. The system auto-confirms once the table overlay confidence crosses 0.8. If ARCore loses tracking, it gracefully resets and asks you to try again — because it knows how you are with instructions.
+    * **Guided AR Table Setup Wizard:** A four-step wizard (lock felt color → tap the four corner pockets → optional manual per-pocket guide → auto-ready) walks you through calibrating the AR overlay. The system auto-confirms once the table overlay confidence crosses 0.8. If ARCore's tracking blips for a moment, the app just floats on the last known table pose instead of throwing your whole scan away — it turns out constantly nuking your progress every time a hand crosses the lens was *more* annoying than the tracking hiccup itself, so a full rescan is now only required if you back all the way out of AR setup yourself.
 * **Protractor Mode**
     * To remind you of the basic, soul-crushing simplicity of a cut shot.
     * See where the balls will go before you hit them.
@@ -62,24 +62,26 @@ The Details.
 Cue D’état is built upon a single, immutable truth:
 Unidirectional Data Flow is the master of the master of the universe. State flows down, events flow up. To question this is to question physics, which is how you got yourself to this point in the first place.
 
-1.  **Camera Preview:** Uses CameraX to display a live feed from the device camera.
+This app is not a custom `View` with a `Canvas` and a prayer — it's a strict Model-View-Intent (MVI)
+app, unidirectional data flow all the way down. State flows down, events flow up, and the moment
+someone tries to sneak business logic into a Composable, physics itself should intervene.
+
+1.  **Camera Preview:** Uses CameraX (and, for the AR flow, ARCore) to display a live feed from the device camera.
 2.  **Sensor Input:** Leverages the `TYPE_ROTATION_VECTOR` sensor to determine the phone's pitch, roll, and yaw. The pitch is primarily used to tilt the 2D protractor plane. An offset is applied to account for natural phone holding angles.
-3.  **Custom View (`ProtractorOverlayView`):** All guides and visual elements are drawn on a custom `View` that overlays the camera preview.
-4.  **Drawing Logic:**
+3.  **MVI Pipeline:** Every user interaction becomes a `MainScreenEvent`, sent up to `MainViewModel`. The `StateReducer` (and its sub-reducers, one per concern — gestures, controls, CV, etc.) is the *only* thing allowed to touch `CueDetatState`, producing a new immutable state as a pure function of the old one. `UpdateStateUseCase` then runs on that new state to derive everything downstream of it — perspective matrices, aiming lines, bank shots, spin paths — before the final state is emitted from a `StateFlow` and the UI redraws itself as a pure function of it.
+4.  **Rendering (Compose, not a custom `View`):** `ProtractorOverlay` is a Compose `Canvas` that drives `OverlayRenderer.draw` on every recomposition, delegating to sub-renderers (`TableRenderer`, `RailRenderer`, `BallRenderer`, `LineRenderer`, …) in strict z-order.
     * **Protractor Plane:** A logical 2D plane is defined. Circles representing the cue and target ball positions, protractor angle lines, and deflection lines are drawn on this plane.
-    * **3D Projection (Simplified):** An `android.graphics.Camera` object is used to apply an X-axis rotation (based on phone pitch) to this logical plane, creating a 3D perspective effect. This transformed matrix is then applied to the canvas.
+    * **3D Projection (Simplified):** `UpdateStateUseCase` builds the projection with `android.graphics.Camera` — a `worldMatrix` handles 2D zoom, then a `perspectiveMatrix` applies table rotation (Y-axis) followed by device pitch/tilt (X-axis), assembled into the final `pitchMatrix` the renderer uses every frame.
     * **Ghost Balls:** Screen-space circles are drawn to represent the "3D" position of the cue and target balls. Their Y-offset from the projected plane centers is scaled by the sine of the pitch angle (raised to a power for a more pronounced effect) to simulate them floating above the plane.
     * **Helper Text:** Text labels are drawn either on the (lifted) protractor plane or directly in screen space, with basic collision avoidance and dynamic sizing.
-5.  **Gesture Handling:**
-    * `ScaleGestureDetector` for pinch-to-zoom.
-    * `MotionEvent` tracking for single-finger pan-to-rotate.
-6.  **Theming:** Uses Jetpack Compose for Material 3 theming, with color values then passed to the custom view's `Paint` objects.
+5.  **Gesture Handling:** A single Compose `pointerInput` modifier, `view/gestures/GestureHandler.kt`, handles everything — single-finger drag (move objects / pan), two-finger pinch-to-zoom, and two-finger rotation — and turns raw touches into the same `MainScreenEvent`s as everything else. No `ScaleGestureDetector`, no raw `MotionEvent` plumbing.
+6.  **Theming:** Uses Jetpack Compose Material 3 theming throughout; derived color values feed a `PaintCache` of pre-configured `Paint` objects for the `Canvas` drawing calls.
 
 ## Known Quirks & Future Delusions
 
 * **A Virtual Table for Virtually Useful Bank Shot Projection:** Using more sophisticated dynamic layout involving a line drawing of a billiards table will come someday.
 * **True 3D Rendering:** This app fakes 3D with 2D canvas tricks. Moving to OpenGL ES or a 3D engine like Filament would allow for actual 3D models and lighting, but would also drastically increase complexity. And probably anxiety. But probably not usefulness.
-* **Ball, Table and Pocket Detection:** Partially real, believe it or not. Pocket detection uses Hough circles with an optional TFLite (YOLOv5) model. Table scanning accumulates observations across frames, fits a 2:1 geometry model, and builds a TPS warp map for lens-distortion correction. Ball detection runs via ML Kit + OpenCV contour refinement on every frame. What remains fantasy: doing all of this reliably on a $12 phone held by someone who has had three beers.
+* **Ball, Table and Pocket Detection:** Partially real, believe it or not. Pocket/table detection uses a merged TFLite (YOLOv8n) model, `MergedTFLiteDetector`, with a Hough-circle fallback if the model asset isn't available. Table scanning accumulates observations across frames, fits a 2:1 geometry model, and builds a TPS warp map for lens-distortion correction. Ball detection runs via ML Kit for coarse region proposals, then `CvBallDetector` refines each region with a felt-mask-subtraction + connected-components pipeline, finished off with `HoughCircles` for sub-pixel centering — no contour detection involved. What remains fantasy: doing all of this reliably on a $12 phone held by someone who has had three beers.
 * **Insulting Warnings:** The pool of sarcastic remarks is finite. Contributions welcome if they tickle me the required level of pink.
 * **Performance:** Drawing many complex paths and text elements on every frame can be demanding. Optimizations are an ongoing battle. And yet, somehow, it feels more like a you-problem.
 

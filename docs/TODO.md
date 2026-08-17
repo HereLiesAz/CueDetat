@@ -17,8 +17,8 @@ Last updated: 2026-03-28
 - **Spec:** `docs/superpowers/specs/2026-03-24-beginner-rendering-ar-flow-design.md` — confidence should rise during the `SCAN_TABLE` phase as table boundary coverage increases.
 
 ### 1.3 TFLite Pocket Detector Asset Verification
-- **File:** `data/TFLitePocketDetector.kt`, `app/src/main/assets/`
-- **Problem:** The TFLite YOLOv5 model file path/asset presence is not verified across all build variants. Graceful fallback to Hough circles exists, but if the asset is silently missing, the more capable path is always skipped without any diagnostic signal.
+- **File:** `data/MergedTFLiteDetector.kt`, `feature_mlmodel/src/main/assets/ml/`
+- **Problem:** The TFLite (YOLOv8n, `MASTER_POOL_MODEL.tflite`) model file path/asset presence is not verified across all build variants. Graceful fallback to Hough circles exists, but if the asset is silently missing, the more capable path is always skipped without any diagnostic signal.
 
 ### 1.4 Lens Barrel Distortion Correction
 - **File:** `ui/composables/calibration/`, `data/VisionRepository.kt`

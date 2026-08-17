@@ -53,5 +53,8 @@
 
 * **AR Tracking Badge** (`ArTrackingBadge`):
   * A small pulsing indicator shown in `AR_ACTIVE` state to signal that ARCore is tracking.
-  * When tracking drops from `TRACKING` to `PAUSED`, `ArCoreBackground` dispatches `ArTrackingLost`,
-    which clears the scan model and returns to `AR_SETUP`.
+  * When tracking drops from `TRACKING` to `PAUSED`, `ArCoreBackground` does **not** clear the scan
+    model or bounce the user back to `AR_SETUP`. It logs a warning and holds the last known
+    anchors/matrix, letting ARCore recover on its own; `ArTrackingLost` (the event that would have
+    done the reset) is a deliberate no-op in `ControlReducer`, kept around only to avoid a
+    disruptive full reset on every brief tracking blip.

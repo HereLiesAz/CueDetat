@@ -12,12 +12,14 @@ The application's vision system uses a hybrid, two-stage pipeline to achieve rob
 
 2. **Phase 2: OpenCV Refinement (The "Sniper")**
 
-* **Tool**: OpenCV.
+* **Tool**: OpenCV, via `CvBallDetector`.
 * **Purpose**: For each ROI provided by the Scout, a more precise algorithm is run *only within that
   box*.
-* **Algorithm**: The default refinement method is **Contour Detection** (`findContours` +
-  `minEnclosingCircle`), which is more robust against perspective distortion than the alternative
-  `HoughCircles` method.
+* **Algorithm**: There is no contour/Hough toggle. `CvBallDetector` runs a single fixed pipeline:
+  build a felt-color mask from the sampled HSV mean/stdDev, morphologically close it and subtract
+  the original mask to isolate ball-sized blobs, filter those blobs by area and circularity via
+  `connectedComponentsWithStats`, then run `HoughCircles` in a local crop around each surviving
+  blob to refine its center/radius to sub-pixel precision.
 * **Dynamic Rangefinder**: The system calculates the expected on-screen pixel radius of a ball at
   the Y-coordinate of the Scout's bounding box. This provides the Sniper with a tight `minRadius`
   and `maxRadius`, reducing false positives.

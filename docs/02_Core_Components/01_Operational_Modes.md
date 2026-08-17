@@ -113,7 +113,14 @@ The AR camera system follows a strict state machine built on the mandatory rule:
 - **Camera-Only Mode** → `OFF`: Clicking **Off** while in camera-only mode turns off the camera
   and toggles the button back to **AR**.
 - **`AR_SETUP`** → `AR_ACTIVE`: Auto-advances when table identification is successful.
-- **`AR_ACTIVE`** → `AR_SETUP`: `ArTrackingLost` (clears scan model and returns to setup).
+- **`ArTrackingLost` is a deliberate no-op**: when ARCore tracking drops from `TRACKING` to
+  `PAUSED`, `ArCoreBackground` just logs a warning and holds the last known anchors/matrix; it does
+  not dispatch `ArTrackingLost` at all. Even if it did, `ControlReducer`'s handler for that event is
+  a no-op ("The nuclear payload has been disarmed") — it does **not** clear `tableScanModel`,
+  `lensWarpTps`, or return `cameraMode` to `AR_SETUP`. An earlier version reset state on every
+  tracking blip and was found too disruptive (brief tracking loss is common and momentary), so the
+  app now floats on the last known table pose and only requires a fresh scan if the user explicitly
+  restarts AR setup. See `ArFlowReducerTest.kt` for the regression test guarding this behavior.
 
 ### AR_SETUP Behavior
 
