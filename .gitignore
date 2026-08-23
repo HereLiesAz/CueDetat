@@ -51,3 +51,7 @@ project_backup_full_*
 project_source_only_*
 project_source_scoped_*
 .superpowers/
+
+# ── Python (CI tooling) ──────────────────────────────────────────────────────
+__pycache__/
+*.pyc
