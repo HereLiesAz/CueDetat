@@ -158,13 +158,9 @@ private fun handleSetExperienceMode(
     mode: ExperienceMode,
     reducerUtils: ReducerUtils
 ): CueDetatState {
-    // Guard: Expert is gated by entitlement. If the caller asks for Expert
-    // when the user is not entitled, leave the state unchanged. UI surfaces
-    // (PaywallSheet, MainViewModel.onEvent) are responsible for triggering
-    // the purchase flow on this path.
-    if (mode == ExperienceMode.EXPERT && !state.isExpertEntitled) {
-        return state
-    }
+    // Expert mode is free and unconditional. It used to be gated behind a
+    // Play Billing entitlement read from an unsigned client-side cache that
+    // nothing ever verified; the gate is gone along with the billing stack.
 
     val newState = state.copy(
         experienceMode = mode,

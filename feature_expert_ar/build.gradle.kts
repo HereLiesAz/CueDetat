@@ -7,7 +7,7 @@
 // The base (:app) never references these classes at compile time — it talks to
 // the `ArController` interface and loads `ArControllerImpl` via reflection after
 // the split installs (see ArControllerFacade / PlayArFeatureDelivery). Delivery
-// is entitlement-gated: the split is only requested for paid / trial users.
+// is requested on demand, the first time a user actually opens Expert AR.
 //
 // The base uses a `distribution` flavor dimension (play/foss), so this module
 // must declare the same dimension/flavors — otherwise `implementation(project(":app"))`

@@ -10,7 +10,7 @@ package com.hereliesaz.cuedetat.delivery
  *    flavor adds the module's java srcDir and ARCore), so the code is always
  *    present and there is nothing to install.
  *  - **play**: the base AAB ships *without* the AR code or ARCore. The split is
- *    delivered on demand via Play Feature Delivery the first time an entitled
+ *    delivered on demand via Play Feature Delivery the first time a
  *    user enters Expert AR.
  *
  * Only the install concern lives here; the base resolves the implementation

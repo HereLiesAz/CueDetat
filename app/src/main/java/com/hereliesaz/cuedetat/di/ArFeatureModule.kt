@@ -13,7 +13,7 @@ import javax.inject.Singleton
 /**
  * Binds the base [ArController] to the [ArControllerFacade], which loads the real
  * implementation from the on-demand `:feature_expert_ar` dynamic feature module
- * via reflection once an entitled user requests it (see ArControllerFacade).
+ * via reflection once a user requests it (see ArControllerFacade).
  */
 @Module
 @InstallIn(SingletonComponent::class)

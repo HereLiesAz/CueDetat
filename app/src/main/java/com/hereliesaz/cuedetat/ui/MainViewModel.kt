@@ -72,8 +72,6 @@ class MainViewModel @Inject constructor(
     val visionAnalyzer: VisionAnalyzer,
     val metaWearableRepository: MetaWearableRepository,
     val arController: ArController,
-    private val entitlementRepository: com.hereliesaz.cuedetat.billing.EntitlementRepository,
-    private val integrityRepository: com.hereliesaz.cuedetat.data.IntegrityRepository,
     private val shotAdvisor: com.hereliesaz.cuedetat.domain.advisor.ShotAdvisor,
     private val appUpdater: com.hereliesaz.cuedetat.update.AppUpdater,
     val wristWearableRepository: com.hereliesaz.cuedetat.data.WristWearableRepository,
@@ -107,90 +105,6 @@ class MainViewModel @Inject constructor(
     /** Dismiss the update popup for this session. */
     fun dismissUpdate() {
         _updateInfo.value = null
-    }
-
-    /**
-     * Forces a re-query of the user's Play subscription status. Called from
-     * MainActivity.onResume so we catch state changes (cancel, refund,
-     * just-completed purchase) that happened while the app was backgrounded.
-     */
-    private var lastEntitlementRefresh = 0L
-
-    fun refreshEntitlement() {
-        // Battery/network: this fires on every foreground. A just-completed purchase is
-        // reflected immediately via the billing client's purchaseUpdates flow, so the
-        // foreground re-verification only needs to run occasionally. Coalesce calls within
-        // the TTL to avoid a redundant Play query on every resume.
-        val now = System.currentTimeMillis()
-        if (now - lastEntitlementRefresh < ENTITLEMENT_REFRESH_TTL_MS) return
-        lastEntitlementRefresh = now
-        viewModelScope.launch {
-            runCatching { entitlementRepository.refresh() }
-        }
-    }
-
-    /** Guards [attemptTesterAutoUnlock] so we only try the silent picker once per process. */
-    private var attemptedTesterAutoUnlock = false
-
-    /**
-     * Best-effort, no-prompt tester unlock on app start. If the user's Google
-     * account is already authorized for this app and is on the build-baked
-     * tester allowlist, this grants Expert Mode without them ever having to
-     * open the paywall and walk through the tester section. Previously the
-     * silent resolve only ran when the paywall sheet was opened, so an
-     * allowlisted tester who never opened it never got unlocked.
-     *
-     * Credential Manager requires an Activity, so this is Activity-bound and
-     * invoked from MainActivity. Safe to call on every resume — it self-guards
-     * (already entitled / already attempted) and never shows UI.
-     */
-    fun attemptTesterAutoUnlock(activity: android.app.Activity) {
-        if (attemptedTesterAutoUnlock) return
-        if (entitlementRepository.entitlement.value.active) return
-        attemptedTesterAutoUnlock = true
-        viewModelScope.launch {
-            runCatching { entitlementRepository.silentlyResolveTesterLicense(activity) }
-        }
-    }
-
-    /**
-     * Fetches a Play Integrity token as an on-device, best-effort diagnostic
-     * signal only. No backend exists to verify this token against Google's
-     * servers. The `IntegrityRepository.result` this call produces is
-     * separately observed by `PlayBillingEntitlementRepository`, but only to
-     * set a cosmetic `isDeviceGenuine` flag shown in the in-app debug dialog
-     * (see [com.hereliesaz.cuedetat.ui.composables.dialogs.BillingDebugDialog]) —
-     * that flag is NOT consulted anywhere Expert-mode entitlement is granted
-     * or checked. Entitlement is decided solely by purchase/tester/trial
-     * state in `EntitlementRepository`. Treat a failed/missing token here as
-     * "diagnostic unavailable", not as proof of tampering, since there is no
-     * server-side verdict backing it.
-     */
-    private fun performIntegrityCheck() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val projectNumber = if (com.hereliesaz.cuedetat.BuildConfig.FLAVOR == "play") {
-                com.hereliesaz.cuedetat.BuildConfig.GOOGLE_CLOUD_PROJECT_NUMBER
-            } else 0L
-
-            val token = if (projectNumber != 0L) {
-                android.util.Log.i("MainViewModel", "Using Standard Integrity API with project $projectNumber")
-                val requestHash = java.util.UUID.randomUUID().toString()
-                integrityRepository.fetchStandardToken(projectNumber, requestHash)
-            } else {
-                android.util.Log.i("MainViewModel", "Using Snapshot Integrity API (no project number)")
-                val nonce = java.util.UUID.randomUUID().toString()
-                integrityRepository.fetchSnapshotToken(nonce)
-            }
-
-            if (token != null) {
-                android.util.Log.i(
-                    "MainViewModel",
-                    "Play Integrity token retrieved successfully (diagnostic only; not verified server-side)."
-                )
-            } else {
-                android.util.Log.w("MainViewModel", "Play Integrity check failed to retrieve a token.")
-            }
-        }
     }
 
     private var experienceModeUpdateJob: Job? = null
@@ -262,15 +176,9 @@ class MainViewModel @Inject constructor(
             val savedState = userPreferencesRepository.stateFlow.first()
             val savedFeltSamples = tableScanRepository.loadFeltSamples()
             val currentExperienceMode = _uiState.value.experienceMode
-            // Pull the entitlement live rather than from the JSON snapshot. The
-            // entitlement event may already have set _uiState.isExpertEntitled
-            // by the time this load completes; in any case the StateFlow is the
-            // source of truth.
-            val liveEntitled = entitlementRepository.entitlement.value.active
             val initialState = (savedState ?: CueDetatState()).copy(
                 experienceMode = currentExperienceMode,
                 savedFeltSamples = savedFeltSamples,
-                isExpertEntitled = liveEntitled,
             )
             processAndEmitState(initialState, UpdateType.FULL)
 
@@ -278,9 +186,6 @@ class MainViewModel @Inject constructor(
             // committed, so a network response can't be overwritten by the
             // saved-state load.
             onEvent(MainScreenEvent.CheckForUpdate)
-            
-            // Perform security integrity check on startup.
-            performIntegrityCheck()
         }
 
         // Pipe WarningManager's timed messages into uiState.warningText.
@@ -339,8 +244,7 @@ class MainViewModel @Inject constructor(
         }
 
         // Expert-AR is delivered on demand and loaded lazily: the split is only
-        // fetched the first time an (already entitled, since AR is expert-only and
-        // paywall-gated) user actually enters the AR camera flow. See the
+        // fetched the first time a user actually enters the AR camera flow. See the
         // CycleCameraMode interception in processEvent + ensureArModuleLoaded().
 
         viewModelScope.launch {
@@ -349,43 +253,6 @@ class MainViewModel @Inject constructor(
                 onEvent(MainScreenEvent.LoadTableScan(savedModel))
                 checkLocationAndPromptIfNeeded(savedModel)
             }
-        }
-
-        // Collect entitlement updates and propagate into the reducer. Gated on process
-        // lifecycle so it isn't live while backgrounded; entitlement is a StateFlow, so
-        // re-collecting on the next foreground immediately replays the current value.
-        viewModelScope.launch {
-            ProcessLifecycleOwner.get().lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                entitlementRepository.entitlement.collect { entitlement ->
-                    onEvent(MainScreenEvent.EntitlementChanged(entitlement))
-                }
-            }
-        }
-
-        // Onboarding paywall: fire every time the splash is shown and every
-        // time the user enters HATER mode while not entitled. Entitled users
-        // (including FOSS, which is permanently active) never see it.
-        viewModelScope.launch {
-            if (entitlementRepository.entitlement.value.active) return@launch
-            _uiState
-                .map { it.experienceMode to it.isExpertEntitled }
-                .distinctUntilChanged()
-                .filter { (mode, entitled) ->
-                    !entitled && (mode == null || mode == ExperienceMode.HATER)
-                }
-                .collect {
-                    // Re-check live entitlement: _uiState.isExpertEntitled may
-                    // still be false on app start if the EntitlementChanged
-                    // event hasn't propagated, but the repository's StateFlow
-                    // is always current.
-                    if (!entitlementRepository.entitlement.value.active) {
-                        onEvent(
-                            MainScreenEvent.ShowPaywall(
-                                com.hereliesaz.cuedetat.billing.PaywallTrigger.ONBOARDING
-                            )
-                        )
-                    }
-                }
         }
 
         // Collect Wrist Wearable state
@@ -422,7 +289,7 @@ class MainViewModel @Inject constructor(
      * Fetch + load the on-demand Expert-AR module if it isn't already, driving the
      * [CueDetatState.arModuleState] lifecycle so the UI can show progress / retry.
      * Idempotent: a no-op once READY or while a load is already in flight.
-     * `arController.ensureLoaded()` is itself entitlement-gated and installs the
+     * `arController.ensureLoaded()` installs the
      * split (play) before reflectively loading the implementation.
      */
     private fun ensureArModuleLoaded() {
@@ -478,25 +345,6 @@ class MainViewModel @Inject constructor(
                 onEvent(MainScreenEvent.ApplyPendingExperienceMode)
             }
             return
-        }
-
-        // Intercept the apply step: if the cycle landed on EXPERT and the user
-        // is not entitled, surface the paywall and clear the pending mode so
-        // the next cycle starts fresh. The reducer would otherwise silently
-        // refuse the transition and the user would see no feedback.
-        if (event is MainScreenEvent.ApplyPendingExperienceMode) {
-            val target = _uiState.value.pendingExperienceMode
-            if (target == ExperienceMode.EXPERT && !_uiState.value.isExpertEntitled) {
-                _uiState.value = _uiState.value.copy(pendingExperienceMode = null)
-                viewModelScope.launch {
-                    _singleEvent.emit(
-                        SingleEvent.ShowPaywall(
-                            com.hereliesaz.cuedetat.billing.PaywallTrigger.EXPERT_TOGGLE_TAP
-                        )
-                    )
-                }
-                return
-            }
         }
 
         val currentState = _uiState.value
@@ -713,16 +561,11 @@ class MainViewModel @Inject constructor(
                 is MainScreenEvent.SetExperienceMode -> {
                     if (event.mode == ExperienceMode.HATER) {
                         _singleEvent.emit(SingleEvent.InitiateHaterMode)
-                    } else if (event.mode == ExperienceMode.EXPERT && !_uiState.value.isExpertEntitled) {
-                        _singleEvent.emit(SingleEvent.ShowPaywall(com.hereliesaz.cuedetat.billing.PaywallTrigger.SPLASH_SCREEN))
                     }
                 }
 
                 is MainScreenEvent.Shake -> _singleEvent.emit(SingleEvent.HaterShake)
 
-                is MainScreenEvent.ShowPaywall -> {
-                    _singleEvent.emit(SingleEvent.ShowPaywall(event.trigger))
-                }
 
                 else -> { /* Do nothing for state-changing events */ }
             }
@@ -730,8 +573,5 @@ class MainViewModel @Inject constructor(
     }
 
     private companion object {
-        // Coalesce foreground entitlement re-verifications. Purchases still reflect
-        // immediately via the billing client's purchaseUpdates flow.
-        const val ENTITLEMENT_REFRESH_TTL_MS = 30 * 60 * 1000L // 30 minutes
     }
 }

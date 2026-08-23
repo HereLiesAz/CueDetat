@@ -37,20 +37,9 @@ class UserPreferencesRepository @Inject constructor(
         val CAMERA_MATRIX_JSON = stringPreferencesKey("camera_matrix_json")
         val DIST_COEFFS_JSON = stringPreferencesKey("dist_coeffs_json")
 
-        // Epoch millis the one-time Expert preview/trial was started. 0 (absent)
-        // means the trial has never been used. A non-zero value both gates the
-        // trial (one per install) and lets the entitlement repo compute expiry.
-        val EXPERT_TRIAL_STARTED_AT = longPreferencesKey("expert_trial_started_at")
     }
 
-    /** Epoch millis the Expert trial was started, or 0 if it never was. */
-    suspend fun readExpertTrialStartedAt(): Long =
-        dataStore.data.first()[PreferencesKeys.EXPERT_TRIAL_STARTED_AT] ?: 0L
 
-    /** Records the Expert trial start time. Persisted immediately so a kill mid-trial can't reset it. */
-    suspend fun setExpertTrialStartedAt(millis: Long) {
-        dataStore.edit { prefs -> prefs[PreferencesKeys.EXPERT_TRIAL_STARTED_AT] = millis }
-    }
 
     val stateFlow: Flow<CueDetatState?> = dataStore.data
         .map { preferences ->
@@ -90,12 +79,7 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun saveState(state: CueDetatState) {
         dataStore.edit { preferences ->
-            // isExpertEntitled is sourced live from EntitlementRepository on every
-            // launch — persisting it lets stale values clobber the FOSS build's
-            // always-true entitlement (and a Play user's just-redeemed purchase)
-            // when the saved state is reloaded after the entitlement event has
-            // already updated _uiState.
-            val stateToSave = state.copy(experienceMode = null, isExpertEntitled = false)
+            val stateToSave = state.copy(experienceMode = null)
             val jsonString = gson.toJson(stateToSave)
             preferences[PreferencesKeys.STATE_JSON] = jsonString
         }

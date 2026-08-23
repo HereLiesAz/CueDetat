@@ -1,141 +1,8 @@
-import java.io.ByteArrayOutputStream
 import java.util.Properties
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import javax.inject.Inject
-import org.gradle.api.DefaultTask
-import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.provider.Property
-import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.InputDirectory
-import org.gradle.api.tasks.Optional
-import org.gradle.api.tasks.OutputDirectory
-import org.gradle.api.tasks.TaskAction
-import org.gradle.process.ExecOperations
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
-abstract class FetchTesterEmailsTask : DefaultTask() {
-    @get:OutputDirectory
-    abstract val outputDir: DirectoryProperty
-
-    @get:Input
-    @get:Optional
-    abstract val ggLink: Property<String>
-
-    @get:Input
-    @get:Optional
-    abstract val ggSession: Property<String>
-
-    @get:InputDirectory
-    abstract val scriptDir: DirectoryProperty
-
-    @get:Inject
-    abstract val execOperations: ExecOperations
-
-    @TaskAction
-    fun fetch() {
-        val outFile = outputDir.file("tester_emails.txt").get().asFile
-        outFile.parentFile.mkdirs()
-
-        val link = ggLink.orNull
-        val session = ggSession.orNull
-
-        if (link.isNullOrBlank() || session.isNullOrBlank()) {
-            logger.lifecycle("[testerLicense] GG_LINK or GG_SESSION absent — writing empty allowlist.")
-            outFile.writeText("")
-            return
-        }
-
-        val script = File(scriptDir.get().asFile, "fetch-tester-emails.mjs")
-        if (!script.exists()) {
-            logger.warn("[testerLicense] scraper script missing at $script — writing empty allowlist.")
-            outFile.writeText("")
-            return
-        }
-
-        val nodeModules = File(scriptDir.get().asFile, "node_modules/playwright")
-        if (!nodeModules.exists()) {
-            logger.lifecycle("[testerLicense] installing scraper dependencies (npm ci)…")
-            execOperations.exec {
-                workingDir = scriptDir.get().asFile
-                commandLine = listOf("npm", "ci", "--no-audit", "--no-fund")
-                isIgnoreExitValue = true
-            }
-        }
-
-        val stdoutCollector = ByteArrayOutputStream()
-        val result = execOperations.exec {
-            workingDir = scriptDir.get().asFile
-            commandLine = listOf("node", script.absolutePath)
-            environment("GG_LINK", link)
-            environment("GG_SESSION", session)
-            standardOutput = stdoutCollector
-            isIgnoreExitValue = true
-        }
-
-        val raw = stdoutCollector.toString(Charsets.UTF_8).trim()
-        if (result.exitValue != 0) {
-            logger.warn("[testerLicense] scraper exited ${result.exitValue}; writing whatever it emitted (${raw.lines().size} lines).")
-        }
-        outFile.writeText(raw + if (raw.isEmpty()) "" else "\n")
-        logger.lifecycle("[testerLicense] wrote ${raw.lines().count { it.isNotBlank() }} hashes to ${outFile.name}.")
-    }
-}
-
-val versionPropsFile = rootProject.file("version.properties")
-val versionPropsPath = versionPropsFile.absolutePath
-val versionProps = Properties()
-if (versionPropsFile.exists()) {
-    versionPropsFile.inputStream().use { versionProps.load(it) }
-}
-
-var majorVal = (versionProps.getProperty("MAJOR") ?: "0").toInt()
-var minorVal = (versionProps.getProperty("MINOR") ?: "0").toInt()
-var patchVal = (versionProps.getProperty("PATCH") ?: "0").toInt()
-var buildVal = (versionProps.getProperty("BUILD") ?: "0").toInt()
-val lastMajorVal = (versionProps.getProperty("LAST_MAJOR") ?: majorVal.toString()).toInt()
-val lastMinorVal = (versionProps.getProperty("LAST_MINOR") ?: minorVal.toString()).toInt()
-
-val isBuildingTask = gradle.startParameter.taskNames.any {
-    it.contains("assemble") || it.contains("bundle") || it.contains("install")
-}
-
-// CI override: when -PversionBuild=<n> is passed (e.g. the git commit count via
-// `git rev-list --count HEAD`), it becomes the authoritative BUILD/versionCode.
-// This guarantees a strictly-increasing versionCode for Play uploads without
-// relying on the committed version.properties value. When the property is absent
-// the original local auto-increment behaviour is preserved untouched.
-val versionBuildOverride = project.findProperty("versionBuild")?.toString()?.trim()?.toIntOrNull()
-
-if (versionBuildOverride != null) {
-    buildVal = versionBuildOverride
-    if (majorVal != lastMajorVal || minorVal != lastMinorVal) {
-        patchVal = 0
-    }
-} else if (isBuildingTask) {
-    buildVal++
-    if (majorVal != lastMajorVal || minorVal != lastMinorVal) {
-        patchVal = 0
-    } else {
-        patchVal++
-    }
-}
-
-// Optional explicit versionName override (e.g. -PversionName=1.10.2.999); when
-// absent the name is derived from the components below.
-val versionNameOverride = project.findProperty("versionName")?.toString()?.trim()?.takeIf { it.isNotEmpty() }
-
-val finalBuild = buildVal
-val finalPatch = patchVal
-val finalMajor = majorVal
-val finalMinor = minorVal
-val finalVersionName = versionNameOverride ?: "$finalMajor.$finalMinor.$finalPatch.$finalBuild"
-// Only write the computed values back into version.properties for ordinary local
-// builds. When CI supplies -PversionBuild we must NOT persist its commit-count
-// number into the tracked file (it would clobber the local sequence on the next
-// commit). The override is ephemeral and lives only for that build.
-val finalIsBuilding = isBuildingTask && versionBuildOverride == null
 
 val localProps = Properties().apply {
     val file = rootProject.file("local.properties")
@@ -143,13 +10,7 @@ val localProps = Properties().apply {
         file.inputStream().use { load(it) }
     }
 }
-val googleCloudProjectNumber = localProps.getProperty("GOOGLE_CLOUD_PROJECT_NUMBER") ?: "0"
 val githubAccessToken = localProps.getProperty("GH_TOKEN") ?: ""
-// OAuth 2.0 *Web* client ID from Google Cloud Console. Required by
-// Credential Manager's GetGoogleIdOption. Empty when absent: the tester
-// auto-resolve falls back to no-op so the build still works for
-// contributors who don't have credentials configured.
-val googleOauthWebClientId = localProps.getProperty("GOOGLE_OAUTH_WEB_CLIENT_ID") ?: ""
 
 // Task to write back the updated properties
 tasks.register("updateVersionProperties") {
@@ -217,9 +78,7 @@ android {
         versionCode = finalBuild
         versionName = finalVersionName
         
-        buildConfigField("long", "GOOGLE_CLOUD_PROJECT_NUMBER", "${googleCloudProjectNumber}L")
         buildConfigField("String", "GH_TOKEN", "\"$githubAccessToken\"")
-        buildConfigField("String", "GOOGLE_OAUTH_WEB_CLIENT_ID", "\"$googleOauthWebClientId\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -270,9 +129,6 @@ android {
         }
     }
 
-    // The play-release build pulls a generated tester-email allowlist asset
-    // from a gradle task (see fetchTesterEmails below). The file lives outside
-    // src/play/assets/ so it is never tracked in git.
 
     signingConfigs {
         create("release") {
@@ -428,16 +284,16 @@ dependencies {
     // bundles the model directly and never performs split installs.
     "playImplementation"(libs.play.feature.delivery)
 
-    // Play Billing — only included in the play flavor APK.
-    "playImplementation"(libs.androidx.billing.ktx)
-
-    // Credential Manager + Google ID — only included in the play flavor APK.
-    // Used to read the device's currently-signed-in Google account email
-    // (via a one-tap account picker on first use) so the app can match it
-    // against the tester-license allowlist baked into the build.
-    "playImplementation"(libs.androidx.credentials)
-    "playImplementation"(libs.androidx.credentials.play.services.auth)
-    "playImplementation"(libs.google.id)
+    // The metric core. Pure Kotlin Multiplatform: units, table geometry,
+    // ball physics, the aim solver and the projection. No Android types cross
+    // this boundary in either direction.
+    implementation(project(":core:units"))
+    implementation(project(":core:geometry"))
+    implementation(project(":core:physics"))
+    implementation(project(":core:projection"))
+    implementation(project(":core:aim"))
+    implementation(project(":core:advisor"))
+    implementation(project(":core:state"))
 
     // Core & Jetpack
     implementation(libs.androidx.core.ktx)
@@ -449,22 +305,18 @@ dependencies {
     implementation(libs.kotlinx.coroutines.play.services)
 
     // Compose
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
+        implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.material)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.material.icons.extended)
+    implementation(libs.androidx.compose.material.icons.extended)
 
     // Hilt
     implementation(libs.hilt.android)
     implementation(libs.tensorflow.lite.metadata)
     implementation(libs.tensorflow.lite.support)
     ksp(libs.hilt.compiler)
-    // Override the older kotlin-metadata-jvm that hilt-compiler bundles so the
-    // KSP processor can parse Kotlin 2.4.0 metadata (highest-version wins).
-    ksp(libs.kotlin.metadata.jvm)
     implementation(libs.androidx.hilt.navigation.compose)
 
     // CameraX
@@ -472,21 +324,21 @@ dependencies {
 
     // Networking
     implementation(libs.retrofit)
-    implementation(libs.converter.gson)
+    implementation(libs.retrofit.converter.gson)
     implementation(libs.aznavrail)
 
     // Location
     implementation(libs.play.services.location)
 
     // Computer Vision
-    implementation(libs.mlkit)
+    implementation(libs.mlkit.object.detection)
     implementation(libs.opencv)
 
     // ARCore now lives in the on-demand :feature_expert_ar dynamic feature, so
     // the play base AAB ships without it. The foss flavor compiles that module's
     // sources directly into the APK (see the foss sourceSet above), so it needs
     // ARCore on its own classpath.
-    "fossImplementation"(libs.core)
+    "fossImplementation"(libs.arcore)
 
     // TFLite — pocket detection model
     implementation(libs.tensorflow.lite)
@@ -495,17 +347,18 @@ dependencies {
     implementation(libs.tensorflow.lite.gpu)
     implementation(libs.tensorflow.lite.gpu.api)
 
-    // Meta Wearables DAT
-    implementation(libs.mwdat.core)
-    implementation(libs.mwdat.camera)
-    debugImplementation(libs.mwdat.mockdevice)
+    // Meta Wearables DAT. Served only from a credentialed GitHub Packages
+    // registry, so it is scoped to the play flavor: previously :app depended on
+    // these unconditionally and `./gradlew assembleFossDebug` from a clean clone
+    // failed at dependency resolution for every outside contributor -- the exact
+    // audience a FOSS flavor exists for.
+    "playImplementation"(libs.mwdat.core)
+    "playImplementation"(libs.mwdat.camera)
+    "playDebugImplementation"(libs.mwdat.mockdevice)
 
     // Wear OS Data Layer
     implementation(libs.play.services.wearable)
 
-
-    // Security & Integrity
-    implementation(libs.play.integrity)
 
     // Physics
     // implementation(libs.google.liquidfun)
@@ -514,18 +367,12 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    debugImplementation(libs.androidx.ui.tooling)
-    debugImplementation(libs.androidx.ui.test.manifest)
+        debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
     // implementation("cljsjs:liquidfun:1.1.0-0")
-    implementation(libs.kotlin.metadata.jvm)
-    implementation(libs.kotlin.stdlib)
 
     constraints {
-        implementation(libs.jose4j) {
-            because("Transitive dependency vulnerability")
-        }
-        implementation(libs.guava.vulnerability) {
+        implementation(libs.guava) {
             because("Transitive dependency vulnerability")
         }
     }
@@ -541,45 +388,5 @@ configurations.all {
             useVersion(libs.versions.bouncycastle.get())
             because("Force-upgrade Bouncy Castle modules to fix vulnerabilities and ensure version alignment")
         }
-        // Hilt/Dagger's annotation processor bundles an older kotlin-metadata-jvm that can't parse
-        // metadata emitted by the Kotlin 2.4.0 compiler ("version 2.4.0, max supported 2.3.0"),
-        // which fails hiltJavaCompile. Force it to match the Kotlin version on every configuration
-        // (incl. the annotation-processor classpath, which a plain implementation() dep doesn't cover).
-        if (requested.group == "org.jetbrains.kotlin" && requested.name == "kotlin-metadata-jvm") {
-            useVersion(libs.versions.kotlinMetadataJvm.get())
-            because("Hilt's processor must support the Kotlin compiler's metadata version")
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Tester license allowlist: scrapes the tester Google Group's member list
-// during the play-release pipeline and emits one SHA-256 hex per email into
-// build/generated/testerLicense/assets/tester_emails.txt. The file is then
-// consumed by TestLicenseAllowlist at runtime.
-//
-// Skips silently (writes an empty file) when:
-//   - GG_LINK or GG_SESSION env vars are missing (local dev / play debug)
-//   - The Node script fails for any reason
-//
-// Hooked into the asset generation pipeline for playRelease so other build
-// variants are unaffected, including IDE sync.
-// ---------------------------------------------------------------------------
-val fetchTesterEmails = tasks.register<FetchTesterEmailsTask>("fetchTesterEmails") {
-    description = "Scrape tester Google Group members and emit SHA-256 hashes for the play-release allowlist."
-    group = "tester license"
-    outputDir.set(layout.buildDirectory.dir("generated/testerLicense/assets"))
-    scriptDir.set(rootProject.layout.projectDirectory.dir(".github/scripts"))
-    ggLink.set(providers.environmentVariable("GG_LINK"))
-    ggSession.set(providers.environmentVariable("GG_SESSION"))
-    outputs.upToDateWhen { false } // env-driven; always re-fetch when invoked
-}
-
-androidComponents.onVariants { variant ->
-    if (variant.flavorName == "play" && variant.buildType == "release") {
-        variant.sources.assets?.addGeneratedSourceDirectory(
-            fetchTesterEmails,
-            FetchTesterEmailsTask::outputDir
-        )
     }
 }

@@ -7,7 +7,6 @@ import com.hereliesaz.cuedetat.domain.reducers.reduceAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceAdvancedOptionsAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceControlAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceCvAction
-import com.hereliesaz.cuedetat.domain.reducers.reduceEntitlementAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceObstacleAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceSpinAction
 import com.hereliesaz.cuedetat.domain.reducers.reduceSystemAction
@@ -57,7 +56,7 @@ fun stateReducer(
         is MainScreenEvent.StartCalibrationMode, is MainScreenEvent.SampleColorAt,
         is MainScreenEvent.ToggleCvRefinementMethod,
         is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2,
-        is MainScreenEvent.ToggleBillingDebugDialog ->
+        is MainScreenEvent.ToggleSupportSheet ->
             reduceAdvancedOptionsAction(currentState, action)
 
         // --- CONTROLS & TRANSFORMS ---
@@ -141,10 +140,6 @@ fun stateReducer(
         is MainScreenEvent.RecommendationComputed ->
             currentState.copy(recommendedShot = action.shot)
 
-        // --- ENTITLEMENT ---
-        // Handled by [EntitlementReducer]. Sets isExpertEntitled and may
-        // force-downgrade EXPERT to BEGINNER if entitlement drops.
-        is MainScreenEvent.EntitlementChanged -> reduceEntitlementAction(currentState, action)
 
         // Default catch-all (should ideally never happen for known events).
         else -> currentState

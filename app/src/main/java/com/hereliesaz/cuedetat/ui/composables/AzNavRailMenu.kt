@@ -252,25 +252,6 @@ fun AzNavRailMenu(
             }
         )
 
-        // "Get Expert" tile only shows for non-entitled users in the play
-        // flavor. In FOSS the entitlement is permanently active so this tile
-        // never renders.
-        if (!uiState.isExpertEntitled) {
-            azRailItemLowerCase(
-                id = "get_expert",
-                text = "Get Expert",
-                fillColor = b1Y,
-                textColor = Color.White,
-                onClick = {
-                    onEvent(
-                        MainScreenEvent.ShowPaywall(
-                            com.hereliesaz.cuedetat.billing.PaywallTrigger.NAV_TILE
-                        )
-                    )
-                }
-            )
-        }
-        
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             val isArActive = uiState.cameraMode != CameraMode.OFF
             azRailToggle(
@@ -388,13 +369,16 @@ fun AzNavRailMenu(
             azMenuItem(id = "advanced", route = "main", text = "Advanced", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) })
         }
 
+        // Replaces the old "Billing & License" item, which shipped a tester-
+        // license console to every user in every build with no debug or
+        // entitlement gate at all.
         azMenuItem(
-            id = "billing-debug",
+            id = "support",
             route = "main",
-            text = "Billing & License",
+            text = "Support",
             fillColor = b1Y,
             textColor = Color.White,
-            onClick = { onEvent(MainScreenEvent.ToggleBillingDebugDialog) },
+            onClick = { onEvent(MainScreenEvent.ToggleSupportSheet) },
         )
 
         azDivider()

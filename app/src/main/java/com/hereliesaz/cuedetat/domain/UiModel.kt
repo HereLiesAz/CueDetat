@@ -133,7 +133,7 @@ data class CueDetatState(
     val lockedHsvColor: FloatArray? = null,
     val lockedHsvStdDev: FloatArray? = null,
     val showAdvancedOptionsDialog: Boolean = false,
-    val showBillingDebugDialog: Boolean = false,
+    val showSupportSheet: Boolean = false,
     val showCalibrationScreen: Boolean = false,
     val showTableScanScreen: Boolean = false,
     val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
@@ -184,7 +184,6 @@ data class CueDetatState(
     val isTopDownViewActive: Boolean = false,
     @Transient val topDownBitmap: android.graphics.Bitmap? = null,
     val topDownTransitionProgress: Float = 0f,
-    val isExpertEntitled: Boolean = false,
     val isAdvisorEnabled: Boolean = false,
     @Transient val recommendedShot: com.hereliesaz.cuedetat.domain.advisor.RecommendedShot? = null,
     val wearableState: com.hereliesaz.cuedetat.data.WearableState = com.hereliesaz.cuedetat.data.WearableState(),
@@ -216,7 +215,7 @@ data class CueDetatState(
         relocaliserAttemptFrames, snapCandidates, tableScanModel, depthPlane, arDerivedPitch,
         arMeasuredHeightM, arTableMatrix, arCapturedCorners, depthCapability, arModuleState,
         lockedHsvColor?.toList(), lockedHsvStdDev?.toList(), showAdvancedOptionsDialog,
-        showBillingDebugDialog, showCalibrationScreen, showTableScanScreen, cvRefinementMethod,
+        showSupportSheet, showCalibrationScreen, showTableScanScreen, cvRefinementMethod,
         useCustomModel, isSnappingEnabled, hasTargetBallBeenMoved, hasCueBallBeenMoved,
         cannyThreshold1, cannyThreshold2, isAutoCalibrating, showCvMask, isTestingCvMask,
         isCalibratingColor, colorSamplePoint, cameraMatrix, distCoeffs, shotLineAnchor,
@@ -227,7 +226,7 @@ data class CueDetatState(
         isWorldLocked, preResetState, postResetState, ballSelectionPhase, cueBallCvAnchor,
         targetCvAnchor, obstacleCvAnchors, latestVersionName, distanceUnit, targetBallDistance,
         lensWarpTps, targetType, isTopDownViewActive, topDownBitmap, topDownTransitionProgress,
-        isExpertEntitled, isAdvisorEnabled, recommendedShot, wearableState,
+        isAdvisorEnabled, recommendedShot, wearableState,
     )
 
     override fun equals(other: Any?): Boolean {
@@ -254,8 +253,6 @@ sealed class MainScreenEvent {
     object ToggleExperienceModeSelection : MainScreenEvent()
     object ApplyPendingExperienceMode : MainScreenEvent()
     data class SetExperienceMode(val mode: ExperienceMode) : MainScreenEvent()
-    data class EntitlementChanged(val entitlement: com.hereliesaz.cuedetat.billing.Entitlement) : MainScreenEvent()
-    data class ShowPaywall(val trigger: com.hereliesaz.cuedetat.billing.PaywallTrigger) : MainScreenEvent()
     data class ScreenGestureStarted(val position: PointF) : MainScreenEvent()
     data class Drag(val previousPosition: PointF, val currentPosition: PointF) : MainScreenEvent()
     object GestureEnded : MainScreenEvent()
@@ -316,7 +313,7 @@ sealed class MainScreenEvent {
     object StartArTracking : MainScreenEvent()
     object ClearSamplePoint : MainScreenEvent()
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
-    object ToggleBillingDebugDialog : MainScreenEvent()
+    object ToggleSupportSheet : MainScreenEvent()
     object ToggleCalibrationScreen : MainScreenEvent()
     data class ApplyQuickAlign(
         val translation: Offset,
