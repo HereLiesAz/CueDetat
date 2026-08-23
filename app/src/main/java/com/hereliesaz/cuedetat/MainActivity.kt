@@ -224,11 +224,11 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            if (showSupport.value) {
+            if (showSupportSheetState.value) {
                 com.hereliesaz.cuedetat.ui.composables.support.SupportSheet(
-                    onDismiss = { showSupport.value = false },
+                    onDismiss = { showSupportSheetState.value = false },
                     onOpenUrl = { url ->
-                        showSupport.value = false
+                        showSupportSheetState.value = false
                         openUrlSafely(url)
                     },
                 )

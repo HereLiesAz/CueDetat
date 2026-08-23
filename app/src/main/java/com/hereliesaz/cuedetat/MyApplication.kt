@@ -2,7 +2,7 @@ package com.hereliesaz.cuedetat
 
 import android.app.Application
 import android.util.Log
-import com.meta.wearable.dat.core.Wearables
+import com.hereliesaz.cuedetat.data.MetaWearableRepository
 import dagger.hilt.android.HiltAndroidApp
 import org.opencv.android.OpenCVLoader
 
@@ -12,6 +12,13 @@ import org.opencv.android.OpenCVLoader
  */
 @HiltAndroidApp
 class MyApplication : Application() {
+
+    /**
+     * Injected rather than referenced directly: the vendor SDK is play-flavour
+     * only, and `src/main` must not name it (see [MetaWearableRepository]).
+     */
+    @javax.inject.Inject
+    lateinit var metaWearableRepository: MetaWearableRepository
 
     override fun onCreate() {
         super.onCreate()
@@ -45,12 +52,7 @@ class MyApplication : Application() {
     }
 
     fun initializeWearables() {
-        try {
-            Wearables.initialize(this)
-            Log.d("MyApplication", "Meta Wearables initialized")
-        } catch (e: Exception) {
-            Log.e("MyApplication", "Failed to initialize Meta Wearables", e)
-        }
+        metaWearableRepository.initialize()
     }
 
     private fun clearMetaWearableStorageWorkaround() {

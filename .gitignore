@@ -11,7 +11,6 @@
 build/
 */build/
 **/build/
-!src/**/build/
 captures/
 .externalNativeBuild/
 .cxx/
