@@ -5,67 +5,43 @@ pluginManagement {
                 includeGroupByRegex("com\\.android.*")
                 includeGroupByRegex("com\\.google.*")
                 includeGroupByRegex("androidx.*")
-
             }
         }
         mavenCentral()
         gradlePluginPortal()
         maven(url = "https://jitpack.io")
-        mavenLocal()
-        maven("https://oss.sonatype.org/content/repositories/snapshots")
-
-    }
-    plugins {
-        id("com.android.application") version "9.2.1"
-        id("com.android.library") version "9.2.1"
-        id("com.android.dynamic-feature") version "9.2.1"
-        id("com.github.triplet.play") version "4.0.0"
-
     }
 }
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
         mavenCentral()
-        mavenLocal()
-        maven(url = "https://jitpack.io")
+        maven(url = "https://jitpack.io") {
+            content { includeGroupByRegex("com\\.github\\..*") }
+        }
+
+        // Meta Wearables DAT. Consumed ONLY by the `play` flavor (see
+        // app/build.gradle.kts) so that a clean clone can build `foss` with no
+        // credentials — previously :app depended on these unconditionally and an
+        // outside contributor could not build the FOSS flavor at all.
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/facebook/meta-wearables-dat-android")
-            // Only serve Meta Wearable artifacts from this repo. Without this
-            // filter Gradle queries GitHub Packages for every dependency, and
-            // any unauthenticated 401 (e.g. for TFLite, which lives on Maven
-            // Central) aborts the whole build instead of falling through.
-            content {
-                includeGroup("com.meta.wearable")
-            }
+            content { includeGroup("com.meta.wearable") }
+
             val localProps = java.util.Properties().apply {
                 val file = settingsDir.resolve("local.properties")
-                if (file.exists()) {
-                    file.inputStream().use { load(it) }
-                }
+                if (file.exists()) file.inputStream().use { load(it) }
             }
-
             val ghUser = providers.gradleProperty("gh_user")
-                .orElse(providers.gradleProperty("GH_USER"))
-                .orElse(providers.environmentVariable("GH_ACTOR"))
                 .orElse(providers.environmentVariable("GITHUB_ACTOR"))
-                .orNull ?: localProps.getProperty("gh_user") ?: localProps.getProperty("GH_USER") ?: localProps.getProperty("GH_ACTOR")
-
+                .orNull ?: localProps.getProperty("gh_user")
             val ghToken = providers.gradleProperty("gh_token")
-                .orElse(providers.gradleProperty("GH_TOKEN"))
-                .orElse(providers.environmentVariable("GH_TOKEN"))
                 .orElse(providers.environmentVariable("GITHUB_TOKEN"))
-                .orNull ?: localProps.getProperty("gh_token") ?: localProps.getProperty("GH_TOKEN")
+                .orNull ?: localProps.getProperty("gh_token")
 
-            if (ghUser.isNullOrBlank() || ghToken.isNullOrBlank()) {
-                logger.warn(
-                    "⚠ GitHubPackages credentials missing. Set 'gh_user' and 'gh_token' " +
-                    "in local.properties (or GITHUB_ACTOR/GITHUB_TOKEN env vars). Builds that need " +
-                    "com.meta.wearable artifacts will fail at resolution."
-                )
-            }
             credentials {
                 username = ghUser ?: ""
                 password = ghToken ?: ""
@@ -75,17 +51,49 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "CueDetat"
-include(":app")
-// On-demand dynamic feature module carrying the 24 MB TFLite master model.
-// Delivered via Play Feature Delivery for the `play` AAB; the `foss` flavor
-// bundles the same asset directly (see app/build.gradle.kts), since standalone
-// FOSS APKs have no Play split-install channel.
-include(":feature_mlmodel")
-// On-demand dynamic feature module carrying the Expert-only ARCore table-scan
-// flow + the ARCore dependency. Delivered via Play Feature Delivery for the
-// `play` AAB (entitlement-gated); the `foss` flavor compiles the module's
-// sources directly in (see app/build.gradle.kts), since standalone FOSS APKs
-// have no Play split-install channel.
-include(":feature_expert_ar")
 
-include(":wear")
+// Fast core-only configuration:
+//
+//   ./gradlew -Pcuedetat.coreOnly=true allTests
+//
+// Skips every Android module so the build configures and runs with no Android
+// SDK installed. That is the architectural point: the geometry, physics and aim
+// maths the product exists to compute are verifiable on any machine in seconds,
+// with no emulator. CI uses this for the fast feedback job.
+val coreOnly = providers.gradleProperty("cuedetat.coreOnly").orNull?.toBoolean() == true
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Kotlin Multiplatform core.
+//
+// Everything below is pure Kotlin with NO Android, OpenCV or ARCore types. It
+// holds the entire model of the game — units, table geometry, ball physics, the
+// aim solver, the projection — in SI units, and it is the single source of
+// truth the Android app, the Wear app and any future iOS/desktop client render.
+//
+// These modules run on `jvmTest` with no Android SDK installed, which is the
+// point: the geometry that the whole product exists to compute is now testable
+// on any machine, in milliseconds, without an emulator.
+// ─────────────────────────────────────────────────────────────────────────────
+include(":core:units")
+include(":core:geometry")
+include(":core:physics")
+include(":core:projection")
+include(":core:aim")
+include(":core:advisor")
+include(":core:state")
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Android delivery.
+// ─────────────────────────────────────────────────────────────────────────────
+if (!coreOnly) {
+    include(":app")
+
+    // On-demand dynamic feature carrying the 24 MB TFLite master model. Delivered
+    // via Play Feature Delivery for the `play` AAB; `foss` bundles the asset direct.
+    include(":feature_mlmodel")
+
+    // On-demand dynamic feature carrying the ARCore table-scan flow.
+    include(":feature_expert_ar")
+
+    include(":wear")
+}
