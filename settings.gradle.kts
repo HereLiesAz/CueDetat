@@ -35,12 +35,30 @@ dependencyResolutionManagement {
                 val file = settingsDir.resolve("local.properties")
                 if (file.exists()) file.inputStream().use { load(it) }
             }
+            // Credential lookup order matters, and the env-var names are not
+            // interchangeable. GitHub Actions sets GITHUB_ACTOR automatically but
+            // never exports GITHUB_TOKEN as an env var, and a workflow's built-in
+            // GITHUB_TOKEN cannot read another org's packages anyway. Every
+            // workflow in .github/workflows therefore passes a PAT as GH_TOKEN
+            // with GH_ACTOR alongside it -- those are the names that must be read
+            // here. Dropping them yields a blank password and a 401 from
+            // maven.pkg.github.com that reads like a permissions problem.
             val ghUser = providers.gradleProperty("gh_user")
+                .orElse(providers.environmentVariable("GH_ACTOR"))
                 .orElse(providers.environmentVariable("GITHUB_ACTOR"))
                 .orNull ?: localProps.getProperty("gh_user")
             val ghToken = providers.gradleProperty("gh_token")
+                .orElse(providers.environmentVariable("GH_TOKEN"))
                 .orElse(providers.environmentVariable("GITHUB_TOKEN"))
                 .orNull ?: localProps.getProperty("gh_token")
+
+            if (ghUser.isNullOrBlank() || ghToken.isNullOrBlank()) {
+                logger.warn(
+                    "GitHubPackages credentials are missing or blank. Set gh_user and " +
+                        "gh_token in local.properties, or export GH_ACTOR and GH_TOKEN. " +
+                        "The foss flavor builds without them; the play flavor cannot."
+                )
+            }
 
             credentials {
                 username = ghUser ?: ""

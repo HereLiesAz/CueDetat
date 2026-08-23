@@ -408,12 +408,15 @@ dependencies {
     // audience a FOSS flavor exists for.
     "playImplementation"(libs.mwdat.core)
     "playImplementation"(libs.mwdat.camera)
-    // Note: flavour+buildType configurations ("playDebugImplementation") are not
-    // available at this point in configuration, so the mock device rides on the
-    // flavour configuration instead. It is debug tooling and unreferenced in
-    // release, so R8 strips it; the property that matters is preserved -- the
-    // foss flavour never needs the credentialed registry.
-    "playImplementation"(libs.mwdat.mockdevice)
+    // The mock device is debug tooling and must stay off the release classpath.
+    // "R8 will strip it" is not an argument for widening the scope: shrinking runs
+    // long after resolution, so bundlePlayRelease would still have to fetch the
+    // artifact from the credentialed registry before it could throw it away --
+    // which is exactly how it broke.
+    //
+    // The flavour+buildType configuration does not exist yet while this block is
+    // evaluated (AGP creates it once the android DSL is finalised), so the
+    // narrowest correct scope has to be applied afterwards. See below.
 
     // Wear OS Data Layer
     implementation(libs.play.services.wearable)
@@ -447,5 +450,18 @@ configurations.all {
             useVersion(libs.versions.bouncycastle.get())
             because("Force-upgrade Bouncy Castle modules to fix vulnerabilities and ensure version alignment")
         }
+    }
+}
+
+// Meta Wearables mock device: play + debug only.
+//
+// `playDebugImplementation` is created by AGP after the android DSL is
+// finalised, so it cannot be named inside the dependencies { } block above.
+// Registering it here keeps the artifact -- which resolves only from the
+// credentialed GitHub Packages registry -- off both playReleaseRuntimeClasspath
+// and every foss classpath.
+afterEvaluate {
+    dependencies {
+        add("playDebugImplementation", libs.mwdat.mockdevice)
     }
 }
