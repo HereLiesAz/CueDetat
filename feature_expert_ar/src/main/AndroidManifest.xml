@@ -5,7 +5,7 @@
     <!--
       On-demand delivery: the Expert-AR split is NOT installed with the base app.
       The base requests it at runtime via SplitInstallManager (PlayArFeatureDelivery),
-      gated on entitlement, the first time an entitled user enters Expert AR.
+      on demand, the first time a user enters Expert AR.
 
       dist:fusing include="true" keeps the module available in fused/standalone
       APKs (universal APK / bundletool standalone) so non-Play distributions of

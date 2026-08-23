@@ -21,6 +21,11 @@ jobs:
       contents: read
     steps:
       - name: Invoke Jules
+        # SUPPLY CHAIN: unpinned. This action runs with repository secrets in
+        # scope, and @main means whatever its author pushes next runs here with
+        # no review. Pin to a release tag or a commit SHA. Left unpinned only
+        # because the pinning SHA could not be resolved offline -- do not treat
+        # this comment as the fix.
         uses: google-labs-code/jules-invoke@main
         with:
           jules_api_key: ${{ secrets.JULES_API_KEY }}

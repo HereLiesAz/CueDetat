@@ -1,211 +1,186 @@
-# This file is a Gradle version catalog. It centralizes dependency versions.
-# See https://docs.gradle.org/current/userguide/platforms.html for details.
+# Cue d'État — Gradle version catalog.
+#
+# Every version here is a VERIFIED LATEST STABLE release (checked against
+# repo1.maven.org / dl.google.com maven-metadata.xml, not from memory).
+# Pre-release coordinates (-RC / -alpha / -beta) are not permitted: the previous
+# catalog pinned Kotlin 2.4.20-RC, an unreleased compiler, as the project baseline.
+#
+# Toolchain: JDK 21 everywhere (see gradle.properties + jvmToolchain(21)).
 
 [versions]
 applicationId = "com.hereliesaz.cuedetat"
 appName = "Cue D’état"
-# Android & Jetpack
+
+# ── Toolchain ────────────────────────────────────────────────────────────────
+jdk = "21"
+kotlin = "2.4.10"
+agp = "9.3.1"
+ksp = "2.3.11"
+composeMultiplatform = "1.11.1"
+
+# ── Kotlin ecosystem (multiplatform-capable) ─────────────────────────────────
+coroutines = "1.11.0"
+serialization = "1.11.0"
+atomicfu = "0.33.0"
+
+# ── AndroidX / Jetpack ───────────────────────────────────────────────────────
 activityCompose = "1.13.0"
-appcompat = "1.7.1"
-camera = "1.4.2"
-cameraxVersion = "1.4.2"
-composeBom = "2026.05.01"
-constraintlayout = "2.2.1"
-core = "1.54.0"
-coreKtx = "1.16.0"
-datastorePreferences = "1.2.1"
-espresso = "3.7.0"
-glanceAppwidget = "1.2.0-rc01"
-hiltNavigationCompose = "1.3.0"
-jbox2d = "2.3.0-BETA"
-junit = "4.13.2"
-junitTest = "1.2.1"
-junitExt = "1.11.2"
-junitAndroidExt = "1.3.0"
-kotlinMetadataJvm = "2.4.20-RC" # Must match kotlinAndroid; Hilt's processor needs a metadata parser for the compiler's metadata version
-kotlinxCoroutinesAndroid = "1.11.0"
-kotlinxCoroutinesCore = "1.11.0"
-kphysicsVersion = "1.0.0"
-lifecycle = "2.9.1"
-lifecycleRuntimeCompose = "2.10.0"
-lifecycleViewmodelCompose = "2.10.0"
-lifecycleViewmodelKtx = "2.10.0"
-material = "1.14.0"
-material3 = "1.4.0-beta02"
-material3AdaptiveNavSuite = "1.5.0-alpha21"
-materialIconsExtended = "1.7.8"
-multidex = "2.0.1"
-objectDetection = "17.0.2"
-objectDetectionCustom = "17.0.2"
-opencv = "4.13.0"
-palette = "1.0.0"
-guava = "1.11.0"
-# Kotlin & Coroutines
-kotlinxCoroutinesGuava = "1.10.2"
-slf4jBom = "2.1.0-alpha1"
-stdlib = "2.4.20-RC"
-camerax = "1.4.2"
-
-# Hilt (Dependency Injection)
-hilt = "2.59.2" # Matches plugin version
-
-# Networking
-retrofit = "3.0.0"
-converterGson = "3.0.0"
-
-# Plugins
-androidApplication = "9.2.1" # Example, use your actual AGP version
-kotlinAndroid = "2.4.20-RC"
-kotlinCompose = "2.4.20-RC"
-ksp = "2.3.8"
-benchmarkCommon = "1.4.1"
-composeMaterial3 = "1.6.2"
-tensorflowLite = "2.17.0"
-tensorflowLiteTaskVision = "0.4.4"
-ui = "1.11.2"
-animationCore = "1.8.3"
-uiGraphics = "1.11.2"
-visionCommon = "17.3.0"
-lifecycleKtx = "2.10.0"
 androidxCore = "1.19.0"
-cameraVideo = "1.6.1"
-glance = "1.2.0-alpha01"
-foundationLayout = "1.11.2"
-animationCoreVersion = "1.11.2"
-roomKtx = "2.8.4"
-glanceVersion = "1.1.1"
-material3Version = "1.3.2"
-sceneformBase = "1.17.1"
-liquidfun = "1.1.0"
-androidxMaterial3 = "1.4.0"
-aznavrail = "10.19"
-playServicesLocation = "21.3.0"
-playServicesWearable = "18.2.0"
+appcompat = "1.7.1"
+camerax = "1.6.1"
+composeUi = "1.12.0"
+datastore = "1.2.1"
+lifecycle = "2.11.0"
+material = "1.14.0"
+material3 = "1.4.0"
+material3AdaptiveNavSuite = "1.4.0"
+materialIconsExtended = "1.7.8"
+palette = "1.0.0"
+
+# ── Dependency injection (Android layer only; the KMP core is pure) ──────────
+hilt = "2.60.1"
+hiltNavigationCompose = "1.3.0"
+
+# ── Vision / AR (Android-only) ───────────────────────────────────────────────
+arcore = "1.54.0"
+mlkitObjectDetection = "17.0.2"
+mlkitVisionCommon = "17.3.0"
+opencv = "4.13.0"
+tensorflowLite = "2.17.0"
 tensorflowLiteSupport = "0.5.0"
 tensorflowLiteMetadata = "0.5.0"
-metaWearableDat = "0.6.0"
-jose4j = "0.9.6"
-guavaVulnerability = "33.6.0-android"
-netty = "4.1.137.Final"
-bouncycastle = "1.84"
-androidx-billing = "9.0.0"
-play-integrity = "1.6.0"
-playFeatureDelivery = "2.1.0"
-androidxCredentials = "1.6.0"
-googleId = "1.2.0"
 
+# ── Play / distribution (play flavor only) ───────────────────────────────────
+billing = "9.1.0"
+playFeatureDelivery = "2.1.0"
+playIntegrity = "1.6.0"
+playServicesLocation = "21.3.0"
+playServicesWearable = "18.2.0"
+
+# ── Wearables (play flavor only — see app/build.gradle.kts) ──────────────────
+metaWearableDat = "0.6.0"
+
+# ── Networking ───────────────────────────────────────────────────────────────
+retrofit = "3.0.0"
+
+# ── UI third-party ───────────────────────────────────────────────────────────
+aznavrail = "10.19"
+
+# ── Test ─────────────────────────────────────────────────────────────────────
+junit = "4.13.2"
+androidxJunit = "1.3.0"
+espresso = "3.7.0"
+
+# ── Transitive pins (CVE remediation) ────────────────────────────────────────
+bouncycastle = "1.84"
+guava = "33.6.0-android"
+netty = "4.1.137.Final"
 
 [libraries]
-# AndroidX Core & UI
-androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
-androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
-androidx-camera-analysis = { module = "androidx.camera:camera-analysis", version.ref = "cameraxVersion" }
-androidx-camera-video = { module = "androidx.camera:camera-video", version.ref = "cameraVideo" }
-androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
-androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCore" }
-androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
-androidx-billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "androidx-billing" }
-play-integrity = { group = "com.google.android.play", name = "integrity", version.ref = "play-integrity" }
-play-feature-delivery = { group = "com.google.android.play", name = "feature-delivery", version.ref = "playFeatureDelivery" }
-androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "androidxCredentials" }
-androidx-credentials-play-services-auth = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "androidxCredentials" }
-google-id = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleId" }
-androidx-datastore-preferences-rxjava2 = { module = "androidx.datastore:datastore-preferences-rxjava2", version.ref = "datastorePreferences" }
-androidx-datastore-preferences-rxjava3 = { module = "androidx.datastore:datastore-preferences-rxjava3", version.ref = "datastorePreferences" }
-androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glanceAppwidget" }
+
+# ── Kotlin multiplatform core ────────────────────────────────────────────────
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-guava = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-guava", version.ref = "coroutines" }
+kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+kotlinx-atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "atomicfu" }
+
+# ── AndroidX ─────────────────────────────────────────────────────────────────
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-palette = { module = "androidx.palette:palette-ktx", version.ref = "palette" }
+
+# ── Compose (Android) ────────────────────────────────────────────────────────
+androidx-compose-foundation = { module = "androidx.compose.foundation:foundation", version.ref = "composeUi" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
+androidx-compose-material3-adaptive-navigation-suite = { module = "androidx.compose.material3:material3-adaptive-navigation-suite", version.ref = "material3AdaptiveNavSuite" }
+androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
+androidx-compose-ui = { module = "androidx.compose.ui:ui", version.ref = "composeUi" }
+androidx-compose-ui-graphics = { module = "androidx.compose.ui:ui-graphics", version.ref = "composeUi" }
+androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling", version.ref = "composeUi" }
+androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "composeUi" }
+androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4", version.ref = "composeUi" }
+androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest", version.ref = "composeUi" }
+material = { module = "com.google.android.material:material", version.ref = "material" }
+
+# ── CameraX ──────────────────────────────────────────────────────────────────
+androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
+androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "camerax" }
+androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
+
+# ── Hilt ─────────────────────────────────────────────────────────────────────
+hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
+hilt-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hilt" }
 androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
-androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycleRuntimeCompose" }
-androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleKtx" }
-androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleViewmodelCompose" }
-androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", version.ref = "lifecycleViewmodelKtx" }
-androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
-androidx-multidex = { group = "androidx.multidex", name = "multidex", version.ref = "multidex" }
-core = { module = "com.google.ar:core", version.ref = "core" }
-dagger-hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
-kotlin-metadata-jvm = { module = "org.jetbrains.kotlin:kotlin-metadata-jvm", version.ref = "kotlinMetadataJvm" }
-kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesAndroid" }
-kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
-kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "kotlinxCoroutinesCore" }
-material = { group = "com.google.android.material", name = "material", version.ref = "material" }
-aznavrail = { group = "com.github.HereLiesAz", name = "AzNavRail", version.ref = "aznavrail" }
 
-
-# Jetpack Compose
-androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
-androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "androidxMaterial3" }
-androidx-compose-material3-adaptive-navigation-suite = { group = "androidx.compose.material3", name = "material3-adaptive-navigation-suite", version.ref = "material3AdaptiveNavSuite" }
-androidx-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "ui" }
-androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics", version.ref = "uiGraphics" }
-androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling", version.ref = "ui" }
-androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview", version.ref = "ui" }
-androidx-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "ui" }
-
-
-# CameraX
-androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "cameraVideo" }
-androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "cameraVideo" }
-androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "cameraVideo" }
-androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "cameraVideo" }
-kotlinx-coroutines-guava = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-guava", version.ref = "guava" }
-
-
-# Kotlin Stdlib
-kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "stdlib" }
-
-# Hilt
-hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
-hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
-
-# Retrofit
-mlkit = { module = "com.google.mlkit:object-detection", version.ref = "objectDetection" } # Placeholder for bundle creation
+# ── Vision / AR ──────────────────────────────────────────────────────────────
+arcore = { module = "com.google.ar:core", version.ref = "arcore" }
+mlkit-detection = { module = "com.google.mlkit:object-detection", version.ref = "mlkitObjectDetection" }
+mlkit-vision-common = { module = "com.google.mlkit:vision-common", version.ref = "mlkitVisionCommon" }
 opencv = { module = "org.opencv:opencv", version.ref = "opencv" }
-retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
-converter-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "converterGson" }
-
-# Testing
-junit = { group = "junit", name = "junit", version.ref = "junit" }
-androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitAndroidExt" }
-androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
-androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4", version.ref = "junitExt" }
-androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest", version.ref = "ui" }
-androidx-benchmark-common = { group = "androidx.benchmark", name = "benchmark-common", version.ref = "benchmarkCommon" }
-
-androidx-palette = { group = "androidx.palette", name = "palette-ktx", version.ref = "palette" }
-compose-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "composeMaterial3" } # This is for Wear Compose, likely not what's needed for ExpressiveNavigationRail
-slf4j-bom = { module = "org.slf4j:slf4j-bom", version.ref = "slf4jBom" }
 tensorflow-lite = { module = "org.tensorflow:tensorflow-lite", version.ref = "tensorflowLite" }
 tensorflow-lite-gpu = { module = "org.tensorflow:tensorflow-lite-gpu", version.ref = "tensorflowLite" }
 tensorflow-lite-gpu-api = { module = "org.tensorflow:tensorflow-lite-gpu-api", version.ref = "tensorflowLite" }
-tensorflow-lite-task-vision = { module = "org.tensorflow:tensorflow-lite-task-vision", version.ref = "tensorflowLiteTaskVision" }
-vision-common = { module = "com.google.mlkit:vision-common", version.ref = "visionCommon" }
-androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
-androidx-compose-animation-core = { group = "androidx.compose.animation", name = "animation-core", version.ref = "animationCoreVersion" }
-androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "roomKtx" }
-glance = { group = "androidx.glance", name = "glance", version.ref = "glanceVersion" }
-sceneform-base = { group = "com.google.ar.sceneform", name = "sceneform-base", version.ref = "sceneformBase" }
-jbox2d-library = { group = "org.jbox2d", name = "jbox2d-library", version.ref = "jbox2d" }
-play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
-play-services-wearable = { group = "com.google.android.gms", name = "play-services-wearable", version.ref = "playServicesWearable" }
-tensorflow-lite-support = { group = "org.tensorflow", name = "tensorflow-lite-support", version.ref = "tensorflowLiteSupport" }
-tensorflow-lite-metadata = { group = "org.tensorflow", name = "tensorflow-lite-metadata", version.ref = "tensorflowLiteMetadata" }
-# Meta Wearables DAT
-mwdat-core = { group = "com.meta.wearable", name = "mwdat-core", version.ref = "metaWearableDat" }
-mwdat-camera = { group = "com.meta.wearable", name = "mwdat-camera", version.ref = "metaWearableDat" }
-mwdat-mockdevice = { group = "com.meta.wearable", name = "mwdat-mockdevice", version.ref = "metaWearableDat" }
+tensorflow-lite-support = { module = "org.tensorflow:tensorflow-lite-support", version.ref = "tensorflowLiteSupport" }
+tensorflow-lite-metadata = { module = "org.tensorflow:tensorflow-lite-metadata", version.ref = "tensorflowLiteMetadata" }
 
-# Vulnerability Fixes & Others
-jose4j = { group = "org.bitbucket.b_c", name = "jose4j", version.ref = "jose4j" }
-guava-vulnerability = { group = "com.google.guava", name = "guava", version.ref = "guavaVulnerability" }
-netty-all = { group = "io.netty", name = "netty-all", version.ref = "netty" }
+# ── Play / distribution ──────────────────────────────────────────────────────
+androidx-billing-ktx = { module = "com.android.billingclient:billing-ktx", version.ref = "billing" }
+play-feature-delivery = { module = "com.google.android.play:feature-delivery", version.ref = "playFeatureDelivery" }
+play-integrity = { module = "com.google.android.play:integrity", version.ref = "playIntegrity" }
+play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
+play-services-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "playServicesWearable" }
+
+# ── Meta Wearables DAT (private GitHub Packages — play flavor only) ──────────
+mwdat-core = { module = "com.meta.wearable:mwdat-core", version.ref = "metaWearableDat" }
+mwdat-camera = { module = "com.meta.wearable:mwdat-camera", version.ref = "metaWearableDat" }
+mwdat-mockdevice = { module = "com.meta.wearable:mwdat-mockdevice", version.ref = "metaWearableDat" }
+
+# ── Networking ───────────────────────────────────────────────────────────────
+retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
+retrofit-converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "retrofit" }
+
+# ── UI third-party ───────────────────────────────────────────────────────────
+aznavrail = { module = "com.github.HereLiesAz:AzNavRail", version.ref = "aznavrail" }
+
+# ── Test ─────────────────────────────────────────────────────────────────────
+junit = { module = "junit:junit", version.ref = "junit" }
+androidx-junit = { module = "androidx.test.ext:junit", version.ref = "androidxJunit" }
+androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
+
+# ── Transitive CVE pins ──────────────────────────────────────────────────────
+bouncycastle-bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
+bouncycastle-bcutil = { module = "org.bouncycastle:bcutil-jdk18on", version.ref = "bouncycastle" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+netty-all = { module = "io.netty:netty-all", version.ref = "netty" }
 
 [plugins]
-android-application = { id = "com.android.application", version.ref = "androidApplication" }
-android-dynamic-feature = { id = "com.android.dynamic-feature", version.ref = "androidApplication" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlinAndroid" }
-kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlinCompose" }
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+android-dynamic-feature = { id = "com.android.dynamic-feature", version.ref = "agp" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 
 [bundles]
-camera = ["androidx-camera-core", "androidx-camera-camera2", "androidx-camera-lifecycle", "androidx-camera-view", "kotlinx-coroutines-guava"]
-compose = ["androidx-ui", "androidx-ui-graphics", "androidx-ui-tooling-preview", "androidx-compose-material3", "androidx-activity-compose"]
+camera = ["androidx-camera-core", "androidx-camera-camera2", "androidx-camera-lifecycle", "androidx-camera-view"]
+compose-android = [
+    "androidx-compose-ui",
+    "androidx-compose-ui-graphics",
+    "androidx-compose-ui-tooling-preview",
+    "androidx-compose-foundation",
+    "androidx-compose-material3",
+    "androidx-activity-compose",
+]

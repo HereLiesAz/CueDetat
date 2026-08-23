@@ -16,7 +16,7 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
  * implementation classes (ArTableSession / ArFrameProcessor / ArCoreBackground /
  * TableScanViewModel) directly. That decoupling is what lets the implementation
  * eventually live in the on-demand `:feature_expert_ar` dynamic feature module,
- * delivered only to entitled (paid / trial) users.
+ * delivered on demand the first time AR is requested.
  *
  * Step 1 of the extraction: the implementation (BaseArController) still lives in
  * the base and is Hilt-bound, so behaviour is unchanged. Step 2 moves the
@@ -27,8 +27,8 @@ interface ArController {
 
     /**
      * Ensure the Expert-AR implementation is available, requesting the on-demand
-     * `:feature_expert_ar` split if necessary. Entitlement-gated: returns false
-     * (and stays a no-op) for users who are not entitled. Implemented by the
+     * `:feature_expert_ar` split if necessary. Available to everyone.
+     * Implemented by the
      * facade; the loaded implementation and the no-op both use the default.
      */
     suspend fun ensureLoaded(): Boolean = true

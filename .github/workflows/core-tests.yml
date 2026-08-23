@@ -1,0 +1,59 @@
+name: Core tests
+
+# The fast feedback job. Runs the pure Kotlin Multiplatform `:core:*` modules —
+# units, table geometry, ball physics, the aim solver, the projection — which
+# need no Android SDK, no emulator and no signing config.
+#
+# This exists because nothing in CI ran a test before a build or a publish. That
+# was not hypothetical: the Wear trainer's fluidity score shipped hard-pinned to
+# 1.0 for over five weeks across an unknown number of green builds, because no
+# workflow ever executed the logic. The geometry this project exists to compute
+# had zero test coverage at all.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: core-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Core (JVM)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate the Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run the core test suite
+        run: ./gradlew -Pcuedetat.coreOnly=true allTests --stacktrace
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-test-reports
+          path: |
+            core/*/build/reports/tests/
+            core/*/build/test-results/
+          retention-days: 14
+          if-no-files-found: ignore

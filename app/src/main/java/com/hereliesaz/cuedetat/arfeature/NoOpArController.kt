@@ -9,7 +9,7 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
 
 /**
  * Inert [ArController] used by [ArControllerFacade] before the Expert-AR module
- * is loaded (and permanently for un-entitled users). Reports no AR capability,
+ * is loaded, and on devices without ARCore. Reports no AR capability,
  * so the AR/scan UI in the base never composes and the per-frame hooks are
  * harmless no-ops.
  */

@@ -12,5 +12,6 @@ sealed class SingleEvent {
     data class OpenUrl(val url: String) : SingleEvent()
     data class SendFeedbackEmail(val email: String, val subject: String) : SingleEvent()
     data object HaterShake : SingleEvent()
-    data class ShowPaywall(val trigger: com.hereliesaz.cuedetat.billing.PaywallTrigger) : SingleEvent()
+    /** Opens the donation sheet. Nothing is gated; this is a tip jar. */
+    data object ShowSupportSheet : SingleEvent()
 }

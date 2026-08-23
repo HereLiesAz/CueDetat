@@ -52,6 +52,40 @@ This is an Android application that uses your device's camera and a frankly exce
 * I'm a genieaouxess.
 * And this is a photo from a vacation two years ago that I accidentally pretend included.
 
+## Free, and how it stays that way
+
+Every feature is free and unconditional. There is no Expert tier, no paywall, no
+entitlement, no trial and nothing to restore — the whole billing stack was
+removed, along with the tester-licence console that used to ship to every user in
+every build. If the app is useful to you, there are donation links under
+**Support** in the nav rail. Nothing behind them unlocks anything.
+
+## The core
+
+The game model lives in [`core/`](core/) as pure Kotlin Multiplatform modules —
+units, table geometry, ball physics, the aim solver and the projection — with no
+Android, OpenCV or ARCore types anywhere in them:
+
+```bash
+./gradlew -Pcuedetat.coreOnly=true allTests   # no Android SDK required
+```
+
+Three things this buys that the previous architecture could not:
+
+* **Real units.** The world is metres. It used to be a dimensionless plane scaled
+  from `LOGICAL_BALL_RADIUS = 25f`, which is how spin decay constants ended up
+  specified "per logical unit" and how the on-screen distance readout ended up
+  as `1200 / screenRadiusInPixels` — a number that changed when you moved the
+  zoom slider.
+* **Aim that accounts for throw.** The ghost ball is the starting estimate, not
+  the answer. Cut-induced throw pushes the object ball off the line of centres by
+  up to about 5°, so the solver pre-compensates; squirt is applied at the cue tip,
+  where it actually happens, so putting english on the ball now changes the line
+  you are told to shoot along.
+* **Pockets that are apertures.** A mouth of width `m` entered at `θ` off its
+  axis presents `m·cos(θ)`, so a ball rolling along the rail is rejected by the
+  side pocket and accepted by the corner. Six bare points could not express that.
+
 ## How It Works: The Gore.
 The Details.
 
@@ -64,7 +98,7 @@ someone tries to sneak business logic into a Composable, physics itself should i
 
 1.  **Camera Preview:** Uses CameraX (and, for the AR flow, ARCore) to display a live feed from the device camera.
 2.  **Sensor Input:** Leverages the `TYPE_ROTATION_VECTOR` sensor to determine the phone's pitch, roll, and yaw. The pitch is primarily used to tilt the 2D protractor plane. An offset is applied to account for natural phone holding angles.
-3.  **MVI Pipeline:** Every user interaction becomes a `MainScreenEvent`, sent up to `MainViewModel`. The `StateReducer` (and its sub-reducers, one per concern — gestures, controls, CV, etc.) is the *only* thing allowed to touch `CueDetatState`, producing a new immutable state as a pure function of the old one. `UpdateStateUseCase` then runs on that new state to derive everything downstream of it — perspective matrices, aiming lines, bank shots, spin paths — before the final state is emitted from a `StateFlow` and the UI redraws itself as a pure function of it.
+3.  **MVI Pipeline:** Every user interaction becomes a `MainScreenEvent`, sent up to `MainViewModel`. The `StateReducer` (and its sub-reducers, one per concern — gestures, controls, CV, etc.) produces a new immutable state as a pure function of the old one. It is *mostly*, not solely, responsible for `CueDetatState`: `MainViewModel` still applies a few `.copy()` calls of its own, including one real state-transition rule. Calling that "the only thing allowed to touch state" would be a claim this README used to make and the code did not honour. `UpdateStateUseCase` then runs on that new state to derive everything downstream of it — perspective matrices, aiming lines, bank shots, spin paths — before the final state is emitted from a `StateFlow` and the UI redraws itself as a pure function of it.
 4.  **Rendering (Compose, not a custom `View`):** `ProtractorOverlay` is a Compose `Canvas` that drives `OverlayRenderer.draw` on every recomposition, delegating to sub-renderers (`TableRenderer`, `RailRenderer`, `BallRenderer`, `LineRenderer`, …) in strict z-order.
     * **Protractor Plane:** A logical 2D plane is defined. Circles representing the cue and target ball positions, protractor angle lines, and deflection lines are drawn on this plane.
     * **3D Projection (Simplified):** `UpdateStateUseCase` builds the projection with `android.graphics.Camera` — a `worldMatrix` handles 2D zoom, then a `perspectiveMatrix` applies table rotation (Y-axis) followed by device pitch/tilt (X-axis), assembled into the final `pitchMatrix` the renderer uses every frame.
@@ -77,7 +111,7 @@ someone tries to sneak business logic into a Composable, physics itself should i
 
 * **A Virtual Table for Virtually Useful Bank Shot Projection:** Using more sophisticated dynamic layout involving a line drawing of a billiards table will come someday.
 * **True 3D Rendering:** This app fakes 3D with 2D canvas tricks. Moving to OpenGL ES or a 3D engine like Filament would allow for actual 3D models and lighting, but would also drastically increase complexity. And probably anxiety. But probably not usefulness.
-* **Ball, Table and Pocket Detection:** Partially real, believe it or not. Pocket/table detection uses a merged TFLite (YOLOv8n) model, `MergedTFLiteDetector`, with a Hough-circle fallback if the model asset isn't available. Table scanning accumulates observations across frames, fits a 2:1 geometry model, and builds a TPS warp map for lens-distortion correction. Ball detection runs via ML Kit for coarse region proposals, then `CvBallDetector` refines each region with a felt-mask-subtraction + connected-components pipeline, finished off with `HoughCircles` for sub-pixel centering — no contour detection involved. What remains fantasy: doing all of this reliably on a $12 phone held by someone who has had three beers.
+* **Ball, Table and Pocket Detection:** Partially real, believe it or not. Pocket/table detection uses a merged TFLite (YOLOv8n) model, `MergedTFLiteDetector`, with a felt-boundary-extraction fallback if the model asset isn't available. Table scanning accumulates observations across frames, fits a 2:1 geometry model, and builds a TPS warp map for lens-distortion correction. Ball detection runs via ML Kit for coarse region proposals, refined by `findContours` + `minEnclosingCircle`, and merged with an independent `CvBallDetector` pass (felt-mask subtraction, connected components, `HoughCircles`). The pocket/table fallback is felt-boundary extraction, not Hough circles — this README previously claimed the opposite on both counts. What remains fantasy: doing all of this reliably on a $12 phone held by someone who has had three beers.
 * **Insulting Warnings:** The pool of sarcastic remarks is finite. Contributions welcome if they tickle me the required level of pink.
 * **Performance:** Drawing many complex paths and text elements on every frame can be demanding. Optimizations are an ongoing battle. And yet, somehow, it feels more like a you-problem.
 

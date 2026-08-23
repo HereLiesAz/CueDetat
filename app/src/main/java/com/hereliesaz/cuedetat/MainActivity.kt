@@ -51,21 +51,14 @@ class MainActivity : ComponentActivity() {
 
     // Backed by rememberSaveable-created MutableStates (assigned once composition starts,
     // see AppContent/setContent below) instead of plain mutableStateOf Activity fields, so
-    // an in-progress paywall / permission-gate survives Activity recreation on a
+    // an in-progress support-sheet / permission-gate survives Activity recreation on a
     // configuration change (e.g. system dark-mode toggle) instead of silently resetting and
-    // dismissing an open paywall sheet with no callback. Written to from non-composable
+    // dismissing an open sheet with no callback. Written to from non-composable
     // callbacks (requestPermissionsLauncher, observeSingleEvents' flow collector) via
     // `.value`, which is safe: Compose's snapshot system observes such writes regardless of
     // whether they originate inside composition.
     private lateinit var cameraPermissionGrantedState: MutableState<Boolean>
-    private lateinit var paywallTriggerState: MutableState<com.hereliesaz.cuedetat.billing.PaywallTrigger?>
-
-    // Bumped on every paywall request so the sheet re-shows even when the
-    // trigger enum value is identical to the previous one. Without this,
-    // setting paywallTrigger from SPLASH_SCREEN to SPLASH_SCREEN does nothing
-    // (mutableStateOf uses structural equality), so a non-null→non-null
-    // transition silently drops the request.
-    private lateinit var paywallShowSequenceState: MutableState<Long>
+    private lateinit var showSupportSheetState: MutableState<Boolean>
 
     private val requestPermissionsLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
@@ -96,17 +89,14 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val cameraGranted = rememberSaveable { mutableStateOf(hasCameraPermission()) }
-            val trigger =
-                rememberSaveable { mutableStateOf<com.hereliesaz.cuedetat.billing.PaywallTrigger?>(null) }
-            val showSequence = rememberSaveable { mutableStateOf(0L) }
+            val showSupport = rememberSaveable { mutableStateOf(false) }
             // Publish the saveable MutableState instances to the Activity fields once per
             // composition commit so the non-composable callbacks above/below can write to
             // them. SideEffect (rather than a bare assignment) avoids re-publishing during a
             // composition that gets discarded before being committed.
             SideEffect {
                 cameraPermissionGrantedState = cameraGranted
-                paywallTriggerState = trigger
-                paywallShowSequenceState = showSequence
+                showSupportSheetState = showSupport
             }
 
             if (cameraGranted.value) {
@@ -137,11 +127,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        viewModel.refreshEntitlement()
-        // Silently unlock Expert for allowlisted testers without requiring them
-        // to open the paywall. Self-guards and never prompts.
-        viewModel.attemptTesterAutoUnlock(this)
-
         // Camera permission is only checked once up front in onCreate; if the user revokes
         // it from system Settings while the app is backgrounded, CameraX fails silently
         // inside a swallowed catch(Exception) in CameraBackground, leaving a frozen blank
@@ -155,22 +140,25 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Opens an external link through the same allowlist every other outbound
+     * link uses. Donation links go through here too — nothing gets a raw intent
+     * just because it is ours.
+     */
+    private fun openUrlSafely(url: String) {
+        if (SecurityUtils.isSafeUrl(url)) {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } else {
+            Toast.makeText(this, "Link blocked for security.", Toast.LENGTH_SHORT).show()
+            android.util.Log.w("MainActivity", "Suspicious URL blocked: $url")
+        }
+    }
+
     private fun observeSingleEvents() {
         viewModel.singleEvent.onEach { event ->
             when (event) {
                 is SingleEvent.OpenUrl -> {
-                    if (SecurityUtils.isSafeUrl(event.url)) {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
-                        startActivity(intent)
-                    } else {
-                        // Notify the user instead of failing silently
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Link blocked for security.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        android.util.Log.w("MainActivity", "Suspicious URL blocked: ${event.url}")
-                    }
+                    openUrlSafely(event.url)
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 is SingleEvent.SendFeedbackEmail -> {
@@ -192,9 +180,8 @@ class MainActivity : ComponentActivity() {
                     haterViewModel.onEvent(HaterEvent.ShakeDetected)
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
-                is SingleEvent.ShowPaywall -> {
-                    paywallShowSequenceState.value = paywallShowSequenceState.value + 1
-                    paywallTriggerState.value = event.trigger
+                is SingleEvent.ShowSupportSheet -> {
+                    showSupportSheetState.value = true
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 null -> { /* Do nothing */ }
@@ -237,35 +224,19 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            paywallTriggerState.value?.let { trigger ->
-                // key(paywallShowSequence): force a fresh composition (and
-                // fresh ModalBottomSheet animation) on every show request,
-                // even if the trigger enum is identical to the previous one.
-                androidx.compose.runtime.key(paywallShowSequenceState.value) {
-                    com.hereliesaz.cuedetat.ui.composables.paywall.PaywallSheet(
-                        trigger = trigger,
-                        onDismiss = { paywallTriggerState.value = null },
-                        onPurchasedAutoEnterExpert = {
-                            viewModel.onEvent(MainScreenEvent.SetExperienceMode(ExperienceMode.EXPERT))
-                        }
-                    )
-                }
+            if (showSupportSheetState.value) {
+                com.hereliesaz.cuedetat.ui.composables.support.SupportSheet(
+                    onDismiss = { showSupportSheetState.value = false },
+                    onOpenUrl = { url ->
+                        showSupportSheetState.value = false
+                        openUrlSafely(url)
+                    },
+                )
             }
 
             if (showSplashScreen) {
                 SplashScreen(onRoleSelected = { selectedMode ->
-                    if (selectedMode == ExperienceMode.EXPERT && !uiState.isExpertEntitled) {
-                        // Bypass the SetExperienceMode reducer chain entirely:
-                        // every Expert tap on splash for an unentitled user
-                        // must show the paywall, every single time.
-                        viewModel.onEvent(
-                            MainScreenEvent.ShowPaywall(
-                                com.hereliesaz.cuedetat.billing.PaywallTrigger.SPLASH_SCREEN
-                            )
-                        )
-                    } else {
-                        viewModel.onEvent(MainScreenEvent.SetExperienceMode(selectedMode))
-                    }
+                    viewModel.onEvent(MainScreenEvent.SetExperienceMode(selectedMode))
                 })
             } else {
                 val currentAppControlColorScheme = MaterialTheme.colorScheme

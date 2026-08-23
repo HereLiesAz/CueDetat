@@ -90,15 +90,18 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # TODO(ci): No workflow in this repo currently runs unit tests OR instrumented
-      # tests (e.g. app/src/androidTest/.../MergedTFLiteDetectorTest.kt, which exercises
-      # the real TFLite ML pipeline via detect()/detectPool()). Unit tests could run
-      # here via `./gradlew testFossDebugUnitTest`; instrumented tests need a device —
-      # e.g. reactivecircus/android-emulator-runner — to run
-      # `./gradlew connectedFossDebugAndroidTest`. Left as a TODO rather than wiring an
-      # emulator job silently/incompletely, since headless-emulator CI is a nontrivial
-      # infra addition (API level matrix, snapshot caching, flakiness handling) beyond
-      # the scope of the change that added this note.
+      # The pure Kotlin Multiplatform core carries the geometry, physics and aim
+      # maths, and needs no SDK -- so it gates the build directly. The :core:*
+      # suite also runs standalone in core-tests.yml for faster PR feedback.
+      - name: Run unit tests
+        run: ./gradlew -Pcuedetat.coreOnly=true allTests --stacktrace
+
+      - name: Run Android unit tests
+        run: ./gradlew testFossDebugUnitTest --stacktrace
+
+      # Instrumented tests (app/src/androidTest) still need a device. Wiring an
+      # emulator matrix is a separate, deliberate piece of work; it is listed in
+      # REBUILD_PLAN.md rather than half-added here.
       - name: Build with Gradle
         id: gradle-build
         env:
@@ -192,7 +195,7 @@ jobs:
       # RELEASE STEPS (Only run on PUSH, not Pull Requests)
       # ------------------------------------------------------------------
       - name: Prepare Release Variables
-        if: success() && github.event_name == 'push'
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         id: release_vars
         run: |
           export BUILD_NUMBER=$(git rev-list --count HEAD)
@@ -245,7 +248,11 @@ jobs:
           cd build_tools_package && zip -r ../build-tools.zip . && cd ..
 
       - name: Publish Release
-        if: success() && github.event_name == 'push'
+        # Gated on main: this force-pushes a shared tag and clobbers the public
+        # 'Latest Debug Build' asset, so a push to any feature branch must not
+        # reach it. The workflow triggers on branches: ['**'] by design, for
+        # build feedback -- publishing is the part that has to be narrowed.
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

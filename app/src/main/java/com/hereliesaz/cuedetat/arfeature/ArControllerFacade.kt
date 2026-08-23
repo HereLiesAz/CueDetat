@@ -7,7 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.hereliesaz.cuedetat.billing.EntitlementRepository
 import com.hereliesaz.cuedetat.delivery.ArFeatureDelivery
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
@@ -24,8 +23,8 @@ import javax.inject.Singleton
  * swapping its [delegate] from [NoOpArController] to the real implementation once
  * the on-demand `:feature_expert_ar` split is available.
  *
- * Loading is entitlement-gated: [ensureLoaded] is a no-op (returns false) until
- * the user is entitled, so un-entitled users never download or run the AR code.
+ * Loading is on demand: the module is fetched the first time AR is actually
+ * requested, so nobody pays the download for a feature they never open.
  * The implementation class lives in the dynamic feature module and is resolved
  * reflectively — the base has no compile-time dependency on it or on ARCore.
  *
@@ -35,7 +34,6 @@ import javax.inject.Singleton
 @Singleton
 class ArControllerFacade @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val entitlementRepository: EntitlementRepository,
     private val delivery: ArFeatureDelivery,
 ) : ArController {
 
@@ -45,8 +43,6 @@ class ArControllerFacade @Inject constructor(
 
     override suspend fun ensureLoaded(): Boolean {
         if (loaded) return true
-        // Entitlement gate: never fetch or run the Expert-AR code for free users.
-        if (!entitlementRepository.entitlement.value.active) return false
         if (!delivery.ensureInstalled()) return false
         return loadMutex.withLock {
             if (loaded) return@withLock true

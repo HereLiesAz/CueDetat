@@ -20,13 +20,6 @@ enum class DistanceUnit {
     METRIC, IMPERIAL
 }
 
-enum class CvRefinementMethod {
-    CONTOUR, HOUGH;
-
-    fun next(): CvRefinementMethod {
-        return if (this == CONTOUR) HOUGH else CONTOUR
-    }
-}
 
 enum class InteractionMode {
     NONE,

@@ -21,6 +21,11 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
                 ).toFloat()
                 state.copy(
                     isMasseModeActive = true,
+                    // See handleToggleBankingMode: these are alternative shot
+                    // types, and leaving both set produced a masse dial drawn
+                    // over bank-shot geometry that the aiming pass ignored.
+                    isBankingMode = false,
+                    bankingAimTarget = null,
                     isSpinControlVisible = false,
                     lingeringSpinOffset = null,
                     selectedSpinOffset = null,

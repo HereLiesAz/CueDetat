@@ -14,7 +14,6 @@ import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.model.Table
-import com.hereliesaz.cuedetat.view.state.CvRefinementMethod
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
@@ -31,9 +30,21 @@ enum class CameraMode {
 
 enum class ExperienceMode {
     EXPERT, BEGINNER, HATER;
-    fun next(): ExperienceMode {
-        val nextOrdinal = (this.ordinal + 1) % values().size
-        return values()[nextOrdinal]
+
+    /**
+     * The primary mode control toggles between the two modes that are actually
+     * the product. Hater mode is still reachable -- from the splash screen and
+     * by shaking the device -- but it is no longer a third stop on this cycle.
+     *
+     * It used to be, which meant the single most load-bearing control in the nav
+     * rail put a physics-dice joke screen between Beginner and Expert: one tap in
+     * three landed on an unrelated product, and getting back required going all
+     * the way round.
+     */
+    fun next(): ExperienceMode = when (this) {
+        EXPERT -> BEGINNER
+        BEGINNER -> EXPERT
+        HATER -> EXPERT
     }
 }
 
@@ -133,10 +144,9 @@ data class CueDetatState(
     val lockedHsvColor: FloatArray? = null,
     val lockedHsvStdDev: FloatArray? = null,
     val showAdvancedOptionsDialog: Boolean = false,
-    val showBillingDebugDialog: Boolean = false,
+    val showSupportSheet: Boolean = false,
     val showCalibrationScreen: Boolean = false,
     val showTableScanScreen: Boolean = false,
-    val cvRefinementMethod: CvRefinementMethod = CvRefinementMethod.CONTOUR,
     val useCustomModel: Boolean = false,
     val isSnappingEnabled: Boolean = true,
     val hasTargetBallBeenMoved: Boolean = false,
@@ -184,7 +194,6 @@ data class CueDetatState(
     val isTopDownViewActive: Boolean = false,
     @Transient val topDownBitmap: android.graphics.Bitmap? = null,
     val topDownTransitionProgress: Float = 0f,
-    val isExpertEntitled: Boolean = false,
     val isAdvisorEnabled: Boolean = false,
     @Transient val recommendedShot: com.hereliesaz.cuedetat.domain.advisor.RecommendedShot? = null,
     val wearableState: com.hereliesaz.cuedetat.data.WearableState = com.hereliesaz.cuedetat.data.WearableState(),
@@ -192,15 +201,24 @@ data class CueDetatState(
     val pitchAngle: Float
         get() = currentOrientation.pitch
 
-    // CueDetatState has three FloatArray? fields (relocaliserDeltaQ, lockedHsvColor,
-    // lockedHsvStdDev). Kotlin's compiler-generated data class equals()/hashCode() would
-    // compare FloatArray fields by reference, not content, silently breaking equality
-    // (and thus StateFlow update suppression / distinctUntilChanged-style checks) whenever
-    // only ball classification / locked color / relocaliser data changed. Rather than
-    // hand-writing per-field comparisons for all ~120 properties (error-prone to keep in
-    // sync as fields are added), we build a single comparable snapshot list where the
-    // FloatArray fields are converted to List<Float> (structural equality) and everything
-    // else is compared exactly as the synthesized equals would compare it.
+    // INVARIANT: every property in the primary constructor above must appear
+    // exactly once in comparableFields() below. Nothing enforces this -- it is
+    // maintained by hand -- and a field that is added here but forgotten there
+    // is compared by neither equals() nor hashCode(), which silently defeats
+    // StateFlow conflation for that field alone. Verified in sync at 120/120 as
+    // of this commit.
+    //
+    // The list exists because three fields are FloatArray? (relocaliserDeltaQ,
+    // lockedHsvColor, lockedHsvStdDev), and the compiler-generated equals() for
+    // a data class compares arrays by reference, not content. Converting those
+    // three to a small content-comparing wrapper type would let the synthesized
+    // equals()/hashCode() be correct on their own and delete this whole
+    // mechanism -- there would be no second list to forget. That touches 38 call
+    // sites across seven files and is tracked in REBUILD_PLAN.md rather than
+    // done blind here.
+    //
+    // The rebuilt core sidesteps the problem entirely: :core:state holds no
+    // arrays, no matrices and no bitmaps, so its equality is the generated one.
     private fun comparableFields(): List<Any?> = listOf(
         experienceMode, pendingExperienceMode, haterState, viewWidth, viewHeight, screenDensity,
         protractorUnit, onPlaneBall, obstacleBalls, savedFeltSamples, table, zoomSliderPosition,
@@ -216,7 +234,7 @@ data class CueDetatState(
         relocaliserAttemptFrames, snapCandidates, tableScanModel, depthPlane, arDerivedPitch,
         arMeasuredHeightM, arTableMatrix, arCapturedCorners, depthCapability, arModuleState,
         lockedHsvColor?.toList(), lockedHsvStdDev?.toList(), showAdvancedOptionsDialog,
-        showBillingDebugDialog, showCalibrationScreen, showTableScanScreen, cvRefinementMethod,
+        showSupportSheet, showCalibrationScreen, showTableScanScreen,
         useCustomModel, isSnappingEnabled, hasTargetBallBeenMoved, hasCueBallBeenMoved,
         cannyThreshold1, cannyThreshold2, isAutoCalibrating, showCvMask, isTestingCvMask,
         isCalibratingColor, colorSamplePoint, cameraMatrix, distCoeffs, shotLineAnchor,
@@ -227,7 +245,7 @@ data class CueDetatState(
         isWorldLocked, preResetState, postResetState, ballSelectionPhase, cueBallCvAnchor,
         targetCvAnchor, obstacleCvAnchors, latestVersionName, distanceUnit, targetBallDistance,
         lensWarpTps, targetType, isTopDownViewActive, topDownBitmap, topDownTransitionProgress,
-        isExpertEntitled, isAdvisorEnabled, recommendedShot, wearableState,
+        isAdvisorEnabled, recommendedShot, wearableState,
     )
 
     override fun equals(other: Any?): Boolean {
@@ -254,8 +272,6 @@ sealed class MainScreenEvent {
     object ToggleExperienceModeSelection : MainScreenEvent()
     object ApplyPendingExperienceMode : MainScreenEvent()
     data class SetExperienceMode(val mode: ExperienceMode) : MainScreenEvent()
-    data class EntitlementChanged(val entitlement: com.hereliesaz.cuedetat.billing.Entitlement) : MainScreenEvent()
-    data class ShowPaywall(val trigger: com.hereliesaz.cuedetat.billing.PaywallTrigger) : MainScreenEvent()
     data class ScreenGestureStarted(val position: PointF) : MainScreenEvent()
     data class Drag(val previousPosition: PointF, val currentPosition: PointF) : MainScreenEvent()
     object GestureEnded : MainScreenEvent()
@@ -316,7 +332,7 @@ sealed class MainScreenEvent {
     object StartArTracking : MainScreenEvent()
     object ClearSamplePoint : MainScreenEvent()
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
-    object ToggleBillingDebugDialog : MainScreenEvent()
+    object ToggleSupportSheet : MainScreenEvent()
     object ToggleCalibrationScreen : MainScreenEvent()
     data class ApplyQuickAlign(
         val translation: Offset,
@@ -325,7 +341,6 @@ sealed class MainScreenEvent {
         val tpsWarpData: TpsWarpData
     ) : MainScreenEvent()
 
-    object ToggleCvRefinementMethod : MainScreenEvent()
     data class UpdateCannyT1(val value: Float) : MainScreenEvent()
     data class UpdateCannyT2(val value: Float) : MainScreenEvent()
     object ToggleCvModel : MainScreenEvent()
