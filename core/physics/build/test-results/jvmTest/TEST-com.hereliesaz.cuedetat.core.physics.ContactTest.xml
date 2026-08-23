@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ContactTest[jvm]" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-08-23T16:24:33.901Z" hostname="vm" time="0.259">
+  <properties/>
+  <testcase name="followPullsTheCueBallForwardOfTheTangentAndDrawPullsItBack[jvm]" classname="com.hereliesaz.cuedetat.core.physics.ContactTest" time="0.087"/>
+  <testcase name="frictionFallsAsRelativeSurfaceSpeedRises[jvm]" classname="com.hereliesaz.cuedetat.core.physics.ContactTest" time="0.0"/>
+  <testcase name="aStunCueBallLeavesAlongTheTangentLine[jvm]" classname="com.hereliesaz.cuedetat.core.physics.ContactTest" time="0.1"/>
+  <testcase name="throwReversesWhenTheCutReverses[jvm]" classname="com.hereliesaz.cuedetat.core.physics.ContactTest" time="0.001"/>
+  <testcase name="englishChangesThrowBecauseItChangesTheSliding[jvm]" classname="com.hereliesaz.cuedetat.core.physics.ContactTest" time="0.0"/>
+  <testcase name="rightEnglishSquirtsTheCueBallLeft[jvm]" classname="com.hereliesaz.cuedetat.core.physics.ContactTest" time="0.001"/>
+  <testcase name="theCushionKeepsOnlyPartOfTheSideSpin[jvm]" classname="com.hereliesaz.cuedetat.core.physics.ContactTest" time="0.019"/>
+  <testcase name="runningEnglishAndReverseEnglishSendTheBallDifferentWays[jvm]" classname="com.hereliesaz.cuedetat.core.physics.ContactTest" time="0.0"/>
+  <testcase name="aCushionReboundLosesSpeedButKeepsDirectionSensible[jvm]" classname="com.hereliesaz.cuedetat.core.physics.ContactTest" time="0.0"/>
+  <testcase name="aFullBallHitThrowsNothing[jvm]" classname="com.hereliesaz.cuedetat.core.physics.ContactTest" time="0.0"/>
+  <testcase name="spinSurfaceSpeedFollowsTheStandardRelation[jvm]" classname="com.hereliesaz.cuedetat.core.physics.ContactTest" time="0.0"/>
+  <testcase name="tipOffsetsOutsideTheMiscueCircleAreClamped[jvm]" classname="com.hereliesaz.cuedetat.core.physics.ContactTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

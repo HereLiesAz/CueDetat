@@ -209,22 +209,44 @@ data class TablePose(val rotation: Mat3, val translation: Vec3) {
 
     companion object {
         /**
-         * A pose looking at the table centre from [height] above the cloth and
-         * [distance] back along `-x`, tilted to frame the table.
+         * Builds a pose from a camera position and what it is looking at.
+         *
+         * Camera convention is the standard pinhole one: `+x` right, `+y` down,
+         * `+z` forward along the optical axis. Rows of the rotation are the
+         * camera basis expressed in table coordinates.
+         */
+        fun lookAt(
+            cameraPosition: Vec3,
+            target: Vec3 = Vec3.ZERO,
+            worldUp: Vec3 = Vec3(0.0, 0.0, 1.0),
+        ): TablePose {
+            val forward = (target - cameraPosition).normalized()
+            val right = (worldUp cross forward).normalized()
+            val down = (right cross forward).normalized()
+
+            val rotation = Mat3(
+                doubleArrayOf(
+                    right.x, right.y, right.z,
+                    down.x, down.y, down.z,
+                    forward.x, forward.y, forward.z,
+                )
+            )
+            return TablePose(rotation, (rotation * cameraPosition) * -1.0)
+        }
+
+        /**
+         * A camera [height] above the cloth and [distance] back along `-x`,
+         * aimed at the table centre.
          *
          * This is what the no-camera protractor mode uses. It is an honest
          * synthetic viewpoint chosen by the app, not a fudged version of a real
-         * one — and it flows through exactly the same projection as a real pose,
-         * so there is only ever one code path.
+         * one -- and it flows through exactly the same projection as a real pose,
+         * so there is only ever one code path. The old renderer had a separate
+         * fake-3D pipeline for this case, which is precisely why a real ARCore
+         * pose had to bypass it entirely by overwriting all five matrices.
          */
-        fun elevatedView(height: Length, distance: Length, tilt: Angle): TablePose {
-            // Camera looks along +x and down by `tilt`.
-            val r = Mat3.rotationX(Angle(kotlin.math.PI / 2.0 + tilt.radians)) *
-                Mat3.rotationZ(Angle(-kotlin.math.PI / 2.0))
-            val camInTable = Vec3(-distance.meters, 0.0, height.meters)
-            val t = (r * camInTable) * -1.0
-            return TablePose(r, t)
-        }
+        fun elevatedView(height: Length, distance: Length): TablePose =
+            lookAt(Vec3(-distance.meters, 0.0, height.meters))
     }
 }
 

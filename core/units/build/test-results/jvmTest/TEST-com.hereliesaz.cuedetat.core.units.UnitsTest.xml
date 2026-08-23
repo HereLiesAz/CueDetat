@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="UnitsTest[jvm]" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-08-23T16:24:34.303Z" hostname="vm" time="0.137">
+  <properties/>
+  <testcase name="approximateComparisonRespectsTolerance[jvm]" classname="com.hereliesaz.cuedetat.core.units.UnitsTest" time="0.052"/>
+  <testcase name="angleNormalisationWrapsIntoASingleTurn[jvm]" classname="com.hereliesaz.cuedetat.core.units.UnitsTest" time="0.015"/>
+  <testcase name="speedReferencesAreOrdered[jvm]" classname="com.hereliesaz.cuedetat.core.units.UnitsTest" time="0.001"/>
+  <testcase name="imperialAndMetricAgree[jvm]" classname="com.hereliesaz.cuedetat.core.units.UnitsTest" time="0.001"/>
+  <testcase name="metricFormattingIsWholeCentimetres[jvm]" classname="com.hereliesaz.cuedetat.core.units.UnitsTest" time="0.024"/>
+  <testcase name="lengthsCompareAndArithmeticStaysDimensional[jvm]" classname="com.hereliesaz.cuedetat.core.units.UnitsTest" time="0.0"/>
+  <testcase name="aRegulationBallIsTwoAndAQuarterInches[jvm]" classname="com.hereliesaz.cuedetat.core.units.UnitsTest" time="0.0"/>
+  <testcase name="imperialFormattingCarriesTwelveInchesIntoTheNextFoot[jvm]" classname="com.hereliesaz.cuedetat.core.units.UnitsTest" time="0.015"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
