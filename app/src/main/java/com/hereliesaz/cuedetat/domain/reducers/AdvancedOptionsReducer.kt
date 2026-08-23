@@ -61,9 +61,6 @@ internal fun reduceAdvancedOptionsAction(state: CueDetatState, action: MainScree
         }
 
         // Cycle through refinement algorithms (Hough vs Contour).
-        is MainScreenEvent.ToggleCvRefinementMethod -> {
-            state.copy(cvRefinementMethod = state.cvRefinementMethod.next())
-        }
 
         else -> state
     }

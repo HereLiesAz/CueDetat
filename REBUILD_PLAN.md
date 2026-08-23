@@ -60,3 +60,21 @@ Working plan for the re-envisioning. Tracks what is done and what remains.
 - [ ] Untrack `ml/` (52 MB) and `build.log`; collapse `.gitignore`
 - [ ] Pin third-party actions; delete `blank.yml`
 - [ ] Collapse the duplicated `Dev_Guide/` + `docs/` trees
+
+## Follow-up (not done in this pass)
+
+- **Delete `CueDetatState.comparableFields()`.** Convert the three `FloatArray?`
+  fields (`relocaliserDeltaQ`, `lockedHsvColor`, `lockedHsvStdDev`) to a small
+  content-comparing wrapper so the compiler-generated `equals()`/`hashCode()` are
+  correct on their own. 38 call sites across seven files. Verified in sync at
+  120/120 today, but nothing enforces it.
+- **Migrate the renderer onto `:core:projection`.** `Perspective.kt`'s fudged
+  pitch curve, the 30% roll and the hardcoded viewing distance should go, and
+  every draw site should read one `ProjectedBall` rather than re-deriving lift.
+  This is the change that fixes the guide lines not landing on the ball.
+- **`ml/`** — 52 MB of unreferenced training artifacts. `git rm --cached` would
+  not reclaim clone cost (the blobs stay in history); needs a history rewrite or
+  an LFS migration, and an explicit decision from the owner.
+- **Pin the `@main` GitHub Actions** to commit SHAs. Flagged in place; the SHAs
+  could not be resolved from the build sandbox.
+- **Instrumented tests** still need an emulator matrix in CI.

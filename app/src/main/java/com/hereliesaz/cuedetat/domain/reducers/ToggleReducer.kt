@@ -121,7 +121,12 @@ internal fun reduceToggleAction(
             state.copy(
                 isBeginnerViewLocked = true,
                 areHelpersVisible = true, // Force help on
-                cameraMode = if (state.cameraMode == CameraMode.OFF) CameraMode.CAMERA else state.cameraMode, // Force camera on
+                // Beginner has no camera-mode control, so never leave it in one
+                // it cannot exit. See handleSetExperienceMode for the detail.
+                cameraMode = when (state.cameraMode) {
+                    CameraMode.OFF, CameraMode.META_GLASSES -> CameraMode.CAMERA
+                    else -> state.cameraMode
+                },
                 protractorUnit = ProtractorUnit(reducerUtils.getDefaultTargetBallPosition(), LOGICAL_BALL_RADIUS, 0f),
                 onPlaneBall = null,
                 obstacleBalls = emptyList(),
@@ -186,7 +191,16 @@ private fun handleSetExperienceMode(
             isBankingMode = false,
             areHelpersVisible = true,
             isBeginnerViewLocked = true,
-            cameraMode = if (state.cameraMode == CameraMode.OFF) CameraMode.CAMERA else state.cameraMode,
+            // Beginner's nav rail has no camera-mode control at all, so any mode
+            // it cannot exit would strand the user. Previously an Expert user who
+            // enabled Meta Glasses and then switched to Beginner kept rendering
+            // the glasses feed with no way back except cycling Mode all the way
+            // round through Hater -- an undiscoverable dead end reachable through
+            // ordinary navigation.
+            cameraMode = when (state.cameraMode) {
+                CameraMode.OFF, CameraMode.META_GLASSES -> CameraMode.CAMERA
+                else -> state.cameraMode
+            },
             zoomSliderPosition = 0f
         )
         ExperienceMode.HATER -> newState
@@ -205,6 +219,16 @@ private fun handleToggleBankingMode(
 
         state.copy(
             isBankingMode = true,
+            // Banking and masse are alternative shot types, not independent
+            // flags. Nothing used to enforce that: both nav-rail toggles were
+            // live with no guard, the aiming pass resolved banking first and
+            // skipped masse entirely, and the masse dial kept rendering over the
+            // bank UI and writing state as it was dragged. :core:state models
+            // this as a sealed ShotMode so it cannot recur there.
+            isMasseModeActive = false,
+            masseShotAngleDeg = 0f,
+            masseImpactPoints = emptyList(),
+            masseConnectsTarget = false,
             onPlaneBall = newBankingBall,
             zoomSliderPosition = 0f,
             table = state.table.copy(isVisible = true),
