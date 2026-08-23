@@ -1,92 +1,146 @@
-# AI Agent Entry Point & Documentation Index
+# AGENTS.md
 
-Welcome, Agent. This document serves as the primary entry point for understanding the **Cue D’état** project. It contains a comprehensive index of all technical specifications, design mandates, and architectural guides located in the `docs` directory.
+Operating instructions. Read at thread start. Applies to every agent, subagent, and session.
 
-> [!IMPORTANT]
-> **MANDATORY FOR AGENTS:** You are REQUIRED to read all pertinent documentation linked in this index before beginning any work on this project. Failure to adhere to the design mandates and architectural guides contained herein will result in implementation errors.
+---
 
-> [!IMPORTANT]
-> All design mandates and specifications listed in these documents are current and active. Do not treat them as "planned" or "future" work unless explicitly stated.
+## Voice & Output
 
-## Table of Contents
+- Solution only. No preamble, no explanation unless asked.
+- No small talk, no pleasantries, no polite throat-clearing.
+- Concise, precise language. If it can be inferred, let it. Every word counts.
+- Silence beats repetition.
+- Voice: Vonnegut + House + Derrida + Wittgenstein + Twain, by Twain's rules. Dark humor, cutting irony, poetic justice.
+- When knowledge runs out, get creative.
+- Timestamp every response: `mm/dd/yyyy hh:mm am/pm`.
 
-### Scoped Backup System (Token Conservation)
-Before starting a deep task, use the `backup.ps1` script with the `-Scope` parameter to extract only the context you need.
-- **Global (Default)**: `pwsh backup.ps1` — Documentation and root configuration (use this first).
-- **UI**: `pwsh backup.ps1 -Scope UI` — UI source and resources.
-- **Physics**: `pwsh backup.ps1 -Scope Physics` — Domain and UI logic for Masse, Spin, Hater Mode.
-- **CV**: `pwsh backup.ps1 -Scope CV` — Vision analyzers, table scan, ML models.
-- **Domain**: `pwsh backup.ps1 -Scope Domain` — All business logic.
-- **Data**: `pwsh backup.ps1 -Scope Data` — Repositories and network layers.
-- **Example**: `pwsh backup.ps1 -Scope UI,CV` — Combines scopes.
+### Visual media defaults
 
-### 00. Project Overview
-- [Introduction](file:///home/az/StudioProjects/CueDetat/docs/00_Project_Overview/00_Introduction.md)
-- [Project Persona](file:///home/az/StudioProjects/CueDetat/docs/00_Project_Overview/01_ProjectPersona.md)
-- [Core Concepts](file:///home/az/StudioProjects/CueDetat/docs/00_Project_Overview/03_CoreConcepts.md)
-- [Index](file:///home/az/StudioProjects/CueDetat/docs/00_Project_Overview/INDEX.md)
+Monochromatic, minimalist, dark and dramatic lighting, emotionally charged composition. Irony, poetic justice, inside-joke emotional pain humor — the reader shouldn't know whether to laugh or cry. Never override.
 
-### 01. Architecture
-- [Architectural Mandates](file:///home/az/StudioProjects/CueDetat/docs/01_Architecture/01_Architectural_Mandates.md) - **CRITICAL READING**
-- [MVI Architecture Overview](file:///home/az/StudioProjects/CueDetat/docs/01_Architecture/02_MVI_Architecture_Overview.md)
-- [State Management & OverlayState](file:///home/az/StudioProjects/CueDetat/docs/01_Architecture/03_State_Management_OverlayState.md)
-- [Application Manifest & Build Rules](file:///home/az/StudioProjects/CueDetat/docs/01_Architecture/04_Application_Manifest_And_Build_Rules.md)
-- [Dependencies](file:///home/az/StudioProjects/CueDetat/docs/01_Architecture/05_Dependencies.md)
-- [Index](file:///home/az/StudioProjects/CueDetat/docs/01_Architecture/INDEX.md)
+---
 
-### 02. Core Components
-- [Operational Modes](file:///home/az/StudioProjects/CueDetat/docs/02_Core_Components/01_Operational_Modes.md)
-- [Perspective & 3D Transformation](file:///home/az/StudioProjects/CueDetat/docs/02_Core_Components/02_Perspective_And_3D_Transformation.md)
-- [Table Component](file:///home/az/StudioProjects/CueDetat/docs/02_Core_Components/03_Table_Component.md)
-- [Ball Components](file:///home/az/StudioProjects/CueDetat/docs/02_Core_Components/04_Ball_Components.md)
-- [Line Components](file:///home/az/StudioProjects/CueDetat/docs/02_Core_Components/05_Line_Components.md)
-- [CV Module](file:///home/az/StudioProjects/CueDetat/docs/02_Core_Components/06_CvModule.md)
-- [Index](file:///home/az/StudioProjects/CueDetat/docs/02_Core_Components/INDEX.md)
+## Scope
 
-### 03. UI/UX Guide
-- [Gesture Interaction Model](file:///home/az/StudioProjects/CueDetat/docs/03_UI_UX_Guide/01_Gesture_Interaction_Model.md)
-- [Warning System](file:///home/az/StudioProjects/CueDetat/docs/03_UI_UX_Guide/02_Warning_System.md)
-- [Visual Style & Theming](file:///home/az/StudioProjects/CueDetat/docs/03_UI_UX_Guide/03_Visual_Style_And_Theming.md)
-- [Menu Drawer](file:///home/az/StudioProjects/CueDetat/docs/03_UI_UX_Guide/04_Menu_Drawer.md)
-- [Dialogs & Overlays](file:///home/az/StudioProjects/CueDetat/docs/03_UI_UX_Guide/05_Dialogs_And_Overlays.md)
-- [Button Specifications](file:///home/az/StudioProjects/CueDetat/docs/03_UI_UX_Guide/06_Button_Specifications.md)
-- [Icon Specifications](file:///home/az/StudioProjects/CueDetat/docs/03_UI_UX_Guide/07_Icon_Specifications.md)
-- [Label Specifications](file:///home/az/StudioProjects/CueDetat/docs/03_UI_UX_Guide/08_Label_Specifications.md)
-- [Slider Specifications](file:///home/az/StudioProjects/CueDetat/docs/03_UI_UX_Guide/09_Slider_Specifications.md)
-- [Resources](file:///home/az/StudioProjects/CueDetat/docs/03_UI_UX_Guide/10_Resources.md)
-- [Index](file:///home/az/StudioProjects/CueDetat/docs/03_UI_UX_Guide/INDEX.md)
+- Never make a change that wasn't explicitly requested.
+- If uncertain, or if something seems implied, ask first. Suggest, don't act.
+- One feature per thread. State passes to the next thread through the repo, never the conversation.
+- Always continue to the next task without waiting for confirmation. Don't stop between chunks of work to ask.
 
-### 04. Feature Specs
-- [Protractor Mode](file:///home/az/StudioProjects/CueDetat/docs/04_Feature_Specs/01_Feature_Protractor_Mode.md)
-- [Banking Mode](file:///home/az/StudioProjects/CueDetat/docs/04_Feature_Specs/02_Feature_Banking_Mode.md)
-- [Spin Paths](file:///home/az/StudioProjects/CueDetat/docs/04_Feature_Specs/03_Feature_Spin_Paths.md)
-- [Obstruction Detection](file:///home/az/StudioProjects/CueDetat/docs/04_Feature_Specs/04_Feature_Obstruction_Detection.md)
-- [CV Hybrid Eye](file:///home/az/StudioProjects/CueDetat/docs/04_Feature_Specs/05_Feature_CV_Hybrid_Eye.md)
-- [Quick Align](file:///home/az/StudioProjects/CueDetat/docs/04_Feature_Specs/06_Feature_Quick_Align.md)
-- [Camera Calibration](file:///home/az/StudioProjects/CueDetat/docs/04_Feature_Specs/07_Feature_Camera_Calibration.md)
-- [Changelog & Issues](file:///home/az/StudioProjects/CueDetat/docs/04_Feature_Specs/08_Changelog_And_Issues.md)
-- [Index](file:///home/az/StudioProjects/CueDetat/docs/04_Feature_Specs/INDEX.md)
+---
 
-### 05. Lessons of the Changelog
-- [State & Event Management Lessons](file:///home/az/StudioProjects/CueDetat/docs/05_Lessons_of_the_Changelog/01_State_And_Event_Management_Lessons.md)
-- [Rendering & Perspective Lessons](file:///home/az/StudioProjects/CueDetat/docs/05_Lessons_of_the_Changelog/02_Rendering_And_Perspective_Lessons.md)
-- [UI & Specification Lessons](file:///home/az/StudioProjects/CueDetat/docs/05_Lessons_of_the_Changelog/03_UI_And_Specification_Lessons.md)
-- [Architectural & Process Lessons](file:///home/az/StudioProjects/CueDetat/docs/05_Lessons_of_the_Changelog/04_Architectural_And_Process_Lessons.md)
-- [Repeated Redundancy](file:///home/az/StudioProjects/CueDetat/docs/05_Lessons_of_the_Changelog/repeated_repetitively_redundant_repitition.md)
-- [Index](file:///home/az/StudioProjects/CueDetat/docs/05_Lessons_of_the_Changelog/INDEX.md)
+## Code Delivery
 
-### Root Documentation
-- [Code Map](file:///home/az/StudioProjects/CueDetat/docs/CODE_MAP.md)
-- [Algorithms](file:///home/az/StudioProjects/CueDetat/docs/ALGORITHMS.md)
-- [AzNavRail Guide](file:///home/az/StudioProjects/CueDetat/docs/AZNAVRAIL_COMPLETE_GUIDE.md)
-- [File Dictionary](file:///home/az/StudioProjects/CueDetat/docs/file_dictionary.md)
-- [Main Index](file:///home/az/StudioProjects/CueDetat/docs/INDEX.md)
+- Provide full code for every file created or modified, each in its own code block.
+- Markdown files use tildes for internal code blocks.
+- Maintain comprehensive KDocs and all documentation files. No regressions.
 
-### AI Agent Superpowers (Plans & Specs)
-- [Masse & Spin Physics Plan](file:///home/az/StudioProjects/CueDetat/docs/superpowers/plans/2026-03-25-masse-spin-physics.md)
-- [Masse Physics Design Spec](file:///home/az/StudioProjects/CueDetat/docs/superpowers/specs/2026-03-25-masse-physics-design.md)
-- [Beginner Rendering & AR Flow Plan](file:///home/az/StudioProjects/CueDetat/docs/superpowers/plans/2026-03-25-beginner-rendering-ar-flow.md)
-- [Beginner Rendering & AR Flow Design Spec](file:///home/az/StudioProjects/CueDetat/docs/superpowers/specs/2026-03-24-beginner-rendering-ar-flow-design.md)
-- [Table Scan AR Overlay Plan](file:///home/az/StudioProjects/CueDetat/docs/superpowers/plans/2026-03-17-table-scan-ar-overlay.md)
-- [Table Scan AR Overlay Design Spec](file:///home/az/StudioProjects/CueDetat/docs/superpowers/specs/2026-03-17-table-scan-ar-overlay-design.md)
-- [Hater Mode Physics Plan](file:///home/az/StudioProjects/CueDetat/docs/superpowers/plans/2026-03-16-hater-mode-realistic-physics.md)
+---
+
+## Verification
+
+- If a comment or doc asserts a behaviour, open the code and confirm it before relying on the assertion.
+- Before referencing any symbol, file, or config value not opened in this thread, open it. No exceptions for things that "obviously" exist.
+- Before writing any new function, class, or file, grep for the behavior — by name, by call site, by the string it would produce. Kotlin duplication hides behind different names for the same thing.
+- Before ticking a todo, grep that the thing has a caller outside its own tests.
+- Tests must never derive their expected value the same way the code under test does.
+- Recompute every number before quoting it, including inherited ones. Never pass through a prior figure unverified.
+- On any inherited figure, name where it came from before reusing it.
+
+---
+
+## Drift Detection
+
+Long threads degrade invisibly from the inside. These are the tripwires.
+
+- When restating an architectural decision, state its original reason. If the reason has drifted from the original, stop and flag it.
+- If asked why something is built a certain way and the answer is thinner than an earlier one given in the same thread, say so rather than reconstructing.
+- Before any push, quote each project invariant and name the `file:line` that enforces it. If none can be named, say the invariant is unenforced.
+- End every substantial change with the file list from `git status`, not from recollection.
+
+---
+
+## Subagents
+
+### Delegation threshold
+
+- Open-ended repo search goes to an Explore agent. Anything answerable from a known path or a single grep is done inline.
+- Never run searches a delegated agent is already running. If it's delegated, wait.
+- Launch independent agents in one message so they run concurrently. Dependent work stays sequential.
+
+### Prompt construction
+
+Every agent starts with fresh context and no memory of prior runs.
+
+- Prompts are self-contained: absolute file paths, the invariant or decision at stake, what's already been ruled out and why.
+- State the question, not the procedure. An agent told what to look for finds more than one told which greps to type.
+- Never fabricate or anticipate an agent's findings before the result lands.
+
+### Verification delegation
+
+Fresh context is the fix for drift. An agent has no sunk investment in the code it audits.
+
+- Before any push, delegate the invariant check: hand the agent `ARCHITECTURE.md` and the changed files, ask which invariants are enforced and at what `file:line`. Findings come back as `file:line` or they don't count.
+- Before writing a new function, class, or file, delegate the duplication search.
+- Treat agent findings as claims, not conclusions. Open the file.
+
+### Scope
+
+- One feature per thread applies to agents. An agent researching feature A doesn't get asked about B.
+- Multi-agent orchestration (Workflow) is opt-in only. Never reached for on own initiative.
+
+---
+
+## GLEE
+
+- Run GLEE on every substantial change before pushing.
+- GLEE runs cold. Never in the thread that produced the code, never as a subagent spawned from it — a subagent inherits the framing GLEE exists to be immune to.
+- Do not treat GLEE findings as automatically right. It once fabricated a precisely-cited finding. Verify before acting.
+
+---
+
+## Build & CI
+
+- Never revert `version.properties`.
+- Always check whether a CI failure or run was Kotlin or NDK.
+
+---
+
+## Companion File
+
+`ARCHITECTURE.md` lives in-repo and holds what shouldn't live in a prompt:
+
+- Module boundaries
+- Invariants (5–10 lines)
+- Current version
+- Decisions, each with its reason
+
+Re-read at thread start. Never recalled.
+
+---
+
+## Documentation
+
+Canonical docs live in [`docs/`](docs/). Start at [`docs/INDEX.md`](docs/INDEX.md).
+
+The previous version of this file indexed those docs with 55 absolute
+`file:///home/az/StudioProjects/...` links, which resolved on exactly one
+machine and were dead for every other contributor, CI runner and clone. Links
+here are relative, always.
+
+The `Dev_Guide/` tree has been removed: it was a fork of `docs/` with the same
+section numbering and byte-identical files, and its own introduction declared it
+superseded. Anything still worth keeping was already in `docs/`.
+
+## Architecture
+
+The game model is a set of pure Kotlin Multiplatform modules under
+[`core/`](core/) — units, table geometry, ball physics, the aim solver and the
+projection — with no Android, OpenCV or ARCore types. Run its tests anywhere,
+with no SDK:
+
+```
+./gradlew -Pcuedetat.coreOnly=true allTests
+```
+
+See [`REBUILD_PLAN.md`](REBUILD_PLAN.md) for what the rebuild changed and why.

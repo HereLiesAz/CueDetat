@@ -9,6 +9,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Sync to GitLab
+        # SUPPLY CHAIN: unpinned. This action runs with repository secrets in
+        # scope, and @main means whatever its author pushes next runs here with
+        # no review. Pin to a release tag or a commit SHA. Left unpinned only
+        # because the pinning SHA could not be resolved offline -- do not treat
+        # this comment as the fix.
         uses: kujov/gitlab-sync@main
         with:
           gitlab_url: ${{ secrets.GITLAB_URL }}
