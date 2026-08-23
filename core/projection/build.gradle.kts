@@ -4,19 +4,17 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 // module — that is what makes it testable with `:core:projection:jvmTest` on any
 // machine, with no SDK and no emulator.
 //
-// The Android target is registered only when an SDK is actually available, so a
-// contributor (or a sandbox) without one can still build and test the core.
-val androidSdkPresent: Boolean =
-    providers.environmentVariable("ANDROID_HOME").isPresent ||
-        providers.environmentVariable("ANDROID_SDK_ROOT").isPresent ||
-        rootProject.file("local.properties").exists()
+// There is deliberately NO Android target here. The module has no Android source
+// set to build, and Android consumers resolve the `jvm()` variant through
+// Kotlin's standard jvm -> androidJvm compatibility rule. An earlier revision
+// registered androidTarget() behind an "is the SDK present?" check; that check
+// passed locally (no SDK, so it was skipped) and failed on CI (SDK present, so
+// it applied 'com.android.library', which AGP 9 refuses to load alongside the
+// multiplatform plugin). A conditional that changes what gets built depending on
+// the machine is not a portability feature, it is a hidden second configuration.
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-}
-
-if (androidSdkPresent) {
-    apply(plugin = "com.android.library")
 }
 
 kotlin {
@@ -29,12 +27,6 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
 
-    if (androidSdkPresent) {
-        androidTarget {
-            compilerOptions { jvmTarget.set(JvmTarget.JVM_21) }
-        }
-    }
-
     sourceSets {
         commonMain.dependencies {
             api(project(":core:units"))
@@ -42,18 +34,6 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-        }
-    }
-}
-
-if (androidSdkPresent) {
-    extensions.configure<com.android.build.api.dsl.LibraryExtension>("android") {
-        namespace = "com.hereliesaz.cuedetat.core.projection"
-        compileSdk = 37
-        defaultConfig { minSdk = 29 }
-        compileOptions {
-            sourceCompatibility = JavaVersion.VERSION_21
-            targetCompatibility = JavaVersion.VERSION_21
         }
     }
 }
