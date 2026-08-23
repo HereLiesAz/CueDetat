@@ -4,6 +4,60 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+val versionPropsFile = rootProject.file("version.properties")
+val versionPropsPath = versionPropsFile.absolutePath
+val versionProps = Properties()
+if (versionPropsFile.exists()) {
+    versionPropsFile.inputStream().use { versionProps.load(it) }
+}
+
+var majorVal = (versionProps.getProperty("MAJOR") ?: "0").toInt()
+var minorVal = (versionProps.getProperty("MINOR") ?: "0").toInt()
+var patchVal = (versionProps.getProperty("PATCH") ?: "0").toInt()
+var buildVal = (versionProps.getProperty("BUILD") ?: "0").toInt()
+val lastMajorVal = (versionProps.getProperty("LAST_MAJOR") ?: majorVal.toString()).toInt()
+val lastMinorVal = (versionProps.getProperty("LAST_MINOR") ?: minorVal.toString()).toInt()
+
+val isBuildingTask = gradle.startParameter.taskNames.any {
+    it.contains("assemble") || it.contains("bundle") || it.contains("install")
+}
+
+// CI override: when -PversionBuild=<n> is passed (e.g. the git commit count via
+// `git rev-list --count HEAD`), it becomes the authoritative BUILD/versionCode.
+// This guarantees a strictly-increasing versionCode for Play uploads without
+// relying on the committed version.properties value. When the property is absent
+// the original local auto-increment behaviour is preserved untouched.
+val versionBuildOverride = project.findProperty("versionBuild")?.toString()?.trim()?.toIntOrNull()
+
+if (versionBuildOverride != null) {
+    buildVal = versionBuildOverride
+    if (majorVal != lastMajorVal || minorVal != lastMinorVal) {
+        patchVal = 0
+    }
+} else if (isBuildingTask) {
+    buildVal++
+    if (majorVal != lastMajorVal || minorVal != lastMinorVal) {
+        patchVal = 0
+    } else {
+        patchVal++
+    }
+}
+
+// Optional explicit versionName override (e.g. -PversionName=1.10.2.999); when
+// absent the name is derived from the components below.
+val versionNameOverride = project.findProperty("versionName")?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+
+val finalBuild = buildVal
+val finalPatch = patchVal
+val finalMajor = majorVal
+val finalMinor = minorVal
+val finalVersionName = versionNameOverride ?: "$finalMajor.$finalMinor.$finalPatch.$finalBuild"
+// Only write the computed values back into version.properties for ordinary local
+// builds. When CI supplies -PversionBuild we must NOT persist its commit-count
+// number into the tracked file (it would clobber the local sequence on the next
+// commit). The override is ephemeral and lives only for that build.
+val finalIsBuilding = isBuildingTask && versionBuildOverride == null
+
 val localProps = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) {
@@ -331,7 +385,7 @@ dependencies {
     implementation(libs.play.services.location)
 
     // Computer Vision
-    implementation(libs.mlkit.object.detection)
+    implementation(libs.mlkit.detection)
     implementation(libs.opencv)
 
     // ARCore now lives in the on-demand :feature_expert_ar dynamic feature, so
@@ -354,7 +408,12 @@ dependencies {
     // audience a FOSS flavor exists for.
     "playImplementation"(libs.mwdat.core)
     "playImplementation"(libs.mwdat.camera)
-    "playDebugImplementation"(libs.mwdat.mockdevice)
+    // Note: flavour+buildType configurations ("playDebugImplementation") are not
+    // available at this point in configuration, so the mock device rides on the
+    // flavour configuration instead. It is debug tooling and unreferenced in
+    // release, so R8 strips it; the property that matters is preserved -- the
+    // foss flavour never needs the credentialed registry.
+    "playImplementation"(libs.mwdat.mockdevice)
 
     // Wear OS Data Layer
     implementation(libs.play.services.wearable)

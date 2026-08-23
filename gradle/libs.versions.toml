@@ -123,7 +123,7 @@ androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-com
 
 # ── Vision / AR ──────────────────────────────────────────────────────────────
 arcore = { module = "com.google.ar:core", version.ref = "arcore" }
-mlkit-object-detection = { module = "com.google.mlkit:object-detection", version.ref = "mlkitObjectDetection" }
+mlkit-detection = { module = "com.google.mlkit:object-detection", version.ref = "mlkitObjectDetection" }
 mlkit-vision-common = { module = "com.google.mlkit:vision-common", version.ref = "mlkitVisionCommon" }
 opencv = { module = "org.opencv:opencv", version.ref = "opencv" }
 tensorflow-lite = { module = "org.tensorflow:tensorflow-lite", version.ref = "tensorflowLite" }
