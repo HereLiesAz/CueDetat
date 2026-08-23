@@ -1,37 +1,35 @@
 name: Play Publish (AAB)
 
-# Builds a signed Android App Bundle of the `play` flavor and (optionally)
-# publishes it to the Google Play Console.
+# Builds a signed Android App Bundle of the `play` flavor and publishes it to
+# the Google Play Console.
 #
-# Safe by default: manual trigger only, internal track, draft status, and
-# publishing OFF (build + upload the .aab as a workflow artifact only). Flip the
-# `publish` input to actually push to Play.
+# Every push to main publishes. One AAB is uploaded once and assigned to four
+# tracks in a single Play edit (see .github/scripts/play_publish.py):
+#
+#   internal    completed  -- live to internal testers
+#   alpha       completed  -- live to closed testing
+#   beta        draft      -- open testing, awaiting a human
+#   production  draft      -- production, awaiting a human
+#
+# Play's track ids do not match the console's labels: "closed testing" is
+# `alpha` and "open testing" is `beta`.
+#
+# A manual run can set `dry_run` to build and upload the .aab as a workflow
+# artifact without touching Play.
 #
 # Signing reuses the same secrets and injected-signing approach as
 # android_release.yml; versioning reuses the -PversionBuild override
 # (git commit count) wired into app/build.gradle.kts.
 
 on:
-  push: 
+  push:
     branches: 'main'
   workflow_dispatch:
     inputs:
-      track:
-        description: 'Play track to publish to'
-        type: choice
-        options: [internal, alpha, beta, production]
-        default: internal
-        required: true
-      status:
-        description: 'Release status on the chosen track'
-        type: choice
-        options: [draft, completed]
-        default: completed
-        required: true
-      publish:
-        description: 'Publish to Play? (off = build + upload the .aab artifact only)'
+      dry_run:
+        description: 'Build the .aab but do NOT publish it to Play'
         type: boolean
-        default: true
+        default: false
         required: true
 
 concurrency:
@@ -116,6 +114,7 @@ jobs:
           echo "package_name=$PKG" >> "$GITHUB_OUTPUT"
 
       - name: Build signed Play AAB
+        id: build
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -128,6 +127,7 @@ jobs:
         run: |
           BUILD_NUMBER=$(git rev-list --count HEAD)
           echo "versionCode (commit count) = $BUILD_NUMBER"
+          echo "version_code=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
           ./gradlew bundlePlayRelease -PversionBuild="$BUILD_NUMBER" --build-cache \
             -Pandroid.injected.signing.store.file="$(pwd)/app/keystore.jks" \
@@ -153,13 +153,27 @@ jobs:
           path: ${{ steps.aab.outputs.aab_path }}
           if-no-files-found: error
 
-      - name: Publish to Google Play
-        if: ${{ github.event.inputs.publish == 'true' }}
-        uses: r0adkll/upload-google-play@v1
+      # r0adkll/upload-google-play cannot express this policy: its `status` is a
+      # single value across all `tracks`, so two statuses would need two
+      # invocations -- two separate Play edits, the second re-uploading a
+      # version code that already exists. Its `existingEditId` input has no
+      # matching output to thread between calls. The API models it directly.
+      - name: Set up Python
+        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run != 'true' }}
+        uses: actions/setup-python@v5
         with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: ${{ steps.pkg.outputs.package_name }}
-          releaseFiles: app/build/outputs/bundle/playRelease/*.aab
-          track: ${{ github.event.inputs.track }}
-          status: ${{ github.event.inputs.status }}
-          mappingFile: app/build/outputs/mapping/playRelease/mapping.txt
+          python-version: '3.12'
+
+      - name: Install Play publishing dependencies
+        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run != 'true' }}
+        run: pip install --disable-pip-version-check google-api-python-client google-auth
+
+      - name: Publish to Google Play
+        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run != 'true' }}
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PLAY_PACKAGE_NAME: ${{ steps.pkg.outputs.package_name }}
+          PLAY_AAB_PATH: ${{ steps.aab.outputs.aab_path }}
+          PLAY_MAPPING_PATH: app/build/outputs/mapping/playRelease/mapping.txt
+          PLAY_RELEASE_NAME: ${{ steps.build.outputs.version_code }}
+        run: python .github/scripts/play_publish.py
