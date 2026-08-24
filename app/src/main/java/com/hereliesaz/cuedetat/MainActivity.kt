@@ -181,7 +181,9 @@ class MainActivity : ComponentActivity() {
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 is SingleEvent.ShowSupportSheet -> {
-                    showSupportSheetState.value = true
+                    if (::showSupportSheetState.isInitialized) {
+                        showSupportSheetState.value = true
+                    }
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 null -> { /* Do nothing */ }
