@@ -34,6 +34,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -84,16 +85,36 @@ def main() -> int:
     print(f"Opened edit {edit_id}")
 
     try:
-        # Upload once. Every track below reuses the version code this returns.
-        bundle = edits.bundles().upload(
-            packageName=package_name,
-            editId=edit_id,
-            media_body=MediaFileUpload(
-                aab_path, mimetype="application/octet-stream", resumable=True
-            ),
-        ).execute()
-        version_code = bundle["versionCode"]
-        print(f"Uploaded {aab_path} as versionCode {version_code}")
+        # Upload once with retry logic. Every track below reuses the version code this returns.
+        max_retries = 3
+        retry_delay = 5
+        version_code = None
+        
+        for attempt in range(max_retries):
+            try:
+                request = edits.bundles().upload(
+                    packageName=package_name,
+                    editId=edit_id,
+                    media_body=MediaFileUpload(
+                        aab_path, mimetype="application/octet-stream", resumable=True
+                    ),
+                )
+                # Set timeout to 10 minutes (600 seconds) for large AAB uploads
+                request.http.timeout = 600
+                bundle = request.execute()
+                version_code = bundle["versionCode"]
+                print(f"Uploaded {aab_path} as versionCode {version_code}")
+                break
+            except (TimeoutError, OSError) as e:
+                if attempt < max_retries - 1:
+                    print(f"Upload attempt {attempt + 1} timed out, retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    raise
+        
+        if version_code is None:
+            raise RuntimeError("Failed to upload bundle after all retries")
 
         if mapping_path and os.path.isfile(mapping_path):
             edits.deobfuscationfiles().upload(
