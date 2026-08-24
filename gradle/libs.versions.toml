@@ -149,7 +149,7 @@ retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit
 retrofit-converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "retrofit" }
 
 # ── UI third-party ───────────────────────────────────────────────────────────
-aznavrail = { module = "com.github.HereLiesAz:AzNavRail", version.ref = "aznavrail" }
+aznavrail = { module = "com.github.HereLiesAz.AzNavRail:aznavrail", version.ref = "aznavrail" }
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 junit = { module = "junit:junit", version.ref = "junit" }
