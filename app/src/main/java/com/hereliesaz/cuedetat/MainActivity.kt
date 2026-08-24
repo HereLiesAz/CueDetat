@@ -100,7 +100,7 @@ class MainActivity : ComponentActivity() {
             }
 
             if (cameraGranted.value) {
-                AppContent()
+                AppContent(showSupport)
             } else {
                 CueDetatTheme {
                     PermissionExplanationScreen(onConfirm = {
@@ -192,7 +192,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun AppContent() {
+    private fun AppContent(showSupport: MutableState<Boolean>) {
         val uiState by viewModel.uiState.collectAsStateWithLifecycle()
         val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
         val showSplashScreen = uiState.experienceMode == null
@@ -226,11 +226,11 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            if (showSupportSheetState.value) {
+            if (showSupport.value) {
                 com.hereliesaz.cuedetat.ui.composables.support.SupportSheet(
-                    onDismiss = { showSupportSheetState.value = false },
+                    onDismiss = { showSupport.value = false },
                     onOpenUrl = { url ->
-                        showSupportSheetState.value = false
+                        showSupport.value = false
                         openUrlSafely(url)
                     },
                 )
