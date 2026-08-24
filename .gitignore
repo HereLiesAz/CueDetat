@@ -68,3 +68,5 @@ app/release/baselineProfiles/1/app-x86-release.dm
 app/release/baselineProfiles/1/app-x86_64-release.dm
 app/release/output-metadata.json
 /app/release/app-release.aab
+/app/debug/output-metadata.json
+/app/debug/wear-debug.apk
