@@ -10,6 +10,14 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
+            <option value="$PROJECT_DIR$/core" />
+            <option value="$PROJECT_DIR$/core/advisor" />
+            <option value="$PROJECT_DIR$/core/aim" />
+            <option value="$PROJECT_DIR$/core/geometry" />
+            <option value="$PROJECT_DIR$/core/physics" />
+            <option value="$PROJECT_DIR$/core/projection" />
+            <option value="$PROJECT_DIR$/core/state" />
+            <option value="$PROJECT_DIR$/core/units" />
             <option value="$PROJECT_DIR$/feature_expert_ar" />
             <option value="$PROJECT_DIR$/feature_mlmodel" />
             <option value="$PROJECT_DIR$/wear" />
