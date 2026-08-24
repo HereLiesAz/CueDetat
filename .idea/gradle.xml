@@ -10,6 +10,9 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
+            <option value="$PROJECT_DIR$/feature_expert_ar" />
+            <option value="$PROJECT_DIR$/feature_mlmodel" />
+            <option value="$PROJECT_DIR$/wear" />
           </set>
         </option>
         <option name="resolveExternalAnnotations" value="true" />
