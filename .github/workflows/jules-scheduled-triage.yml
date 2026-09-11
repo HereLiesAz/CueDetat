@@ -1,0 +1,97 @@
+name: '📋 Jules Scheduled Issue Triage'
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Every hour
+  workflow_dispatch:
+
+concurrency:
+  group: '${{ github.workflow }}'
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: 'bash'
+
+jobs:
+  find-issues:
+    runs-on: 'ubuntu-latest'
+    timeout-minutes: 7
+    permissions:
+      contents: 'read'
+      issues: 'read'
+    outputs:
+      available_labels: '${{ steps.get_labels.outputs.available_labels }}'
+      issues_to_triage: '${{ steps.find_issues.outputs.issues_to_triage }}'
+      has_issues: '${{ steps.find_issues.outputs.has_issues }}'
+    steps:
+      - name: 'Get repository labels'
+        id: 'get_labels'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          script: |-
+            const labels = [];
+            for await (const response of github.paginate.iterator(github.rest.issues.listLabelsForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            })) {
+              labels.push(...response.data);
+            }
+            if (!labels || labels.length === 0) {
+              core.setFailed('No issue labels found in this repository.')
+            }
+            const labelNames = labels.map(label => label.name).sort();
+            core.setOutput('available_labels', labelNames.join(','));
+
+      - name: 'Find untriaged issues'
+        id: 'find_issues'
+        env:
+          GH_TOKEN: '${{ secrets.GH_TOKEN || github.token }}'
+          GITHUB_REPOSITORY: '${{ github.repository }}'
+        run: |-
+          echo '🔍 Finding unlabeled open issues...'
+          ISSUES="$(gh issue list \
+            --state 'open' \
+            --search 'no:label' \
+            --json number,title,body \
+            --limit '20' \
+            --repo "${GITHUB_REPOSITORY}"
+          )"
+          ISSUE_COUNT="$(echo "${ISSUES}" | jq 'length')"
+          echo "Found ${ISSUE_COUNT} unlabeled issue(s)."
+          echo "issues_to_triage=${ISSUES}" >> "${GITHUB_OUTPUT}"
+          if [ "${ISSUE_COUNT}" -gt 0 ]; then
+            echo "has_issues=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "has_issues=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+  triage:
+    needs: 'find-issues'
+    if: '${{ needs.find-issues.outputs.has_issues == ''true'' }}'
+    runs-on: 'ubuntu-latest'
+    timeout-minutes: 15
+    permissions:
+      contents: 'read'
+      issues: 'write'
+    strategy:
+      matrix:
+        issue: '${{ fromJson(needs.find-issues.outputs.issues_to_triage) }}'
+      max-parallel: 3
+    steps:
+      - name: 'Invoke Jules on issue #${{ matrix.issue.number }}'
+        uses: 'google-labs-code/jules-invoke@v1.0.0'
+        with:
+          prompt: |-
+            Triage this unlabeled GitHub issue and apply appropriate labels.
+
+            **Issue #${{ matrix.issue.number }}: ${{ matrix.issue.title }}**
+
+            ${{ matrix.issue.body }}
+
+            **Available labels (comma-separated):**
+            ${{ needs.find-issues.outputs.available_labels }}
+
+            Apply labels to issue #${{ matrix.issue.number }} in ${{ github.repository }} using only labels from the available set. Do not invent new labels. If the issue is ambiguous, apply "status/needs-triage" if it exists, otherwise leave it unlabeled.
+          jules_api_key: '${{ secrets.JULES_API_KEY }}'

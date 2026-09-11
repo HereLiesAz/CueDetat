@@ -1,0 +1,42 @@
+name: '▶️ Jules Invoke'
+
+on:
+  workflow_call:
+    inputs:
+      additional_context:
+        type: 'string'
+        description: 'Task or context from the triggering comment'
+        required: false
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'Task for Jules to perform'
+        required: true
+
+concurrency:
+  group: '${{ github.workflow }}-invoke-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}'
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: 'bash'
+
+jobs:
+  invoke:
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
+      issues: 'write'
+      pull-requests: 'write'
+    steps:
+      - name: 'Invoke Jules'
+        uses: 'google-labs-code/jules-invoke@v1.0.0'
+        with:
+          prompt: |-
+            ${{ inputs.additional_context || inputs.prompt }}
+
+            Repository: ${{ github.repository }}
+            Triggered by: @${{ github.actor }}
+            Issue/PR: #${{ github.event.pull_request.number || github.event.issue.number }}
+          jules_api_key: '${{ secrets.JULES_API_KEY }}'
+          include_last_commit: true

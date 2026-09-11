@@ -1,0 +1,56 @@
+name: Deploy over FTP
+
+# Mirror the built site to your own host over SFTP (SSH file transfer).
+# Runs on every push to main, and can be fired by hand from the Actions tab.
+# Uses lftp's built-in SFTP implementation — not OpenSSH — because
+# ProFTPD mod_sftp/0.9.9's password auth is incompatible with sshpass.
+#
+# Required secrets: FTP_SERVER, FTP_USERNAME, FTP_PASSWORD
+# Optional vars:    SFTP_PORT (default 22), FTP_SERVER_DIR (default /app)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: sftp-deploy
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./docs/
+          destination: ./_site
+
+      - name: Deploy via lftp (SFTP)
+        env:
+          HOST: ${{ secrets.FTP_SERVER }}
+          USERNAME: ${{ secrets.FTP_USERNAME }}
+          PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          PORT: ${{ vars.SFTP_PORT || '22' }}
+          REMOTE_DIR: ${{ vars.FTP_SERVER_DIR || '/app' }}
+        run: |
+          set -e
+          sudo apt-get install -y lftp
+
+          USER_TRIMMED=$(printf '%s' "$USERNAME" | tr -d ' \t\r\n')
+          PW_TRIMMED=$(printf '%s' "$PASSWORD" | tr -d '\r\n')
+
+          lftp -u "$USER_TRIMMED","$PW_TRIMMED" \
+            -p "$PORT" \
+            -e "set sftp:auto-confirm yes; set ssl:verify-certificate no; mirror -R --verbose ./_site/ $REMOTE_DIR; quit" \
+            sftp://"$HOST"

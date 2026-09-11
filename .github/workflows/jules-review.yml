@@ -1,0 +1,50 @@
+name: '🔎 Jules Review'
+
+on:
+  workflow_call:
+    inputs:
+      additional_context:
+        type: 'string'
+        description: 'Any additional context from the request'
+        required: false
+
+concurrency:
+  group: '${{ github.workflow }}-review-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}'
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: 'bash'
+
+jobs:
+  review:
+    runs-on: 'ubuntu-latest'
+    timeout-minutes: 15
+    permissions:
+      contents: 'read'
+      issues: 'write'
+      pull-requests: 'write'
+    steps:
+      - name: 'Invoke Jules for PR review'
+        uses: 'google-labs-code/jules-invoke@v1.0.0'
+        with:
+          prompt: |-
+            Please review pull request #${{ github.event.pull_request.number || github.event.issue.number }} in ${{ github.repository }}.
+
+            **Title:** ${{ github.event.pull_request.title || github.event.issue.title }}
+
+            **Description:**
+            ${{ github.event.pull_request.body || github.event.issue.body }}
+
+            ${{ inputs.additional_context && format('**Additional context from requester:** {0}', inputs.additional_context) || '' }}
+
+            Review the diff for:
+            - Correctness bugs and logic errors
+            - Security issues (injection, permission leaks, unvalidated input at boundaries)
+            - Performance regressions
+            - Opportunities for simplification or reuse
+
+            Post your findings as a review comment on the PR. If you find fixable issues, open a follow-up PR with the corrections rather than blocking the review.
+          jules_api_key: '${{ secrets.JULES_API_KEY }}'
+          include_last_commit: true
+          include_commit_log: true

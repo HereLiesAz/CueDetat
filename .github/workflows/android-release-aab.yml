@@ -1,0 +1,195 @@
+name: Build & Publish AAB (Play)
+
+# Builds a SIGNED Android App Bundle and publishes it to Play.
+# Auto-detects package name from app/build.gradle.kts.
+# Reads version from version.properties (Major.Minor.Patch.Build).
+# Requires .github/scripts/play_multitrack_publish.py in the repo.
+#
+# Required secrets:
+#   KEYSTORE_RAW              — base64-encoded release keystore (.jks)
+#   KEYSTORE_PASSWORD         — keystore password
+#   KEY_ALIAS                 — key alias inside the keystore
+#   KEY_PASSWORD              — key password
+#   PLAY_SERVICE_ACCOUNT_JSON — Google Play service account JSON (full contents)
+#
+# Optional secrets (Google Services injection — skipped if template absent):
+#   GOOGLE_SERVICES_API_KEY
+#   PROJECT_ID
+#   CLIENT_ID
+#
+# Optional secrets (add any extra project-specific API keys here):
+#   CUSTOM_API_KEY            — placeholder; rename and replicate as needed
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - version.properties
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to Play? (off = build + upload .aab artifact only)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Inject Google Services
+        env:
+          GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
+          PROJECT_ID: ${{ secrets.PROJECT_ID }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CUSTOM_API_KEY: ${{ secrets.CUSTOM_API_KEY }}
+        run: |
+          if [ -f "app/google-services.json.template" ]; then
+            echo "Template found. Injecting secrets..."
+            sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
+          else
+            echo "Warning: google-services.json.template not found. Skipping injection."
+          fi
+          # Add any extra local.properties keys below:
+          # echo "CUSTOM_API_KEY=$CUSTOM_API_KEY" >> local.properties
+
+      - name: Decode signing keystore
+        env:
+          KEYSTORE_RAW: ${{ secrets.KEYSTORE_RAW }}
+        run: |
+          if [ -z "$KEYSTORE_RAW" ]; then
+            echo "::error::KEYSTORE_RAW secret is empty — cannot produce a signed bundle."
+            exit 1
+          fi
+          echo "$KEYSTORE_RAW" | base64 -d > app/keystore.jks
+          if [ ! -s app/keystore.jks ]; then
+            echo "::error::Decoded keystore is empty — KEYSTORE_RAW is not valid base64."
+            exit 1
+          fi
+          echo "Keystore decoded to app/keystore.jks ($(stat -c%s app/keystore.jks) bytes)"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        with:
+          cache-read-only: false
+          dependency-graph: disabled
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Resolve package name
+        id: meta
+        run: |
+          PKG=$(grep -E 'applicationId\s*=' app/build.gradle.kts | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "package_name=$PKG" >> "$GITHUB_OUTPUT"
+
+          if [ -f "settings.gradle.kts" ]; then
+            APP_NAME=$(grep 'rootProject.name' settings.gradle.kts | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
+          elif [ -f "settings.gradle" ]; then
+            APP_NAME=$(grep 'rootProject.name' settings.gradle | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
+          else
+            APP_NAME="app"
+          fi
+          echo "app_name=${APP_NAME,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Build Release AAB (signed)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          KEYSTORE_FILE: ${{ github.workspace }}/app/keystore.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew bundleRelease
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.app_name }}-release-aab
+          path: app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+
+      - name: Publish to Google Play (internal completed + alpha/beta/prod draft)
+        id: play-upload
+        if: ${{ github.event_name == 'push' || inputs.publish }}
+        env:
+          PACKAGE_NAME: ${{ steps.meta.outputs.package_name }}
+          AAB_GLOB: app/build/outputs/bundle/release/*.aab
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          pip install --quiet google-api-python-client google-auth google-auth-httplib2 httplib2==0.15.0
+          python .github/scripts/play_multitrack_publish.py
+
+      - name: Persist auto-incremented versionCode without clobbering newer versions
+        if: ${{ always() && (github.event_name == 'push' || inputs.publish) }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- version.properties; then
+            echo "version.properties unchanged — nothing to persist"
+            exit 0
+          fi
+
+          NEW_BUILD=$(grep -E '^versionBuild=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          NEW_MAJOR=$(grep -E '^versionMajor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          NEW_MINOR=$(grep -E '^versionMinor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          NEW_MINOR_LAST=$(grep -E '^versionMinorLast=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          NEW_PATCH=$(grep -E '^versionPatch=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          BRANCH="${{ github.ref_name }}"
+
+          for attempt in 1 2 3 4 5; do
+            git fetch origin "${BRANCH}"
+            REMOTE_BUILD=$(git show "origin/${BRANCH}:version.properties" 2>/dev/null | grep -E '^versionBuild=' | cut -d'=' -f2 | tr -d '\r ' || echo 0)
+
+            if [ "$REMOTE_BUILD" -ge "$NEW_BUILD" ]; then
+              echo "Remote versionBuild=${REMOTE_BUILD} is already >= this build's ${NEW_BUILD}; refusing to overwrite it."
+              exit 0
+            fi
+
+            git reset --hard "origin/${BRANCH}"
+            cat > version.properties <<EOF
+          # Version source of truth
+          versionBuild=${NEW_BUILD}
+          versionMajor=${NEW_MAJOR}
+          versionMinor=${NEW_MINOR}
+          versionMinorLast=${NEW_MINOR_LAST}
+          versionPatch=${NEW_PATCH}
+          EOF
+            git add version.properties
+            git commit -m "ci: versionBuild=${NEW_BUILD} [skip ci]"
+
+            if git push origin "HEAD:${BRANCH}"; then
+              echo "Pushed versionBuild=${NEW_BUILD} on attempt ${attempt}"
+              exit 0
+            fi
+            echo "::warning::Push raced with a newer main commit; checking the remote version again"
+          done
+
+          echo "::error::Could not safely persist versionBuild=${NEW_BUILD} after 5 attempts"
+          exit 1
+
+      - name: Fail loudly if Play upload didn't succeed
+        if: ${{ always() && steps.play-upload.outcome != 'success' && steps.play-upload.outcome != 'skipped' }}
+        run: |
+          echo "::error title=Play upload failed::AAB did not land on all target tracks. Workflow is FAILED." >&2
+          exit 1

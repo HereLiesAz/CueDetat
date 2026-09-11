@@ -1,0 +1,67 @@
+name: '🔀 Jules Triage'
+
+on:
+  workflow_call:
+    inputs:
+      additional_context:
+        type: 'string'
+        description: 'Any additional context from the request'
+        required: false
+
+concurrency:
+  group: '${{ github.workflow }}-triage-${{ github.event_name }}-${{ github.event.issue.number }}'
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: 'bash'
+
+jobs:
+  triage:
+    runs-on: 'ubuntu-latest'
+    timeout-minutes: 7
+    permissions:
+      contents: 'read'
+      issues: 'read'
+      pull-requests: 'read'
+    outputs:
+      available_labels: '${{ steps.get_labels.outputs.available_labels }}'
+    steps:
+      - name: 'Get repository labels'
+        id: 'get_labels'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          script: |-
+            const labels = [];
+            for await (const response of github.paginate.iterator(github.rest.issues.listLabelsForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            })) {
+              labels.push(...response.data);
+            }
+            if (!labels || labels.length === 0) {
+              core.setFailed('No issue labels found in this repository.')
+            }
+            const labelNames = labels.map(label => label.name).sort();
+            core.setOutput('available_labels', labelNames.join(','));
+            core.info(`Found ${labelNames.length} labels: ${labelNames.join(', ')}`);
+
+      - name: 'Invoke Jules for issue triage'
+        if: '${{ steps.get_labels.outputs.available_labels != '''' }}'
+        uses: 'google-labs-code/jules-invoke@v1.0.0'
+        with:
+          prompt: |-
+            Triage the following GitHub issue and apply the most appropriate labels from the available set.
+
+            **Issue #${{ github.event.issue.number }}: ${{ github.event.issue.title }}**
+
+            ${{ github.event.issue.body }}
+
+            **Available labels (comma-separated):**
+            ${{ steps.get_labels.outputs.available_labels }}
+
+            ${{ inputs.additional_context && format('**Additional context:** {0}', inputs.additional_context) || '' }}
+
+            Apply labels to issue #${{ github.event.issue.number }} in ${{ github.repository }} using only labels from the available set above. Do not invent new labels. If the issue provides insufficient information to pick a label confidently, apply "status/needs-triage" if it exists, otherwise leave it unlabeled.
+          jules_api_key: '${{ secrets.JULES_API_KEY }}'

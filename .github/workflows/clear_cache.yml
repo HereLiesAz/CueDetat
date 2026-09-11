@@ -1,0 +1,39 @@
+name: Clear Gradle Cache
+
+on:
+  workflow_dispatch: # Runs manually only
+
+# Least-privilege default token; jobs needing more declare their own permissions block.
+permissions:
+  contents: read
+
+jobs:
+  clear-cache:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write # Required to delete caches
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      - name: Delete all caches
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          echo "Fetching list of cache keys..."
+          cacheIds=$(gh cache list --limit 100 --json id --jq '.[].id')
+          
+          if [ -z "$cacheIds" ]; then
+            echo "No caches found to delete."
+            exit 0
+          fi
+
+          echo "Deleting caches..."
+          for cacheId in $cacheIds
+          do
+            gh cache delete "$cacheId"
+            echo "Deleted cache ID: $cacheId"
+          done
+          
+          echo "All caches cleared."

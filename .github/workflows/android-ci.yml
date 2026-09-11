@@ -1,0 +1,235 @@
+name: Android CI
+
+# Runs unit tests on every push/PR, then builds and releases a debug APK on push.
+# Auto-detects app name from settings.gradle.kts / settings.gradle.
+# Reads version from version.properties (Major.Minor.Patch.Build).
+#
+# Required secrets (all optional — build falls back to debug key / skips injection):
+#   KEYSTORE_RAW             — base64-encoded release keystore (.jks)
+#   KEYSTORE_PASSWORD        — keystore password
+#   KEY_ALIAS                — key alias inside the keystore
+#   KEY_PASSWORD             — key password
+#   GH_TOKEN                 — GitHub token with write access (defaults to GITHUB_TOKEN)
+#
+# Optional secrets (Google Services injection — skipped if template absent):
+#   GOOGLE_SERVICES_API_KEY  — Firebase/Google API key
+#   PROJECT_ID               — Firebase project ID
+#   CLIENT_ID                — OAuth client ID
+#
+# Optional secrets (add any extra project-specific API keys here):
+#   CUSTOM_API_KEY           — placeholder; rename and replicate as needed
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inject Google Services
+        env:
+          GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
+          PROJECT_ID: ${{ secrets.PROJECT_ID }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CUSTOM_API_KEY: ${{ secrets.CUSTOM_API_KEY }}
+        run: |
+          if [ -f "app/google-services.json.template" ]; then
+            sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
+          fi
+          # Add any extra local.properties keys below:
+          # echo "CUSTOM_API_KEY=$CUSTOM_API_KEY" >> local.properties
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+          dependency-graph: generate-submit-and-upload
+
+      - name: Run unit tests
+        run: |
+          chmod +x gradlew
+          ./gradlew test --continue --build-cache --no-daemon --stacktrace
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: '**/build/reports/tests/'
+
+  build-and-release:
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      checks: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Inject Google Services
+        env:
+          GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
+          PROJECT_ID: ${{ secrets.PROJECT_ID }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CUSTOM_API_KEY: ${{ secrets.CUSTOM_API_KEY }}
+        run: |
+          if [ -f "app/google-services.json.template" ]; then
+            echo "Template found. Injecting secrets..."
+            sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
+          else
+            echo "Warning: google-services.json.template not found. Skipping injection."
+          fi
+          # echo "CUSTOM_API_KEY=$CUSTOM_API_KEY" >> local.properties
+
+      - name: Decode signing keystore
+        env:
+          KEYSTORE_RAW: ${{ secrets.KEYSTORE_RAW }}
+        run: |
+          if [ -z "$KEYSTORE_RAW" ]; then
+            echo "::warning::KEYSTORE_RAW secret is empty — building with the default debug key."
+            exit 0
+          fi
+          echo "$KEYSTORE_RAW" | base64 -d > app/keystore.jks
+          if [ ! -s app/keystore.jks ]; then
+            echo "::error::Decoded keystore is empty — KEYSTORE_RAW is not valid base64."
+            exit 1
+          fi
+          echo "Keystore decoded to app/keystore.jks ($(stat -c%s app/keystore.jks) bytes)"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        with:
+          cache-read-only: false
+          dependency-graph: disabled
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        id: gradle-build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          KEYSTORE_FILE: ${{ github.workspace }}/app/keystore.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set +e
+          ./gradlew assembleDebug --build-cache --no-daemon > build.log 2>&1
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          cat build.log
+          exit $EXIT_CODE
+
+      - name: Report Failure to Jules
+        if: failure() && steps.gradle-build.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            let logTail = 'Log file not found.';
+            try { logTail = fs.readFileSync('build.log', 'utf8').slice(-4000); } catch (e) {}
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Build Failure on ${context.eventName === 'pull_request' ? 'PR #' + context.issue.number : context.ref}`,
+              body: `/jules debug this build error\n\n**Log:**\n\`\`\`\n${logTail}\n\`\`\``,
+              labels: ['jules', 'bug']
+            });
+
+      - name: Prepare Release Variables
+        if: success() && github.event_name == 'push'
+        id: release_vars
+        run: |
+          MAJOR=$(grep '^versionMajor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          MINOR=$(grep '^versionMinor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          PATCH=$(grep '^versionPatch=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          BUILD_NUMBER=$(grep '^versionBuild=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          VERSION_NAME="$MAJOR.$MINOR.$PATCH.$BUILD_NUMBER"
+          TAG_NAME="latest-debug-v${MAJOR}.${MINOR}"
+          if [ -f "settings.gradle.kts" ]; then
+            APP_NAME=$(grep 'rootProject.name' settings.gradle.kts | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
+          elif [ -f "settings.gradle" ]; then
+            APP_NAME=$(grep 'rootProject.name' settings.gradle | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
+          else
+            APP_NAME="App"
+          fi
+          APK_ORIGINAL=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          if [ -z "$APK_ORIGINAL" ]; then
+            echo "Error: No APK found to release!"
+            exit 1
+          fi
+          TARGET_NAME="${APP_NAME}-${VERSION_NAME}-debug.apk"
+          mv "$APK_ORIGINAL" "$TARGET_NAME"
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "APK_FILE=$TARGET_NAME" >> $GITHUB_ENV
+          mkdir -p build_tools_package/tools build_tools_package/native
+          [ -d "app/src/main/assets/tools" ] && cp -r app/src/main/assets/tools/* build_tools_package/tools/ || true
+          [ -d "app/src/main/jniLibs/arm64-v8a" ] && cp -r app/src/main/jniLibs/arm64-v8a/* build_tools_package/native/ || true
+          cd build_tools_package && zip -r ../build-tools.zip . && cd ..
+
+      - name: Publish Release
+        if: success() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -fa $TAG_NAME -m "Latest Debug Build"
+          git push origin $TAG_NAME --force
+          BUILD_TOOLS="build-tools.zip"
+          if gh release view $TAG_NAME > /dev/null 2>&1; then
+            echo "Updating existing release..."
+            gh release delete-asset "$TAG_NAME" "$BUILD_TOOLS" -y || true
+            gh release edit $TAG_NAME --prerelease \
+              --title "Latest Debug Build ($TAG_NAME)" \
+              --notes "Auto-build from commit $GITHUB_SHA" \
+              --target $GITHUB_SHA
+            gh release upload $TAG_NAME "$APK_FILE" --clobber
+            [ -f "$BUILD_TOOLS" ] && gh release upload $TAG_NAME "$BUILD_TOOLS" --clobber
+          else
+            echo "Creating new release..."
+            gh release create $TAG_NAME "$APK_FILE" --prerelease \
+              --title "Latest Debug Build ($TAG_NAME)" \
+              --notes "Auto-build from commit $GITHUB_SHA" \
+              --target $GITHUB_SHA
+            [ -f "$BUILD_TOOLS" ] && gh release upload $TAG_NAME "$BUILD_TOOLS" --clobber
+          fi

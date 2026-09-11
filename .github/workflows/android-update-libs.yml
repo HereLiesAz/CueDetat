@@ -1,0 +1,80 @@
+name: Update Dependencies
+
+# Manually triggered. Downloads native/header libraries into the `dependencies` branch.
+# Customize the download steps below for your project's vendored libs.
+#
+# Built-in support:
+#   GLM   — header-only math library (github.com/g-truc/glm)
+#   LiteRT — TensorFlow Lite successor (requires a valid download URL)
+#
+# Optional env vars (set in repo Variables, not Secrets):
+#   GLM_VERSION    — e.g. 1.0.1 (default: 1.0.1)
+#   LITERT_VERSION — e.g. 2.1.0 (default: 2.1.0)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  update-libs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Switch to dependencies branch
+        run: |
+          if git ls-remote --exit-code --heads origin dependencies; then
+            git checkout dependencies
+            git pull origin dependencies
+          else
+            git checkout --orphan dependencies
+            git rm -rf .
+          fi
+
+      - name: Create libs directory
+        run: mkdir -p libs
+
+      - name: Download GLM
+        env:
+          GLM_VERSION: ${{ vars.GLM_VERSION || '1.0.1' }}
+        run: |
+          echo "Downloading GLM ${GLM_VERSION}..."
+          rm -rf libs/glm
+          wget -q https://github.com/g-truc/glm/archive/refs/tags/${GLM_VERSION}.zip -O glm.zip
+          unzip -q glm.zip
+          mkdir -p libs/glm
+          mv glm-${GLM_VERSION}/glm libs/glm/glm
+          rm -rf glm-${GLM_VERSION} glm.zip
+
+      - name: Download LiteRT
+        env:
+          LITERT_VERSION: ${{ vars.LITERT_VERSION || '2.1.0' }}
+        run: |
+          echo "Downloading LiteRT ${LITERT_VERSION}..."
+          rm -rf libs/litert
+          mkdir -p libs/litert
+          # TODO: replace the placeholder below with a real download URL when one is available.
+          # wget -q "https://example.com/litert/${LITERT_VERSION}/litert.zip" -O litert.zip && unzip -q litert.zip -d libs/litert && rm litert.zip
+          echo "LiteRT version ${LITERT_VERSION}" > libs/litert/README.md
+          echo "Populate this directory or update the workflow with a valid download URL." >> libs/litert/README.md
+
+      # Add more library download steps here following the same pattern.
+
+      - name: Commit and Push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add libs
+          if ! git diff --cached --quiet; then
+            git commit -m "Update dependencies"
+            git push origin dependencies
+          else
+            echo "No changes to commit."
+          fi
