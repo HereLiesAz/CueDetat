@@ -1,5 +1,8 @@
-name: '🔀 Jules Dispatch'
-
+# centralized-by: HereLiesAz/workflows
+# central-source-path: .github/workflows/jules-dispatch.yml
+# central-source-sha256: 17c13d04cfa6d1e55af692790eaab5608a1b4b511a1f66e56ec133a8803eb5da
+# This file intentionally contains no repository secrets.
+name: 🔀 Jules Dispatch [central proxy]
 on:
   pull_request_review_comment:
     types:
@@ -18,128 +21,21 @@ on:
     types:
       - 'created'
 
-defaults:
-  run:
-    shell: 'bash'
-
+permissions:
+  contents: read
+  id-token: write
 jobs:
-  dispatch:
-    # PRs: only non-forks; issues: open/reopen only;
-    # comments: only OWNER/MEMBER/COLLABORATOR typing @jules
-    if: |-
-      (
-        github.event_name == 'pull_request' &&
-        github.event.pull_request.head.repo.fork == false
-      ) || (
-        github.event_name == 'issues' &&
-        contains(fromJSON('["opened", "reopened"]'), github.event.action)
-      ) || (
-        github.event.sender.type == 'User' &&
-        startsWith(github.event.comment.body || github.event.review.body || github.event.issue.body, '@jules') &&
-        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association || github.event.issue.author_association)
-      )
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-      issues: 'write'
-      pull-requests: 'write'
-    outputs:
-      command: '${{ steps.extract_command.outputs.command }}'
-      additional_context: '${{ steps.extract_command.outputs.additional_context }}'
-      issue_number: '${{ github.event.pull_request.number || github.event.issue.number }}'
+  central-dispatch:
+    runs-on: ubuntu-latest
     steps:
-      - name: 'Extract command'
-        id: 'extract_command'
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+      - name: Dispatch to HereLiesAz/workflows
         env:
-          EVENT_TYPE: '${{ github.event_name }}.${{ github.event.action }}'
-          REQUEST: '${{ github.event.comment.body || github.event.review.body || github.event.issue.body }}'
-        with:
-          script: |
-            const eventType = process.env.EVENT_TYPE;
-            const request = process.env.REQUEST || '';
-            if (eventType === 'pull_request.opened') {
-              core.setOutput('command', 'review');
-            } else if (['issues.opened', 'issues.reopened'].includes(eventType)) {
-              core.setOutput('command', 'triage');
-            } else if (request.startsWith('@jules /review')) {
-              core.setOutput('command', 'review');
-              core.setOutput('additional_context', request.replace(/^@jules \/review/, '').trim());
-            } else if (request.startsWith('@jules /triage')) {
-              core.setOutput('command', 'triage');
-            } else if (request.startsWith('@jules')) {
-              core.setOutput('command', 'invoke');
-              core.setOutput('additional_context', request.replace(/^@jules/, '').trim());
-            } else {
-              core.setOutput('command', 'fallthrough');
-            }
-
-      - name: 'Acknowledge request'
-        env:
-          GH_TOKEN: '${{ secrets.GH_TOKEN || github.token }}'
-          ISSUE_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
-          REPOSITORY: '${{ github.repository }}'
-        run: |-
-          gh issue comment "${ISSUE_NUMBER}" \
-            --body "🤖 Hi @${{ github.actor }}, Jules is on it. Track progress in [the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})." \
-            --repo "${REPOSITORY}"
-
-  review:
-    needs: 'dispatch'
-    if: '${{ needs.dispatch.outputs.command == ''review'' }}'
-    uses: './.github/workflows/jules-review.yml'
-    permissions:
-      contents: 'read'
-      issues: 'write'
-      pull-requests: 'write'
-    with:
-      additional_context: '${{ needs.dispatch.outputs.additional_context }}'
-    secrets: 'inherit'
-
-  triage:
-    needs: 'dispatch'
-    if: '${{ needs.dispatch.outputs.command == ''triage'' }}'
-    uses: './.github/workflows/jules-triage.yml'
-    permissions:
-      contents: 'read'
-      issues: 'write'
-      pull-requests: 'write'
-    with:
-      additional_context: '${{ needs.dispatch.outputs.additional_context }}'
-    secrets: 'inherit'
-
-  invoke:
-    needs: 'dispatch'
-    if: '${{ needs.dispatch.outputs.command == ''invoke'' }}'
-    uses: './.github/workflows/jules-invoke.yml'
-    permissions:
-      contents: 'read'
-      issues: 'write'
-      pull-requests: 'write'
-    with:
-      additional_context: '${{ needs.dispatch.outputs.additional_context }}'
-    secrets: 'inherit'
-
-  fallthrough:
-    needs:
-      - 'dispatch'
-      - 'review'
-      - 'triage'
-      - 'invoke'
-    if: |-
-      ${{ always() && !cancelled() && (failure() || needs.dispatch.outputs.command == 'fallthrough') }}
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-      issues: 'write'
-      pull-requests: 'write'
-    steps:
-      - name: 'Send failure comment'
-        env:
-          GH_TOKEN: '${{ secrets.GH_TOKEN || github.token }}'
-          ISSUE_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
-          REPOSITORY: '${{ github.repository }}'
-        run: |-
-          gh issue comment "${ISSUE_NUMBER}" \
-            --body "🤖 Sorry @${{ github.actor }}, Jules couldn't process that. [See the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})." \
-            --repo "${REPOSITORY}"
+          WORKFLOWS_GATEWAY_URL: ${{ vars.WORKFLOWS_GATEWAY_URL }}
+          EVENT_JSON: ${{ toJSON(github.event) }}
+          INPUTS_JSON: ${{ toJSON(inputs) }}
+          VARS_JSON: ${{ toJSON(vars) }}
+          SOURCE_WORKFLOW_PATH: .github/workflows/jules-dispatch.yml
+          SOURCE_SHA256: 17c13d04cfa6d1e55af692790eaab5608a1b4b511a1f66e56ec133a8803eb5da
+        shell: bash
+        run: "set -euo pipefail\n[[ -n \"${WORKFLOWS_GATEWAY_URL:-}\" ]] || { echo \"Repository variable WORKFLOWS_GATEWAY_URL is not configured.\" >&2; exit 1; }\noidc_response=\"$(curl --fail-with-body --silent --show-error -H \"Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}\" \"${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hereliesaz-workflows\")\"\noidc_token=\"$(jq -r '.value // empty' <<<\"$oidc_response\")\"\n[[ -n \"$oidc_token\" ]] || { echo \"GitHub did not issue an OIDC token.\" >&2; exit 1; }\necho \"::add-mask::$oidc_token\"\nDISPATCH_EVENT_JSON=\"$(jq -c '{\n  action,\n  number,\n  pull_request: (if .pull_request then {\n    number: .pull_request.number,\n    title: (.pull_request.title // \"\"),\n    body: (.pull_request.body // \"\"),\n    base: {ref: .pull_request.base.ref, sha: .pull_request.base.sha},\n    head: {\n      ref: .pull_request.head.ref,\n      sha: .pull_request.head.sha,\n      repo: {\n        full_name: .pull_request.head.repo.full_name,\n        fork: (.pull_request.head.repo.fork // false)\n      }\n    }\n  } else null end),\n  issue: (if .issue then {\n    number: .issue.number,\n    title: (.issue.title // \"\"),\n    body: (.issue.body // \"\"),\n    pull_request: (if .issue.pull_request then {url: (.issue.pull_request.url // \"\")} else null end)\n  } else null end),\n  comment: (if .comment then {\n    body: (.comment.body // \"\"),\n    author_association: (.comment.author_association // \"\"),\n    user: {type: (.comment.user.type // \"\"), login: (.comment.user.login // \"\")}\n  } else null end),\n  review: (if .review then {\n    body: (.review.body // \"\"),\n    author_association: (.review.author_association // \"\"),\n    user: {type: (.review.user.type // \"\"), login: (.review.user.login // \"\")}\n  } else null end)\n}' <<<\"$EVENT_JSON\")\"\npayload=\"$(jq -n   --arg repository \"$GITHUB_REPOSITORY\" --arg repository_id \"$GITHUB_REPOSITORY_ID\"   --arg repository_owner \"$GITHUB_REPOSITORY_OWNER\" --arg repository_owner_id \"$GITHUB_REPOSITORY_OWNER_ID\"   --arg sha \"$GITHUB_SHA\" --arg ref \"$GITHUB_REF\" --arg ref_name \"$GITHUB_REF_NAME\" --arg ref_type \"$GITHUB_REF_TYPE\"   --arg head_ref \"$GITHUB_HEAD_REF\" --arg base_ref \"$GITHUB_BASE_REF\" --arg actor \"$GITHUB_ACTOR\" --arg actor_id \"$GITHUB_ACTOR_ID\"   --arg event_name \"$GITHUB_EVENT_NAME\" --arg run_id \"$GITHUB_RUN_ID\" --arg run_number \"$GITHUB_RUN_NUMBER\" --arg run_attempt \"$GITHUB_RUN_ATTEMPT\"   --arg workflow_ref \"$GITHUB_WORKFLOW_REF\" --arg workflow_name \"$GITHUB_WORKFLOW\" --arg source_workflow_path \"$SOURCE_WORKFLOW_PATH\"   --arg source_sha256 \"$SOURCE_SHA256\" --argjson event \"$DISPATCH_EVENT_JSON\" --argjson inputs \"$INPUTS_JSON\" --argjson vars \"$VARS_JSON\"   '{repository:$repository,repository_id:$repository_id,repository_owner:$repository_owner,repository_owner_id:$repository_owner_id,sha:$sha,check_sha:($event.pull_request.head.sha // $sha),ref:$ref,ref_name:$ref_name,ref_type:$ref_type,head_ref:$head_ref,base_ref:$base_ref,actor:$actor,actor_id:$actor_id,event_name:$event_name,event:$event,inputs:$inputs,vars:$vars,run_id:$run_id,run_number:$run_number,run_attempt:$run_attempt,workflow_ref:$workflow_ref,workflow_name:$workflow_name,source_workflow_path:$source_workflow_path,source_sha256:$source_sha256}')\"\ncurl --fail-with-body --silent --show-error -X POST \"${WORKFLOWS_GATEWAY_URL%/}/dispatch\" -H \"Authorization: Bearer ${oidc_token}\" -H \"Content-Type: application/json\" --data-binary \"$payload\""
+    if: ${{ github.event_name == 'issues' || github.event_name == 'pull_request' || (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '@jules')) || (github.event_name == 'pull_request_review_comment' && startsWith(github.event.comment.body, '@jules')) || (github.event_name == 'pull_request_review' && startsWith(github.event.review.body, '@jules')) }}
