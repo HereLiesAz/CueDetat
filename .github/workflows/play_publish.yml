@@ -1,26 +1,8 @@
-name: Play Publish (AAB)
-
-# Builds a signed Android App Bundle of the `play` flavor and publishes it to
-# the Google Play Console.
-#
-# Every push to main publishes. One AAB is uploaded once and assigned to four
-# tracks in a single Play edit (see .github/scripts/play_publish.py):
-#
-#   internal    completed  -- live to internal testers
-#   alpha       completed  -- live to closed testing
-#   beta        draft      -- open testing, awaiting a human
-#   production  draft      -- production, awaiting a human
-#
-# Play's track ids do not match the console's labels: "closed testing" is
-# `alpha` and "open testing" is `beta`.
-#
-# A manual run can set `dry_run` to build and upload the .aab as a workflow
-# artifact without touching Play.
-#
-# Signing reuses the same secrets and injected-signing approach as
-# android_release.yml; versioning reuses the -PversionBuild override
-# (git commit count) wired into app/build.gradle.kts.
-
+# centralized-by: HereLiesAz/workflows
+# central-source-path: .github/workflows/play_publish.yml
+# central-source-sha256: 48cc88893221e4dbfa9bdede0cec35d7fcd6932f3d4d472cf496284e59d19c18
+# This file intentionally contains no repository secrets.
+name: Play Publish (AAB) [central proxy]
 on:
   push:
     branches: 'main'
@@ -32,148 +14,20 @@ on:
         default: false
         required: true
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
-
+permissions:
+  contents: read
+  id-token: write
 jobs:
-  bundle:
+  central-dispatch:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: read
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # full history so `git rev-list --count HEAD` is the real commit count
-
-      - name: Inject Google Services
+      - name: Dispatch to HereLiesAz/workflows
         env:
-          GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
-          PROJECT_ID: ${{ secrets.PROJECT_ID }}
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-        run: |
-          if [ -f "app/google-services.json.template" ]; then
-            echo "Template found. Injecting secrets..."
-            sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
-          else
-            echo "Warning: google-services.json.template not found. Skipping injection."
-          fi
-
-      - name: Generate Keystore from Secrets
-        env:
-          KEYSTORE_PRIVATE: ${{ secrets.KEYSTORE_PRIVATE }}
-          KEYSTORE_CHAIN: ${{ secrets.KEYSTORE_CHAIN }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        run: |
-          echo "Generating keystore from certificate chain and private key..."
-          echo "$KEYSTORE_PRIVATE" > private_key.pem
-          echo "$KEYSTORE_CHAIN" > certificate_chain.crt
-
-          openssl pkcs12 -export -in certificate_chain.crt -inkey private_key.pem \
-            -name "$KEY_ALIAS" -out keystore.p12 \
-            -password pass:"$KEYSTORE_PASSWORD"
-
-          keytool -importkeystore -srckeystore keystore.p12 -srcstoretype PKCS12 \
-            -destkeystore app/keystore.jks -deststoretype JKS \
-            -srcstorepass "$KEYSTORE_PASSWORD" \
-            -deststorepass "$KEYSTORE_PASSWORD" \
-            -alias "$KEY_ALIAS" -noprompt
-
-          rm private_key.pem certificate_chain.crt keystore.p12
-          echo "Keystore generated at app/keystore.jks"
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: false
-          dependency-graph: disabled
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Resolve package name
-        id: pkg
-        run: |
-          # Read applicationId from the version catalog (single source of truth),
-          # falling back to the namespace in app/build.gradle.kts.
-          PKG=$(grep -E '^[[:space:]]*applicationId[[:space:]]*=' gradle/libs.versions.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-          if [ -z "$PKG" ]; then
-            PKG=$(grep -E 'applicationId[[:space:]]*=' app/build.gradle.kts | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-          fi
-          echo "Resolved packageName: $PKG"
-          echo "package_name=$PKG" >> "$GITHUB_OUTPUT"
-
-      - name: Build signed Play AAB
-        id: build
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          GH_ACTOR: ${{ secrets.GH_ACTOR }}
-          # Optional tester-license allowlist scrape (writes an empty allowlist when absent).
-          GG_LINK: ${{ secrets.GG_LINK }}
-          GG_SESSION: ${{ secrets.GG_SESSION }}
-        run: |
-          BUILD_NUMBER=$(git rev-list --count HEAD)
-          echo "versionCode (commit count) = $BUILD_NUMBER"
-          echo "version_code=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
-
-          ./gradlew bundlePlayRelease -PversionBuild="$BUILD_NUMBER" --build-cache \
-            -Pandroid.injected.signing.store.file="$(pwd)/app/keystore.jks" \
-            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
-            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
-
-      - name: Locate AAB
-        id: aab
-        run: |
-          AAB=$(find app/build/outputs/bundle/playRelease -name "*.aab" | head -n 1)
-          if [ -z "$AAB" ]; then
-            echo "Error: no Play release AAB found."
-            exit 1
-          fi
-          echo "Found AAB: $AAB"
-          echo "aab_path=$AAB" >> "$GITHUB_OUTPUT"
-
-      - name: Upload AAB artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: play-release-aab
-          path: ${{ steps.aab.outputs.aab_path }}
-          if-no-files-found: error
-
-      # r0adkll/upload-google-play cannot express this policy: its `status` is a
-      # single value across all `tracks`, so two statuses would need two
-      # invocations -- two separate Play edits, the second re-uploading a
-      # version code that already exists. Its `existingEditId` input has no
-      # matching output to thread between calls. The API models it directly.
-      - name: Set up Python
-        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run != 'true' }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Play publishing dependencies
-        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run != 'true' }}
-        run: pip install --disable-pip-version-check google-api-python-client google-auth
-
-      - name: Publish to Google Play
-        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run != 'true' }}
-        env:
-          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          PLAY_PACKAGE_NAME: ${{ steps.pkg.outputs.package_name }}
-          PLAY_AAB_PATH: ${{ steps.aab.outputs.aab_path }}
-          PLAY_MAPPING_PATH: app/build/outputs/mapping/playRelease/mapping.txt
-          PLAY_RELEASE_NAME: ${{ steps.build.outputs.version_code }}
-        run: python .github/scripts/play_publish.py
+          WORKFLOWS_GATEWAY_URL: ${{ vars.WORKFLOWS_GATEWAY_URL }}
+          EVENT_JSON: ${{ toJSON(github.event) }}
+          INPUTS_JSON: ${{ toJSON(inputs) }}
+          VARS_JSON: ${{ toJSON(vars) }}
+          SOURCE_WORKFLOW_PATH: .github/workflows/play_publish.yml
+          SOURCE_SHA256: 48cc88893221e4dbfa9bdede0cec35d7fcd6932f3d4d472cf496284e59d19c18
+        shell: bash
+        run: "set -euo pipefail\n[[ -n \"${WORKFLOWS_GATEWAY_URL:-}\" ]] || { echo \"Repository variable WORKFLOWS_GATEWAY_URL is not configured.\" >&2; exit 1; }\noidc_response=\"$(curl --fail-with-body --silent --show-error -H \"Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}\" \"${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hereliesaz-workflows\")\"\noidc_token=\"$(jq -r '.value // empty' <<<\"$oidc_response\")\"\n[[ -n \"$oidc_token\" ]] || { echo \"GitHub did not issue an OIDC token.\" >&2; exit 1; }\necho \"::add-mask::$oidc_token\"\npayload=\"$(jq -n   --arg repository \"$GITHUB_REPOSITORY\" --arg repository_id \"$GITHUB_REPOSITORY_ID\"   --arg repository_owner \"$GITHUB_REPOSITORY_OWNER\" --arg repository_owner_id \"$GITHUB_REPOSITORY_OWNER_ID\"   --arg sha \"$GITHUB_SHA\" --arg ref \"$GITHUB_REF\" --arg ref_name \"$GITHUB_REF_NAME\" --arg ref_type \"$GITHUB_REF_TYPE\"   --arg head_ref \"$GITHUB_HEAD_REF\" --arg base_ref \"$GITHUB_BASE_REF\" --arg actor \"$GITHUB_ACTOR\" --arg actor_id \"$GITHUB_ACTOR_ID\"   --arg event_name \"$GITHUB_EVENT_NAME\" --arg run_id \"$GITHUB_RUN_ID\" --arg run_number \"$GITHUB_RUN_NUMBER\" --arg run_attempt \"$GITHUB_RUN_ATTEMPT\"   --arg workflow_ref \"$GITHUB_WORKFLOW_REF\" --arg workflow_name \"$GITHUB_WORKFLOW\" --arg source_workflow_path \"$SOURCE_WORKFLOW_PATH\"   --arg source_sha256 \"$SOURCE_SHA256\" --argjson event \"$EVENT_JSON\" --argjson inputs \"$INPUTS_JSON\" --argjson vars \"$VARS_JSON\"   '{repository:$repository,repository_id:$repository_id,repository_owner:$repository_owner,repository_owner_id:$repository_owner_id,sha:$sha,check_sha:($event.pull_request.head.sha // $sha),ref:$ref,ref_name:$ref_name,ref_type:$ref_type,head_ref:$head_ref,base_ref:$base_ref,actor:$actor,actor_id:$actor_id,event_name:$event_name,event:$event,inputs:$inputs,vars:$vars,run_id:$run_id,run_number:$run_number,run_attempt:$run_attempt,workflow_ref:$workflow_ref,workflow_name:$workflow_name,source_workflow_path:$source_workflow_path,source_sha256:$source_sha256}')\"\ncurl --fail-with-body --silent --show-error -X POST \"${WORKFLOWS_GATEWAY_URL%/}/dispatch\" -H \"Authorization: Bearer ${oidc_token}\" -H \"Content-Type: application/json\" --data-binary \"$payload\""
