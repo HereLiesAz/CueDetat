@@ -48,15 +48,16 @@ class ArControllerImpl(context: Context) : ArController {
         )
     }
 
-    override fun probeCapability(): DepthCapability =
-        if (arTableSession.isArCoreAvailable()) {
-            val testSession = arTableSession.createSession()
-            val cap = arTableSession.capability
-            if (testSession != null) arTableSession.close()
-            cap
-        } else {
-            DepthCapability.NONE
+    override fun probeCapability(): DepthCapability {
+        if (!arTableSession.isArCoreAvailable()) return DepthCapability.NONE
+
+        val testSession = arTableSession.createSession() ?: return DepthCapability.NONE
+        return try {
+            DepthCapability.DEPTH_API
+        } finally {
+            arTableSession.close()
         }
+    }
 
     override fun updateUiState(state: CueDetatState) {
         arFrameProcessor.updateUiState(state)
