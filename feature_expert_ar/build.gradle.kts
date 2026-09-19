@@ -9,11 +9,7 @@
 // the split installs (see ArControllerFacade / PlayArFeatureDelivery). Delivery
 // is requested on demand, the first time a user actually opens Expert AR.
 //
-// The base uses a `distribution` flavor dimension (play/foss), so this module
-// must declare the same dimension/flavors — otherwise `implementation(project(":app"))`
-// is ambiguous. The `foss` flavor never consumes a split (standalone FOSS APKs
-// have no Play split channel); foss bundles this module's sources directly via a
-// java.srcDir in app/build.gradle.kts, with ARCore added as fossImplementation.
+// This module is currently dormant and is not included from settings.gradle.kts.
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -35,11 +31,6 @@ android {
         minSdk = 29
     }
 
-    flavorDimensions += "distribution"
-    productFlavors {
-        create("play") { dimension = "distribution" }
-        create("foss") { dimension = "distribution" }
-    }
 
     buildFeatures {
         compose = true

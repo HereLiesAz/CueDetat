@@ -117,28 +117,22 @@ someone tries to sneak business logic into a Composable, physics itself should i
 
 ## Building & Releasing
 
-Two distribution channels share one codebase via product flavors:
-
-* **`play`** → Google Play, shipped as a **signed Android App Bundle (AAB)**.
-* **`foss`** → standalone APK on GitHub Releases.
-
-Quick local builds (`versionCode` = git commit count, kept monotonic for Play):
+Cue D’état has one Android application variant and one package identity:
+`com.hereliesaz.cuedetat`. Google Play consumes the AAB; GitHub Releases consume
+the APK built from the same source set and dependencies.
 
 ```bash
-./gradlew bundlePlayRelease  -PversionBuild=$(git rev-list --count HEAD)   # signed Play AAB
-./gradlew assembleFossRelease -PversionBuild=$(git rev-list --count HEAD)  # signed FOSS APK
+./gradlew bundleRelease   -PversionBuild=$(git rev-list --count HEAD)
+./gradlew assembleRelease -PversionBuild=$(git rev-list --count HEAD)
 ```
 
-Publishing to Play is automated by the **“Play Publish (AAB)”** GitHub Actions
-workflow (`workflow_dispatch`): inputs `track` (default `internal`), `status`
-(default `draft`), and `publish` (default `false` = upload the `.aab` artifact
-only). The ~24 MB TFLite model is delivered to Play as an **on-demand dynamic
-feature module** (`:feature_mlmodel`) and bundled directly into the FOSS APK.
+The TFLite master model is bundled directly into the app. Expert AR/table scan is
+currently disabled: its UI controls are hidden, its events are rejected, and its
+ARCore implementation is not part of the shipped build until the native path is
+verified on real devices.
 
-Required repo secrets: `KEYSTORE_PRIVATE`, `KEYSTORE_CHAIN`, `KEYSTORE_PASSWORD`,
-`KEY_ALIAS`, `KEY_PASSWORD` (signing) and `PLAY_SERVICE_ACCOUNT_JSON` (Play
-publishing). **Full details, one-time Play Console setup, and the Data-safety
-checklist are in [`docs/RELEASE.md`](docs/RELEASE.md).**
+Required signing and Play-publishing secrets are documented in
+[`docs/RELEASE.md`](docs/RELEASE.md).
 
 ## License
 

@@ -67,6 +67,9 @@ jobs:
           dependency-graph: generate-submit-and-upload
 
       - name: Run unit tests
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
         run: |
           chmod +x gradlew
           ./gradlew test --continue --build-cache --no-daemon --stacktrace

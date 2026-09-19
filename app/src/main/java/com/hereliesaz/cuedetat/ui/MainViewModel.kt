@@ -177,9 +177,16 @@ class MainViewModel @Inject constructor(
             val savedState = userPreferencesRepository.stateFlow.first()
             val savedFeltSamples = tableScanRepository.loadFeltSamples()
             val currentExperienceMode = _uiState.value.experienceMode
-            val initialState = (savedState ?: CueDetatState()).copy(
+            val restoredState = savedState ?: CueDetatState()
+            val safeCameraMode = when (restoredState.cameraMode) {
+                CameraMode.AR_SETUP, CameraMode.AR_ACTIVE -> CameraMode.OFF
+                else -> restoredState.cameraMode
+            }
+            val initialState = restoredState.copy(
                 experienceMode = currentExperienceMode,
                 savedFeltSamples = savedFeltSamples,
+                cameraMode = safeCameraMode,
+                showTableScanScreen = false,
             )
             processAndEmitState(initialState, UpdateType.FULL)
 
@@ -325,6 +332,19 @@ class MainViewModel @Inject constructor(
     }
 
     private fun processEvent(event: MainScreenEvent) {
+        // Expert AR/table scan is deliberately unavailable. Block the event
+        // boundary as well as hiding the controls so stale state, tutorials, or
+        // programmatic callers cannot enter the disabled path.
+        val targetsDisabledAr =
+            event is MainScreenEvent.CycleCameraMode ||
+                event is MainScreenEvent.ToggleTableScanScreen ||
+                event is MainScreenEvent.StartManualHoleCapture ||
+                event is MainScreenEvent.RetryArModuleLoad ||
+                event is MainScreenEvent.ForceArActive ||
+                (event is MainScreenEvent.SetCameraMode &&
+                    (event.mode == CameraMode.AR_SETUP || event.mode == CameraMode.AR_ACTIVE))
+        if (targetsDisabledAr) return
+
         if (event is MainScreenEvent.ScreenGestureStarted || event is MainScreenEvent.LogicalGestureStarted) {
             warningManager.dismissWarning()
         }

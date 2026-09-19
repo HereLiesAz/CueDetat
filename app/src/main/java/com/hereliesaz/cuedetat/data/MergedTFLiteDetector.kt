@@ -128,11 +128,9 @@ class MergedTFLiteDetector(
     }
 
     init {
-        // Eager attempt: succeeds immediately when the model is in the base
-        // assets (foss APK, or play debug where the feature is merged in). For a
-        // play release the model lives in an on-demand split that isn't present
-        // yet — this fails gracefully (logged, no interpreters) and is retried
-        // by [ensureModelReady] once the split is installed.
+        // The master model is bundled directly into the sole app variant.
+        // Keep this load resilient so a corrupt/missing asset disables detection
+        // rather than taking the process down.
         loadMasterPackage(context)
     }
 
@@ -140,8 +138,8 @@ class MergedTFLiteDetector(
     private val isLoaded: Boolean get() = interpreters.isNotEmpty()
 
     /**
-     * Ensures the model is installed and loaded. Requests the on-demand split
-     * via [ModelDelivery] when needed, then loads from the split-aware context.
+     * Ensures the bundled model is loaded. [ModelDelivery] remains as a small
+     * compatibility boundary; its sole-variant implementation is immediate.
      * Idempotent and cheap once loaded.
      */
     override suspend fun ensureModelReady(): Boolean {

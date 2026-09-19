@@ -253,16 +253,6 @@ fun AzNavRailMenu(
         )
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            val isArActive = uiState.cameraMode != CameraMode.OFF
-            azRailToggle(
-                id = "ar",
-                route = "main",
-                isChecked = isArActive,
-                toggleOnText = "off", toggleOffText = "ar",
-                fillColor = b3R, textColor = Color.White,
-                onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
-            )
-
             azRailToggle(
                 id = "meta_glasses",
                 route = "main",
@@ -273,39 +263,11 @@ fun AzNavRailMenu(
                     if (uiState.cameraMode == CameraMode.META_GLASSES) {
                         onEvent(MainScreenEvent.TurnCameraOff)
                     } else {
-                        onEvent(MainScreenEvent.SetExperienceMode(ExperienceMode.EXPERT)) // Ensure expert mode for glasses
+                        onEvent(MainScreenEvent.SetExperienceMode(ExperienceMode.EXPERT))
                         onEvent(MainScreenEvent.SetCameraMode(CameraMode.META_GLASSES))
                     }
                 }
             )
-
-            azRailItemLowerCase(id = "felt", text = "felt", fillColor = b11R, textColor = Color.White, onClick = {
-                onEvent(MainScreenEvent.ToggleTableScanScreen)
-            })
-
-            azRailItemLowerCase(id = "holes", text = "holes", fillColor = b12P, textColor = Color.White, onClick = {
-                onEvent(MainScreenEvent.StartManualHoleCapture)
-            })
-
-            if (inArSubMode) {
-                if (uiState.pitchMatrix != null || uiState.topDownBitmap != null) {
-                    azRailToggle(
-                        id = "top_down_view",
-                        route = "main",
-                        isChecked = uiState.isTopDownViewActive,
-                        toggleOnText = "back", toggleOffText = "view",
-                        fillColor = b8K, textColor = Color.White,
-                        onClick = { 
-                            if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
-                            else onEvent(MainScreenEvent.ToggleTopDownView)
-                        }
-                    )
-                }
-
-                azRailItemLowerCase(id = "cancel_ar", text = "Cancel", fillColor = Color.DarkGray, textColor = Color.White, onClick = {
-                    onEvent(MainScreenEvent.CancelArSetup) 
-                })
-            }
         }
         azDivider()
 

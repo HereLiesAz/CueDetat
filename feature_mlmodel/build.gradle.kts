@@ -23,11 +23,6 @@ android {
         minSdk = 29
     }
 
-    flavorDimensions += "distribution"
-    productFlavors {
-        create("play") { dimension = "distribution" }
-        create("foss") { dimension = "distribution" }
-    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
