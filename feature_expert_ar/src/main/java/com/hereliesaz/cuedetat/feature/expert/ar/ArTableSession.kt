@@ -3,6 +3,7 @@ package com.hereliesaz.cuedetat.feature.expert.ar
 import android.content.Context
 import android.graphics.Matrix
 import android.graphics.PointF
+import android.util.Log
 import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
@@ -70,11 +71,16 @@ class ArTableSession(
     val capturedCount: StateFlow<Int> = _capturedCount.asStateFlow()
 
     /** True once ARCore world tracking is available on this device. */
-    fun isArCoreAvailable(): Boolean = try {
-        ArCoreApk.getInstance().checkAvailability(context).isSupported
-    } catch (_: Exception) {
-        false
-    }
+    fun isArCoreAvailable(): Boolean =
+        try {
+            ArCoreApk.getInstance().checkAvailability(context).isSupported
+        } catch (e: LinkageError) {
+            Log.e(TAG, "ARCore native library is unavailable during capability check", e)
+            false
+        } catch (e: Exception) {
+            Log.w(TAG, "ARCore capability check failed", e)
+            false
+        }
 
     /**
      * Capability now reflects ARCore *availability* (the Depth API is disabled). Downstream gates
@@ -90,18 +96,26 @@ class ArTableSession(
      */
     fun createSession(): Session? {
         if (!isArCoreAvailable()) return null
+
+        var candidate: Session? = null
         return try {
-            val s = Session(context)
-            val config = Config(s).apply {
+            candidate = Session(context)
+            val config = Config(candidate).apply {
                 depthMode = Config.DepthMode.DISABLED
                 updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                 lightEstimationMode = Config.LightEstimationMode.DISABLED
                 planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
             }
-            s.configure(config)
-            session = s
-            s
-        } catch (_: Exception) {
+            candidate.configure(config)
+            session = candidate
+            candidate
+        } catch (e: LinkageError) {
+            runCatching { candidate?.close() }
+            Log.e(TAG, "ARCore native library failed to load; disabling AR for this session", e)
+            null
+        } catch (e: Exception) {
+            runCatching { candidate?.close() }
+            Log.w(TAG, "Unable to create ARCore session", e)
             null
         }
     }
@@ -280,12 +294,37 @@ class ArTableSession(
         tableAnchor = null
     }
 
-    fun pause() { session?.pause() }
-    fun resume() { try { session?.resume() } catch (_: Exception) {} }
+    fun pause() {
+        try {
+            session?.pause()
+        } catch (e: LinkageError) {
+            Log.e(TAG, "ARCore native call failed while pausing", e)
+        }
+    }
+
+    fun resume() {
+        try {
+            session?.resume()
+        } catch (e: LinkageError) {
+            Log.e(TAG, "ARCore native call failed while resuming", e)
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to resume ARCore session", e)
+        }
+    }
+
     fun close() {
         clearAnchors()
         clearPlaneAnchor()
-        session?.close()
-        session = null
+        try {
+            session?.close()
+        } catch (e: LinkageError) {
+            Log.e(TAG, "ARCore native call failed while closing", e)
+        } finally {
+            session = null
+        }
+    }
+
+    companion object {
+        private const val TAG = "ArTableSession"
     }
 }
