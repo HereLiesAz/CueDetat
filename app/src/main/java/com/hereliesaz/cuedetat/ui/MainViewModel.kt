@@ -20,6 +20,7 @@ import com.hereliesaz.cuedetat.domain.ArModuleState
 import com.hereliesaz.cuedetat.domain.BallSelectionPhase
 import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.DepthCapability
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.TableScanModel
@@ -308,7 +309,14 @@ class MainViewModel @Inject constructor(
                 false
             }
             if (loaded) {
-                onEvent(MainScreenEvent.DepthCapabilityDetected(arController.probeCapability()))
+                val capability = try {
+                    arController.probeCapability()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (_: Throwable) {
+                    DepthCapability.NONE
+                }
+                onEvent(MainScreenEvent.DepthCapabilityDetected(capability))
                 onEvent(MainScreenEvent.ArModuleLoadSucceeded)
             } else {
                 onEvent(MainScreenEvent.ArModuleLoadFailed)
