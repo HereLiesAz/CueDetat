@@ -1,6 +1,7 @@
 package com.hereliesaz.cuedetat
 
 import android.app.Application
+import android.content.Context
 import android.util.Log
 import com.hereliesaz.cuedetat.data.MetaWearableRepository
 import dagger.hilt.android.HiltAndroidApp
@@ -12,6 +13,27 @@ import org.opencv.android.OpenCVLoader
  */
 @HiltAndroidApp
 class MyApplication : Application() {
+
+    /**
+     * SplitCompat must be installed at application startup for Play on-demand
+     * modules. Use reflection so the FOSS flavor stays free of Play Core.
+     */
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        try {
+            val splitCompat = Class.forName("com.google.android.play.core.splitcompat.SplitCompat")
+            val installed = splitCompat
+                .getMethod("install", Context::class.java)
+                .invoke(null, this) as? Boolean
+            if (installed == false) {
+                Log.e(TAG, "SplitCompat reported startup installation failure")
+            }
+        } catch (_: ClassNotFoundException) {
+            // Expected in the FOSS flavor: there are no on-demand Play splits.
+        } catch (t: Throwable) {
+            Log.e(TAG, "SplitCompat startup installation failed", t)
+        }
+    }
 
     /**
      * Injected rather than referenced directly: the vendor SDK is play-flavour
@@ -55,6 +77,7 @@ class MyApplication : Application() {
         metaWearableRepository.initialize()
     }
 
+
     private fun clearMetaWearableStorageWorkaround() {
         // Known file names used by Meta SDK for encrypted storage.
         // Deleting these forces the SDK to recreate them with the current KeyStore.
@@ -67,5 +90,9 @@ class MyApplication : Application() {
         sdkFiles.forEach { fileName ->
             deleteSharedPreferences(fileName)
         }
+    }
+
+    companion object {
+        private const val TAG = "CueDetatApp"
     }
 }
