@@ -3,23 +3,21 @@
 package com.hereliesaz.cuedetat.di
 
 import com.hereliesaz.cuedetat.arfeature.ArController
-import com.hereliesaz.cuedetat.arfeature.ArControllerFacade
-import dagger.Binds
+import com.hereliesaz.cuedetat.arfeature.NoOpArController
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Binds the base [ArController] to the [ArControllerFacade], which loads the real
- * implementation from the on-demand `:feature_expert_ar` dynamic feature module
- * via reflection once a user requests it (see ArControllerFacade).
+ * Expert AR is intentionally disabled in the shipped app. Keep the boundary so
+ * dormant AR work can return later without exposing a half-working control.
  */
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class ArFeatureModule {
-
-    @Binds
+object ArFeatureModule {
+    @Provides
     @Singleton
-    abstract fun bindArController(impl: ArControllerFacade): ArController
+    fun provideArController(): ArController = NoOpArController
 }

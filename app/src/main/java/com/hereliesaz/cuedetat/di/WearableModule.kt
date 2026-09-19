@@ -1,21 +1,21 @@
 package com.hereliesaz.cuedetat.di
 
 import com.hereliesaz.cuedetat.data.MetaWearableRepository
-import com.hereliesaz.cuedetat.data.NoOpMetaWearableRepository
+import com.hereliesaz.cuedetat.data.MetaWearableRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-/** FOSS builds ship no Meta Wearables SDK; bind the no-op. */
+/** Binds the real Meta Wearables implementation for the single app variant. */
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class FossWearableModule {
+abstract class WearableModule {
 
     @Binds
     @Singleton
     abstract fun bindMetaWearableRepository(
-        impl: NoOpMetaWearableRepository,
+        impl: MetaWearableRepositoryImpl,
     ): MetaWearableRepository
 }

@@ -25,15 +25,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * The real Meta Wearables integration. Play flavour only.
- *
- * The `com.meta.wearable` artifacts resolve only from a credentialed GitHub
- * Packages registry, so nothing in `src/main` may reference them -- that is what
- * made `assembleFossDebug` impossible from a clean clone. The contract lives in
- * `src/main` as [MetaWearableRepository]; FOSS binds a no-op.
+ * The real Meta Wearables integration used by the single Android application.
  */
 @Singleton
-class PlayMetaWearableRepository @Inject constructor(
+class MetaWearableRepositoryImpl @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : MetaWearableRepository {
 

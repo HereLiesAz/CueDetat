@@ -22,10 +22,8 @@ dependencyResolutionManagement {
             content { includeGroupByRegex("com\\.github\\..*") }
         }
 
-        // Meta Wearables DAT. Consumed ONLY by the `play` flavor (see
-        // app/build.gradle.kts) so that a clean clone can build `foss` with no
-        // credentials — previously :app depended on these unconditionally and an
-        // outside contributor could not build the FOSS flavor at all.
+        // Meta Wearables DAT. The single Android variant includes the real
+        // integration, so builds that resolve these artifacts need package access.
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/facebook/meta-wearables-dat-android")
@@ -56,7 +54,7 @@ dependencyResolutionManagement {
                 logger.warn(
                     "GitHubPackages credentials are missing or blank. Set gh_user and " +
                         "gh_token in local.properties, or export GH_ACTOR and GH_TOKEN. " +
-                        "The foss flavor builds without them; the play flavor cannot."
+                        "Android builds that include Meta Wearables cannot resolve them without package access."
                 )
             }
 
@@ -106,12 +104,8 @@ include(":core:state")
 if (!coreOnly) {
     include(":app")
 
-    // On-demand dynamic feature carrying the 24 MB TFLite master model. Delivered
-    // via Play Feature Delivery for the `play` AAB; `foss` bundles the asset direct.
-    include(":feature_mlmodel")
-
-    // On-demand dynamic feature carrying the ARCore table-scan flow.
-    include(":feature_expert_ar")
+    // The model asset is bundled directly by :app. Expert AR remains in the
+    // repository as dormant source but is not part of the build while disabled.
 
     include(":wear")
 }

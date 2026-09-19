@@ -8,10 +8,8 @@ import com.hereliesaz.cuedetat.domain.DepthCapability
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 
 /**
- * Inert [ArController] used by [ArControllerFacade] before the Expert-AR module
- * is loaded, and on devices without ARCore. Reports no AR capability,
- * so the AR/scan UI in the base never composes and the per-frame hooks are
- * harmless no-ops.
+ * Inert [ArController] used while Expert AR is disabled. It reports no AR
+ * capability and every interaction surface is a no-op.
  */
 object NoOpArController : ArController {
 

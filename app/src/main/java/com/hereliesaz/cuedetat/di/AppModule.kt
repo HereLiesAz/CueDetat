@@ -87,6 +87,11 @@ object AppModule {
         }
     }
 
+    /** The model is bundled in the sole app variant; there is nothing to install. */
+    @Provides
+    @Singleton
+    fun provideModelDelivery(): ModelDelivery = object : ModelDelivery {}
+
     /**
      * Provides a shared Merged TFLite Detector instance.
      * This combines pocket and pool detection with shared preprocessing.

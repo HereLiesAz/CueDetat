@@ -117,12 +117,9 @@ android {
     namespace = "com.hereliesaz.cuedetat"
     compileSdk = 37
 
-    // The ~24 MB TFLite master model lives in this on-demand dynamic feature
-    // module instead of the base install. For the `play` AAB it is delivered
-    // via Play Feature Delivery; the `foss` flavor pulls the same asset directly
-    // (see the sourceSets block below) because standalone FOSS APKs cannot use
-    // split installs.
-    dynamicFeatures += setOf(":feature_mlmodel", ":feature_expert_ar")
+    // The master TFLite model is bundled into the single application variant.
+    // Expert AR is intentionally excluded from the shipped app until its native
+    // ARCore path is verified on-device.
 
     defaultConfig {
         applicationId = "com.hereliesaz.cuedetat"
@@ -151,38 +148,13 @@ android {
         }
     }
 
-    flavorDimensions += "distribution"
-    productFlavors {
-        create("play") {
-            dimension = "distribution"
-            // applicationId stays as "com.hereliesaz.cuedetat" so existing
-            // Play closed-testing installs receive an upgrade rather than a
-            // side-by-side install.
-        }
-        create("foss") {
-            dimension = "distribution"
-            applicationIdSuffix = ".foss"
-            versionNameSuffix = "-foss"
-        }
-    }
-
-    // FOSS APKs are distributed standalone (GitHub Releases) and have no Play
-    // split-install channel, so they must bundle the TFLite master model
-    // directly. Point the foss asset source set at the dynamic feature module's
-    // assets so the same physical file is reused with no duplication in git.
-    // The `play` flavor deliberately omits this srcDir — its base ships without
-    // the model and fetches it on demand from the :feature_mlmodel split.
     sourceSets {
-        getByName("foss") {
+        getByName("main") {
+            // Reuse the existing model asset directory without making it a
+            // dynamic feature or creating a second app flavor.
             assets.srcDir(rootProject.file("feature_mlmodel/src/main/assets"))
-            // FOSS APKs have no Play split channel, so the Expert-AR module's
-            // sources are compiled directly into the foss APK (ARCore is added as
-            // a fossImplementation dependency below). The play flavor omits this
-            // and fetches the :feature_expert_ar split on demand instead.
-            java.srcDir(rootProject.file("feature_expert_ar/src/main/java"))
         }
     }
-
 
     signingConfigs {
         create("release") {
@@ -258,35 +230,6 @@ android {
 }
 
 
-// Guard: FOSS is distributed as a standalone APK (assembleFossRelease) only.
-// Building a *fused* FOSS artifact (bundleFossRelease or a foss universal APK)
-// would package the :feature_expert_ar classes twice — once from the java.srcDir
-// compiled into the base (see the foss sourceSet above), once from the fused
-// on-demand split (dist:fusing include="true") — producing duplicate classes.
-// The assemble path doesn't package dynamic-feature code, so it's safe; abort the
-// bundle path with an explanation instead of emitting a broken artifact.
-//
-// Keyed on the *resolved* task name (not the requested arg) so it can't be
-// bypassed by Gradle's camelCase abbreviations (e.g. `bFR`) or by transitive
-// inclusion. configureEach stays lazy/configuration-cache friendly: the doFirst
-// is only attached if the AAB task is actually realized into the graph.
-//
-// Match ONLY the per-variant AAB lifecycle tasks (bundleFossDebug /
-// bundleFossRelease). A broad `bundleFoss.*` is wrong: it also matches internal
-// AGP tasks like `bundleFossDebugClassesToCompileJar` that run during a normal
-// assembleFoss* build, which would block the standalone-APK path we rely on.
-tasks.configureEach {
-    if (name == "bundleFossDebug" || name == "bundleFossRelease") {
-        doFirst {
-            throw GradleException(
-                "Refusing to build a FOSS App Bundle ($name). FOSS ships as a standalone APK — " +
-                    "use assembleFossRelease. A fused FOSS bundle would duplicate the " +
-                    ":feature_expert_ar classes (java.srcDir + dist:fusing). See docs/RELEASE.md §4.4."
-            )
-        }
-    }
-}
-
 // ---------------------------------------------------------------------------
 // :wear companion module wiring.
 //
@@ -333,10 +276,6 @@ dependencies {
 
     implementation(libs.androidx.datastore.preferences)
 
-    // Play Feature Delivery — drives on-demand SplitInstall of the
-    // :feature_mlmodel dynamic feature. Play-flavor only: the foss flavor
-    // bundles the model directly and never performs split installs.
-    "playImplementation"(libs.play.feature.delivery)
 
     // The metric core. Pure Kotlin Multiplatform: units, table geometry,
     // ball physics, the aim solver and the projection. No Android types cross
@@ -388,11 +327,7 @@ dependencies {
     implementation(libs.mlkit.detection)
     implementation(libs.opencv)
 
-    // ARCore now lives in the on-demand :feature_expert_ar dynamic feature, so
-    // the play base AAB ships without it. The foss flavor compiles that module's
-    // sources directly into the APK (see the foss sourceSet above), so it needs
-    // ARCore on its own classpath.
-    "fossImplementation"(libs.arcore)
+    // Expert AR/ARCore is deliberately not on the shipped classpath for now.
 
     // TFLite — pocket detection model
     implementation(libs.tensorflow.lite)
@@ -401,22 +336,10 @@ dependencies {
     implementation(libs.tensorflow.lite.gpu)
     implementation(libs.tensorflow.lite.gpu.api)
 
-    // Meta Wearables DAT. Served only from a credentialed GitHub Packages
-    // registry, so it is scoped to the play flavor: previously :app depended on
-    // these unconditionally and `./gradlew assembleFossDebug` from a clean clone
-    // failed at dependency resolution for every outside contributor -- the exact
-    // audience a FOSS flavor exists for.
-    "playImplementation"(libs.mwdat.core)
-    "playImplementation"(libs.mwdat.camera)
-    // The mock device is debug tooling and must stay off the release classpath.
-    // "R8 will strip it" is not an argument for widening the scope: shrinking runs
-    // long after resolution, so bundlePlayRelease would still have to fetch the
-    // artifact from the credentialed registry before it could throw it away --
-    // which is exactly how it broke.
-    //
-    // The flavour+buildType configuration does not exist yet while this block is
-    // evaluated (AGP creates it once the android DSL is finalised), so the
-    // narrowest correct scope has to be applied afterwards. See below.
+    // Meta Wearables is part of the single application variant.
+    implementation(libs.mwdat.core)
+    implementation(libs.mwdat.camera)
+    debugImplementation(libs.mwdat.mockdevice)
 
     // Wear OS Data Layer
     implementation(libs.play.services.wearable)
@@ -453,15 +376,3 @@ configurations.all {
     }
 }
 
-// Meta Wearables mock device: play + debug only.
-//
-// `playDebugImplementation` is created by AGP after the android DSL is
-// finalised, so it cannot be named inside the dependencies { } block above.
-// Registering it here keeps the artifact -- which resolves only from the
-// credentialed GitHub Packages registry -- off both playReleaseRuntimeClasspath
-// and every foss classpath.
-afterEvaluate {
-    dependencies {
-        add("playDebugImplementation", libs.mwdat.mockdevice)
-    }
-}
