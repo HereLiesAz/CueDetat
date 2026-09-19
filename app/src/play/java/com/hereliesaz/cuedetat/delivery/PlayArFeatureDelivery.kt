@@ -35,8 +35,7 @@ class PlayArFeatureDelivery @Inject constructor(
 
     override suspend fun ensureInstalled(): Boolean {
         if (isInstalled) {
-            runCatching { SplitCompat.install(context) }
-            return true
+            return installSplitCompat()
         }
         return suspendCancellableCoroutine { cont ->
             val request = SplitInstallRequest.newBuilder().addModule(MODULE_NAME).build()
@@ -48,8 +47,8 @@ class PlayArFeatureDelivery @Inject constructor(
                     when (state.status()) {
                         SplitInstallSessionStatus.INSTALLED -> {
                             manager.unregisterListener(this)
-                            runCatching { SplitCompat.install(context) }
-                            if (cont.isActive) cont.resume(true)
+                            val ready = installSplitCompat()
+                            if (cont.isActive) cont.resume(ready)
                         }
 
                         SplitInstallSessionStatus.FAILED,
@@ -80,6 +79,18 @@ class PlayArFeatureDelivery @Inject constructor(
             cont.invokeOnCancellation { runCatching { manager.unregisterListener(listener) } }
         }
     }
+
+    private fun installSplitCompat(): Boolean =
+        try {
+            SplitCompat.install(context).also { installed ->
+                if (!installed) {
+                    Log.e(TAG, "SplitCompat could not expose the Expert-AR split")
+                }
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "SplitCompat failed while exposing the Expert-AR split", t)
+            false
+        }
 
     companion object {
         private const val TAG = "PlayArFeatureDelivery"
