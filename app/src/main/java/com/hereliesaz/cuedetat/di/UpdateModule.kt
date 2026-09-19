@@ -1,4 +1,4 @@
-// FILE: app/src/play/java/com/hereliesaz/cuedetat/di/UpdateModule.kt
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/di/UpdateModule.kt
 
 package com.hereliesaz.cuedetat.di
 

@@ -1,4 +1,4 @@
-// FILE: app/src/play/java/com/hereliesaz/cuedetat/update/StoreManagedAppUpdater.kt
+// FILE: app/src/main/java/com/hereliesaz/cuedetat/update/StoreManagedAppUpdater.kt
 
 package com.hereliesaz.cuedetat.update
 

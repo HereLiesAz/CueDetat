@@ -97,6 +97,9 @@ jobs:
         run: ./gradlew -Pcuedetat.coreOnly=true allTests --stacktrace
 
       - name: Run Android unit tests
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
         run: ./gradlew testDebugUnitTest --stacktrace
 
       # Instrumented tests (app/src/androidTest) still need a device. Wiring an

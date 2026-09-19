@@ -79,9 +79,8 @@ class MainViewModel @Inject constructor(
 ) : ViewModel() {
 
     /**
-     * FOSS self-update. Non-null when a newer GitHub release is available; the
-     * UI shows a one-tap "download & install" popup. Always null in Play
-     * (store-managed updates).
+     * Optional updater surface retained behind [AppUpdater]. The single shipped
+     * variant uses a store-managed/no-self-install implementation, so this stays null.
      */
     private val _updateInfo = kotlinx.coroutines.flow.MutableStateFlow<com.hereliesaz.cuedetat.update.UpdateInfo?>(null)
     val updateInfo: kotlinx.coroutines.flow.StateFlow<com.hereliesaz.cuedetat.update.UpdateInfo?> =
@@ -95,7 +94,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    /** Download the available update APK and launch the system installer (FOSS only). */
+    /** Delegate installation only when the configured updater supports it. */
     fun installUpdate(activity: android.app.Activity) {
         val info = _updateInfo.value ?: return
         viewModelScope.launch {
