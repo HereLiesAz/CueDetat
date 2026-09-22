@@ -28,7 +28,7 @@ The app has two product flavors on the `distribution` dimension:
 
 | Flavor | applicationId | Channel | Notes |
 |--------|---------------|---------|-------|
-| `play` | `com.hereliesaz.cuedetat` | Google Play (AAB) | Includes Play Billing, Credential Manager, Play Feature Delivery. |
+| `play` | `com.hereliesaz.cuedetat` | Google Play (AAB) | Includes Credential Manager, Play Feature Delivery. No billing dependency — the app is free and unconditional (see `Changelog.md`). |
 | `foss` | `com.hereliesaz.cuedetat.foss` | GitHub Releases (standalone APK) | No Google Play dependencies; self-updates by sideloading. |
 
 Because the FOSS build is a **standalone APK with no Play split-install
