@@ -1,5 +1,12 @@
 # 4.7. Feature Specification: Camera Calibration
 
+> **STATUS: SPECIFIED BUT NOT IMPLEMENTED.** This document describes a planned feature.
+> None of `CalibrationScreen`, `CalibrationRepository`, `CalibrationViewModel`, or
+> `CalibrationSubmissionDialog` exist anywhere in the codebase as of this writing — there is
+> no `ui/composables/calibration/` directory. The only trace of this feature in the shipped
+> app is the dead `showCalibrationScreen` boolean in `domain/UiModel.kt` and its togglers,
+> which are unwired to anything. Nothing below describes current app behavior.
+
 This document specifies the behavior of the Camera Calibration feature. This is considered an
 internal developer and power-user tool, not a primary feature for the average user.
 

@@ -15,6 +15,15 @@ data class Table(
     val logicalHeight: Float
     val corners: List<PointF>
     val pockets: List<PointF>
+
+    /**
+     * Per-rail unit normals, one per edge of [corners] (index i = edge from corner i to
+     * corner i+1). These point INWARD, toward the table center — not outward, as the
+     * conventional "wall normal" would suggest. [reflect] is sign-invariant, so this does
+     * not affect reflection math, but any other caller must not assume outward-normal
+     * semantics. [RailRenderer] independently recomputes true outward normals from the
+     * warped corners rather than reusing this field, for exactly this reason.
+     */
     val normals: List<PointF>
 
     init {

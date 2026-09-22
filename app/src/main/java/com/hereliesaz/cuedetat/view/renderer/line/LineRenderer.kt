@@ -365,7 +365,6 @@ class LineRenderer {
         val spinPathPaint = spinPathPaintField.apply { set(paints.shotLinePaint); strokeWidth = 4f }
         val spinGlowPaint = spinGlowPaintField.apply { reset(); style = Paint.Style.STROKE; strokeWidth = 8f }
 
-        val pathColor = paths.keys.firstOrNull() ?: Color.White
         val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
 
         paths.forEach { (color, points) ->
@@ -384,9 +383,9 @@ class LineRenderer {
                 // transparent at the tail. Far fewer draw calls than per-segment.
                 val start = screenPoints.first()
                 val end = screenPoints.last()
-                val pr = (pathColor.red * 255).toInt()
-                val pg = (pathColor.green * 255).toInt()
-                val pb = (pathColor.blue * 255).toInt()
+                val pr = (color.red * 255).toInt()
+                val pg = (color.green * 255).toInt()
+                val pb = (color.blue * 255).toInt()
                 val fadeShader = LinearGradient(
                     start.x, start.y, end.x, end.y,
                     intArrayOf(
@@ -771,6 +770,18 @@ class LineRenderer {
         }
 
         if (w1 > epsilon && w2 <= epsilon) {
+            val t = (epsilon - w1) / (w2 - w1)
+
+            return PointF(
+                start.x + t * (end.x - start.x),
+                start.y + t * (end.y - start.y)
+            )
+        }
+
+        // Symmetric case: start is behind the near plane, end is in front. The near-plane
+        // crossing is the same affine interpolation as above (w is linear along the
+        // segment), just evaluated with the roles of start/end swapped.
+        if (w1 <= epsilon && w2 > epsilon) {
             val t = (epsilon - w1) / (w2 - w1)
 
             return PointF(
