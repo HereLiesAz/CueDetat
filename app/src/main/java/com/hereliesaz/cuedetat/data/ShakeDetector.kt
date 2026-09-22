@@ -25,6 +25,7 @@ class ShakeDetector @Inject constructor(
     private var last_z: Float = 0.0f
 
     companion object {
+        // Empirically tuned threshold; no formal derivation on record.
         private const val SHAKE_THRESHOLD = 2200
     }
 

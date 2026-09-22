@@ -20,8 +20,13 @@ object EdgeGeometryFitter {
 
     /**
      * Estimates the correction needed to align the virtual table with detected edges.
-     * @param detectedLogicalPoints 4 corners of the felt quadrilateral in logical space.
-     * @param table The current logical table model.
+     * @param detectedLogicalPoints the endpoints of the detected rail edge segments, in logical
+     *   space — two points per detected edge (see the sole caller,
+     *   `TableScanViewModel.updateStateSnapshot`, which flatMaps `edges` this way), so the list is
+     *   variable-length and at least 4 points long, not exactly the felt's 4 corners.
+     *   [orderPoints] picks the four extreme points from this set to stand in for the corners.
+     * @param tableLogicalWidth the modeled table's logical width (short rail to short rail).
+     * @param tableLogicalHeight the modeled table's logical height (long rail to long rail).
      * @return A Refinement delta to be applied to the current pose.
      */
     fun fitEdges(

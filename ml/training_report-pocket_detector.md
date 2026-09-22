@@ -33,5 +33,10 @@ Generated: 2026-05-13 08:05:34.507584
 - /kaggle/working/exports/pocket_detector_final.onnx
 
 ## Deploy locations (in CueDetat repo)
-- app/src/main/assets/ml/merged_pocket_detector_final_float16.tflite
-- app/src/main/assets/ml/merged_pocket_detector_final.onnx
+- feature_mlmodel/src/main/assets/ml/MASTER_POOL_MODEL.tflite
+
+`app/src/main/assets/ml` does not exist. The deployed model is a single merged
+TFLite binary (YOLOv8n heads for table/pocket/side detection, FP16 weights,
+in-graph NMS) delivered via the on-demand `:feature_mlmodel` module and loaded
+by `MergedTFLiteDetector` (see `README.md`'s "Ball, Table and Pocket Detection"
+section). No `.onnx` file is deployed in the repo.

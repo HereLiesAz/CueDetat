@@ -27,6 +27,13 @@ data class RecommendedShot(
     val confidence: Float,         // 0..1, gates whether we surface anything
     val shotPath: List<PointF>,    // polyline for rendering: cue → ghost → target → pocket (+ banks)
     val cueLeavePath: List<PointF> = emptyList(), // predicted cue path after contact (Phase 2)
+    /**
+     * For KICK shots only: the rail bank point the cue caroms off immediately before reaching
+     * [ghostCuePos]. The final approach into contact runs `approachOrigin → ghostCuePos`, not
+     * `cue → ghostCuePos` (which is blocked — that's why a kick was needed at all). Null for every
+     * other shot type, where the cue's approach is the straight line from the cue ball itself.
+     */
+    val approachOrigin: PointF? = null,
 )
 
 /**

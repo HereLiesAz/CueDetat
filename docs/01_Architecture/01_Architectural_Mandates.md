@@ -33,14 +33,30 @@ will compromise the stability and maintainability of the codebase.
   gestures; it must also be re-verified after events like screen resizing or table visibility
   changes.
 
-* **Mandate 7: ONE SINGLE USER INTERACTION for AR Setup**
-  The AR setup flow must strictly adhere to a single interaction paradigm. There is NO multi-step
-  wizard. The app must NEVER attempt to see the whole table at once, identify pockets
-  automatically, or balls automatically during AR setup. The sole interaction required from the
-  user is capturing the felt color using a magnifying circle and a capture button (styled like a
-  camera app). This action must immediately drop the user into an active AR Tracking state. Any
-  fine-tuning of pocket alignment relies entirely on the user rotating/zooming via UI controls.
-  Felt color samples must be persisted and saved for as long as the app is installed.
+* **Mandate 7: Guided Four-Step AR Setup Wizard**
+  *Note: this mandate previously described a single-interaction flow ("capture felt color, then
+  drop straight into AR tracking, no wizard"). That flow has since been superseded by the
+  four-step wizard described below, and this document was not updated at the time. What follows
+  is a rewrite to match what actually ships — see `docs/CODE_MAP.md` ("Table Scan" section) and
+  `README.md`'s "Guided AR Table Setup Wizard" bullet for the same description in context.*
+
+  AR setup is a four-step wizard, driven by the `ScanStep` enum
+  (`app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/ScanStep.kt`):
+  `FELT_CAPTURE -> CORNER_QUAD -> POCKET_GUIDE -> AUTO_READY`.
+  1. **`FELT_CAPTURE`** — the user locks the felt color using a magnifying circle and a
+     capture button (styled like a camera app).
+  2. **`CORNER_QUAD`** — the user manually taps the four corner pockets; each tap drops a
+     world-anchored ARCore anchor (see `ArTableSession.kt`) that the app tracks in full 6DoF.
+  3. **`POCKET_GUIDE`** — an optional manual per-pocket guide, backed by a TFLite pocket
+     detector (`MergedTFLiteDetector.kt`, on-demand `:feature_mlmodel`), with a Hough-circle
+     fallback (`TableScanAnalyzer.kt`).
+  4. **`AUTO_READY`** — a legacy/safety-fallback step superseded by the wizard's own geometry
+     validation.
+
+  The system auto-confirms once `tableOverlayConfidence >= 0.8` (see `CvReducer.kt`). If ARCore's
+  tracking blips momentarily, the app floats on the last known table pose instead of forcing a
+  full rescan; a rescan is only required if the user backs all the way out of AR setup. Felt color
+  samples must be persisted and saved for as long as the app is installed.
 
 * **Mandate 8: Logical Space Rendering for Massé**
   All Massé shot components, including kicks and paths, must be calculated and drawn in logical

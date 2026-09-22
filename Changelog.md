@@ -25,14 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CONTINUATION-flood / MadeYouReset DoS, SNI 16 MiB allocation, decompression bombs, request
   smuggling, IPv6 subnet-filter bypass, TLS hostname-verification bypass, and more).
 
-### Changed — Billing
+### Removed — Billing
 
-- **Expert Mode is now a one-time purchase instead of a subscription.** New non-consumable
-  in-app product `expert_mode_unlock` (INAPP), no base plans, no free trial, no auto-renew.
-  Once purchased it is owned permanently and never re-verified away offline (the 14-day
-  offline cap was removed). The paywall shows a single price with an "Unlock Expert Mode"
-  button. Price remains configured in Play Console only. No data migration — the prior
-  subscription had no purchasers.
+- **The entire billing/entitlement/paywall stack has been deleted (~30 files).** Expert Mode
+  is free for everyone, unconditionally — no `expert_mode_unlock` product, no paywall, no
+  entitlement check, no trial, and nothing to restore. `billing-ktx` and `play-integrity`
+  dependencies were dropped, entitlement fields were removed from state and reducers, and a
+  `SupportRepository` + donation sheet (external links only, no billing dependency) replaced
+  the paid gateway. See `README.md` ("Free, and how it stays that way") and `REBUILD_PLAN.md`
+  (Phase C) for the reasoning: entitlement was read from an unsigned, client-persisted
+  DataStore blob with no server ever contradicting it, and a debug billing/tester-license
+  console shipped to every user in every build with no `BuildConfig.DEBUG` gate.
 
 ### Changed — Battery & processing efficiency
 

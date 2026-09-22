@@ -38,11 +38,15 @@ fun CameraBackground(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember { PreviewView(context) }
-    // Executor only needed when an analyzer is attached.
-    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
 
     // Re-runs when lifecycleOwner or analyzer changes (null ↔ non-null causes rebind).
+    // The executor is created fresh on every rerun (and shut down in this same
+    // effect's onDispose) so a stale, already-shutdown executor from a prior
+    // analyzer swap is never reused — reusing one made setAnalyzer() throw
+    // RejectedExecutionException on the next rebind.
     DisposableEffect(lifecycleOwner, analyzer) {
+        // Executor only needed when an analyzer is attached.
+        val cameraExecutor = Executors.newSingleThreadExecutor()
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         val mainExecutor = ContextCompat.getMainExecutor(context)
 

@@ -37,6 +37,16 @@ private data class DrawSignature(
     val onPlaneBall: Any?,
     val topDownProgress: Float,
     val recommendedShot: Any?,
+    val protractorUnit: Any?,
+    val obstacleBalls: Any?,
+    val tangentDirection: Float,
+    val isMasseModeActive: Boolean,
+    val spinPaths: Any?,
+    val currentOrientation: Any?,
+    val visionData: Any?,
+    val cameraMode: Any?,
+    val experienceMode: Any?,
+    val isBeginnerViewLocked: Boolean,
 )
 
 @Composable
@@ -81,6 +91,16 @@ fun ProtractorOverlay(
                 onPlaneBall = uiState.onPlaneBall,
                 topDownProgress = topDownProgress,
                 recommendedShot = uiState.recommendedShot,
+                protractorUnit = uiState.protractorUnit,
+                obstacleBalls = uiState.obstacleBalls,
+                tangentDirection = uiState.tangentDirection,
+                isMasseModeActive = uiState.isMasseModeActive,
+                spinPaths = uiState.spinPaths,
+                currentOrientation = uiState.currentOrientation,
+                visionData = uiState.visionData,
+                cameraMode = uiState.cameraMode,
+                experienceMode = uiState.experienceMode,
+                isBeginnerViewLocked = uiState.isBeginnerViewLocked,
             )
         }
     }

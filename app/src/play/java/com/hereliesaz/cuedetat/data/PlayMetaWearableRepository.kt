@@ -39,12 +39,60 @@ class PlayMetaWearableRepository @Inject constructor(
 
     override val isSupported: Boolean = true
 
+    /**
+     * Initialises the Meta SDK. Guards against `AEADBadTagException` from the
+     * SDK's `EncryptedSharedPreferences`: if the KeyStore falls out of sync
+     * with the encrypted storage files (e.g. after a device restore), init
+     * fails on that specific exception. Only then do we clear the potentially
+     * corrupted files and retry once, rather than clearing them unconditionally
+     * on every launch (which would wipe valid pairing state every cold start).
+     */
     override fun initialize() {
         try {
             Wearables.initialize(context)
             Log.d(tag, "Meta Wearables initialized")
         } catch (e: Exception) {
-            Log.e(tag, "Failed to initialize Meta Wearables", e)
+            if (isStorageCorruption(e)) {
+                Log.w(tag, "Meta Wearables storage appears corrupted; clearing and retrying", e)
+                clearMetaWearableStorageWorkaround()
+                try {
+                    Wearables.initialize(context)
+                    Log.d(tag, "Meta Wearables initialized after storage reset")
+                } catch (retryException: Exception) {
+                    Log.e(tag, "Failed to initialize Meta Wearables after storage reset", retryException)
+                }
+            } else {
+                Log.e(tag, "Failed to initialize Meta Wearables", e)
+            }
+        }
+    }
+
+    /** Walks the cause chain looking for the KeyStore/EncryptedSharedPreferences mismatch. */
+    private fun isStorageCorruption(e: Throwable?): Boolean {
+        var cause: Throwable? = e
+        var depth = 0
+        while (cause != null && depth < 5) {
+            if (cause is javax.crypto.AEADBadTagException) return true
+            cause = cause.cause
+            depth++
+        }
+        return false
+    }
+
+    /**
+     * Known file names used by the Meta SDK for encrypted storage. Deleting
+     * these forces the SDK to recreate them with the current KeyStore. Called
+     * only from [initialize]'s corruption-recovery path, never unconditionally.
+     */
+    private fun clearMetaWearableStorageWorkaround() {
+        val sdkFiles = listOf(
+            "ManifestRecordStore",
+            "DeviceRecordStore",
+            "acdc_manifest_store",
+            "acdc_device_store"
+        )
+        sdkFiles.forEach { fileName ->
+            context.deleteSharedPreferences(fileName)
         }
     }
 

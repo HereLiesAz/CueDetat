@@ -28,8 +28,10 @@ class SnapReducer @Inject constructor() {
     // The time in milliseconds a ball must be tracked before becoming a confirmed snap target.
     private val SNAP_THRESHOLD_MS = 1500L
 
-    // The maximum distance in pixels a detection can move and still be considered the "same" candidate.
-    private val SNAP_PROXIMITY_THRESHOLD_PX = 30f
+    // The maximum distance a detection can move and still be considered the "same" candidate.
+    // Unit is NOT consistently pixels: per VisionRepository's genericBalls/balls construction,
+    // these are logical-plane units when a homography pose exists, and screen pixels otherwise.
+    private val SNAP_PROXIMITY_THRESHOLD = 30f
 
     /**
      * Updates the list of snap candidates based on new vision data.
@@ -80,7 +82,7 @@ class SnapReducer @Inject constructor() {
             if (closestExisting != null && hypot(
                     (closestExisting.detectedPoint.x - point.x).toDouble(),
                     (closestExisting.detectedPoint.y - point.y).toDouble()
-                ) < SNAP_PROXIMITY_THRESHOLD_PX
+                ) < SNAP_PROXIMITY_THRESHOLD
             ) {
                 // MATCH FOUND: This detection corresponds to an existing candidate.
 
@@ -117,7 +119,7 @@ class SnapReducer @Inject constructor() {
 
         // Re-anchor virtual balls to their nearest CV candidate, if anchored.
         // Uses a generous threshold (3× snap proximity) to hold through brief occlusions.
-        val anchorFollowThreshold = SNAP_PROXIMITY_THRESHOLD_PX * 3
+        val anchorFollowThreshold = SNAP_PROXIMITY_THRESHOLD * 3
 
         var newOnPlaneBall = currentState.onPlaneBall
         var newProtractorUnit = currentState.protractorUnit

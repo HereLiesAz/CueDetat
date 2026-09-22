@@ -58,14 +58,6 @@ val finalVersionName = versionNameOverride ?: "$finalMajor.$finalMinor.$finalPat
 // commit). The override is ephemeral and lives only for that build.
 val finalIsBuilding = isBuildingTask && versionBuildOverride == null
 
-val localProps = Properties().apply {
-    val file = rootProject.file("local.properties")
-    if (file.exists()) {
-        file.inputStream().use { load(it) }
-    }
-}
-val githubAccessToken = localProps.getProperty("GH_TOKEN") ?: ""
-
 // Task to write back the updated properties
 tasks.register("updateVersionProperties") {
     val path = versionPropsPath
@@ -131,8 +123,6 @@ android {
         
         versionCode = finalBuild
         versionName = finalVersionName
-        
-        buildConfigField("String", "GH_TOKEN", "\"$githubAccessToken\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

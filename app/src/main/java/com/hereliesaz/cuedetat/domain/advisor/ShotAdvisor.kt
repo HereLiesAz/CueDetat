@@ -129,7 +129,12 @@ class ShotAdvisor @Inject constructor() {
         if (shot.type == ShotType.COMBO) return shot
         val cueV = Vector2(input.cue.x, input.cue.y)
         val targetV = Vector2(shot.targetPos.x, shot.targetPos.y)
-        val shotAngle = atan2(shot.ghostCuePos.y - input.cue.y, shot.ghostCuePos.x - input.cue.x)
+        // For a KICK, the cue's final approach into the ghost-ball contact runs from the rail
+        // bank point (approachOrigin), not straight from the cue ball — that direct line is what
+        // was blocked, forcing the kick in the first place. Every other type approaches straight
+        // from the cue.
+        val approachFrom = shot.approachOrigin ?: input.cue
+        val shotAngle = atan2(shot.ghostCuePos.y - approachFrom.y, shot.ghostCuePos.x - approachFrom.x)
         val scratchRadius = r * 1.8f
 
         var bestSpin = PointF(0f, 0f)
@@ -345,6 +350,7 @@ class ShotAdvisor @Inject constructor() {
                         hardnessFor(dist, input.tableDiagonal), PointF(0f, 0f),
                         cutFactor * distFactor * KICK_CONF, confidence = cutFactor * distFactor * KICK_CONF,
                         shotPath = listOf(cue, railPt, ghost, target, pocket),
+                        approachOrigin = railPt,
                     )
                 )
             }

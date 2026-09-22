@@ -12,7 +12,6 @@ import com.google.gson.stream.JsonWriter
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
-import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.data.MergedTFLiteDetector
 import com.hereliesaz.cuedetat.delivery.ModelDelivery
 import com.hereliesaz.cuedetat.domain.CueDetatState
@@ -43,26 +42,19 @@ object AppModule {
     /**
      * Provides the Retrofit interface for GitHub API interactions.
      * Used for checking updates and submitting automated issue reports.
+     *
+     * The only endpoint this client ever calls is the public, unauthenticated
+     * `GET /repos/hereliesaz/CueDetat/releases/latest` (see [GithubApi] and
+     * [com.hereliesaz.cuedetat.data.GithubRepository]). It therefore carries no
+     * `Authorization` header — a bearer token has no functional benefit here and
+     * must never be embedded in a shipped APK/AAB for zero gain.
      */
     @Provides
     @Singleton
     fun provideGithubApi(): GithubApi {
-        val client = if (BuildConfig.GH_TOKEN.isNotBlank()) {
-            OkHttpClient.Builder()
-                .addInterceptor { chain ->
-                    val request = chain.request().newBuilder()
-                        .addHeader("Authorization", "token ${BuildConfig.GH_TOKEN}")
-                        .build()
-                    chain.proceed(request)
-                }
-                .build()
-        } else {
-            OkHttpClient.Builder().build()
-        }
-
         return Retrofit.Builder()
             .baseUrl("https://api.github.com/")
-            .client(client)
+            .client(OkHttpClient.Builder().build())
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(GithubApi::class.java)

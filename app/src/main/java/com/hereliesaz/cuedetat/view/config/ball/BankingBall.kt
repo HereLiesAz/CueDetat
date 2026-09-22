@@ -33,6 +33,4 @@ data class BankingBall(
     override val centerColor: Color = Color.White,
     /** No fill color. */
     override val fillColor: Color = Color.Transparent,
-    /** No 3D lift. */
-    override val additionalOffset3d: Float = 0f,
 ) : BallsConfig

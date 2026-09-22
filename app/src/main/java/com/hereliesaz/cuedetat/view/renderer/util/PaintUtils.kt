@@ -106,7 +106,7 @@ fun createGlowPaint(
     // If inactive, key depends on the base color and width.
     val glowValue = state.glowStickValue
     val key = if (abs(glowValue) > 0.05f) {
-        "glow_${glowValue}_${blurType.name}"
+        "glow_${glowValue}_${blurType.name}_${baseGlowWidth}_${baseGlowColor}"
     } else {
         "glow_${baseGlowColor}_${baseGlowWidth}_${blurType.name}"
     }
