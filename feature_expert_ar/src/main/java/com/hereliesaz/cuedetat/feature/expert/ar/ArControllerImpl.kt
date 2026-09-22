@@ -51,9 +51,13 @@ class ArControllerImpl(context: Context) : ArController {
     override fun probeCapability(): DepthCapability =
         if (arTableSession.isArCoreAvailable()) {
             val testSession = arTableSession.createSession()
-            val cap = arTableSession.capability
-            if (testSession != null) arTableSession.close()
-            cap
+            if (testSession != null) {
+                val cap = arTableSession.capability
+                arTableSession.close()
+                cap
+            } else {
+                DepthCapability.NONE
+            }
         } else {
             DepthCapability.NONE
         }

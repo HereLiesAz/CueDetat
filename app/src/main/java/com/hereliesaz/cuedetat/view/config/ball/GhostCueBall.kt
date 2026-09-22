@@ -33,6 +33,4 @@ data class GhostCueBall(
     override val centerColor: Color = Color.White,
     /** No fill color. */
     override val fillColor: Color = Color.Transparent,
-    /** Lifted 4 inches (simulated units) above the table to avoid visual z-fighting and indicate it's a projection. */
-    override val additionalOffset3d: Float = 4f,
 ) : BallsConfig

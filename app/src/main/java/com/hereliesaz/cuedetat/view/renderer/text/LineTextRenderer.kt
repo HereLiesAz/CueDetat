@@ -243,13 +243,4 @@ class LineTextRenderer {
 
         return String.format("%.1f", diamondValue)
     }
-
-    fun drawBankingLabels(
-        canvas: Canvas,
-        state: CueDetatState,
-        paints: PaintCache,
-        typeface: Typeface?
-    ) {
-        // This function is deprecated as its logic has been moved to LineRenderer, which has access to the necessary helper functions.
-    }
 }

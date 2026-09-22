@@ -54,8 +54,6 @@ interface BallsConfig : VisualProperties {
     val centerColor: Color
     /** The fill color of the ball. Use Transparent for wireframe style. */
     val fillColor: Color
-    /** An additional 3D offset (Z-axis) to "lift" the ghost representation above the table. */
-    val additionalOffset3d: Float
 }
 
 /**

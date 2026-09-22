@@ -32,6 +32,4 @@ data class ObstacleBall(
     override val centerColor: Color = Color.Transparent,
     /** Filled with semi-transparent black to dim the area behind them. */
     override val fillColor: Color = Color.Black.copy(alpha = 0.5f),
-    /** No 3D lift. */
-    override val additionalOffset3d: Float = 0f,
 ) : BallsConfig

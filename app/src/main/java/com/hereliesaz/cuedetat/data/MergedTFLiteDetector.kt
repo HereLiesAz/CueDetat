@@ -22,7 +22,9 @@ import kotlin.math.min
 
 private const val MASTER_MODEL_FILE = "ml/MASTER_POOL_MODEL.tflite"
 private const val INPUT_SIZE = 640
+// Empirically tuned threshold; no formal derivation on record.
 private const val CONFIDENCE_THRESHOLD = 0.30f
+// Empirically tuned threshold; no formal derivation on record.
 private const val POOL_CONFIDENCE_THRESHOLD = 0.25f
 private const val MAX_DETECTIONS = 300
 

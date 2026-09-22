@@ -17,7 +17,10 @@ class RelocaliserUseCase @Inject constructor() {
             val currentHist = current[id] ?: continue
             if (bhattacharyyaSimilarity(savedHist, currentHist) > MATCH_THRESHOLD) matches++
         }
-        return matches >= REQUIRED_MATCHES
+        // Require REQUIRED_MATCHES, but never more matches than there are saved histograms to
+        // match against — a model scanned with fewer than REQUIRED_MATCHES pockets would
+        // otherwise never validate.
+        return matches >= minOf(REQUIRED_MATCHES, saved.size)
     }
 
     fun bhattacharyyaSimilarity(a: List<Float>, b: List<Float>): Float {

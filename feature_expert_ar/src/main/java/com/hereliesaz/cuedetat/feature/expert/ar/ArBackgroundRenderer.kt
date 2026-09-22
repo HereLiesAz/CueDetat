@@ -2,11 +2,14 @@ package com.hereliesaz.cuedetat.feature.expert.ar
 
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
+import android.util.Log
 import com.google.ar.core.Coordinates2d
 import com.google.ar.core.Frame
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+
+private const val TAG = "ArBackgroundRenderer"
 
 /**
  * Minimal OpenGL ES 2.0 renderer that draws the ARCore camera feed as a fullscreen background.
@@ -79,6 +82,12 @@ class ArBackgroundRenderer {
             GLES20.glAttachShader(it, vert)
             GLES20.glAttachShader(it, frag)
             GLES20.glLinkProgram(it)
+
+            val linkStatus = IntArray(1)
+            GLES20.glGetProgramiv(it, GLES20.GL_LINK_STATUS, linkStatus, 0)
+            if (linkStatus[0] != GLES20.GL_TRUE) {
+                Log.e(TAG, "Program link failed: ${GLES20.glGetProgramInfoLog(it)}")
+            }
         }
 
         positionHandle = GLES20.glGetAttribLocation(program, "a_Position")
@@ -131,5 +140,11 @@ class ArBackgroundRenderer {
         GLES20.glCreateShader(type).also {
             GLES20.glShaderSource(it, src)
             GLES20.glCompileShader(it)
+
+            val compileStatus = IntArray(1)
+            GLES20.glGetShaderiv(it, GLES20.GL_COMPILE_STATUS, compileStatus, 0)
+            if (compileStatus[0] != GLES20.GL_TRUE) {
+                Log.e(TAG, "Shader compile failed: ${GLES20.glGetShaderInfoLog(it)}")
+            }
         }
 }

@@ -44,6 +44,7 @@ import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
 import com.hereliesaz.cuedetat.ui.composables.SpinControl
 import com.hereliesaz.cuedetat.ui.composables.TopControls
 import com.hereliesaz.cuedetat.ui.composables.ZoomControls
+import com.hereliesaz.cuedetat.ui.composables.AdvancedOptionsDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.GlowStickDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.LuminanceAdjustmentDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.TableSizeSelectionDialog
@@ -325,6 +326,16 @@ fun ProtractorScreen(
                 onEvent = mainViewModel::onEvent,
                 onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleTableSizeDialog) }
             )
+        }
+
+        onscreen(alignment = Alignment.Center) {
+            if (uiState.showAdvancedOptionsDialog) {
+                AdvancedOptionsDialog(
+                    state = uiState,
+                    onEvent = mainViewModel::onEvent,
+                    onDismiss = { mainViewModel.onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) }
+                )
+            }
         }
 
     }

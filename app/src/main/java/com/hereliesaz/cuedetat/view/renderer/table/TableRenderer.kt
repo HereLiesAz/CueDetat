@@ -25,10 +25,21 @@ import com.hereliesaz.cuedetat.view.renderer.warpedBy
  */
 class TableRenderer {
 
+    // Hoisted Paints — previously allocated inside drawPockets() on every redraw (every
+    // frame the table is visible). Each is fully reconfigured on every use, so behavior
+    // is identical to the old per-call `Paint(...).apply { }` allocation.
+    private val pocketedPaintWhite = Paint()
+    private val pocketedPaintRed = Paint()
+    private val pocketOutlinePaint = Paint()
+    private val pocketFillPaint = Paint()
+
     companion object {
         /**
          * Returns the logical coordinates of the 6 pockets.
-         * Used by hit-testing logic in [UpdateStateUseCase] as well as rendering.
+         *
+         * Used only for rendering (by [drawPockets]). Hit-testing logic (e.g. in
+         * `UpdateStateUseCase`) reads `state.table.pockets` directly instead of going
+         * through this function.
          */
         fun getLogicalPockets(state: CueDetatState): List<PointF> {
             return state.table.pockets
@@ -116,17 +127,16 @@ class TableRenderer {
         val pockets = getLogicalPockets(state).map { it.warpedBy(tps) }
         val pocketRadius = referenceRadius * 1.8f
 
-        // Pre-allocate paints for different states (Normal, Aimed, Banked).
-        val pocketedPaintWhite =
-            Paint(paints.pocketFillPaint).apply { color = android.graphics.Color.WHITE }
-        val pocketedPaintRed = Paint(paints.pocketFillPaint).apply { color = WarningRed.toArgb() }
-        val pocketOutlinePaint = Paint(paints.tableOutlinePaint).apply {
-            color = holesConfig.strokeColor.toArgb()
-            strokeWidth = holesConfig.strokeWidth
-        }
-        val pocketFillPaint = Paint(paints.pocketFillPaint).apply {
-            color = holesConfig.fillColor.toArgb()
-        }
+        // Configure the hoisted paints for different states (Normal, Aimed, Banked).
+        pocketedPaintWhite.set(paints.pocketFillPaint)
+        pocketedPaintWhite.color = android.graphics.Color.WHITE
+        pocketedPaintRed.set(paints.pocketFillPaint)
+        pocketedPaintRed.color = WarningRed.toArgb()
+        pocketOutlinePaint.set(paints.tableOutlinePaint)
+        pocketOutlinePaint.color = holesConfig.strokeColor.toArgb()
+        pocketOutlinePaint.strokeWidth = holesConfig.strokeWidth
+        pocketFillPaint.set(paints.pocketFillPaint)
+        pocketFillPaint.color = holesConfig.fillColor.toArgb()
 
         // Draw each pocket.
         pockets.forEachIndexed { index, pos ->

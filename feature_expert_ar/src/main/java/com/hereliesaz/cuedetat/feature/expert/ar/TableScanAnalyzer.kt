@@ -22,6 +22,8 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.hypot
 import androidx.core.graphics.createBitmap
 
+private const val TAG = "TableScanAnalyzer"
+
 /**
  * CameraX ImageAnalysis.Analyzer.
  * Strategy 1: TFLite/ONNX Object Detection.
@@ -194,9 +196,21 @@ class TableScanAnalyzer(
                     if (h - hRange < 0 || h + hRange > 180) {
                         val mask1 = Mat()
                         val mask2 = Mat()
+                        val wrappedUpper = h + hRange
+                        val wrappedLower = h - hRange
                         val lower1 = Scalar(0.0, sMin, vMin)
-                        val upper1 = Scalar(minOf(180.0, h + hRange).let { if (it > 180) it - 180 else it }, 255.0, 255.0)
-                        val lower2 = Scalar(maxOf(0.0, h - hRange).let { if (it < 0) it + 180 else it }, sMin, vMin)
+                        // If the upper end wraps past 180, mask1 covers the wrapped sliver near 0;
+                        // otherwise mask1 just covers up to h+hRange (clamped to 180 for safety).
+                        val upper1 = Scalar(
+                            if (wrappedUpper > 180) wrappedUpper - 180 else minOf(180.0, wrappedUpper),
+                            255.0, 255.0
+                        )
+                        // If the lower end wraps below 0, mask2 covers the wrapped sliver near 180;
+                        // otherwise mask2 starts at h-hRange (clamped to 0 for safety) up to 180.
+                        val lower2 = Scalar(
+                            if (wrappedLower < 0) wrappedLower + 180 else maxOf(0.0, wrappedLower),
+                            sMin, vMin
+                        )
                         val upper2 = Scalar(180.0, 255.0, 255.0)
 
                         Core.inRange(hsvMat, lower1, upper1, mask1)
@@ -268,7 +282,9 @@ class TableScanAnalyzer(
                         contours.forEach { it.release() }
                     }
 
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    Log.w(TAG, "Strategy 2 fallback failed", e)
+                }
             }
         } finally {
             image.close()

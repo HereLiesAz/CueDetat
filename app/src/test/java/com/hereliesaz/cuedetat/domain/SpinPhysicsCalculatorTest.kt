@@ -60,8 +60,15 @@ class SpinPhysicsCalculatorTest {
         )
         assertTrue("Right and left spin must produce different paths",
             right.size >= 2 && left.size >= 2)
-        // Both paths hit the same first rail at the same x; their y on that rail must differ (squirt deflects up vs down)
-        assertNotEquals("Right and left spin first-bounce y must differ",
+        // With cueBallPos=(0,50) and this near-horizontal tangent, the ball is still
+        // roughly 489 logical units from the nearest rail (table half-width) but the
+        // path sampler records a point every PATH_SAMPLING_RATE(4) * STEP_SIZE(4) = 16
+        // logical units, so points[1] is an ordinary periodic sample far short of any
+        // rail, not a rail-intersection point. This assertion verifies that right vs.
+        // left sideSpin already diverges in y by that first sample, i.e. the
+        // sideSpin/swerve term (K_SWERVE) is bending the two paths apart — it says
+        // nothing about rail-throw (K_THROW), which only applies at a bounce.
+        assertNotEquals("Right and left spin first-sample y must differ",
             right[1].y, left[1].y, 0.5f)
     }
 

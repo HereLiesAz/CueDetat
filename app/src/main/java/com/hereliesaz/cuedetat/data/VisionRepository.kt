@@ -176,7 +176,7 @@ class VisionRepository @Inject constructor(
     @SuppressLint("UnsafeOptInUsageError")
     fun processImage(imageProxy: ImageProxy?, bitmap: android.graphics.Bitmap, state: CueDetatState) {
         ensureModelOnce()
-        if (isProcessing.get()) {
+        if (!isProcessing.compareAndSet(false, true)) {
             imageProxy?.close()
             return
         }
@@ -185,9 +185,9 @@ class VisionRepository @Inject constructor(
         // Battery: drop frames that arrive faster than the adaptive interval allows.
         if (!shouldAcceptFrame(currentTime)) {
             imageProxy?.close()
+            isProcessing.set(false)
             return
         }
-        isProcessing.set(true)
         lastFrameAcceptedTime = currentTime
 
         var scaledBitmap: android.graphics.Bitmap? = null
@@ -236,7 +236,12 @@ class VisionRepository @Inject constructor(
                 90 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_CLOCKWISE); matToUse = reusableRotatedMat }
                 180 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_180); matToUse = reusableRotatedMat }
                 270 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_COUNTERCLOCKWISE); matToUse = reusableRotatedMat }
-                else -> { matToUse = originalMat }
+                // rotationDegrees == 0: no rotation needed, but captureRectifiedSnapshot()
+                // unconditionally reads reusableRotatedMat and bails if it's still empty
+                // from a prior frame. Keep it populated regardless of this frame's
+                // rotation so the top-down snapshot feature works on devices that never
+                // hit the 90/180/270 branches above.
+                else -> { originalMat.copyTo(reusableRotatedMat); matToUse = originalMat }
             }
 
             Imgproc.cvtColor(matToUse, reusableHsvMat, Imgproc.COLOR_BGR2HSV)
@@ -592,10 +597,9 @@ class VisionRepository @Inject constructor(
     @SuppressLint("UnsafeOptInUsageError")
     fun processArCpuImage(image: MediaImage, rotationDegrees: Int, state: CueDetatState) {
         ensureModelOnce()
-        if (isProcessing.get()) {
+        if (!isProcessing.compareAndSet(false, true)) {
             return
         }
-        isProcessing.set(true)
 
         var scaledBitmap: android.graphics.Bitmap? = null
         var fullBitmap: android.graphics.Bitmap? = null

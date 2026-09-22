@@ -22,12 +22,12 @@ class MyApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        
-        // Workaround for AEADBadTagException in Meta SDK's EncryptedSharedPreferences.
-        // If the KeyStore becomes out of sync with the files (e.g. after a restore),
-        // the SDK fails to initialize its storage. We clear the potentially 
-        // corrupted files to allow a fresh start.
-        clearMetaWearableStorageWorkaround()
+
+        // The AEADBadTagException workaround (clearing the Meta SDK's encrypted
+        // storage files when the KeyStore falls out of sync with them) now lives
+        // in PlayMetaWearableRepository.initialize(), gated on that specific
+        // failure, instead of running unconditionally here on every cold start.
+        // See PlayMetaWearableRepository for the guarded clear-and-retry.
 
         // Only initialize Wearables if we have the necessary permissions,
         // or let it fail gracefully if called here. On first launch, 
@@ -53,19 +53,5 @@ class MyApplication : Application() {
 
     fun initializeWearables() {
         metaWearableRepository.initialize()
-    }
-
-    private fun clearMetaWearableStorageWorkaround() {
-        // Known file names used by Meta SDK for encrypted storage.
-        // Deleting these forces the SDK to recreate them with the current KeyStore.
-        val sdkFiles = listOf(
-            "ManifestRecordStore",
-            "DeviceRecordStore",
-            "acdc_manifest_store",
-            "acdc_device_store"
-        )
-        sdkFiles.forEach { fileName ->
-            deleteSharedPreferences(fileName)
-        }
     }
 }

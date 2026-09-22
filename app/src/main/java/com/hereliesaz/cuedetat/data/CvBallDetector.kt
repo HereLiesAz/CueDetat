@@ -66,6 +66,7 @@ class CvBallDetector {
         if (bgrMat.empty() || hsvMat.empty()) return emptyList()
         if (bgrMat.rows() != hsvMat.rows() || bgrMat.cols() != hsvMat.cols()) return emptyList()
 
+        // Empirically tuned threshold; no formal derivation on record.
         val sdScale = 2.5f
         val lower = Scalar(
             max(0.0, feltHsv[0] - sdScale * feltStdDev[0] - 5.0),

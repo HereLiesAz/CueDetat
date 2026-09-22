@@ -100,21 +100,33 @@ fun MasseControl(
                         }
                         if (secondDown != null) {
                             secondDown.consume()
-                            isMoveModeActive = true
-                            var pointerId = secondDown.id
-                            try {
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    val dragChange = event.changes.find { it.id == pointerId }
-                                    if (dragChange == null || !dragChange.pressed) break
-                                    val pan = dragChange.positionChange()
-                                    if (pan != Offset.Zero) {
-                                        onEvent(MainScreenEvent.DragSpinControl(PointF(pan.x, pan.y)))
-                                        dragChange.consume()
+
+                            val radiusPx = size.width / 2f
+                            val dx = secondDown.position.x - radiusPx
+                            val dy = secondDown.position.y - radiusPx
+                            val distSq = dx * dx + dy * dy
+
+                            if (distSq < radiusPx * radiusPx) {
+                                // Double tap INSIDE the wheel: RESET
+                                onEvent(MainScreenEvent.ClearSpinState)
+                            } else {
+                                // Double tap OUTSIDE the wheel: MOVE mode
+                                isMoveModeActive = true
+                                var pointerId = secondDown.id
+                                try {
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        val dragChange = event.changes.find { it.id == pointerId }
+                                        if (dragChange == null || !dragChange.pressed) break
+                                        val pan = dragChange.positionChange()
+                                        if (pan != Offset.Zero) {
+                                            onEvent(MainScreenEvent.DragSpinControl(PointF(pan.x, pan.y)))
+                                            dragChange.consume()
+                                        }
                                     }
+                                } finally {
+                                    isMoveModeActive = false
                                 }
-                            } finally {
-                                isMoveModeActive = false
                             }
                         }
                     }

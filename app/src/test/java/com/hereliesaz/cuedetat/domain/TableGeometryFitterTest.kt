@@ -43,10 +43,22 @@ class TableGeometryFitterTest {
 
     @Test
     fun `fit handles layout with small noise on each point`() {
-        val noisy = idealPts.values.map { Pt(it.x + (-1..1).random().toFloat(), it.y + (-1..1).random().toFloat()) }
+        // Seeded so the perturbation (and thus the assertions below) is reproducible
+        // run-to-run instead of depending on unseeded global randomness.
+        val rng = kotlin.random.Random(42)
+        val noisy = idealPts.values.map {
+            Pt(it.x + rng.nextInt(-1, 2).toFloat(), it.y + rng.nextInt(-1, 2).toFloat())
+        }
         val result = TableGeometryFitter.fitPt(noisy)
         assertNotNull("Should fit even with small noise", result)
         assertEquals(6, result!!.size)
+        val byId = result!!.associate { it.first to it.second }
+        PocketId.values().forEach { id ->
+            val expected = idealPts[id]!!
+            val actual = byId[id]!!
+            assertEquals("${id}.x", expected.x, actual.x, 1.5f)
+            assertEquals("${id}.y", expected.y, actual.y, 1.5f)
+        }
     }
 
     @Test

@@ -26,6 +26,13 @@ class CvDebugRenderer {
     /** Reusable Bitmap to avoid frequent allocations during the render loop. */
     private var bmp: Bitmap? = null
 
+    /** Reusable Mat for the BGRA-converted mask, to avoid a fresh allocation every frame. */
+    private val coloredMask = Mat()
+
+    companion object {
+        private const val TAG = "CvDebugRenderer"
+    }
+
     /**
      * Draws the CV debug mask onto the canvas.
      *
@@ -52,7 +59,8 @@ class CvDebugRenderer {
 
             // The mask is likely a single-channel grayscale Mat (CV_8UC1).
             // We need to convert it to a 4-channel BGRA Mat (CV_8UC4) to map it to a Bitmap.
-            val coloredMask = Mat()
+            // 'coloredMask' is a reused class-level field; cvtColor overwrites its contents
+            // in place, so no fresh Mat is allocated per frame.
             Imgproc.cvtColor(maskMat, coloredMask, Imgproc.COLOR_GRAY2BGRA)
 
             // Convert the OpenCV Mat to the Android Bitmap.
@@ -75,13 +83,13 @@ class CvDebugRenderer {
                 canvas.drawBitmap(it, matrix, maskPaint)
             }
 
-            // Release the temporary colored Mat immediately to prevent native memory leaks.
-            coloredMask.release()
-            // Note: We do NOT release 'maskMat' here, as it belongs to the 'visionData' object
-            // held in the state. The repository managing that data is responsible for its lifecycle.
+            // Note: We do NOT release 'coloredMask' here, since it is a reused class-level
+            // field (see above), not a per-call allocation. We also do NOT release 'maskMat'
+            // here, as it belongs to the 'visionData' object held in the state. The repository
+            // managing that data is responsible for its lifecycle.
         } catch (e: Exception) {
             // Catch generic exceptions to prevent the app from crashing during rendering glitches.
-            // In production, this should probably log the error.
+            android.util.Log.e(TAG, "CV debug mask draw failed", e)
         }
     }
 }

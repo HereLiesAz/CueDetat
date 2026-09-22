@@ -2,6 +2,7 @@
 package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
+import android.util.Log
 import kotlin.math.ln
 
 /**
@@ -89,6 +90,14 @@ object ThinPlateSpline {
             val u = tpsKernel(dx * dx + dy * dy)
             x += solved.weightsX[i] * u
             y += solved.weightsY[i] * u
+        }
+        // A near-singular control-point configuration (e.g. duplicate/collinear points) can leave
+        // solveLinearSystem() with a near-zero pivot it skipped rather than resolved, producing
+        // NaN/Infinity weights that would otherwise propagate silently through every warped point.
+        // Fall back to an identity (unwarped) mapping for this point rather than returning garbage.
+        if (!x.isFinite() || !y.isFinite()) {
+            Log.w("ThinPlateSpline", "Non-finite TPS result for $point; falling back to identity warp")
+            return point
         }
         return PointF(x.toFloat(), y.toFloat())
     }

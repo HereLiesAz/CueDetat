@@ -38,7 +38,7 @@ class ArFlowReducerTest {
 
     @Test
     fun `CycleCameraMode from AR_ACTIVE transitions to LITE_AR`() {
-        // ToggleReducer:46 — AR_ACTIVE deliberately drops to LITE_AR rather than OFF
+        // ToggleReducer:45 — AR_ACTIVE deliberately drops to LITE_AR rather than OFF
         // so users keep a usable camera view after AR session ends.
         val s = base.copy(cameraMode = CameraMode.AR_ACTIVE)
         val result = reduceToggleAction(s, MainScreenEvent.CycleCameraMode, utils)
@@ -61,7 +61,7 @@ class ArFlowReducerTest {
 
     @Test
     fun `ArTrackingLost preserves AR session state (float on last known matrix)`() {
-        // ControlReducer:116 — ArTrackingLost is a deliberate no-op; the app floats on
+        // ControlReducer:138 — ArTrackingLost is a deliberate no-op; the app floats on
         // the last known matrix rather than tearing down the AR session whenever the
         // tracker hiccups. Test guards against accidentally restoring the old
         // "nuclear payload" behaviour.

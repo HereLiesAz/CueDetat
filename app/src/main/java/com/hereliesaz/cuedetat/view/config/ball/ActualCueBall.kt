@@ -33,6 +33,4 @@ data class ActualCueBall(
     override val centerColor: Color = Color.White,
     /** No fill color (wireframe/transparent). */
     override val fillColor: Color = Color.Transparent,
-    /** No 3D lift. */
-    override val additionalOffset3d: Float = 0f,
 ) : BallsConfig
