@@ -60,11 +60,11 @@ This document serves as an index, mapping high-level concepts to their concrete 
     *   *Responsibility:* CameraX preview + `ImageAnalysis` composable. Used when `cameraMode` is `CAMERA` or `CAMERA_ONLY`.
 *   **AR Camera:** `feature_expert_ar/src/main/java/com/hereliesaz/cuedetat/feature/expert/ar/ArCoreBackground.kt`
     *   *Responsibility:* ARCore-powered `GLSurfaceView` composable. Allocates the OES texture, renders the camera feed as a fullscreen quad, feeds CPU frames to `ArFrameProcessor`. When tracking drops from `TRACKING` to `PAUSED` it only logs a warning and holds the existing anchors — it does **not** dispatch `ArTrackingLost` (that event is a deliberate no-op elsewhere anyway; see `ControlReducer`).
-*   **AR Frame Bridge:** `app/src/main/java/com/hereliesaz/cuedetat/data/ArFrameProcessor.kt`
+*   **AR Frame Bridge:** `feature_expert_ar/src/main/java/com/hereliesaz/cuedetat/feature/expert/ar/ArFrameProcessor.kt`
     *   *Responsibility:* Thread-safe bridge from GL-thread ARCore `Frame` objects to `VisionRepository`, using `AtomicReference` so neither thread blocks.
-*   **ARCore Session:** `app/src/main/java/com/hereliesaz/cuedetat/data/ArDepthSession.kt`
-    *   *Responsibility:* Creates and configures the ARCore `Session`; extracts `DepthPlane` data from the Depth API each frame.
-*   **GL Background Renderer:** `app/src/main/java/com/hereliesaz/cuedetat/data/ArBackgroundRenderer.kt`
+*   **ARCore Session:** `feature_expert_ar/src/main/java/com/hereliesaz/cuedetat/feature/expert/ar/ArTableSession.kt`
+    *   *Responsibility:* Owns the ARCore `Session` and the world anchors that define the table in expert mode. Drops a world `Anchor` via hit-test for each corner pocket the user captures; `computeFrameUpdate` re-projects those anchors to screen every frame and fits the logical→screen homography the renderer applies. Its `capability` property exposes `DepthCapability` (`DEPTH_API` if ARCore is available, `NONE` otherwise) — the ARCore Depth API itself is deliberately disabled, since anchors only need plane-finding and hit-testing. There is no `ArDepthSession.kt` in the repo; this is the real class doing ARCore session/tracking work.
+*   **GL Background Renderer:** `feature_expert_ar/src/main/java/com/hereliesaz/cuedetat/feature/expert/ar/ArBackgroundRenderer.kt`
     *   *Responsibility:* OpenGL ES 2.0 renderer that allocates the OES texture and draws the ARCore camera feed as a fullscreen quad.
 *   **AR Status Overlays:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/overlays/ArStatusOverlay.kt`
     *   *Key composables:* `ArTrackingBadge` (pulsing indicator when AR is active). `ArSetupPrompt` has been deleted.

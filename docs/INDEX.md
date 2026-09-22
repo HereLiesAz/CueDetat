@@ -27,14 +27,14 @@ stability.
 To resolve any potential conflicts in the documentation, follow this order of precedence. Later
 documents in this list supersede earlier ones.
 
-1. **`04-8_Changelog_And_Issues.md`**: This is the definitive source for the current project status,
+1. **[`04_Feature_Specs/08_Changelog_And_Issues.md`](04_Feature_Specs/08_Changelog_And_Issues.md)**: This is the definitive source for the current project status,
    including open tasks and a log of completed work.
 2. **Interaction Model Documents**: The final implementation for any gesture must satisfy the
-   specifications in `03-1_Gesture_Interaction_Model.md`, `03-9_Slider_Specifications.md`, and
-   `04-1_Feature_Protractor_Mode.md`.
+   specifications in [`03_UI_UX_Guide/01_Gesture_Interaction_Model.md`](03_UI_UX_Guide/01_Gesture_Interaction_Model.md), [`03_UI_UX_Guide/09_Slider_Specifications.md`](03_UI_UX_Guide/09_Slider_Specifications.md), and
+   [`04_Feature_Specs/01_Feature_Protractor_Mode.md`](04_Feature_Specs/01_Feature_Protractor_Mode.md).
 3. **Core Architecture**: The foundational principles in the `01_Architecture` directory are
    absolute unless directly contradicted by a more specific feature specification.
-4. **Development History (`05_Development_History`)**: These documents are historical records of
+4. **Development History ([`05_Lessons_of_the_Changelog/`](05_Lessons_of_the_Changelog/))**: These documents are historical records of
    previous bugs and architectural decisions. They provide context for *why* the current rules
    exist. In case of a direct conflict with a primary specification document, the primary
    specification takes precedence.

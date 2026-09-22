@@ -6,16 +6,20 @@ This privacy policy outlines the data practices for the Cue d'Etat application.
 
 ### Information We Collect
 
-The application does not collect, store, or transmit any personally identifiable information. All data processing occurs exclusively on your device.
+The application does not transmit any personally identifiable information off your device. All data processing, including the coarse location described below, occurs exclusively on your device and is stored locally only.
 
 * [cite_start]**Camera Data:** The application requires access to your device's camera[cite: 605]. [cite_start]The camera feed is processed in real-time on your device to provide the core functionality of overlaying aiming guides[cite: 618]. This video data is not stored, saved, or transmitted off your device. [cite_start]Each frame is processed and immediately discarded[cite: 618].
 
 * [cite_start]**Sensor Data:** The application uses your device's rotation vector sensor to determine its physical orientation (pitch, roll, and yaw)[cite: 607]. [cite_start]This data is used solely to create the 3D perspective effect on the screen and is not stored or transmitted[cite: 607, 702].
 
-* [cite_start]**User Preferences:** The application saves your chosen settings locally on your device using Android's SharedPreferences system[cite: 614]. This includes preferences such as:
+* [cite_start]**User Preferences:** The application saves your chosen settings locally on your device using Jetpack DataStore[cite: 614]. This includes preferences such as:
     * [cite_start]Table size [cite: 615]
     * [cite_start]Distance units (Imperial/Metric) [cite: 614]
     * [cite_start]Visual and Computer Vision (CV) tuning parameters [cite: 616]
+
+* **Location Data:** The application requests coarse location (`ACCESS_COARSE_LOCATION`) to attach an approximate GPS coordinate to a saved table-scan profile, so it can recognize when you're back at a table you've already scanned and skip re-scanning it. This location data is stored only on your device, alongside the rest of the scan profile, and is never transmitted anywhere.
+
+* **Bluetooth:** The application requests `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT`, requested together with location at first launch, to discover and connect to optional Meta smart-glasses hardware for the glasses camera-feed feature (`MetaWearableRepository`). These permissions are used only for that device pairing and are not used to collect data about other nearby devices.
 
 * [cite_start]**Network Information:** The application uses the internet for one specific purpose: to check the project's public GitHub repository for the latest version number[cite: 606, 626]. This process is anonymous and does not send any user or device information.
 
