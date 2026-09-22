@@ -38,6 +38,8 @@ Your information is used exclusively to provide the features of the application.
 
 * [cite_start]**CAMERA:** This permission is essential for the application's primary function of analyzing the view of the pool table and overlaying aiming guides[cite: 605, 618].
 * [cite_start]**INTERNET:** This permission is used only to check for application updates on GitHub[cite: 605, 626].
+* **ACCESS_COARSE_LOCATION:** Used to attach an approximate GPS coordinate to a saved table-scan profile, so the app can recognize a previously-scanned table and skip re-scanning it. Stored locally only; never transmitted.
+* **BLUETOOTH_SCAN / BLUETOOTH_CONNECT:** Used to discover and connect to optional Meta smart-glasses hardware for the glasses camera-feed feature. Not used to collect data about other nearby devices.
 
 ### Changes to This Privacy Policy
 
