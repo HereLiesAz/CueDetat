@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Lock button.** Once AR tracking starts, the rail's `ar` button reads `lock`. Line the virtual table up over the real one and tap it: the corners are anchored in ARCore and the table stays put as you move. `unlock` releases it to realign. New events `LockArTable` / `UnlockArTable` / `ArTableLockResult`, state `isArTableLocked`.
+- **Lock button.** Once AR tracking starts, the rail's `ar` button reads `lock`. Line the virtual table up over the real one and tap it: the corners are anchored in ARCore and the table stays put as you move. `unlock` releases it to realign. New events `LockArTable` / `UnlockArTable` / `ArTableLockResult`, state `isArTableLocked`. Lock pins to the plane the felt-coloured pixels sit on (`FeltColorMatch`), so the table is not anchored to the floor.
 - **Pocket tapping removed.** The `CORNER_QUAD` corner-tap step, the `POCKET_GUIDE` per-pocket guide, manual hole capture, partial-scan resume and the `ScanStep` enum are gone. The table scan is felt capture only. `ArTableSession` keeps the anchor->homography path for the coming table-lock step.
 - **Rail:** `help` renamed `wtf?` (AzNavRail reserves its own help item); `felt` and `holes` removed from the rail; `glasses` and `advisor` hidden behind `SHOW_GLASSES` / `SHOW_ADVISOR`.
 - **Tutorial reimplemented on AzNavRail 10.18's status-driven guidance framework** (`azStatus`/`azEdge`/`azGoal`/`azGuidanceTarget` in `AzNavRailMenu` + `TutorialGuidanceTargets.kt`), replacing the blocking `TutorialOverlay`/`TutorialReducer` placeholder. The tutorial is now non-blocking and completion is framework-persisted. Resolves the "Interactive Tutorial is Blocking" issue.

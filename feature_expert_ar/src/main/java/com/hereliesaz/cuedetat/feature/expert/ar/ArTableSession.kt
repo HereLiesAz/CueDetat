@@ -5,12 +5,15 @@ import android.graphics.Matrix
 import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
+import com.google.ar.core.Coordinates2d
 import com.google.ar.core.Frame
+import com.google.ar.core.HitResult
 import com.google.ar.core.Plane
 import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.hereliesaz.cuedetat.domain.DepthCapability
+import com.hereliesaz.cuedetat.domain.FeltColorMatch
 import com.hereliesaz.cuedetat.domain.TableFrameHomography
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Pt
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Vec3
@@ -19,6 +22,13 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.atan2
 import kotlin.math.pow
 import kotlin.math.sqrt
+
+/** Felt-vote sampling: a FELT_GRID x FELT_GRID grid across the virtual table. */
+private const val FELT_GRID = 5
+/** Grid inset from the virtual table's edges, as a fraction, to stay off the cushions. */
+private const val FELT_INSET = 0.1f
+/** Half-size of the image patch averaged at each grid point, in image pixels. */
+private const val FELT_PATCH_PX = 4
 
 /** Height and derived pitch for the camera's position above the detected table plane. */
 data class CameraAbovePlane(val pitchDegrees: Float, val heightM: Float)
@@ -53,7 +63,11 @@ class ArTableSession(
     @Volatile private var tableAnchors: List<Anchor>? = null
 
     /** Screen positions of the virtual table's corners plus their logical twins, awaiting a GL frame. */
-    private class LockRequest(val screenCorners: List<Pt>, val logicalCorners: List<Pt>)
+    private class LockRequest(
+        val screenCorners: List<Pt>,
+        val logicalCorners: List<Pt>,
+        val feltHsv: FloatArray?,
+    )
     private val pendingLock = AtomicReference<LockRequest?>(null)
     private val unlockRequested = AtomicBoolean(false)
 
@@ -111,12 +125,14 @@ class ArTableSession(
     /**
      * Queues a lock. [screenCorners] are where the virtual table's corners sit on screen right now
      * (TL, TR, BR, BL, in view pixels); [logicalCorners] are the same corners in logical space.
-     * The next GL frame anchors them; the outcome arrives as [FrameUpdate.lockResult].
+     * [feltHsv] is the captured felt colour (Android HSV); when present it picks the table's
+     * plane (see [findTablePlanePose]). The next GL frame anchors them; the outcome arrives as
+     * [FrameUpdate.lockResult].
      */
-    fun requestLock(screenCorners: List<Pt>, logicalCorners: List<Pt>) {
+    fun requestLock(screenCorners: List<Pt>, logicalCorners: List<Pt>, feltHsv: FloatArray?) {
         if (screenCorners.size != 4 || logicalCorners.size != 4) return
         unlockRequested.set(false)
-        pendingLock.set(LockRequest(screenCorners, logicalCorners))
+        pendingLock.set(LockRequest(screenCorners, logicalCorners, feltHsv))
     }
 
     /** Queues release of the locked table; the overlay returns to the sensor-driven pose. */
@@ -155,25 +171,16 @@ class ArTableSession(
     }
 
     /**
-     * Casts each virtual corner onto the table plane and anchors it. The plane is the horizontal
-     * plane under the virtual table's centre if ARCore has found one there, else the first
-     * horizontal plane found ([tableAnchor]). Casting onto the infinite plane (rather than
-     * hit-testing each corner) matters: felt is too plain for ARCore to map edge to edge, so the
-     * corners usually fall outside the detected polygon.
+     * Casts each virtual corner onto the table plane and anchors it. Casting onto the infinite
+     * plane (rather than hit-testing each corner) matters: felt is too plain for ARCore to map
+     * edge to edge, so the corners usually fall outside the detected polygon.
      */
     private fun performLock(
         frame: Frame, req: LockRequest,
         view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int,
     ): Boolean {
         val s = session ?: return false
-        val cx = req.screenCorners.sumOf { it.x.toDouble() }.toFloat() / 4f
-        val cy = req.screenCorners.sumOf { it.y.toDouble() }.toFloat() / 4f
-        val planePose = frame.hitTest(cx, cy).firstOrNull { hit ->
-            val t = hit.trackable
-            t is Plane && t.type == Plane.Type.HORIZONTAL_UPWARD_FACING &&
-                t.isPoseInPolygon(hit.hitPose)
-        }?.hitPose ?: tableAnchor?.takeIf { it.trackingState == TrackingState.TRACKING }?.pose
-        ?: return false
+        val planePose = findTablePlanePose(frame, req, vpW, vpH) ?: return false
 
         val viewProj = FloatArray(16)
         val invViewProj = FloatArray(16)
@@ -197,6 +204,67 @@ class ArTableSession(
         idealCorners = req.logicalCorners
         tableAnchors = anchors
         return true
+    }
+
+    /**
+     * The plane the table sits on, in order of trust:
+     * 1. Felt vote. Points spread across the virtual table are kept only where the camera image
+     *    there is felt-coloured ([FeltColorMatch]); each is hit-tested, and the horizontal plane
+     *    hit most often wins. This is what keeps the table off the floor: ARCore finds the floor
+     *    and chairs too, but only the table is felt.
+     * 2. Whatever horizontal plane lies under the virtual table's centre.
+     * 3. The first horizontal plane ARCore found ([tableAnchor]).
+     */
+    private fun findTablePlanePose(frame: Frame, req: LockRequest, vpW: Int, vpH: Int): Pose? {
+        fun planeHit(x: Float, y: Float) = frame.hitTest(x, y).firstOrNull { hit ->
+            val t = hit.trackable
+            t is Plane && t.type == Plane.Type.HORIZONTAL_UPWARD_FACING && t.isPoseInPolygon(hit.hitPose)
+        }
+
+        req.feltHsv?.let { felt -> feltVotedPlanePose(frame, req.screenCorners, felt, vpW, vpH, ::planeHit) }
+            ?.let { return it }
+
+        val cx = req.screenCorners.sumOf { it.x.toDouble() }.toFloat() / 4f
+        val cy = req.screenCorners.sumOf { it.y.toDouble() }.toFloat() / 4f
+        planeHit(cx, cy)?.let { return it.hitPose }
+
+        return tableAnchor?.takeIf { it.trackingState == TrackingState.TRACKING }?.pose
+    }
+
+    private fun feltVotedPlanePose(
+        frame: Frame, corners: List<Pt>, felt: FloatArray, vpW: Int, vpH: Int,
+        planeHit: (Float, Float) -> HitResult?,
+    ): Pose? {
+        val image = try { frame.acquireCameraImage() } catch (_: Exception) { return null }
+        try {
+            val votes = mutableMapOf<Plane, MutableList<Pose>>()
+            val view = FloatArray(2)
+            val img = FloatArray(2)
+            for (i in 0 until FELT_GRID) for (j in 0 until FELT_GRID) {
+                // Bilinear point inside the quad TL, TR, BR, BL, inset off the cushions.
+                val u = FELT_INSET + (1f - 2 * FELT_INSET) * i / (FELT_GRID - 1)
+                val v = FELT_INSET + (1f - 2 * FELT_INSET) * j / (FELT_GRID - 1)
+                val (tl, tr, br, bl) = corners
+                val x = (1 - v) * ((1 - u) * tl.x + u * tr.x) + v * ((1 - u) * bl.x + u * br.x)
+                val y = (1 - v) * ((1 - u) * tl.y + u * tr.y) + v * ((1 - u) * bl.y + u * br.y)
+                if (x < 0f || y < 0f || x >= vpW || y >= vpH) continue
+
+                view[0] = x; view[1] = y
+                frame.transformCoordinates2d(Coordinates2d.VIEW, view, Coordinates2d.IMAGE_PIXELS, img)
+                val px = img[0].toInt(); val py = img[1].toInt()
+                val hsv = sampleYuvHsv(
+                    image, px - FELT_PATCH_PX, py - FELT_PATCH_PX, px + FELT_PATCH_PX, py + FELT_PATCH_PX,
+                    samplesPerSide = 4,
+                ) ?: continue
+                if (!FeltColorMatch.matches(hsv, felt)) continue
+
+                val hit = planeHit(x, y) ?: continue
+                votes.getOrPut(hit.trackable as Plane) { mutableListOf() }.add(hit.hitPose)
+            }
+            return votes.maxByOrNull { it.value.size }?.value?.first()
+        } finally {
+            image.close()
+        }
     }
 
     private fun buildTableMatrix(view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int): Matrix? {

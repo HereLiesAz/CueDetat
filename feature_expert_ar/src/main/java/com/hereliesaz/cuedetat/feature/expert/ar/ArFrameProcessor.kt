@@ -1,6 +1,5 @@
 package com.hereliesaz.cuedetat.feature.expert.ar
 
-import android.graphics.Color
 import android.media.Image
 import com.google.ar.core.Frame
 import com.hereliesaz.cuedetat.data.VisionRepository
@@ -65,51 +64,10 @@ class ArFrameProcessor(
         }
     }
 
-    /**
-     * Averages the YUV_420_888 centre crop and converts to HSV. Pure read of the image planes
-     * (BT.601 full-range YUV->RGB, then Android RGBToHSV), so no OpenCV dependency.
-     */
-    private fun sampleCenterHsv(image: Image): FloatArray? {
-        if (image.format != android.graphics.ImageFormat.YUV_420_888) return null
-        val w = image.width
-        val h = image.height
-        val yPlane = image.planes[0]
-        val uPlane = image.planes[1]
-        val vPlane = image.planes[2]
-        val yBuf = yPlane.buffer
-        val uBuf = uPlane.buffer
-        val vBuf = vPlane.buffer
-
-        var rSum = 0.0; var gSum = 0.0; var bSum = 0.0; var count = 0
-
-        val x0 = (w * 0.45f).toInt(); val x1 = (w * 0.55f).toInt()
-        val y0 = (h * 0.45f).toInt(); val y1 = (h * 0.55f).toInt()
-        val step = ((x1 - x0) / 16).coerceAtLeast(1)
-
-        var y = y0
-        while (y < y1) {
-            var x = x0
-            while (x < x1) {
-                val yIdx = y * yPlane.rowStride + x * yPlane.pixelStride
-                val uvX = x / 2; val uvY = y / 2
-                val uIdx = uvY * uPlane.rowStride + uvX * uPlane.pixelStride
-                val vIdx = uvY * vPlane.rowStride + uvX * vPlane.pixelStride
-                if (yIdx < yBuf.limit() && uIdx < uBuf.limit() && vIdx < vBuf.limit()) {
-                    val yy = (yBuf.get(yIdx).toInt() and 0xFF).toDouble()
-                    val uu = (uBuf.get(uIdx).toInt() and 0xFF) - 128.0
-                    val vv = (vBuf.get(vIdx).toInt() and 0xFF) - 128.0
-                    rSum += (yy + 1.402 * vv).coerceIn(0.0, 255.0)
-                    gSum += (yy - 0.344136 * uu - 0.714136 * vv).coerceIn(0.0, 255.0)
-                    bSum += (yy + 1.772 * uu).coerceIn(0.0, 255.0)
-                    count++
-                }
-                x += step
-            }
-            y += step
-        }
-        if (count == 0) return null
-        val hsv = FloatArray(3)
-        Color.RGBToHSV((rSum / count).toInt(), (gSum / count).toInt(), (bSum / count).toInt(), hsv)
-        return hsv
-    }
+    /** Mean HSV of the centre 10% of the image (the felt-capture reticle). */
+    private fun sampleCenterHsv(image: Image): FloatArray? = sampleYuvHsv(
+        image,
+        (image.width * 0.45f).toInt(), (image.height * 0.45f).toInt(),
+        (image.width * 0.55f).toInt(), (image.height * 0.55f).toInt(),
+    )
 }

@@ -112,6 +112,12 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   infinite plane, not per-corner hit-tests, because plain felt is rarely mapped
   edge to edge by ARCore.
 
+- **Felt colour picks the table's plane.** At lock, points across the virtual
+  table are sampled from the camera image; only felt-coloured ones
+  (`FeltColorMatch`) are hit-tested, and the plane they hit most wins. Reason:
+  ARCore finds the floor and furniture too, and a table pinned to the floor
+  drifts by parallax as the user moves. Colour, not texture, is what felt has.
+
 ---
 
 ## Where things actually live (correcting known-stale doc claims)

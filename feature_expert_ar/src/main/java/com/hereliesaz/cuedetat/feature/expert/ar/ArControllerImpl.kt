@@ -75,6 +75,7 @@ class ArControllerImpl(context: Context) : ArController {
         arTableSession.requestLock(
             screenCorners.map { TableFrameHomography.Pt(it.x, it.y) },
             logicalCorners.map { TableFrameHomography.Pt(it.x, it.y) },
+            feltHsv = tableScanViewModel.capturedFeltHsv.value,
         )
     }
 
