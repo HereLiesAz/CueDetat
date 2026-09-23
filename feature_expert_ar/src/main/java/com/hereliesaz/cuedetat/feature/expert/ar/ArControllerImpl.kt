@@ -35,7 +35,6 @@ class ArControllerImpl(context: Context) : ArController {
     private val tableScanViewModel = TableScanViewModel(
         deps.tableScanRepository(),
         deps.pocketDetector(),
-        arTableSession,
         arFrameProcessor,
     )
 
@@ -43,8 +42,7 @@ class ArControllerImpl(context: Context) : ArController {
         TableScanAnalyzer(
             tableScanViewModel::onFrame,
             tableScanViewModel::onFeltColorSampled,
-            tableScanViewModel::onCenterVSampled,
-            tableScanViewModel.pocketDetector,
+            pocketDetector = tableScanViewModel.pocketDetector,
         )
     }
 

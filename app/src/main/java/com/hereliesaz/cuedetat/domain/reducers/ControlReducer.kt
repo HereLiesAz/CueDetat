@@ -114,14 +114,7 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             )
 
         is MainScreenEvent.ArTableMatrixUpdated ->
-            state.copy(
-                arTableMatrix = action.matrix,
-                arCapturedCorners = action.capturedCorners
-            )
-
-        is MainScreenEvent.ArCornerCaptured ->
-            if (action.hit) state.copy(warningText = null)
-            else state.copy(warningText = "Aim the centre at a pocket on the floor and hold steady.")
+            state.copy(arTableMatrix = action.matrix)
 
         is MainScreenEvent.DepthCapabilityDetected ->
             state.copy(depthCapability = action.capability)

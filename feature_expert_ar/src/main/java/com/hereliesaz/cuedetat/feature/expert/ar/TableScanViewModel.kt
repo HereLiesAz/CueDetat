@@ -5,7 +5,6 @@ import android.graphics.Matrix
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.data.TableScanRepository
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
-import com.hereliesaz.cuedetat.ui.composables.tablescan.ScanStep
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.PocketCluster
 import com.hereliesaz.cuedetat.domain.PocketId
@@ -50,30 +49,14 @@ private const val CLUSTER_MERGE_DISTANCE = 3.0f
 class TableScanViewModel(
     private val tableScanRepository: TableScanRepository,
     val pocketDetector: PocketDetector,
-    private val arTableSession: ArTableSession,
     private val arFrameProcessor: ArFrameProcessor,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-
-    /** Number of corner anchors captured via ARCore hit-tests (0..4). Drives the corner-quad UI. */
-    val capturedCornerCount: StateFlow<Int> = arTableSession.capturedCount
-
-    private val _scanStep = MutableStateFlow(ScanStep.FELT_CAPTURE)
-    val scanStep: StateFlow<ScanStep> = _scanStep.asStateFlow()
-
-    private val _currentPocketTarget = MutableStateFlow<PocketId?>(null)
-    val currentPocketTarget: StateFlow<PocketId?> = _currentPocketTarget.asStateFlow()
 
     private val _mlConfidence = MutableStateFlow(0f)
     val mlConfidence: StateFlow<Float> = _mlConfidence.asStateFlow()
 
     private val _mlTableBoundary = MutableStateFlow<android.graphics.RectF?>(null)
-
-    private val _darknessConfidence = MutableStateFlow(0f)
-    val darknessConfidence: StateFlow<Float> = _darknessConfidence.asStateFlow()
-
-    @Volatile private var latestCenterHistogram: List<Float> = emptyList()
-    private val capturedHistograms = mutableMapOf<PocketId, List<Float>>()
 
     private val _scanProgress = MutableStateFlow<Map<PocketId, Boolean>>(emptyMap())
 
@@ -94,27 +77,11 @@ class TableScanViewModel(
     private val _capturedFeltHsv = MutableStateFlow<FloatArray?>(null)
     val capturedFeltHsv: StateFlow<FloatArray?> = _capturedFeltHsv.asStateFlow()
 
-    /**
-     * Corner-quad scan: up to 4 *logical-space* points for the four corner pockets.
-     *
-     * Each point is captured by aiming the centre crosshair at a corner pocket and
-     * tapping Capture, exactly like felt-colour capture. At capture time the screen
-     * centre is projected to logical space via the current inverse pitch matrix, so
-     * the points stay anchored to the table plane as the device tilts. The UI projects
-     * them back to screen space (via the live pitch matrix) to draw the polygon.
-     *
-     * Order in the list is capture order; on commit they are reordered by geometry
-     * into TL, TR, BR, BL.
-     */
-    private val _cornerTaps = MutableStateFlow<List<PointF>>(emptyList())
-    val cornerTaps: StateFlow<List<PointF>> = _cornerTaps.asStateFlow()
-
     private val _selectedSampleIds = MutableStateFlow<Set<String>>(emptySet())
     val selectedSampleIds: StateFlow<Set<String>> = _selectedSampleIds.asStateFlow()
 
     // Mutable cluster accumulator: identity → running cluster.
-    // Mutated from onFrame (Default), captureCurrentPocket (Main), resetScan (caller),
-    // and init (Main). All mutations and full reads run under synchronized(clustersLock).
+    // Mutated from onFrame (Default) and resetScan (caller). All mutations and full reads run under synchronized(clustersLock).
     // Critical sections are short, so a JVM monitor is sufficient and works from both
     // suspend and non-suspend callers without coroutine plumbing.
     private val clusters = mutableMapOf<PocketId, MutableList<PointF>>()
@@ -137,28 +104,6 @@ class TableScanViewModel(
             }
         }
 
-        // Resume partial scan if it exists
-        scope.launch {
-            val partial = tableScanRepository.loadPartialScan()
-            if (partial != null) {
-                val (step, savedPoints) = partial
-                _scanStep.value = step
-                synchronized(clustersLock) {
-                    savedPoints.forEach { (id, pt) ->
-                        clusters[id] = mutableListOf(pt)
-                        _scanProgress.value += (id to true)
-                    }
-                }
-
-                // If it was POCKET_GUIDE, set the target to the first missing pocket
-                if (step == ScanStep.POCKET_GUIDE) {
-                    val nextIdx = PocketId.entries.toTypedArray().indexOfFirst { !savedPoints.containsKey(it) }
-                    if (nextIdx != -1) {
-                        _currentPocketTarget.value = PocketId.entries.toTypedArray()[nextIdx]
-                    }
-                }
-            }
-        }
     }
 
     fun toggleSampleSelection(id: String) {
@@ -212,13 +157,6 @@ class TableScanViewModel(
 
     /** Called by TableScanAnalyzer each frame with the mean HSV of the centre crop of the felt. */
     fun onFeltColorSampled(hsv: FloatArray) { lastFeltHsv = hsv }
-
-    fun onCenterVSampled(normalizedV: Float, histogram: List<Float>) {
-        latestCenterHistogram = histogram
-        val feltV = _capturedFeltHsv.value?.get(2) ?: lastFeltHsv[2]
-        if (feltV < 0.05f) return
-        _darknessConfidence.value = (1f - (normalizedV / feltV)).coerceIn(0f, 1f)
-    }
 
     /**
      * Called by TableScanAnalyzer on each frame.
@@ -423,12 +361,10 @@ class TableScanViewModel(
             feltColorHsv = feltColorHsv,
             scanLatitude = location?.first,
             scanLongitude = location?.second,
-            pocketSurroundHistograms = capturedHistograms.toMap(),
             calibrationTimestamp = System.currentTimeMillis()
         )
         withContext(Dispatchers.IO) {
             tableScanRepository.save(model)
-            tableScanRepository.clearPartialScan()
         }
 
         // Invariant: emit LoadTableScan FIRST so tableScanModel is set in state before pose is applied.
@@ -443,13 +379,8 @@ class TableScanViewModel(
         _scanProgress.value = emptyMap()
         _scanComplete.value = false
         _capturedFeltHsv.value = null
-        _scanStep.value = ScanStep.FELT_CAPTURE
-        _currentPocketTarget.value = null
         _mlConfidence.value = 0f
         _mlTableBoundary.value = null
-        _cornerTaps.value = emptyList()
-        arTableSession.clearAnchors()
-        tableScanRepository.clearPartialScan()
     }
 
     // ------ Coordinate helpers ------
@@ -493,7 +424,6 @@ class TableScanViewModel(
             
             withContext(Dispatchers.IO) {
                 tableScanRepository.save(model)
-                tableScanRepository.clearPartialScan()
             }
             
             // Convert Android Compose HSV (0-360, 0-1, 0-1) to OpenCV HSV (0-180, 0-255, 0-255)
@@ -515,122 +445,8 @@ class TableScanViewModel(
             ))
             
             _capturedFeltHsv.value = lastFeltHsv
-
-            // Skip the painful per-pocket wizard; users tap the four corner pockets directly.
-            // Each tap drops a world anchor via an ARCore hit-test (see captureCornerAtCrosshair).
-            _cornerTaps.value = emptyList()
-            beginCornerCapture(tableSize)
-            _scanStep.value = ScanStep.CORNER_QUAD
-            _currentPocketTarget.value = null
-        }
-    }
-
-    /**
-     * Primes the AR session for corner capture: clears any prior anchors and hands ARCore the ideal
-     * logical corner layout (TL, TR, BR, BL) for the selected table size, which the per-frame
-     * homography maps onto the captured anchors.
-     */
-    private fun beginCornerCapture(tableSize: TableSize) {
-        arTableSession.clearAnchors()
-        val table = Table(tableSize, true)
-        // Table.pockets order is TL, TR, BL, BR -> reorder to TL, TR, BR, BL.
-        val ideal = listOf(table.pockets[0], table.pockets[1], table.pockets[3], table.pockets[2])
-            .map { com.hereliesaz.cuedetat.domain.TableFrameHomography.Pt(it.x, it.y) }
-        arTableSession.setIdealCorners(ideal)
-    }
-
-    /**
-     * Capture the corner pocket currently under the centre reticle.
-     *
-     * Queues an ARCore hit-test at the screen centre on the next GL frame; the resulting world
-     * anchor defines that corner in 6DoF. The anchor count comes back via [capturedCornerCount].
-     */
-    fun captureCornerAtCrosshair() {
-        if (_scanStep.value != ScanStep.CORNER_QUAD) return
-        if (arTableSession.capturedCount.value >= 4) return
-        arTableSession.requestCapture()
-    }
-
-    fun clearCornerTaps() {
-        arTableSession.clearAnchors()
-        _cornerTaps.value = emptyList()
-    }
-
-    /**
-     * Commit the four captured corner pockets.
-     *
-     * In the world-anchored flow the corners' *placement* lives in ARCore (the anchors drive the
-     * per-frame homography), so the persisted [TableScanModel] simply stores the ideal logical
-     * pocket layout for the selected table size — which is what downstream aiming geometry
-     * (AdvisorInputAdapter) consumes. No homography/decompose pose is needed here anymore.
-     */
-    fun completeCornerScan() {
-        if (arTableSession.capturedCount.value != 4) return
-
-        scope.launch {
-            val tableSize = _selectedTableSize.value
-            val table = Table(tableSize, true)
-            val ideal = PocketId.entries.mapIndexed { i, id ->
-                id to PointF(table.pockets[i].x, table.pockets[i].y)
-            }.toMap()
-
-            synchronized(clustersLock) {
-                clusters.clear()
-                ideal.forEach { (id, pt) -> clusters[id] = mutableListOf(pt) }
-            }
-            _scanProgress.value = ideal.keys.associateWith { true }
-            completeScan(ideal)
-        }
-    }
-
-    /**
-     * User clicks to capture the pocket currently under the reticle.
-     */
-    fun captureCurrentPocket() {
-        val inverse = inversePitchMatrix ?: return
-        val step = _scanStep.value
-        val currentId = _currentPocketTarget.value ?: return
-
-        if (step != ScanStep.POCKET_GUIDE) return
-
-        scope.launch {
-            // Screen center is (viewWidth/2, viewHeight/2)
-            val screenCenter = PointF(viewWidth / 2f, viewHeight / 2f)
-            val logicalPt = Perspective.screenToLogical(screenCenter, inverse)
-
-            // Add to clusters and snapshot under the lock so concurrent onFrame
-            // calls cannot interleave.
-            val pointsToSave = synchronized(clustersLock) {
-                clusters.getOrPut(currentId) { mutableListOf() }.add(logicalPt)
-                clusters.mapValues { it.value.first() }
-            }
-            capturedHistograms[currentId] = latestCenterHistogram.toList()
-
-            _scanProgress.value += (currentId to true)
-
-            // Persist progress immediately
-            withContext(Dispatchers.IO) {
-                tableScanRepository.savePartialScan(ScanStep.POCKET_GUIDE, pointsToSave)
-            }
-
-            // Advance Wizard
-            val nextIdx = PocketId.entries.indexOf(currentId) + 1
-            if (nextIdx < PocketId.entries.size) {
-                _currentPocketTarget.value = PocketId.entries.toTypedArray()[nextIdx]
-            } else {
-                // Done capturing all 6!
-                _currentPocketTarget.value = null
-
-                val centerPts = synchronized(clustersLock) {
-                    clusters.mapValues { (_, obs) ->
-                        PointF(obs.map { it.x }.average().toFloat(), obs.map { it.y }.average().toFloat())
-                    }
-                }
-
-                // We don't use TableGeometryFitter here because the user MANUALLY told us which pocket is which.
-                // We trust the identities.
-                completeScan(centerPts)
-            }
+            // Felt capture is the whole scan: signal completion so the screen hands off to AR tracking.
+            _scanComplete.value = true
         }
     }
 }

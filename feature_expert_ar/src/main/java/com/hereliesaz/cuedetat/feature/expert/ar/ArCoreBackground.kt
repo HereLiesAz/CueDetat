@@ -21,17 +21,15 @@ import javax.microedition.khronos.opengles.GL10
 private const val TAG = "ArCoreBackground"
 
 /**
- * Full-screen camera background powered by ARCore, used for the whole expert-mode AR flow (corner
- * capture during AR_SETUP and live tracking during AR_ACTIVE).
+ * Full-screen camera background powered by ARCore, used for the whole expert-mode AR flow.
  *
  * Each frame the GL renderer:
  * 1. Draws the camera feed as a fullscreen quad.
  * 2. Feeds the CPU image to [ArFrameProcessor] for ball detection and felt-colour sampling.
- * 3. Runs [ArTableSession.computeFrameUpdate]: performs any queued corner capture (hit-test at the
- *    screen centre), re-projects the captured anchors, and fits the logical->screen homography,
- *    then emits [MainScreenEvent.ArTableMatrixUpdated] (and [MainScreenEvent.ArCornerCaptured]).
+ * 3. Runs [ArTableSession.computeFrameUpdate] to fit the logical->screen homography from the
+ *    table's corner anchors, then emits [MainScreenEvent.ArTableMatrixUpdated] (null until locked).
  * 4. Emits a geometry-derived viewing pitch via [MainScreenEvent.ArCameraPoseUpdated] (used as the
- *    perspective hint before four corners are captured).
+ *    perspective hint before the table is locked).
  *
  * Lifecycle: the [DisposableEffect] drives session resume/pause/close so the ARCore camera is
  * released before CameraX can re-acquire it on a mode switch.
@@ -142,19 +140,14 @@ private class ArCoreRenderer(
             arFrameProcessor.processFrame(frame)
 
             if (currentTracking == TrackingState.TRACKING) {
-                // World-anchored table: capture, re-project, fit the homography.
-                val update = arTableSession.computeFrameUpdate(frame, surfaceWidth, surfaceHeight)
+                // World-anchored table: fit the homography from the corner anchors.
                 onEvent(
                     MainScreenEvent.ArTableMatrixUpdated(
-                        matrix = update.matrix,
-                        capturedCorners = update.capturedCorners
+                        matrix = arTableSession.computeFrameUpdate(frame, surfaceWidth, surfaceHeight)
                     )
                 )
-                update.capture?.let { c ->
-                    onEvent(MainScreenEvent.ArCornerCaptured(hit = c.hit, count = c.count))
-                }
 
-                // Pitch hint from plane geometry (used before four corners exist).
+                // Pitch hint from plane geometry (used before the table is locked).
                 arTableSession.findAndAnchorTablePlane(frame)
                 arTableSession.computeCameraAbovePlane(frame)?.let { abovePlane ->
                     onEvent(

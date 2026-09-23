@@ -1,16 +1,13 @@
 // app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanScreen.kt
 package com.hereliesaz.cuedetat.feature.expert.ar
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,7 +25,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,26 +39,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
-import android.os.Build
-import android.view.HapticFeedbackConstants
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
-import com.hereliesaz.cuedetat.domain.PocketId
-import com.hereliesaz.cuedetat.ui.composables.tablescan.ScanStep
 import kotlinx.coroutines.delay
 
 /**
- * Full-screen scan UI.
+ * Full-screen scan UI: felt-colour capture.
  *
- * Shows a live camera feed with a pocket progress overlay.
- * Six pocket indicators fill in (yellow solid) as each pocket is detected.
- * Done button unlocks when all 6 are found. Reset clears accumulated detections.
+ * The user aims the centre reticle at the felt and taps the shutter. The captured colour is
+ * shown briefly, then the scan completes and hands off to AR tracking. There is no pocket or
+ * corner tapping: that path was removed.
  *
  * GPS permission is requested here at scan-start time.
  */
@@ -74,32 +63,9 @@ fun TableScanScreen(
 ) {
     // Animation state: tracks whether the user has tapped capture (circle expands).
     var isCapturing by remember { mutableStateOf(false) }
-    var showGreenFlash by remember { mutableStateOf(false) }
-    var isCapturingPocket by remember { mutableStateOf(false) }
-    var pocketCaptureCount by remember { mutableStateOf(0) }
-    var isCapturingCorner by remember { mutableStateOf(false) }
-    var cornerCaptureCount by remember { mutableStateOf(0) }
 
     // Captured felt color from the ViewModel (non-null once captureFeltAndComplete fires).
     val capturedHsv by viewModel.capturedFeltHsv.collectAsState()
-    val scanStep by viewModel.scanStep.collectAsState()
-    val currentPocketTarget by viewModel.currentPocketTarget.collectAsState()
-    // Corner capture is now ARCore-anchored: the count comes from the session and the live
-    // on-screen positions arrive via uiState.arCapturedCorners (projected every AR frame).
-    val capturedCornerCount by viewModel.capturedCornerCount.collectAsState()
-
-    val capturedCount = PocketId.entries.count { id ->
-        currentPocketTarget != null &&
-                PocketId.entries.indexOf(id) < PocketId.entries.indexOf(currentPocketTarget!!)
-    }
-
-    LaunchedEffect(capturedCount) {
-        if (capturedCount > 0) {
-            showGreenFlash = true
-            delay(300L)
-            showGreenFlash = false
-        }
-    }
 
     // Magnifying circle size: expands to 240dp on tap, snaps back to 120dp when idle.
     val circleSize by animateDpAsState(
@@ -107,32 +73,6 @@ fun TableScanScreen(
         animationSpec = tween(durationMillis = 400),
         label = "magnifyCircle"
     )
-
-    val pocketCircleSize by animateDpAsState(
-        targetValue = if (isCapturingPocket) 240.dp else 120.dp,
-        animationSpec = tween(durationMillis = 400),
-        label = "pocketMagnifyCircle"
-    )
-
-    val cornerCircleSize by animateDpAsState(
-        targetValue = if (isCapturingCorner) 240.dp else 120.dp,
-        animationSpec = tween(durationMillis = 400),
-        label = "cornerMagnifyCircle"
-    )
-
-    LaunchedEffect(pocketCaptureCount) {
-        if (pocketCaptureCount > 0) {
-            delay(600L)
-            isCapturingPocket = false
-        }
-    }
-
-    LaunchedEffect(cornerCaptureCount) {
-        if (cornerCaptureCount > 0) {
-            delay(600L)
-            isCapturingCorner = false
-        }
-    }
 
     // Alpha for the felt display circle: 0 → snap 1 → hold 1s → animate to 0.
     val feltAlpha = remember { Animatable(0f) }
@@ -181,13 +121,10 @@ fun TableScanScreen(
         }
     }
 
-
     Box(modifier = Modifier.fillMaxSize()) {
         // State hoisted above conditionals (Compose rule: no @Composable calls in if/when blocks)
         val selectedIds by viewModel.selectedSampleIds.collectAsState()
         val mlConfidence by viewModel.mlConfidence.collectAsState()
-        val darknessConfidence by viewModel.darknessConfidence.collectAsState()
-        val view = LocalView.current
 
         // Top Gallery: Felt Samples
         if (uiState.savedFeltSamples.isNotEmpty()) {
@@ -243,165 +180,45 @@ fun TableScanScreen(
             }
         }
 
-        // Magnifying circle: visible while capture hasn't completed yet.
-        // Expands from 120dp to 240dp when the user taps, giving tactile feedback.
-        val showReticle = when (scanStep) {
-            ScanStep.FELT_CAPTURE -> capturedHsv == null
-            ScanStep.POCKET_GUIDE -> true
-            ScanStep.CORNER_QUAD -> true
-            ScanStep.AUTO_READY -> false
-        }
-        if (showReticle) {
-            if (scanStep == ScanStep.FELT_CAPTURE) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(circleSize)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.2f))
-                        .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
-                ) {
-                    if (!isCapturing) {
-                        val crosshairColor = if (mlConfidence > 0.8f) Color.Green else Color.White
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            drawCircle(
-                                color = crosshairColor.copy(alpha = 0.3f),
-                                radius = size.minDimension / 2,
-                                style = Stroke(width = 1.dp.toPx())
-                            )
-                            drawCircle(color = crosshairColor, radius = 2.dp.toPx(), center = center)
-                        }
+        // Magnifying circle: visible until the felt is captured. Expands on tap.
+        if (capturedHsv == null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(circleSize)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.2f))
+                    .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
+            ) {
+                if (!isCapturing) {
+                    val crosshairColor = if (mlConfidence > 0.8f) Color.Green else Color.White
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawCircle(
+                            color = crosshairColor.copy(alpha = 0.3f),
+                            radius = size.minDimension / 2,
+                            style = Stroke(width = 1.dp.toPx())
+                        )
+                        drawCircle(color = crosshairColor, radius = 2.dp.toPx(), center = center)
                     }
-                }
-            } else if (scanStep == ScanStep.POCKET_GUIDE) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(pocketCircleSize)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.2f))
-                        .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
-                ) {
-                    if (!isCapturingPocket) {
-                        val crosshairColor = if (darknessConfidence > 0.8f) Color.Green else Color.White
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            drawCircle(
-                                color = crosshairColor.copy(alpha = 0.3f),
-                                radius = size.minDimension / 2,
-                                style = Stroke(width = 1.dp.toPx())
-                            )
-                            drawCircle(color = crosshairColor, radius = 2.dp.toPx(), center = center)
-                        }
-                    }
-                }
-            } else if (scanStep == ScanStep.CORNER_QUAD) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(cornerCircleSize)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.2f))
-                        .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
-                ) {
-                    if (!isCapturingCorner) {
-                        val crosshairColor = if (capturedCornerCount >= 4) Color.Green else Color.White
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            drawCircle(
-                                color = crosshairColor.copy(alpha = 0.3f),
-                                radius = size.minDimension / 2,
-                                style = Stroke(width = 1.dp.toPx())
-                            )
-                            // Crosshair lines for precise aiming at the pocket.
-                            drawLine(
-                                color = crosshairColor,
-                                start = Offset(center.x - 12.dp.toPx(), center.y),
-                                end = Offset(center.x + 12.dp.toPx(), center.y),
-                                strokeWidth = 1.5.dp.toPx()
-                            )
-                            drawLine(
-                                color = crosshairColor,
-                                start = Offset(center.x, center.y - 12.dp.toPx()),
-                                end = Offset(center.x, center.y + 12.dp.toPx()),
-                                strokeWidth = 1.5.dp.toPx()
-                            )
-                            drawCircle(color = crosshairColor, radius = 2.dp.toPx(), center = center)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Corner-quad polygon overlay.
-        //
-        // Each captured corner is a world anchor (ARCore), re-projected to screen every frame and
-        // delivered as uiState.arCapturedCorners. Because the anchors are tracked in 6DoF, each
-        // marked pocket stays glued to its real-world spot as the user moves. A trailing line runs
-        // from the last marked pocket to the centre reticle, so the user visibly "draws" the table
-        // polygon as they capture each corner.
-        if (scanStep == ScanStep.CORNER_QUAD) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val projected = uiState.arCapturedCorners.map { Offset(it.x, it.y) }
-                val crosshair = Offset(size.width / 2f, size.height / 2f)
-                val isClosed = projected.size >= 4
-
-                // Polygon edges between consecutive captured corners.
-                for (i in 0 until projected.size - 1) {
-                    drawLine(
-                        color = Color.Yellow.copy(alpha = 0.6f),
-                        start = projected[i],
-                        end = projected[i + 1],
-                        strokeWidth = 2.dp.toPx()
-                    )
-                }
-
-                if (isClosed && projected.size == 4) {
-                    // Close the quad: last corner back to the first.
-                    drawLine(
-                        color = Color.Green.copy(alpha = 0.7f),
-                        start = projected[3],
-                        end = projected[0],
-                        strokeWidth = 2.dp.toPx()
-                    )
-                } else if (projected.isNotEmpty()) {
-                    // Trailing rubber-band line from the last marked pocket to the crosshair.
-                    drawLine(
-                        color = Color.White.copy(alpha = 0.5f),
-                        start = projected.last(),
-                        end = crosshair,
-                        strokeWidth = 2.dp.toPx()
-                    )
-                }
-
-                // Marker dots on each captured corner.
-                projected.forEach { p ->
-                    drawCircle(color = Color.Yellow, radius = 6.dp.toPx(), center = p)
-                    drawCircle(
-                        color = Color.White,
-                        radius = 6.dp.toPx(),
-                        center = p,
-                        style = Stroke(width = 1.5.dp.toPx())
-                    )
                 }
             }
         }
 
         // Felt display circle: appears once capture is done, fades out after 1 second.
-        if (scanStep == ScanStep.FELT_CAPTURE) {
-            capturedHsv?.let { hsv ->
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .alpha(feltAlpha.value)
-                        .size(240.dp)
-                        .clip(CircleShape)
-                        .background(Color.hsv(hsv[0], hsv[1], hsv[2]))
-                        .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
-                )
-            }
+        capturedHsv?.let { hsv ->
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .alpha(feltAlpha.value)
+                    .size(240.dp)
+                    .clip(CircleShape)
+                    .background(Color.hsv(hsv[0], hsv[1], hsv[2]))
+                    .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
+            )
         }
 
-        // Bottom Controls: hidden once capture is in progress or complete.
-        if (!isCapturing && (capturedHsv == null || scanStep == ScanStep.POCKET_GUIDE || scanStep == ScanStep.CORNER_QUAD)) {
+        // Bottom controls: hidden once capture is in progress or complete.
+        if (!isCapturing && capturedHsv == null) {
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -409,217 +226,29 @@ fun TableScanScreen(
                     .padding(bottom = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                when (scanStep) {
-                    ScanStep.FELT_CAPTURE -> {
-                        Text(
-                            text = "Point at the felt and tap below",
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-                        // Existing shutter button (unchanged)
-                        Box(modifier = Modifier.size(80.dp).padding(4.dp)) {
-                            Canvas(modifier = Modifier.fillMaxSize()) {
-                                drawCircle(color = Color.White.copy(alpha = 0.2f), style = Stroke(width = 4.dp.toPx()))
-                                drawArc(
-                                    color = if (mlConfidence > 0.8f) Color.Green else Color.Yellow,
-                                    startAngle = -90f, sweepAngle = 360f * mlConfidence,
-                                    useCenter = false, style = Stroke(width = 4.dp.toPx())
-                                )
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.Center).size(64.dp).clip(CircleShape)
-                                    .background(Color.White).border(4.dp, Color.LightGray, CircleShape)
-                                    .clickable { isCapturing = true; viewModel.captureFeltAndComplete() }
-                            )
-                        }
-                    }
-
-                    ScanStep.POCKET_GUIDE -> {
-                        val pocketNames = mapOf(
-                            PocketId.TL to "Top Left", PocketId.TR to "Top Right",
-                            PocketId.BL to "Bottom Left", PocketId.BR to "Bottom Right",
-                            PocketId.SL to "Left Side", PocketId.SR to "Right Side"
-                        )
-                        val targetName = pocketNames[currentPocketTarget] ?: "Pocket"
-
-                        Text(
-                            text = "Point at the $targetName pocket and tap below",
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        )
-
-                        // 6-pocket progress row
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        ) {
-                            PocketId.entries.forEachIndexed { index, _ ->
-                                val isDone = index < (PocketId.entries.indexOf(currentPocketTarget ?: PocketId.SR))
-                                Box(
-                                    modifier = Modifier
-                                        .size(14.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isDone) Color.Green else Color.White.copy(alpha = 0.4f))
-                                        .border(1.dp, Color.White, CircleShape)
-                                )
-                            }
-                        }
-
-                        // Capture button — enabled only when darkness confidence > 0.5
-                        val captureEnabled = darknessConfidence > 0.5f
-                        Box(modifier = Modifier.size(80.dp).padding(4.dp)) {
-                            Canvas(modifier = Modifier.fillMaxSize()) {
-                                drawCircle(color = Color.White.copy(alpha = 0.2f), style = Stroke(width = 4.dp.toPx()))
-                                drawArc(
-                                    color = if (darknessConfidence > 0.8f) Color.Green else Color.Yellow,
-                                    startAngle = -90f, sweepAngle = 360f * darknessConfidence,
-                                    useCenter = false,
-                                    style = Stroke(width = 4.dp.toPx())
-                                )
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.Center).size(64.dp).clip(CircleShape)
-                                    .background(Color.White)
-                                    .border(4.dp, Color.LightGray, CircleShape)
-                                    .clickable(enabled = captureEnabled) {
-                                        val haptic = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                            HapticFeedbackConstants.CONFIRM
-                                        } else {
-                                            HapticFeedbackConstants.LONG_PRESS
-                                        }
-                                        view.performHapticFeedback(haptic)
-                                        isCapturingPocket = true
-                                        pocketCaptureCount++
-                                        viewModel.captureCurrentPocket()
-                                    }
-                            )
-                        }
-                    }
-
-                    ScanStep.CORNER_QUAD -> {
-                        val placed = capturedCornerCount
-                        Text(
-                            text = when {
-                                placed == 0 -> "Aim the crosshair at a corner pocket and tap Capture"
-                                placed < 4 -> "Aim at the next corner pocket and tap Capture ($placed of 4)"
-                                else -> "All four corners marked — tap the check to confirm"
-                            },
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        )
-
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        ) {
-                            repeat(4) { i ->
-                                Box(
-                                    modifier = Modifier
-                                        .size(14.dp)
-                                        .clip(CircleShape)
-                                        .background(if (i < placed) Color.Green else Color.White.copy(alpha = 0.4f))
-                                        .border(1.dp, Color.White, CircleShape)
-                                )
-                            }
-                        }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(24.dp)
-                        ) {
-                            TextButton(onClick = { viewModel.clearCornerTaps() }) {
-                                Text("Reset", color = Color.White)
-                            }
-
-                            // Capture shutter — marks the pocket under the crosshair.
-                            val captureEnabled = placed < 4
-                            Box(modifier = Modifier.size(80.dp).padding(4.dp)) {
-                                Canvas(modifier = Modifier.fillMaxSize()) {
-                                    drawCircle(color = Color.White.copy(alpha = 0.2f), style = Stroke(width = 4.dp.toPx()))
-                                    drawArc(
-                                        color = if (placed == 4) Color.Green else Color.Yellow,
-                                        startAngle = -90f, sweepAngle = 360f * (placed / 4f),
-                                        useCenter = false, style = Stroke(width = 4.dp.toPx())
-                                    )
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.Center).size(64.dp).clip(CircleShape)
-                                        .background(if (captureEnabled) Color.White else Color.LightGray.copy(alpha = 0.5f))
-                                        .border(4.dp, Color.LightGray, CircleShape)
-                                        .clickable(enabled = captureEnabled) {
-                                            val haptic = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                                HapticFeedbackConstants.CONFIRM
-                                            } else {
-                                                HapticFeedbackConstants.LONG_PRESS
-                                            }
-                                            view.performHapticFeedback(haptic)
-                                            isCapturingCorner = true
-                                            cornerCaptureCount++
-                                            viewModel.captureCornerAtCrosshair()
-                                        }
-                                )
-                            }
-
-                            // Confirm — commits the polygon once all four corners are placed.
-                            val confirmEnabled = placed == 4
-                            Box(modifier = Modifier.size(64.dp).padding(4.dp)) {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.Center).size(56.dp).clip(CircleShape)
-                                        .background(if (confirmEnabled) Color.Green else Color.DarkGray.copy(alpha = 0.5f))
-                                        .border(2.dp, Color.White, CircleShape)
-                                        .clickable(enabled = confirmEnabled) {
-                                            val haptic = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                                HapticFeedbackConstants.CONFIRM
-                                            } else {
-                                                HapticFeedbackConstants.LONG_PRESS
-                                            }
-                                            view.performHapticFeedback(haptic)
-                                            viewModel.completeCornerScan()
-                                        }
-                                ) {
-                                    Text(
-                                        text = "✓",
-                                        color = Color.White,
-                                        style = MaterialTheme.typography.titleLarge,
-                                        modifier = Modifier.align(Alignment.Center)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    ScanStep.AUTO_READY -> {
-                        // AUTO_READY is superseded by the wizard geometry validation —
-                        // the wizard transitions directly to AR_ACTIVE. This branch is kept
-                        // as a safety fallback only.
-                        Text(
-                            text = "Table geometry confirmed. Starting AR…",
-                            color = Color.Green,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(bottom = 16.dp)
+                Text(
+                    text = "Point at the felt and tap below",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                Box(modifier = Modifier.size(80.dp).padding(4.dp)) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawCircle(color = Color.White.copy(alpha = 0.2f), style = Stroke(width = 4.dp.toPx()))
+                        drawArc(
+                            color = if (mlConfidence > 0.8f) Color.Green else Color.Yellow,
+                            startAngle = -90f, sweepAngle = 360f * mlConfidence,
+                            useCenter = false, style = Stroke(width = 4.dp.toPx())
                         )
                     }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center).size(64.dp).clip(CircleShape)
+                            .background(Color.White).border(4.dp, Color.LightGray, CircleShape)
+                            .clickable { isCapturing = true; viewModel.captureFeltAndComplete() }
+                    )
                 }
             }
-        }
-
-        AnimatedVisibility(
-            visible = showGreenFlash,
-            enter = fadeIn(animationSpec = tween(50)),
-            exit = fadeOut(animationSpec = tween(250))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Green.copy(alpha = 0.25f))
-            )
         }
     }
 }

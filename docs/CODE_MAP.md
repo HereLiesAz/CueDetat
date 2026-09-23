@@ -70,12 +70,10 @@ This document serves as an index, mapping high-level concepts to their concrete 
     *   *Key composables:* `ArTrackingBadge` (pulsing indicator when AR is active). `ArSetupPrompt` has been deleted.
 
 ### Table Scan
-*   **Scan Step State Machine:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/ScanStep.kt`
-    *   *Responsibility:* Four-step enum (`FELT_CAPTURE`, `CORNER_QUAD`, `POCKET_GUIDE`, `AUTO_READY`) driving the scan wizard. Lives in the base module (not `:feature_expert_ar`) because `TableScanRepository` persists/restores it.
 *   **Table Scan Screen:** `feature_expert_ar/src/main/java/com/hereliesaz/cuedetat/feature/expert/ar/TableScanScreen.kt`
-    *   Rendered as an **inline overlay** inside `ProtractorScreen`, shown when `uiState.showTableScanScreen` is `true`. It is not a navigated route; `ROUTE_SCAN` has been removed from the `NavHost`. No GPS permission request, no Cancel button. Calls `viewModel.resetScan()` on entry via `LaunchedEffect`. Renders UI for all four `ScanStep`s: felt-color capture, world-anchored corner-pocket tapping, the (alternate/manual) per-pocket guide, and the legacy `AUTO_READY` fallback.
+    *   Rendered as an **inline overlay** inside `ProtractorScreen`, shown when `uiState.showTableScanScreen` is `true`. It is not a navigated route; `ROUTE_SCAN` has been removed from the `NavHost`. No GPS permission request, no Cancel button. Calls `viewModel.resetScan()` on entry via `LaunchedEffect`. Felt-colour capture only; pocket tapping was removed.
 *   **Table Scan ViewModel:** `feature_expert_ar/src/main/java/com/hereliesaz/cuedetat/feature/expert/ar/TableScanViewModel.kt`
-    *   *Responsibility:* Drives the `ScanStep` wizard. `captureFeltAndComplete()` locks the felt color, loads a default table model, and advances `FELT_CAPTURE → CORNER_QUAD` (world-anchored corner capture via `ArTableSession`). `POCKET_GUIDE` (reached by resuming a saved partial scan) is the per-pocket capture step, accumulating pocket detections into `PocketCluster`s and fitting geometry via `TableGeometryFitter`. `AUTO_READY` is a legacy/safety-fallback step superseded by the wizard's own geometry validation. Persists the resulting `TableScanModel`.
+    *   *Responsibility:* `captureFeltAndComplete()` locks the felt color, loads a default table model and completes the scan. `onFrame` still accumulates automatic pocket detections into `PocketCluster`s and fits geometry via `TableGeometryFitter` (no user tapping). Persists the resulting `TableScanModel`.
 *   **Table Scan Analyzer:** `feature_expert_ar/src/main/java/com/hereliesaz/cuedetat/feature/expert/ar/TableScanAnalyzer.kt`
     *   *Responsibility:* CameraX `ImageAnalysis.Analyzer` that detects pocket-sized blobs using `PocketDetector` (TFLite) or a Hough-circle fallback.
 *   **Pocket Detector Interface:** `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/PocketDetector.kt`
