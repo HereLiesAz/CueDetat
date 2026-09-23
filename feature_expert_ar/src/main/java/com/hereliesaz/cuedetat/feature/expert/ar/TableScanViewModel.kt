@@ -452,17 +452,6 @@ class TableScanViewModel(
         tableScanRepository.clearPartialScan()
     }
 
-    fun startManualHoleCapture() {
-        synchronized(clustersLock) { clusters.clear() }
-        _scanProgress.value = emptyMap()
-        _scanComplete.value = false
-        _scanStep.value = ScanStep.POCKET_GUIDE
-        _currentPocketTarget.value = PocketId.entries.toTypedArray()[0]
-        _mlConfidence.value = 0f
-        _mlTableBoundary.value = null
-        tableScanRepository.clearPartialScan()
-    }
-
     // ------ Coordinate helpers ------
 
     /**

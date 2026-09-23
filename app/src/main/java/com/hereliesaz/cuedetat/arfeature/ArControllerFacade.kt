@@ -85,6 +85,4 @@ class ArControllerFacade @Inject constructor(
     @Composable
     override fun ScanOverlay(uiState: CueDetatState, onEvent: (MainScreenEvent) -> Unit) =
         delegate.ScanOverlay(uiState, onEvent)
-
-    override fun startManualHoleCapture() = delegate.startManualHoleCapture()
 }

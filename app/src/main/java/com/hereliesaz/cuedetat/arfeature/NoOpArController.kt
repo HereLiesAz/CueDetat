@@ -28,6 +28,4 @@ object NoOpArController : ArController {
 
     @Composable
     override fun ScanOverlay(uiState: CueDetatState, onEvent: (MainScreenEvent) -> Unit) {}
-
-    override fun startManualHoleCapture() {}
 }

@@ -92,8 +92,4 @@ class ArControllerImpl(context: Context) : ArController {
             viewModel = tableScanViewModel,
         )
     }
-
-    override fun startManualHoleCapture() {
-        tableScanViewModel.startManualHoleCapture()
-    }
 }

@@ -52,7 +52,4 @@ interface ArController {
     /** The full-screen table-scan overlay UI. */
     @Composable
     fun ScanOverlay(uiState: CueDetatState, onEvent: (MainScreenEvent) -> Unit)
-
-    /** Begin a manual hole capture (driven from the nav menu). */
-    fun startManualHoleCapture()
 }
