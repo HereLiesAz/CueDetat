@@ -192,7 +192,7 @@ jobs:
           else
             APP_NAME="App"
           fi
-          APK_ORIGINAL=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          APK_ORIGINAL=$(find app/build/outputs/apk/foss/debug -name "*.apk" | head -n 1)
           if [ -z "$APK_ORIGINAL" ]; then
             echo "Error: No APK found to release!"
             exit 1

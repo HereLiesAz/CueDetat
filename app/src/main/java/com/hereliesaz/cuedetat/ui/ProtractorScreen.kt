@@ -80,12 +80,7 @@ fun ProtractorScreen(
 
     AzNavRailMenu(
         uiState = uiState,
-        onEvent = { event ->
-            if (event is MainScreenEvent.StartManualHoleCapture) {
-                mainViewModel.arController.startManualHoleCapture()
-            }
-            mainViewModel.onEvent(event)
-        },
+        onEvent = { event -> mainViewModel.onEvent(event) },
         navController = navController,
         currentDestination = currentRoute,
     ) {

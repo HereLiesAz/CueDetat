@@ -131,11 +131,10 @@ data class CueDetatState(
     @Transient val arMeasuredHeightM: Float? = null,
     // World-anchored table (ARCore). arTableMatrix maps logical table space -> screen pixels,
     // recomputed every AR frame from the camera pose + corner anchors, so the overlay tracks in
-    // full 6DoF as the user walks around. Null until 4 corners are captured / tracking is valid.
+    // full 6DoF as the user walks around. Null until the table is locked / tracking is valid.
     @Transient val arTableMatrix: Matrix? = null,
-    // Live screen positions of the captured corner anchors, projected each AR frame. Drives the
-    // capture-feedback line from the last captured pocket to the centre reticle.
-    @Transient val arCapturedCorners: List<PointF> = emptyList(),
+    // True once the Lock button has anchored the virtual table to the real one in ARCore.
+    @Transient val isArTableLocked: Boolean = false,
     val depthCapability: DepthCapability = DepthCapability.NONE,
     // Download/load lifecycle of the on-demand Expert-AR module. Transient: it is
     // runtime-only and must not survive process death (a LOADING snapshot would
@@ -232,7 +231,7 @@ data class CueDetatState(
         sizeCalculationMatrix, inversePitchMatrix, flatMatrix, logicalPlaneMatrix, hasInverseMatrix,
         visionData, arConfidenceHistory, arLowConfidenceFrameCount, relocaliserDeltaQ?.toList(),
         relocaliserAttemptFrames, snapCandidates, tableScanModel, depthPlane, arDerivedPitch,
-        arMeasuredHeightM, arTableMatrix, arCapturedCorners, depthCapability, arModuleState,
+        arMeasuredHeightM, arTableMatrix, isArTableLocked, depthCapability, arModuleState,
         lockedHsvColor?.toList(), lockedHsvStdDev?.toList(), showAdvancedOptionsDialog,
         showSupportSheet, showCalibrationScreen, showTableScanScreen,
         useCustomModel, isSnappingEnabled, hasTargetBallBeenMoved, hasCueBallBeenMoved,
@@ -362,7 +361,6 @@ sealed class MainScreenEvent {
     // Table scan events
     data class LoadTableScan(val model: TableScanModel) : MainScreenEvent()
     object ClearTableScan : MainScreenEvent()
-    object StartManualHoleCapture : MainScreenEvent()
     data class UpdateArPose(
         val translation: Offset,
         val rotation: Float,
@@ -389,16 +387,14 @@ sealed class MainScreenEvent {
     ) : MainScreenEvent()
 
     // World-anchored table events (emitted from the ARCore GL thread each frame).
-    // [matrix] is the logical->screen homography (null until 4 corners are tracked);
-    // [capturedCorners] are the live projected screen positions of the captured anchors.
-    data class ArTableMatrixUpdated(
-        val matrix: Matrix?,
-        val capturedCorners: List<PointF>
-    ) : MainScreenEvent()
-    // Result of a corner-capture hit-test. [hit] is false when the centre reticle did not land on
-    // a tracked plane (the user is shown guidance and the capture is a no-op). [count] is the new
-    // number of captured corners.
-    data class ArCornerCaptured(val hit: Boolean, val count: Int) : MainScreenEvent()
+    // [matrix] is the logical->screen homography (null until the table is locked).
+    data class ArTableMatrixUpdated(val matrix: Matrix?) : MainScreenEvent()
+    // Lock button: anchor the virtual table where it currently sits over the real one.
+    object LockArTable : MainScreenEvent()
+    // Release the lock; the table returns to the sensor-driven pose.
+    object UnlockArTable : MainScreenEvent()
+    // Outcome of a lock attempt, from the ARCore GL thread. False when no table plane was found.
+    data class ArTableLockResult(val locked: Boolean) : MainScreenEvent()
 
     // AR setup / lifecycle events
     object CancelArSetup : MainScreenEvent()

@@ -14,7 +14,7 @@ This is an Android application that uses your device's camera and a frankly exce
 * **Live Camera Augmented Reality Overlay:**
     * See the guides directly on your pool game.
     * Designed for easy one or two-handed use.
-    * **Guided AR Table Setup Wizard:** A four-step wizard (lock felt color → tap the four corner pockets → optional manual per-pocket guide → auto-ready) walks you through calibrating the AR overlay. The system auto-confirms once the table overlay confidence crosses 0.8. If ARCore's tracking blips for a moment, the app just floats on the last known table pose instead of throwing your whole scan away — it turns out constantly nuking your progress every time a hand crosses the lens was *more* annoying than the tracking hiccup itself, so a full rescan is now only required if you back all the way out of AR setup yourself.
+    * **Guided AR Table Setup Wizard:** Point at the felt and tap once. That is the whole setup; the pocket-tapping ritual has been retired, having never once worked. If ARCore's tracking blips for a moment, the app just floats on the last known table pose instead of throwing your whole scan away — it turns out constantly nuking your progress every time a hand crosses the lens was *more* annoying than the tracking hiccup itself, so a full rescan is now only required if you back all the way out of AR setup yourself.
 * **Protractor Mode**
     * To remind you of the basic, soul-crushing simplicity of a cut shot.
     * See where the balls will go before you hit them.

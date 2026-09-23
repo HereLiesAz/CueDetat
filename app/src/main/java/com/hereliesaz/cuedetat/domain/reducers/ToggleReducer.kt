@@ -40,10 +40,11 @@ internal fun reduceToggleAction(
                 lockedHsvColor = null,
                 lockedHsvStdDev = null,
                 tableScanModel = null,
-                lensWarpTps = null
+                lensWarpTps = null,
+                isArTableLocked = false
             )
-            CameraMode.AR_ACTIVE -> state.copy(cameraMode = CameraMode.LITE_AR)
-            else -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false)
+            CameraMode.AR_ACTIVE -> state.copy(cameraMode = CameraMode.LITE_AR, isArTableLocked = false)
+            else -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false, isArTableLocked = false)
         }
         is MainScreenEvent.StartArTracking -> {
             val phase = if (state.experienceMode == ExperienceMode.EXPERT) {
@@ -52,11 +53,12 @@ internal fun reduceToggleAction(
             state.copy(
                 cameraMode = CameraMode.AR_ACTIVE,
                 showTableScanScreen = false,
+                isArTableLocked = false,
                 ballSelectionPhase = phase
             )
         }
-        is MainScreenEvent.CancelArSetup -> state.copy(cameraMode = CameraMode.CAMERA_ONLY, showTableScanScreen = false)
-        is MainScreenEvent.TurnCameraOff -> state.copy(cameraMode = CameraMode.OFF)
+        is MainScreenEvent.CancelArSetup -> state.copy(cameraMode = CameraMode.CAMERA_ONLY, showTableScanScreen = false, isArTableLocked = false)
+        is MainScreenEvent.TurnCameraOff -> state.copy(cameraMode = CameraMode.OFF, isArTableLocked = false)
         is MainScreenEvent.SetCameraMode -> state.copy(cameraMode = action.mode)
         is MainScreenEvent.ToggleTargetType -> {
             val nextType = if (state.targetType == com.hereliesaz.cuedetat.domain.TargetType.SOLIDS) {
@@ -146,9 +148,6 @@ internal fun reduceToggleAction(
         is MainScreenEvent.ToggleCalibrationScreen -> state.copy(showCalibrationScreen = !state.showCalibrationScreen)
         is MainScreenEvent.ToggleTableScanScreen ->
             state.copy(showTableScanScreen = !state.showTableScanScreen)
-
-        is MainScreenEvent.StartManualHoleCapture ->
-            state.copy(showTableScanScreen = true)
 
         is MainScreenEvent.ExitToSplash -> state.copy(experienceMode = null)
         is MainScreenEvent.ToggleTopDownView -> state.copy(isTopDownViewActive = !state.isTopDownViewActive)

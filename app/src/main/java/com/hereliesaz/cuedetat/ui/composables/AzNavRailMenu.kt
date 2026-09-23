@@ -258,15 +258,34 @@ fun AzNavRailMenu(
         )
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            val isArActive = uiState.cameraMode != CameraMode.OFF
-            azRailToggle(
-                id = "ar",
-                route = "main",
-                isChecked = isArActive,
-                toggleOnText = "off", toggleOffText = "ar",
-                fillColor = b3R, textColor = Color.White,
-                onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
-            )
+            // One button, two jobs. Before tracking it starts the camera (felt capture, then AR).
+            // Once tracking, it becomes Lock: line the virtual table up over the real one and tap
+            // to anchor it in the AR world. Tap again to unlock and realign.
+            if (uiState.cameraMode == CameraMode.AR_ACTIVE) {
+                azRailToggle(
+                    id = "ar",
+                    route = "main",
+                    isChecked = uiState.isArTableLocked,
+                    toggleOnText = "unlock", toggleOffText = "lock",
+                    fillColor = b3R, textColor = Color.White,
+                    onClick = {
+                        onEvent(
+                            if (uiState.isArTableLocked) MainScreenEvent.UnlockArTable
+                            else MainScreenEvent.LockArTable
+                        )
+                    }
+                )
+            } else {
+                val isArActive = uiState.cameraMode != CameraMode.OFF
+                azRailToggle(
+                    id = "ar",
+                    route = "main",
+                    isChecked = isArActive,
+                    toggleOnText = "off", toggleOffText = "ar",
+                    fillColor = b3R, textColor = Color.White,
+                    onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
+                )
+            }
 
             // Glasses hidden until Meta wearable support is revisited.
             if (SHOW_GLASSES) azRailToggle(

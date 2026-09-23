@@ -98,14 +98,25 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   (see `docs/04_Feature_Specs/07_Feature_Camera_Calibration.md` for a parallel
   case: a spec/file describing something that was never actually wired up).
 
-- **The AR table-scan flow is a 4-step wizard** (`FELT_CAPTURE → CORNER_QUAD →
-  POCKET_GUIDE → AUTO_READY`, `feature_expert_ar`'s `ScanStep`), not a
-  single-step "capture felt color and go" flow. Reason: automatic corner/pocket
-  detection alone proved unreliable enough in practice that manual
-  corner-tap and an optional per-pocket guide step were added. This
-  supersedes an earlier single-step design that `docs/01_Architecture/01_Architectural_Mandates.md`
-  described — if you find a doc still describing the single-step version,
-  it's stale, not aspirational.
+- **The AR table-scan flow is felt capture only.** One tap captures the felt
+  colour, loads a default table model and hands off to AR tracking. Reason:
+  pocket tapping (the former `CORNER_QUAD` corner taps and `POCKET_GUIDE`
+  per-pocket guide) did not work and was deleted.
+
+- **The table is locked by hand, not detected.** Once tracking, the rail's `ar`
+  button reads `lock`: the user lines the virtual table up over the real one and
+  taps it. The virtual corners' current screen positions are cast onto the
+  detected horizontal plane (`TableFrameHomography.screenToPlane`) and anchored;
+  `ArTableSession` then drives the overlay from those anchors. Reason: the
+  user's eye is the one table detector that has worked. The cast uses the
+  infinite plane, not per-corner hit-tests, because plain felt is rarely mapped
+  edge to edge by ARCore.
+
+- **Felt colour picks the table's plane.** At lock, points across the virtual
+  table are sampled from the camera image; only felt-coloured ones
+  (`FeltColorMatch`) are hit-tested, and the plane they hit most wins. Reason:
+  ARCore finds the floor and furniture too, and a table pinned to the floor
+  drifts by parallax as the user moves. Colour, not texture, is what felt has.
 
 ---
 

@@ -114,14 +114,21 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             )
 
         is MainScreenEvent.ArTableMatrixUpdated ->
-            state.copy(
-                arTableMatrix = action.matrix,
-                arCapturedCorners = action.capturedCorners
-            )
+            state.copy(arTableMatrix = action.matrix)
 
-        is MainScreenEvent.ArCornerCaptured ->
-            if (action.hit) state.copy(warningText = null)
-            else state.copy(warningText = "Aim the centre at a pocket on the floor and hold steady.")
+        // The anchoring itself is a side effect (MainViewModel -> ArController); state changes
+        // only when the GL thread reports back.
+        is MainScreenEvent.LockArTable -> state
+
+        is MainScreenEvent.UnlockArTable ->
+            state.copy(isArTableLocked = false, arTableMatrix = null)
+
+        is MainScreenEvent.ArTableLockResult ->
+            if (action.locked) state.copy(isArTableLocked = true, warningText = null)
+            else state.copy(
+                isArTableLocked = false,
+                warningText = "No table surface found yet. Sweep the camera over the table and try again."
+            )
 
         is MainScreenEvent.DepthCapabilityDetected ->
             state.copy(depthCapability = action.capability)

@@ -69,6 +69,38 @@ class TableFrameHomographyTest {
     }
 
     @Test
+    fun `screenToPlane hits the plane under the pixel`() {
+        // Identity view & proj: NDC == world. Ray through screen centre runs along z from -1 to 1;
+        // plane z = 0.5 (normal +z). Expected hit: world (0, 0, 0.5), written out by hand.
+        val hit = TableFrameHomography.screenToPlane(
+            identity4, 500f, 400f, 1000, 800,
+            planePoint = Vec3(0f, 0f, 0.5f), planeNormal = Vec3(0f, 0f, 1f)
+        )!!
+        assertEquals(0f, hit.x, 1e-4f)
+        assertEquals(0f, hit.y, 1e-4f)
+        assertEquals(0.5f, hit.z, 1e-4f)
+
+        // Top-left pixel is NDC (-1, 1) -> world (-1, 1, z).
+        val corner = TableFrameHomography.screenToPlane(
+            identity4, 0f, 0f, 1000, 800,
+            planePoint = Vec3(0f, 0f, 0f), planeNormal = Vec3(0f, 0f, 1f)
+        )!!
+        assertEquals(-1f, corner.x, 1e-4f)
+        assertEquals(1f, corner.y, 1e-4f)
+    }
+
+    @Test
+    fun `screenToPlane rejects a ray parallel to the plane`() {
+        // Ray runs along z; a plane with normal +x is parallel to it.
+        assertNull(
+            TableFrameHomography.screenToPlane(
+                identity4, 500f, 400f, 1000, 800,
+                planePoint = Vec3(5f, 0f, 0f), planeNormal = Vec3(1f, 0f, 0f)
+            )
+        )
+    }
+
+    @Test
     fun `worldToScreen rejects points behind the camera`() {
         // Perspective-style proj (col-major) where clip.w = -z_eye. With identity view, a point at
         // z = +1 has w = -1 (behind, OpenGL camera looks down -z) -> null; z = -1 -> projectable.

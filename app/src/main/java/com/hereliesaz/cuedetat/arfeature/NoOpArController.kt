@@ -21,6 +21,9 @@ object NoOpArController : ArController {
 
     override fun setTableZOffsetLogical(tableZOffsetLogical: Float) {}
 
+    override fun lockTable(screenCorners: List<android.graphics.PointF>, logicalCorners: List<android.graphics.PointF>) {}
+    override fun unlockTable() {}
+
     @Composable
     override fun ArBackground(modifier: Modifier, onEvent: (MainScreenEvent) -> Unit) {}
 
@@ -28,6 +31,4 @@ object NoOpArController : ArController {
 
     @Composable
     override fun ScanOverlay(uiState: CueDetatState, onEvent: (MainScreenEvent) -> Unit) {}
-
-    override fun startManualHoleCapture() {}
 }

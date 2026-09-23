@@ -1,6 +1,7 @@
 package com.hereliesaz.cuedetat.feature.expert.ar
 
 import android.content.Context
+import android.graphics.PointF
 import androidx.camera.core.ImageAnalysis
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -35,7 +36,6 @@ class ArControllerImpl(context: Context) : ArController {
     private val tableScanViewModel = TableScanViewModel(
         deps.tableScanRepository(),
         deps.pocketDetector(),
-        arTableSession,
         arFrameProcessor,
     )
 
@@ -43,8 +43,7 @@ class ArControllerImpl(context: Context) : ArController {
         TableScanAnalyzer(
             tableScanViewModel::onFrame,
             tableScanViewModel::onFeltColorSampled,
-            tableScanViewModel::onCenterVSampled,
-            tableScanViewModel.pocketDetector,
+            pocketDetector = tableScanViewModel.pocketDetector,
         )
     }
 
@@ -72,6 +71,16 @@ class ArControllerImpl(context: Context) : ArController {
         )
     }
 
+    override fun lockTable(screenCorners: List<PointF>, logicalCorners: List<PointF>) {
+        arTableSession.requestLock(
+            screenCorners.map { TableFrameHomography.Pt(it.x, it.y) },
+            logicalCorners.map { TableFrameHomography.Pt(it.x, it.y) },
+            feltHsv = tableScanViewModel.capturedFeltHsv.value,
+        )
+    }
+
+    override fun unlockTable() = arTableSession.unlock()
+
     @Composable
     override fun ArBackground(modifier: Modifier, onEvent: (MainScreenEvent) -> Unit) {
         ArCoreBackground(
@@ -91,9 +100,5 @@ class ArControllerImpl(context: Context) : ArController {
             uiState = uiState,
             viewModel = tableScanViewModel,
         )
-    }
-
-    override fun startManualHoleCapture() {
-        tableScanViewModel.startManualHoleCapture()
     }
 }

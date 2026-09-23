@@ -2,25 +2,33 @@ package com.hereliesaz.cuedetat.feature.expert.ar
 
 import android.content.Context
 import android.graphics.Matrix
-import android.graphics.PointF
 import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
+import com.google.ar.core.Coordinates2d
 import com.google.ar.core.Frame
+import com.google.ar.core.HitResult
 import com.google.ar.core.Plane
+import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.hereliesaz.cuedetat.domain.DepthCapability
+import com.hereliesaz.cuedetat.domain.FeltColorMatch
 import com.hereliesaz.cuedetat.domain.TableFrameHomography
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Pt
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Vec3
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.atan2
 import kotlin.math.pow
 import kotlin.math.sqrt
+
+/** Felt-vote sampling: a FELT_GRID x FELT_GRID grid across the virtual table. */
+private const val FELT_GRID = 5
+/** Grid inset from the virtual table's edges, as a fraction, to stay off the cushions. */
+private const val FELT_INSET = 0.1f
+/** Half-size of the image patch averaged at each grid point, in image pixels. */
+private const val FELT_PATCH_PX = 4
 
 /** Height and derived pitch for the camera's position above the detected table plane. */
 data class CameraAbovePlane(val pitchDegrees: Float, val heightM: Float)
@@ -28,19 +36,21 @@ data class CameraAbovePlane(val pitchDegrees: Float, val heightM: Float)
 /**
  * Owns the ARCore [Session] and the world anchors that define the table in expert mode.
  *
- * Each corner pocket the user captures becomes a world [Anchor] dropped via a hit-test at the
- * screen centre. ARCore's visual-inertial tracking keeps those anchors fixed as the user walks
- * around, so the table persists and the overlay tracks in full 6DoF without any appearance-based
- * relocalisation. Every frame [computeFrameUpdate] re-projects the anchors to screen and fits the
- * logical->screen homography that the 2D Canvas renderer applies.
+ * The table is defined by four world [Anchor]s at its corner pockets (TL, TR, BR, BL). ARCore's
+ * visual-inertial tracking keeps them fixed as the user walks around, and every frame
+ * [computeFrameUpdate] fits the logical->screen homography the 2D Canvas renderer applies.
+ *
+ * The anchors come from the Lock button: the user lines the virtual table up over the real one,
+ * taps Lock, and [requestLock] hands over the on-screen positions of the virtual table's four
+ * corners. On the next GL frame each is cast onto the detected horizontal plane and anchored
+ * there. From then on ARCore holds the table in place; [unlock] lets go.
  *
  * The ARCore Depth API is intentionally disabled — corner anchors only need plane-finding and
  * hit-testing, and the depth stream was a per-frame battery cost feeding only a pitch fallback.
  *
- * Threading: [createSession]/[close]/[pause]/[resume] run on the main thread. [requestCapture]
- * is called from the UI thread (sets an atomic flag). [computeFrameUpdate] runs on the GL thread,
- * which is the only mutator of [anchors] and [orderedAnchors]. The exposed [StateFlow]s are
- * updated from the GL thread and observed on the main thread.
+ * Threading: [createSession]/[close]/[pause]/[resume] run on the main thread. [requestLock] and
+ * [unlock] are called from the UI thread (atomic hand-off). [computeFrameUpdate] runs on the GL
+ * thread and is the only place anchors are created.
  */
 /** Manually constructed by ArControllerImpl (lives in the on-demand module; no Hilt here). */
 class ArTableSession(
@@ -49,25 +59,24 @@ class ArTableSession(
     private var session: Session? = null
     private var tableAnchor: Anchor? = null
 
-    // Corner anchors in capture order (max 4). GL-thread only.
-    private val anchors = mutableListOf<Anchor>()
-    // Anchors reordered TL, TR, BR, BL once all four are captured. Fixes the anchor->ideal-corner
-    // assignment so the homography stays consistent regardless of later viewpoint.
-    private var orderedAnchors: List<Anchor>? = null
+    // Corner anchors ordered TL, TR, BR, BL. Null until the table is locked.
+    @Volatile private var tableAnchors: List<Anchor>? = null
 
-    private val captureRequested = AtomicBoolean(false)
+    /** Screen positions of the virtual table's corners plus their logical twins, awaiting a GL frame. */
+    private class LockRequest(
+        val screenCorners: List<Pt>,
+        val logicalCorners: List<Pt>,
+        val feltHsv: FloatArray?,
+    )
+    private val pendingLock = AtomicReference<LockRequest?>(null)
+    private val unlockRequested = AtomicBoolean(false)
 
-    // Ideal logical corner positions (TL, TR, BR, BL), set when a scan begins.
+    // Ideal logical corner positions (TL, TR, BR, BL) matching [tableAnchors].
     @Volatile private var idealCorners: List<Pt> = emptyList()
 
-    // Height of the table plane above the captured anchors, in metres, driven by the tableZOffset
-    // slider. Lets the user nudge the virtual table up off the floor-plane hit-test to sit on the
-    // rail (the hit-test lands on the floor under the pocket, ~rail-height below the real pocket).
+    // Height of the table plane above the corner anchors, in metres, driven by the tableZOffset
+    // slider.
     @Volatile private var tableHeightMeters: Float = 0f
-
-    private val _capturedCount = MutableStateFlow(0)
-    /** Number of corner anchors captured so far (0..4). Observed by the scan UI. */
-    val capturedCount: StateFlow<Int> = _capturedCount.asStateFlow()
 
     /** True once ARCore world tracking is available on this device. */
     fun isArCoreAvailable(): Boolean = try {
@@ -108,120 +117,158 @@ class ArTableSession(
 
     fun getSession(): Session? = session
 
-    /** Sets the ideal logical corner layout (TL, TR, BR, BL) for the table being scanned. */
-    fun setIdealCorners(corners: List<Pt>) {
-        idealCorners = corners
-    }
-
-    /** Sets the table-plane lift above the captured anchors (tableZOffset slider, in metres). */
+    /** Sets the table-plane lift above the corner anchors (tableZOffset slider, in metres). */
     fun setTableHeightMeters(meters: Float) {
         tableHeightMeters = meters
     }
 
-    /** Queues a corner capture; the next GL frame performs the hit-test at screen centre. */
-    fun requestCapture() {
-        captureRequested.set(true)
+    /**
+     * Queues a lock. [screenCorners] are where the virtual table's corners sit on screen right now
+     * (TL, TR, BR, BL, in view pixels); [logicalCorners] are the same corners in logical space.
+     * [feltHsv] is the captured felt colour (Android HSV); when present it picks the table's
+     * plane (see [findTablePlanePose]). The next GL frame anchors them; the outcome arrives as
+     * [FrameUpdate.lockResult].
+     */
+    fun requestLock(screenCorners: List<Pt>, logicalCorners: List<Pt>, feltHsv: FloatArray?) {
+        if (screenCorners.size != 4 || logicalCorners.size != 4) return
+        unlockRequested.set(false)
+        pendingLock.set(LockRequest(screenCorners, logicalCorners, feltHsv))
     }
 
-    /** Detaches all corner anchors and resets capture progress (rescan / cancel). */
+    /** Queues release of the locked table; the overlay returns to the sensor-driven pose. */
+    fun unlock() {
+        pendingLock.set(null)
+        unlockRequested.set(true)
+    }
+
+    /** Detaches the corner anchors (rescan / cancel). */
     fun clearAnchors() {
-        anchors.forEach { runCatching { it.detach() } }
-        anchors.clear()
-        orderedAnchors = null
-        captureRequested.set(false)
-        _capturedCount.value = 0
+        tableAnchors?.forEach { runCatching { it.detach() } }
+        tableAnchors = null
+        idealCorners = emptyList()
     }
 
     /**
-     * Result of a hit-test attempt requested via [requestCapture]: whether it landed on a plane,
-     * and the new captured-corner count.
+     * [matrix]: logical->screen homography, null while unlocked or tracking is lost.
+     * [lockResult]: non-null only on the frame that served a [requestLock] (true = locked).
      */
-    data class CaptureResult(val hit: Boolean, val count: Int)
+    data class FrameUpdate(val matrix: Matrix?, val lockResult: Boolean?)
 
     /**
-     * Per-frame update on the GL thread. Performs a queued capture (if any), then re-projects the
-     * captured anchors to screen and, once four are tracked, fits the logical->screen homography.
-     *
-     * @return [FrameUpdate] with the (possibly null) table matrix, the live projected corner
-     *   positions for the capture-feedback line, and an optional [CaptureResult] for this frame.
+     * Per-frame update on the GL thread: serves any queued lock/unlock, then fits the
+     * logical->screen homography from the corner anchors.
      */
-    data class FrameUpdate(
-        val matrix: Matrix?,
-        val capturedCorners: List<PointF>,
-        val capture: CaptureResult?,
-    )
-
     fun computeFrameUpdate(frame: Frame, vpW: Int, vpH: Int): FrameUpdate {
-        var capture: CaptureResult? = null
-        if (captureRequested.getAndSet(false) && anchors.size < 4) {
-            capture = performCapture(frame, vpW, vpH)
-        }
+        if (unlockRequested.getAndSet(false)) clearAnchors()
 
         val view = FloatArray(16)
         val proj = FloatArray(16)
         frame.camera.getViewMatrix(view, 0)
         frame.camera.getProjectionMatrix(proj, 0, 0.01f, 100f)
 
-        val capturedScreens = anchors.mapNotNull { anchor ->
-            anchorWorld(anchor)?.let { w ->
-                TableFrameHomography.worldToScreen(view, proj, w, vpW, vpH)
-                    ?.let { PointF(it.x, it.y) }
-            }
-        }
-
-        val matrix = buildTableMatrix(view, proj, vpW, vpH)
-        return FrameUpdate(matrix, capturedScreens, capture)
-    }
-
-    private fun performCapture(frame: Frame, vpW: Int, vpH: Int): CaptureResult {
-        val hit = frame.hitTest(vpW / 2f, vpH / 2f)
-            .firstOrNull { result ->
-                val t = result.trackable
-                t is Plane && t.isPoseInPolygon(result.hitPose) &&
-                        t.type == Plane.Type.HORIZONTAL_UPWARD_FACING
-            }
-        if (hit == null) return CaptureResult(hit = false, count = anchors.size)
-
-        return try {
-            anchors.add(hit.createAnchor())
-            if (anchors.size == 4) {
-                orderedAnchors = orderCornersTlTrBrBl(frame, vpW, vpH)
-            }
-            _capturedCount.value = anchors.size
-            CaptureResult(hit = true, count = anchors.size)
-        } catch (_: Exception) {
-            CaptureResult(hit = false, count = anchors.size)
-        }
+        val lockResult = pendingLock.getAndSet(null)?.let { performLock(frame, it, view, proj, vpW, vpH) }
+        return FrameUpdate(buildTableMatrix(view, proj, vpW, vpH), lockResult)
     }
 
     /**
-     * Fixes the anchor -> ideal-corner assignment once, by projecting the four anchors to screen
-     * and sorting them clockwise from top-left. Done a single time at capture completion so the
-     * per-frame homography stays consistent even after the user walks to the far side of the table.
+     * Casts each virtual corner onto the table plane and anchors it. Casting onto the infinite
+     * plane (rather than hit-testing each corner) matters: felt is too plain for ARCore to map
+     * edge to edge, so the corners usually fall outside the detected polygon.
      */
-    private fun orderCornersTlTrBrBl(frame: Frame, vpW: Int, vpH: Int): List<Anchor> {
-        val view = FloatArray(16)
-        val proj = FloatArray(16)
-        frame.camera.getViewMatrix(view, 0)
-        frame.camera.getProjectionMatrix(proj, 0, 0.01f, 100f)
+    private fun performLock(
+        frame: Frame, req: LockRequest,
+        view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int,
+    ): Boolean {
+        val s = session ?: return false
+        val planePose = findTablePlanePose(frame, req, vpW, vpH) ?: return false
 
-        val withScreen = anchors.mapNotNull { a ->
-            anchorWorld(a)?.let { w ->
-                TableFrameHomography.worldToScreen(view, proj, w, vpW, vpH)?.let { s -> a to s }
-            }
+        val viewProj = FloatArray(16)
+        val invViewProj = FloatArray(16)
+        android.opengl.Matrix.multiplyMM(viewProj, 0, proj, 0, view, 0)
+        if (!android.opengl.Matrix.invertM(invViewProj, 0, viewProj, 0)) return false
+
+        val planePoint = Vec3(planePose.tx(), planePose.ty(), planePose.tz())
+        val y = planePose.yAxis
+        val planeNormal = Vec3(y[0], y[1], y[2])
+
+        val worlds = req.screenCorners.map { c ->
+            TableFrameHomography.screenToPlane(invViewProj, c.x, c.y, vpW, vpH, planePoint, planeNormal)
+                ?: return false
         }
-        if (withScreen.size != 4) return anchors.toList()
+        val anchors = try {
+            worlds.map { w -> s.createAnchor(Pose(floatArrayOf(w.x, w.y, w.z), planePose.rotationQuaternion)) }
+        } catch (_: Exception) {
+            return false
+        }
+        clearAnchors()
+        idealCorners = req.logicalCorners
+        tableAnchors = anchors
+        return true
+    }
 
-        val cx = withScreen.sumOf { it.second.x.toDouble() }.toFloat() / 4f
-        val cy = withScreen.sumOf { it.second.y.toDouble() }.toFloat() / 4f
-        val top = withScreen.filter { it.second.y < cy }.sortedBy { it.second.x }
-        val bottom = withScreen.filter { it.second.y >= cy }.sortedByDescending { it.second.x }
-        // top: left, right ; bottom: right, left  ->  TL, TR, BR, BL
-        return (top + bottom).map { it.first }.take(4)
+    /**
+     * The plane the table sits on, in order of trust:
+     * 1. Felt vote. Points spread across the virtual table are kept only where the camera image
+     *    there is felt-coloured ([FeltColorMatch]); each is hit-tested, and the horizontal plane
+     *    hit most often wins. This is what keeps the table off the floor: ARCore finds the floor
+     *    and chairs too, but only the table is felt.
+     * 2. Whatever horizontal plane lies under the virtual table's centre.
+     * 3. The first horizontal plane ARCore found ([tableAnchor]).
+     */
+    private fun findTablePlanePose(frame: Frame, req: LockRequest, vpW: Int, vpH: Int): Pose? {
+        fun planeHit(x: Float, y: Float) = frame.hitTest(x, y).firstOrNull { hit ->
+            val t = hit.trackable
+            t is Plane && t.type == Plane.Type.HORIZONTAL_UPWARD_FACING && t.isPoseInPolygon(hit.hitPose)
+        }
+
+        req.feltHsv?.let { felt -> feltVotedPlanePose(frame, req.screenCorners, felt, vpW, vpH, ::planeHit) }
+            ?.let { return it }
+
+        val cx = req.screenCorners.sumOf { it.x.toDouble() }.toFloat() / 4f
+        val cy = req.screenCorners.sumOf { it.y.toDouble() }.toFloat() / 4f
+        planeHit(cx, cy)?.let { return it.hitPose }
+
+        return tableAnchor?.takeIf { it.trackingState == TrackingState.TRACKING }?.pose
+    }
+
+    private fun feltVotedPlanePose(
+        frame: Frame, corners: List<Pt>, felt: FloatArray, vpW: Int, vpH: Int,
+        planeHit: (Float, Float) -> HitResult?,
+    ): Pose? {
+        val image = try { frame.acquireCameraImage() } catch (_: Exception) { return null }
+        try {
+            val votes = mutableMapOf<Plane, MutableList<Pose>>()
+            val view = FloatArray(2)
+            val img = FloatArray(2)
+            for (i in 0 until FELT_GRID) for (j in 0 until FELT_GRID) {
+                // Bilinear point inside the quad TL, TR, BR, BL, inset off the cushions.
+                val u = FELT_INSET + (1f - 2 * FELT_INSET) * i / (FELT_GRID - 1)
+                val v = FELT_INSET + (1f - 2 * FELT_INSET) * j / (FELT_GRID - 1)
+                val (tl, tr, br, bl) = corners
+                val x = (1 - v) * ((1 - u) * tl.x + u * tr.x) + v * ((1 - u) * bl.x + u * br.x)
+                val y = (1 - v) * ((1 - u) * tl.y + u * tr.y) + v * ((1 - u) * bl.y + u * br.y)
+                if (x < 0f || y < 0f || x >= vpW || y >= vpH) continue
+
+                view[0] = x; view[1] = y
+                frame.transformCoordinates2d(Coordinates2d.VIEW, view, Coordinates2d.IMAGE_PIXELS, img)
+                val px = img[0].toInt(); val py = img[1].toInt()
+                val hsv = sampleYuvHsv(
+                    image, px - FELT_PATCH_PX, py - FELT_PATCH_PX, px + FELT_PATCH_PX, py + FELT_PATCH_PX,
+                    samplesPerSide = 4,
+                ) ?: continue
+                if (!FeltColorMatch.matches(hsv, felt)) continue
+
+                val hit = planeHit(x, y) ?: continue
+                votes.getOrPut(hit.trackable as Plane) { mutableListOf() }.add(hit.hitPose)
+            }
+            return votes.maxByOrNull { it.value.size }?.value?.first()
+        } finally {
+            image.close()
+        }
     }
 
     private fun buildTableMatrix(view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int): Matrix? {
-        val ordered = orderedAnchors ?: return null
+        val ordered = tableAnchors ?: return null
         if (ordered.size != 4 || idealCorners.size != 4) return null
         if (ordered.any { it.trackingState != TrackingState.TRACKING }) return null
         val cornersWorld = ordered.map { anchorWorld(it) ?: return null }
@@ -237,11 +284,11 @@ class ArTableSession(
         return Vec3(p.tx(), p.ty(), p.tz())
     }
 
-    // --- Plane-anchor pitch fallback (used before 4 corners are captured) ---
+    // --- Plane-anchor pitch fallback (used while the table is not locked) ---
 
     /**
      * Searches updated trackables for a horizontal plane matching pool-table dimensions and anchors
-     * to it. Used to warm tracking and provide a pitch estimate before the corners are captured.
+     * to it. Used to warm tracking and provide a pitch estimate before the table is locked.
      */
     fun findAndAnchorTablePlane(frame: Frame) {
         if (tableAnchor != null) return

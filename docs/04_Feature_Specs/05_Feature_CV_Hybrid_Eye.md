@@ -44,16 +44,14 @@ The application's vision system uses a hybrid, two-stage pipeline to achieve rob
 ## AR Table Tracking & Setup
 
 The AR setup pipeline strictly adheres to the **"ONE SINGLE USER INTERACTION" mandate** for the
-*minimum* path to `AR_ACTIVE`: a single felt-color capture is enough to start tracking. The
-four-step `ScanStep` wizard (`FELT_CAPTURE`, `CORNER_QUAD`, `POCKET_GUIDE`, `AUTO_READY`) is the
-active table-scan flow, not a deprecated one — see `docs/CODE_MAP.md` and
-`docs/02_Core_Components/01_Operational_Modes.md` for the full state machine.
+*minimum* path to `AR_ACTIVE`: a single felt-color capture is the whole table scan. Pocket
+tapping (corner taps and the per-pocket guide) was removed.
 
 ### Felt Capture Pipeline
 
 1. **Magnifying UI**: The setup screen presents a magnifying circle UI. 
 2. **Single Interaction**: The user points at the felt and taps the "Capture" button.
-3. **Immediate AR**: This single tap adds the captured HSV color to a persistent list of `FeltSample`s, and `captureFeltAndComplete()` immediately locks the color, loads a default table model, and advances the wizard into `CORNER_QUAD` (world-anchored corner-pocket capture) rather than transitioning straight to `AR_ACTIVE`.
+3. **Immediate AR**: This single tap adds the captured HSV color to a persistent list of `FeltSample`s, and `captureFeltAndComplete()` immediately locks the color, loads a default table model, and completes the scan, handing off to `AR_ACTIVE`.
 4. **Multiple Samples**: While on the capture screen, the user can manage previously captured samples (move, delete). Order dictates the weight of influence in the tracking algorithm.
 
 The application relies entirely on the user for fine-tuning the table geometry (rotation, zoom) via manual sliders after the AR session has started. MVI state advancement happens instantly upon capture.
