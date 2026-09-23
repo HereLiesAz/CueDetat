@@ -42,6 +42,16 @@ interface ArController {
     /** Set the table-plane lift; input is the logical tableZOffset (converted to metres internally). */
     fun setTableZOffsetLogical(tableZOffsetLogical: Float)
 
+    /**
+     * Anchor the virtual table in the AR world. [screenCorners] are where its corners sit on
+     * screen now and [logicalCorners] the same corners in logical space, both TL, TR, BR, BL.
+     * The result comes back as [MainScreenEvent.ArTableLockResult].
+     */
+    fun lockTable(screenCorners: List<android.graphics.PointF>, logicalCorners: List<android.graphics.PointF>)
+
+    /** Release the locked table. */
+    fun unlockTable()
+
     /** Full-screen ARCore camera background (corner capture during setup + 6DoF tracking). */
     @Composable
     fun ArBackground(modifier: Modifier, onEvent: (MainScreenEvent) -> Unit)

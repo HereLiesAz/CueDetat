@@ -7,12 +7,15 @@ import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Plane
+import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.hereliesaz.cuedetat.domain.DepthCapability
 import com.hereliesaz.cuedetat.domain.TableFrameHomography
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Pt
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Vec3
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.atan2
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -27,15 +30,17 @@ data class CameraAbovePlane(val pitchDegrees: Float, val heightM: Float)
  * visual-inertial tracking keeps them fixed as the user walks around, and every frame
  * [computeFrameUpdate] fits the logical->screen homography the 2D Canvas renderer applies.
  *
- * Pocket tapping (hit-testing the screen centre to drop each anchor) has been removed. Nothing
- * supplies [tableAnchors] yet: the matrix stays null until the table-lock step (virtual table
- * placed over the real one, then locked) provides them.
+ * The anchors come from the Lock button: the user lines the virtual table up over the real one,
+ * taps Lock, and [requestLock] hands over the on-screen positions of the virtual table's four
+ * corners. On the next GL frame each is cast onto the detected horizontal plane and anchored
+ * there. From then on ARCore holds the table in place; [unlock] lets go.
  *
  * The ARCore Depth API is intentionally disabled — corner anchors only need plane-finding and
  * hit-testing, and the depth stream was a per-frame battery cost feeding only a pitch fallback.
  *
- * Threading: [createSession]/[close]/[pause]/[resume] run on the main thread.
- * [computeFrameUpdate] runs on the GL thread.
+ * Threading: [createSession]/[close]/[pause]/[resume] run on the main thread. [requestLock] and
+ * [unlock] are called from the UI thread (atomic hand-off). [computeFrameUpdate] runs on the GL
+ * thread and is the only place anchors are created.
  */
 /** Manually constructed by ArControllerImpl (lives in the on-demand module; no Hilt here). */
 class ArTableSession(
@@ -46,6 +51,11 @@ class ArTableSession(
 
     // Corner anchors ordered TL, TR, BR, BL. Null until the table is locked.
     @Volatile private var tableAnchors: List<Anchor>? = null
+
+    /** Screen positions of the virtual table's corners plus their logical twins, awaiting a GL frame. */
+    private class LockRequest(val screenCorners: List<Pt>, val logicalCorners: List<Pt>)
+    private val pendingLock = AtomicReference<LockRequest?>(null)
+    private val unlockRequested = AtomicBoolean(false)
 
     // Ideal logical corner positions (TL, TR, BR, BL) matching [tableAnchors].
     @Volatile private var idealCorners: List<Pt> = emptyList()
@@ -98,6 +108,23 @@ class ArTableSession(
         tableHeightMeters = meters
     }
 
+    /**
+     * Queues a lock. [screenCorners] are where the virtual table's corners sit on screen right now
+     * (TL, TR, BR, BL, in view pixels); [logicalCorners] are the same corners in logical space.
+     * The next GL frame anchors them; the outcome arrives as [FrameUpdate.lockResult].
+     */
+    fun requestLock(screenCorners: List<Pt>, logicalCorners: List<Pt>) {
+        if (screenCorners.size != 4 || logicalCorners.size != 4) return
+        unlockRequested.set(false)
+        pendingLock.set(LockRequest(screenCorners, logicalCorners))
+    }
+
+    /** Queues release of the locked table; the overlay returns to the sensor-driven pose. */
+    fun unlock() {
+        pendingLock.set(null)
+        unlockRequested.set(true)
+    }
+
     /** Detaches the corner anchors (rescan / cancel). */
     fun clearAnchors() {
         tableAnchors?.forEach { runCatching { it.detach() } }
@@ -106,15 +133,70 @@ class ArTableSession(
     }
 
     /**
-     * Per-frame update on the GL thread: fits the logical->screen homography from the corner
-     * anchors, or returns null when the table is not locked or tracking is lost.
+     * [matrix]: logical->screen homography, null while unlocked or tracking is lost.
+     * [lockResult]: non-null only on the frame that served a [requestLock] (true = locked).
      */
-    fun computeFrameUpdate(frame: Frame, vpW: Int, vpH: Int): Matrix? {
+    data class FrameUpdate(val matrix: Matrix?, val lockResult: Boolean?)
+
+    /**
+     * Per-frame update on the GL thread: serves any queued lock/unlock, then fits the
+     * logical->screen homography from the corner anchors.
+     */
+    fun computeFrameUpdate(frame: Frame, vpW: Int, vpH: Int): FrameUpdate {
+        if (unlockRequested.getAndSet(false)) clearAnchors()
+
         val view = FloatArray(16)
         val proj = FloatArray(16)
         frame.camera.getViewMatrix(view, 0)
         frame.camera.getProjectionMatrix(proj, 0, 0.01f, 100f)
-        return buildTableMatrix(view, proj, vpW, vpH)
+
+        val lockResult = pendingLock.getAndSet(null)?.let { performLock(frame, it, view, proj, vpW, vpH) }
+        return FrameUpdate(buildTableMatrix(view, proj, vpW, vpH), lockResult)
+    }
+
+    /**
+     * Casts each virtual corner onto the table plane and anchors it. The plane is the horizontal
+     * plane under the virtual table's centre if ARCore has found one there, else the first
+     * horizontal plane found ([tableAnchor]). Casting onto the infinite plane (rather than
+     * hit-testing each corner) matters: felt is too plain for ARCore to map edge to edge, so the
+     * corners usually fall outside the detected polygon.
+     */
+    private fun performLock(
+        frame: Frame, req: LockRequest,
+        view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int,
+    ): Boolean {
+        val s = session ?: return false
+        val cx = req.screenCorners.sumOf { it.x.toDouble() }.toFloat() / 4f
+        val cy = req.screenCorners.sumOf { it.y.toDouble() }.toFloat() / 4f
+        val planePose = frame.hitTest(cx, cy).firstOrNull { hit ->
+            val t = hit.trackable
+            t is Plane && t.type == Plane.Type.HORIZONTAL_UPWARD_FACING &&
+                t.isPoseInPolygon(hit.hitPose)
+        }?.hitPose ?: tableAnchor?.takeIf { it.trackingState == TrackingState.TRACKING }?.pose
+        ?: return false
+
+        val viewProj = FloatArray(16)
+        val invViewProj = FloatArray(16)
+        android.opengl.Matrix.multiplyMM(viewProj, 0, proj, 0, view, 0)
+        if (!android.opengl.Matrix.invertM(invViewProj, 0, viewProj, 0)) return false
+
+        val planePoint = Vec3(planePose.tx(), planePose.ty(), planePose.tz())
+        val y = planePose.yAxis
+        val planeNormal = Vec3(y[0], y[1], y[2])
+
+        val worlds = req.screenCorners.map { c ->
+            TableFrameHomography.screenToPlane(invViewProj, c.x, c.y, vpW, vpH, planePoint, planeNormal)
+                ?: return false
+        }
+        val anchors = try {
+            worlds.map { w -> s.createAnchor(Pose(floatArrayOf(w.x, w.y, w.z), planePose.rotationQuaternion)) }
+        } catch (_: Exception) {
+            return false
+        }
+        clearAnchors()
+        idealCorners = req.logicalCorners
+        tableAnchors = anchors
+        return true
     }
 
     private fun buildTableMatrix(view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int): Matrix? {

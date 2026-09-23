@@ -101,9 +101,16 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
 - **The AR table-scan flow is felt capture only.** One tap captures the felt
   colour, loads a default table model and hands off to AR tracking. Reason:
   pocket tapping (the former `CORNER_QUAD` corner taps and `POCKET_GUIDE`
-  per-pocket guide) did not work and was deleted. The table lock is to come
-  from placing the virtual table over the real one and locking it with ARCore;
-  `ArTableSession` keeps the anchor->homography half for that step.
+  per-pocket guide) did not work and was deleted.
+
+- **The table is locked by hand, not detected.** Once tracking, the rail's `ar`
+  button reads `lock`: the user lines the virtual table up over the real one and
+  taps it. The virtual corners' current screen positions are cast onto the
+  detected horizontal plane (`TableFrameHomography.screenToPlane`) and anchored;
+  `ArTableSession` then drives the overlay from those anchors. Reason: the
+  user's eye is the one table detector that has worked. The cast uses the
+  infinite plane, not per-corner hit-tests, because plain felt is rarely mapped
+  edge to edge by ARCore.
 
 ---
 

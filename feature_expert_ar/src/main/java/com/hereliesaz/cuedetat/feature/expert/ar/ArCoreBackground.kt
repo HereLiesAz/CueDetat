@@ -26,8 +26,10 @@ private const val TAG = "ArCoreBackground"
  * Each frame the GL renderer:
  * 1. Draws the camera feed as a fullscreen quad.
  * 2. Feeds the CPU image to [ArFrameProcessor] for ball detection and felt-colour sampling.
- * 3. Runs [ArTableSession.computeFrameUpdate] to fit the logical->screen homography from the
- *    table's corner anchors, then emits [MainScreenEvent.ArTableMatrixUpdated] (null until locked).
+ * 3. Runs [ArTableSession.computeFrameUpdate]: anchors the table if Lock was tapped, fits the
+ *    logical->screen homography from the corner anchors, then emits
+ *    [MainScreenEvent.ArTableMatrixUpdated] (null until locked) and, on a lock attempt,
+ *    [MainScreenEvent.ArTableLockResult].
  * 4. Emits a geometry-derived viewing pitch via [MainScreenEvent.ArCameraPoseUpdated] (used as the
  *    perspective hint before the table is locked).
  *
@@ -140,12 +142,10 @@ private class ArCoreRenderer(
             arFrameProcessor.processFrame(frame)
 
             if (currentTracking == TrackingState.TRACKING) {
-                // World-anchored table: fit the homography from the corner anchors.
-                onEvent(
-                    MainScreenEvent.ArTableMatrixUpdated(
-                        matrix = arTableSession.computeFrameUpdate(frame, surfaceWidth, surfaceHeight)
-                    )
-                )
+                // World-anchored table: serve any Lock tap, then fit the homography from the anchors.
+                val update = arTableSession.computeFrameUpdate(frame, surfaceWidth, surfaceHeight)
+                onEvent(MainScreenEvent.ArTableMatrixUpdated(matrix = update.matrix))
+                update.lockResult?.let { onEvent(MainScreenEvent.ArTableLockResult(it)) }
 
                 // Pitch hint from plane geometry (used before the table is locked).
                 arTableSession.findAndAnchorTablePlane(frame)

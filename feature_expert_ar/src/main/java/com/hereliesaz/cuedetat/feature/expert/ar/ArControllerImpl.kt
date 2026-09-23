@@ -1,6 +1,7 @@
 package com.hereliesaz.cuedetat.feature.expert.ar
 
 import android.content.Context
+import android.graphics.PointF
 import androidx.camera.core.ImageAnalysis
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -69,6 +70,15 @@ class ArControllerImpl(context: Context) : ArController {
             tableZOffsetLogical / TableFrameHomography.LOGICAL_UNITS_PER_METER
         )
     }
+
+    override fun lockTable(screenCorners: List<PointF>, logicalCorners: List<PointF>) {
+        arTableSession.requestLock(
+            screenCorners.map { TableFrameHomography.Pt(it.x, it.y) },
+            logicalCorners.map { TableFrameHomography.Pt(it.x, it.y) },
+        )
+    }
+
+    override fun unlockTable() = arTableSession.unlock()
 
     @Composable
     override fun ArBackground(modifier: Modifier, onEvent: (MainScreenEvent) -> Unit) {

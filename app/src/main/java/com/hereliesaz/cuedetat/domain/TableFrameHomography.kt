@@ -78,6 +78,32 @@ object TableFrameHomography {
     }
 
     /**
+     * Inverse of [worldToScreen] onto a plane: casts the ray through screen pixel ([sx], [sy]) and
+     * intersects it with the plane through [planePoint] with normal [planeNormal].
+     *
+     * [invViewProj] is the column-major inverse of `proj * view`. Returns null when the ray is
+     * parallel to the plane or the intersection lies behind the camera.
+     */
+    fun screenToPlane(
+        invViewProj: FloatArray,
+        sx: Float, sy: Float, vpW: Int, vpH: Int,
+        planePoint: Vec3, planeNormal: Vec3,
+    ): Vec3? {
+        val ndcX = sx / vpW * 2f - 1f
+        val ndcY = 1f - sy / vpH * 2f
+        val near = multiplyColMajor(invViewProj, ndcX, ndcY, -1f, 1f)
+        val far = multiplyColMajor(invViewProj, ndcX, ndcY, 1f, 1f)
+        if (abs(near[3]) < 1e-9f || abs(far[3]) < 1e-9f) return null
+        val origin = Vec3(near[0] / near[3], near[1] / near[3], near[2] / near[3])
+        val dir = sub(Vec3(far[0] / far[3], far[1] / far[3], far[2] / far[3]), origin)
+        val denom = dot(planeNormal, dir)
+        if (abs(denom) < 1e-9f) return null
+        val t = dot(planeNormal, sub(planePoint, origin)) / denom
+        if (t < 0f) return null
+        return add(origin, scale(dir, t))
+    }
+
+    /**
      * Plane normal from three corner anchors. The sign is chosen to point "up" (+y in ARCore's
      * Y-up world), so [raise] lifts the table off the floor rather than into it.
      */

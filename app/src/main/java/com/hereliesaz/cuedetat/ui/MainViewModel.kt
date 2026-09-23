@@ -328,6 +328,23 @@ class MainViewModel @Inject constructor(
         if (event is MainScreenEvent.CycleCameraMode && _uiState.value.cameraMode == CameraMode.OFF) {
             ensureArModuleLoaded()
         }
+        // Lock: hand ARCore the virtual table's corners exactly as they sit on screen now, so the
+        // anchors land under what the user lined up. pitchMatrix maps logical -> screen pixels.
+        if (event is MainScreenEvent.LockArTable) {
+            val state = _uiState.value
+            val c = state.table.corners // TL, TR, BR, BL
+            val pts = FloatArray(8).also { a -> c.forEachIndexed { i, p -> a[i * 2] = p.x; a[i * 2 + 1] = p.y } }
+            state.pitchMatrix?.mapPoints(pts)
+            if (state.pitchMatrix != null) {
+                arController.lockTable(
+                    screenCorners = List(4) { i -> android.graphics.PointF(pts[i * 2], pts[i * 2 + 1]) },
+                    logicalCorners = c,
+                )
+            }
+        }
+        if (event is MainScreenEvent.UnlockArTable) {
+            arController.unlockTable()
+        }
         if (event is MainScreenEvent.RetryArModuleLoad) {
             arModuleLoadJob?.cancel()
             arModuleLoadJob = null

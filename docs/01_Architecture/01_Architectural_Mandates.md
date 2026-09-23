@@ -42,8 +42,9 @@ will compromise the stability and maintainability of the codebase.
 
   AR setup is felt capture only: the user locks the felt color using a magnifying circle and a
   capture button (styled like a camera app), and the scan completes. Pocket tapping (the former
-  `CORNER_QUAD` corner taps and `POCKET_GUIDE` per-pocket guide) was removed. The table lock is to
-  come from placing the virtual table over the real one and locking it with ARCore.
+  `CORNER_QUAD` corner taps and `POCKET_GUIDE` per-pocket guide) was removed. Once tracking, the
+  rail's `ar` button reads `lock`: the user lines the virtual table up over the real one and taps
+  it to anchor the table in ARCore (`unlock` releases it to realign).
 
   The system auto-confirms once `tableOverlayConfidence >= 0.8` (see `CvReducer.kt`). If ARCore's
   tracking blips momentarily, the app floats on the last known table pose instead of forcing a

@@ -70,6 +70,11 @@ class ArControllerFacade @Inject constructor(
     override fun setTableZOffsetLogical(tableZOffsetLogical: Float) =
         delegate.setTableZOffsetLogical(tableZOffsetLogical)
 
+    override fun lockTable(screenCorners: List<android.graphics.PointF>, logicalCorners: List<android.graphics.PointF>) =
+        delegate.lockTable(screenCorners, logicalCorners)
+
+    override fun unlockTable() = delegate.unlockTable()
+
     @Composable
     override fun ArBackground(modifier: Modifier, onEvent: (MainScreenEvent) -> Unit) =
         delegate.ArBackground(modifier, onEvent)

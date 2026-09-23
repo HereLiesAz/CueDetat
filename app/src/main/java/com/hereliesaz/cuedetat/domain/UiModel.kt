@@ -133,6 +133,8 @@ data class CueDetatState(
     // recomputed every AR frame from the camera pose + corner anchors, so the overlay tracks in
     // full 6DoF as the user walks around. Null until the table is locked / tracking is valid.
     @Transient val arTableMatrix: Matrix? = null,
+    // True once the Lock button has anchored the virtual table to the real one in ARCore.
+    @Transient val isArTableLocked: Boolean = false,
     val depthCapability: DepthCapability = DepthCapability.NONE,
     // Download/load lifecycle of the on-demand Expert-AR module. Transient: it is
     // runtime-only and must not survive process death (a LOADING snapshot would
@@ -229,7 +231,7 @@ data class CueDetatState(
         sizeCalculationMatrix, inversePitchMatrix, flatMatrix, logicalPlaneMatrix, hasInverseMatrix,
         visionData, arConfidenceHistory, arLowConfidenceFrameCount, relocaliserDeltaQ?.toList(),
         relocaliserAttemptFrames, snapCandidates, tableScanModel, depthPlane, arDerivedPitch,
-        arMeasuredHeightM, arTableMatrix, depthCapability, arModuleState,
+        arMeasuredHeightM, arTableMatrix, isArTableLocked, depthCapability, arModuleState,
         lockedHsvColor?.toList(), lockedHsvStdDev?.toList(), showAdvancedOptionsDialog,
         showSupportSheet, showCalibrationScreen, showTableScanScreen,
         useCustomModel, isSnappingEnabled, hasTargetBallBeenMoved, hasCueBallBeenMoved,
@@ -387,6 +389,12 @@ sealed class MainScreenEvent {
     // World-anchored table events (emitted from the ARCore GL thread each frame).
     // [matrix] is the logical->screen homography (null until the table is locked).
     data class ArTableMatrixUpdated(val matrix: Matrix?) : MainScreenEvent()
+    // Lock button: anchor the virtual table where it currently sits over the real one.
+    object LockArTable : MainScreenEvent()
+    // Release the lock; the table returns to the sensor-driven pose.
+    object UnlockArTable : MainScreenEvent()
+    // Outcome of a lock attempt, from the ARCore GL thread. False when no table plane was found.
+    data class ArTableLockResult(val locked: Boolean) : MainScreenEvent()
 
     // AR setup / lifecycle events
     object CancelArSetup : MainScreenEvent()
