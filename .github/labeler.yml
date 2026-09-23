@@ -1,0 +1,19 @@
+# Path labels for the shared HereLiesAz/workflows pr-labeler (actions/labeler@v7).
+ui:
+  - changed-files:
+      - any-glob-to-any-file: 'app/src/main/java/**/ui/**'
+core:
+  - changed-files:
+      - any-glob-to-any-file: 'core/**'
+ar:
+  - changed-files:
+      - any-glob-to-any-file: 'feature_expert_ar/**'
+ci:
+  - changed-files:
+      - any-glob-to-any-file: '.github/**'
+docs:
+  - changed-files:
+      - any-glob-to-any-file: ['**/*.md', 'docs/**']
+build:
+  - changed-files:
+      - any-glob-to-any-file: ['**/*.gradle.kts', 'gradle/**', 'version.properties']
