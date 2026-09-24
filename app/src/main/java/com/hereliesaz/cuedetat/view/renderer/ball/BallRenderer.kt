@@ -283,8 +283,10 @@ class BallRenderer {
             }
         }
 
-        // Passive Detection Glow (Selection mode NONE)
-        if (state.tableScanModel != null && state.ballSelectionPhase == BallSelectionPhase.NONE) {
+        // Passive Detection Glow (Selection mode NONE). Shown whenever the camera is on: gating
+        // it on a completed table scan hid every detection from anyone who hadn't scanned.
+        if (state.cameraMode != com.hereliesaz.cuedetat.domain.CameraMode.OFF &&
+            state.ballSelectionPhase == BallSelectionPhase.NONE) {
             val candidates = state.snapCandidates ?: emptyList()
             state.pitchMatrix?.let { matrix ->
                 candidates.forEach { candidate ->

@@ -1,32 +1,52 @@
 # 4.5. Feature Specification: CV Hybrid Eye
 
-The application's vision system uses a hybrid, two-stage pipeline to achieve robust ball detection.
+Ball detection is colour-based: a ball is a hole in the felt. It runs in `CvBallDetector` on the
+full-resolution camera frame (a quarter-scale frame leaves a ball about two pixels across). The
+trained TFLite model has no ball class (table, pocket and rail only), and ML Kit's generic
+object detector, formerly the "scout" stage, never found balls and has been removed from the
+path.
 
-## The Two-Stage Pipeline
+## Table snap and pose memory
 
-1. **Phase 1: ML Detection (The "Scout")**
+`TableFitter` searches the virtual table's pan, rotation and zoom for the outline that best
+overlaps the felt in view (IoU), pulled toward the remembered orientation in proportion to its
+trust. `TableSnapPolicy` sets three degrees: a dashed ghost of the fit (IoU ≥ 0.6), Lock snapping
+to the fit (≥ 0.7), and a gentle drift toward it after 1.5 s without a touch (≥ 0.85).
 
-* **Tool**: ML Kit's generic Object Detection.
-* **Purpose**: To perform a fast, initial pass on the full camera frame and identify Regions of
-  Interest (ROIs) via bounding boxes.
+Memory (`TablePoseStore`, `TablePosePrior`, `TableOrientationLearner`): the session's last
+pose (fading over 10 min), every table's poses keyed by GPS (75 m), and the last table anywhere
+at half trust. The learner predicts rotation from compass yaw (the table's heading is a constant
+of the room; rotation = heading − yaw, modulo 180°) and zoom from pitch. When the camera comes
+on, a prior trusted ≥ 0.3 seeds the table unless the user has already moved it. Every Lock and
+every very good fit (IoU ≥ 0.9, at most once a minute) is recorded, and appended to
+`table_pose_log.jsonl` (location coarsened to ~1 km) for training a proper model later.
 
-2. **Phase 2: OpenCV Refinement (The "Sniper")**
+## The Pipeline
 
-* **Tool**: OpenCV, via `CvBallDetector`.
-* **Purpose**: For each ROI provided by the Scout, a more precise algorithm is run *only within that
-  box*.
-* **Algorithm**: There is no contour/Hough toggle. `CvBallDetector` runs a single fixed pipeline:
-  1. Build a felt color mask from the sampled HSV mean/stdDev (`inRange`).
-  2. Morphologically close the mask to seal ball-sized holes, then subtract the original mask —
-     the surviving blobs are ball candidates.
-  3. Run `connectedComponentsWithStats` on the candidate mask and filter blobs by area and
-     circularity (`approxRadius / bboxRadius`).
-  4. For each surviving blob, run `HoughCircles` in a local crop around the blob to refine the
-     center and radius to sub-pixel precision, falling back to the blob's centroid/bounding-box
-     radius if Hough finds nothing.
-* **Dynamic Rangefinder**: The system calculates the expected on-screen pixel radius of a ball at
-  the Y-coordinate of the Scout's bounding box. This provides the Sniper with a tight `minRadius`
-  and `maxRadius`, reducing false positives.
+1. **Felt mask**: `inRange` around the felt HSV mean ± spread (hue held tight; saturation and
+   value loose, floor 25, so shadowed or dark felt still masks).
+2. **Table region**: the playing surface projected into the frame from the table pose; without a
+   pose, the convex hull of the largest felt area. Eroded slightly off the cushion line.
+3. **Islands**: table region AND NOT felt, opened with a 3 px kernel to drop noise, then
+   `connectedComponentsWithStats`.
+4. **Judgement** (`BallIslandRules.judge`, pure and unit-tested): each island is compared with the
+   ball radius expected at that spot. Area 0.35–1.8 of a ball's disk, aspect ≤ 1.5 and fill ≥ 0.5
+   is one ball; roughly twice the area with aspect 1.5–2.6 is two touching balls, split along the
+   long axis; anything else is rejected.
+5. **Naming** (`BallIslandRules.classify`): from the shares of white and dark pixels inside the
+   ball: mostly white is the cue; mostly dark with little white is the 8; a real share of white
+   beside colour is a stripe; otherwise a solid. Rotation-free, because a stripe's band lies at
+   any angle.
+
+* **Expected radius**: with a table pose, the logical ball radius is projected into the frame at
+  each island, so far balls are expected smaller. Without one, it is estimated from the visible
+  surface area (`BallIslandRules.fallbackRadius`).
+* **Frame to screen**: CameraX frames arrive in sensor orientation; `CameraViewMapping.fillCenter`
+  applies the preview's rotation and centre-crop. ARCore frames use ARCore's own
+  `Frame.transformCoordinates2d` mapping, since its CPU image is cropped differently from its
+  on-screen feed.
+* **Threading**: in AR, detection runs on a background worker; the GL thread only copies the
+  image and releases it.
 
 ## Color Calibration
 
