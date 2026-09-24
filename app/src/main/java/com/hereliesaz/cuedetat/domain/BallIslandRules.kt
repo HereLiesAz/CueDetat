@@ -31,11 +31,12 @@ object BallIslandRules {
     /** Island area over bounding-box area. A disk fills pi/4 (0.785) of its box. */
     const val MIN_FILL = 0.5f
 
-    /** Two touching balls: area and aspect ranges for the side-by-side pair. */
+    /**
+     * Two touching balls: area range. No aspect test, because a pair lying diagonally has a
+     * near-square bounding box; [splitPair] finds the axis from the island's own shape.
+     */
     const val PAIR_MIN_AREA_RATIO = 1.5f
     const val PAIR_MAX_AREA_RATIO = 2.6f
-    const val PAIR_MIN_ASPECT = 1.5f
-    const val PAIR_MAX_ASPECT = 2.6f
 
     /** Below this radius (pixels) colour statistics are noise; the ball is left UNKNOWN. */
     const val MIN_CLASSIFY_RADIUS_PX = 3f
@@ -57,7 +58,7 @@ object BallIslandRules {
         data object Reject : Verdict
         /** One ball, centred on the island's centroid. */
         data object Single : Verdict
-        /** Two touching balls, centred on the halves of the box's long axis. */
+        /** Two touching balls; see [splitPair]. */
         data object Pair : Verdict
     }
 
@@ -79,11 +80,23 @@ object BallIslandRules {
             max(width, height) <= expectedRadius * 2.6f
         ) return Verdict.Single
 
-        if (ratio in PAIR_MIN_AREA_RATIO.toDouble()..PAIR_MAX_AREA_RATIO.toDouble() &&
-            aspect in PAIR_MIN_ASPECT..PAIR_MAX_ASPECT
-        ) return Verdict.Pair
+        if (ratio in PAIR_MIN_AREA_RATIO.toDouble()..PAIR_MAX_AREA_RATIO.toDouble()) return Verdict.Pair
 
         return Verdict.Reject
+    }
+
+    /**
+     * Centres of two touching balls: one ball radius either side of the island's centroid, along
+     * its principal axis (from the central second moments mu20, mu02, mu11). Works at any angle,
+     * which the bounding box does not.
+     *
+     * @return x1, y1, x2, y2
+     */
+    fun splitPair(cx: Float, cy: Float, mu20: Double, mu02: Double, mu11: Double, radius: Float): FloatArray {
+        val theta = 0.5 * kotlin.math.atan2(2.0 * mu11, mu20 - mu02)
+        val dx = (kotlin.math.cos(theta) * radius).toFloat()
+        val dy = (kotlin.math.sin(theta) * radius).toFloat()
+        return floatArrayOf(cx - dx, cy - dy, cx + dx, cy + dy)
     }
 
     /**

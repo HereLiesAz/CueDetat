@@ -108,18 +108,26 @@ class CvBallDetector {
                 BallIslandRules.Verdict.Single ->
                     results += ball(hsvMat, cx, cy, expected, confidence)
                 BallIslandRules.Verdict.Pair -> {
-                    // Two touching balls: split the box along its long axis.
-                    val (p, q) = if (w >= h) {
-                        PointF(x + w * 0.25f, cy) to PointF(x + w * 0.75f, cy)
-                    } else {
-                        PointF(cx, y + h * 0.25f) to PointF(cx, y + h * 0.75f)
-                    }
-                    results += ball(hsvMat, p.x, p.y, expected, confidence)
-                    results += ball(hsvMat, q.x, q.y, expected, confidence)
+                    // Two touching balls: split along the island's principal axis.
+                    val m = islandMoments(label, x, y, w, h)
+                    val c = BallIslandRules.splitPair(cx, cy, m.mu20, m.mu02, m.mu11, expected)
+                    results += ball(hsvMat, c[0], c[1], expected, confidence)
+                    results += ball(hsvMat, c[2], c[3], expected, confidence)
                 }
             }
         }
         return results
+    }
+
+    /** Second moments of one labelled island, from its bounding-box crop of [labels]. */
+    private fun islandMoments(label: Int, x: Int, y: Int, w: Int, h: Int): org.opencv.imgproc.Moments {
+        val crop = labels.submat(CvRect(x, y, w, h))
+        try {
+            Core.compare(crop, Scalar(label.toDouble()), scratch, Core.CMP_EQ)
+            return Imgproc.moments(scratch, true)
+        } finally {
+            crop.release()
+        }
     }
 
     private fun buildFeltMask(hsvMat: Mat, felt: FloatArray, sd: FloatArray) {

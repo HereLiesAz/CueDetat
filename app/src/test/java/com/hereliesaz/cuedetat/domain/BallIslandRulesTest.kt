@@ -39,6 +39,24 @@ class BallIslandRulesTest {
     }
 
     @Test
+    fun `two touching balls on a diagonal are still a pair`() {
+        // Two r=10 disks at 45 degrees: box about 34 x 34 (aspect 1), area 628, fill 0.54.
+        assertEquals(Verdict.Pair, BallIslandRules.judge(area = 628, width = 34, height = 34, expectedRadius = 10f))
+    }
+
+    @Test
+    fun `pair split follows the island's axis`() {
+        // Horizontal pair: variance along x only (mu11 = 0, mu20 > mu02) -> centres at cx -/+ r.
+        val h = BallIslandRules.splitPair(50f, 20f, mu20 = 400.0, mu02 = 100.0, mu11 = 0.0, radius = 10f)
+        assertEquals(40f, h[0], 1e-3f); assertEquals(20f, h[1], 1e-3f)
+        assertEquals(60f, h[2], 1e-3f); assertEquals(20f, h[3], 1e-3f)
+        // 45-degree pair: mu20 = mu02 and mu11 > 0 -> theta = 45 degrees, offset r / sqrt 2 = 7.071.
+        val d = BallIslandRules.splitPair(0f, 0f, mu20 = 100.0, mu02 = 100.0, mu11 = 50.0, radius = 10f)
+        assertEquals(-7.071f, d[0], 1e-3f); assertEquals(-7.071f, d[1], 1e-3f)
+        assertEquals(7.071f, d[2], 1e-3f); assertEquals(7.071f, d[3], 1e-3f)
+    }
+
+    @Test
     fun `a big blob like a hand is rejected`() {
         // 5000 / 314 = 16 disks.
         assertEquals(Verdict.Reject, BallIslandRules.judge(area = 5000, width = 90, height = 80, expectedRadius = 10f))
