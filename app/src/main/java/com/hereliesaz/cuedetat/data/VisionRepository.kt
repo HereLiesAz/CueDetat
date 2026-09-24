@@ -16,7 +16,6 @@ import com.hereliesaz.cuedetat.domain.ThinPlateSpline
 import com.hereliesaz.cuedetat.domain.decomposeHomography
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.utils.toMat
-import android.media.Image as MediaImage
 import com.hereliesaz.cuedetat.view.model.Perspective
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -452,14 +451,17 @@ class VisionRepository @Inject constructor(
     }
 
     /**
-     * @param image ARCore CPU image, sensor orientation
+     * AR-path detection on one frame. Call off the GL thread: this is the whole CV pass.
+     *
+     * @param fullMat ARCore CPU image as BGR, sensor orientation, full resolution. Read only;
+     *   the caller owns and releases it.
      * @param rotationDegrees clockwise rotation to upright; used only when [frameToView] is null
-     * @param frameToView maps [image] pixels to view pixels, from ARCore's own
+     * @param frameToView maps [fullMat] pixels to view pixels, from ARCore's own
      *   `Frame.transformCoordinates2d` (its crop differs from CameraX's); null falls back to a
      *   centre-crop estimate
      */
     @SuppressLint("UnsafeOptInUsageError")
-    fun processArCpuImage(image: MediaImage, rotationDegrees: Int, state: CueDetatState, frameToView: Matrix? = null) {
+    fun processArFrame(fullMat: Mat, rotationDegrees: Int, state: CueDetatState, frameToView: Matrix? = null) {
         ensureModelOnce()
         if (!isProcessing.compareAndSet(false, true)) {
             return
@@ -468,9 +470,6 @@ class VisionRepository @Inject constructor(
         val smallMat = Mat()
 
         try {
-            // Full-resolution raw BGR frame: balls are found here.
-            val fullMat = image.toMat(reusableFrameMat)
-
             // Quarter-scale HSV, for felt auto-detection only.
             Imgproc.resize(fullMat, smallMat, Size((fullMat.cols() / 4).toDouble(), (fullMat.rows() / 4).toDouble()))
             Imgproc.cvtColor(smallMat, reusableHsvMat, Imgproc.COLOR_BGR2HSV)
