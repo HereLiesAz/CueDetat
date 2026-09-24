@@ -47,9 +47,9 @@ class GestureReducer @Inject constructor() {
         val ballDragHitRadius = (LOGICAL_BALL_RADIUS * 8.0f) / currentZoom
         val touchRadius = ballDragHitRadius
 
-        // 0. Ball Selection Phase: tap near a confirmed snap candidate to attach a virtual ball
-        if (currentState.tableScanModel != null &&
-            currentState.ballSelectionPhase != BallSelectionPhase.NONE) {
+        // 0. Ball Selection Phase: tap near a confirmed snap candidate to attach a virtual ball.
+        // Needs detections, not a table scan: the phase is only entered with the camera on.
+        if (currentState.ballSelectionPhase != BallSelectionPhase.NONE) {
             
             val confirmed = currentState.snapCandidates?.filter { it.isConfirmed } ?: emptyList()
             

@@ -404,7 +404,8 @@ class MainViewModel @Inject constructor(
         val finalState = when (logicalEvent) {
             is MainScreenEvent.CvDataUpdated -> {
                 val stateAfterSnap = snapReducer.reduce(reducedState, logicalEvent.visionData)
-                if (stateAfterSnap.tableScanModel != null &&
+                // Camera on, not "table scanned": detections exist without a scan.
+                if (stateAfterSnap.cameraMode != CameraMode.OFF &&
                     stateAfterSnap.experienceMode == ExperienceMode.EXPERT &&
                     stateAfterSnap.ballSelectionPhase == BallSelectionPhase.NONE &&
                     stateAfterSnap.snapCandidates?.any { it.isConfirmed } == true

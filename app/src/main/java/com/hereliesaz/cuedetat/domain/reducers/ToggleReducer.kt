@@ -44,7 +44,7 @@ internal fun reduceToggleAction(
                 isArTableLocked = false
             )
             CameraMode.AR_ACTIVE -> state.copy(cameraMode = CameraMode.LITE_AR, isArTableLocked = false)
-            else -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false, isArTableLocked = false)
+            else -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false, isArTableLocked = false, ballSelectionPhase = com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE)
         }
         is MainScreenEvent.StartArTracking -> {
             val phase = if (state.experienceMode == ExperienceMode.EXPERT) {
@@ -58,7 +58,7 @@ internal fun reduceToggleAction(
             )
         }
         is MainScreenEvent.CancelArSetup -> state.copy(cameraMode = CameraMode.CAMERA_ONLY, showTableScanScreen = false, isArTableLocked = false)
-        is MainScreenEvent.TurnCameraOff -> state.copy(cameraMode = CameraMode.OFF, isArTableLocked = false)
+        is MainScreenEvent.TurnCameraOff -> state.copy(cameraMode = CameraMode.OFF, isArTableLocked = false, ballSelectionPhase = com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE)
         is MainScreenEvent.SetCameraMode -> state.copy(cameraMode = action.mode)
         is MainScreenEvent.ToggleTargetType -> {
             val nextType = if (state.targetType == com.hereliesaz.cuedetat.domain.TargetType.SOLIDS) {

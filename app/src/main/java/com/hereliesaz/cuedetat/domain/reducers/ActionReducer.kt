@@ -86,7 +86,8 @@ internal fun reduceAction(
                 cueBallCvAnchor = null,
                 targetCvAnchor = null,
                 obstacleCvAnchors = emptyList(),
-                ballSelectionPhase = if (state.tableScanModel != null && state.experienceMode == ExperienceMode.EXPERT)
+                ballSelectionPhase = if (state.cameraMode != com.hereliesaz.cuedetat.domain.CameraMode.OFF &&
+                    state.experienceMode == ExperienceMode.EXPERT)
                     BallSelectionPhase.AWAITING_CUE else BallSelectionPhase.NONE
             )
         }
