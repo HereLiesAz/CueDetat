@@ -72,7 +72,17 @@ class SensorRepository @Inject constructor(
                         movement > 1.5f -> 0.07f // moderate movement
                         else -> 0.025f                         // near-still: maximum stabilization
                     }
-                    smoothedYaw = smoothedYaw?.let { (rawYaw * alpha) + (it * (1 - alpha)) } ?: rawYaw
+                    // Yaw wraps at ±180°: step along the shortest arc, or facing south the average
+                    // of 179° and -179° comes out as 0° (north).
+                    smoothedYaw = smoothedYaw?.let { prev ->
+                        var d = rawYaw - prev
+                        if (d > 180f) d -= 360f
+                        if (d < -180f) d += 360f
+                        var y = prev + d * alpha
+                        if (y > 180f) y -= 360f
+                        if (y <= -180f) y += 360f
+                        y
+                    } ?: rawYaw
                     smoothedPitch = smoothedPitch?.let { (rawPitch * alpha) + (it * (1 - alpha)) } ?: rawPitch
                     smoothedRoll = smoothedRoll?.let { (rawRoll * alpha) + (it * (1 - alpha)) } ?: rawRoll
 
