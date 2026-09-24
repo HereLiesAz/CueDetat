@@ -112,6 +112,21 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   infinite plane, not per-corner hit-tests, because plain felt is rarely mapped
   edge to edge by ARCore.
 
+- **Balls are found top-down when a pose exists.** The frame is rectified
+  onto the table through the pose and balls are found there. Reason: the
+  phone is never above the table, and the pose already knows where the
+  table is; rectifying removes shape search and size guessing. Balls stand
+  off the felt, so each is placed at its contact point
+  (`TopDownBallRules`), not its centroid.
+
+- **The table snaps to the felt to three degrees, and remembers.** Ghost at
+  IoU 0.6, Lock snaps at 0.7, untouched pull at 0.85 (`TableSnapPolicy`).
+  Poses are remembered per session, per location and for the last table,
+  and an on-device learner predicts orientation from the compass. Reason:
+  the user asked for snapping with persistence and a prediction model; the
+  learner needs no training data, and the pose log feeds a future trained
+  model.
+
 - **Felt colour picks the table's plane.** At lock, points across the virtual
   table are sampled from the camera image; only felt-coloured ones
   (`FeltColorMatch`) are hit-tested, and the plane they hit most wins. Reason:

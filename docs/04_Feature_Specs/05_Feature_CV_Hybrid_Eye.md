@@ -6,7 +6,33 @@ trained TFLite model has no ball class (table, pocket and rail only), and ML Kit
 object detector, formerly the "scout" stage, never found balls and has been removed from the
 path.
 
-## The Pipeline
+## Top-down detection (with a table pose)
+
+Whenever the table pose is known (the sensor-driven virtual table, or an AR lock), the camera
+frame is rectified onto the table plane (`TopDownBallDetector`): a top-down view at 8 px per
+ball radius in which the table is a known rectangle and every ball the same size. Balls are
+non-felt islands there. Because a ball stands off the felt, its image is stretched away from
+the camera by `k = 1 / sin(elevation)` (read locally off the rectification); it stays one ball
+wide across. `TopDownBallRules` (pure, tested) judges islands by width across and length along,
+splits front/back and side-by-side pairs, and places each ball at its contact point: the near
+end plus `R · tan(elevation / 2)`. The island pipeline below is the fallback without a pose.
+
+## Table snap and pose memory
+
+`TableFitter` searches the virtual table's pan, rotation and zoom for the outline that best
+overlaps the felt in view (IoU), pulled toward the remembered orientation in proportion to its
+trust. `TableSnapPolicy` sets three degrees: a dashed ghost of the fit (IoU ≥ 0.6), Lock snapping
+to the fit (≥ 0.7), and a gentle drift toward it after 1.5 s without a touch (≥ 0.85).
+
+Memory (`TablePoseStore`, `TablePosePrior`, `TableOrientationLearner`): the session's last
+pose (fading over 10 min), every table's poses keyed by GPS (75 m), and the last table anywhere
+at half trust. The learner predicts rotation from compass yaw (the table's heading is a constant
+of the room; rotation = heading − yaw, modulo 180°) and zoom from pitch. When the camera comes
+on, a prior trusted ≥ 0.3 seeds the table. Every Lock and every very good fit (IoU ≥ 0.9, at most
+once a minute) is recorded, and appended to `table_pose_log.jsonl` (location coarsened to ~1 km)
+for training a proper model later.
+
+## The Pipeline (fallback, no pose)
 
 1. **Felt mask**: `inRange` around the felt HSV mean ± spread (hue held tight; saturation and
    value loose, floor 25, so shadowed or dark felt still masks).
