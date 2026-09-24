@@ -10,7 +10,10 @@ scored and labelled:
             well off 90 degrees): what the app sees. Keep.
   overhead  the felt outline is close to a rectangle: shot from above. Drop.
   partial   the felt runs off the frame, so its shape can't be judged. Review by eye.
-  none      no dominant felt colour found (close-ups, people, rooms). Review by eye.
+  none      no dominant felt colour found (close-ups, people, rooms, black and white).
+            Review by eye.
+
+Felt is looked for outside the orange hues (skin, wood, lamplight).
 
 How: the felt is the largest region of the dominant saturated hue; its outline is reduced
 to four corners; the score is the larger of (a) how unequal opposite edges are and (b) how
@@ -36,7 +39,12 @@ def felt_quad(img):
     sat = (hsv[..., 1] > 70) & (hsv[..., 2] > 40)
     if sat.mean() < 0.1:
         return None, None, small.shape
-    hist = np.bincount(hsv[..., 0][sat].ravel(), minlength=180)
+    hist = np.bincount(hsv[..., 0][sat].ravel(), minlength=180).astype(float)
+    # Skin, wood and warm lamplight sit at orange hues (OpenCV 8-30); felt never does. Without
+    # this, portraits and wooden rails pass for felt.
+    hist[8:31] = 0
+    if hist.sum() < 0.08 * sat.size:
+        return None, None, small.shape
     hue = int(np.argmax(np.convolve(hist, np.ones(9), mode="same")))
     lo, hi = (hue - 12) % 180, (hue + 12) % 180
     h = hsv[..., 0].astype(int)

@@ -23,6 +23,7 @@ fetching is up to whoever runs it.
 
 ~~~
 python3 fetch_openverse.py            # data/images/, data/manifest.csv (attribution per image)
+python3 content_filter.py             # data/content.csv: keep / overhead / off_topic (CLIP)
 python3 perspective_score.py          # data/perspective.csv: oblique / overhead / partial / none
 export YOUTUBE_API_KEY=...
 python3 youtube_cc_search.py          # data/youtube_cc.csv
@@ -30,7 +31,13 @@ python3 youtube_cc_search.py          # data/youtube_cc.csv
 python3 extract_frames.py VIDEO_DIR   # data/frames/, data/frames.csv
 ~~~
 
-`perspective_score.py` fits the felt outline to four corners: a trapezoid (unequal opposite
+`content_filter.py` is the main filter: CLIP (ViT-B-32, zero-shot) scores each image for
+"is a pool table" against decoys (swimming pools, fields, portraits, diagrams…) and for
+player's-eye versus overhead. A keyword search for "pool" is mostly other things; geometry
+alone can't tell. On a hand-checked sample, its `keep` set was all player's-eye pool tables;
+its `overhead` set is loose (pocket close-ups land there) and worth a look by eye.
+
+`perspective_score.py` is a geometric second opinion: it fits the felt outline to four corners: a trapezoid (unequal opposite
 edges, corners far from 90°) is **oblique** and kept; a near-rectangle is **overhead** and
 dropped; felt running off the frame is **partial** and a missing felt colour is **none**,
 both for review by eye.
