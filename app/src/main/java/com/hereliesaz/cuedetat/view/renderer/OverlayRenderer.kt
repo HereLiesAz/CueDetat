@@ -154,5 +154,45 @@ class OverlayRenderer {
 
         // Pass 4 (topmost): the advisor's recommended shot, when enabled.
         recommendationRenderer.draw(canvas, state, matrixFor2DPlane)
+
+        if (topDownProgress <= 0f) drawTableFitGhost(canvas, state, pitchMatrix)
+    }
+
+    private val ghostPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        style = android.graphics.Paint.Style.STROKE
+        strokeWidth = 4f
+        color = android.graphics.Color.WHITE
+        alpha = 150
+        pathEffect = android.graphics.DashPathEffect(floatArrayOf(24f, 16f), 0f)
+    }
+    private val ghostPath = android.graphics.Path()
+    private val ghostPts = FloatArray(8)
+
+    /**
+     * Where the app thinks the real table is (the felt fit), as a dashed outline in screen space:
+     * a suggestion the user can accept with Lock. Hidden when unsure, when locked, or when the
+     * table already sits on it.
+     */
+    private fun drawTableFitGhost(canvas: Canvas, state: CueDetatState, pitchMatrix: Matrix) {
+        val fit = state.tableFit ?: return
+        if (state.isArTableLocked || fit.iou < com.hereliesaz.cuedetat.domain.TableSnapPolicy.GHOST_MIN_IOU) return
+        state.table.corners.forEachIndexed { i, c -> ghostPts[i * 2] = c.x; ghostPts[i * 2 + 1] = c.y }
+        pitchMatrix.mapPoints(ghostPts)
+        // Nearest-corner match: the fit may name the same outline's corners half a turn round.
+        val drift = (0 until 4).sumOf { i ->
+            fit.viewQuad.minOf { q ->
+                kotlin.math.hypot((ghostPts[i * 2] - q.x).toDouble(), (ghostPts[i * 2 + 1] - q.y).toDouble())
+            }
+        } / 4.0
+        if (drift < GHOST_MIN_DRIFT_PX) return
+        ghostPath.reset()
+        fit.viewQuad.forEachIndexed { i, p -> if (i == 0) ghostPath.moveTo(p.x, p.y) else ghostPath.lineTo(p.x, p.y) }
+        ghostPath.close()
+        canvas.drawPath(ghostPath, ghostPaint)
+    }
+
+    private companion object {
+        /** Average corner gap (px) below which the table already sits on the fit. */
+        const val GHOST_MIN_DRIFT_PX = 12.0
     }
 }

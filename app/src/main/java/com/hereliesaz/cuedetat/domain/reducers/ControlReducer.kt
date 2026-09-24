@@ -123,6 +123,21 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
         is MainScreenEvent.UnlockArTable ->
             state.copy(isArTableLocked = false, arTableMatrix = null)
 
+        is MainScreenEvent.TableFitUpdated ->
+            state.copy(tableFit = if (state.isArTableLocked) null else action.fit)
+
+        is MainScreenEvent.ApplyTablePose -> {
+            if (state.isArTableLocked) state else {
+                val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode)
+                state.copy(
+                    viewOffset = PointF(action.offsetX, action.offsetY),
+                    worldRotationDegrees = action.rotationDeg,
+                    zoomSliderPosition = ZoomMapping.zoomToSlider(action.zoom.coerceIn(minZoom, maxZoom), minZoom, maxZoom),
+                    valuesChangedSinceReset = true,
+                )
+            }
+        }
+
         is MainScreenEvent.ArTableLockResult ->
             if (action.locked) state.copy(isArTableLocked = true, warningText = null)
             else state.copy(

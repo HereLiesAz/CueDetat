@@ -72,6 +72,7 @@ fun stateReducer(
         is MainScreenEvent.DepthCapabilityDetected, is MainScreenEvent.ArTrackingLost,
         is MainScreenEvent.ArTableMatrixUpdated, is MainScreenEvent.LockArTable,
         is MainScreenEvent.UnlockArTable, is MainScreenEvent.ArTableLockResult,
+        is MainScreenEvent.TableFitUpdated, is MainScreenEvent.ApplyTablePose,
         is MainScreenEvent.ArModuleLoadStarted, is MainScreenEvent.ArModuleLoadSucceeded,
         is MainScreenEvent.ArModuleLoadFailed ->
             reduceControlAction(currentState, action)
