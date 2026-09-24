@@ -100,8 +100,16 @@ def main():
                 try:
                     download(r["url"], path)
                 except Exception as e:
-                    print(f"  skip {r['id']}: {e}", file=sys.stderr)
-                    continue
+                    # Wikimedia refuses bulk full-size fetches (429) and asks for thumbnails;
+                    # Openverse serves one.
+                    thumb = r.get("thumbnail")
+                    try:
+                        if not thumb:
+                            raise e
+                        download(thumb, path)
+                    except Exception as e2:
+                        print(f"  skip {r['id']}: {e2}", file=sys.stderr)
+                        continue
                 seen.add(r["id"])
                 rows.append({
                     "id": r["id"], "file": os.path.relpath(path, args.out), "query": q,
