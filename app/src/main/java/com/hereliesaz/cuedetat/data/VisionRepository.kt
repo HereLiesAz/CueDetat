@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.opencv.calib3d.Calib3d
 import org.opencv.core.Core
-import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.MatOfDouble
 import org.opencv.core.MatOfPoint
@@ -109,7 +108,6 @@ class VisionRepository @Inject constructor(
     private val feltColorDetector = FeltColorDetector()
     private val cvBallDetector = CvBallDetector()
     private val tableFitter = TableFitter()
-    private val topDownBallDetector = TopDownBallDetector()
     private var lastTableFitMs = 0L
 
     /**
@@ -400,16 +398,11 @@ class VisionRepository @Inject constructor(
             ?: lastFeltDetection?.stdDev
             ?: floatArrayOf(8f, 40f, 50f)
 
+        Imgproc.cvtColor(frame, reusableFullHsvMat, Imgproc.COLOR_BGR2HSV)
+
         val viewToFrame = Matrix()
         val pose = if (frameToView.invert(viewToFrame)) tablePoseInFrame(state, frameToView, viewToFrame) else null
 
-        // With a table pose, look from above: rectify the frame onto the table and find balls
-        // there, where the table is a known rectangle and every ball the same size.
-        if (pose != null) {
-            topDownBalls(frame, viewToFrame, state, feltMean, feltSd, pose)?.let { return it }
-        }
-
-        Imgproc.cvtColor(frame, reusableFullHsvMat, Imgproc.COLOR_BGR2HSV)
         val detections = cvBallDetector.detect(
             frame, reusableFullHsvMat, feltMean, feltSd,
             tablePolygon = pose?.polygon,
@@ -433,69 +426,6 @@ class VisionRepository @Inject constructor(
                 boundingBox = android.graphics.Rect(
                     (d.center.x - d.radius).toInt(), (d.center.y - d.radius).toInt(),
                     (d.center.x + d.radius).toInt(), (d.center.y + d.radius).toInt(),
-                ),
-            )
-        }
-    }
-
-    /**
-     * Top-down detection ([TopDownBallDetector]): frame rectified through the table pose.
-     * Positions come out as contact points on the table. Null if the pose can't rectify.
-     */
-    private fun topDownBalls(
-        frame: Mat,
-        viewToFrame: Matrix,
-        state: CueDetatState,
-        feltMean: FloatArray,
-        feltSd: FloatArray,
-        pose: FramePose,
-    ): List<DetectedBall>? {
-        val pitch = state.pitchMatrix ?: return null
-        val inverse = state.inversePitchMatrix?.takeIf { state.hasInverseMatrix } ?: return null
-
-        // logical -> view -> frame, as a 3x3 homography.
-        val logicalToFrame = Matrix(pitch).apply { postConcat(viewToFrame) }
-        val v = FloatArray(9).also { logicalToFrame.getValues(it) }
-        val h = Mat(3, 3, CvType.CV_64F).apply { put(0, 0, *DoubleArray(9) { v[it].toDouble() }) }
-
-        // Viewing direction at a logical point: one screen step up (away from the player, for a
-        // phone held normally) and one across, taken back onto the table.
-        val step = 8f
-        val viewDirection = { lx: Float, ly: Float ->
-            val p = floatArrayOf(lx, ly)
-            pitch.mapPoints(p)
-            val q = floatArrayOf(p[0], p[1] - step, p[0] + step, p[1])
-            inverse.mapPoints(q)
-            val ax = q[0] - lx; val ay = q[1] - ly
-            val al = hypot(ax, ay)
-            val cl = hypot(q[2] - lx, q[3] - ly)
-            if (al < 1e-6f || cl < 1e-6f) null
-            else TopDownBallDetector.ViewDirection(ax / al, ay / al, (al / cl).coerceAtLeast(1f))
-        }
-
-        val balls = try {
-            topDownBallDetector.detect(
-                frame, h, state.table.logicalWidth, state.table.logicalHeight, LOGICAL_BALL_RADIUS,
-                feltMean, feltSd, viewDirection,
-            )
-        } catch (e: Exception) {
-            return null
-        } finally {
-            h.release()
-        }
-
-        val pt = FloatArray(2)
-        return balls.map { b ->
-            // Box around the contact point in frame pixels, for the debug overlay.
-            pt[0] = b.logical.x; pt[1] = b.logical.y
-            logicalToFrame.mapPoints(pt)
-            val r = pose.radiusAt(pt[0], pt[1])
-            DetectedBall(
-                position = state.lensWarpTps?.let { ThinPlateSpline.applyWarp(it, b.logical) } ?: b.logical,
-                type = b.type,
-                confidence = b.confidence,
-                boundingBox = android.graphics.Rect(
-                    (pt[0] - r).toInt(), (pt[1] - 2 * r).toInt(), (pt[0] + r).toInt(), pt[1].toInt(),
                 ),
             )
         }
