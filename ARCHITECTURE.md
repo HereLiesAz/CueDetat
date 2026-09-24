@@ -103,8 +103,8 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   pocket tapping (the former `CORNER_QUAD` corner taps and `POCKET_GUIDE`
   per-pocket guide) did not work and was deleted.
 
-- **The table is locked by hand, not detected.** Once tracking, the rail's `ar`
-  button reads `lock`: the user lines the virtual table up over the real one and
+- **The table is locked by hand, not detected.** Once tracking, a `lock` rail
+  item appears above `ar`/`off`: the user lines the virtual table up over the real one and
   taps it. The virtual corners' current screen positions are cast onto the
   detected horizontal plane (`TableFrameHomography.screenToPlane`) and anchored;
   `ArTableSession` then drives the overlay from those anchors. Reason: the
