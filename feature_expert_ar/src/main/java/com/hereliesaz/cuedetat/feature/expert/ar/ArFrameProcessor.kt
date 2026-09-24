@@ -1,6 +1,8 @@
 package com.hereliesaz.cuedetat.feature.expert.ar
 
+import android.graphics.Matrix
 import android.media.Image
+import com.google.ar.core.Coordinates2d
 import com.google.ar.core.Frame
 import com.hereliesaz.cuedetat.data.VisionRepository
 import com.hereliesaz.cuedetat.domain.CueDetatState
@@ -65,11 +67,29 @@ class ArFrameProcessor(
             // ARCore's CPU image sensor orientation matches the display orientation configured
             // via session.setDisplayGeometry(); for portrait-primary Android apps this is 90°.
             val rotation = 90
-            visionRepository.processArCpuImage(cpuImage, rotation, state)
+            visionRepository.processArCpuImage(
+                cpuImage, rotation, state, imageToView(frame, cpuImage.width, cpuImage.height)
+            )
         } catch (_: Exception) {
             // A bad frame is skipped; the next one gets a fresh image.
         } finally {
             cpuImage.close()
+        }
+    }
+
+    /**
+     * CPU-image pixels -> view pixels, straight from ARCore. Its CPU image and its on-screen
+     * camera feed are cropped differently, so a guessed scale puts detections in the wrong place.
+     * Rotation, scale and crop are affine, so three corners fix the whole mapping.
+     */
+    private fun imageToView(frame: Frame, width: Int, height: Int): Matrix? {
+        val src = floatArrayOf(0f, 0f, width.toFloat(), 0f, 0f, height.toFloat())
+        val dst = FloatArray(6)
+        return try {
+            frame.transformCoordinates2d(Coordinates2d.IMAGE_PIXELS, src, Coordinates2d.VIEW, dst)
+            Matrix().takeIf { it.setPolyToPoly(src, 0, dst, 0, 3) }
+        } catch (_: Exception) {
+            null
         }
     }
 
