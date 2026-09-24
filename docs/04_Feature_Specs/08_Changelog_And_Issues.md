@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Lock is its own rail item.** `lock`/`unlock` shows while AR is tracking, above `ar`/`off`. `off` now turns the camera straight off from any camera mode (it used to step AR down to Lite AR first).
+- **Lock is its own rail item.** `lock`/`unlock` shows while AR is tracking, above `ar`/`off`. `off` now turns the camera straight off from any camera mode (it used to step AR down to Lite AR first). The redundant `Cancel` rail item is gone.
 
 - **Table snap and pose memory.** The virtual table is fitted to the felt in view: a ghost outline suggests the fit, Lock snaps to it, and a sure fit gently pulls the table when untouched. Confirmed poses are remembered per session, per location and for the last table, and an on-device learner predicts the table's orientation from the compass. Poses are logged for training a model later.
 - **Sensor yaw smoothing** no longer swings through north when the phone faces south.

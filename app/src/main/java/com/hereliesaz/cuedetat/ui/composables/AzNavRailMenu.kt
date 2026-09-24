@@ -320,10 +320,6 @@ fun AzNavRailMenu(
                         }
                     )
                 }
-
-                azRailItemLowerCase(id = "cancel_ar", text = "Cancel", fillColor = Color.DarkGray, textColor = Color.White, onClick = {
-                    onEvent(MainScreenEvent.CancelArSetup) 
-                })
             }
         }
         azDivider()
