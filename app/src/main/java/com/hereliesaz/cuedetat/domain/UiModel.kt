@@ -135,6 +135,9 @@ data class CueDetatState(
     @Transient val arTableMatrix: Matrix? = null,
     // True once the Lock button has anchored the virtual table to the real one in ARCore.
     @Transient val isArTableLocked: Boolean = false,
+    // Best fit of the virtual table to the felt in view (snap target), refreshed a few times a
+    // second while the table is not locked. Drawn as a ghost outline; used by the Lock button.
+    @Transient val tableFit: com.hereliesaz.cuedetat.data.TableFitter.Fit? = null,
     val depthCapability: DepthCapability = DepthCapability.NONE,
     // Download/load lifecycle of the on-demand Expert-AR module. Transient: it is
     // runtime-only and must not survive process death (a LOADING snapshot would
@@ -231,7 +234,7 @@ data class CueDetatState(
         sizeCalculationMatrix, inversePitchMatrix, flatMatrix, logicalPlaneMatrix, hasInverseMatrix,
         visionData, arConfidenceHistory, arLowConfidenceFrameCount, relocaliserDeltaQ?.toList(),
         relocaliserAttemptFrames, snapCandidates, tableScanModel, depthPlane, arDerivedPitch,
-        arMeasuredHeightM, arTableMatrix, isArTableLocked, depthCapability, arModuleState,
+        arMeasuredHeightM, arTableMatrix, isArTableLocked, tableFit, depthCapability, arModuleState,
         lockedHsvColor?.toList(), lockedHsvStdDev?.toList(), showAdvancedOptionsDialog,
         showSupportSheet, showCalibrationScreen, showTableScanScreen,
         useCustomModel, isSnappingEnabled, hasTargetBallBeenMoved, hasCueBallBeenMoved,
@@ -395,6 +398,11 @@ sealed class MainScreenEvent {
     object UnlockArTable : MainScreenEvent()
     // Outcome of a lock attempt, from the ARCore GL thread. False when no table plane was found.
     data class ArTableLockResult(val locked: Boolean) : MainScreenEvent()
+    // Latest snap fit of the table to the felt (null: nothing to fit to).
+    data class TableFitUpdated(val fit: com.hereliesaz.cuedetat.data.TableFitter.Fit?) : MainScreenEvent()
+    // Move the virtual table to a pose (snap, remembered orientation). Unlike UpdateArPose this is
+    // not a user gesture, so it does not set isWorldLocked.
+    data class ApplyTablePose(val offsetX: Float, val offsetY: Float, val rotationDeg: Float, val zoom: Float) : MainScreenEvent()
 
     // AR setup / lifecycle events
     object CancelArSetup : MainScreenEvent()

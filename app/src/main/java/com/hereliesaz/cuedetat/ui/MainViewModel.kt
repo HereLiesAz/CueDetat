@@ -75,6 +75,7 @@ class MainViewModel @Inject constructor(
     private val shotAdvisor: com.hereliesaz.cuedetat.domain.advisor.ShotAdvisor,
     private val appUpdater: com.hereliesaz.cuedetat.update.AppUpdater,
     val wristWearableRepository: com.hereliesaz.cuedetat.data.WristWearableRepository,
+    private val tablePoseStore: com.hereliesaz.cuedetat.data.TablePoseStore,
 ) : ViewModel() {
 
     /**
@@ -328,14 +329,19 @@ class MainViewModel @Inject constructor(
         if (event is MainScreenEvent.CycleCameraMode && _uiState.value.cameraMode == CameraMode.OFF) {
             ensureArModuleLoaded()
         }
-        // Lock: hand ARCore the virtual table's corners exactly as they sit on screen now, so the
-        // anchors land under what the user lined up. pitchMatrix maps logical -> screen pixels.
+        // Lock: hand ARCore the virtual table's corners as they sit on screen, so the anchors land
+        // under what the user lined up. If the felt fit is sure enough, snap to it first and lock
+        // the fitted outline instead. pitchMatrix maps logical -> screen pixels.
         if (event is MainScreenEvent.LockArTable) {
             val state = _uiState.value
             val c = state.table.corners // TL, TR, BR, BL
-            val pts = FloatArray(8).also { a -> c.forEachIndexed { i, p -> a[i * 2] = p.x; a[i * 2 + 1] = p.y } }
-            state.pitchMatrix?.mapPoints(pts)
-            if (state.pitchMatrix != null) {
+            val fit = state.tableFit?.takeIf { it.iou >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.LOCK_MIN_IOU }
+            if (fit != null) {
+                // The reducer moves the table onto the fit for this same event (ControlReducer).
+                arController.lockTable(screenCorners = fit.viewQuad, logicalCorners = c)
+            } else if (state.pitchMatrix != null) {
+                val pts = FloatArray(8).also { a -> c.forEachIndexed { i, p -> a[i * 2] = p.x; a[i * 2 + 1] = p.y } }
+                state.pitchMatrix.mapPoints(pts)
                 arController.lockTable(
                     screenCorners = List(4) { i -> android.graphics.PointF(pts[i * 2], pts[i * 2 + 1]) },
                     logicalCorners = c,
@@ -431,6 +437,103 @@ class MainViewModel @Inject constructor(
         processAndEmitState(finalState, updateType)
 
         handleSingleEvents(logicalEvent)
+        tableSnapSideEffects(logicalEvent, currentState, _uiState.value)
+    }
+
+    // --- Table snap and pose memory (see TableSnapPolicy, TablePosePrior) --------------------
+
+    private var lastUserTableAdjustMs = 0L
+    private var lastPoseRecordMs = 0L
+    @Volatile private var cachedLocation: Pair<Double, Double>? = null
+    @Volatile private var locationSamples: List<com.hereliesaz.cuedetat.domain.TablePoseSample>? = null
+    @Volatile private var lastTableSamples: List<com.hereliesaz.cuedetat.domain.TablePoseSample>? = null
+
+    init {
+        // The fit asks for the remembered orientation at the phone's current heading.
+        visionRepository.tablePrior = { yaw, pitch -> tablePrior(yaw, pitch)?.prediction }
+    }
+
+    private fun tablePrior(yaw: Float, pitch: Float) = com.hereliesaz.cuedetat.domain.TablePosePrior.choose(
+        session = tablePoseStore.sessionSample,
+        atLocation = locationSamples,
+        lastTable = lastTableSamples,
+        yawDeg = yaw,
+        pitchDeg = pitch,
+        nowMs = System.currentTimeMillis(),
+    )
+
+    private fun tableSnapSideEffects(event: MainScreenEvent, before: CueDetatState, after: CueDetatState) {
+        val now = System.currentTimeMillis()
+        when (event) {
+            // Any hand on the table (or the screen) holds the pull off.
+            is MainScreenEvent.PanView, is MainScreenEvent.ZoomSliderChanged, is MainScreenEvent.ZoomScaleChanged,
+            is MainScreenEvent.TableRotationChanged, is MainScreenEvent.TableRotationApplied,
+            is MainScreenEvent.ScreenGestureStarted, is MainScreenEvent.LogicalGestureStarted ->
+                lastUserTableAdjustMs = now
+
+            is MainScreenEvent.TableFitUpdated -> {
+                val fit = event.fit ?: return
+                val current = poseOf(after)
+                com.hereliesaz.cuedetat.domain.TableSnapPolicy.pullStep(
+                    current, fit.pose.let { com.hereliesaz.cuedetat.domain.TableSnapPolicy.Pose(it.offsetX, it.offsetY, it.rotationDeg, it.zoom) },
+                    fit.iou, now - lastUserTableAdjustMs,
+                )?.let { onEvent(MainScreenEvent.ApplyTablePose(it.offsetX, it.offsetY, it.rotationDeg, it.zoom)) }
+                if (fit.iou >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.RECORD_MIN_IOU &&
+                    now - lastPoseRecordMs >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.RECORD_INTERVAL_MS
+                ) {
+                    recordPose(after, fit.pose.let { com.hereliesaz.cuedetat.domain.TableSnapPolicy.Pose(it.offsetX, it.offsetY, it.rotationDeg, it.zoom) })
+                }
+            }
+
+            is MainScreenEvent.ArTableLockResult -> if (event.locked) recordPose(after, poseOf(after))
+
+            else -> Unit
+        }
+
+        // Camera just came on: load what is remembered here and seed the table with it.
+        if (before.cameraMode == CameraMode.OFF && after.cameraMode != CameraMode.OFF) {
+            val startedMs = now
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val loc = runCatching { tableScanRepository.getCurrentLocation() }.getOrNull()
+                cachedLocation = loc
+                locationSamples = tablePoseStore.samplesAt(loc?.first, loc?.second)
+                lastTableSamples = tablePoseStore.lastTableSamples()
+                val state = _uiState.value
+                val prior = tablePrior(state.currentOrientation.yaw, state.currentOrientation.pitch)?.prediction
+                // A GPS fix can take seconds; if the user has touched the table since, leave it.
+                if (prior != null && prior.confidence >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.PRIOR_APPLY_CONFIDENCE &&
+                    lastUserTableAdjustMs <= startedMs && !state.isBeginnerViewLocked && !state.isArTableLocked
+                ) {
+                    onEvent(MainScreenEvent.ApplyTablePose(state.viewOffset.x, state.viewOffset.y, prior.rotationDeg, prior.zoom))
+                }
+            }
+        }
+    }
+
+    private fun poseOf(state: CueDetatState): com.hereliesaz.cuedetat.domain.TableSnapPolicy.Pose {
+        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked)
+        return com.hereliesaz.cuedetat.domain.TableSnapPolicy.Pose(
+            state.viewOffset.x, state.viewOffset.y, state.worldRotationDegrees,
+            ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom),
+        )
+    }
+
+    private fun recordPose(state: CueDetatState, pose: com.hereliesaz.cuedetat.domain.TableSnapPolicy.Pose) {
+        lastPoseRecordMs = System.currentTimeMillis()
+        val o = state.currentOrientation
+        val sample = com.hereliesaz.cuedetat.domain.TablePoseSample(
+            yawDeg = o.yaw, pitchDeg = o.pitch, rollDeg = o.roll,
+            rotationDeg = pose.rotationDeg, zoom = pose.zoom,
+            offsetX = pose.offsetX, offsetY = pose.offsetY,
+            timestampMs = lastPoseRecordMs,
+        )
+        val loc = cachedLocation
+        val size = state.table.size.name
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            tablePoseStore.record(sample, loc?.first, loc?.second, size)
+            locationSamples = tablePoseStore.samplesAt(loc?.first, loc?.second)
+            lastTableSamples = tablePoseStore.lastTableSamples()
+        }
     }
 
     private fun processAndEmitState(state: CueDetatState, type: UpdateType) {
@@ -500,7 +603,11 @@ class MainViewModel @Inject constructor(
             // UpdateStateUseCase.updateMatricesAndTransforms (screen-space vertical lift). Without a
             // FULL recompute the new tableZOffset is stored but never applied, so the table doesn't
             // move until some other event happens to recompute the matrices.
-            is MainScreenEvent.MoveTableZ -> UpdateType.FULL
+            is MainScreenEvent.MoveTableZ,
+            // Snap / remembered pose moves the table like a pan-rotate-zoom does.
+            is MainScreenEvent.ApplyTablePose,
+            // Lock may snap the table onto the felt fit first (ControlReducer).
+            is MainScreenEvent.LockArTable -> UpdateType.FULL
 
             is MainScreenEvent.Reset, is MainScreenEvent.LogicalGestureStarted, is MainScreenEvent.LogicalDragApplied,
             is MainScreenEvent.GestureEnded, is MainScreenEvent.AddObstacleBall -> UpdateType.AIMING

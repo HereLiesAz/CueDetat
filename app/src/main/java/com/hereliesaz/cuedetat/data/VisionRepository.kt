@@ -107,6 +107,14 @@ class VisionRepository @Inject constructor(
 
     private val feltColorDetector = FeltColorDetector()
     private val cvBallDetector = CvBallDetector()
+    private val tableFitter = TableFitter()
+    private var lastTableFitMs = 0L
+
+    /**
+     * Remembered table orientation for the phone's current heading and tilt (yaw, pitch), set by
+     * the view-model from [TablePoseStore]. Steers the table fit; null when nothing is remembered.
+     */
+    @Volatile var tablePrior: ((Float, Float) -> com.hereliesaz.cuedetat.domain.TableOrientationLearner.Prediction?)? = null
     private var lastFeltDetection: FeltColorDetector.Result? = null
 
     private val isProcessing = AtomicBoolean(false)
@@ -127,6 +135,7 @@ class VisionRepository @Inject constructor(
         const val IDLE_INTERVAL_MS = 80L      // ~12fps once detections have been stable
         const val MOTION_HOLD_MS = 1500L      // stay responsive this long after the last change
         const val SIGNATURE_EPSILON = 6.0f    // scaled px a detection must move to count as motion
+        const val TABLE_FIT_INTERVAL_MS = 300L // table snap fit cadence
     }
 
     /**
@@ -321,6 +330,13 @@ class VisionRepository @Inject constructor(
             }
             val balls = detectBallsInFrame(fullMat, frameToView, state, autoFelt)
 
+            // Table snap fit on the upright quarter frame, which the preview shows centre-cropped.
+            maybeFitTable(state, hsvMat, autoFelt) {
+                Matrix().apply {
+                    setValues(CameraViewMapping.fillCenter(hsvMat.cols(), hsvMat.rows(), 0, state.viewWidth, state.viewHeight))
+                }
+            }
+
             var finalVisionData = VisionData(
                 // genericBalls and balls share one coord system (logical when a pose exists,
                 // screen otherwise), which the snap/obstacle/gesture reducers compare against.
@@ -415,6 +431,43 @@ class VisionRepository @Inject constructor(
         }
     }
 
+    /**
+     * Fits the virtual table to the felt (see [TableFitter]) a few times a second while the
+     * camera is on and the table is not locked, and publishes the result as
+     * [MainScreenEvent.TableFitUpdated].
+     *
+     * @param hsv small HSV frame
+     * @param frameToView maps [hsv] pixels to view pixels; built only when a fit runs
+     */
+    private fun maybeFitTable(
+        state: CueDetatState,
+        hsv: Mat,
+        autoFelt: FeltColorDetector.Result?,
+        frameToView: () -> Matrix,
+    ) {
+        val now = System.currentTimeMillis()
+        if (now - lastTableFitMs < TABLE_FIT_INTERVAL_MS) return
+        if (state.cameraMode == CameraMode.OFF || state.isArTableLocked || state.isBeginnerViewLocked) return
+        val pitch = state.pitchMatrix ?: return
+        val felt = state.lockedHsvColor ?: autoFelt?.hsv ?: lastFeltDetection?.hsv ?: return
+        val feltSd = state.lockedHsvStdDev ?: autoFelt?.stdDev ?: lastFeltDetection?.stdDev ?: floatArrayOf(8f, 40f, 50f)
+        lastTableFitMs = now
+
+        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked)
+        val zoom = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom)
+        // The pan exactly as pitchMatrix was built with it (UpdateStateUseCase clamps Y), or
+        // A = M0 * W0^-1 would carry the clamp difference into every candidate.
+        val limitY = (state.table.logicalHeight / 2f) * zoom
+        val current = TableFitter.Pose(
+            state.viewOffset.x, state.viewOffset.y.coerceIn(-limitY, limitY), state.worldRotationDegrees, zoom,
+        )
+        val prior = tablePrior?.invoke(state.currentOrientation.yaw, state.currentOrientation.pitch)
+        val fit = runCatching {
+            tableFitter.fit(hsv, felt, feltSd, frameToView(), current, pitch, state.table.corners, prior)
+        }.getOrNull()
+        emitEvent(MainScreenEvent.TableFitUpdated(fit))
+    }
+
     /** The playing surface and ball size in frame pixels, derived from the table pose. */
     private class FramePose(val polygon: List<PointF>, val radiusAt: (Float, Float) -> Float)
 
@@ -486,6 +539,11 @@ class VisionRepository @Inject constructor(
                 )
             }
             var balls = detectBallsInFrame(fullMat, mapping, state, autoFelt)
+
+            // Table snap fit on the quarter-scale raw frame: quarter pixels -> full -> view.
+            maybeFitTable(state, reusableHsvMat, autoFelt) {
+                Matrix().apply { setScale(4f, 4f); postConcat(mapping) }
+            }
             if (state.hasInverseMatrix && state.table.isVisible) {
                 balls = balls.filter { state.table.isPointInside(it.position) }
             }
