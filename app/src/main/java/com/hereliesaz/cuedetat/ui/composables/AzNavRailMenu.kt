@@ -258,16 +258,15 @@ fun AzNavRailMenu(
         )
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            // One button, two jobs. Before tracking it starts the camera (felt capture, then AR).
-            // Once tracking, it becomes Lock: line the virtual table up over the real one and tap
-            // to anchor it in the AR world. Tap again to unlock and realign.
+            // Lock: once AR is tracking, line the virtual table up over the real one and tap to
+            // anchor it in the AR world; tap again to unlock and realign.
             if (uiState.cameraMode == CameraMode.AR_ACTIVE) {
                 azRailToggle(
-                    id = "ar",
+                    id = "lock",
                     route = "main",
                     isChecked = uiState.isArTableLocked,
                     toggleOnText = "unlock", toggleOffText = "lock",
-                    fillColor = b3R, textColor = Color.White,
+                    fillColor = b10B, textColor = Color.White,
                     onClick = {
                         onEvent(
                             if (uiState.isArTableLocked) MainScreenEvent.UnlockArTable
@@ -275,17 +274,20 @@ fun AzNavRailMenu(
                         )
                     }
                 )
-            } else {
-                val isArActive = uiState.cameraMode != CameraMode.OFF
-                azRailToggle(
-                    id = "ar",
-                    route = "main",
-                    isChecked = isArActive,
-                    toggleOnText = "off", toggleOffText = "ar",
-                    fillColor = b3R, textColor = Color.White,
-                    onClick = { onEvent(MainScreenEvent.CycleCameraMode) }
-                )
             }
+
+            // AR: starts the camera (felt capture, then AR tracking); "off" turns it straight off.
+            val isCameraOn = uiState.cameraMode != CameraMode.OFF
+            azRailToggle(
+                id = "ar",
+                route = "main",
+                isChecked = isCameraOn,
+                toggleOnText = "off", toggleOffText = "ar",
+                fillColor = b3R, textColor = Color.White,
+                onClick = {
+                    onEvent(if (isCameraOn) MainScreenEvent.TurnCameraOff else MainScreenEvent.CycleCameraMode)
+                }
+            )
 
             // Glasses hidden until Meta wearable support is revisited.
             if (SHOW_GLASSES) azRailToggle(
@@ -318,10 +320,6 @@ fun AzNavRailMenu(
                         }
                     )
                 }
-
-                azRailItemLowerCase(id = "cancel_ar", text = "Cancel", fillColor = Color.DarkGray, textColor = Color.White, onClick = {
-                    onEvent(MainScreenEvent.CancelArSetup) 
-                })
             }
         }
         azDivider()
