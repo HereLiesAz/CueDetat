@@ -7,6 +7,26 @@ trainers), which is why this one exists.
 Only reuse-licensed material. Nothing here is scraped from platforms that give creators no
 reuse setting (Facebook, Instagram and TikTok have none).
 
+## The links database
+
+**`links.csv`** is the dataset: links to reuse-licensed photos, no images stored. One row per
+photo: image URL, source page, title, creator, licence (with URL and version), a ready-made
+attribution line, and CLIP scores:
+
+- `is_table`: probability the photo shows a pool / billiards / snooker table.
+- `eye_level`: probability it is seen from a player's position rather than from above.
+- `verdict`: `keep` (player's-eye pool table), `overhead`, `off_topic`, or `unscored` (its
+  thumbnail couldn't be fetched).
+
+Rows are sorted `keep` first. Rebuild it with:
+
+~~~
+python3 fetch_openverse.py --links-only --out links_run   # metadata only, no downloads
+python3 build_links_db.py --manifest links_run/manifest.csv --out links.csv
+~~~
+
+`build_links_db.py` reads each Openverse thumbnail into memory to score it and keeps nothing.
+
 ## Sources
 
 | Source | How | Licence filter |

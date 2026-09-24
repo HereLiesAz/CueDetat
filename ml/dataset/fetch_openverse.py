@@ -40,7 +40,7 @@ QUERIES = [
 FIELDS = [
     "id", "file", "query", "title", "creator", "creator_url", "license", "license_version",
     "license_url", "source", "provider", "foreign_landing_url", "url", "width", "height",
-    "attribution",
+    "attribution", "thumbnail",
 ]
 
 
@@ -56,15 +56,35 @@ def download(url, path):
         f.write(r.read())
 
 
+def fetch_image(r, path):
+    """Downloads the image; falls back to Openverse's thumbnail when the source refuses."""
+    try:
+        download(r["url"], path)
+        return True
+    except Exception as e:
+        # Wikimedia refuses bulk full-size fetches (429) and asks for thumbnails.
+        thumb = r.get("thumbnail")
+        try:
+            if not thumb:
+                raise e
+            download(thumb, path)
+            return True
+        except Exception as e2:
+            print(f"  skip {r['id']}: {e2}", file=sys.stderr)
+            return False
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="data")
     ap.add_argument("--max-per-query", type=int, default=240)
     ap.add_argument("--sleep", type=float, default=1.2)
+    ap.add_argument("--links-only", action="store_true",
+                    help="record links and attribution without downloading images")
     args = ap.parse_args()
 
     img_dir = os.path.join(args.out, "images")
-    os.makedirs(img_dir, exist_ok=True)
+    os.makedirs(img_dir if not args.links_only else args.out, exist_ok=True)
     manifest = os.path.join(args.out, "manifest.csv")
 
     seen = set()
@@ -96,23 +116,12 @@ def main():
                 ext = os.path.splitext(urllib.parse.urlparse(r["url"]).path)[1].lower() or ".jpg"
                 if ext not in (".jpg", ".jpeg", ".png", ".webp"):
                     continue
-                path = os.path.join(img_dir, r["id"] + ext)
-                try:
-                    download(r["url"], path)
-                except Exception as e:
-                    # Wikimedia refuses bulk full-size fetches (429) and asks for thumbnails;
-                    # Openverse serves one.
-                    thumb = r.get("thumbnail")
-                    try:
-                        if not thumb:
-                            raise e
-                        download(thumb, path)
-                    except Exception as e2:
-                        print(f"  skip {r['id']}: {e2}", file=sys.stderr)
-                        continue
+                path = "" if args.links_only else os.path.join(img_dir, r["id"] + ext)
+                if path and not fetch_image(r, path):
+                    continue
                 seen.add(r["id"])
                 rows.append({
-                    "id": r["id"], "file": os.path.relpath(path, args.out), "query": q,
+                    "id": r["id"], "file": os.path.relpath(path, args.out) if path else "", "query": q,
                     "title": r.get("title") or "", "creator": r.get("creator") or "",
                     "creator_url": r.get("creator_url") or "", "license": r["license"],
                     "license_version": r.get("license_version") or "",
@@ -121,8 +130,10 @@ def main():
                     "foreign_landing_url": r.get("foreign_landing_url") or "", "url": r["url"],
                     "width": r.get("width") or "", "height": r.get("height") or "",
                     "attribution": r.get("attribution") or "",
+                    "thumbnail": r.get("thumbnail") or "",
                 })
-                time.sleep(0.2)
+                if path:
+                    time.sleep(0.2)
             print(f"[{q}] page {page}: {len(rows)} images total")
             if page >= data.get("page_count", page):
                 break
