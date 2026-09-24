@@ -113,7 +113,7 @@ class TableFitter {
             TableOrientationLearner.normalize180(best.params[2].toFloat()), exp(best.params[3]).toFloat(),
         )
         val quad = viewQuad(pose, a, corners)
-        return Fit(pose, iou(pose, a, viewToFrame, corners), quad)
+        return Fit(pose, iou(pose, a, viewToFrame, corners).toFloat(), quad)
     }
 
     private fun worldMatrix(p: Pose) = Matrix().apply {

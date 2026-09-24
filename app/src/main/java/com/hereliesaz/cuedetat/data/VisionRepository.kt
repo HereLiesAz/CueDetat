@@ -454,9 +454,12 @@ class VisionRepository @Inject constructor(
         lastTableFitMs = now
 
         val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked)
+        val zoom = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom)
+        // The pan exactly as pitchMatrix was built with it (UpdateStateUseCase clamps Y), or
+        // A = M0 * W0^-1 would carry the clamp difference into every candidate.
+        val limitY = (state.table.logicalHeight / 2f) * zoom
         val current = TableFitter.Pose(
-            state.viewOffset.x, state.viewOffset.y, state.worldRotationDegrees,
-            ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom),
+            state.viewOffset.x, state.viewOffset.y.coerceIn(-limitY, limitY), state.worldRotationDegrees, zoom,
         )
         val prior = tablePrior?.invoke(state.currentOrientation.yaw, state.currentOrientation.pitch)
         val fit = runCatching {

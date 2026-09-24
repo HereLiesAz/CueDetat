@@ -116,26 +116,23 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
         is MainScreenEvent.ArTableMatrixUpdated ->
             state.copy(arTableMatrix = action.matrix)
 
-        // The anchoring itself is a side effect (MainViewModel -> ArController); state changes
-        // only when the GL thread reports back.
-        is MainScreenEvent.LockArTable -> state
-
         is MainScreenEvent.UnlockArTable ->
             state.copy(isArTableLocked = false, arTableMatrix = null)
 
         is MainScreenEvent.TableFitUpdated ->
             state.copy(tableFit = if (state.isArTableLocked) null else action.fit)
 
-        is MainScreenEvent.ApplyTablePose -> {
-            if (state.isArTableLocked) state else {
-                val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode)
-                state.copy(
-                    viewOffset = PointF(action.offsetX, action.offsetY),
-                    worldRotationDegrees = action.rotationDeg,
-                    zoomSliderPosition = ZoomMapping.zoomToSlider(action.zoom.coerceIn(minZoom, maxZoom), minZoom, maxZoom),
-                    valuesChangedSinceReset = true,
-                )
-            }
+        is MainScreenEvent.ApplyTablePose ->
+            if (state.isArTableLocked) state
+            else applyTablePose(state, action.offsetX, action.offsetY, action.rotationDeg, action.zoom)
+
+        // Lock snaps the table onto a sure felt fit before ARCore anchors that same outline
+        // (MainViewModel hands ARCore the fit's quad). Done here, not by queuing ApplyTablePose,
+        // so the table can't be left behind if the lock result lands first.
+        is MainScreenEvent.LockArTable -> {
+            val fit = state.tableFit?.takeIf { it.iou >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.LOCK_MIN_IOU }
+            if (fit == null || state.isArTableLocked) state
+            else applyTablePose(state, fit.pose.offsetX, fit.pose.offsetY, fit.pose.rotationDeg, fit.pose.zoom)
         }
 
         is MainScreenEvent.ArTableLockResult ->
@@ -165,4 +162,27 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
 
         else -> state
     }
+}
+
+/**
+ * Moves the virtual table to a pose. Y is clamped exactly as UpdateStateUseCase clamps the pan
+ * when it builds the matrices; storing an unclamped Y would let the snap pull push the stored
+ * offset past what is drawn, forever.
+ */
+internal fun applyTablePose(
+    state: com.hereliesaz.cuedetat.domain.CueDetatState,
+    offsetX: Float,
+    offsetY: Float,
+    rotationDeg: Float,
+    zoom: Float,
+): com.hereliesaz.cuedetat.domain.CueDetatState {
+    val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked)
+    val z = zoom.coerceIn(minZoom, maxZoom)
+    val limit = (state.table.logicalHeight / 2f) * z
+    return state.copy(
+        viewOffset = PointF(offsetX, offsetY.coerceIn(-limit, limit)),
+        worldRotationDegrees = rotationDeg,
+        zoomSliderPosition = ZoomMapping.zoomToSlider(z, minZoom, maxZoom),
+        valuesChangedSinceReset = true,
+    )
 }
