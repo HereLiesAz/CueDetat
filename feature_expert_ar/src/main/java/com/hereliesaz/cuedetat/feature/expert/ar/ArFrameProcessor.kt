@@ -51,16 +51,25 @@ class ArFrameProcessor(
         if (now - lastProcessTime.get() < 100L) return
         lastProcessTime.set(now)
 
+        val cpuImage = try {
+            frame.acquireCameraImage()
+        } catch (_: Exception) {
+            // No image this frame (not yet available, or ARCore's small pool is exhausted).
+            return
+        }
+        // ARCore lends a handful of CPU images at a time. One that is never closed is gone for
+        // the session, and once the pool drains acquireCameraImage fails on every frame, which
+        // silently ends all AR detection. So close it whatever happens below.
         try {
-            val cpuImage = frame.acquireCameraImage()
             sampleCenterHsv(cpuImage)?.let { _latestFeltHsv.value = it }
             // ARCore's CPU image sensor orientation matches the display orientation configured
             // via session.setDisplayGeometry(); for portrait-primary Android apps this is 90°.
             val rotation = 90
             visionRepository.processArCpuImage(cpuImage, rotation, state)
-            cpuImage.close()
         } catch (_: Exception) {
-            // acquireCameraImage can fail if a previous image is still open; skip frame.
+            // A bad frame is skipped; the next one gets a fresh image.
+        } finally {
+            cpuImage.close()
         }
     }
 
