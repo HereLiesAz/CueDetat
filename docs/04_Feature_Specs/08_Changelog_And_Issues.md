@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Ball detection rebuilt.** `CvBallDetector` now finds balls as non-felt islands inside the table on the full-resolution frame, judged against the ball size the table pose predicts (`BallIslandRules`), with rotation-free cue/8/stripe/solid naming. Frame-to-screen mapping fixed (`CameraViewMapping` for CameraX, ARCore's own mapping in AR). ML Kit's generic detector removed from the ball path. Detections show and can be selected without a table scan. AR detection runs off the GL thread, and the ARCore CPU image is always released.
+
 - **Lock button.** Once AR tracking starts, the rail's `ar` button reads `lock`. Line the virtual table up over the real one and tap it: the corners are anchored in ARCore and the table stays put as you move. `unlock` releases it to realign. New events `LockArTable` / `UnlockArTable` / `ArTableLockResult`, state `isArTableLocked`. Lock pins to the plane the felt-coloured pixels sit on (`FeltColorMatch`), so the table is not anchored to the floor.
 - **Pocket tapping removed.** The `CORNER_QUAD` corner-tap step, the `POCKET_GUIDE` per-pocket guide, manual hole capture, partial-scan resume and the `ScanStep` enum are gone. The table scan is felt capture only. `ArTableSession` keeps the anchor->homography path for the coming table-lock step.
 - **Rail:** `help` renamed `wtf?` (AzNavRail reserves its own help item); `felt` and `holes` removed from the rail; `glasses` and `advisor` hidden behind `SHOW_GLASSES` / `SHOW_ADVISOR`.

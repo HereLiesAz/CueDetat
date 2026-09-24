@@ -19,8 +19,7 @@ import android.graphics.RectF
  * class-name overlap, so no ball/cue class was ever actually trained. Do not
  * reinterpret classId 1/2 as "ball"/"cue" — VisionRepository previously did this
  * and it was a bug (fixed; see the notes there). Real per-frame ball detection
- * comes from the generic ML object detector plus [CvBallDetector]'s classical-CV
- * Hough-circle refinement.
+ * comes from [CvBallDetector] (non-felt islands inside the table).
  */
 data class PoolDetection(
     val rect: RectF,
