@@ -244,7 +244,7 @@ class LineRenderer {
         drawSpinPaths(canvas, state, paints, activeMatrix, camArray, distArray)
 
         if (state.areHelpersVisible && state.experienceMode != ExperienceMode.BEGINNER) {
-            textRenderer.drawProtractorLabels(canvas, state, paints, typeface)
+            textRenderer.drawProtractorLabels(canvas, state, paints, typeface, activeMatrix, camArray, distArray)
         }
     }
 
