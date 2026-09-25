@@ -18,36 +18,30 @@ data class UpdateInfo(
 )
 
 /**
- * Flavor-specific self-update.
- *
- *  - **foss**: checks GitHub releases and can sideload the new APK via the
- *    system installer (the only kind of "auto-update" Android allows a
- *    normally-installed app).
- *  - **play**: no-op. Google Play owns updates for store installs, and
- *    self-updating APKs violate Play policy.
+ * In-app update offer. The single build decides at runtime ([GithubAppUpdater]): copies
+ * installed by Google Play leave updates to Play; any other install checks GitHub Releases.
  */
 interface AppUpdater {
 
-    /** True only in flavors that can self-update (FOSS). */
+    /** True when this install updates from GitHub (not installed by Play). */
     val isSupported: Boolean get() = false
 
     /**
      * Returns [UpdateInfo] when a newer release than the running build is
-     * available, else null. No-op (null) in the Play flavor.
+     * available, else null. Always null for Play installs.
      */
     suspend fun checkForUpdate(): UpdateInfo? = null
 
     /**
-     * Download the release APK and launch the system installer. No-op in Play.
-     * Must be called with an [Activity] so the install prompt and any
-     * "allow from this source" settings redirect have a UI host.
+     * Hands the update to the browser, which downloads the APK and opens the system installer.
+     * Needs an [Activity] to start from. No-op for Play installs.
      */
     suspend fun downloadAndInstall(activity: Activity, info: UpdateInfo) {}
 }
 
 /**
  * Compares dotted version strings, ignoring a leading "v" and any non-numeric
- * suffix (e.g. the FOSS build's "-foss"). Returns true when [latestTag] is
+ * suffix (e.g. the old FOSS build's "-foss"). Returns true when [latestTag] is
  * strictly newer than [current].
  */
 fun isNewerVersion(latestTag: String, current: String): Boolean {

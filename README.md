@@ -117,23 +117,23 @@ someone tries to sneak business logic into a Composable, physics itself should i
 
 ## Building & Releasing
 
-Two distribution channels share one codebase via product flavors:
-
-* **`play`** → Google Play, shipped as a **signed Android App Bundle (AAB)**.
-* **`foss`** → standalone APK on GitHub Releases.
+One build serves both channels: Google Play gets the signed App Bundle, GitHub Releases the
+signed APK. The TFLite model and the Expert-AR code are compiled into the app. The in-app
+updater checks GitHub only on copies Play didn't install; Play installs update through Play.
 
 Quick local builds (`versionCode` = git commit count, kept monotonic for Play):
 
 ```bash
-./gradlew bundlePlayRelease  -PversionBuild=$(git rev-list --count HEAD)   # signed Play AAB
-./gradlew assembleFossRelease -PversionBuild=$(git rev-list --count HEAD)  # signed FOSS APK
+./gradlew bundleRelease   -PversionBuild=$(git rev-list --count HEAD)   # signed AAB (Play)
+./gradlew assembleRelease -PversionBuild=$(git rev-list --count HEAD)   # signed APK (GitHub)
 ```
 
-Publishing to Play is automated by the **“Play Publish (AAB)”** GitHub Actions
-workflow (`workflow_dispatch`): inputs `track` (default `internal`), `status`
-(default `draft`), and `publish` (default `false` = upload the `.aab` artifact
-only). The ~24 MB TFLite model is delivered to Play as an **on-demand dynamic
-feature module** (`:feature_mlmodel`) and bundled directly into the FOSS APK.
+The build needs GitHub Packages credentials (`GH_ACTOR`/`GH_TOKEN`, or `gh_user`/`gh_token`
+in `local.properties`) for the Meta Wearables SDK.
+
+Publishing to Play runs centrally (HereLiesAz/workflows' **Android Play Release**, bound to
+`.github/workflows/play_publish.yml`): every push to `main` uploads one AAB, live on the
+internal and closed-testing tracks and as a draft on open testing and production.
 
 Required repo secrets: `KEYSTORE_PRIVATE`, `KEYSTORE_CHAIN`, `KEYSTORE_PASSWORD`,
 `KEY_ALIAS`, `KEY_PASSWORD` (signing) and `PLAY_SERVICE_ACCOUNT_JSON` (Play

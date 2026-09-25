@@ -8,10 +8,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 
 /**
- * One-tap update popup for the FOSS build. Tapping "Download & install"
- * downloads the newest release APK and launches the system installer (Android
- * always shows its own confirm step — full silent install isn't possible for a
- * normally-installed app).
+ * One-tap update popup for installs not made by Google Play. "Download" opens the newest
+ * release APK in the browser, which downloads it and hands it to the system installer.
  */
 @Composable
 fun AppUpdateDialog(
@@ -22,12 +20,12 @@ fun AppUpdateDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Update available") },
-        text = { Text("Version $versionName is ready. Download and install it now?") },
+        text = { Text("Version $versionName is ready. Download it now?") },
         confirmButton = {
             TextButton(onClick = {
                 onInstall()
                 onDismiss()
-            }) { Text("Download & install") }
+            }) { Text("Download") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Later") }

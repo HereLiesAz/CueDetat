@@ -5,7 +5,7 @@ name: Android Release Build
 #  - Pushing a "v*" tag (e.g. v1.8.0) to create a tagged release automatically.
 #
 # Unlike android_debug_apk_release.yml, this workflow:
-#  - Builds the FOSS *release* APK (assembleFossRelease) with R8/minification.
+#  - Builds the *release* APK (assembleRelease) with R8/minification.
 #  - Signs the APK with the production keystore.
 #  - Publishes a non-prerelease GitHub Release with the signed APK attached.
 
@@ -111,7 +111,7 @@ jobs:
           set +e
           export BUILD_NUMBER=$(git rev-list --count HEAD)
 
-          ./gradlew assembleFossRelease -PversionBuild=$BUILD_NUMBER --build-cache \
+          ./gradlew assembleRelease -PversionBuild=$BUILD_NUMBER --build-cache \
             -Pandroid.injected.signing.store.file=$(pwd)/app/keystore.jks \
             -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
             -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
@@ -122,13 +122,13 @@ jobs:
           cat build.log
           exit $EXIT_CODE
 
-      - name: Verify FOSS Release APK contains no Play Billing classes
+      - name: Verify release APK contains no Play Billing classes
         if: success() && steps.gradle-build.outcome == 'success'
         run: |
           set -e
-          APK=$(find app/build/outputs/apk/foss/release -name "*.apk" | head -n 1)
+          APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
           if [ -z "$APK" ]; then
-            echo "Error: no FOSS release APK found to verify."
+            echo "Error: no release APK found to verify."
             exit 1
           fi
           BUILD_TOOLS_DIR=$(ls -d "$ANDROID_HOME"/build-tools/* | tail -n 1)
@@ -142,7 +142,7 @@ jobs:
           FOUND=0
           for DEX in "$TMPDIR"/classes*.dex; do
             if "$DEXDUMP" "$DEX" 2>/dev/null | grep -q "com/android/billingclient"; then
-              echo "ERROR: billing client class found in $DEX of FOSS release APK!"
+              echo "ERROR: billing client class found in $DEX of release APK!"
               FOUND=1
             fi
           done
@@ -150,7 +150,7 @@ jobs:
           if [ "$FOUND" = "1" ]; then
             exit 1
           fi
-          echo "OK: FOSS release APK contains no com.android.billingclient classes."
+          echo "OK: release APK contains no com.android.billingclient classes."
 
       - name: Verify Release APK is signed (not debug)
         if: success() && steps.gradle-build.outcome == 'success'
@@ -158,7 +158,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           set -e
-          APK=$(find app/build/outputs/apk/foss/release -name "*.apk" | head -n 1)
+          APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
           BUILD_TOOLS_DIR=$(ls -d "$ANDROID_HOME"/build-tools/* | tail -n 1)
           APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
           if [ ! -x "$APKSIGNER" ]; then
@@ -246,7 +246,7 @@ jobs:
              APP_NAME="App"
           fi
 
-          APK_ORIGINAL=$(find app/build/outputs/apk/foss/release -name "*.apk" | head -n 1)
+          APK_ORIGINAL=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
 
           if [ -z "$APK_ORIGINAL" ]; then
              echo "Error: No release APK found to release!"

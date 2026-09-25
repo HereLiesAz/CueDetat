@@ -20,16 +20,8 @@ enum class MetaConnectionStatus {
  *
  * ## Why this is an interface
  *
- * The `com.meta.wearable` artifacts resolve only from a credentialed GitHub
- * Packages registry. While the real implementation lived here in `src/main`,
- * `:app` had to depend on those artifacts unconditionally, and
- * `./gradlew assembleFossDebug` from a clean clone failed at dependency
- * resolution for every outside contributor — the exact audience a FOSS flavour
- * exists for.
- *
- * The contract lives here; `play` binds the real implementation and `foss` binds
- * a no-op, matching the seam this project already uses for model delivery, AR
- * feature delivery and app updates.
+ * It separates the app from the Meta SDK (resolved from a credentialed GitHub Packages registry)
+ * and gives tests a seam. `WearableModule` binds [PlayMetaWearableRepository].
  */
 interface MetaWearableRepository {
 

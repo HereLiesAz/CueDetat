@@ -52,7 +52,6 @@ tensorflowLiteMetadata = "0.5.0"
 
 # ── Play / distribution (play flavor only) ───────────────────────────────────
 billing = "9.1.0"
-playFeatureDelivery = "2.1.0"
 playIntegrity = "1.6.0"
 playServicesLocation = "21.3.0"
 playServicesWearable = "18.2.0"
@@ -134,7 +133,6 @@ tensorflow-lite-metadata = { module = "org.tensorflow:tensorflow-lite-metadata",
 
 # ── Play / distribution ──────────────────────────────────────────────────────
 androidx-billing-ktx = { module = "com.android.billingclient:billing-ktx", version.ref = "billing" }
-play-feature-delivery = { module = "com.google.android.play:feature-delivery", version.ref = "playFeatureDelivery" }
 play-integrity = { module = "com.google.android.play:integrity", version.ref = "playIntegrity" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 play-services-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "playServicesWearable" }
@@ -165,7 +163,6 @@ netty-all = { module = "io.netty:netty-all", version.ref = "netty" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
-android-dynamic-feature = { id = "com.android.dynamic-feature", version.ref = "agp" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

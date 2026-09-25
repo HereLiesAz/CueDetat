@@ -67,9 +67,13 @@ jobs:
           dependency-graph: generate-submit-and-upload
 
       - name: Run unit tests
+        # The Meta Wearables SDK resolves only from GitHub Packages (settings.gradle.kts).
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_ACTOR: ${{ secrets.GH_ACTOR }}
         run: |
           chmod +x gradlew
-          ./gradlew testFossDebugUnitTest testFossReleaseUnitTest --continue --build-cache --no-daemon --stacktrace
+          ./gradlew testDebugUnitTest testReleaseUnitTest --continue --build-cache --no-daemon --stacktrace
 
       - name: Upload test reports
         if: always()
@@ -152,6 +156,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_ACTOR: ${{ secrets.GH_ACTOR }}
           KEYSTORE_FILE: ${{ github.workspace }}/app/keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -199,7 +204,7 @@ jobs:
           else
             APP_NAME="App"
           fi
-          APK_ORIGINAL=$(find app/build/outputs/apk/foss/debug -name "*.apk" | head -n 1)
+          APK_ORIGINAL=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
           if [ -z "$APK_ORIGINAL" ]; then
             echo "Error: No APK found to release!"
             exit 1
