@@ -153,7 +153,7 @@ fun AzNavRailMenu(
         }
 
         // Finish affordance: the framework leaves the final step non-tappable, so surface an explicit
-        // "Finish" that marks the active tutorial goal reached (target-independent; persists immediately).
+        // "OK" that marks the active tutorial goal reached (target-independent; persists immediately).
         onscreen(alignment = Alignment.BottomCenter) {
             val controller = LocalAzGuidanceController.current
             val finishGoalId = controller?.currentInstructions?.firstOrNull { snap ->
@@ -168,7 +168,7 @@ fun AzNavRailMenu(
                         .background(Color(0xFF2196F3), RoundedCornerShape(24.dp))
                         .padding(horizontal = 24.dp, vertical = 2.dp)
                 ) {
-                    Text(text = "Finish  ✓", color = Color.White)
+                    Text(text = "OK", color = Color.White)
                 }
             }
         }
