@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import android.media.Image
 import com.google.ar.core.Coordinates2d
 import com.google.ar.core.Frame
+import com.hereliesaz.cuedetat.data.CaptureCamera
 import com.hereliesaz.cuedetat.data.VisionRepository
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -77,11 +78,13 @@ class ArFrameProcessor(
         val claimed = workerBusy.compareAndSet(false, true)
         var copy: Mat? = null
         var mapping: Matrix? = null
+        var camera: CaptureCamera? = null
         try {
             sampleCenterHsv(cpuImage)?.let { _latestFeltHsv.value = it }
             if (claimed) {
                 copy = cpuImage.toMat(Mat())
                 mapping = imageToView(frame, cpuImage.width, cpuImage.height)
+                camera = cameraOf(frame, cpuImage.width, cpuImage.height)
             }
         } catch (_: Exception) {
             // A bad frame is skipped; the next one gets a fresh image.
@@ -97,13 +100,14 @@ class ArFrameProcessor(
             return
         }
         val frameToView = mapping
+        val frameCamera = camera
         try {
             worker.execute {
                 try {
                     // ARCore's CPU image sensor orientation matches the display orientation
                     // configured via session.setDisplayGeometry(); for portrait-primary Android
                     // apps this is 90°. Used only when ARCore's own mapping is unavailable.
-                    visionRepository.processArFrame(mat, 90, state, frameToView)
+                    visionRepository.processArFrame(mat, 90, state, frameToView, frameCamera)
                 } catch (_: Exception) {
                     // Skip the frame.
                 } finally {
@@ -132,6 +136,26 @@ class ArFrameProcessor(
         } catch (_: Exception) {
             null
         }
+    }
+
+    /**
+     * Intrinsics of the CPU image and the camera's world pose, for training capture. ARCore gives
+     * intrinsics for its own image size; they are scaled to the CPU image's.
+     */
+    private fun cameraOf(frame: Frame, width: Int, height: Int): CaptureCamera? = try {
+        val cam = frame.camera
+        val k = cam.imageIntrinsics
+        val dims = k.imageDimensions
+        val sx = if (dims[0] > 0) width.toFloat() / dims[0] else 1f
+        val sy = if (dims[1] > 0) height.toFloat() / dims[1] else 1f
+        val f = k.focalLength
+        val c = k.principalPoint
+        val pose = FloatArray(7)
+        cam.pose.getTranslation(pose, 0)
+        cam.pose.getRotationQuaternion(pose, 3)
+        CaptureCamera(f[0] * sx, f[1] * sy, c[0] * sx, c[1] * sy, width, height, pose)
+    } catch (_: Exception) {
+        null
     }
 
     /** Mean HSV of the centre 10% of the image (the felt-capture reticle). */

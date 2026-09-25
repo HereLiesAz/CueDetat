@@ -82,6 +82,12 @@ jobs:
     needs: unit-tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Every branch push republishes the same latest-debug tag, but the workflow-level group is
+    # per ref, so pushes to different branches raced on the upload. Pushes share one group
+    # here (queued, not cancelled mid-upload); PR builds, which publish nothing, don't wait.
+    concurrency:
+      group: ${{ github.event_name == 'push' && format('{0}-latest-debug-release', github.workflow) || format('{0}-build-{1}', github.workflow, github.ref) }}
+      cancel-in-progress: false
     permissions:
       contents: write
       issues: write
@@ -150,6 +156,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          CAPTURE_RELAY_URL: ${{ secrets.CAPTURE_RELAY_URL }}
         run: |
           set +e
           ./gradlew assembleDebug --build-cache --no-daemon > build.log 2>&1

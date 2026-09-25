@@ -110,6 +110,7 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GH_ACTOR: ${{ secrets.GH_ACTOR }}
+          CAPTURE_RELAY_URL: ${{ secrets.CAPTURE_RELAY_URL }}
         run: |
           set +e
           export BUILD_NUMBER=$(git rev-list --count HEAD)

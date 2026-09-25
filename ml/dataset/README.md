@@ -98,6 +98,21 @@ from disk instead, run `prelabel.py --local-root $PWD/data` and start Label Stud
 splits train/val by a hash of the image id, so re-exports keep the split. Table corners that
 fall outside the frame are kept, flagged as not visible.
 
+### In-app captures
+
+With the user's consent the app sends its own player's-eye frames, with sensor readings, the
+table pose and its detections, through `ml/capture-relay` into a private repo. To label them:
+
+~~~
+git clone git@github.com:HereLiesAz/cuedetat-captures.git
+python3 captures_to_labelstudio.py --captures cuedetat-captures --root $PWD
+# import labelstudio/captures_tasks.json into the same project (local-file serving on, root $PWD)
+python3 ls_to_yolo.py export.json --local-root $PWD
+~~~
+
+The table outline is pre-labelled only where the user locked the table or the snap fit agreed
+with the felt; ball boxes are the app's own detections.
+
 ## Licences and attribution
 
 `data/manifest.csv` keeps creator, licence, licence URL and source page for every image, and

@@ -82,6 +82,8 @@ fun AzNavRailMenu(
     onEvent: (MainScreenEvent) -> Unit,
     navController: NavHostController,
     currentDestination: String?,
+    captureEnabled: Boolean = false,
+    onToggleCapture: () -> Unit = {},
     content: AzNavHostScope.() -> Unit = {},
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -380,6 +382,8 @@ fun AzNavRailMenu(
         }
 
         azMenuItem(id = "orientation", route = "main", text = "Orientation", fillColor = b15M, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) })
+        // Training capture (CaptureRecorder): the setting the consent dialog points to.
+        azMenuItem(id = "training_data", route = "main", text = if (captureEnabled) "Training data: on" else "Training data: off", fillColor = b10B, textColor = Color.White, onClick = onToggleCapture)
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azMenuItem(id = "advanced", route = "main", text = "Advanced", fillColor = b1Y, textColor = Color.White, onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) })

@@ -10,11 +10,12 @@ Only tasks with a human annotation are used; bare predictions are skipped, becau
 unreviewed pre-label is not a label. Tasks are split into train/val by a stable hash of the
 image id so re-exports keep the same split.
 
-Images are copied from data/images when present (matched by id), otherwise downloaded from
-the task's image URL.
+Images are copied from data/images when present (matched by id), from --local-root for tasks
+served by Label Studio's local-file storage (in-app captures), otherwise downloaded from the
+task's image URL.
 
 Usage:
-    python3 ls_to_yolo.py export.json [--data data] [--out yolo] [--val 0.15]
+    python3 ls_to_yolo.py export.json [--data data] [--out yolo] [--val 0.15] [--local-root DIR]
 """
 import argparse
 import glob
@@ -35,7 +36,10 @@ def split_of(image_id, val):
     return "val" if h < val else "train"
 
 
-def fetch(task, data_dir, dest_no_ext):
+LOCAL_PREFIX = "/data/local-files/?d="
+
+
+def fetch(task, data_dir, dest_no_ext, local_root=""):
     iid = task["data"].get("id", str(task.get("id")))
     local = glob.glob(os.path.join(data_dir, "images", iid + ".*"))
     if local:
@@ -43,6 +47,13 @@ def fetch(task, data_dir, dest_no_ext):
         shutil.copyfile(local[0], dest)
         return dest
     url = task["data"]["image"]
+    if url.startswith(LOCAL_PREFIX) and local_root:
+        src = os.path.join(local_root, url[len(LOCAL_PREFIX):])
+        if not os.path.exists(src):
+            return None
+        dest = dest_no_ext + os.path.splitext(src)[1]
+        shutil.copyfile(src, dest)
+        return dest
     if not url.startswith("http"):
         return None
     r = requests.get(url, timeout=30, headers={"User-Agent": "CueDetat-dataset/1.0"})
@@ -63,6 +74,7 @@ def main():
     ap.add_argument("--data", default="data")
     ap.add_argument("--out", default="yolo")
     ap.add_argument("--val", type=float, default=0.15)
+    ap.add_argument("--local-root", default="", help="Label Studio local-files document root")
     args = ap.parse_args()
 
     with open(args.export) as f:
@@ -110,7 +122,7 @@ def main():
                     continue
                 dest = os.path.join(args.out, kind, "images", split, iid)
                 if img is None:
-                    img = fetch(t, args.data, dest)
+                    img = fetch(t, args.data, dest, args.local_root)
                     if img is None:
                         raise RuntimeError("no image")
                 else:

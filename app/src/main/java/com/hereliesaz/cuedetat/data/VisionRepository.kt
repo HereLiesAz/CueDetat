@@ -47,7 +47,8 @@ import kotlinx.coroutines.launch
 @Singleton
 class VisionRepository @Inject constructor(
     private val poolDetector: MergedTFLiteDetector,
-    private val relocaliserUseCase: com.hereliesaz.cuedetat.domain.RelocaliserUseCase
+    private val relocaliserUseCase: com.hereliesaz.cuedetat.domain.RelocaliserUseCase,
+    private val captureRecorder: CaptureRecorder,
 ) {
     private val _visionDataFlow = MutableStateFlow(VisionData())
     val visionDataFlow = _visionDataFlow.asStateFlow()
@@ -329,6 +330,11 @@ class VisionRepository @Inject constructor(
                 )
             }
             val balls = detectBallsInFrame(fullMat, frameToView, state, autoFelt)
+            captureRecorder.offer(
+                fullMat, rotationDegrees, frameToView, state, balls,
+                feltHsv = hsv, feltStdDev = state.lockedHsvStdDev ?: autoFelt?.stdDev ?: hsvTuple?.second,
+                camera = null,
+            )
 
             // Table snap fit on the upright quarter frame, which the preview shows centre-cropped.
             maybeFitTable(state, hsvMat, autoFelt) {
@@ -512,9 +518,16 @@ class VisionRepository @Inject constructor(
      * @param frameToView maps [fullMat] pixels to view pixels, from ARCore's own
      *   `Frame.transformCoordinates2d` (its crop differs from CameraX's); null falls back to a
      *   centre-crop estimate
+     * @param camera ARCore intrinsics and pose for this frame, recorded by [CaptureRecorder]
      */
     @SuppressLint("UnsafeOptInUsageError")
-    fun processArFrame(fullMat: Mat, rotationDegrees: Int, state: CueDetatState, frameToView: Matrix? = null) {
+    fun processArFrame(
+        fullMat: Mat,
+        rotationDegrees: Int,
+        state: CueDetatState,
+        frameToView: Matrix? = null,
+        camera: CaptureCamera? = null,
+    ) {
         ensureModelOnce()
         if (!isProcessing.compareAndSet(false, true)) {
             return
@@ -539,6 +552,11 @@ class VisionRepository @Inject constructor(
                 )
             }
             var balls = detectBallsInFrame(fullMat, mapping, state, autoFelt)
+            captureRecorder.offer(
+                fullMat, rotationDegrees, mapping, state, balls,
+                feltHsv = hsv, feltStdDev = state.lockedHsvStdDev ?: autoFelt?.stdDev ?: lastFeltDetection?.stdDev,
+                camera = camera,
+            )
 
             // Table snap fit on the quarter-scale raw frame: quarter pixels -> full -> view.
             maybeFitTable(state, reusableHsvMat, autoFelt) {
