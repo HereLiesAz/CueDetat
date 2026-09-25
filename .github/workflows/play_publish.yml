@@ -1,26 +1,9 @@
+# centralized-by: HereLiesAz/workflows
+# central-source-path: .github/workflows/play_publish.yml
+# central-source-sha256: c99c3eed02d6deb557eaba891c904d3fcdabde1c27a518dee8c7e8e422b92b98
+# This file intentionally contains no repository secrets.
+# central-run-tracker: HereLiesAz/workflows
 name: Play Publish (AAB)
-
-# Builds the signed Android App Bundle from the single release variant and publishes it to
-# the Google Play Console.
-#
-# Every push to main publishes. One AAB is uploaded once and assigned to four
-# tracks in a single Play edit (see .github/scripts/play_publish.py):
-#
-#   internal    completed  -- live to internal testers
-#   alpha       completed  -- live to closed testing
-#   beta        draft      -- open testing, awaiting a human
-#   production  draft      -- production, awaiting a human
-#
-# Play's track ids do not match the console's labels: "closed testing" is
-# `alpha` and "open testing" is `beta`.
-#
-# A manual run can set `dry_run` to build and upload the .aab as a workflow
-# artifact without touching Play.
-#
-# Signing reuses the same secrets and injected-signing approach as
-# android_release.yml; versioning reuses the -PversionBuild override
-# (git commit count) wired into app/build.gradle.kts.
-
 on:
   push:
     branches: 'main'
@@ -32,148 +15,54 @@ on:
         default: false
         required: true
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
-
+permissions:
+  actions: read
+  contents: read
+  statuses: read
 jobs:
-  bundle:
+  central:
+    name: Start
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: read
-
+    timeout-minutes: 25
+    outputs:
+      run_id: ${{ steps.locate.outputs.run_id }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # full history so `git rev-list --count HEAD` is the real commit count
-
-      - name: Inject Google Services
+      - id: locate
+        name: Locate run
         env:
-          GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
-          PROJECT_ID: ${{ secrets.PROJECT_ID }}
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-        run: |
-          if [ -f "app/google-services.json.template" ]; then
-            echo "Template found. Injecting secrets..."
-            sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
-          else
-            echo "Warning: google-services.json.template not found. Skipping injection."
-          fi
-
-      - name: Generate Keystore from Secrets
+          GH_TOKEN: ${{ github.token }}
+          STATUS_CONTEXT: .github/workflows/play_publish.yml
+          TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: "set -euo pipefail\ncreated_at=\"$(gh api \"repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\" --jq .created_at)\"\nthreshold=\"$(date -u -d \"$created_at - 5 seconds\" +%s)\"\n# The gateway skips some events a tracker still sees (unmatched filters, forks, manual\n# runs, CI-skip pushes). No central status within 20 minutes means no central run.\nfor _ in $(seq 1 80); do\n  url=\"$(gh api \"repos/$GITHUB_REPOSITORY/statuses/$TARGET_SHA?per_page=100\" --jq \\\n    \"[.[] | select(.context == \\\"$STATUS_CONTEXT\\\" and ((.updated_at | fromdateiso8601) >= $threshold))][0].target_url // empty\")\"\n  run_id=\"$(sed -nE 's#.*/HereLiesAz/workflows/actions/runs/([0-9]+).*#\\1#p' <<<\"$url\")\"\n  if [[ -n \"$run_id\" ]]; then\n    echo \"run_id=$run_id\" >> \"$GITHUB_OUTPUT\"\n    echo \"Run: $url\"\n    exit 0\n  fi\n  sleep 15\ndone\necho \"::notice::No run of this workflow was started for this event.\"\n"
+  version_contract:
+    name: version_contract
+    needs:
+      - central
+    if: ${{ needs.central.outputs.run_id != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: version_contract
         env:
-          KEYSTORE_PRIVATE: ${{ secrets.KEYSTORE_PRIVATE }}
-          KEYSTORE_CHAIN: ${{ secrets.KEYSTORE_CHAIN }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        run: |
-          echo "Generating keystore from certificate chain and private key..."
-          echo "$KEYSTORE_PRIVATE" > private_key.pem
-          echo "$KEYSTORE_CHAIN" > certificate_chain.crt
-
-          openssl pkcs12 -export -in certificate_chain.crt -inkey private_key.pem \
-            -name "$KEY_ALIAS" -out keystore.p12 \
-            -password pass:"$KEYSTORE_PASSWORD"
-
-          keytool -importkeystore -srckeystore keystore.p12 -srcstoretype PKCS12 \
-            -destkeystore app/keystore.jks -deststoretype JKS \
-            -srcstorepass "$KEYSTORE_PASSWORD" \
-            -deststorepass "$KEYSTORE_PASSWORD" \
-            -alias "$KEY_ALIAS" -noprompt
-
-          rm private_key.pem certificate_chain.crt keystore.p12
-          echo "Keystore generated at app/keystore.jks"
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: false
-          dependency-graph: disabled
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Resolve package name
-        id: pkg
-        run: |
-          # Read applicationId from the version catalog (single source of truth),
-          # falling back to the namespace in app/build.gradle.kts.
-          PKG=$(grep -E '^[[:space:]]*applicationId[[:space:]]*=' gradle/libs.versions.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-          if [ -z "$PKG" ]; then
-            PKG=$(grep -E 'applicationId[[:space:]]*=' app/build.gradle.kts | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-          fi
-          echo "Resolved packageName: $PKG"
-          echo "package_name=$PKG" >> "$GITHUB_OUTPUT"
-
-      - name: Build signed Play AAB
-        id: build
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ needs.central.outputs.run_id }}
+          JOB_NAME: version_contract
+        shell: bash
+        run: "set -euo pipefail\napi=\"repos/HereLiesAz/workflows/actions/runs/$RUN_ID\"\nseen=\"\"\njob=\"\"\nfor _ in $(seq 1 1440); do\n  job=\"$(gh api \"$api/jobs?per_page=100\" --jq \"[.jobs[] | select(.name == \\\"$JOB_NAME\\\" or (.name | startswith(\\\"$JOB_NAME \\\")) or (.name | startswith(\\\"$JOB_NAME / \\\")))][0] // empty\")\"\n  if [[ -z \"$job\" ]]; then\n    [[ \"$(gh api \"$api\" --jq .status)\" == completed ]] && { echo \"Skipped.\"; exit 0; }\n    sleep 10\n    continue\n  fi\n  while IFS= read -r line; do\n    [[ -n \"$line\" ]] || continue\n    grep -qxF \"$line\" <<<\"$seen\" || { echo \"$line\"; seen+=\"$line\"$'\\n'; }\n  done < <(jq -r '.steps[]? | select(.status == \"completed\" and .conclusion != \"skipped\")\n    | \"\\(if .conclusion == \"success\" then \"✓\" else \"✗\" end) \\(.name)\"' <<<\"$job\")\n  [[ \"$(jq -r .status <<<\"$job\")\" == completed ]] && break\n  sleep 10\ndone\nconclusion=\"$(jq -r '.conclusion // \"cancelled\"' <<<\"$job\")\"\necho \"::group::Log\"\nif log=\"$(gh api \"repos/HereLiesAz/workflows/actions/jobs/$(jq -r .id <<<\"$job\")/logs\" 2>/dev/null)\"; then\n  sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z //' <<<\"$log\"\nelse\n  echo \"Log unavailable here: $(jq -r .html_url <<<\"$job\")\"\nfi\necho \"::endgroup::\"\ncase \"$conclusion\" in\n  success|skipped|neutral) exit 0 ;;\n  *) echo \"::error::$JOB_NAME: $conclusion\"; exit 1 ;;\nesac\n"
+  build_and_publish:
+    name: build_and_publish
+    needs:
+      - central
+      - version_contract
+    if: ${{ needs.central.outputs.run_id != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: build_and_publish
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          GH_ACTOR: ${{ secrets.GH_ACTOR }}
-          # Optional tester-license allowlist scrape (writes an empty allowlist when absent).
-          GG_LINK: ${{ secrets.GG_LINK }}
-          GG_SESSION: ${{ secrets.GG_SESSION }}
-        run: |
-          BUILD_NUMBER=$(git rev-list --count HEAD)
-          echo "versionCode (commit count) = $BUILD_NUMBER"
-          echo "version_code=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
-
-          ./gradlew bundleRelease -PversionBuild="$BUILD_NUMBER" --build-cache \
-            -Pandroid.injected.signing.store.file="$(pwd)/app/keystore.jks" \
-            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
-            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
-
-      - name: Locate AAB
-        id: aab
-        run: |
-          AAB=$(find app/build/outputs/bundle/release -name "*.aab" | head -n 1)
-          if [ -z "$AAB" ]; then
-            echo "Error: no release AAB found."
-            exit 1
-          fi
-          echo "Found AAB: $AAB"
-          echo "aab_path=$AAB" >> "$GITHUB_OUTPUT"
-
-      - name: Upload AAB artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: play-release-aab
-          path: ${{ steps.aab.outputs.aab_path }}
-          if-no-files-found: error
-
-      # r0adkll/upload-google-play cannot express this policy: its `status` is a
-      # single value across all `tracks`, so two statuses would need two
-      # invocations -- two separate Play edits, the second re-uploading a
-      # version code that already exists. Its `existingEditId` input has no
-      # matching output to thread between calls. The API models it directly.
-      - name: Set up Python
-        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run != 'true' }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Play publishing dependencies
-        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run != 'true' }}
-        run: pip install --disable-pip-version-check google-api-python-client google-auth
-
-      - name: Publish to Google Play
-        if: ${{ github.event_name == 'push' || github.event.inputs.dry_run != 'true' }}
-        env:
-          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          PLAY_PACKAGE_NAME: ${{ steps.pkg.outputs.package_name }}
-          PLAY_AAB_PATH: ${{ steps.aab.outputs.aab_path }}
-          PLAY_MAPPING_PATH: app/build/outputs/mapping/release/mapping.txt
-          PLAY_RELEASE_NAME: ${{ steps.build.outputs.version_code }}
-        run: python .github/scripts/play_publish.py
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ needs.central.outputs.run_id }}
+          JOB_NAME: build_and_publish
+        shell: bash
+        run: "set -euo pipefail\napi=\"repos/HereLiesAz/workflows/actions/runs/$RUN_ID\"\nseen=\"\"\njob=\"\"\nfor _ in $(seq 1 1440); do\n  job=\"$(gh api \"$api/jobs?per_page=100\" --jq \"[.jobs[] | select(.name == \\\"$JOB_NAME\\\" or (.name | startswith(\\\"$JOB_NAME \\\")) or (.name | startswith(\\\"$JOB_NAME / \\\")))][0] // empty\")\"\n  if [[ -z \"$job\" ]]; then\n    [[ \"$(gh api \"$api\" --jq .status)\" == completed ]] && { echo \"Skipped.\"; exit 0; }\n    sleep 10\n    continue\n  fi\n  while IFS= read -r line; do\n    [[ -n \"$line\" ]] || continue\n    grep -qxF \"$line\" <<<\"$seen\" || { echo \"$line\"; seen+=\"$line\"$'\\n'; }\n  done < <(jq -r '.steps[]? | select(.status == \"completed\" and .conclusion != \"skipped\")\n    | \"\\(if .conclusion == \"success\" then \"✓\" else \"✗\" end) \\(.name)\"' <<<\"$job\")\n  [[ \"$(jq -r .status <<<\"$job\")\" == completed ]] && break\n  sleep 10\ndone\nconclusion=\"$(jq -r '.conclusion // \"cancelled\"' <<<\"$job\")\"\necho \"::group::Log\"\nif log=\"$(gh api \"repos/HereLiesAz/workflows/actions/jobs/$(jq -r .id <<<\"$job\")/logs\" 2>/dev/null)\"; then\n  sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z //' <<<\"$log\"\nelse\n  echo \"Log unavailable here: $(jq -r .html_url <<<\"$job\")\"\nfi\necho \"::endgroup::\"\ncase \"$conclusion\" in\n  success|skipped|neutral) exit 0 ;;\n  *) echo \"::error::$JOB_NAME: $conclusion\"; exit 1 ;;\nesac\n"
