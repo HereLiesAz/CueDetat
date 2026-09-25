@@ -81,7 +81,7 @@ data class AimingLineLabelProperties(
     override val xOffset: Float = 5f,
     override val yOffset: Float = -4f,
     override val opacity: Float = 1.0f,
-    override val rotationDegrees: Float = 270f,
+    override val rotationDegrees: Float = 0f,
     override val isPersistentlyVisible: Boolean = false
 ) : LabelProperties
 

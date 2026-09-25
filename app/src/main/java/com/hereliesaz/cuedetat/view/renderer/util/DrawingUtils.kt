@@ -71,11 +71,21 @@ object DrawingUtils {
         val y = (screenY - cy) / fy
 
         val r2 = x * x + y * y
+        // The calibration only holds inside the image. Far outside it the polynomial turns
+        // over (barrel k1 < 0 drives the factor negative), flinging a line's off-screen end
+        // across the view: lines appeared to fly up off the table. Beyond the image corner
+        // the distortion is held at its corner value, which keeps the mapping monotonic.
+        val cornerR2 = (cx / fx) * (cx / fx) + (cy / fy) * (cy / fy)
+        val scale = if (r2 > cornerR2 && r2 > 0.0) kotlin.math.sqrt(cornerR2 / r2) else 1.0
+        val rc2 = minOf(r2, cornerR2)
 
-        val radialDistortion = 1.0 + k1 * r2 + k2 * (r2 * r2) + k3 * (r2 * r2 * r2)
+        val radialDistortion = 1.0 + k1 * rc2 + k2 * (rc2 * rc2) + k3 * (rc2 * rc2 * rc2)
 
-        val xTangential = 2.0 * p1 * x * y + p2 * (r2 + 2.0 * x * x)
-        val yTangential = p1 * (r2 + 2.0 * y * y) + 2.0 * p2 * x * y
+        // Tangential terms grow with r²; beyond the corner, scale them linearly with r instead.
+        val xc = x * scale
+        val yc = y * scale
+        val xTangential = (2.0 * p1 * xc * yc + p2 * (rc2 + 2.0 * xc * xc)) / scale
+        val yTangential = (p1 * (rc2 + 2.0 * yc * yc) + 2.0 * p2 * xc * yc) / scale
 
         val xDistorted = x * radialDistortion + xTangential
         val yDistorted = y * radialDistortion + yTangential

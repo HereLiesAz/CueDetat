@@ -107,7 +107,13 @@ data class Table(
         val t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / d
         val u = -((p1.x - p2.x) * (p1.y - p3.y) - (p1.y - p2.y) * (p1.x - p3.x)) / d
 
-        return if (t in 0.001f..1.0f && u in 0f..1f) {
+        // Skip hits right at p1 (a path leaving a rail must not re-hit it). A fixed fraction of
+        // the segment alone failed long segments: callers that extend a direction thousands
+        // of times over lost every rail within ~10 ball widths of p1. Capping the margin at an
+        // absolute distance fixes those and leaves short simulation steps as they were.
+        val segLen = kotlin.math.hypot((p2.x - p1.x).toDouble(), (p2.y - p1.y).toDouble()).toFloat()
+        val minT = if (segLen > 0f) minOf(0.001f, MIN_HIT_DISTANCE / segLen) else 0.001f
+        return if (t > minT && t <= 1.0f && u in 0f..1f) {
             PointF().apply {
                 x = p1.x + t * (p2.x - p1.x)
                 y = p1.y + t * (p2.y - p1.y)
@@ -134,5 +140,10 @@ data class Table(
             x = (mag * kotlin.math.cos(newAngle)).toFloat()
             y = (mag * kotlin.math.sin(newAngle)).toFloat()
         }
+    }
+
+    private companion object {
+        /** Closest a rail hit may be to the segment start, in logical units (a tenth of a ball radius). */
+        const val MIN_HIT_DISTANCE = LOGICAL_BALL_RADIUS * 0.1f
     }
 }

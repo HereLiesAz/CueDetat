@@ -3,6 +3,7 @@
 package com.hereliesaz.cuedetat.view.renderer.text
 
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.Typeface
@@ -12,6 +13,7 @@ import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.config.ui.LabelProperties
+import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -35,44 +37,70 @@ class LineTextRenderer {
         return (baseSize * zoomFactor).coerceIn(minFontSize, maxFontSize)
     }
 
+    /**
+     * Draws [text] along a line on the table: [distanceFromOrigin] logical units from [origin]
+     * in the logical direction [directionRadians] (atan2 convention). Position and angle are
+     * both taken from the projected line, so the label sits on the line as drawn and turns
+     * with it under pitch, table rotation and lens distortion; it is flipped when needed so
+     * it never reads upside down.
+     */
     private fun draw(
         canvas: Canvas,
         text: String,
         origin: PointF,
-        angleDegrees: Float,
+        directionRadians: Double,
         distanceFromOrigin: Float,
         config: LabelProperties,
         paint: Paint,
-        state: CueDetatState
+        state: CueDetatState,
+        matrix: Matrix,
+        camArray: DoubleArray?,
+        distArray: DoubleArray?
     ) {
-        val matrix = state.pitchMatrix ?: return
-        val textAngleRadians = Math.toRadians((angleDegrees - 90).toDouble())
+        val dirX = cos(directionRadians).toFloat()
+        val dirY = sin(directionRadians).toFloat()
 
-        // 1. Calculate base logical position
-        val logicalX = origin.x + (distanceFromOrigin * cos(textAngleRadians)).toFloat()
-        val logicalY = origin.y + (distanceFromOrigin * sin(textAngleRadians)).toFloat()
+        val logicalX = origin.x + distanceFromOrigin * dirX
+        val logicalY = origin.y + distanceFromOrigin * dirY
+        val step = state.protractorUnit.radius
+        val screen = project(logicalX, logicalY, matrix, camArray, distArray) ?: return
+        val ahead = project(logicalX + dirX * step, logicalY + dirY * step, matrix, camArray, distArray) ?: return
 
-        // 2. Transform base logical position to screen position
-        val screenCoords = floatArrayOf(logicalX, logicalY)
-        matrix.mapPoints(screenCoords)
+        var angle = Math.toDegrees(atan2((ahead.y - screen.y).toDouble(), (ahead.x - screen.x).toDouble())).toFloat()
+        if (angle > 90f) angle -= 180f else if (angle < -90f) angle += 180f
 
-        // 3. Apply screen-space offset
-        val finalX = screenCoords[0] + config.xOffset
-        val finalY = screenCoords[1] + config.yOffset
+        val finalX = screen.x + config.xOffset
+        val finalY = screen.y + config.yOffset
 
         canvas.save()
-        // 4. Rotate around the final screen position
-        canvas.rotate(angleDegrees + config.rotationDegrees, finalX, finalY)
+        canvas.rotate(angle + config.rotationDegrees, finalX, finalY)
         paint.color = config.color.copy(alpha = config.opacity).toArgb()
-        canvas.drawText(text, finalX, finalY, paint)
+        // Baseline just above the line, so the text rides on it rather than across it.
+        canvas.drawText(text, finalX, finalY - paint.descent() - LINE_GAP, paint)
         canvas.restore()
+    }
+
+    /** Logical point → screen, the way [DrawingUtils.buildDistortedLinePath] draws lines; null behind the camera. */
+    private fun project(x: Float, y: Float, matrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?): PointF? {
+        val v = FloatArray(9).also { matrix.getValues(it) }
+        if (v[Matrix.MPERSP_0] * x + v[Matrix.MPERSP_1] * y + v[Matrix.MPERSP_2] <= 0f) return null
+        val pts = floatArrayOf(x, y)
+        matrix.mapPoints(pts)
+        return if (camArray != null && distArray != null && camArray.size == 9) {
+            DrawingUtils.applyBarrelDistortion(pts[0], pts[1], camArray, distArray)
+        } else {
+            PointF(pts[0], pts[1])
+        }
     }
 
     fun drawProtractorLabels(
         canvas: Canvas,
         state: CueDetatState,
         paints: PaintCache,
-        typeface: Typeface?
+        typeface: Typeface?,
+        matrix: Matrix,
+        camArray: DoubleArray?,
+        distArray: DoubleArray?
     ) {
         val textPaint = paints.textPaint.apply { this.typeface = typeface }
         textPaint.textSize = getDynamicFontSize(38f, state)
@@ -86,63 +114,51 @@ class LineTextRenderer {
             maxZoom
         ) / ZoomMapping.DEFAULT_ZOOM
 
-        // Aiming Line Label
+        val ghost = state.protractorUnit.ghostCueBallCenter
+        val target = state.protractorUnit.center
+        val aimDirection = atan2((target.y - ghost.y).toDouble(), (target.x - ghost.x).toDouble())
+
+        // Aiming Line Label - beyond the target ball, along the aiming line
         draw(
             canvas,
             "Aiming Line",
-            state.protractorUnit.center,
-            state.protractorUnit.rotationDegrees,
+            target,
+            aimDirection,
             state.protractorUnit.radius * 5.0f * zoomFactor,
             LabelConfig.aimingLine,
             textPaint,
-            state
+            state, matrix, camArray, distArray
         )
 
-        // Shot Guide Line Label - Anchored to Ghost Ball
+        // Shot Guide Line Label - between the ghost ball and the cue ball, along the shot line
         state.shotLineAnchor?.let { anchor ->
-            val shotLineAngle = Math.toDegrees(
-                atan2(
-                    (state.protractorUnit.ghostCueBallCenter.y - anchor.y).toDouble(),
-                    (state.protractorUnit.ghostCueBallCenter.x - anchor.x).toDouble()
-                ).toDouble()
-            ).toFloat()
             draw(
                 canvas,
                 "Shot Guide Line",
-                state.protractorUnit.ghostCueBallCenter,
-                shotLineAngle,
+                ghost,
+                atan2((anchor.y - ghost.y).toDouble(), (anchor.x - ghost.x).toDouble()),
                 state.protractorUnit.radius * 4.0f * zoomFactor,
                 LabelConfig.shotGuideLine,
                 textPaint,
-                state
+                state, matrix, camArray, distArray
             )
         }
 
-        // Tangent Line Labels - Drawn on both sides
-        val tangentBaseAngle = state.protractorUnit.rotationDegrees + 90f
+        // Tangent Line Labels - both sides of the ghost ball, along the tangent
         val tangentDistance = state.protractorUnit.radius * 3.0f * zoomFactor
-        draw(
-            canvas,
-            "Tangent Line",
-            state.protractorUnit.ghostCueBallCenter,
-            tangentBaseAngle + (90 * state.tangentDirection),
-            tangentDistance,
-            LabelConfig.tangentLine,
-            textPaint,
-            state
-        )
-        draw(
-            canvas,
-            "Tangent Line",
-            state.protractorUnit.ghostCueBallCenter,
-            tangentBaseAngle - (90 * state.tangentDirection),
-            tangentDistance,
-            LabelConfig.tangentLine,
-            textPaint,
-            state
-        )
+        for (side in listOf(1.0, -1.0)) {
+            draw(
+                canvas,
+                "Tangent Line",
+                ghost,
+                aimDirection + side * Math.PI / 2,
+                tangentDistance,
+                LabelConfig.tangentLine,
+                textPaint,
+                state, matrix, camArray, distArray
+            )
+        }
     }
-
 
     fun drawAngleLabel(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint, radius: Float) {
         val config = LabelConfig.angleGuide
@@ -242,5 +258,10 @@ class LineTextRenderer {
         }
 
         return String.format("%.1f", diamondValue)
+    }
+
+    private companion object {
+        /** Screen gap in pixels between a line and the label riding on it. */
+        const val LINE_GAP = 12f
     }
 }
