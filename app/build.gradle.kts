@@ -58,6 +58,11 @@ val finalVersionName = versionNameOverride ?: "$finalMajor.$finalMinor.$finalPat
 // commit). The override is ephemeral and lives only for that build.
 val finalIsBuilding = isBuildingTask && versionBuildOverride == null
 
+// Play release override: the central Play workflow passes the upload's versionCode as
+// -PversionCodeOverride (it also passes -PversionBuild twice, and the last, smaller value
+// wins). When present, it is the versionCode, so every upload outranks the one before.
+val versionCodeOverride = project.findProperty("versionCodeOverride")?.toString()?.trim()?.toIntOrNull()
+
 // Task to write back the updated properties
 tasks.register("updateVersionProperties") {
     val path = versionPropsPath
@@ -119,7 +124,7 @@ android {
         minSdk = 29
         targetSdk = 37
         
-        versionCode = finalBuild
+        versionCode = versionCodeOverride ?: finalBuild
         versionName = finalVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
