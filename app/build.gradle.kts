@@ -263,7 +263,7 @@ dependencies {
     // parses build files statically and does not evaluate that dynamic override,
     // so it keeps flagging the vulnerable transitive versions (CVE-2026-5598 and
     // the older bcpkix/LDAP-injection advisories). These explicit constraints
-    // pin the patched 1.84 in a form static analysis recognizes, so the alerts
+    // pin the patched 1.86 in a form static analysis recognizes, so the alerts
     // resolve. Keep the version in sync with libs.versions.bouncycastle.
     constraints {
         val bcVersion = libs.versions.bouncycastle.get()
