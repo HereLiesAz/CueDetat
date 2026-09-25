@@ -97,8 +97,8 @@ class PlayMetaWearableRepository @Inject constructor(
 
     private val tag = "MetaWearableRepo"
 
-    private var currentSession: Session? = null
-    private var currentStream: Stream? = null
+    private var currentSession: DeviceSession? = null
+    private var currentCamera: Camera? = null
     private var sessionJob: Job? = null
 
     private val _videoFrame = MutableStateFlow<Bitmap?>(null)
@@ -133,20 +133,22 @@ class PlayMetaWearableRepository @Inject constructor(
                     currentSession = session
                     session.start()
 
-                    session.addStream(config).onSuccess { stream ->
-                        currentStream = stream
+                    // DAT 1.0: a session adds a Camera, which owns the Stream.
+                    session.addCamera(config).onSuccess { camera ->
+                        currentCamera = camera
+                        val stream = camera.stream
                         stream.start()
                         _isStreaming.value = true
                         _connectionStatus.value = MetaConnectionStatus.STREAMING
                         observeStream(stream)
                         Log.d(tag, "Meta stream started successfully")
-                    }.onFailure { error ->
-                        Log.e(tag, "Failed to add stream: $error")
+                    }.onFailure { error, _ ->
+                        Log.e(tag, "Failed to add camera: $error")
                         _lastError.value = "Stream error: $error"
                         _connectionStatus.value = MetaConnectionStatus.ERROR
                         stopStreaming()
                     }
-                }.onFailure { error ->
+                }.onFailure { error, _ ->
                     // No paired/available device is the common case here; surface it
                     // distinctly so the UI can tell the user to pair their glasses.
                     Log.e(tag, "Failed to create session: $error")
@@ -185,8 +187,8 @@ class PlayMetaWearableRepository @Inject constructor(
         Log.d(tag, "Stopping Meta glasses stream/session")
         sessionJob?.cancel()
         sessionJob = null
-        currentStream?.stop()
-        currentStream = null
+        currentCamera?.stop()
+        currentCamera = null
         currentSession?.stop()
         currentSession = null
         _isStreaming.value = false
