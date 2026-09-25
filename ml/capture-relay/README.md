@@ -16,17 +16,15 @@ Uploads are rate-limited per install (30 a minute).
    commit on `main` (a README is enough).
 2. Create a fine-grained GitHub token: *only* that repo, permission **Contents: read and
    write**, nothing else.
-3. Deploy:
+3. Add it to the Worker as the secret `GITHUB_TOKEN` (Cloudflare dashboard → Workers →
+   `cuedetat-capture-relay` → Settings → Variables and secrets). Deploys keep it.
 
-~~~
-cd ml/capture-relay
-npm i -g wrangler
-wrangler login
-wrangler secret put GITHUB_TOKEN        # paste the token
-wrangler deploy                         # prints https://cuedetat-capture-relay.<you>.workers.dev
-~~~
+Deploys are central: `.github/workflows/capture-relay-deploy.yml` is bound to
+`HereLiesAz/workflows`' **Cloudflare Worker Deploy**, which runs `npm test` here and
+`wrangler deploy` on every push to `main` touching `ml/capture-relay/`, with the central
+Cloudflare credentials. The first deploy creates the Worker; set the secret after it, then the
+relay works. (To deploy by hand instead: `wrangler secret put GITHUB_TOKEN && wrangler deploy`.)
 
-   If the data repo has another name, change `GITHUB_REPO` in `wrangler.toml` first.
 4. In the CueDetat repo: Settings → Secrets and variables → Actions → new secret
    `CAPTURE_RELAY_URL` = the workers.dev URL. CI builds pick it up; local builds take
    `-PcaptureRelayUrl=…`. Without it, the app keeps frames on the phone and sends nothing.

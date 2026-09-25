@@ -1,0 +1,25 @@
+# Deploys the training-capture relay (ml/capture-relay) to Cloudflare. Bound centrally to
+# HereLiesAz/workflows' cloudflare-worker-deploy.yml, whose purpose profile points it at
+# ml/capture-relay; the controller replaces this file with its tracker once registered.
+name: Deploy Capture Relay
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ml/capture-relay/**"
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm test
+        working-directory: ml/capture-relay
+      - uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: ml/capture-relay
