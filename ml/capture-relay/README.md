@@ -29,6 +29,9 @@ relay works. (To deploy by hand instead: `wrangler secret put GITHUB_TOKEN && wr
    `CAPTURE_RELAY_URL` = the workers.dev URL. CI builds pick it up; local builds take
    `-PcaptureRelayUrl=…`. Without it, the app keeps frames on the phone and sends nothing.
 
+Each push's deploy result shows on the commit as the `.github/workflows/capture-relay-deploy.yml`
+status, linking to the central run.
+
 ## Limits worth knowing
 
 - GitHub repos get slow past a few GB. At ~1 MB a frame that is a few thousand frames; move
