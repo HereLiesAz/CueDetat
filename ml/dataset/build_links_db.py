@@ -48,9 +48,24 @@ def fetch(url):
         return None
 
 
+def wikimedia_thumb(url, width=500):
+    """Wikimedia's standard-size thumbnail for a Commons file URL, or None for other hosts.
+
+    Commons answers bulk full-size fetches with 429 and asks for thumbnails in its standard
+    sizes instead; Openverse's own thumbnail proxy fails (424) on those same files.
+    """
+    prefix = "https://upload.wikimedia.org/wikipedia/commons/"
+    if not url.startswith(prefix) or "/thumb/" in url:
+        return None
+    path = url[len(prefix):]  # a/ab/Name.jpg
+    name = path.rsplit("/", 1)[-1]
+    return f"{prefix}thumb/{path}/{width}px-{name}"
+
+
 def fetch_patiently(row, tries=4):
-    """Openverse's thumbnail, then the source; backs off on failure (429s are the usual cause)."""
-    urls = [f"https://api.openverse.org/v1/images/{row['id']}/thumb/", row["url"]]
+    """Wikimedia thumbnail, Openverse's thumbnail, then the source; backs off on failure."""
+    urls = [u for u in (wikimedia_thumb(row["url"]),
+                        f"https://api.openverse.org/v1/images/{row['id']}/thumb/", row["url"]) if u]
     for attempt in range(tries):
         for url in urls:
             im = fetch(url)

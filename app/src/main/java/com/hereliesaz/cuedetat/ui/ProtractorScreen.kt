@@ -45,6 +45,7 @@ import com.hereliesaz.cuedetat.ui.composables.SpinControl
 import com.hereliesaz.cuedetat.ui.composables.TopControls
 import com.hereliesaz.cuedetat.ui.composables.ZoomControls
 import com.hereliesaz.cuedetat.ui.composables.AdvancedOptionsDialog
+import com.hereliesaz.cuedetat.ui.composables.dialogs.CaptureConsentDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.GlowStickDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.LuminanceAdjustmentDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.TableSizeSelectionDialog
@@ -78,11 +79,16 @@ fun ProtractorScreen(
         label = "topDownProgress"
     )
 
+    val captureEnabled by mainViewModel.captureEnabled.collectAsStateWithLifecycle()
+    val captureNeedsConsent by mainViewModel.captureNeedsConsent.collectAsStateWithLifecycle()
+
     AzNavRailMenu(
         uiState = uiState,
         onEvent = { event -> mainViewModel.onEvent(event) },
         navController = navController,
         currentDestination = currentRoute,
+        captureEnabled = captureEnabled,
+        onToggleCapture = { mainViewModel.setCaptureEnabled(!captureEnabled) },
     ) {
         // --- Background layer 0: Camera ---
         // AR mode with ARCore depth uses ArCoreBackground (manages its own GL + session).
@@ -324,6 +330,9 @@ fun ProtractorScreen(
         }
 
         onscreen(alignment = Alignment.Center) {
+            if (captureNeedsConsent && isOnMain) {
+                CaptureConsentDialog(onAnswer = mainViewModel::setCaptureEnabled)
+            }
             if (uiState.showAdvancedOptionsDialog) {
                 AdvancedOptionsDialog(
                     state = uiState,

@@ -9,6 +9,8 @@
     <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Training capture uploads only on unmetered networks (CaptureRecorder). -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />

@@ -1,0 +1,17 @@
+name = "cuedetat-capture-relay"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+GITHUB_REPO = "HereLiesAz/cuedetat-captures"
+GITHUB_BRANCH = "main"
+
+# Per-install limit: 30 uploads a minute (the app keeps at most one frame every 2 s and sends
+# up to 20 at once after being offline, so this only bites on abuse).
+[[ratelimits]]
+name = "UPLOAD_LIMIT"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 30
+  period = 60

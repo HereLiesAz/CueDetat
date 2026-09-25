@@ -2,6 +2,8 @@ package com.hereliesaz.cuedetat.data
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.net.ConnectivityManager
+import com.hereliesaz.cuedetat.BuildConfig
 import android.graphics.Matrix
 import com.google.gson.Gson
 import com.hereliesaz.cuedetat.domain.CaptureSampler
@@ -18,12 +20,14 @@ import org.opencv.core.Mat
 import org.opencv.core.MatOfDouble
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
+import java.io.DataOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -45,11 +49,15 @@ data class CaptureCamera(
 )
 
 /**
- * Training-capture mode: while switched on, keeps a steady, sharp camera frame about every two
- * seconds (see [CaptureSampler]) with everything the app knew at that moment, for training the
- * ball detector and the table-orientation model on the app's own player's-eye view.
+ * Training capture: while the user has agreed, keeps a steady, sharp camera frame about every two
+ * seconds (see [CaptureSampler]) with everything the app knew at that moment, and sends it to
+ * the developer for training the ball detector and the table-orientation model on the app's own
+ * player's-eye view.
  *
- * Each kept frame is two files in [dir] (`Android/data/<package>/files/captures`):
+ * Consent is asked once ([needsConsent]; the dialog is `CaptureConsentDialog`) and can be
+ * changed any time from the menu. Nothing is captured until the user says yes.
+ *
+ * Each kept frame is two files in [dir] (`Android/data/<package>/files/captures`) until sent:
  * - `<id>.jpg`: the frame, rotated upright, full resolution.
  * - `<id>.json`: phone yaw/pitch/roll; the virtual table's pose (rotation, zoom, pan, whether
  *   locked, snap fit IoU) and its four corners in image pixels when it is on screen; the felt
@@ -57,7 +65,11 @@ data class CaptureCamera(
  *   in image pixels. `ml/dataset/captures_to_labelstudio.py` turns these into Label Studio tasks
  *   with the detections as pre-labels.
  *
- * The switch persists across launches. [shareZip] packs the folder for sharing.
+ * Sending: when [BuildConfig.CAPTURE_RELAY_URL] is set, pending pairs are POSTed to the relay
+ * (`ml/capture-relay`, which commits them to a private GitHub repo; the app holds no GitHub
+ * token), on unmetered networks only, oldest first, and deleted once accepted. With no relay
+ * URL they stay on the phone. At most [MAX_PENDING] frames wait; capture pauses beyond that.
+ * Each install sends a random id so frames group by phone without naming anyone.
  *
  * [offer] is called from the vision worker on every processed frame and returns at once when
  * capture is off or no frame is due; encoding and disk writes run on a single background thread.
@@ -71,12 +83,21 @@ class CaptureRecorder @Inject constructor(
     private val writer = Executors.newSingleThreadExecutor { r -> Thread(r, "capture-writer") }
     private val writerBusy = AtomicBoolean(false)
 
-    private val _enabled = MutableStateFlow(prefs.getBoolean(KEY_ENABLED, false))
+    private val _enabled = MutableStateFlow(prefs.getString(KEY_CONSENT, null) == CONSENT_YES)
+    /** True only after the user agreed. */
     val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
 
-    private val _count = MutableStateFlow(0)
-    /** Frames currently in [dir]. */
-    val count: StateFlow<Int> = _count.asStateFlow()
+    private val _needsConsent = MutableStateFlow(prefs.getString(KEY_CONSENT, null) == null)
+    /** True until the user has answered the consent dialog once. */
+    val needsConsent: StateFlow<Boolean> = _needsConsent.asStateFlow()
+
+    @Volatile private var pending = 0
+
+    private val installId: String by lazy {
+        prefs.getString(KEY_INSTALL_ID, null) ?: UUID.randomUUID().toString().also {
+            prefs.edit().putString(KEY_INSTALL_ID, it).apply()
+        }
+    }
 
     @Volatile private var lastKeptMs = 0L
     @Volatile private var lastOrientation: FloatArray? = null
@@ -85,12 +106,18 @@ class CaptureRecorder @Inject constructor(
     val dir: File get() = File(context.getExternalFilesDir(null) ?: context.filesDir, "captures")
 
     init {
-        writer.execute { _count.value = countFrames() }
+        writer.execute {
+            pending = countFrames()
+            if (_enabled.value) uploadPending()
+        }
     }
 
+    /** Records the user's answer (from the consent dialog or the menu). */
     fun setEnabled(on: Boolean) {
-        prefs.edit().putBoolean(KEY_ENABLED, on).apply()
+        prefs.edit().putString(KEY_CONSENT, if (on) CONSENT_YES else CONSENT_NO).apply()
         _enabled.value = on
+        _needsConsent.value = false
+        if (on) writer.execute { uploadPending() }
     }
 
     /**
@@ -111,7 +138,7 @@ class CaptureRecorder @Inject constructor(
         feltStdDev: FloatArray?,
         camera: CaptureCamera?,
     ) {
-        if (!_enabled.value) return
+        if (!_enabled.value || pending >= MAX_PENDING) return
         val now = System.currentTimeMillis()
         val o = state.currentOrientation
         val orientation = floatArrayOf(o.yaw, o.pitch, o.roll)
@@ -127,8 +154,12 @@ class CaptureRecorder @Inject constructor(
         try {
             writer.execute {
                 try {
-                    if (write(copy, rotationDegrees, meta)) _count.value = _count.value + 1
-                    else lastKeptMs = 0L // blurred: try again on the next steady frame
+                    if (write(copy, rotationDegrees, meta)) {
+                        pending++
+                        uploadPending()
+                    } else {
+                        lastKeptMs = 0L // blurred: try again on the next steady frame
+                    }
                 } catch (_: Exception) {
                     // A failed write loses one frame, nothing else.
                 } finally {
@@ -142,28 +173,58 @@ class CaptureRecorder @Inject constructor(
         }
     }
 
-    /** Zips [dir] into the cache for sharing; null when there is nothing to share. */
-    fun shareZip(): File? {
-        val files = dir.listFiles()?.filter { it.isFile }?.sortedBy { it.name }.orEmpty()
-        if (files.isEmpty()) return null
-        val out = File(File(context.cacheDir, "shared").apply { mkdirs() }, "cuedetat-captures.zip")
-        ZipOutputStream(FileOutputStream(out)).use { zip ->
-            for (f in files) {
-                zip.putNextEntry(ZipEntry("captures/${f.name}"))
-                f.inputStream().use { it.copyTo(zip) }
-                zip.closeEntry()
-            }
+    /**
+     * Sends waiting frames to the relay, oldest first, deleting each once accepted. Stops at the
+     * first failure (the next kept frame retries). Runs on [writer].
+     */
+    private fun uploadPending() {
+        val relay = BuildConfig.CAPTURE_RELAY_URL
+        if (relay.isBlank() || !_enabled.value || !unmetered()) return
+        val images = dir.listFiles { f -> f.name.endsWith(".jpg") }?.sortedBy { it.name }.orEmpty()
+        for (jpg in images.take(UPLOADS_PER_PASS)) {
+            val json = File(dir, jpg.nameWithoutExtension + ".json")
+            if (!json.exists()) { jpg.delete(); continue }
+            if (!post(relay, jpg, json)) return
+            jpg.delete(); json.delete()
+            pending = (pending - 1).coerceAtLeast(0)
         }
-        return out
     }
 
-    /** Deletes every captured frame. */
-    fun deleteAll() {
-        writer.execute {
-            dir.listFiles()?.forEach { it.delete() }
-            _count.value = 0
+    private fun unmetered(): Boolean = runCatching {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        cm.activeNetwork != null && !cm.isActiveNetworkMetered
+    }.getOrDefault(false)
+
+    /** multipart/form-data POST of one pair to `<relay>/upload`; true on 2xx. */
+    private fun post(relay: String, jpg: File, json: File): Boolean = runCatching {
+        val boundary = "cuedetat" + UUID.randomUUID().toString().replace("-", "")
+        val conn = (URL(relay.trimEnd('/') + "/upload").openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doOutput = true
+            connectTimeout = 15_000
+            readTimeout = 30_000
+            setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+            setRequestProperty("X-Install-Id", installId)
+            setRequestProperty("X-App-Version", BuildConfig.VERSION_NAME)
         }
-    }
+        try {
+            DataOutputStream(conn.outputStream).use { out ->
+                fun part(name: String, file: File, type: String) {
+                    out.writeBytes("--$boundary\r\n")
+                    out.writeBytes("Content-Disposition: form-data; name=\"$name\"; filename=\"${file.name}\"\r\n")
+                    out.writeBytes("Content-Type: $type\r\n\r\n")
+                    file.inputStream().use { it.copyTo(out) }
+                    out.writeBytes("\r\n")
+                }
+                part("image", jpg, "image/jpeg")
+                part("meta", json, "application/json")
+                out.writeBytes("--$boundary--\r\n")
+            }
+            conn.responseCode in 200..299
+        } finally {
+            conn.disconnect()
+        }
+    }.getOrDefault(false)
 
     private fun countFrames(): Int = dir.listFiles { f -> f.name.endsWith(".jpg") }?.size ?: 0
 
@@ -197,6 +258,7 @@ class CaptureRecorder @Inject constructor(
 
         return mapOf(
             "id" to idOf(now),
+            "installId" to installId,
             "timestampMs" to now,
             "image" to idOf(now) + ".jpg",
             "width" to w,
@@ -280,7 +342,12 @@ class CaptureRecorder @Inject constructor(
     private fun idOf(ms: Long) = "cap_$ms"
 
     private companion object {
-        const val KEY_ENABLED = "enabled"
+        const val KEY_CONSENT = "consent"
+        const val KEY_INSTALL_ID = "install_id"
+        const val CONSENT_YES = "yes"
+        const val CONSENT_NO = "no"
+        const val MAX_PENDING = 300
+        const val UPLOADS_PER_PASS = 20
         const val SHARPNESS_WIDTH = 480.0
         const val JPEG_QUALITY = 92
     }

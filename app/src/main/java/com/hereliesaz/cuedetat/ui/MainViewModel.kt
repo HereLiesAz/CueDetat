@@ -76,7 +76,16 @@ class MainViewModel @Inject constructor(
     private val appUpdater: com.hereliesaz.cuedetat.update.AppUpdater,
     val wristWearableRepository: com.hereliesaz.cuedetat.data.WristWearableRepository,
     private val tablePoseStore: com.hereliesaz.cuedetat.data.TablePoseStore,
+    private val captureRecorder: com.hereliesaz.cuedetat.data.CaptureRecorder,
 ) : ViewModel() {
+
+    /** Training capture is on (the user agreed). */
+    val captureEnabled: kotlinx.coroutines.flow.StateFlow<Boolean> = captureRecorder.enabled
+
+    /** The one-time training-capture consent dialog is still owed. */
+    val captureNeedsConsent: kotlinx.coroutines.flow.StateFlow<Boolean> = captureRecorder.needsConsent
+
+    fun setCaptureEnabled(on: Boolean) = captureRecorder.setEnabled(on)
 
     /**
      * FOSS self-update. Non-null when a newer GitHub release is available; the
