@@ -1,6 +1,8 @@
-# Deploys the training-capture relay (ml/capture-relay) to Cloudflare. Bound centrally to
-# HereLiesAz/workflows' cloudflare-worker-deploy.yml, whose purpose profile points it at
-# ml/capture-relay; the controller replaces this file with its tracker once registered.
+# centralized-by: HereLiesAz/workflows
+# central-source-path: .github/workflows/capture-relay-deploy.yml
+# central-source-sha256: cc3b3d2f63a2ff31d475af991e561c7ff8003b432b51c8b1c41a084ad82c0171
+# This file intentionally contains no repository secrets.
+# central-run-tracker: HereLiesAz/workflows
 name: Deploy Capture Relay
 on:
   push:
@@ -8,18 +10,53 @@ on:
     paths:
       - "ml/capture-relay/**"
   workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+  statuses: read
 jobs:
-  deploy:
+  central:
+    name: Start
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      run_id: ${{ steps.locate.outputs.run_id }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - run: npm test
-        working-directory: ml/capture-relay
-      - uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: ml/capture-relay
+      - id: locate
+        name: Locate run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATUS_CONTEXT: .github/workflows/capture-relay-deploy.yml
+          TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: "set -euo pipefail\ncreated_at=\"$(gh api \"repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\" --jq .created_at)\"\nthreshold=\"$(date -u -d \"$created_at - 5 seconds\" +%s)\"\n# The gateway skips some events a tracker still sees (unmatched filters, forks, manual\n# runs, CI-skip pushes). No central status within 20 minutes means no central run.\nfor _ in $(seq 1 80); do\n  url=\"$(gh api \"repos/$GITHUB_REPOSITORY/statuses/$TARGET_SHA?per_page=100\" --jq \\\n    \"[.[] | select(.context == \\\"$STATUS_CONTEXT\\\" and ((.updated_at | fromdateiso8601) >= $threshold))][0].target_url // empty\")\"\n  run_id=\"$(sed -nE 's#.*/HereLiesAz/workflows/actions/runs/([0-9]+).*#\\1#p' <<<\"$url\")\"\n  if [[ -n \"$run_id\" ]]; then\n    echo \"run_id=$run_id\" >> \"$GITHUB_OUTPUT\"\n    echo \"Run: $url\"\n    exit 0\n  fi\n  sleep 15\ndone\necho \"::notice::No run of this workflow was started for this event.\"\n"
+  policy_secret_preflight:
+    name: policy_secret_preflight
+    needs:
+      - central
+    if: ${{ needs.central.outputs.run_id != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: policy_secret_preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ needs.central.outputs.run_id }}
+          JOB_NAME: policy_secret_preflight
+        shell: bash
+        run: "set -euo pipefail\napi=\"repos/HereLiesAz/workflows/actions/runs/$RUN_ID\"\nseen=\"\"\njob=\"\"\nfor _ in $(seq 1 1440); do\n  job=\"$(gh api \"$api/jobs?per_page=100\" --jq \"[.jobs[] | select(.name == \\\"$JOB_NAME\\\" or (.name | startswith(\\\"$JOB_NAME \\\")) or (.name | startswith(\\\"$JOB_NAME / \\\")))][0] // empty\")\"\n  if [[ -z \"$job\" ]]; then\n    [[ \"$(gh api \"$api\" --jq .status)\" == completed ]] && { echo \"Skipped.\"; exit 0; }\n    sleep 10\n    continue\n  fi\n  while IFS= read -r line; do\n    [[ -n \"$line\" ]] || continue\n    grep -qxF \"$line\" <<<\"$seen\" || { echo \"$line\"; seen+=\"$line\"$'\\n'; }\n  done < <(jq -r '.steps[]? | select(.status == \"completed\" and .conclusion != \"skipped\")\n    | \"\\(if .conclusion == \"success\" then \"✓\" else \"✗\" end) \\(.name)\"' <<<\"$job\")\n  [[ \"$(jq -r .status <<<\"$job\")\" == completed ]] && break\n  sleep 10\ndone\nconclusion=\"$(jq -r '.conclusion // \"cancelled\"' <<<\"$job\")\"\necho \"::group::Log\"\nif log=\"$(gh api \"repos/HereLiesAz/workflows/actions/jobs/$(jq -r .id <<<\"$job\")/logs\" 2>/dev/null)\"; then\n  sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z //' <<<\"$log\"\nelse\n  echo \"Log unavailable here: $(jq -r .html_url <<<\"$job\")\"\nfi\necho \"::endgroup::\"\ncase \"$conclusion\" in\n  success|skipped|neutral) exit 0 ;;\n  *) echo \"::error::$JOB_NAME: $conclusion\"; exit 1 ;;\nesac\n"
+  test_and_deploy:
+    name: test_and_deploy
+    needs:
+      - central
+    if: ${{ needs.central.outputs.run_id != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: test_and_deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ needs.central.outputs.run_id }}
+          JOB_NAME: test_and_deploy
+        shell: bash
+        run: "set -euo pipefail\napi=\"repos/HereLiesAz/workflows/actions/runs/$RUN_ID\"\nseen=\"\"\njob=\"\"\nfor _ in $(seq 1 1440); do\n  job=\"$(gh api \"$api/jobs?per_page=100\" --jq \"[.jobs[] | select(.name == \\\"$JOB_NAME\\\" or (.name | startswith(\\\"$JOB_NAME \\\")) or (.name | startswith(\\\"$JOB_NAME / \\\")))][0] // empty\")\"\n  if [[ -z \"$job\" ]]; then\n    [[ \"$(gh api \"$api\" --jq .status)\" == completed ]] && { echo \"Skipped.\"; exit 0; }\n    sleep 10\n    continue\n  fi\n  while IFS= read -r line; do\n    [[ -n \"$line\" ]] || continue\n    grep -qxF \"$line\" <<<\"$seen\" || { echo \"$line\"; seen+=\"$line\"$'\\n'; }\n  done < <(jq -r '.steps[]? | select(.status == \"completed\" and .conclusion != \"skipped\")\n    | \"\\(if .conclusion == \"success\" then \"✓\" else \"✗\" end) \\(.name)\"' <<<\"$job\")\n  [[ \"$(jq -r .status <<<\"$job\")\" == completed ]] && break\n  sleep 10\ndone\nconclusion=\"$(jq -r '.conclusion // \"cancelled\"' <<<\"$job\")\"\necho \"::group::Log\"\nif log=\"$(gh api \"repos/HereLiesAz/workflows/actions/jobs/$(jq -r .id <<<\"$job\")/logs\" 2>/dev/null)\"; then\n  sed -E 's/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z //' <<<\"$log\"\nelse\n  echo \"Log unavailable here: $(jq -r .html_url <<<\"$job\")\"\nfi\necho \"::endgroup::\"\ncase \"$conclusion\" in\n  success|skipped|neutral) exit 0 ;;\n  *) echo \"::error::$JOB_NAME: $conclusion\"; exit 1 ;;\nesac\n"
