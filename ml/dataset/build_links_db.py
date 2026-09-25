@@ -95,22 +95,23 @@ def write_links(path, rows):
     os.replace(tmp, path)
 
 
-def rescore_unscored(path, score):
+def rescore_unscored(path, score, workers=8):
     rows = list(csv.DictReader(open(path, newline="")))
     todo = [r for r in rows if r["verdict"] == "unscored"]
     print(f"{len(todo)} unscored", flush=True)
-    for i, r in enumerate(todo):
-        im = fetch_patiently(r)
-        if im is not None:
-            is_table, eye = score([im])[0]
-            r["is_table"], r["eye_level"] = f"{is_table:.3f}", f"{eye:.3f}"
-            r["verdict"] = verdict_of(is_table, eye)
-        time.sleep(0.5)
-        if (i + 1) % 25 == 0:
-            # Save as it goes: a long run that dies keeps what it scored, and a rerun only
-            # retries what is still unscored.
-            write_links(path, rows)
-            print(f"{i + 1}/{len(todo)}", flush=True)
+    # Fetches run in parallel: a dead link can spend minutes in fetch_patiently's retries,
+    # and one at a time that stalled the whole run behind it.
+    with ThreadPoolExecutor(workers) as ex:
+        for i, (r, im) in enumerate(zip(todo, ex.map(fetch_patiently, todo))):
+            if im is not None:
+                is_table, eye = score([im])[0]
+                r["is_table"], r["eye_level"] = f"{is_table:.3f}", f"{eye:.3f}"
+                r["verdict"] = verdict_of(is_table, eye)
+            if (i + 1) % 25 == 0:
+                # Save as it goes: a long run that dies keeps what it scored, and a rerun only
+                # retries what is still unscored.
+                write_links(path, rows)
+                print(f"{i + 1}/{len(todo)}", flush=True)
     write_links(path, rows)
     counts = {}
     for r in rows:
@@ -145,7 +146,7 @@ def main():
         return [(float(tp[: len(TABLE)].sum()), float(vp[: len(EYE)].sum())) for tp, vp in zip(topic, view)]
 
     if args.rescore_unscored:
-        rescore_unscored(args.out, score)
+        rescore_unscored(args.out, score, args.workers)
         return
 
     rows = list(csv.DictReader(open(args.manifest, newline="")))
