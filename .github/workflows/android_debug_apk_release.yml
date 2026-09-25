@@ -97,6 +97,10 @@ jobs:
         run: ./gradlew -Pcuedetat.coreOnly=true allTests --stacktrace
 
       - name: Run Android unit tests
+        # The Meta Wearables SDK resolves only from GitHub Packages (settings.gradle.kts).
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_ACTOR: ${{ secrets.GH_ACTOR }}
         run: ./gradlew testDebugUnitTest --stacktrace
 
       # Instrumented tests (app/src/androidTest) still need a device. Wiring an
