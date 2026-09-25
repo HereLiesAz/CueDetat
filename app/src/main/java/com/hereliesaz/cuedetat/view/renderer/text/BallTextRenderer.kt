@@ -53,9 +53,6 @@ class BallTextRenderer {
 
         val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(drawCenter, ball.radius, state, matrix)
         val screenPos = DrawingUtils.mapPoint(drawCenter, matrix)
-        // A ball off screen gets no label: clamped to the edge below, it would hang there
-        // detached from anything (the "Actual Cue Ball" label stranded at the screen edge).
-        if (screenPos.x !in 0f..state.viewWidth.toFloat() || screenPos.y !in 0f..state.viewHeight.toFloat()) return
 
         val visualLift = if (isBeginnerLocked) 0f else radiusInfo.lift
 

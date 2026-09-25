@@ -58,6 +58,8 @@ class LineRenderer {
     private val trianglePath = Path()
 
     private val shotLinePaintField = Paint()
+    private val fadeLineField = Paint()
+    private val fadeGlowField = Paint()
     private val protractorObstructionField = Paint()
     private val aimingLinePaintField = Paint()
     private val aimingObstructionField = Paint()
@@ -237,6 +239,9 @@ class LineRenderer {
         } else {
             if (!state.isMasseModeActive) {
                 drawClippedLine(canvas, warpedShotAnchor, shotGuideDirection, shotLinePaint, shotLineGlow, state, paints, activeMatrix, camArray, distArray, false, null, typeface)
+                if (state.table.isVisible) {
+                    drawFadeBeyondTable(canvas, warpedShotAnchor, shotGuideDirection, shotLinePaint, shotLineGlow, state, activeMatrix, camArray, distArray)
+                }
             }
             drawTangentLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
             drawAimingLines(canvas, state, paints, activeMatrix, camArray, distArray, typeface)
@@ -355,6 +360,45 @@ class LineRenderer {
             val inactiveDirection = normalize(PointF(tangentDx * -state.tangentDirection, tangentDy * -state.tangentDirection))
             drawClippedLine(canvas, start, inactiveDirection, tangentDottedPaint, tangentGlow, state, paints, activeMatrix, camArray, distArray, false, null, typeface, drawGeometry)
         }
+    }
+
+    /**
+     * Continues a line past the table edge where [drawClippedLine] stops it, fading from the
+     * line's own paint to transparent over a quarter of the table's length.
+     */
+    private fun drawFadeBeyondTable(
+        canvas: Canvas,
+        start: PointF,
+        direction: PointF,
+        paint: Paint,
+        glowPaint: Paint?,
+        state: CueDetatState,
+        activeMatrix: Matrix,
+        camArray: DoubleArray?,
+        distArray: DoubleArray?
+    ) {
+        val farEnd = PointF(start.x + direction.x * state.table.logicalHeight * 4f, start.y + direction.y * state.table.logicalHeight * 4f)
+        val exit = getTruncatedEnd(start, farEnd, state)
+        if (getSafeLogicalPoint(start, exit, activeMatrix) != exit) return // table edge not in front of the camera
+        val fadeLength = state.table.logicalHeight * 0.25f
+        val fadeEnd = getSafeLogicalPoint(exit, PointF(exit.x + direction.x * fadeLength, exit.y + direction.y * fadeLength), activeMatrix) ?: return
+
+        val path = DrawingUtils.buildDistortedLinePath(exit, fadeEnd, activeMatrix, camArray, distArray)
+        val measure = android.graphics.PathMeasure(path, false)
+        if (measure.length < 1f) return
+        val from = FloatArray(2).also { measure.getPosTan(0f, it, null) }
+        val to = FloatArray(2).also { measure.getPosTan(measure.length, it, null) }
+
+        fun faded(source: Paint, into: Paint): Paint = into.apply {
+            set(source)
+            shader = android.graphics.LinearGradient(
+                from[0], from[1], to[0], to[1],
+                source.color, source.color and 0x00FFFFFF,
+                android.graphics.Shader.TileMode.CLAMP
+            )
+        }
+        glowPaint?.let { canvas.drawPath(path, faded(it, fadeGlowField)) }
+        canvas.drawPath(path, faded(paint, fadeLineField))
     }
 
     private fun drawSpinPaths(canvas: Canvas, state: CueDetatState, paints: PaintCache, activeMatrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?) {
