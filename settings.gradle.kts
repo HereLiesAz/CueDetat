@@ -56,7 +56,7 @@ dependencyResolutionManagement {
                 logger.warn(
                     "GitHubPackages credentials are missing or blank. Set gh_user and " +
                         "gh_token in local.properties, or export GH_ACTOR and GH_TOKEN. " +
-                        "The foss flavor builds without them; the play flavor cannot."
+                        "The build needs them for the Meta Wearables SDK."
                 )
             }
 
@@ -106,12 +106,8 @@ include(":core:state")
 if (!coreOnly) {
     include(":app")
 
-    // On-demand dynamic feature carrying the 24 MB TFLite master model. Delivered
-    // via Play Feature Delivery for the `play` AAB; `foss` bundles the asset direct.
-    include(":feature_mlmodel")
-
-    // On-demand dynamic feature carrying the ARCore table-scan flow.
-    include(":feature_expert_ar")
+    // feature_mlmodel/ and feature_expert_ar/ are no longer modules: :app compiles their
+    // sources and assets directly (see app/build.gradle.kts sourceSets).
 
     include(":wear")
 }

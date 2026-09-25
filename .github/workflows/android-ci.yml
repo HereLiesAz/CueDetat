@@ -69,7 +69,7 @@ jobs:
       - name: Run unit tests
         run: |
           chmod +x gradlew
-          ./gradlew testFossDebugUnitTest testFossReleaseUnitTest --continue --build-cache --no-daemon --stacktrace
+          ./gradlew testDebugUnitTest testReleaseUnitTest --continue --build-cache --no-daemon --stacktrace
 
       - name: Upload test reports
         if: always()
@@ -199,7 +199,7 @@ jobs:
           else
             APP_NAME="App"
           fi
-          APK_ORIGINAL=$(find app/build/outputs/apk/foss/debug -name "*.apk" | head -n 1)
+          APK_ORIGINAL=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
           if [ -z "$APK_ORIGINAL" ]; then
             echo "Error: No APK found to release!"
             exit 1
