@@ -1,0 +1,26 @@
+<View>
+  <Image name="image" value="$image" zoom="true" zoomControl="true"/>
+  <PolygonLabels name="table" toName="image" strokeWidth="2" pointSize="small" opacity="0.2">
+    <Label value="table" background="#ffffff"/>
+  </PolygonLabels>
+  <RectangleLabels name="balls" toName="image" strokeWidth="1">
+    <Label value="cue"/>
+    <Label value="1"/>
+    <Label value="2"/>
+    <Label value="3"/>
+    <Label value="4"/>
+    <Label value="5"/>
+    <Label value="6"/>
+    <Label value="7"/>
+    <Label value="8"/>
+    <Label value="9"/>
+    <Label value="10"/>
+    <Label value="11"/>
+    <Label value="12"/>
+    <Label value="13"/>
+    <Label value="14"/>
+    <Label value="15"/>
+    <Label value="ball"/>
+  </RectangleLabels>
+  <Header value="$attribution" size="6"/>
+</View>

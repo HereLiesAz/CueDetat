@@ -62,6 +62,42 @@ edges, corners far from 90°) is **oblique** and kept; a near-rectangle is **ove
 dropped; felt running off the frame is **partial** and a missing felt colour is **none**,
 both for review by eye.
 
+## Labelling
+
+Pre-labels are colour guesses for a person to accept or fix in
+[Label Studio](https://labelstud.io), not ground truth.
+
+~~~
+python3 prelabel.py                   # labelstudio/tasks.json + config.xml (kept links only)
+pip install label-studio && label-studio start
+# new project -> Labeling Setup -> Code: paste labelstudio/config.xml
+# Import: labelstudio/tasks.json (pre-labels arrive as predictions)
+# fix each task, Submit; then Export -> JSON
+python3 ls_to_yolo.py export.json     # yolo/balls (detect), yolo/table (pose, 4 corners)
+~~~
+
+What is guessed:
+
+- **table**: the felt outline as four corners, clockwise from top-left (same method as
+  `perspective_score.py`). Skipped when under 55% of the quad is felt colour.
+- **balls**: circles (Hough) centred on or near the felt, mostly not felt-coloured, with felt
+  beside or below them. Skipped when more than 18 are found (texture, not balls).
+- **number**: white -> `cue`, black -> `8`, else hue picks the pair (yellow 1/9, blue 2/10,
+  red 3/11, purple 4/12, orange 5/13, green 6/14, maroon 7/15) and a white share picks the
+  stripe. `ball` means round and on the table, number unknown. Often wrong: check every one.
+
+On the 1,084 kept links: a table on 557, 1,678 ball boxes. Recall is the weak side; expect
+to draw more than you delete.
+
+`tasks.json` points at source URLs, so it imports without downloading anything. To label
+from disk instead, run `prelabel.py --local-root $PWD/data` and start Label Studio with
+`LABEL_STUDIO_LOCAL_FILES_SERVING_ENABLED=true` and
+`LABEL_STUDIO_LOCAL_FILES_DOCUMENT_ROOT=$PWD/data`.
+
+`ls_to_yolo.py` uses only submitted annotations (unreviewed predictions are skipped) and
+splits train/val by a hash of the image id, so re-exports keep the split. Table corners that
+fall outside the frame are kept, flagged as not visible.
+
 ## Licences and attribution
 
 `data/manifest.csv` keeps creator, licence, licence URL and source page for every image, and
