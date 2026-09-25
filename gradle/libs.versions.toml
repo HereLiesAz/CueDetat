@@ -14,9 +14,9 @@ appName = "Cue D’état"
 # ── Toolchain ────────────────────────────────────────────────────────────────
 jdk = "21"
 kotlin = "2.4.20"
-agp = "9.3.2"
-ksp = "2.3.11"
-composeMultiplatform = "1.11.1"
+agp = "9.4.1"
+ksp = "2.3.12"
+composeMultiplatform = "1.12.1"
 
 # ── Kotlin ecosystem (multiplatform-capable) ─────────────────────────────────
 coroutines = "1.11.0"
@@ -25,10 +25,10 @@ atomicfu = "0.33.0"
 
 # ── AndroidX / Jetpack ───────────────────────────────────────────────────────
 activityCompose = "1.13.0"
-androidxCore = "1.19.0"
-appcompat = "1.7.1"
-camerax = "1.6.1"
-composeUi = "1.12.0"
+androidxCore = "1.19.1"
+appcompat = "1.8.0"
+camerax = "1.6.2"
+composeUi = "1.12.1"
 datastore = "1.2.1"
 lifecycle = "2.11.0"
 material = "1.14.0"
@@ -39,13 +39,13 @@ palette = "1.0.0"
 
 # ── Dependency injection (Android layer only; the KMP core is pure) ──────────
 hilt = "2.60.1"
-hiltNavigationCompose = "1.3.0"
+hiltNavigationCompose = "1.4.0"
 
 # ── Vision / AR (Android-only) ───────────────────────────────────────────────
-arcore = "1.54.0"
+arcore = "1.56.0"
 mlkitObjectDetection = "17.0.2"
 mlkitVisionCommon = "17.3.0"
-opencv = "4.13.0"
+opencv = "5.0.0.1"
 tensorflowLite = "2.17.0"
 tensorflowLiteSupport = "0.5.0"
 tensorflowLiteMetadata = "0.5.0"
@@ -53,17 +53,17 @@ tensorflowLiteMetadata = "0.5.0"
 # ── Play / distribution (play flavor only) ───────────────────────────────────
 billing = "9.1.0"
 playIntegrity = "1.6.0"
-playServicesLocation = "21.3.0"
-playServicesWearable = "18.2.0"
+playServicesLocation = "21.4.0"
+playServicesWearable = "20.0.1"
 
 # ── Wearables (play flavor only — see app/build.gradle.kts) ──────────────────
-metaWearableDat = "0.6.0"
+metaWearableDat = "1.0.0"
 
 # ── Networking ───────────────────────────────────────────────────────────────
 retrofit = "3.0.0"
 
 # ── UI third-party ───────────────────────────────────────────────────────────
-aznavrail = "11.21"
+aznavrail = "11.50"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 junit = "4.13.2"
@@ -72,8 +72,8 @@ espresso = "3.7.0"
 
 # ── Transitive pins (CVE remediation) ────────────────────────────────────────
 bouncycastle = "1.86"
-guava = "33.6.0-android"
-netty = "4.1.137.Final"
+guava = "33.7.1-android"
+netty = "4.2.18.Final"
 
 [libraries]
 
