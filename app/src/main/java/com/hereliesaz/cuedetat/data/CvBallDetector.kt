@@ -121,7 +121,7 @@ class CvBallDetector {
     }
 
     /** Second moments of one labelled island, from its bounding-box crop of [labels]. */
-    private fun islandMoments(label: Int, x: Int, y: Int, w: Int, h: Int): org.opencv.imgproc.Moments {
+    private fun islandMoments(label: Int, x: Int, y: Int, w: Int, h: Int): org.opencv.geometry.Moments {
         val crop = labels.submat(CvRect(x, y, w, h))
         try {
             Core.compare(crop, Scalar(label.toDouble()), scratch, Core.CMP_EQ)
