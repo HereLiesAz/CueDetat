@@ -118,6 +118,11 @@ android {
 
     defaultConfig {
         applicationId = "com.hereliesaz.cuedetat"
+        // Training-capture relay (ml/capture-relay). Empty: frames stay on the phone. Set with
+        // -PcaptureRelayUrl=https://… or the CAPTURE_RELAY_URL environment variable (CI secret).
+        val captureRelayUrl = providers.gradleProperty("captureRelayUrl").orNull
+            ?: providers.environmentVariable("CAPTURE_RELAY_URL").orNull ?: ""
+        buildConfigField("String", "CAPTURE_RELAY_URL", "\"$captureRelayUrl\"")
         minSdk = 29
         targetSdk = 37
         
