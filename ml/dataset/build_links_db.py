@@ -21,6 +21,7 @@ rate limits), slowly and with backoff, and rewrites --out in place.
 """
 import argparse
 import csv
+import os
 import io
 import time
 import urllib.request
@@ -84,6 +85,16 @@ def verdict_of(is_table, eye):
 ORDER = {"keep": 0, "overhead": 1, "unscored": 2, "off_topic": 3}
 
 
+def write_links(path, rows):
+    rows = sorted(rows, key=lambda r: (ORDER[r["verdict"]], r["id"]))
+    tmp = path + ".tmp"
+    with open(tmp, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=COLUMNS)
+        w.writeheader()
+        w.writerows(rows)
+    os.replace(tmp, path)
+
+
 def rescore_unscored(path, score):
     rows = list(csv.DictReader(open(path, newline="")))
     todo = [r for r in rows if r["verdict"] == "unscored"]
@@ -96,12 +107,11 @@ def rescore_unscored(path, score):
             r["verdict"] = verdict_of(is_table, eye)
         time.sleep(0.5)
         if (i + 1) % 25 == 0:
+            # Save as it goes: a long run that dies keeps what it scored, and a rerun only
+            # retries what is still unscored.
+            write_links(path, rows)
             print(f"{i + 1}/{len(todo)}", flush=True)
-    rows.sort(key=lambda r: (ORDER[r["verdict"]], r["id"]))
-    with open(path, "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=COLUMNS)
-        w.writeheader()
-        w.writerows(rows)
+    write_links(path, rows)
     counts = {}
     for r in rows:
         counts[r["verdict"]] = counts.get(r["verdict"], 0) + 1
