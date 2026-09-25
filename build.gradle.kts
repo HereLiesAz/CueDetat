@@ -10,9 +10,9 @@ buildscript {
             // even evaluated, so that force doesn't reach it. Force it here too so the
             // root project's own classpath resolves the patched version as well.
             force(
-                "org.bouncycastle:bcprov-jdk18on:1.84",
-                "org.bouncycastle:bcpkix-jdk18on:1.84",
-                "org.bouncycastle:bcutil-jdk18on:1.84",
+                "org.bouncycastle:bcprov-jdk18on:1.86",
+                "org.bouncycastle:bcpkix-jdk18on:1.86",
+                "org.bouncycastle:bcutil-jdk18on:1.86",
             )
         }
     }

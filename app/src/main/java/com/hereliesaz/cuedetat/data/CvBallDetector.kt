@@ -3,6 +3,7 @@ package com.hereliesaz.cuedetat.data
 
 import android.graphics.PointF
 import com.hereliesaz.cuedetat.domain.BallIslandRules
+import org.opencv.geometry.Geometry
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -120,11 +121,11 @@ class CvBallDetector {
     }
 
     /** Second moments of one labelled island, from its bounding-box crop of [labels]. */
-    private fun islandMoments(label: Int, x: Int, y: Int, w: Int, h: Int): org.opencv.imgproc.Moments {
+    private fun islandMoments(label: Int, x: Int, y: Int, w: Int, h: Int): org.opencv.geometry.Moments {
         val crop = labels.submat(CvRect(x, y, w, h))
         try {
             Core.compare(crop, Scalar(label.toDouble()), scratch, Core.CMP_EQ)
-            return Imgproc.moments(scratch, true)
+            return Geometry.moments(scratch, true)
         } finally {
             crop.release()
         }
@@ -177,10 +178,10 @@ class CvBallDetector {
         val hierarchy = Mat()
         try {
             Imgproc.findContours(feltMask, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
-            val largest = contours.maxByOrNull { Imgproc.contourArea(it) } ?: return null
+            val largest = contours.maxByOrNull { Geometry.contourArea(it) } ?: return null
             val hullIdx = MatOfInt()
             try {
-                Imgproc.convexHull(largest, hullIdx)
+                Geometry.convexHull(largest, hullIdx)
                 val pts = largest.toArray()
                 return MatOfPoint(*hullIdx.toArray().map { pts[it] }.toTypedArray())
             } finally {

@@ -27,7 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.opencv.calib3d.Calib3d
+import org.opencv.geometry.Geometry
 import org.opencv.core.Core
 import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
@@ -326,7 +326,7 @@ class TableScanViewModel(
         srcMat.fromList(srcList)
         dstMat.fromList(dstList)
 
-        val homography = Calib3d.findHomography(srcMat, dstMat, Calib3d.RANSAC, 3.0)
+        val homography = Geometry.findHomography(srcMat, dstMat, Geometry.RANSAC, 3.0)
         if (homography.empty()) return
 
         // Decompose using logical dimensions where center is (0,0), canceling out the canvasCenter offset logic intended for pixel coordinates

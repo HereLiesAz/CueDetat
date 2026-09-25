@@ -11,8 +11,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
-import com.hereliesaz.cuedetat.ui.theme.SulfurDust
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
@@ -70,11 +70,10 @@ private fun AzNavHostScope.azRailItemLowerCase(
     id: String,
     text: String,
     fillColor: Color,
-    textColor: Color,
     route: String? = null,
     onClick: () -> Unit
 ) {
-    azRailItem(id = id, text = text.lowercase(), fillColor = fillColor, textColor = textColor, route = route, onClick = onClick)
+    azRailItem(id = id, text = text.lowercase(), fillColor = fillColor, route = route, onClick = onClick)
 }
 
 @Composable
@@ -123,6 +122,9 @@ fun AzNavRailMenu(
     // defined inside the non-@Composable content lambda, before `guidance` is assigned — can reach it.
     val guidanceHolder = remember { mutableStateOf<AzGuidanceController?>(null) }
 
+    // The rail accent, and every AzNavRail surface drawn in it, follows the app theme (guide §2.B).
+    val railAccent = MaterialTheme.colorScheme.primary
+
     val guidance = AzHostActivityLayout(
         navController = navController,
         modifier = Modifier,
@@ -132,7 +134,7 @@ fun AzNavRailMenu(
     ) {
         // [SECTION 1] Configuration (DSL) - MANDATORY TOP POSITION
         azConfig(dockingSide = AzDockingSide.LEFT, packButtons = false, showFooter = true)
-        azTheme(defaultShape = AzButtonShape.CIRCLE, activeColor = SulfurDust)
+        azTheme(defaultShape = AzButtonShape.CIRCLE, activeColor = railAccent)
         azAdvanced(isLoading = false, helpEnabled = true, onDismissHelp = {})
 
         // [SECTION 1b] Tutorial guidance (AzNavRail 10.18 status-driven framework).
@@ -165,10 +167,10 @@ fun AzNavRailMenu(
                     onClick = { controller.markReached(finishGoalId) },
                     modifier = Modifier
                         .padding(bottom = 96.dp)
-                        .background(Color(0xFF2196F3), RoundedCornerShape(24.dp))
+                        .background(railAccent, RoundedCornerShape(24.dp))
                         .padding(horizontal = 24.dp, vertical = 2.dp)
                 ) {
-                    Text(text = "OK", color = Color.White)
+                    Text(text = "OK", color = Color.Black)
                 }
             }
         }
@@ -218,45 +220,39 @@ fun AzNavRailMenu(
         if (inArSubMode && uiState.experienceMode != ExperienceMode.BEGINNER) {
             azRailToggle(
                 id = "target_type",
-                route = "main",
                 isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
                 toggleOnText = "Stripes", toggleOffText = "Solids",
                 fillColor = if (uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES) b4P else b8K,
-                textColor = SulfurDust,
                 onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
             )
         }
 
         // [SECTION 4] Mode-specific Rail Items
         if (uiState.experienceMode == ExperienceMode.HATER) {
-            azRailItemLowerCase(id = "shake", text = "Shake", fillColor = b1Y, textColor = SulfurDust, onClick = { onEvent(MainScreenEvent.Shake) })
-            azRailItemLowerCase(id = "exit", text = "Exit", fillColor = b2B, textColor = SulfurDust, onClick = { onEvent(MainScreenEvent.ExitToSplash) })
+            azRailItemLowerCase(id = "shake", text = "Shake", fillColor = b1Y, onClick = { onEvent(MainScreenEvent.Shake) })
+            azRailItemLowerCase(id = "exit", text = "Exit", fillColor = b2B, onClick = { onEvent(MainScreenEvent.ExitToSplash) })
             return@AzHostActivityLayout // Hater Mode doesn't show standard nav
         }
 
         azRailToggle(
             // "wtf", not "help": AzNavRail reserves its own auto-placed help item.
             id = "wtf",
-            route = "main",
             isChecked = uiState.areHelpersVisible,
             toggleOnText = "wtf?",
             toggleOffText = "wtf?",
             fillColor = b1Y,
-            textColor = SulfurDust,
             onClick = { onEvent(MainScreenEvent.ToggleHelp) }
         )
         azMenuItem(
             id = "tutorial",
-            route = "main",
             text = "Tutorial",
             fillColor = b2B,
-            textColor = SulfurDust,
             onClick = {
                 if (uiState.cameraMode == CameraMode.OFF) {
                     onEvent(MainScreenEvent.SetCameraMode(CameraMode.CAMERA))
                 }
                 val goal = if (uiState.cameraMode == CameraMode.LITE_AR) "tutorial.dynamicAr" else "tutorial.dynamicNonAr"
-                guidanceHolder.value?.let { it.enable(); it.activate(goal) }
+                guidanceHolder.value?.let { it.resetGuidance(goal); it.activate(goal) } // activate() no-ops on finished/skipped goals
             }
         )
 
@@ -266,10 +262,9 @@ fun AzNavRailMenu(
             if (uiState.cameraMode == CameraMode.AR_ACTIVE) {
                 azRailToggle(
                     id = "lock",
-                    route = "main",
                     isChecked = uiState.isArTableLocked,
                     toggleOnText = "unlock", toggleOffText = "lock",
-                    fillColor = b10B, textColor = SulfurDust,
+                    fillColor = b10B,
                     onClick = {
                         onEvent(
                             if (uiState.isArTableLocked) MainScreenEvent.UnlockArTable
@@ -283,10 +278,9 @@ fun AzNavRailMenu(
             val isCameraOn = uiState.cameraMode != CameraMode.OFF
             azRailToggle(
                 id = "ar",
-                route = "main",
                 isChecked = isCameraOn,
                 toggleOnText = "off", toggleOffText = "ar",
-                fillColor = b3R, textColor = SulfurDust,
+                fillColor = b3R,
                 onClick = {
                     onEvent(if (isCameraOn) MainScreenEvent.TurnCameraOff else MainScreenEvent.CycleCameraMode)
                 }
@@ -295,10 +289,9 @@ fun AzNavRailMenu(
             // Glasses hidden until Meta wearable support is revisited.
             if (SHOW_GLASSES) azRailToggle(
                 id = "meta_glasses",
-                route = "main",
                 isChecked = uiState.cameraMode == CameraMode.META_GLASSES,
                 toggleOnText = "phone", toggleOffText = "glasses",
-                fillColor = b5O, textColor = SulfurDust,
+                fillColor = b5O,
                 onClick = {
                     if (uiState.cameraMode == CameraMode.META_GLASSES) {
                         onEvent(MainScreenEvent.TurnCameraOff)
@@ -313,10 +306,9 @@ fun AzNavRailMenu(
                 if (uiState.pitchMatrix != null || uiState.topDownBitmap != null) {
                     azRailToggle(
                         id = "top_down_view",
-                        route = "main",
                         isChecked = uiState.isTopDownViewActive,
                         toggleOnText = "back", toggleOffText = "view",
-                        fillColor = b8K, textColor = SulfurDust,
+                        fillColor = b8K,
                         onClick = { 
                             if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
                             else onEvent(MainScreenEvent.ToggleTopDownView)
@@ -328,25 +320,23 @@ fun AzNavRailMenu(
         azDivider()
 
         if (uiState.experienceMode != ExperienceMode.BEGINNER) {
-            azRailToggle(id = "spin", route = "main", isChecked = uiState.isSpinControlVisible, toggleOnText = "Spin", toggleOffText = "Spin", fillColor = b4P, textColor = SulfurDust, onClick = { onEvent(MainScreenEvent.ToggleSpinControl) })
-            azRailToggle(id = "masse", route = "main", isChecked = uiState.isMasseModeActive, toggleOnText = "Massé", toggleOffText = "Massé", fillColor = b5O, textColor = SulfurDust, onClick = { onEvent(MainScreenEvent.ToggleMasseMode) })
+            azRailToggle(id = "spin", isChecked = uiState.isSpinControlVisible, toggleOnText = "Spin", toggleOffText = "Spin", fillColor = b4P, onClick = { onEvent(MainScreenEvent.ToggleSpinControl) })
+            azRailToggle(id = "masse", isChecked = uiState.isMasseModeActive, toggleOnText = "Massé", toggleOffText = "Massé", fillColor = b5O, onClick = { onEvent(MainScreenEvent.ToggleMasseMode) })
             // Advisor hidden for the foreseeable future.
-            if (SHOW_ADVISOR) azRailToggle(id = "advisor", route = "main", isChecked = uiState.isAdvisorEnabled, toggleOnText = "Advisor", toggleOffText = "Advisor", fillColor = b13O, textColor = SulfurDust, onClick = { onEvent(MainScreenEvent.ToggleAdvisor) })
+            if (SHOW_ADVISOR) azRailToggle(id = "advisor", isChecked = uiState.isAdvisorEnabled, toggleOnText = "Advisor", toggleOffText = "Advisor", fillColor = b13O, onClick = { onEvent(MainScreenEvent.ToggleAdvisor) })
         }
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailToggle(id = "bank", route = "main", isChecked = uiState.isBankingMode, toggleOnText = "aim", toggleOffText = "bank", fillColor = b6G, textColor = SulfurDust, onClick = { onEvent(MainScreenEvent.ToggleBankingMode) })
-            azRailItemLowerCase(id = "add_obstacle", text = "add", fillColor = b7M, textColor = SulfurDust, onClick = { onEvent(MainScreenEvent.AddObstacleBall) })
+            azRailToggle(id = "bank", isChecked = uiState.isBankingMode, toggleOnText = "aim", toggleOffText = "bank", fillColor = b6G, onClick = { onEvent(MainScreenEvent.ToggleBankingMode) })
+            azRailItemLowerCase(id = "add_obstacle", text = "add", fillColor = b7M, onClick = { onEvent(MainScreenEvent.AddObstacleBall) })
         }
 
         if (uiState.experienceMode == ExperienceMode.BEGINNER) {
             azRailToggle(
                 id = "view_mode",
-                route = "main",
                 isChecked = !uiState.isBeginnerViewLocked,
                 toggleOnText = "dynamic", toggleOffText = "static",
                 fillColor = if (!uiState.isBeginnerViewLocked) b6G else b7M,
-                textColor = SulfurDust,
                 onClick = {
                     if (uiState.isBeginnerViewLocked) onEvent(MainScreenEvent.UnlockBeginnerView)
                     else onEvent(MainScreenEvent.LockBeginnerView)
@@ -356,11 +346,9 @@ fun AzNavRailMenu(
             if (inArSubMode) {
                 azRailToggle(
                     id = "target_type",
-                    route = "main",
                     isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
                     toggleOnText = "Stripes", toggleOffText = "Solids",
                     fillColor = if (uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES) b4P else b8K,
-                    textColor = SulfurDust,
                     onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
                 )
             }
@@ -372,22 +360,22 @@ fun AzNavRailMenu(
                 uiState.postResetState != null -> "redo"
                 else -> "reset"
             }
-            azRailItemLowerCase(id = "reset", text = resetLabel, fillColor = b8K, textColor = SulfurDust, onClick = { onEvent(MainScreenEvent.Reset) })
+            azRailItemLowerCase(id = "reset", text = resetLabel, fillColor = b8K, onClick = { onEvent(MainScreenEvent.Reset) })
         }
         azDivider()
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azMenuItem(id = "size", route = "main", text = "Table Size", fillColor = b13O, textColor = SulfurDust, onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) })
-            azMenuItem(id = "units", route = "main", text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Metric" else "Imperial", fillColor = b14G, textColor = SulfurDust, onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) })
+            azMenuItem(id = "size", text = "Table Size", fillColor = b13O, onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) })
+            azMenuItem(id = "units", text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Metric" else "Imperial", fillColor = b14G, onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) })
             azDivider()
         }
 
-        azMenuItem(id = "orientation", route = "main", text = "Orientation", fillColor = b15M, textColor = SulfurDust, onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) })
+        azMenuItem(id = "orientation", text = "Orientation", fillColor = b15M, onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) })
         // Training capture (CaptureRecorder): the setting the consent dialog points to.
-        azMenuItem(id = "training_data", route = "main", text = if (captureEnabled) "Training data: on" else "Training data: off", fillColor = b10B, textColor = SulfurDust, onClick = onToggleCapture)
+        azMenuItem(id = "training_data", text = if (captureEnabled) "Training data: on" else "Training data: off", fillColor = b10B, onClick = onToggleCapture)
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azMenuItem(id = "advanced", route = "main", text = "Advanced", fillColor = b1Y, textColor = SulfurDust, onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) })
+            azMenuItem(id = "advanced", text = "Advanced", fillColor = b1Y, onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) })
         }
 
         // Replaces the old "Billing & License" item, which shipped a tester-
@@ -395,15 +383,13 @@ fun AzNavRailMenu(
         // entitlement gate at all.
         azMenuItem(
             id = "support",
-            route = "main",
             text = "Support",
             fillColor = b1Y,
-            textColor = SulfurDust,
             onClick = { onEvent(MainScreenEvent.ToggleSupportSheet) },
         )
 
         azDivider()
-        azMenuItem(id = "mode", route = "main", text = "Mode: ${uiState.experienceMode?.name}", fillColor = b2B, textColor = SulfurDust, onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) })
+        azMenuItem(id = "mode", text = "Mode: ${uiState.experienceMode?.name}", fillColor = b2B, onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) })
     }
 
     // Cache the controller for the manual "Tutorial" rail item (see guidanceHolder above).
@@ -415,13 +401,13 @@ fun AzNavRailMenu(
         when (uiState.experienceMode) {
             ExperienceMode.BEGINNER -> {
                 val goal = if (uiState.isBeginnerViewLocked) "tutorial.beginnerStatic" else "tutorial.beginnerDynamic"
-                if (!guidance.isCompleted(goal)) {
-                    guidance.enable(); guidance.activate(goal)
+                if (!guidance.isCompleted(goal) && !guidance.isDismissed(goal)) {
+                    guidance.activate(goal)
                 }
             }
             ExperienceMode.EXPERT -> {
-                if (!guidance.isCompleted("tutorial.expert")) {
-                    guidance.enable(); guidance.activate("tutorial.expert")
+                if (!guidance.isCompleted("tutorial.expert") && !guidance.isDismissed("tutorial.expert")) {
+                    guidance.activate("tutorial.expert")
                 }
             }
             else -> {}

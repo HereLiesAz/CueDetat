@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.opencv.calib3d.Calib3d
+import org.opencv.geometry.Geometry
 import org.opencv.core.Core
 import org.opencv.core.Mat
 import org.opencv.core.MatOfDouble
@@ -787,16 +787,16 @@ class VisionRepository @Inject constructor(
             kernel.release()
         }
 
-        val largest = contours.maxByOrNull { Imgproc.contourArea(it) } ?: return 0f
-        if (Imgproc.contourArea(largest) < mat.rows() * mat.cols() * 0.05) return 0f
+        val largest = contours.maxByOrNull { Geometry.contourArea(it) } ?: return 0f
+        if (Geometry.contourArea(largest) < mat.rows() * mat.cols() * 0.05) return 0f
 
         val approx = MatOfPoint2f()
         val contour2f = MatOfPoint2f(*largest.toArray())
         var epsilonCoeff = 0.01
-        val perimeter = Imgproc.arcLength(contour2f, true)
+        val perimeter = Geometry.arcLength(contour2f, true)
 
         while (epsilonCoeff < 0.1) {
-            Imgproc.approxPolyDP(contour2f, approx, epsilonCoeff * perimeter, true)
+            Geometry.approxPolyDP(contour2f, approx, epsilonCoeff * perimeter, true)
             if (approx.rows() == 4) break
             epsilonCoeff += 0.01
         }
@@ -806,7 +806,7 @@ class VisionRepository @Inject constructor(
         if (approx.rows() == 4) {
             pts = approx.toArray()
         } else {
-            val rect = Imgproc.minAreaRect(contour2f)
+            val rect = Geometry.minAreaRect(contour2f)
             val rectPts = arrayOfNulls<org.opencv.core.Point>(4)
             rect.points(rectPts)
             pts = Array(4) { rectPts[it]!! }
@@ -832,7 +832,7 @@ class VisionRepository @Inject constructor(
         val srcMat = MatOfPoint2f(*sortedCorners.toTypedArray())
         val dstMat = MatOfPoint2f(*logicalCorners.toTypedArray())
 
-        val h = Calib3d.findHomography(srcMat, dstMat, Calib3d.RANSAC, 5.0)
+        val h = Geometry.findHomography(srcMat, dstMat, Geometry.RANSAC, 5.0)
         srcMat.release()
         dstMat.release()
 
@@ -920,7 +920,7 @@ class VisionRepository @Inject constructor(
         val dstMat = MatOfPoint2f()
         dstMat.fromList(dstPointsList)
 
-        val transform = Imgproc.getPerspectiveTransform(srcMat, dstMat)
+        val transform = Geometry.getPerspectiveTransform(srcMat, dstMat)
         val outMat = Mat()
         Imgproc.warpPerspective(mat, outMat, transform, Size(outW, outH))
 

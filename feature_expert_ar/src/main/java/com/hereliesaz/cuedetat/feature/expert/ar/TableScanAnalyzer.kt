@@ -8,6 +8,7 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import com.hereliesaz.cuedetat.BuildConfig
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
+import org.opencv.geometry.Geometry
 import org.opencv.android.Utils
 import org.opencv.core.Core
 import org.opencv.core.Mat
@@ -234,16 +235,16 @@ class TableScanAnalyzer(
                     try {
                         Imgproc.findContours(maskMat, contours, contourHierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
 
-                        val largestContour = contours.maxByOrNull { Imgproc.contourArea(it) }
+                        val largestContour = contours.maxByOrNull { Geometry.contourArea(it) }
 
-                        if (largestContour != null && Imgproc.contourArea(largestContour) > (smallWidth * smallHeight * 0.1)) {
+                        if (largestContour != null && Geometry.contourArea(largestContour) > (smallWidth * smallHeight * 0.1)) {
                             val contour2f = MatOfPoint2f(*largestContour.toArray())
                             val approx = MatOfPoint2f()
                             try {
-                                val perimeter = Imgproc.arcLength(contour2f, true)
+                                val perimeter = Geometry.arcLength(contour2f, true)
                                 var epsilonCoeff = 0.01
                                 while (epsilonCoeff < 0.1) {
-                                    Imgproc.approxPolyDP(contour2f, approx, epsilonCoeff * perimeter, true)
+                                    Geometry.approxPolyDP(contour2f, approx, epsilonCoeff * perimeter, true)
                                     if (approx.rows() == 4) break
                                     epsilonCoeff += 0.01
                                 }

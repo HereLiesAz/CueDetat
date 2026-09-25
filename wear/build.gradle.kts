@@ -39,8 +39,8 @@ dependencies {
     implementation(libs.play.services.wearable)
 
     // Compose for Wear OS
-    implementation("androidx.wear.compose:compose-material:1.4.0")
-    implementation("androidx.wear.compose:compose-foundation:1.4.0")
+    implementation("androidx.wear.compose:compose-material:1.7.0")
+    implementation("androidx.wear.compose:compose-foundation:1.7.0")
     
     // Core & Jetpack
     implementation(libs.androidx.core.ktx)
