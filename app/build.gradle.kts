@@ -58,10 +58,19 @@ val finalVersionName = versionNameOverride ?: "$finalMajor.$finalMinor.$finalPat
 // commit). The override is ephemeral and lives only for that build.
 val finalIsBuilding = isBuildingTask && versionBuildOverride == null
 
-// Play release override: the central Play workflow passes the upload's versionCode as
-// -PversionCodeOverride (it also passes -PversionBuild twice, and the last, smaller value
-// wins). When present, it is the versionCode, so every upload outranks the one before.
-val versionCodeOverride = project.findProperty("versionCodeOverride")?.toString()?.trim()?.toIntOrNull()
+// Play release versionCode: continues the Play sequence (last upload 1454), one per PR merged
+// into main after playCodeBaseCommit — each Play release is a merge, so the next is 1455. The central Play workflow's -PversionCodeOverride
+// (major*10^8 + minor*10^6 + patch*10^4 + build) is deliberately ignored: it burns codes by
+// the ten thousand. Needs full git history (the Play checkout fetches it); without it the
+// local version.properties build number is used.
+val playCodeBase = 1454
+val playCodeBaseCommit = "baf18d4"
+val playVersionCode: Int? = if (project.findProperty("versionCodeOverride") == null) null else runCatching {
+    providers.exec {
+        commandLine("git", "rev-list", "--count", "--merges", "$playCodeBaseCommit..HEAD")
+        workingDir = rootDir
+    }.standardOutput.asText.get().trim().toInt() + playCodeBase
+}.getOrNull()
 
 // Task to write back the updated properties
 tasks.register("updateVersionProperties") {
@@ -124,7 +133,7 @@ android {
         minSdk = 29
         targetSdk = 37
         
-        versionCode = versionCodeOverride ?: finalBuild
+        versionCode = playVersionCode ?: finalBuild
         versionName = finalVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
