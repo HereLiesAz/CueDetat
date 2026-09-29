@@ -21,6 +21,8 @@ import kotlin.math.sqrt
  * @param zoom zoom factor of the confirmed table
  * @param offsetX `viewOffset.x`
  * @param offsetY `viewOffset.y`
+ * @param anchor true when the user placed the table (scan placement or lock), so which end is
+ *   which is known; false for automatic felt-fit samples. Missing in older files → false.
  */
 @Keep // Serialised with Gson (TablePoseStore); R8 must keep field names.
 data class TablePoseSample(
@@ -32,6 +34,7 @@ data class TablePoseSample(
     val offsetX: Float,
     val offsetY: Float,
     val timestampMs: Long,
+    val anchor: Boolean = false,
 )
 
 /**
@@ -42,8 +45,10 @@ data class TablePoseSample(
  * left on screen. So `rotation = s * yaw + c`, where `c` is learned per table and `s` is -1 by
  * geometry (confirmed from the data once there is enough spread in yaw to tell).
  *
- * Tables look the same turned half way round, so angles are compared modulo 180° (averaged as
- * doubled angles).
+ * Tables look the same turned half way round, so angles are averaged modulo 180° (as doubled
+ * angles). Which end is which is then taken from the most recent [TablePoseSample.anchor] — a
+ * pose the user placed — whose compass heading picks the half-turn. With no anchor the end is
+ * unknown and the result stays folded to (-90, 90].
  *
  * Zoom follows distance, and people tend to stand the same way at the same table, so it is
  * regressed on pitch when the samples vary enough in pitch; otherwise it is their mean.
@@ -74,8 +79,11 @@ object TableOrientationLearner {
         if (samples.isEmpty()) return null
 
         val sign = chooseSign(samples)
-        val (headingDeg, agreement) = circularMean180(samples.map { it.rotationDeg - sign * it.yawDeg })
-        val rotation = normalize180(sign * yawDeg + headingDeg)
+        val (heading180, agreement) = circularMean180(samples.map { it.rotationDeg - sign * it.yawDeg })
+        val headingDeg = samples.filter { it.anchor }.maxByOrNull { it.timestampMs }
+            ?.let { resolveEnd(heading180, it.rotationDeg - sign * it.yawDeg) }
+        val rotation = if (headingDeg != null) normalize360(sign * yawDeg + headingDeg)
+        else normalize180(sign * yawDeg + heading180)
 
         val zoom = predictZoom(samples, pitchDeg)
         val count = (samples.size.toFloat() / FULL_CONFIDENCE_SAMPLES).coerceAtMost(1f)
@@ -138,6 +146,19 @@ object TableOrientationLearner {
         }
         val rLen = (hypot(s, c) / anglesDeg.size).coerceIn(1e-9, 1.0)
         return Math.toDegrees(sqrt(-2.0 * kotlin.math.ln(rLen))).toFloat()
+    }
+
+    /** Of [heading180] and its half-turn, the one nearer [anchorHeadingDeg] (full circle). */
+    fun resolveEnd(heading180: Float, anchorHeadingDeg: Float): Float =
+        if (abs(normalize360(heading180 - anchorHeadingDeg)) <= 90f) heading180
+        else normalize360(heading180 + 180f)
+
+    /** Angle wrapped into (-180, 180]. */
+    fun normalize360(deg: Float): Float {
+        var a = deg % 360f
+        if (a <= -180f) a += 360f
+        if (a > 180f) a -= 360f
+        return a
     }
 
     /** Angle folded into (-90, 90]. */

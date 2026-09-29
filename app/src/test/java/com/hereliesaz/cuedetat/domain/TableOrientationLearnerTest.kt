@@ -56,4 +56,38 @@ class TableOrientationLearnerTest {
         assertEquals(90f, TableOrientationLearner.normalize180(-90f), 1e-3f)
         assertEquals(2f, TableOrientationLearner.diff180(89f, -89f), 1e-3f)
     }
+
+    private fun anchor(yaw: Float, rot: Float, t: Long) =
+        TablePoseSample(yaw, 30f, 0f, rot, 1f, 0f, 0f, t, anchor = true)
+
+    @Test
+    fun `an anchor keeps the far end far`() {
+        // Placed at yaw 0 with rotation 170: heading c = 170. Phone turns to yaw 30 → 140.
+        // Folded, that would be -40 — the table turned end for end.
+        val p = TableOrientationLearner.predict(listOf(anchor(0f, 170f, 1L)), yawDeg = 30f, pitchDeg = 30f)!!
+        assertEquals(140f, p.rotationDeg, 1e-3f)
+    }
+
+    @Test
+    fun `felt-fit samples of the other end don't flip an anchored table`() {
+        // Anchor says c = 170. Fit samples say c = -10 — the same line, other end.
+        val samples = listOf(anchor(0f, 170f, 1L)) + List(4) { sample(0f, -10f) }
+        val p = TableOrientationLearner.predict(samples, yawDeg = 0f, pitchDeg = 30f)!!
+        assertEquals(170f, p.rotationDeg, 1e-3f)
+    }
+
+    @Test
+    fun `the newest anchor wins`() {
+        // User rotated the table end for end and re-locked.
+        val samples = listOf(anchor(0f, 170f, 1L), anchor(0f, -10f, 2L))
+        val p = TableOrientationLearner.predict(samples, yawDeg = 0f, pitchDeg = 30f)!!
+        assertEquals(-10f, p.rotationDeg, 1e-3f)
+    }
+
+    @Test
+    fun `normalize360 wraps into minus 180 to 180`() {
+        assertEquals(-170f, TableOrientationLearner.normalize360(190f), 1e-3f)
+        assertEquals(180f, TableOrientationLearner.normalize360(-180f), 1e-3f)
+        assertEquals(10f, TableOrientationLearner.normalize360(370f), 1e-3f)
+    }
 }

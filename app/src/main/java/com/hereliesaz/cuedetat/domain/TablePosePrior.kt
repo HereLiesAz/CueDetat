@@ -43,7 +43,8 @@ object TablePosePrior {
             val age = (nowMs - s.timestampMs).coerceAtLeast(0L)
             if (age < SESSION_FADE_MS) {
                 // The table stays put; the phone turned. Same rule as the learner (sign -1).
-                val rotation = TableOrientationLearner.normalize180(s.rotationDeg - (yawDeg - s.yawDeg))
+                // Full circle: the session pose is what was on screen, end included.
+                val rotation = TableOrientationLearner.normalize360(s.rotationDeg - (yawDeg - s.yawDeg))
                 val trust = 1f - age.toFloat() / SESSION_FADE_MS
                 candidates += Prior(TableOrientationLearner.Prediction(rotation, s.zoom, trust), Source.SESSION)
             }

@@ -523,11 +523,16 @@ class MainViewModel @Inject constructor(
                 if (fit.iou >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.RECORD_MIN_IOU &&
                     now - lastPoseRecordMs >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.RECORD_INTERVAL_MS
                 ) {
-                    recordPose(after, fit.pose.let { com.hereliesaz.cuedetat.domain.TableSnapPolicy.Pose(it.offsetX, it.offsetY, it.rotationDeg, it.zoom) })
+                    // The fit can't tell the ends apart; record it turned to match the table on screen.
+                    val shown = after.worldRotationDegrees
+                    val fitRot = shown + com.hereliesaz.cuedetat.domain.TableOrientationLearner.normalize180(fit.pose.rotationDeg - shown)
+                    recordPose(after, fit.pose.let { com.hereliesaz.cuedetat.domain.TableSnapPolicy.Pose(it.offsetX, it.offsetY, fitRot, it.zoom) })
                 }
             }
 
-            is MainScreenEvent.ArTableLockResult -> if (event.locked) recordPose(after, poseOf(after))
+            // The user placed the table: a scan's placement or a lock. These fix which end is which.
+            is MainScreenEvent.ArTableLockResult -> if (event.locked) recordPose(after, poseOf(after), anchor = true)
+            is MainScreenEvent.ApplyQuickAlign -> recordPose(after, poseOf(after), anchor = true)
 
             else -> Unit
         }
@@ -560,7 +565,7 @@ class MainViewModel @Inject constructor(
         )
     }
 
-    private fun recordPose(state: CueDetatState, pose: com.hereliesaz.cuedetat.domain.TableSnapPolicy.Pose) {
+    private fun recordPose(state: CueDetatState, pose: com.hereliesaz.cuedetat.domain.TableSnapPolicy.Pose, anchor: Boolean = false) {
         lastPoseRecordMs = System.currentTimeMillis()
         val o = state.currentOrientation
         val sample = com.hereliesaz.cuedetat.domain.TablePoseSample(
@@ -568,6 +573,7 @@ class MainViewModel @Inject constructor(
             rotationDeg = pose.rotationDeg, zoom = pose.zoom,
             offsetX = pose.offsetX, offsetY = pose.offsetY,
             timestampMs = lastPoseRecordMs,
+            anchor = anchor,
         )
         val loc = cachedLocation
         val size = state.table.size.name

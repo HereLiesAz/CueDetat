@@ -76,7 +76,7 @@ class TablePoseStore @Inject constructor(
         val updated = if (existing != null) {
             all.remove(existing)
             existing.copy(
-                samples = (existing.samples + sample).takeLast(MAX_SAMPLES_PER_TABLE),
+                samples = trim(existing.samples + sample),
                 tableSize = tableSize,
                 lastUsedMs = sample.timestampMs,
             )
@@ -116,6 +116,17 @@ class TablePoseStore @Inject constructor(
     companion object {
         const val LOG_FILE = "table_pose_log.jsonl"
         const val MAX_SAMPLES_PER_TABLE = 40
+
+        /**
+         * Keeps the newest [MAX_SAMPLES_PER_TABLE] samples, but never drops the newest anchor:
+         * felt-fit samples arrive often and would otherwise push out the one pose that says
+         * which end of the table is which.
+         */
+        internal fun trim(samples: List<TablePoseSample>): List<TablePoseSample> {
+            val kept = samples.takeLast(MAX_SAMPLES_PER_TABLE)
+            val anchor = samples.lastOrNull { it.anchor } ?: return kept
+            return if (anchor in kept) kept else listOf(anchor) + kept.drop(1)
+        }
         const val MAX_TABLES = 50
         const val MAX_LOG_BYTES = 5L * 1024 * 1024
     }
