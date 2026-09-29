@@ -9,12 +9,15 @@ import kotlin.math.sqrt
  * Decides whether a [TableScanModel] saved on disk could plausibly describe the table the
  * user is standing at right now.
  *
- * A saved scan used to be restored unconditionally on every launch, then a "you may be at a
- * different table" warning fired if the phone had wandered more than [MAX_DISTANCE_M] away —
- * pinning a months-old table from another bar onto the overlay and blaming the user for it.
- * The scan now stays on disk but is only restored when this says it can be the same table.
+ * The saved scan exists so a phone pulled out of a pocket mid-game doesn't demand a rescan.
+ * It is not a long-term memory: lighting shifts through the day and a scan is quick, so a
+ * scan older than [MAX_AGE_MS] is not restored. It used to be restored forever, then a
+ * "you may be at a different table" warning blamed the user for the result.
  */
 object SavedScanPlausibility {
+
+    /** A game session, generously. Past this the scan is stale (light, table, venue). */
+    const val MAX_AGE_MS = 2L * 60 * 60 * 1000
 
     /** Farther than this from the scan site and it is a different venue, not a different table. */
     const val MAX_DISTANCE_M = 100.0
@@ -23,20 +26,26 @@ object SavedScanPlausibility {
 
     /**
      * @param model the saved scan.
+     * @param nowMs current wall-clock time, epoch millis.
      * @param current the device's current (lat, lon), or null when no fix is available.
      * @return true if the scan may be restored.
      *
-     * - Scan made without location (permission denied at scan time): nothing to compare, so it
-     *   is restored, as before.
-     * - Scan has a location but the device has none now: it can't be confirmed, so it is not
-     *   restored. A wrong table is worse than no table; rescanning fixes the latter.
-     * - Otherwise: restored only within [MAX_DISTANCE_M] of the scan site.
+     * - Age: restored only if made within [MAX_AGE_MS]. Scans with no timestamp (0, legacy) or
+     *   one in the future (clock change) are not restored.
+     * - Location: a veto only. If both the scan and the device have a fix and they are more
+     *   than [MAX_DISTANCE_M] apart, not restored. A missing fix vetoes nothing — a basement
+     *   bar with no signal mid-game still gets its table back.
      */
-    fun isPlausiblySameTable(model: TableScanModel, current: Pair<Double, Double>?): Boolean {
-        val lat = model.scanLatitude
-        val lon = model.scanLongitude
-        if (lat == null || lon == null) return true
-        if (current == null) return false
+    fun isPlausiblySameTable(
+        model: TableScanModel,
+        nowMs: Long,
+        current: Pair<Double, Double>?,
+    ): Boolean {
+        val age = nowMs - model.calibrationTimestamp
+        if (model.calibrationTimestamp <= 0L || age < 0 || age > MAX_AGE_MS) return false
+        val lat = model.scanLatitude ?: return true
+        val lon = model.scanLongitude ?: return true
+        if (current == null) return true
         return distanceMetres(lat, lon, current.first, current.second) <= MAX_DISTANCE_M
     }
 

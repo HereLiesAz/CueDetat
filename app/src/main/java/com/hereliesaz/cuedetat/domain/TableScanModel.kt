@@ -34,7 +34,10 @@ data class PocketCluster(
  * the colour-based edge detector during AR tracking.
  *
  * scanLatitude/scanLongitude: GPS coordinates at scan time, or null if permission
- * was denied. Used to skip restoring the scan when the user is > 100 m away (SavedScanPlausibility).
+ * was denied. Restore veto when the user is > 100 m away (SavedScanPlausibility).
+ *
+ * calibrationTimestamp: epoch millis at scan time; 0 for legacy scans. Scans older than
+ * SavedScanPlausibility.MAX_AGE_MS are not restored.
  */
 @Keep
 data class TableScanModel(

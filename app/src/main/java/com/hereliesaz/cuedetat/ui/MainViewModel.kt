@@ -258,14 +258,15 @@ class MainViewModel @Inject constructor(
         // CycleCameraMode interception in processEvent + ensureArModuleLoaded().
 
         viewModelScope.launch {
-            // Restore the saved scan only if the user could be at that table. A scan from another
-            // venue stays on disk but is never pinned onto the overlay (see SavedScanPlausibility).
+            // Restore the saved scan only mid-session at the same venue. A stale or far-away scan
+            // stays on disk but is never pinned onto the overlay (see SavedScanPlausibility).
             val savedModel = tableScanRepository.load()
-            if (savedModel != null) {
+            val now = System.currentTimeMillis()
+            if (savedModel != null && now - savedModel.calibrationTimestamp in 0..SavedScanPlausibility.MAX_AGE_MS) {
                 val current = if (savedModel.scanLatitude != null && savedModel.scanLongitude != null) {
                     tableScanRepository.getCurrentLocation()
                 } else null
-                if (SavedScanPlausibility.isPlausiblySameTable(savedModel, current)) {
+                if (SavedScanPlausibility.isPlausiblySameTable(savedModel, now, current)) {
                     onEvent(MainScreenEvent.LoadTableScan(savedModel))
                     // The foreground seeder below may have run before this async restore landed.
                     onEvent(MainScreenEvent.SeedRelocaliser(null))

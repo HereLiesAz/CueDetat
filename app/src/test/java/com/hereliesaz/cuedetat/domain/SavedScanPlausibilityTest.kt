@@ -9,13 +9,17 @@ import org.junit.Test
 
 class SavedScanPlausibilityTest {
 
-    private fun scan(lat: Double?, lon: Double?) = TableScanModel(
+    private val now = 1_800_000_000_000L
+    private val minute = 60_000L
+
+    private fun scan(lat: Double?, lon: Double?, madeAt: Long = now - 10 * minute) = TableScanModel(
         pockets = emptyList(),
         lensWarpTps = TpsWarpData(srcPoints = listOf(PointF(0f, 0f)), dstPoints = listOf(PointF(0f, 0f))),
         tableSize = TableSize.EIGHT_FT,
         feltColorHsv = listOf(0f, 0f, 0f),
         scanLatitude = lat,
         scanLongitude = lon,
+        calibrationTimestamp = madeAt,
     )
 
     // Jackson Square, New Orleans.
@@ -29,29 +33,44 @@ class SavedScanPlausibilityTest {
     }
 
     @Test
-    fun `scan without location is restored`() {
-        assertTrue(SavedScanPlausibility.isPlausiblySameTable(scan(null, null), null))
+    fun `scan without location is restored while fresh`() {
+        assertTrue(SavedScanPlausibility.isPlausiblySameTable(scan(null, null), now, null))
     }
 
     @Test
-    fun `located scan with no current fix is not restored`() {
-        assertFalse(SavedScanPlausibility.isPlausiblySameTable(scan(lat, lon), null))
+    fun `located scan with no current fix is restored while fresh`() {
+        assertTrue(SavedScanPlausibility.isPlausiblySameTable(scan(lat, lon), now, null))
     }
 
     @Test
-    fun `same spot is restored`() {
-        assertTrue(SavedScanPlausibility.isPlausiblySameTable(scan(lat, lon), lat to lon))
+    fun `scan 90 minutes old is restored`() {
+        assertTrue(SavedScanPlausibility.isPlausiblySameTable(scan(null, null, now - 90 * minute), now, null))
+    }
+
+    @Test
+    fun `scan 3 hours old is not restored`() {
+        assertFalse(SavedScanPlausibility.isPlausiblySameTable(scan(lat, lon, now - 180 * minute), now, lat to lon))
+    }
+
+    @Test
+    fun `legacy scan without timestamp is not restored`() {
+        assertFalse(SavedScanPlausibility.isPlausiblySameTable(scan(lat, lon, 0L), now, lat to lon))
+    }
+
+    @Test
+    fun `scan from the future is not restored`() {
+        assertFalse(SavedScanPlausibility.isPlausiblySameTable(scan(lat, lon, now + 5 * minute), now, lat to lon))
     }
 
     @Test
     fun `about 55 m away is restored`() {
         // 0.0005 deg latitude ~ 55.6 m.
-        assertTrue(SavedScanPlausibility.isPlausiblySameTable(scan(lat, lon), (lat + 0.0005) to lon))
+        assertTrue(SavedScanPlausibility.isPlausiblySameTable(scan(lat, lon), now, (lat + 0.0005) to lon))
     }
 
     @Test
     fun `another bar across town is not restored`() {
         // 0.01 deg latitude ~ 1.1 km.
-        assertFalse(SavedScanPlausibility.isPlausiblySameTable(scan(lat, lon), (lat + 0.01) to lon))
+        assertFalse(SavedScanPlausibility.isPlausiblySameTable(scan(lat, lon), now, (lat + 0.01) to lon))
     }
 }

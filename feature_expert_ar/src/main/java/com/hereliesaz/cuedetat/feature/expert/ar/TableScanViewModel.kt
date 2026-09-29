@@ -419,7 +419,8 @@ class TableScanViewModel(
                 tableSize = tableSize,
                 feltColorHsv = hsv,
                 scanLatitude = location?.first,
-                scanLongitude = location?.second
+                scanLongitude = location?.second,
+                calibrationTimestamp = System.currentTimeMillis()
             )
             
             withContext(Dispatchers.IO) {
