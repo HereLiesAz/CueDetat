@@ -80,6 +80,12 @@ data class CueDetatState(
     ),
     val zoomSliderPosition: Float = 0f,
     val worldRotationDegrees: Float = 0f,
+    /**
+     * The part of [worldRotationDegrees] the user put there by hand (swiper, rotate gesture).
+     * Compass follow and automatic snaps change [worldRotationDegrees] but never this; the
+     * rotation swiper shows only this.
+     */
+    val userRotationDegrees: Float = 0f,
     val areHelpersVisible: Boolean = LabelConfig.showLabelsByDefault,
     val valuesChangedSinceReset: Boolean = false,
     val cameraMode: CameraMode = CameraMode.OFF,
@@ -112,6 +118,11 @@ data class CueDetatState(
     val lingeringSpinOffset: PointF? = null,
     @Transient val spinPathsAlpha: Float = 1.0f,
     val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f),
+    /**
+     * Compass yaw the table's rotation was last matched to (see SystemReducer, compass follow).
+     * Null until the first heading, and while follow is suspended, so resuming never jumps.
+     */
+    @Transient val compassRefYaw: Float? = null,
     @Transient val pitchMatrix: Matrix? = null,
     @Transient val railPitchMatrix: Matrix? = null,
     @Transient val sizeCalculationMatrix: Matrix? = null,
@@ -224,13 +235,13 @@ data class CueDetatState(
     private fun comparableFields(): List<Any?> = listOf(
         experienceMode, pendingExperienceMode, haterState, viewWidth, viewHeight, screenDensity,
         protractorUnit, onPlaneBall, obstacleBalls, savedFeltSamples, table, zoomSliderPosition,
-        worldRotationDegrees, areHelpersVisible, valuesChangedSinceReset, cameraMode, viewOffset,
+        worldRotationDegrees, userRotationDegrees, areHelpersVisible, valuesChangedSinceReset, cameraMode, viewOffset,
         tableZOffset, orientationLock, pendingOrientationLock, isBeginnerViewLocked, isBankingMode,
         bankingAimTarget, bankShotPath, pocketedBankShotPocketIndex, showTableSizeDialog,
         isForceLightMode, luminanceAdjustment, showLuminanceDialog, glowStickValue, showGlowStickDialog,
         isSpinControlVisible, isMasseModeActive, masseShotAngleDeg, selectedSpinOffset, spinPaths,
         masseImpactPoints, masseConnectsTarget, masseGhostBallCenter, spinControlCenter,
-        lingeringSpinOffset, spinPathsAlpha, currentOrientation, pitchMatrix, railPitchMatrix,
+        lingeringSpinOffset, spinPathsAlpha, currentOrientation, compassRefYaw, pitchMatrix, railPitchMatrix,
         sizeCalculationMatrix, inversePitchMatrix, flatMatrix, logicalPlaneMatrix, hasInverseMatrix,
         visionData, arConfidenceHistory, arLowConfidenceFrameCount, relocaliserDeltaQ?.toList(),
         relocaliserAttemptFrames, snapCandidates, tableScanModel, depthPlane, arDerivedPitch,

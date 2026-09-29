@@ -44,4 +44,11 @@ class TablePosePriorTest {
         // 0.001 degree of latitude is 111.2 m.
         assertEquals(111.2, TablePosePrior.distanceMeters(0.0, 0.0, 0.001, 0.0), 0.5)
     }
+
+    @Test
+    fun `the session pose keeps its end`() {
+        // Confirmed at yaw 0, rotation 170. Phone turned to yaw 30: 140, not the folded -40.
+        val p = TablePosePrior.choose(sample(0f, 170f, t = 1_000L), null, null, 30f, 30f, 1_000L)!!
+        assertEquals(140f, p.prediction.rotationDeg, 1e-3f)
+    }
 }

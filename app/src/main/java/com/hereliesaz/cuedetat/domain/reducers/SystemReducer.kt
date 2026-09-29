@@ -6,6 +6,7 @@ import androidx.compose.material3.darkColorScheme
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
+import com.hereliesaz.cuedetat.domain.TableOrientationLearner
 import com.hereliesaz.cuedetat.view.config.ui.LabelConfig
 import com.hereliesaz.cuedetat.view.model.ProtractorUnit
 import com.hereliesaz.cuedetat.view.model.Table
@@ -32,7 +33,7 @@ internal fun reduceSystemAction(state: CueDetatState, action: MainScreenEvent): 
         is MainScreenEvent.SizeChanged -> handleSizeChanged(state, action)
 
         // Case: The device's physical orientation has changed (Portrait/Landscape).
-        is MainScreenEvent.FullOrientationChanged -> state.copy(currentOrientation = action.orientation)
+        is MainScreenEvent.FullOrientationChanged -> followCompass(state.copy(currentOrientation = action.orientation))
 
         // Case: The application's theme/color scheme has been updated (e.g., dynamic colors).
         is MainScreenEvent.ThemeChanged -> state.copy(appControlColorScheme = action.scheme)
@@ -74,5 +75,31 @@ private fun handleSizeChanged(
         viewHeight = action.height,
         screenDensity = action.density,
         spinControlCenter = newSpinCenter
+    )
+}
+
+/** Heading change (degrees) below which the table isn't turned: keeps sensor jitter from re-rendering. */
+internal const val COMPASS_FOLLOW_DEADBAND_DEG = 0.5f
+
+/**
+ * Turns the virtual table against the phone's compass heading, AR or not: a pool table doesn't
+ * move, so turning the phone right turns the table left on screen (the same rule, sign -1, as
+ * TableOrientationLearner). User rotation adds on top; the compass only contributes its change.
+ *
+ * The change is measured from [CueDetatState.compassRefYaw], not the previous tick, so sub-deadband
+ * drift accumulates instead of being lost. Suspended — and the reference dropped — while the view
+ * is locked (beginner) or ARCore anchors the table, so resuming picks up from the current heading.
+ */
+internal fun followCompass(state: CueDetatState): CueDetatState {
+    val yaw = state.currentOrientation.yaw
+    if (state.isBeginnerViewLocked || state.isArTableLocked) {
+        return if (state.compassRefYaw == null) state else state.copy(compassRefYaw = null)
+    }
+    val ref = state.compassRefYaw ?: return state.copy(compassRefYaw = yaw)
+    val delta = TableOrientationLearner.normalize360(yaw - ref)
+    if (kotlin.math.abs(delta) < COMPASS_FOLLOW_DEADBAND_DEG) return state
+    return state.copy(
+        worldRotationDegrees = TableOrientationLearner.normalize360(state.worldRotationDegrees - delta),
+        compassRefYaw = yaw,
     )
 }

@@ -17,12 +17,12 @@ import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.data.VisionAnalyzer
 import com.hereliesaz.cuedetat.data.VisionRepository
 import com.hereliesaz.cuedetat.domain.ArModuleState
+import com.hereliesaz.cuedetat.domain.SavedScanPlausibility
 import com.hereliesaz.cuedetat.domain.BallSelectionPhase
 import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
-import com.hereliesaz.cuedetat.domain.SavedScanPlausibility
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.domain.UpdateType
@@ -269,22 +269,9 @@ class MainViewModel @Inject constructor(
         // fetched the first time a user actually enters the AR camera flow. See the
         // CycleCameraMode interception in processEvent + ensureArModuleLoaded().
 
-        viewModelScope.launch {
-            // Restore the saved scan only mid-session at the same venue. A stale or far-away scan
-            // stays on disk but is never pinned onto the overlay (see SavedScanPlausibility).
-            val savedModel = tableScanRepository.load()
-            val now = System.currentTimeMillis()
-            if (savedModel != null && now - SavedScanPlausibility.lastUsedAt(savedModel) in 0..SavedScanPlausibility.MAX_AGE_MS) {
-                val current = if (savedModel.scanLatitude != null && savedModel.scanLongitude != null) {
-                    tableScanRepository.getCurrentLocation()
-                } else null
-                if (SavedScanPlausibility.isPlausiblySameTable(savedModel, now, current)) {
-                    onEvent(MainScreenEvent.LoadTableScan(savedModel))
-                    // The foreground seeder below may have run before this async restore landed.
-                    onEvent(MainScreenEvent.SeedRelocaliser(null))
-                }
-            }
-        }
+        // No saved-scan restore at launch: the camera always starts OFF, so the scan (and the
+        // location lookup that vets it) is only needed when AR is turned on — see
+        // restoreSavedScanForAr().
 
         // Collect Wrist Wearable state
         viewModelScope.launch {
@@ -347,6 +334,30 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    /**
+     * On entering AR, reuse the saved table scan instead of forcing a rescan — but only if it
+     * could be the table in front of the user (SavedScanPlausibility: used within the last two
+     * hours, and not > 100 m away when both fixes exist). The reducer has already opened the scan
+     * screen; a plausible scan is loaded and the screen skipped. Otherwise the scan proceeds.
+     */
+    private fun restoreSavedScanForAr() {
+        viewModelScope.launch {
+            val savedModel = withContext(Dispatchers.IO) { tableScanRepository.load() } ?: return@launch
+            val now = System.currentTimeMillis()
+            if (now - SavedScanPlausibility.lastUsedAt(savedModel) !in 0..SavedScanPlausibility.MAX_AGE_MS) return@launch
+            val current = if (savedModel.scanLatitude != null && savedModel.scanLongitude != null) {
+                tableScanRepository.getCurrentLocation()
+            } else null
+            if (!SavedScanPlausibility.isPlausiblySameTable(savedModel, now, current)) return@launch
+            // The user may have finished a fresh scan or left AR while the location resolved.
+            val state = _uiState.value
+            if (state.cameraMode != CameraMode.AR_SETUP || state.tableScanModel != null) return@launch
+            onEvent(MainScreenEvent.LoadTableScan(savedModel))
+            onEvent(MainScreenEvent.SeedRelocaliser(null))
+            onEvent(MainScreenEvent.StartArTracking)
+        }
+    }
+
     private fun processEvent(event: MainScreenEvent) {
         if (event is MainScreenEvent.ScreenGestureStarted || event is MainScreenEvent.LogicalGestureStarted) {
             warningManager.dismissWarning()
@@ -358,6 +369,7 @@ class MainViewModel @Inject constructor(
         // overlay while arModuleState == LOADING. Retry re-runs the same load.
         if (event is MainScreenEvent.CycleCameraMode && _uiState.value.cameraMode == CameraMode.OFF) {
             ensureArModuleLoaded()
+            restoreSavedScanForAr()
         }
         // Lock: hand ARCore the virtual table's corners as they sit on screen, so the anchors land
         // under what the user lined up. If the felt fit is sure enough, snap to it first and lock
@@ -511,11 +523,16 @@ class MainViewModel @Inject constructor(
                 if (fit.iou >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.RECORD_MIN_IOU &&
                     now - lastPoseRecordMs >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.RECORD_INTERVAL_MS
                 ) {
-                    recordPose(after, fit.pose.let { com.hereliesaz.cuedetat.domain.TableSnapPolicy.Pose(it.offsetX, it.offsetY, it.rotationDeg, it.zoom) })
+                    // The fit can't tell the ends apart; record it turned to match the table on screen.
+                    val shown = after.worldRotationDegrees
+                    val fitRot = shown + com.hereliesaz.cuedetat.domain.TableOrientationLearner.normalize180(fit.pose.rotationDeg - shown)
+                    recordPose(after, fit.pose.let { com.hereliesaz.cuedetat.domain.TableSnapPolicy.Pose(it.offsetX, it.offsetY, fitRot, it.zoom) })
                 }
             }
 
-            is MainScreenEvent.ArTableLockResult -> if (event.locked) recordPose(after, poseOf(after))
+            // The user placed the table: a scan's placement or a lock. These fix which end is which.
+            is MainScreenEvent.ArTableLockResult -> if (event.locked) recordPose(after, poseOf(after), anchor = true)
+            is MainScreenEvent.ApplyQuickAlign -> recordPose(after, poseOf(after), anchor = true)
 
             else -> Unit
         }
@@ -548,7 +565,7 @@ class MainViewModel @Inject constructor(
         )
     }
 
-    private fun recordPose(state: CueDetatState, pose: com.hereliesaz.cuedetat.domain.TableSnapPolicy.Pose) {
+    private fun recordPose(state: CueDetatState, pose: com.hereliesaz.cuedetat.domain.TableSnapPolicy.Pose, anchor: Boolean = false) {
         lastPoseRecordMs = System.currentTimeMillis()
         val o = state.currentOrientation
         val sample = com.hereliesaz.cuedetat.domain.TablePoseSample(
@@ -556,6 +573,7 @@ class MainViewModel @Inject constructor(
             rotationDeg = pose.rotationDeg, zoom = pose.zoom,
             offsetX = pose.offsetX, offsetY = pose.offsetY,
             timestampMs = lastPoseRecordMs,
+            anchor = anchor,
         )
         val loc = cachedLocation
         val size = state.table.size.name
@@ -618,7 +636,11 @@ class MainViewModel @Inject constructor(
         event: MainScreenEvent
     ): UpdateType {
         return when (event) {
-            is MainScreenEvent.FullOrientationChanged -> UpdateType.MATRICES_ONLY
+            // Compass follow (SystemReducer.followCompass) may have turned the table: that is a
+            // rotation like TableRotationChanged and needs the same full recompute.
+            is MainScreenEvent.FullOrientationChanged ->
+                if (newState.worldRotationDegrees != oldState.worldRotationDegrees) UpdateType.FULL
+                else UpdateType.MATRICES_ONLY
 
             // World-anchored table pose arrives ~30-60Hz from the ARCore GL thread. It must
             // recompute the matrices each frame so the overlay tracks as the user walks; routing it
