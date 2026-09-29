@@ -22,7 +22,6 @@ import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
-import com.hereliesaz.cuedetat.domain.SavedScanPlausibility
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.domain.UpdateType
@@ -269,22 +268,9 @@ class MainViewModel @Inject constructor(
         // fetched the first time a user actually enters the AR camera flow. See the
         // CycleCameraMode interception in processEvent + ensureArModuleLoaded().
 
-        viewModelScope.launch {
-            // Restore the saved scan only mid-session at the same venue. A stale or far-away scan
-            // stays on disk but is never pinned onto the overlay (see SavedScanPlausibility).
-            val savedModel = tableScanRepository.load()
-            val now = System.currentTimeMillis()
-            if (savedModel != null && now - SavedScanPlausibility.lastUsedAt(savedModel) in 0..SavedScanPlausibility.MAX_AGE_MS) {
-                val current = if (savedModel.scanLatitude != null && savedModel.scanLongitude != null) {
-                    tableScanRepository.getCurrentLocation()
-                } else null
-                if (SavedScanPlausibility.isPlausiblySameTable(savedModel, now, current)) {
-                    onEvent(MainScreenEvent.LoadTableScan(savedModel))
-                    // The foreground seeder below may have run before this async restore landed.
-                    onEvent(MainScreenEvent.SeedRelocaliser(null))
-                }
-            }
-        }
+        // No saved-scan restore at launch: the camera always starts OFF and entering AR
+        // (ToggleReducer, CycleCameraMode from OFF) clears tableScanModel and starts a fresh scan,
+        // so a restored scan — and the location lookup to vet it — would never be used.
 
         // Collect Wrist Wearable state
         viewModelScope.launch {
