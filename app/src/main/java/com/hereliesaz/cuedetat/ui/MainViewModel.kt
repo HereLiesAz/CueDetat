@@ -323,6 +323,7 @@ class MainViewModel @Inject constructor(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (t: Throwable) {
+                android.util.Log.e("ExpertAR", "Expert AR load threw", t)
                 false
             }
             if (loaded) {

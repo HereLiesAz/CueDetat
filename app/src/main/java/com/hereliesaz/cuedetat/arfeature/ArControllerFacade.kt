@@ -1,6 +1,7 @@
 package com.hereliesaz.cuedetat.arfeature
 
 import android.content.Context
+import android.util.Log
 import androidx.camera.core.ImageAnalysis
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,7 +44,10 @@ class ArControllerFacade @Inject constructor(
 
     override suspend fun ensureLoaded(): Boolean {
         if (loaded) return true
-        if (!delivery.ensureInstalled()) return false
+        if (!delivery.ensureInstalled()) {
+            Log.e(TAG, "Expert AR delivery reported not installed")
+            return false
+        }
         return loadMutex.withLock {
             if (loaded) return@withLock true
             // Reflective class loading + instantiation can touch disk (loading a
@@ -51,10 +55,13 @@ class ArControllerFacade @Inject constructor(
             val impl = withContext(Dispatchers.IO) {
                 runCatching {
                     Class.forName(
-                        "com.hereliesaz.cuedetat.feature.expert.ar.ArControllerImpl",
+                        IMPL_CLASS,
                         true,
                         context.classLoader,
                     ).getConstructor(Context::class.java).newInstance(context) as ArController
+                }.onFailure { t ->
+                    // The reason a load fails lives here and nowhere else; the UI only sees false.
+                    Log.e(TAG, "Failed to instantiate $IMPL_CLASS", t)
                 }.getOrNull()
             } ?: return@withLock false
             delegate = impl
@@ -90,4 +97,10 @@ class ArControllerFacade @Inject constructor(
     @Composable
     override fun ScanOverlay(uiState: CueDetatState, onEvent: (MainScreenEvent) -> Unit) =
         delegate.ScanOverlay(uiState, onEvent)
+
+    private companion object {
+        /** Logcat tag: `adb logcat -s ExpertAR`. */
+        const val TAG = "ExpertAR"
+        const val IMPL_CLASS = "com.hereliesaz.cuedetat.feature.expert.ar.ArControllerImpl"
+    }
 }
