@@ -33,6 +33,9 @@ interface ArController {
      */
     suspend fun ensureLoaded(): Boolean = true
 
+    /** Why the last [ensureLoaded] returned false, short enough to show the user; null if unknown. */
+    val lastLoadError: String? get() = null
+
     /** Detect ARCore world-tracking capability (creates and closes a probe session). */
     fun probeCapability(): DepthCapability
 

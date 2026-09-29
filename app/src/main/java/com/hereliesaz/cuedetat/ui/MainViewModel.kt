@@ -333,19 +333,21 @@ class MainViewModel @Inject constructor(
             // Don't use runCatching: it would swallow CancellationException and
             // (e.g. on Retry, which cancels this job) post a spurious
             // ArModuleLoadFailed that races the freshly started load.
+            var thrown: String? = null
             val loaded = try {
                 arController.ensureLoaded()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (t: Throwable) {
                 android.util.Log.e("ExpertAR", "Expert AR load threw", t)
+                thrown = "${t.javaClass.simpleName}: ${t.message ?: "(no message)"}"
                 false
             }
             if (loaded) {
                 onEvent(MainScreenEvent.DepthCapabilityDetected(arController.probeCapability()))
                 onEvent(MainScreenEvent.ArModuleLoadSucceeded)
             } else {
-                onEvent(MainScreenEvent.ArModuleLoadFailed)
+                onEvent(MainScreenEvent.ArModuleLoadFailed(thrown ?: arController.lastLoadError))
             }
         }
     }

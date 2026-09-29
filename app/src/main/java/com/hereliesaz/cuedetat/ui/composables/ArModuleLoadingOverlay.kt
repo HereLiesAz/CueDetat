@@ -101,11 +101,23 @@ fun ArModuleLoadingOverlay(
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Spacer(Modifier.height(8.dp))
+                        // The module is compiled in, not downloaded: a failure here is the AR code
+                        // itself refusing to start, so show why rather than blaming the network.
                         Text(
-                            text = "The AR module couldn’t be downloaded. Check your connection and try again.",
+                            text = "The AR engine failed to start.",
                             style = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.Center,
                         )
+                        uiState.arModuleError?.let { reason ->
+                            Spacer(Modifier.height(8.dp))
+                            androidx.compose.foundation.text.selection.SelectionContainer {
+                                Text(
+                                    text = reason,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
                         Spacer(Modifier.height(16.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             TextButton(onClick = { onEvent(MainScreenEvent.CancelArSetup) }) {

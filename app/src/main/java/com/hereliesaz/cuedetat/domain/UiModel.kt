@@ -170,6 +170,8 @@ data class CueDetatState(
     // runtime-only and must not survive process death (a LOADING snapshot would
     // be stale on restart).
     @Transient val arModuleState: ArModuleState = ArModuleState.IDLE,
+    /** Why Expert AR failed to load, shown in the failure dialog; null unless FAILED. */
+    @Transient val arModuleError: String? = null,
     val lockedHsvColor: FloatArray? = null,
     val lockedHsvStdDev: FloatArray? = null,
     val showAdvancedOptionsDialog: Boolean = false,
@@ -261,7 +263,7 @@ data class CueDetatState(
         sizeCalculationMatrix, inversePitchMatrix, flatMatrix, logicalPlaneMatrix, hasInverseMatrix,
         visionData, arConfidenceHistory, arLowConfidenceFrameCount, relocaliserDeltaQ?.toList(),
         relocaliserAttemptFrames, snapCandidates, tableScanModel, depthPlane, arDerivedPitch,
-        arMeasuredHeightM, arTableMatrix, isArTableLocked, tableFit, depthCapability, arModuleState,
+        arMeasuredHeightM, arTableMatrix, isArTableLocked, tableFit, depthCapability, arModuleState, arModuleError,
         lockedHsvColor?.toList(), lockedHsvStdDev?.toList(), showAdvancedOptionsDialog,
         showSupportSheet, showCalibrationScreen, showTableScanScreen,
         useCustomModel, isSnappingEnabled, hasTargetBallBeenMoved, hasCueBallBeenMoved,
@@ -404,7 +406,8 @@ sealed class MainScreenEvent {
     // On-demand Expert-AR module delivery (see ArControllerFacade / MainViewModel).
     object ArModuleLoadStarted : MainScreenEvent()
     object ArModuleLoadSucceeded : MainScreenEvent()
-    object ArModuleLoadFailed : MainScreenEvent()
+    /** [reason]: the load error to show the user (ArController.lastLoadError), if known. */
+    data class ArModuleLoadFailed(val reason: String? = null) : MainScreenEvent()
     /** User tapped "Retry" on the download-failed overlay. */
     object RetryArModuleLoad : MainScreenEvent()
 

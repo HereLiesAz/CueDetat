@@ -21,13 +21,12 @@ import javax.inject.Singleton
 
 /**
  * The base-bound [ArController]. Stays stable for the app's lifetime while
- * swapping its [delegate] from [NoOpArController] to the real implementation once
- * the on-demand `:feature_expert_ar` split is available.
+ * swapping its [delegate] from [NoOpArController] to the real implementation the
+ * first time AR is requested (ARCore setup is deferred until someone uses it).
  *
- * Loading is on demand: the module is fetched the first time AR is actually
- * requested, so nobody pays the download for a feature they never open.
- * The implementation class lives in the dynamic feature module and is resolved
- * reflectively — the base has no compile-time dependency on it or on ARCore.
+ * The implementation (feature_expert_ar sources, compiled into this module since the
+ * flavor merge) is constructed directly. It used to be resolved reflectively from a
+ * dynamic feature split; that indirection let a build silently ship without it.
  *
  * [delegate] is a Compose [mutableStateOf] so the @Composable surfaces recompose
  * onto the real implementation the moment it loads.
@@ -42,26 +41,29 @@ class ArControllerFacade @Inject constructor(
     private val loadMutex = Mutex()
     @Volatile private var loaded = false
 
+    @Volatile override var lastLoadError: String? = null
+        private set
+
     override suspend fun ensureLoaded(): Boolean {
         if (loaded) return true
         if (!delivery.ensureInstalled()) {
             Log.e(TAG, "Expert AR delivery reported not installed")
+            lastLoadError = "AR feature not installed"
             return false
         }
         return loadMutex.withLock {
             if (loaded) return@withLock true
-            // Reflective class loading + instantiation can touch disk (loading a
-            // freshly installed split's dex), so keep it off the main thread.
+            // Construction sets up ARCore and the scan pipeline; keep it off the main thread.
             val impl = withContext(Dispatchers.IO) {
-                runCatching {
-                    Class.forName(
-                        IMPL_CLASS,
-                        true,
-                        context.classLoader,
-                    ).getConstructor(Context::class.java).newInstance(context) as ArController
+                // Constructed directly, not via Class.forName: the implementation is compiled
+                // into this module, and a compile-time reference turns "sources missing from the
+                // build" into a build failure instead of a ClassNotFoundException on device.
+                runCatching<ArController> {
+                    com.hereliesaz.cuedetat.feature.expert.ar.ArControllerImpl(context)
                 }.onFailure { t ->
                     // The reason a load fails lives here and nowhere else; the UI only sees false.
                     Log.e(TAG, "Failed to instantiate $IMPL_CLASS", t)
+                    lastLoadError = describe(t)
                 }.getOrNull()
             } ?: return@withLock false
             delegate = impl
@@ -97,6 +99,18 @@ class ArControllerFacade @Inject constructor(
     @Composable
     override fun ScanOverlay(uiState: CueDetatState, onEvent: (MainScreenEvent) -> Unit) =
         delegate.ScanOverlay(uiState, onEvent)
+
+    /**
+     * The innermost cause (the constructor may wrap the real one) as
+     * "Type: message", plus the first frame in this app's code, so the failure dialog names it.
+     */
+    private fun describe(t: Throwable): String {
+        var root = t
+        while (root.cause != null && root.cause !== root) root = root.cause!!
+        val frame = root.stackTrace.firstOrNull { it.className.startsWith("com.hereliesaz") }
+        val where = frame?.let { " at ${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }.orEmpty()
+        return "${root.javaClass.simpleName}: ${root.message ?: "(no message)"}$where"
+    }
 
     private companion object {
         /** Logcat tag: `adb logcat -s ExpertAR`. */
