@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Exposes only the debug log folder (DebugLogRecorder.DIR) to the share sheet. -->
+<paths>
+    <cache-path name="debug_log" path="debug_log/" />
+</paths>

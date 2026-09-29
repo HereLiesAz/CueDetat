@@ -81,6 +81,8 @@ fun ProtractorScreen(
 
     val captureEnabled by mainViewModel.captureEnabled.collectAsStateWithLifecycle()
     val captureNeedsConsent by mainViewModel.captureNeedsConsent.collectAsStateWithLifecycle()
+    val debugLogEnabled by mainViewModel.debugLogEnabled.collectAsStateWithLifecycle()
+    val shareContext = androidx.compose.ui.platform.LocalContext.current
 
     AzNavRailMenu(
         uiState = uiState,
@@ -89,6 +91,13 @@ fun ProtractorScreen(
         currentDestination = currentRoute,
         captureEnabled = captureEnabled,
         onToggleCapture = { mainViewModel.setCaptureEnabled(!captureEnabled) },
+        debugLogEnabled = debugLogEnabled,
+        onToggleDebugLog = { mainViewModel.setDebugLogEnabled(!debugLogEnabled) },
+        onShareDebugLog = {
+            val intent = mainViewModel.debugLogShareIntent()
+            if (intent != null) shareContext.startActivity(intent)
+            else android.widget.Toast.makeText(shareContext, "Nothing logged yet.", android.widget.Toast.LENGTH_SHORT).show()
+        },
     ) {
         // --- Background layer 0: Camera ---
         // AR mode with ARCore depth uses ArCoreBackground (manages its own GL + session).

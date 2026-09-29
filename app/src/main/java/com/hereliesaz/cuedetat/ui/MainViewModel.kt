@@ -79,6 +79,7 @@ class MainViewModel @Inject constructor(
     val wristWearableRepository: com.hereliesaz.cuedetat.data.WristWearableRepository,
     private val tablePoseStore: com.hereliesaz.cuedetat.data.TablePoseStore,
     private val captureRecorder: com.hereliesaz.cuedetat.data.CaptureRecorder,
+    private val debugLogRecorder: com.hereliesaz.cuedetat.data.DebugLogRecorder,
 ) : ViewModel() {
 
     /** Training capture is on (the user agreed). */
@@ -88,6 +89,14 @@ class MainViewModel @Inject constructor(
     val captureNeedsConsent: kotlinx.coroutines.flow.StateFlow<Boolean> = captureRecorder.needsConsent
 
     fun setCaptureEnabled(on: Boolean) = captureRecorder.setEnabled(on)
+
+    /** The "Debug log" setting (DebugLogRecorder): records this app's logcat for sharing. */
+    val debugLogEnabled: kotlinx.coroutines.flow.StateFlow<Boolean> = debugLogRecorder.enabled
+
+    fun setDebugLogEnabled(on: Boolean) = debugLogRecorder.setEnabled(on)
+
+    /** Share-sheet intent for the recorded log, or null if nothing is recorded yet. */
+    fun debugLogShareIntent(): android.content.Intent? = debugLogRecorder.shareIntent()
 
     /**
      * FOSS self-update. Non-null when a newer GitHub release is available; the
@@ -99,6 +108,8 @@ class MainViewModel @Inject constructor(
         _updateInfo.asStateFlow()
 
     init {
+        // Before anything else can fail: a debug log that starts late misses the failure.
+        debugLogRecorder.resumeIfEnabled()
         if (appUpdater.isSupported) {
             viewModelScope.launch {
                 runCatching { appUpdater.checkForUpdate() }.getOrNull()?.let { _updateInfo.value = it }
