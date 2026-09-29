@@ -112,6 +112,11 @@ data class CueDetatState(
     val lingeringSpinOffset: PointF? = null,
     @Transient val spinPathsAlpha: Float = 1.0f,
     val currentOrientation: FullOrientation = FullOrientation(0f, 0f, 0f),
+    /**
+     * Compass yaw the table's rotation was last matched to (see SystemReducer, compass follow).
+     * Null until the first heading, and while follow is suspended, so resuming never jumps.
+     */
+    @Transient val compassRefYaw: Float? = null,
     @Transient val pitchMatrix: Matrix? = null,
     @Transient val railPitchMatrix: Matrix? = null,
     @Transient val sizeCalculationMatrix: Matrix? = null,
@@ -230,7 +235,7 @@ data class CueDetatState(
         isForceLightMode, luminanceAdjustment, showLuminanceDialog, glowStickValue, showGlowStickDialog,
         isSpinControlVisible, isMasseModeActive, masseShotAngleDeg, selectedSpinOffset, spinPaths,
         masseImpactPoints, masseConnectsTarget, masseGhostBallCenter, spinControlCenter,
-        lingeringSpinOffset, spinPathsAlpha, currentOrientation, pitchMatrix, railPitchMatrix,
+        lingeringSpinOffset, spinPathsAlpha, currentOrientation, compassRefYaw, pitchMatrix, railPitchMatrix,
         sizeCalculationMatrix, inversePitchMatrix, flatMatrix, logicalPlaneMatrix, hasInverseMatrix,
         visionData, arConfidenceHistory, arLowConfidenceFrameCount, relocaliserDeltaQ?.toList(),
         relocaliserAttemptFrames, snapCandidates, tableScanModel, depthPlane, arDerivedPitch,

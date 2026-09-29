@@ -636,7 +636,11 @@ class MainViewModel @Inject constructor(
         event: MainScreenEvent
     ): UpdateType {
         return when (event) {
-            is MainScreenEvent.FullOrientationChanged -> UpdateType.MATRICES_ONLY
+            // Compass follow (SystemReducer.followCompass) may have turned the table: that is a
+            // rotation like TableRotationChanged and needs the same full recompute.
+            is MainScreenEvent.FullOrientationChanged ->
+                if (newState.worldRotationDegrees != oldState.worldRotationDegrees) UpdateType.FULL
+                else UpdateType.MATRICES_ONLY
 
             // World-anchored table pose arrives ~30-60Hz from the ARCore GL thread. It must
             // recompute the matrices each frame so the overlay tracks as the user walks; routing it
