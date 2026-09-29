@@ -199,9 +199,13 @@ class MainViewModel @Inject constructor(
             val savedState = userPreferencesRepository.stateFlow.first()
             val savedFeltSamples = tableScanRepository.loadFeltSamples()
             val currentExperienceMode = _uiState.value.experienceMode
+            // Height and zoom always open at the defaults, not where the last session left them:
+            // a table lifted or zoomed for one game shouldn't greet the next one.
             val initialState = (savedState ?: CueDetatState()).copy(
                 experienceMode = currentExperienceMode,
                 savedFeltSamples = savedFeltSamples,
+                tableZOffset = com.hereliesaz.cuedetat.domain.DEFAULT_TABLE_Z_OFFSET,
+                zoomSliderPosition = com.hereliesaz.cuedetat.domain.DEFAULT_ZOOM_SLIDER,
             )
             processAndEmitState(initialState, UpdateType.FULL)
 

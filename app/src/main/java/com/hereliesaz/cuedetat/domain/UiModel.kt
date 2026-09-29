@@ -62,6 +62,16 @@ data class FeltSample(
     val hsv: List<Float>
 )
 
+/**
+ * Where the table sits and how big it is when the app opens (and after Reset). The app opens here
+ * every launch; the last session's height and zoom are not restored (MainViewModel), so "default"
+ * means what the user sees on opening.
+ *
+ * Zoom slider -8 of -50..50: about a fifth smaller than the old 0 (standard range: 0.70x vs 0.89x).
+ */
+const val DEFAULT_ZOOM_SLIDER = -8f
+const val DEFAULT_TABLE_Z_OFFSET = 0f
+
 @Keep
 data class CueDetatState(
     val experienceMode: ExperienceMode? = null,
@@ -78,7 +88,7 @@ data class CueDetatState(
         size = TableSize.EIGHT_FT,
         isVisible = false
     ),
-    val zoomSliderPosition: Float = 0f,
+    val zoomSliderPosition: Float = DEFAULT_ZOOM_SLIDER,
     val worldRotationDegrees: Float = 0f,
     /**
      * The part of [worldRotationDegrees] the user put there by hand (swiper, rotate gesture).
@@ -90,7 +100,7 @@ data class CueDetatState(
     val valuesChangedSinceReset: Boolean = false,
     val cameraMode: CameraMode = CameraMode.OFF,
     val viewOffset: PointF = PointF(0f, 0f),
-    val tableZOffset: Float = 0f,
+    val tableZOffset: Float = DEFAULT_TABLE_Z_OFFSET,
     val orientationLock: OrientationLock = OrientationLock.PORTRAIT,
     @Transient val pendingOrientationLock: OrientationLock? = null,
     val isBeginnerViewLocked: Boolean = false,
