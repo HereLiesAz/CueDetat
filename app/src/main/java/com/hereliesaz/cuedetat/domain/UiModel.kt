@@ -80,6 +80,12 @@ data class CueDetatState(
     ),
     val zoomSliderPosition: Float = 0f,
     val worldRotationDegrees: Float = 0f,
+    /**
+     * The part of [worldRotationDegrees] the user put there by hand (swiper, rotate gesture).
+     * Compass follow and automatic snaps change [worldRotationDegrees] but never this; the
+     * rotation swiper shows only this.
+     */
+    val userRotationDegrees: Float = 0f,
     val areHelpersVisible: Boolean = LabelConfig.showLabelsByDefault,
     val valuesChangedSinceReset: Boolean = false,
     val cameraMode: CameraMode = CameraMode.OFF,
@@ -229,7 +235,7 @@ data class CueDetatState(
     private fun comparableFields(): List<Any?> = listOf(
         experienceMode, pendingExperienceMode, haterState, viewWidth, viewHeight, screenDensity,
         protractorUnit, onPlaneBall, obstacleBalls, savedFeltSamples, table, zoomSliderPosition,
-        worldRotationDegrees, areHelpersVisible, valuesChangedSinceReset, cameraMode, viewOffset,
+        worldRotationDegrees, userRotationDegrees, areHelpersVisible, valuesChangedSinceReset, cameraMode, viewOffset,
         tableZOffset, orientationLock, pendingOrientationLock, isBeginnerViewLocked, isBankingMode,
         bankingAimTarget, bankShotPath, pocketedBankShotPocketIndex, showTableSizeDialog,
         isForceLightMode, luminanceAdjustment, showLuminanceDialog, glowStickValue, showGlowStickDialog,

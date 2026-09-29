@@ -54,7 +54,7 @@ import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.ui.composables.MasseControl
 import com.hereliesaz.cuedetat.ui.composables.overlays.ArTrackingBadge
 import com.hereliesaz.cuedetat.ui.composables.overlays.KineticWarningOverlay
-import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSlider
+import com.hereliesaz.cuedetat.ui.composables.sliders.TableRotationSwiper
 import com.hereliesaz.cuedetat.view.ProtractorOverlay
 
 private const val ROUTE_MAIN = "main"
@@ -193,13 +193,13 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen HUD: Table rotation slider (main route only, hidden during felt capture) ---
+        // --- Onscreen HUD: Table rotation swiper (main route only, hidden during felt capture) ---
         onscreen(alignment = Alignment.BottomCenter) {
             if (isOnMain && !uiState.showTableScanScreen) {
-                TableRotationSlider(
+                TableRotationSwiper(
                     isVisible = uiState.table.isVisible,
-                    worldRotationDegrees = uiState.worldRotationDegrees,
-                    onRotationChange = { mainViewModel.onEvent(MainScreenEvent.TableRotationChanged(it)) },
+                    userRotationDegrees = uiState.userRotationDegrees,
+                    onRotate = { mainViewModel.onEvent(MainScreenEvent.TableRotationApplied(it)) },
                     modifier = Modifier
                         .navigationBarsPadding()
                         .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)

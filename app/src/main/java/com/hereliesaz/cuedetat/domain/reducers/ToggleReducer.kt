@@ -135,6 +135,7 @@ internal fun reduceToggleAction(
                 zoomSliderPosition = autoZoomSlider,
                 viewOffset = PointF(0f, 0f),
                 worldRotationDegrees = 0f,
+                userRotationDegrees = 0f,
                 valuesChangedSinceReset = false
             )
         }
@@ -143,7 +144,8 @@ internal fun reduceToggleAction(
             cameraMode = CameraMode.LITE_AR,
             zoomSliderPosition = 0f,
             viewOffset = PointF(0f, 0f),
-            worldRotationDegrees = 0f
+            worldRotationDegrees = 0f,
+            userRotationDegrees = 0f
         )
         is MainScreenEvent.ToggleCalibrationScreen -> state.copy(showCalibrationScreen = !state.showCalibrationScreen)
         is MainScreenEvent.ToggleTableScanScreen ->

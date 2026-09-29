@@ -74,6 +74,7 @@ internal fun reduceAction(
                 obstacleBalls = emptyList(),
                 zoomSliderPosition = 0f,
                 worldRotationDegrees = 0f,
+                userRotationDegrees = 0f,
                 bankingAimTarget = null,
                 valuesChangedSinceReset = false,
                 preResetState = stateToSave,

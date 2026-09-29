@@ -23,13 +23,16 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             state.copy(zoomSliderPosition = newSliderPos, valuesChangedSinceReset = true)
         }
 
+        // Hand rotation (swiper, rotate gesture): moves the table and the user's own tally.
         is MainScreenEvent.TableRotationApplied -> state.copy(
             worldRotationDegrees = state.worldRotationDegrees + action.degrees,
+            userRotationDegrees = state.userRotationDegrees + action.degrees,
             valuesChangedSinceReset = true
         )
 
         is MainScreenEvent.TableRotationChanged -> state.copy(
             worldRotationDegrees = action.degrees,
+            userRotationDegrees = state.userRotationDegrees + (action.degrees - state.worldRotationDegrees),
             valuesChangedSinceReset = true
         )
 

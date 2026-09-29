@@ -46,4 +46,21 @@ class CompassFollowTest {
         assertEquals(10f, s.worldRotationDegrees, 1e-3f)
         assertNull(s.compassRefYaw)
     }
+
+    @Test
+    fun `compass turns the table but not the user's rotation`() {
+        val s = at(at(CueDetatState(worldRotationDegrees = 10f, userRotationDegrees = 10f), 0f), 30f)
+        assertEquals(-20f, s.worldRotationDegrees, 1e-3f)
+        assertEquals(10f, s.userRotationDegrees, 1e-3f)
+    }
+
+    @Test
+    fun `hand rotation moves both`() {
+        val s = reduceControlAction(
+            CueDetatState(worldRotationDegrees = -20f, userRotationDegrees = 10f),
+            com.hereliesaz.cuedetat.domain.MainScreenEvent.TableRotationApplied(5f),
+        )
+        assertEquals(-15f, s.worldRotationDegrees, 1e-3f)
+        assertEquals(15f, s.userRotationDegrees, 1e-3f)
+    }
 }
