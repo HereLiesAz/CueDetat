@@ -84,6 +84,9 @@ fun AzNavRailMenu(
     currentDestination: String?,
     captureEnabled: Boolean = false,
     onToggleCapture: () -> Unit = {},
+    debugLogEnabled: Boolean = false,
+    onToggleDebugLog: () -> Unit = {},
+    onShareDebugLog: () -> Unit = {},
     content: AzNavHostScope.() -> Unit = {},
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -376,6 +379,12 @@ fun AzNavRailMenu(
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azMenuItem(id = "advanced", text = "Advanced", fillColor = b1Y, onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) })
+        }
+
+        // Debug log (DebugLogRecorder): records this app's logcat so failures can be sent without adb.
+        azMenuItem(id = "debug_log", text = if (debugLogEnabled) "Debug log: on" else "Debug log: off", fillColor = b10B, onClick = onToggleDebugLog)
+        if (debugLogEnabled) {
+            azMenuItem(id = "share_debug_log", text = "Share debug log", fillColor = b10B, onClick = onShareDebugLog)
         }
 
         // Replaces the old "Billing & License" item, which shipped a tester-

@@ -73,6 +73,7 @@ This file contains a list of all non-ignored files in the repository and a brief
 *   `feature_expert_ar/src/main/java/com/hereliesaz/cuedetat/feature/expert/ar/ArFrameProcessor.kt`: Thread-safe bridge from GL-thread ARCore `Frame` objects to `VisionRepository`. On the GL thread it acquires the CPU camera image, samples the felt colour, copies the image into a Mat with ARCore's image-to-view mapping, and always closes the image; ball detection runs on a single background worker (`processArFrame`). Uses `AtomicReference` for state sharing without blocking. Lives in the on-demand `:feature_expert_ar` module, not under `app/.../data/`.
 *   `app/src/main/java/com/hereliesaz/cuedetat/data/DeviceCalibrationDatabase.kt`: Loads pre-computed OpenCV camera calibration matrices (intrinsics + distortion coefficients) for known device models from a bundled JSON asset. Falls back to a default identity matrix if the device model is not found.
 *   `app/src/main/java/com/hereliesaz/cuedetat/data/TableScanRepository.kt`: Persists `TableScanModel` to disk as JSON and reads it back. Optionally attaches GPS coordinates (via Fused Location Provider) to the scan for location-based table recognition across sessions.
+*   `app/src/main/java/com/hereliesaz/cuedetat/data/DebugLogRecorder.kt`: The "Debug log" menu setting. While on, records this app's own logcat to a rotating cache file (exposed via a `FileProvider`, `res/xml/debug_log_paths.xml`); "Share debug log" sends it through the share sheet. No adb needed.
 
 ### Domain (AR / Table Geometry)
 
