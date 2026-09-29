@@ -34,7 +34,7 @@ data class PocketCluster(
  * the colour-based edge detector during AR tracking.
  *
  * scanLatitude/scanLongitude: GPS coordinates at scan time, or null if permission
- * was denied. Used to prompt rescan when the user is > 100 m away.
+ * was denied. Used to skip restoring the scan when the user is > 100 m away (SavedScanPlausibility).
  */
 @Keep
 data class TableScanModel(
