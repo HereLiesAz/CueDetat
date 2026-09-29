@@ -186,13 +186,11 @@
 -dontwarn com.google.devtools.build.android.desugar.runtime.ThrowableExtension
 
 #-------------------------------------------------------------------------------
-# Expert AR dynamic feature module
+# Expert AR
 #-------------------------------------------------------------------------------
-# ArControllerFacade (in this module) resolves ArControllerImpl purely via
-# Class.forName("com.hereliesaz.cuedetat.feature.expert.ar.ArControllerImpl", ...)
-# .getConstructor(Context::class.java) after the split installs. Nothing
-# references the class at compile time, so without this rule R8 would strip
-# or rename it and the reflective load would silently fail in release builds.
+# ArControllerFacade now constructs ArControllerImpl directly, so R8 keeps it on its
+# own; this rule is a leftover from the reflective split-install loader, kept as a
+# belt-and-braces guard. It never helped when the class was missing from the build.
 -keep class com.hereliesaz.cuedetat.feature.expert.ar.ArControllerImpl {
     public <init>(android.content.Context);
     *;

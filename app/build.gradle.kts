@@ -152,6 +152,10 @@ android {
         getByName("main") {
             assets.srcDir(rootProject.file("feature_mlmodel/src/main/assets"))
             java.srcDir(rootProject.file("feature_expert_ar/src/main/java"))
+            // AGP 9's built-in Kotlin compiles Kotlin source dirs; register the folder there too.
+            // Without it the Expert-AR .kt files were silently left out of release builds
+            // (ClassNotFoundException: ArControllerImpl on device).
+            kotlin.srcDir(rootProject.file("feature_expert_ar/src/main/java"))
         }
     }
 
