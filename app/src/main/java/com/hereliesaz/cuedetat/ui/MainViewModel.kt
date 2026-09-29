@@ -22,7 +22,7 @@ import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
-import com.hereliesaz.cuedetat.domain.TableScanModel
+import com.hereliesaz.cuedetat.domain.SavedScanPlausibility
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import com.hereliesaz.cuedetat.domain.UpdateStateUseCase
 import com.hereliesaz.cuedetat.domain.UpdateType
@@ -54,6 +54,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import com.hereliesaz.cuedetat.domain.advisor.toAdvisorInput
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.NonCancellable
 import javax.inject.Inject
 
 @HiltViewModel
@@ -234,12 +236,22 @@ class MainViewModel @Inject constructor(
                 // Fires once per foreground transition. Seed the relocaliser with a
                 // null delta — orientation-tracking via foreground service was removed,
                 // so the relocaliser recovers via vision (runEdgeFallback) instead.
-                val model = tableScanRepository.load()
-                if (model != null) {
+                // Only a restored (plausibly-here) scan has anything to relocalise against.
+                if (_uiState.value.tableScanModel != null) {
                     onEvent(MainScreenEvent.SeedRelocaliser(null))
                 }
-                // Hold until lifecycle leaves STARTED, so this fires again on next resume
-                kotlinx.coroutines.awaitCancellation()
+                // Hold until lifecycle leaves STARTED, so this fires again on next resume.
+                // Leaving STARTED (pocketed, screen off, app switched) stamps the restored scan as
+                // last used: the restore window runs from the last time the table was in play,
+                // not from when it was scanned (SavedScanPlausibility).
+                try {
+                    kotlinx.coroutines.awaitCancellation()
+                } finally {
+                    _uiState.value.tableScanModel?.let { model ->
+                        val stamped = model.copy(lastUsedTimestamp = System.currentTimeMillis())
+                        withContext(NonCancellable + Dispatchers.IO) { tableScanRepository.save(stamped) }
+                    }
+                }
             }
         }
 
@@ -258,10 +270,19 @@ class MainViewModel @Inject constructor(
         // CycleCameraMode interception in processEvent + ensureArModuleLoaded().
 
         viewModelScope.launch {
+            // Restore the saved scan only mid-session at the same venue. A stale or far-away scan
+            // stays on disk but is never pinned onto the overlay (see SavedScanPlausibility).
             val savedModel = tableScanRepository.load()
-            if (savedModel != null) {
-                onEvent(MainScreenEvent.LoadTableScan(savedModel))
-                checkLocationAndPromptIfNeeded(savedModel)
+            val now = System.currentTimeMillis()
+            if (savedModel != null && now - SavedScanPlausibility.lastUsedAt(savedModel) in 0..SavedScanPlausibility.MAX_AGE_MS) {
+                val current = if (savedModel.scanLatitude != null && savedModel.scanLongitude != null) {
+                    tableScanRepository.getCurrentLocation()
+                } else null
+                if (SavedScanPlausibility.isPlausiblySameTable(savedModel, now, current)) {
+                    onEvent(MainScreenEvent.LoadTableScan(savedModel))
+                    // The foreground seeder below may have run before this async restore landed.
+                    onEvent(MainScreenEvent.SeedRelocaliser(null))
+                }
             }
         }
 
@@ -625,34 +646,6 @@ class MainViewModel @Inject constructor(
 
             else -> UpdateType.AIMING
         }
-    }
-
-    private suspend fun checkLocationAndPromptIfNeeded(model: TableScanModel) {
-        if (model.scanLatitude == null || model.scanLongitude == null) return
-        val current = tableScanRepository.getCurrentLocation() ?: return
-        val dist = haversineDistanceMetres(
-            model.scanLatitude, model.scanLongitude,
-            current.first, current.second
-        )
-        if (dist > 100.0) {
-            warningManager.triggerWarning(
-                arrayOf("You may be at a different table. Tap Scan Table to rescan."),
-                viewModelScope
-            )
-        }
-    }
-
-    private fun haversineDistanceMetres(
-        lat1: Double, lon1: Double,
-        lat2: Double, lon2: Double
-    ): Double {
-        val r = 6_371_000.0
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = Math.sin(dLat / 2).let { it * it } +
-                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                Math.sin(dLon / 2).let { it * it }
-        return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
     }
 
     private fun handleSingleEvents(event: MainScreenEvent) {
