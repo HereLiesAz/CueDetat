@@ -202,17 +202,30 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen HUD: Table rotation swiper (main route only, hidden during felt capture) ---
+        // --- Onscreen HUD: Table rotation swiper + Lock View (main route only, hidden during felt capture) ---
+        // Lock View sits bottom-right beside the swiper, level with its tick strip.
         onscreen(alignment = Alignment.BottomCenter) {
             if (isOnMain && !uiState.showTableScanScreen) {
-                TableRotationSwiper(
-                    isVisible = uiState.table.isVisible,
-                    userRotationDegrees = uiState.userRotationDegrees,
-                    onRotate = { mainViewModel.onEvent(MainScreenEvent.TableRotationApplied(it)) },
+                androidx.compose.foundation.layout.Row(
+                    verticalAlignment = Alignment.Bottom,
                     modifier = Modifier
+                        .fillMaxWidth()
                         .navigationBarsPadding()
                         .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
-                )
+                ) {
+                    TableRotationSwiper(
+                        isVisible = uiState.table.isVisible,
+                        userRotationDegrees = uiState.userRotationDegrees,
+                        onRotate = { mainViewModel.onEvent(MainScreenEvent.TableRotationApplied(it)) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (!uiState.table.isVisible) androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                    androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
+                    com.hereliesaz.cuedetat.ui.composables.sliders.LockViewButton(
+                        isLocked = uiState.isViewLocked,
+                        onToggle = { mainViewModel.onEvent(MainScreenEvent.ToggleViewLock) },
+                    )
+                }
             }
         }
 

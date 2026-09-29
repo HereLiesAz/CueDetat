@@ -74,7 +74,7 @@ fun stateReducer(
         is MainScreenEvent.UnlockArTable, is MainScreenEvent.ArTableLockResult,
         is MainScreenEvent.TableFitUpdated, is MainScreenEvent.ApplyTablePose,
         is MainScreenEvent.ArModuleLoadStarted, is MainScreenEvent.ArModuleLoadSucceeded,
-        is MainScreenEvent.ArModuleLoadFailed ->
+        is MainScreenEvent.ArModuleLoadFailed, is MainScreenEvent.ToggleViewLock ->
             reduceControlAction(currentState, action)
 
         // --- COMPUTER VISION DATA ---
