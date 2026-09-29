@@ -119,6 +119,11 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
         is MainScreenEvent.ArTableMatrixUpdated ->
             state.copy(arTableMatrix = action.matrix)
 
+        // Dropping the compass reference means unlocking resumes from the current heading
+        // instead of turning the table by everything the phone turned while locked.
+        is MainScreenEvent.ToggleViewLock ->
+            state.copy(isViewLocked = !state.isViewLocked, compassRefYaw = null)
+
         is MainScreenEvent.UnlockArTable ->
             state.copy(isArTableLocked = false, arTableMatrix = null)
 
