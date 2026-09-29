@@ -42,10 +42,14 @@ class ArControllerFacade @Inject constructor(
     private val loadMutex = Mutex()
     @Volatile private var loaded = false
 
+    @Volatile override var lastLoadError: String? = null
+        private set
+
     override suspend fun ensureLoaded(): Boolean {
         if (loaded) return true
         if (!delivery.ensureInstalled()) {
             Log.e(TAG, "Expert AR delivery reported not installed")
+            lastLoadError = "AR feature not installed"
             return false
         }
         return loadMutex.withLock {
@@ -62,6 +66,7 @@ class ArControllerFacade @Inject constructor(
                 }.onFailure { t ->
                     // The reason a load fails lives here and nowhere else; the UI only sees false.
                     Log.e(TAG, "Failed to instantiate $IMPL_CLASS", t)
+                    lastLoadError = describe(t)
                 }.getOrNull()
             } ?: return@withLock false
             delegate = impl
@@ -97,6 +102,18 @@ class ArControllerFacade @Inject constructor(
     @Composable
     override fun ScanOverlay(uiState: CueDetatState, onEvent: (MainScreenEvent) -> Unit) =
         delegate.ScanOverlay(uiState, onEvent)
+
+    /**
+     * The innermost cause (reflection wraps the real one in InvocationTargetException) as
+     * "Type: message", plus the first frame in this app's code, so the failure dialog names it.
+     */
+    private fun describe(t: Throwable): String {
+        var root = t
+        while (root.cause != null && root.cause !== root) root = root.cause!!
+        val frame = root.stackTrace.firstOrNull { it.className.startsWith("com.hereliesaz") }
+        val where = frame?.let { " at ${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }.orEmpty()
+        return "${root.javaClass.simpleName}: ${root.message ?: "(no message)"}$where"
+    }
 
     private companion object {
         /** Logcat tag: `adb logcat -s ExpertAR`. */

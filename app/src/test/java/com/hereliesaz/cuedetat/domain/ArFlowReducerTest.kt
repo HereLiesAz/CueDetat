@@ -166,7 +166,7 @@ class ArFlowReducerTest {
     @Test
     fun `ArModuleLoadFailed sets arModuleState to FAILED`() {
         val s = base.copy(arModuleState = ArModuleState.LOADING)
-        val result = reduceControlAction(s, MainScreenEvent.ArModuleLoadFailed)
+        val result = reduceControlAction(s, MainScreenEvent.ArModuleLoadFailed("boom"))
         assertEquals(ArModuleState.FAILED, result.arModuleState)
     }
 

@@ -154,13 +154,13 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             state.copy(depthCapability = action.capability)
 
         is MainScreenEvent.ArModuleLoadStarted ->
-            state.copy(arModuleState = com.hereliesaz.cuedetat.domain.ArModuleState.LOADING)
+            state.copy(arModuleState = com.hereliesaz.cuedetat.domain.ArModuleState.LOADING, arModuleError = null)
 
         is MainScreenEvent.ArModuleLoadSucceeded ->
             state.copy(arModuleState = com.hereliesaz.cuedetat.domain.ArModuleState.READY)
 
         is MainScreenEvent.ArModuleLoadFailed ->
-            state.copy(arModuleState = com.hereliesaz.cuedetat.domain.ArModuleState.FAILED)
+            state.copy(arModuleState = com.hereliesaz.cuedetat.domain.ArModuleState.FAILED, arModuleError = action.reason)
 
         is MainScreenEvent.ArTrackingLost -> {
             // The nuclear payload has been disarmed.
