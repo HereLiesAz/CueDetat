@@ -12,7 +12,12 @@ class SavedScanPlausibilityTest {
     private val now = 1_800_000_000_000L
     private val minute = 60_000L
 
-    private fun scan(lat: Double?, lon: Double?, madeAt: Long = now - 10 * minute) = TableScanModel(
+    private fun scan(
+        lat: Double?,
+        lon: Double?,
+        madeAt: Long = now - 10 * minute,
+        usedAt: Long = 0L,
+    ) = TableScanModel(
         pockets = emptyList(),
         lensWarpTps = TpsWarpData(srcPoints = listOf(PointF(0f, 0f)), dstPoints = listOf(PointF(0f, 0f))),
         tableSize = TableSize.EIGHT_FT,
@@ -20,6 +25,7 @@ class SavedScanPlausibilityTest {
         scanLatitude = lat,
         scanLongitude = lon,
         calibrationTimestamp = madeAt,
+        lastUsedTimestamp = usedAt,
     )
 
     // Jackson Square, New Orleans.
@@ -72,5 +78,23 @@ class SavedScanPlausibilityTest {
     fun `another bar across town is not restored`() {
         // 0.01 deg latitude ~ 1.1 km.
         assertFalse(SavedScanPlausibility.isPlausiblySameTable(scan(lat, lon), now, (lat + 0.01) to lon))
+    }
+
+    @Test
+    fun `scan made 5 hours ago but used 30 minutes ago is restored`() {
+        assertTrue(
+            SavedScanPlausibility.isPlausiblySameTable(
+                scan(null, null, madeAt = now - 300 * minute, usedAt = now - 30 * minute), now, null
+            )
+        )
+    }
+
+    @Test
+    fun `scan last used 3 hours ago is not restored`() {
+        assertFalse(
+            SavedScanPlausibility.isPlausiblySameTable(
+                scan(null, null, madeAt = now - 300 * minute, usedAt = now - 180 * minute), now, null
+            )
+        )
     }
 }

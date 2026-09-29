@@ -54,6 +54,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import com.hereliesaz.cuedetat.domain.advisor.toAdvisorInput
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.NonCancellable
 import javax.inject.Inject
 
 @HiltViewModel
@@ -238,8 +240,18 @@ class MainViewModel @Inject constructor(
                 if (_uiState.value.tableScanModel != null) {
                     onEvent(MainScreenEvent.SeedRelocaliser(null))
                 }
-                // Hold until lifecycle leaves STARTED, so this fires again on next resume
-                kotlinx.coroutines.awaitCancellation()
+                // Hold until lifecycle leaves STARTED, so this fires again on next resume.
+                // Leaving STARTED (pocketed, screen off, app switched) stamps the restored scan as
+                // last used: the restore window runs from the last time the table was in play,
+                // not from when it was scanned (SavedScanPlausibility).
+                try {
+                    kotlinx.coroutines.awaitCancellation()
+                } finally {
+                    _uiState.value.tableScanModel?.let { model ->
+                        val stamped = model.copy(lastUsedTimestamp = System.currentTimeMillis())
+                        withContext(NonCancellable + Dispatchers.IO) { tableScanRepository.save(stamped) }
+                    }
+                }
             }
         }
 
@@ -262,7 +274,7 @@ class MainViewModel @Inject constructor(
             // stays on disk but is never pinned onto the overlay (see SavedScanPlausibility).
             val savedModel = tableScanRepository.load()
             val now = System.currentTimeMillis()
-            if (savedModel != null && now - savedModel.calibrationTimestamp in 0..SavedScanPlausibility.MAX_AGE_MS) {
+            if (savedModel != null && now - SavedScanPlausibility.lastUsedAt(savedModel) in 0..SavedScanPlausibility.MAX_AGE_MS) {
                 val current = if (savedModel.scanLatitude != null && savedModel.scanLongitude != null) {
                     tableScanRepository.getCurrentLocation()
                 } else null

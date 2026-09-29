@@ -11,7 +11,8 @@ import kotlin.math.sqrt
  *
  * The saved scan exists so a phone pulled out of a pocket mid-game doesn't demand a rescan.
  * It is not a long-term memory: lighting shifts through the day and a scan is quick, so a
- * scan older than [MAX_AGE_MS] is not restored. It used to be restored forever, then a
+ * scan not used within [MAX_AGE_MS] is not restored. The clock runs from the last time the
+ * table was in play ([lastUsedAt]), not from the scan. It used to be restored forever, then a
  * "you may be at a different table" warning blamed the user for the result.
  */
 object SavedScanPlausibility {
@@ -30,8 +31,8 @@ object SavedScanPlausibility {
      * @param current the device's current (lat, lon), or null when no fix is available.
      * @return true if the scan may be restored.
      *
-     * - Age: restored only if made within [MAX_AGE_MS]. Scans with no timestamp (0, legacy) or
-     *   one in the future (clock change) are not restored.
+     * - Age: restored only if [lastUsedAt] is within [MAX_AGE_MS]. Scans with no timestamp
+     *   (0, legacy) or one in the future (clock change) are not restored.
      * - Location: a veto only. If both the scan and the device have a fix and they are more
      *   than [MAX_DISTANCE_M] apart, not restored. A missing fix vetoes nothing — a basement
      *   bar with no signal mid-game still gets its table back.
@@ -41,13 +42,18 @@ object SavedScanPlausibility {
         nowMs: Long,
         current: Pair<Double, Double>?,
     ): Boolean {
-        val age = nowMs - model.calibrationTimestamp
-        if (model.calibrationTimestamp <= 0L || age < 0 || age > MAX_AGE_MS) return false
+        val lastUsed = lastUsedAt(model)
+        val age = nowMs - lastUsed
+        if (lastUsed <= 0L || age < 0 || age > MAX_AGE_MS) return false
         val lat = model.scanLatitude ?: return true
         val lon = model.scanLongitude ?: return true
         if (current == null) return true
         return distanceMetres(lat, lon, current.first, current.second) <= MAX_DISTANCE_M
     }
+
+    /** When the table was last in play: the later of the scan and the last foreground exit. */
+    fun lastUsedAt(model: TableScanModel): Long =
+        maxOf(model.calibrationTimestamp, model.lastUsedTimestamp)
 
     /** Great-circle (haversine) distance in metres. */
     fun distanceMetres(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {

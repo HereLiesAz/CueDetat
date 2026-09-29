@@ -36,8 +36,10 @@ data class PocketCluster(
  * scanLatitude/scanLongitude: GPS coordinates at scan time, or null if permission
  * was denied. Restore veto when the user is > 100 m away (SavedScanPlausibility).
  *
- * calibrationTimestamp: epoch millis at scan time; 0 for legacy scans. Scans older than
- * SavedScanPlausibility.MAX_AGE_MS are not restored.
+ * calibrationTimestamp: epoch millis at scan time; 0 for legacy scans.
+ * lastUsedTimestamp: epoch millis when the app last left the foreground with this scan
+ * restored; 0 if never. The restore window (SavedScanPlausibility.MAX_AGE_MS) runs from
+ * the later of the two.
  */
 @Keep
 data class TableScanModel(
@@ -48,5 +50,6 @@ data class TableScanModel(
     val scanLatitude: Double?,
     val scanLongitude: Double?,
     val pocketSurroundHistograms: Map<PocketId, List<Float>>? = null,
-    val calibrationTimestamp: Long = 0L
+    val calibrationTimestamp: Long = 0L,
+    val lastUsedTimestamp: Long = 0L
 )
