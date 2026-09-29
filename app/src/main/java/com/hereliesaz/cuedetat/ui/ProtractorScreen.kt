@@ -59,6 +59,9 @@ import com.hereliesaz.cuedetat.view.ProtractorOverlay
 
 private const val ROUTE_MAIN = "main"
 
+/** Rotation swiper width (label + tick strip); see the swiper's onscreen block. */
+private val ROTATION_SWIPER_WIDTH = 367.dp
+
 @Composable
 fun ProtractorScreen(
     mainViewModel: MainViewModel
@@ -202,30 +205,33 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen HUD: Table rotation swiper + Lock View (main route only, hidden during felt capture) ---
-        // Lock View sits bottom-right beside the swiper, level with its tick strip.
-        onscreen(alignment = Alignment.BottomCenter) {
+        // --- Onscreen HUD: Table rotation swiper (main route only, hidden during felt capture) ---
+        // Fixed width, left-aligned; AzNavRail lays it out beside the rail. 367 dp ends the strip
+        // where it was cut on a reference phone, clear of the Lock View button.
+        onscreen(alignment = Alignment.BottomStart) {
             if (isOnMain && !uiState.showTableScanScreen) {
-                androidx.compose.foundation.layout.Row(
-                    verticalAlignment = Alignment.Bottom,
+                TableRotationSwiper(
+                    isVisible = uiState.table.isVisible,
+                    userRotationDegrees = uiState.userRotationDegrees,
+                    onRotate = { mainViewModel.onEvent(MainScreenEvent.TableRotationApplied(it)) },
                     modifier = Modifier
-                        .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
-                ) {
-                    TableRotationSwiper(
-                        isVisible = uiState.table.isVisible,
-                        userRotationDegrees = uiState.userRotationDegrees,
-                        onRotate = { mainViewModel.onEvent(MainScreenEvent.TableRotationApplied(it)) },
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (!uiState.table.isVisible) androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-                    androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
-                    com.hereliesaz.cuedetat.ui.composables.sliders.LockViewButton(
-                        isLocked = uiState.isViewLocked,
-                        onToggle = { mainViewModel.onEvent(MainScreenEvent.ToggleViewLock) },
-                    )
-                }
+                        .padding(bottom = 16.dp, start = 16.dp)
+                        .width(ROTATION_SWIPER_WIDTH)
+                )
+            }
+        }
+
+        // --- Onscreen HUD: Lock View (main route only, hidden during felt capture) ---
+        onscreen(alignment = Alignment.BottomEnd) {
+            if (isOnMain && !uiState.showTableScanScreen) {
+                com.hereliesaz.cuedetat.ui.composables.sliders.LockViewButton(
+                    isLocked = uiState.isViewLocked,
+                    onToggle = { mainViewModel.onEvent(MainScreenEvent.ToggleViewLock) },
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .padding(bottom = 16.dp, end = 16.dp)
+                )
             }
         }
 
