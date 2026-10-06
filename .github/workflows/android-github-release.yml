@@ -1,0 +1,13 @@
+# Built, signed and published by HereLiesAz/workflows (.github/workflows/android-github-release.yml):
+# a GitHub Release with the signed CueDetat release APK.
+# Replaces the local android_release.yml. Google Play stays on play_publish.yml.
+# This file is the trigger contract; the central sync replaces it with a tracker.
+name: CueDetat Android GitHub Release
+on:
+  workflow_dispatch:
+permissions: {}
+jobs:
+  hand-off:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "CueDetat Android GitHub Release runs centrally in HereLiesAz/workflows."
