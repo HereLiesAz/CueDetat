@@ -120,7 +120,14 @@ class ArTableSession(
         cloudRequest.set(CloudRequest.Restore(logicalCorners.toList()))
     }
 
-    fun forgetCloudPlacement() { cloudRequest.set(CloudRequest.Forget) }
+    fun forgetCloudPlacement() {
+        // Erase the local ID immediately, even when AR tracking is paused and the
+        // GL thread cannot service a request. Invalidate in-flight callbacks now.
+        cloudGeneration++
+        cloudPrefs.edit().clear().apply()
+        cloudRequest.set(CloudRequest.Forget)
+        cloudMessage("Saved cloud placement forgotten on this device. Google's map expires separately.")
+    }
 
     private fun cloudMessage(message: String, restored: Boolean = false) {
         cloudFeedbackQueue.add(CloudFeedback(message, restored))
@@ -173,7 +180,6 @@ class ArTableSession(
             cloudHostFuture = null
             cloudResolveFuture = null
             cloudPrefs.edit().clear().apply()
-            cloudMessage("Saved cloud placement forgotten on this device. Google's map expires separately.")
             return
         }
         val s = session ?: run {
