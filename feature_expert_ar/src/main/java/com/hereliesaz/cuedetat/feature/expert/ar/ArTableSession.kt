@@ -6,6 +6,7 @@ import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
 import com.google.ar.core.Config
 import com.google.ar.core.Coordinates2d
+import com.google.ar.core.DepthPoint
 import com.google.ar.core.Frame
 import com.google.ar.core.HitResult
 import com.google.ar.core.Plane
@@ -13,6 +14,9 @@ import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.hereliesaz.cuedetat.domain.DepthCapability
+import com.hereliesaz.cuedetat.domain.CameraMode
+import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.domain.FeltColorMatch
 import com.hereliesaz.cuedetat.domain.TableFrameHomography
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Pt
@@ -20,6 +24,8 @@ import com.hereliesaz.cuedetat.domain.TableFrameHomography.Vec3
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.atan2
+import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -40,13 +46,12 @@ data class CameraAbovePlane(val pitchDegrees: Float, val heightM: Float)
  * visual-inertial tracking keeps them fixed as the user walks around, and every frame
  * [computeFrameUpdate] fits the logical->screen homography the 2D Canvas renderer applies.
  *
- * The anchors come from the Lock button: the user lines the virtual table up over the real one,
- * taps Lock, and [requestLock] hands over the on-screen positions of the virtual table's four
- * corners. On the next GL frame each is cast onto the detected horizontal plane and anchored
- * there. From then on ARCore holds the table in place; [unlock] lets go.
+ * Before Lock, a metric-sized table is placed once in world space using an ARCore depth hit,
+ * horizontal-plane hit, or an explicitly estimated starting distance. Its pose survives camera
+ * motion; manual pan, rotation and zoom update that world pose.
  *
- * The ARCore Depth API is intentionally disabled — corner anchors only need plane-finding and
- * hit-testing, and the depth stream was a per-frame battery cost feeding only a pitch fallback.
+ * Lock retains the existing felt-selected horizontal-plane anchoring, and Unlock converts the
+ * locked world pose back to an editable preview. ARCore depth is enabled only when supported.
  *
  * Threading: [createSession]/[close]/[pause]/[resume] run on the main thread. [requestLock] and
  * [unlock] are called from the UI thread (atomic hand-off). [computeFrameUpdate] runs on the GL
@@ -58,6 +63,23 @@ class ArTableSession(
 ) {
     private var session: Session? = null
     private var tableAnchor: Anchor? = null
+    private var supportsDepth = false
+
+    private data class PreviewInput(
+        val corners: List<Pt>,
+        val panX: Float,
+        val panY: Float,
+        val rotationDegrees: Float,
+        val zoom: Float,
+    )
+    /** UI snapshots cross onto the GL thread without changing the ARCore anchor. */
+    private val previewInput = AtomicReference<PreviewInput?>(null)
+    private var previewAnchor: Anchor? = null
+    private var previewOffset = Vec3(0f, 0f, 0f)
+    private var previewRight = Vec3(1f, 0f, 0f)
+    private var previewAway = Vec3(0f, 0f, -1f)
+    private var previewInitialRotation = 0f
+    private var previousPreviewInput: PreviewInput? = null
 
     // Corner anchors ordered TL, TR, BR, BL. Null until the table is locked.
     @Volatile private var tableAnchors: List<Anchor>? = null
@@ -85,15 +107,16 @@ class ArTableSession(
         false
     }
 
-    /**
-     * Capability now reflects ARCore *availability* (the Depth API is disabled). Downstream gates
-     * that previously keyed off DEPTH_API now mean "ARCore world tracking is available".
-     */
+    /** Tracking availability and depth availability are independent capabilities. */
     val capability: DepthCapability
-        get() = if (isArCoreAvailable()) DepthCapability.DEPTH_API else DepthCapability.NONE
+        get() = when {
+            !isArCoreAvailable() -> DepthCapability.NONE
+            supportsDepth -> DepthCapability.DEPTH_API
+            else -> DepthCapability.WORLD_TRACKING
+        }
 
     /**
-     * Creates and configures the ARCore session (Depth disabled, horizontal plane finding).
+     * Creates ARCore world tracking, enabling depth only where supported.
      * Must be called on the main thread before the GL surface is created. Returns null if ARCore
      * is unavailable.
      */
@@ -101,8 +124,9 @@ class ArTableSession(
         if (!isArCoreAvailable()) return null
         return try {
             val s = Session(context)
+            supportsDepth = s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
             val config = Config(s).apply {
-                depthMode = Config.DepthMode.DISABLED
+                depthMode = if (supportsDepth) Config.DepthMode.AUTOMATIC else Config.DepthMode.DISABLED
                 updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                 lightEstimationMode = Config.LightEstimationMode.DISABLED
                 planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
@@ -115,6 +139,24 @@ class ArTableSession(
         }
     }
 
+
+
+    /** Update editable table controls without ever re-anchoring on camera-pose updates. */
+    fun updatePreviewInput(state: CueDetatState) {
+        if (state.cameraMode != CameraMode.AR_ACTIVE || !state.table.isVisible) {
+            previewInput.set(null)
+            return
+        }
+        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(
+            state.experienceMode, state.isBeginnerViewLocked)
+        previewInput.set(PreviewInput(
+            corners = state.table.corners.map { Pt(it.x, it.y) },
+            panX = state.viewOffset.x,
+            panY = state.viewOffset.y,
+            rotationDegrees = state.userRotationDegrees,
+            zoom = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom),
+        ))
+    }
     fun getSession(): Session? = session
 
     /** Sets the table-plane lift above the corner anchors (tableZOffset slider, in metres). */
@@ -135,7 +177,7 @@ class ArTableSession(
         pendingLock.set(LockRequest(screenCorners, logicalCorners, feltHsv))
     }
 
-    /** Queues release of the locked table; the overlay returns to the sensor-driven pose. */
+    /** Release Lock but retain its location as the editable metric preview. */
     fun unlock() {
         pendingLock.set(null)
         unlockRequested.set(true)
@@ -149,7 +191,7 @@ class ArTableSession(
     }
 
     /**
-     * [matrix]: logical->screen homography, null while unlocked or tracking is lost.
+     * [matrix]: logical->screen homography from the locked table or metric preview.
      * [lockResult]: non-null only on the frame that served a [requestLock] (true = locked).
      */
     data class FrameUpdate(val matrix: Matrix?, val lockResult: Boolean?)
@@ -159,15 +201,153 @@ class ArTableSession(
      * logical->screen homography from the corner anchors.
      */
     fun computeFrameUpdate(frame: Frame, vpW: Int, vpH: Int): FrameUpdate {
-        if (unlockRequested.getAndSet(false)) clearAnchors()
+        if (unlockRequested.getAndSet(false)) {
+            adoptLockedPoseAsPreview()
+            clearAnchors()
+        }
 
         val view = FloatArray(16)
         val proj = FloatArray(16)
         frame.camera.getViewMatrix(view, 0)
         frame.camera.getProjectionMatrix(proj, 0, 0.01f, 100f)
 
+        if (tableAnchors == null) updatePreview(frame, view, proj, vpW, vpH)
         val lockResult = pendingLock.getAndSet(null)?.let { performLock(frame, it, view, proj, vpW, vpH) }
         return FrameUpdate(buildTableMatrix(view, proj, vpW, vpH), lockResult)
+    }
+
+    /**
+     * Create one stationary world-space anchor. Depth/plane hits supply real metres; without
+     * either the 1.8m forward / 0.45m below-camera starting point is explicitly an estimate.
+     * The app never claims that estimate is a recognized table.
+     */
+    private fun initializePreview(frame: Frame, input: PreviewInput, vpW: Int, vpH: Int) {
+        val s = session ?: return
+        val camera = frame.camera.pose
+        val cameraBack = camera.zAxis
+        val horizontal = hypot(cameraBack[0].toDouble(), cameraBack[2].toDouble()).toFloat()
+        if (horizontal < 0.05f) return
+        val away = Vec3(-cameraBack[0] / horizontal, 0f, -cameraBack[2] / horizontal)
+        val right = Vec3(-away.z, 0f, away.x)
+        val hits = frame.hitTest(vpW / 2f, vpH / 2f)
+        val hit = hits.firstOrNull { supportsDepth && it.trackable is DepthPoint }
+            ?: hits.firstOrNull { h ->
+                val p = h.trackable
+                p is Plane && p.type == Plane.Type.HORIZONTAL_UPWARD_FACING
+                    && p.isPoseInPolygon(h.hitPose)
+            }
+        val origin = if (hit != null) {
+            Vec3(hit.hitPose.tx(), hit.hitPose.ty(), hit.hitPose.tz())
+        } else {
+            Vec3(camera.tx() + away.x * 1.8f, camera.ty() - 0.45f,
+                camera.tz() + away.z * 1.8f)
+        }
+        previewAnchor = try {
+            s.createAnchor(Pose(floatArrayOf(origin.x, origin.y, origin.z),
+                floatArrayOf(0f, 0f, 0f, 1f)))
+        } catch (_: Exception) { null }
+        if (previewAnchor != null) {
+            previewRight = right
+            previewAway = away
+            previewOffset = Vec3(0f, 0f, 0f)
+            previewInitialRotation = input.rotationDegrees
+            previousPreviewInput = input
+        }
+    }
+
+    /**
+     * Integrate *only explicit control changes* against the current world pose. In particular,
+     * zoom changes camera-to-table range with the pinhole 1/d law; it cannot scale the table
+     * itself or deform its perspective as the camera pans.
+     */
+    private fun updatePreview(frame: Frame, view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int) {
+        val input = previewInput.get()
+        if (input == null) {
+            clearPreview()
+            return
+        }
+        if (previewAnchor == null) initializePreview(frame, input, vpW, vpH)
+        val anchor = previewAnchor ?: return
+        if (anchor.trackingState != TrackingState.TRACKING) return
+        val previous = previousPreviewInput ?: input
+        val pose = anchor.pose
+        val center = Vec3(pose.tx() + previewOffset.x,
+            pose.ty() + previewOffset.y, pose.tz() + previewOffset.z)
+        val dx = input.panX - previous.panX
+        val dy = input.panY - previous.panY
+
+        if (abs(dx) + abs(dy) > 0.001f) {
+            val vp = FloatArray(16)
+            val inverse = FloatArray(16)
+            android.opengl.Matrix.multiplyMM(vp, 0, proj, 0, view, 0)
+            if (android.opengl.Matrix.invertM(inverse, 0, vp, 0)) {
+                val normal = Vec3(0f, 1f, 0f)
+                val from = TableFrameHomography.screenToPlane(
+                    inverse, vpW / 2f, vpH / 2f, vpW, vpH, center, normal)
+                val to = TableFrameHomography.screenToPlane(
+                    inverse, vpW / 2f + dx, vpH / 2f + dy,
+                    vpW, vpH, center, normal)
+                if (from != null && to != null) {
+                    val shiftX = to.x - from.x
+                    val shiftZ = to.z - from.z
+                    // Reject a nearly horizontal ray's pathological intersection distance.
+                    if (hypot(shiftX.toDouble(), shiftZ.toDouble()) <= 0.5) {
+                        previewOffset = Vec3(previewOffset.x + shiftX,
+                            previewOffset.y, previewOffset.z + shiftZ)
+                    }
+                }
+            }
+        }
+        if (previous.zoom > 0f && input.zoom > 0f && abs(input.zoom - previous.zoom) > 1e-5f) {
+            val cam = frame.camera.pose
+            val relX = pose.tx() + previewOffset.x - cam.tx()
+            val relZ = pose.tz() + previewOffset.z - cam.tz()
+            val currentRange = hypot(relX.toDouble(), relZ.toDouble()).toFloat()
+            if (currentRange > 0.05f) {
+                val desiredRange = (currentRange * previous.zoom / input.zoom)
+                    .coerceIn(0.65f, 8f)
+                previewOffset = Vec3(
+                    previewOffset.x + relX * (desiredRange / currentRange - 1f),
+                    previewOffset.y,
+                    previewOffset.z + relZ * (desiredRange / currentRange - 1f),
+                )
+            }
+        }
+        previousPreviewInput = input
+    }
+
+    /** Unlock adopts the last locked corners; there is no screen-space teleport. */
+    private fun adoptLockedPoseAsPreview() {
+        val corners = tableAnchors?.map { anchorWorld(it) ?: return } ?: return
+        val input = previewInput.get() ?: return
+        if (corners.size != 4) return
+        val center = Vec3(corners.sumOf { it.x.toDouble() }.toFloat() / 4f,
+            corners.sumOf { it.y.toDouble() }.toFloat() / 4f,
+            corners.sumOf { it.z.toDouble() }.toFloat() / 4f)
+        val rx = corners[1].x - corners[0].x
+        val rz = corners[1].z - corners[0].z
+        val ax = corners[0].x - corners[3].x
+        val az = corners[0].z - corners[3].z
+        val r = hypot(rx.toDouble(), rz.toDouble()).toFloat()
+        val a = hypot(ax.toDouble(), az.toDouble()).toFloat()
+        if (r < 1e-4f || a < 1e-4f) return
+        val anchor = try {
+            session?.createAnchor(Pose(floatArrayOf(center.x, center.y, center.z),
+                floatArrayOf(0f, 0f, 0f, 1f)))
+        } catch (_: Exception) { null } ?: return
+        clearPreview()
+        previewAnchor = anchor
+        previewRight = Vec3(rx / r, 0f, rz / r)
+        previewAway = Vec3(ax / a, 0f, az / a)
+        previewInitialRotation = input.rotationDegrees
+        previousPreviewInput = input
+    }
+
+    private fun clearPreview() {
+        previewAnchor?.detach()
+        previewAnchor = null
+        previewOffset = Vec3(0f, 0f, 0f)
+        previousPreviewInput = null
     }
 
     /**
@@ -195,8 +375,35 @@ class ArTableSession(
             TableFrameHomography.screenToPlane(invViewProj, c.x, c.y, vpW, vpH, planePoint, planeNormal)
                 ?: return false
         }
+        // The surface vote determines a plane, not a new physical table size.
+        // The projected corners determine only centre and heading. Rebuild the four
+        // positions from the selected table's exact metric dimensions so Lock cannot
+        // silently stretch the playing bed when the fitted plane depth differs.
+        val center = Vec3(
+            worlds.sumOf { it.x.toDouble() }.toFloat() / 4f,
+            worlds.sumOf { it.y.toDouble() }.toFloat() / 4f,
+            worlds.sumOf { it.z.toDouble() }.toFloat() / 4f,
+        )
+        val dx = worlds[1].x - worlds[0].x
+        val dz = worlds[1].z - worlds[0].z
+        val width = hypot(dx.toDouble(), dz.toDouble()).toFloat()
+        if (width < 0.05f) return false
+        val right = Vec3(dx / width, 0f, dz / width)
+        var away = Vec3(right.z, 0f, -right.x)
+        // Keep the virtual TL→BL direction; a 180° table-end flip is not a lock.
+        val alongX = worlds[0].x - worlds[3].x
+        val alongZ = worlds[0].z - worlds[3].z
+        if (away.x * alongX + away.z * alongZ < 0f) {
+            away = Vec3(-away.x, 0f, -away.z)
+        }
+        val metricCorners = TableFrameHomography.metricRectangleCorners(
+            req.logicalCorners, center, right, away, 0f,
+        )
         val anchors = try {
-            worlds.map { w -> s.createAnchor(Pose(floatArrayOf(w.x, w.y, w.z), planePose.rotationQuaternion)) }
+            metricCorners.map { w ->
+                s.createAnchor(Pose(floatArrayOf(w.x, w.y, w.z),
+                    planePose.rotationQuaternion))
+            }
         } catch (_: Exception) {
             return false
         }
@@ -268,12 +475,27 @@ class ArTableSession(
     }
 
     private fun buildTableMatrix(view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int): Matrix? {
-        val ordered = tableAnchors ?: return null
-        if (ordered.size != 4 || idealCorners.size != 4) return null
-        if (ordered.any { it.trackingState != TrackingState.TRACKING }) return null
-        val cornersWorld = ordered.map { anchorWorld(it) ?: return null }
+        val locked = tableAnchors
+        val cornersWorld: List<Vec3>
+        val logical: List<Pt>
+        if (locked != null) {
+            if (locked.size != 4 || idealCorners.size != 4) return null
+            cornersWorld = locked.map { anchorWorld(it) ?: return null }
+            logical = idealCorners
+        } else {
+            val anchor = previewAnchor ?: return null
+            val input = previewInput.get() ?: return null
+            if (anchor.trackingState != TrackingState.TRACKING) return null
+            val pose = anchor.pose
+            val center = Vec3(pose.tx() + previewOffset.x,
+                pose.ty() + previewOffset.y, pose.tz() + previewOffset.z)
+            logical = input.corners
+            cornersWorld = TableFrameHomography.metricRectangleCorners(
+                logical, center, previewRight, previewAway,
+                input.rotationDegrees - previewInitialRotation)
+        }
         val h = TableFrameHomography.computeLogicalToScreen(
-            view, proj, cornersWorld, idealCorners, vpW, vpH, heightMeters = tableHeightMeters
+            view, proj, cornersWorld, logical, vpW, vpH, heightMeters = tableHeightMeters
         ) ?: return null
         return Matrix().apply { setValues(h) }
     }
@@ -331,8 +553,11 @@ class ArTableSession(
     fun resume() { try { session?.resume() } catch (_: Exception) {} }
     fun close() {
         clearAnchors()
+        clearPreview()
         clearPlaneAnchor()
+        previewInput.set(null)
         session?.close()
         session = null
+        supportsDepth = false
     }
 }

@@ -139,7 +139,7 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
         // so the table can't be left behind if the lock result lands first.
         is MainScreenEvent.LockArTable -> {
             val fit = state.tableFit?.takeIf { it.iou >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.LOCK_MIN_IOU }
-            if (fit == null || state.isArTableLocked) state
+            if (fit == null || state.isArTableLocked || state.arTableMatrix != null) state
             else applyTablePose(state, fit.pose.offsetX, fit.pose.offsetY, fit.pose.rotationDeg, fit.pose.zoom)
         }
 

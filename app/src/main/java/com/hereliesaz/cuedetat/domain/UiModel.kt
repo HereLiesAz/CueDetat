@@ -158,7 +158,8 @@ data class CueDetatState(
     @Transient val arMeasuredHeightM: Float? = null,
     // World-anchored table (ARCore). arTableMatrix maps logical table space -> screen pixels,
     // recomputed every AR frame from the camera pose + corner anchors, so the overlay tracks in
-    // full 6DoF as the user walks around. Null until the table is locked / tracking is valid.
+    // full 6DoF as the user walks around. Available from the pre-lock metric preview;
+    // null only before the initial world anchor or when tracking is unavailable.
     @Transient val arTableMatrix: Matrix? = null,
     // True once the Lock button has anchored the virtual table to the real one in ARCore.
     @Transient val isArTableLocked: Boolean = false,
@@ -420,7 +421,7 @@ sealed class MainScreenEvent {
     ) : MainScreenEvent()
 
     // World-anchored table events (emitted from the ARCore GL thread each frame).
-    // [matrix] is the logical->screen homography (null until the table is locked).
+    // [matrix] is the logical->screen homography of the preview or locked table.
     data class ArTableMatrixUpdated(val matrix: Matrix?) : MainScreenEvent()
     // Lock button: anchor the virtual table where it currently sits over the real one.
     /** Lock View button: toggles [CueDetatState.isViewLocked]. */

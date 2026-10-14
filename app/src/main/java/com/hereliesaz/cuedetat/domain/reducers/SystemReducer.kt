@@ -88,11 +88,14 @@ internal const val COMPASS_FOLLOW_DEADBAND_DEG = 0.5f
  *
  * The change is measured from [CueDetatState.compassRefYaw], not the previous tick, so sub-deadband
  * drift accumulates instead of being lost. Suspended — and the reference dropped — while the view
- * is locked (beginner) or ARCore anchors the table, so resuming picks up from the current heading.
+ * is locked (beginner) or ARCore anchors the preview/table, so resuming starts from
+ * the current heading.
  */
 internal fun followCompass(state: CueDetatState): CueDetatState {
     val yaw = state.currentOrientation.yaw
-    if (state.isBeginnerViewLocked || state.isArTableLocked) {
+    if (state.isBeginnerViewLocked || state.isArTableLocked ||
+        (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.AR_ACTIVE &&
+            state.arTableMatrix != null)) {
         return if (state.compassRefYaw == null) state else state.copy(compassRefYaw = null)
     }
     val ref = state.compassRefYaw ?: return state.copy(compassRefYaw = yaw)
