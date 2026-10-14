@@ -109,7 +109,7 @@ class ArTableSession(
     private var cloudHostFuture: HostCloudAnchorFuture? = null
     private var cloudResolveFuture: ResolveCloudAnchorFuture? = null
     // Ignore results from operations cancelled by Forget or session shutdown.
-    private var cloudGeneration = 0L
+    @Volatile private var cloudGeneration = 0L
     private val cloudPrefs by lazy {
         context.getSharedPreferences("cuedetat_cloud_table", Context.MODE_PRIVATE)
     }
