@@ -4,6 +4,7 @@ import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ArProjectionPolicy
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.TableOrientationLearner
@@ -93,12 +94,12 @@ internal const val COMPASS_FOLLOW_DEADBAND_DEG = 0.5f
  */
 internal fun followCompass(state: CueDetatState): CueDetatState {
     val yaw = state.currentOrientation.yaw
-    // ARCore is the only authority for the table's orientation throughout AR_ACTIVE,
-    // even during the first frame and temporary loss of its projection. Checking
-    // arTableMatrix != null previously reopened compass-follow exactly when
-    // tracking was unavailable, causing a phantom table spin on phone roll.
+    // An actual ARCore session owns orientation even when its projection is
+    // briefly missing; compass-follow otherwise resumes and spins the table.
+    // AR_ACTIVE without ARCore capability uses CameraX/CV and still needs
+    // legacy compass-follow. Do not confuse camera mode with AR capability.
     if (state.isBeginnerViewLocked || state.isArTableLocked ||
-        state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.AR_ACTIVE) {
+        ArProjectionPolicy.isWorldTracked(state.cameraMode, state.depthCapability)) {
         return if (state.compassRefYaw == null) state else state.copy(compassRefYaw = null)
     }
     val ref = state.compassRefYaw ?: return state.copy(compassRefYaw = yaw)

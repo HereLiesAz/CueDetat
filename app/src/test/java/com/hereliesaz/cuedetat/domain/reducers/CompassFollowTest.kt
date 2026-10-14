@@ -3,6 +3,7 @@ package com.hereliesaz.cuedetat.domain.reducers
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.CameraMode
+import com.hereliesaz.cuedetat.domain.DepthCapability
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -49,10 +50,11 @@ class CompassFollowTest {
     }
 
     @Test
-    fun `AR mode never follows compass before first ARCore matrix arrives`() {
+    fun `ARCore mode never follows compass before first ARCore matrix arrives`() {
         val ar = at(
             at(CueDetatState(
                 cameraMode = CameraMode.AR_ACTIVE,
+                depthCapability = DepthCapability.WORLD_TRACKING,
                 worldRotationDegrees = 17f,
                 userRotationDegrees = 17f,
             ), 0f), 90f,
@@ -65,10 +67,21 @@ class CompassFollowTest {
     @Test
     fun `AR mode drops a previous compass reference without a matrix`() {
         val started = at(CueDetatState(worldRotationDegrees = 30f), 12f)
-            .copy(cameraMode = CameraMode.AR_ACTIVE)
+            .copy(cameraMode = CameraMode.AR_ACTIVE, depthCapability = DepthCapability.DEPTH_API)
         val rolled = at(started, 110f)
         assertEquals(30f, rolled.worldRotationDegrees, 1e-3f)
         assertNull(rolled.compassRefYaw)
+    }
+
+    @Test
+    fun `CameraX fallback in AR_ACTIVE retains compass orientation updates`() {
+        val start = at(CueDetatState(
+            cameraMode = CameraMode.AR_ACTIVE,
+            depthCapability = DepthCapability.NONE,
+            worldRotationDegrees = 20f,
+        ), 0f)
+        val updated = at(start, 30f)
+        assertEquals(-10f, updated.worldRotationDegrees, 1e-3f)
     }
 
     @Test

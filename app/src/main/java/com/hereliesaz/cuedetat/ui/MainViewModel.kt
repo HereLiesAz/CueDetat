@@ -378,10 +378,10 @@ class MainViewModel @Inject constructor(
 
     private fun processEvent(event: MainScreenEvent) {
         // Lock View: sensor-driven transforms are dropped before they reach the reducers.
+        // Lock View freezes screen-space sensor-driven transforms by design.
+        // It is distinct from AR table Lock (a physical world anchor).
         if (_uiState.value.isViewLocked &&
-            com.hereliesaz.cuedetat.domain.SensorLock.blocks(
-                event, _uiState.value.cameraMode,
-            )
+            com.hereliesaz.cuedetat.domain.SensorLock.blocks(event)
         ) return
         if (event is MainScreenEvent.ScreenGestureStarted || event is MainScreenEvent.LogicalGestureStarted) {
             warningManager.dismissWarning()

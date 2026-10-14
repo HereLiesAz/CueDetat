@@ -18,16 +18,11 @@ class SensorLockTest {
     }
 
     @Test
-    fun `AR world projection must keep tracking even when Lock View is on`() {
-        val frame = MainScreenEvent.ArTableMatrixUpdated(null)
-        assertFalse(SensorLock.blocks(frame, CameraMode.AR_ACTIVE))
-        assertTrue(SensorLock.blocks(frame, CameraMode.CAMERA))
-        assertTrue(
-            SensorLock.blocks(
-                MainScreenEvent.FullOrientationChanged(FullOrientation(45f, 0f, 0f)),
-                CameraMode.AR_ACTIVE,
-            )
-        )
+    fun `Lock View still freezes the AR projection as promised`() {
+        assertTrue(SensorLock.blocks(MainScreenEvent.ArTableMatrixUpdated(null)))
+        assertTrue(SensorLock.blocks(
+            MainScreenEvent.FullOrientationChanged(FullOrientation(45f, 0f, 0f))
+        ))
     }
 
     @Test
