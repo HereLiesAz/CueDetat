@@ -90,6 +90,15 @@ object TableFrameHomography {
         return HorizontalRectanglePose(center, right, away)
     }
 
+    /** Whether calibrated table-away matches the conventional -anchor.zAxis direction.
+     * A mirrored projection cannot be represented by an ARCore yaw quaternion alone.
+     */
+    fun awayHandedness(pose: HorizontalRectanglePose): Float {
+        val defaultAwayX = pose.right.z
+        val defaultAwayZ = -pose.right.x
+        return if (defaultAwayX * pose.away.x + defaultAwayZ * pose.away.z < 0f) -1f else 1f
+    }
+
     // --- vector helpers ---
     private fun sub(a: Vec3, b: Vec3) = Vec3(a.x - b.x, a.y - b.y, a.z - b.z)
     private fun add(a: Vec3, b: Vec3) = Vec3(a.x + b.x, a.y + b.y, a.z + b.z)

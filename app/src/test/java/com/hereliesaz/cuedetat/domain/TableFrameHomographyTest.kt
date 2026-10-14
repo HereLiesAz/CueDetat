@@ -274,6 +274,7 @@ class TableFrameHomographyTest {
         // The centroid remains attached to the one world anchor.
         assertEquals(pose.center.x, corners.sumOf { it.x.toDouble() }.toFloat() / 4f, 1e-4f)
         assertEquals(pose.center.z, corners.sumOf { it.z.toDouble() }.toFloat() / 4f, 1e-4f)
+        assertEquals(1f, TableFrameHomography.awayHandedness(pose), 1e-4f)
     }
 
     @Test
@@ -283,8 +284,9 @@ class TableFrameHomographyTest {
             Vec3(0.5f, 1f, -4.5f), Vec3(-0.5f, 1f, -4.5f),
         )
         val pose = TableFrameHomography.calibrateHorizontalRectangle(sampled)!!
-        assertEquals(-1f, pose.away.z, 1e-4f)
+        assertEquals(1f, pose.away.z, 1e-4f)
         assertEquals(1f, pose.right.x, 1e-4f)
+        assertEquals(-1f, TableFrameHomography.awayHandedness(pose), 1e-4f)
     }
 
     @Test

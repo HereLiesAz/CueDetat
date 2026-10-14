@@ -87,6 +87,9 @@ class ArTableSession(
     // One locked world anchor, oriented so xAxis is table-right and -zAxis is
     // table-away. ARCore can refine its whole pose without changing the bed size.
     private var lockedTableAnchor: Anchor? = null
+    // A screen-space corner order can have either plane handedness. ARCore anchor
+    // rotation alone cannot represent a reflection; retain the calibration parity.
+    private var lockedAwaySign = 1f
 
     /** Screen positions of the virtual table's corners plus their logical twins, awaiting a GL frame. */
     private class LockRequest(
@@ -206,8 +209,13 @@ class ArTableSession(
      */
     fun computeFrameUpdate(frame: Frame, vpW: Int, vpH: Int): FrameUpdate {
         if (unlockRequested.getAndSet(false)) {
-            adoptLockedPoseAsPreview()
-            clearAnchors()
+            if (adoptLockedPoseAsPreview()) {
+                clearAnchors()
+            } else {
+                // ARCore can pause an anchor briefly while relocalizing; never
+                // destroy the locked table until its pose has transferred.
+                unlockRequested.set(true)
+            }
         }
 
         val view = FloatArray(16)
@@ -321,19 +329,21 @@ class ArTableSession(
     }
 
     /** Transfer the locked pose to an editable preview without changing its size or heading. */
-    private fun adoptLockedPoseAsPreview() {
-        val locked = lockedTableAnchor ?: return
-        if (locked.trackingState != TrackingState.TRACKING) return
-        val input = previewInput.get() ?: return
-        val anchor = try { session?.createAnchor(locked.pose) } catch (_: Exception) { null } ?: return
+    private fun adoptLockedPoseAsPreview(): Boolean {
+        val locked = lockedTableAnchor ?: return false
+        if (locked.trackingState != TrackingState.TRACKING) return false
+        val input = previewInput.get() ?: return false
+        val anchor = try { session?.createAnchor(locked.pose) } catch (_: Exception) { null }
+            ?: return false
         clearPreview()
         previewAnchor = anchor
         val right = anchor.pose.xAxis
         val zAxis = anchor.pose.zAxis
         previewRight = Vec3(right[0], 0f, right[2])
-        previewAway = Vec3(-zAxis[0], 0f, -zAxis[2])
+        previewAway = Vec3(-zAxis[0] * lockedAwaySign, 0f, -zAxis[2] * lockedAwaySign)
         previewInitialRotation = input.rotationDegrees
         previousPreviewInput = input
+        return true
     }
 
     private fun clearPreview() {
@@ -381,6 +391,7 @@ class ArTableSession(
         val anchor = try { s.createAnchor(lockedPose) } catch (_: Exception) { return false }
         clearAnchors()
         clearPreview()
+        lockedAwaySign = TableFrameHomography.awayHandedness(calibrated)
         idealCorners = req.logicalCorners.toList()
         lockedTableAnchor = anchor
         return true
@@ -461,7 +472,7 @@ class ArTableSession(
             cornersWorld = TableFrameHomography.metricRectangleCorners(
                 logical, center,
                 Vec3(xAxis[0], 0f, xAxis[2]),
-                Vec3(-zAxis[0], 0f, -zAxis[2]),
+                Vec3(-zAxis[0] * lockedAwaySign, 0f, -zAxis[2] * lockedAwaySign),
                 0f,
             )
         } else {
