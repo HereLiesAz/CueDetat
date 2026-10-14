@@ -116,6 +116,11 @@ android {
 
     defaultConfig {
         applicationId = "com.hereliesaz.cuedetat"
+        // Optional key for Google-hosted ARCore APIs (Geospatial / Cloud Anchors).
+        // The central release runner supplies ARCORE_API_KEY to Gradle when available.
+        // Ordinary ARCore tracking, planes, anchors and depth work with an empty value.
+        manifestPlaceholders["arcoreApiKey"] =
+            providers.environmentVariable("ARCORE_API_KEY").orNull?.trim().orEmpty()
         // Training-capture relay (ml/capture-relay). Empty: frames stay on the phone. Set with
         // -PcaptureRelayUrl=https://… or the CAPTURE_RELAY_URL environment variable (CI secret).
         val captureRelayUrl = providers.gradleProperty("captureRelayUrl").orNull

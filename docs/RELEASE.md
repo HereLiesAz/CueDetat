@@ -161,6 +161,7 @@ Build support (already used elsewhere; pass-through, all optional/graceful):
 |--------|---------|
 | `GH_TOKEN`, `GH_ACTOR` | Read the Meta Wearables artifacts from GitHub Packages. |
 | `GOOGLE_SERVICES_API_KEY`, `PROJECT_ID`, `CLIENT_ID` | `google-services.json` injection (if a template exists). |
+| `ARCORE_API_KEY` | Optional Google-hosted ARCore API key. Central Play and GitHub release builds read this from the `CueDetat` environment of `HereLiesAz/workflows` and pass it to Gradle for `com.google.android.ar.API_KEY` manifest metadata. |
 | `GG_LINK`, `GG_SESSION` | Tester-license allowlist scrape (writes an empty allowlist when absent). |
 
 ---
@@ -200,3 +201,25 @@ When filling out the Play Console **Data safety** form:
 - **Location**: coarse location stays on the device (table profiles); not collected.
 - A public **privacy policy URL** is required; host `PrivacyPolicy.md` and link it in the
   listing.
+
+
+### ARCore authorization readiness
+
+CueDetat already uses local ARCore world tracking, plane detection, anchors, and
+depth where supported. Those features do not need the hosted ARCore API key.
+
+For future **Geospatial API** or **Cloud Anchors** use, set `ARCORE_API_KEY` in
+`HereLiesAz/workflows` → environment `CueDetat` → Actions secrets.
+Both canonical central release builds pass it **only to the Gradle build step**.
+The application module writes it to the merged Android manifest via Gradle's
+`arcoreApiKey` placeholder. Local builds without the key remain valid (empty
+metadata value). This integration does **not** enable Geospatial or Cloud
+Anchors in `Config`; those features require deliberate future implementation.
+
+API keys included in APKs/AABs are recoverable by users. **Restrict this key
+in Google Cloud** to the ARCore API and to the Android package
+`com.hereliesaz.cuedetat` plus its correct Play app-signing SHA-1
+(and the appropriate debug SHA-1 for separate development keys).
+`GOOGLE_CLOUD_KEY` is a service-account JSON credential and must not be
+packaged in the app or substituted for this API key. `GOOGLE_SERVICES` is
+the Firebase client JSON, not the hosted ARCore authorization key.
