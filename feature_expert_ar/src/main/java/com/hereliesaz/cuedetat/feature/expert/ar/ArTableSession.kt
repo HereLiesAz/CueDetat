@@ -108,6 +108,8 @@ class ArTableSession(
     private val cloudFeedbackQueue = ConcurrentLinkedQueue<CloudFeedback>()
     private var cloudHostFuture: HostCloudAnchorFuture? = null
     private var cloudResolveFuture: ResolveCloudAnchorFuture? = null
+    // Ignore results from operations cancelled by Forget or session shutdown.
+    private var cloudGeneration = 0L
     private val cloudPrefs by lazy {
         context.getSharedPreferences("cuedetat_cloud_table", Context.MODE_PRIVATE)
     }
@@ -165,6 +167,7 @@ class ArTableSession(
     private fun processCloudRequest() {
         val request = cloudRequest.getAndSet(null) ?: return
         if (request == CloudRequest.Forget) {
+            cloudGeneration++
             cloudHostFuture?.cancel()
             cloudResolveFuture?.cancel()
             cloudHostFuture = null
@@ -200,12 +203,13 @@ class ArTableSession(
                 val width = idealCorners[1].x - idealCorners[0].x
                 val length = idealCorners[2].y - idealCorners[1].y
                 val parity = lockedAwaySign
+                val generation = cloudGeneration
                 val expiration = System.currentTimeMillis() + CloudPlacementRecord.TTL_MS
                 try {
                     cloudHostFuture = s.hostCloudAnchorAsync(
                         anchor, CloudPlacementRecord.TTL_DAYS,
                         BiConsumer<String, Anchor.CloudAnchorState> { id, state ->
-                            if (session !== s) return@BiConsumer
+                            if (session !== s || generation != cloudGeneration) return@BiConsumer
                             cloudHostFuture = null
                             if (state == Anchor.CloudAnchorState.SUCCESS && id.isNotBlank()) {
                                 savePlacement(CloudPlacementRecord(id, expiration, width, length, parity))
@@ -233,11 +237,12 @@ class ArTableSession(
                     return
                 }
                 if (!enableCloudMode(s)) return
+                val generation = cloudGeneration
                 try {
                     cloudResolveFuture = s.resolveCloudAnchorAsync(
                         saved.id,
                         BiConsumer<Anchor, Anchor.CloudAnchorState> { anchor, state ->
-                            if (session !== s) {
+                            if (session !== s || generation != cloudGeneration) {
                                 anchor?.detach()
                                 return@BiConsumer
                             }
@@ -717,6 +722,7 @@ class ArTableSession(
     fun pause() { session?.pause() }
     fun resume() { try { session?.resume() } catch (_: Exception) {} }
     fun close() {
+        cloudGeneration++
         cloudRequest.set(null)
         cloudHostFuture?.cancel()
         cloudResolveFuture?.cancel()
