@@ -110,6 +110,9 @@ class ArTableSession(
     private var cloudResolveFuture: ResolveCloudAnchorFuture? = null
     // Ignore results from operations cancelled by Forget or session shutdown.
     @Volatile private var cloudGeneration = 0L
+    // Host success and user Forget must serialize their check/write/clear so
+    // a cancelled callback cannot repopulate the persisted identifier.
+    private val cloudPersistenceLock = Any()
     private val cloudPrefs by lazy {
         context.getSharedPreferences("cuedetat_cloud_table", Context.MODE_PRIVATE)
     }
@@ -121,12 +124,17 @@ class ArTableSession(
     }
 
     fun forgetCloudPlacement() {
-        // Erase the local ID immediately, even when AR tracking is paused and the
-        // GL thread cannot service a request. Invalidate in-flight callbacks now.
-        cloudGeneration++
-        cloudPrefs.edit().clear().apply()
+        // Forget must win over any concurrently completing host callback, even
+        // when AR tracking is paused and the GL thread cannot service a request.
+        val forgotten = synchronized(cloudPersistenceLock) {
+            cloudGeneration++
+            cloudPrefs.edit().clear().commit()
+        }
         cloudRequest.set(CloudRequest.Forget)
-        cloudMessage("Saved cloud placement forgotten on this device. Google's map expires separately.")
+        cloudMessage(
+            if (forgotten) "Saved cloud placement forgotten on this device. Google's map expires separately."
+            else "Could not persist forgetting this placement; please try again."
+        )
     }
 
     private fun cloudMessage(message: String, restored: Boolean = false) {
@@ -174,12 +182,10 @@ class ArTableSession(
     private fun processCloudRequest() {
         val request = cloudRequest.getAndSet(null) ?: return
         if (request == CloudRequest.Forget) {
-            cloudGeneration++
             cloudHostFuture?.cancel()
             cloudResolveFuture?.cancel()
             cloudHostFuture = null
             cloudResolveFuture = null
-            cloudPrefs.edit().clear().apply()
             return
         }
         val s = session ?: run {
@@ -215,13 +221,15 @@ class ArTableSession(
                     cloudHostFuture = s.hostCloudAnchorAsync(
                         anchor, CloudPlacementRecord.TTL_DAYS,
                         BiConsumer<String, Anchor.CloudAnchorState> { id, state ->
-                            if (session !== s || generation != cloudGeneration) return@BiConsumer
-                            cloudHostFuture = null
-                            if (state == Anchor.CloudAnchorState.SUCCESS && id.isNotBlank()) {
-                                savePlacement(CloudPlacementRecord(id, expiration, width, length, parity))
-                                cloudMessage("AR placement saved on this device for up to 24 hours.")
-                            } else {
-                                cloudMessage("Couldn't save AR placement: $state")
+                            synchronized(cloudPersistenceLock) {
+                                if (session !== s || generation != cloudGeneration) return@BiConsumer
+                                cloudHostFuture = null
+                                if (state == Anchor.CloudAnchorState.SUCCESS && !id.isNullOrBlank()) {
+                                    savePlacement(CloudPlacementRecord(id, expiration, width, length, parity))
+                                    cloudMessage("AR placement saved on this device for up to 24 hours.")
+                                } else {
+                                    cloudMessage("Couldn't save AR placement: $state")
+                                }
                             }
                         },
                     )
@@ -248,20 +256,22 @@ class ArTableSession(
                     cloudResolveFuture = s.resolveCloudAnchorAsync(
                         saved.id,
                         BiConsumer<Anchor, Anchor.CloudAnchorState> { anchor, state ->
-                            if (session !== s || generation != cloudGeneration) {
-                                anchor?.detach()
-                                return@BiConsumer
-                            }
-                            cloudResolveFuture = null
-                            if (state == Anchor.CloudAnchorState.SUCCESS && anchor != null) {
-                                clearAnchors()
-                                clearPreview()
-                                lockedAwaySign = saved.awaySign
-                                idealCorners = c.toList()
-                                lockedTableAnchor = anchor
-                                cloudMessage("Saved table placement restored. Check pocket alignment.", true)
-                            } else {
-                                cloudMessage("Could not recognize saved placement: $state")
+                            synchronized(cloudPersistenceLock) {
+                                if (session !== s || generation != cloudGeneration) {
+                                    anchor?.detach()
+                                    return@BiConsumer
+                                }
+                                cloudResolveFuture = null
+                                if (state == Anchor.CloudAnchorState.SUCCESS && anchor != null) {
+                                    clearAnchors()
+                                    clearPreview()
+                                    lockedAwaySign = saved.awaySign
+                                    idealCorners = c.toList()
+                                    lockedTableAnchor = anchor
+                                    cloudMessage("Saved table placement restored. Check pocket alignment.", true)
+                                } else {
+                                    cloudMessage("Could not recognize saved placement: $state")
+                                }
                             }
                         },
                     )
@@ -728,7 +738,7 @@ class ArTableSession(
     fun pause() { session?.pause() }
     fun resume() { try { session?.resume() } catch (_: Exception) {} }
     fun close() {
-        cloudGeneration++
+        synchronized(cloudPersistenceLock) { cloudGeneration++ }
         cloudRequest.set(null)
         cloudHostFuture?.cancel()
         cloudResolveFuture?.cancel()
