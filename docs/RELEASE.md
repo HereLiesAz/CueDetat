@@ -223,3 +223,26 @@ in Google Cloud** to the ARCore API and to the Android package
 `GOOGLE_CLOUD_KEY` is a service-account JSON credential and must not be
 packaged in the app or substituted for this API key. `GOOGLE_SERVICES` is
 the Firebase client JSON, not the hosted ARCore authorization key.
+
+
+### One-day ARCore Cloud Anchor save/restore
+
+After the table is locally **Locked**, expert AR users can choose **save 24h**,
+review a confirmation describing the transfer of visual mapping data and camera
+poses to Google, then authorize hosting. No maps are uploaded by ordinary AR
+tracking, Lock or app startup. Cloud hosting requires good feature-map quality;
+move slowly around the table if the app requests it.
+
+The **restore** control resolves the last locally saved cloud ID for the *same
+physical table size*. Restore is deliberate and replaces the current local lock
+only after Google returns a successful anchor. **Forget saved** erases the local
+ID and expiration metadata, but does not revoke Google's already-hosted map,
+which expires independently. The app keeps no images from this service.
+
+Because this app currently uses `ARCORE_API_KEY`, its hosted anchors have
+**a maximum 24-hour TTL** (1 day). For weeks/months of persistence (maximum
+365 days), configure **Android OAuth 2.0 keyless authorization** in Google Cloud
+for both the Play app-signing SHA-1 and any other signing certificates, then
+update the explicit one-day policy and its tests. Never put service-account
+JSON (`GOOGLE_CLOUD_KEY`) inside the APK. Cloud restoration may require
+visually scanning the original table and is not guaranteed to succeed.
