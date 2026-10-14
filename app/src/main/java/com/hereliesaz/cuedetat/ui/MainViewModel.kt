@@ -398,7 +398,7 @@ class MainViewModel @Inject constructor(
             val state = _uiState.value
             val c = state.table.corners // TL, TR, BR, BL
             val fit = state.tableFit?.takeIf { it.iou >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.LOCK_MIN_IOU }
-            if (fit != null) {
+            if (fit != null && state.arTableMatrix == null) {
                 // The reducer moves the table onto the fit for this same event (ControlReducer).
                 arController.lockTable(screenCorners = fit.viewQuad, logicalCorners = c)
             } else if (state.pitchMatrix != null) {
@@ -534,6 +534,8 @@ class MainViewModel @Inject constructor(
                 lastUserTableAdjustMs = now
 
             is MainScreenEvent.TableFitUpdated -> {
+                // World-fixed preview cannot be pulled by a noisy frame-by-frame felt fit.
+                if (after.cameraMode == CameraMode.AR_ACTIVE && after.arTableMatrix != null) return
                 val fit = event.fit ?: return
                 val current = poseOf(after)
                 com.hereliesaz.cuedetat.domain.TableSnapPolicy.pullStep(

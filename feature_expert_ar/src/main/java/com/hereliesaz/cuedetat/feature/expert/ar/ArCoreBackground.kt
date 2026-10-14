@@ -27,8 +27,8 @@ private const val TAG = "ArCoreBackground"
  * 1. Draws the camera feed as a fullscreen quad.
  * 2. Feeds the CPU image to [ArFrameProcessor] for ball detection and felt-colour sampling.
  * 3. Runs [ArTableSession.computeFrameUpdate]: anchors the table if Lock was tapped, fits the
- *    logical->screen homography from the corner anchors, then emits
- *    [MainScreenEvent.ArTableMatrixUpdated] (null until locked) and, on a lock attempt,
+ *    logical->screen homography from the metric preview or locked corners, then emits
+ *    [MainScreenEvent.ArTableMatrixUpdated] (null until tracking) and, on a lock attempt,
  *    [MainScreenEvent.ArTableLockResult].
  * 4. Emits a geometry-derived viewing pitch via [MainScreenEvent.ArCameraPoseUpdated] (used as the
  *    perspective hint before the table is locked).

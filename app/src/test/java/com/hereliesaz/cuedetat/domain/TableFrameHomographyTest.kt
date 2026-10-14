@@ -37,6 +37,62 @@ class TableFrameHomographyTest {
     }
 
     @Test
+    fun `metric eight-foot rectangle preserves actual playing-bed dimensions`() {
+        // Independent reference: eight-foot bed = 44in x 88in; 1in = 0.0254m.
+        val unit = TableFrameHomography.LOGICAL_UNITS_PER_INCH
+        val logical = listOf(
+            Pt(-22f * unit, -44f * unit), Pt(22f * unit, -44f * unit),
+            Pt(22f * unit, 44f * unit), Pt(-22f * unit, 44f * unit)
+        )
+        val corners = TableFrameHomography.metricRectangleCorners(
+            logical, Vec3(2f, 1f, -3f),
+            Vec3(1f, 0f, 0f), Vec3(0f, 0f, -1f), 0f
+        )
+        assertEquals(1.4412f, corners[0].x, 1e-4f)
+        assertEquals(-4.1176f, corners[0].z, 1e-4f)
+        assertEquals(2.5588f, corners[1].x, 1e-4f)
+        assertEquals(-1.8824f, corners[2].z, 1e-4f)
+        corners.forEach { assertEquals(1f, it.y, 1e-4f) }
+        val rotated = TableFrameHomography.metricRectangleCorners(
+            logical, Vec3(2f, 1f, -3f),
+            Vec3(1f, 0f, 0f), Vec3(0f, 0f, -1f), 90f
+        )
+        assertEquals(0.8824f, rotated[0].x, 1e-4f)
+        assertEquals(-2.4412f, rotated[0].z, 1e-4f)
+    }
+
+    @Test
+    fun `camera translation changes apparent position without moving table`() {
+        val logical = listOf(Pt(-1f, -1f), Pt(1f, -1f), Pt(1f, 1f), Pt(-1f, 1f))
+        val corners = TableFrameHomography.metricRectangleCorners(
+            logical, Vec3(0f, 0f, -2f),
+            Vec3(1f, 0f, 0f), Vec3(0f, 0f, -1f), 0f
+        )
+        val proj = floatArrayOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f,
+            0f, 0f, -1f, -1f, 0f, 0f, 0f, 0f)
+        val shiftedCamera = floatArrayOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f,
+            0f, 0f, 1f, 0f, -1f, 0f, 0f, 1f)
+        val before = TableFrameHomography.worldToScreen(identity4, proj, corners[0], 1000, 1000)!!
+        val after = TableFrameHomography.worldToScreen(shiftedCamera, proj, corners[0], 1000, 1000)!!
+        assertEquals(250f, before.x - after.x, 1f)
+        assertEquals(before.y, after.y, 1e-4f)
+        assertEquals(-2f, (corners[0].z + corners[2].z) / 2f, 1e-4f)
+    }
+
+    @Test
+    fun `apparent size follows inverse distance not artificial pitch scaling`() {
+        val proj = floatArrayOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f,
+            0f, 0f, -1f, -1f, 0f, 0f, 0f, 0f)
+        val closerView = floatArrayOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f,
+            0f, 0f, 1f, 0f, 0f, 0f, 0.1f, 1f)
+        val fixed = Vec3(0.3f, 0f, -2f)
+        val first = TableFrameHomography.worldToScreen(identity4, proj, fixed, 1000, 1000)!!
+        val closer = TableFrameHomography.worldToScreen(closerView, proj, fixed, 1000, 1000)!!
+        assertEquals(575f, first.x, 1e-3f)
+        assertEquals(578.9474f, closer.x, 0.01f)
+    }
+
+    @Test
     fun `multiplyColMajor applies translation from last column`() {
         val translate = floatArrayOf(
             1f, 0f, 0f, 0f,

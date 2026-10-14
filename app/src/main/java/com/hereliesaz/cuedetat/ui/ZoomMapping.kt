@@ -5,7 +5,7 @@ import com.hereliesaz.cuedetat.domain.ExperienceMode
 import kotlin.math.ln
 import kotlin.math.pow
 
-internal object ZoomMapping {
+object ZoomMapping {
     const val DEFAULT_ZOOM = 1.0f
 
     private const val STANDARD_MIN_ZOOM = 0.2f

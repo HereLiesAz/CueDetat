@@ -39,7 +39,7 @@ interface ArController {
     /** Detect ARCore world-tracking capability (creates and closes a probe session). */
     fun probeCapability(): DepthCapability
 
-    /** Push the latest derived UI state to the AR frame processor (ball detection input). */
+    /** Push state to AR ball detection and the editable world-anchored table preview. */
     fun updateUiState(state: CueDetatState)
 
     /** Set the table-plane lift; input is the logical tableZOffset (converted to metres internally). */

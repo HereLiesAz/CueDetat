@@ -29,6 +29,30 @@ object TableFrameHomography {
     /** Logical units per meter, for converting ARCore metric distances into logical space. */
     const val LOGICAL_UNITS_PER_METER = LOGICAL_UNITS_PER_INCH / METERS_PER_INCH
 
+    /**
+     * Physical pool-table coordinates in a fixed ARCore world frame. Logical width/length
+     * convert to metres through the existing ball-based coordinate scale. This is a *rigid*
+     * planar rectangle, regardless of camera position or projected magnification.
+     */
+    fun metricRectangleCorners(
+        logical: List<Pt>, center: Vec3, right: Vec3, away: Vec3,
+        yawDegrees: Float,
+    ): List<Vec3> {
+        val radians = Math.toRadians(yawDegrees.toDouble())
+        val c = kotlin.math.cos(radians).toFloat()
+        val s = kotlin.math.sin(radians).toFloat()
+        val rx = right.x * c + away.x * s
+        val rz = right.z * c + away.z * s
+        val ax = away.x * c - right.x * s
+        val az = away.z * c - right.z * s
+        return logical.map { corner ->
+            val x = corner.x / LOGICAL_UNITS_PER_METER
+            val y = -corner.y / LOGICAL_UNITS_PER_METER
+            Vec3(center.x + rx * x + ax * y, center.y,
+                center.z + rz * x + az * y)
+        }
+    }
+
     // --- vector helpers ---
     private fun sub(a: Vec3, b: Vec3) = Vec3(a.x - b.x, a.y - b.y, a.z - b.z)
     private fun add(a: Vec3, b: Vec3) = Vec3(a.x + b.x, a.y + b.y, a.z + b.z)

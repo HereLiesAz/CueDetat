@@ -103,11 +103,19 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   pocket tapping (the former `CORNER_QUAD` corner taps and `POCKET_GUIDE`
   per-pocket guide) did not work and was deleted.
 
+- **Pre-lock AR is metric and stationary in world space.** One ARCore depth/plane hit
+  positions the selected physical table dimensions; when no hit exists, an initial
+  camera-relative position is explicitly estimated. A changing camera pose changes
+  only the perspective projection. User pan/rotation/zoom edit the world pose; zoom
+  changes camera-to-table range, not table dimensions. Reason: artificial screen-space
+  pitch and scaling moved/rotated/deformed the preview during camera motion.
+
 - **The table is locked by hand, not detected.** Once tracking, a `lock` rail
   item appears above `ar`/`off`: the user lines the virtual table up over the real one and
   taps it. The virtual corners' current screen positions are cast onto the
   detected horizontal plane (`TableFrameHomography.screenToPlane`) and anchored;
-  `ArTableSession` then drives the overlay from those anchors. Reason: the
+  `ArTableSession` then drives the overlay from those anchors, rebuilding a rigid
+  rectangle of the selected physical dimensions on the selected felt plane. Reason: the
   user's eye is the one table detector that has worked. The cast uses the
   infinite plane, not per-corner hit-tests, because plain felt is rarely mapped
   edge to edge by ARCore.

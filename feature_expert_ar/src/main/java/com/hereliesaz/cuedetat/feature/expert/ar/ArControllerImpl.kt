@@ -63,6 +63,7 @@ class ArControllerImpl(context: Context) : ArController {
 
     override fun updateUiState(state: CueDetatState) {
         arFrameProcessor.updateUiState(state)
+        arTableSession.updatePreviewInput(state)
     }
 
     override fun setTableZOffsetLogical(tableZOffsetLogical: Float) {
