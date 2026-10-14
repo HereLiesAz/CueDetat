@@ -4,6 +4,7 @@ import android.graphics.PointF
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.ArProjectionPolicy
 import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.TableOrientationLearner
@@ -82,7 +83,7 @@ private fun handleSizeChanged(
 internal const val COMPASS_FOLLOW_DEADBAND_DEG = 0.5f
 
 /**
- * Turns the virtual table against the phone's compass heading, AR or not: a pool table doesn't
+ * Turns the virtual table against the phone's compass heading in non-AR modes: a pool table doesn't
  * move, so turning the phone right turns the table left on screen (the same rule, sign -1, as
  * TableOrientationLearner). User rotation adds on top; the compass only contributes its change.
  *
@@ -93,9 +94,12 @@ internal const val COMPASS_FOLLOW_DEADBAND_DEG = 0.5f
  */
 internal fun followCompass(state: CueDetatState): CueDetatState {
     val yaw = state.currentOrientation.yaw
+    // An actual ARCore session owns orientation even when its projection is
+    // briefly missing; compass-follow otherwise resumes and spins the table.
+    // AR_ACTIVE without ARCore capability uses CameraX/CV and still needs
+    // legacy compass-follow. Do not confuse camera mode with AR capability.
     if (state.isBeginnerViewLocked || state.isArTableLocked ||
-        (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.AR_ACTIVE &&
-            state.arTableMatrix != null)) {
+        ArProjectionPolicy.isWorldTracked(state.cameraMode, state.depthCapability)) {
         return if (state.compassRefYaw == null) state else state.copy(compassRefYaw = null)
     }
     val ref = state.compassRefYaw ?: return state.copy(compassRefYaw = yaw)

@@ -18,6 +18,14 @@ class SensorLockTest {
     }
 
     @Test
+    fun `Lock View still freezes the AR projection as promised`() {
+        assertTrue(SensorLock.blocks(MainScreenEvent.ArTableMatrixUpdated(null)))
+        assertTrue(SensorLock.blocks(
+            MainScreenEvent.FullOrientationChanged(FullOrientation(45f, 0f, 0f))
+        ))
+    }
+
+    @Test
     fun `manual controls are not blocked`() {
         assertFalse(SensorLock.blocks(MainScreenEvent.TableRotationApplied(5f)))
         assertFalse(SensorLock.blocks(MainScreenEvent.ZoomSliderChanged(3f)))
