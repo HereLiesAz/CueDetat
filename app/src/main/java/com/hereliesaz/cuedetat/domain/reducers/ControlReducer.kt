@@ -143,6 +143,12 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             else applyTablePose(state, fit.pose.offsetX, fit.pose.offsetY, fit.pose.rotationDeg, fit.pose.zoom)
         }
 
+        is MainScreenEvent.CloudPlacementResult ->
+            state.copy(
+                isArTableLocked = state.isArTableLocked || action.restored,
+                warningText = action.message,
+            )
+
         is MainScreenEvent.ArTableLockResult ->
             if (action.locked) state.copy(isArTableLocked = true, warningText = null)
             else state.copy(

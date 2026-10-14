@@ -23,6 +23,9 @@ object NoOpArController : ArController {
 
     override fun lockTable(screenCorners: List<android.graphics.PointF>, logicalCorners: List<android.graphics.PointF>) {}
     override fun unlockTable() {}
+    override fun saveCloudPlacement() {}
+    override fun restoreCloudPlacement(logicalCorners: List<android.graphics.PointF>) {}
+    override fun forgetCloudPlacement() {}
 
     @Composable
     override fun ArBackground(modifier: Modifier, onEvent: (MainScreenEvent) -> Unit) {}

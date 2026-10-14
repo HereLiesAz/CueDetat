@@ -429,6 +429,13 @@ sealed class MainScreenEvent {
     object LockArTable : MainScreenEvent()
     // Release the lock; the table returns to the sensor-driven pose.
     object UnlockArTable : MainScreenEvent()
+    /** Hosting sends visual mapping data to Google; the UI must confirm first. */
+    object SaveCloudPlacement : MainScreenEvent()
+    /** User-triggered resolution of a previously saved one-day cloud placement. */
+    object RestoreCloudPlacement : MainScreenEvent()
+    /** Forget only the local ID; Google's hosted record expires independently. */
+    object ForgetCloudPlacement : MainScreenEvent()
+    data class CloudPlacementResult(val message: String, val restored: Boolean = false) : MainScreenEvent()
     // Outcome of a lock attempt, from the ARCore GL thread. False when no table plane was found.
     data class ArTableLockResult(val locked: Boolean) : MainScreenEvent()
     // Latest snap fit of the table to the felt (null: nothing to fit to).

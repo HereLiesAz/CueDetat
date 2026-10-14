@@ -55,6 +55,15 @@ interface ArController {
     /** Release the locked table. */
     fun unlockTable()
 
+    /** Explicit, consent-confirmed cloud hosting; no automatic visual-map upload. */
+    fun saveCloudPlacement() {}
+
+    /** Explicit cloud restoration using the selected table's logical corners. */
+    fun restoreCloudPlacement(logicalCorners: List<android.graphics.PointF>) {}
+
+    /** Remove the saved local Cloud Anchor ID, not Google's already-hosted record. */
+    fun forgetCloudPlacement()
+
     /** Full-screen ARCore camera background (corner capture during setup + 6DoF tracking). */
     @Composable
     fun ArBackground(modifier: Modifier, onEvent: (MainScreenEvent) -> Unit)
