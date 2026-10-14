@@ -245,4 +245,64 @@ class TableFrameHomographyTest {
         assertEquals(500f, centre.y, 0.5f)
         assertTrue(lifted[8] == 1f)
     }
+    @Test
+    fun `single-anchor calibration yields orthogonal stable metric corners`() {
+        // Ray intersections on a slightly skewed plane: choose yaw and centre,
+        // but do not inherit noisy width or skew in the locked playing bed.
+        val sampled = listOf(
+            Vec3(-0.6f, 0.76f, -3.0f), Vec3(0.65f, 0.76f, -2.95f),
+            Vec3(0.6f, 0.76f, -0.45f), Vec3(-0.55f, 0.76f, -0.5f),
+        )
+        val pose = TableFrameHomography.calibrateHorizontalRectangle(sampled)!!
+        val unit = TableFrameHomography.LOGICAL_UNITS_PER_INCH
+        val logical = listOf(
+            Pt(-22f * unit, -44f * unit), Pt(22f * unit, -44f * unit),
+            Pt(22f * unit, 44f * unit), Pt(-22f * unit, 44f * unit),
+        )
+        val corners = TableFrameHomography.metricRectangleCorners(
+            logical, pose.center, pose.right, pose.away, 0f,
+        )
+        fun distance(a: Vec3, b: Vec3) =
+            kotlin.math.hypot(a.x - b.x, a.z - b.z)
+        assertEquals(44f * 0.0254f, distance(corners[0], corners[1]), 1e-4f)
+        assertEquals(88f * 0.0254f, distance(corners[1], corners[2]), 1e-4f)
+        assertEquals(44f * 0.0254f, distance(corners[2], corners[3]), 1e-4f)
+        assertEquals(88f * 0.0254f, distance(corners[3], corners[0]), 1e-4f)
+        val a = corners[1]; val b = corners[0]; val c = corners[3]
+        val dot = (a.x - b.x) * (c.x - b.x) + (a.z - b.z) * (c.z - b.z)
+        assertEquals(0f, dot, 1e-4f)
+        // The centroid remains attached to the one world anchor.
+        assertEquals(pose.center.x, corners.sumOf { it.x.toDouble() }.toFloat() / 4f, 1e-4f)
+        assertEquals(pose.center.z, corners.sumOf { it.z.toDouble() }.toFloat() / 4f, 1e-4f)
+        assertEquals(1f, TableFrameHomography.awayHandedness(pose), 1e-4f)
+    }
+
+    @Test
+    fun `calibration keeps the selected table end instead of flipping 180 degrees`() {
+        val sampled = listOf(
+            Vec3(-0.5f, 1f, -2.5f), Vec3(0.5f, 1f, -2.5f),
+            Vec3(0.5f, 1f, -4.5f), Vec3(-0.5f, 1f, -4.5f),
+        )
+        val pose = TableFrameHomography.calibrateHorizontalRectangle(sampled)!!
+        assertEquals(1f, pose.away.z, 1e-4f)
+        assertEquals(1f, pose.right.x, 1e-4f)
+        assertEquals(-1f, TableFrameHomography.awayHandedness(pose), 1e-4f)
+    }
+
+    @Test
+    fun `calibration rejects unusable geometry before locking`() {
+        assertNull(TableFrameHomography.calibrateHorizontalRectangle(emptyList()))
+        assertNull(TableFrameHomography.calibrateHorizontalRectangle(
+            List(4) { Vec3(0f, 0.6f, -2f) },
+        ))
+        assertNull(TableFrameHomography.calibrateHorizontalRectangle(listOf(
+            Vec3(0f, 0f, 0f), Vec3(1f, 0f, 0f),
+            Vec3(2f, 0f, 0f), Vec3(3f, 0f, 0f),
+        )))
+        assertNull(TableFrameHomography.calibrateHorizontalRectangle(listOf(
+            Vec3(Float.NaN, 0f, 0f), Vec3(1f, 0f, 0f),
+            Vec3(2f, 0f, 0f), Vec3(3f, 0f, 0f),
+        )))
+    }
+
 }

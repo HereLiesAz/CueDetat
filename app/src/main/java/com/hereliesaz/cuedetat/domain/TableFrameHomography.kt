@@ -53,6 +53,52 @@ object TableFrameHomography {
         }
     }
 
+    /** A rigid table centre and heading on an ARCore horizontal plane.
+     * The table's width/length come from logical dimensions, never from a
+     * noisy image-space quad or from independently tracking corner anchors.
+     */
+    data class HorizontalRectanglePose(val center: Vec3, val right: Vec3, val away: Vec3)
+
+    /**
+     * Calibrate a world-space table from four screen-ray intersections in TL,TR,BR,BL order.
+     * Ignore the apparent width/length (perspective/plane estimates can distort them);
+     * reject near-collinear or nonfinite geometry instead of creating a rotating table.
+     */
+    fun calibrateHorizontalRectangle(worldCorners: List<Vec3>): HorizontalRectanglePose? {
+        if (worldCorners.size != 4 ||
+            worldCorners.any { !it.x.isFinite() || !it.y.isFinite() || !it.z.isFinite() }
+        ) return null
+        val (tl, tr, _, bl) = worldCorners
+        val dx = tr.x - tl.x
+        val dz = tr.z - tl.z
+        val width = kotlin.math.hypot(dx, dz)
+        val alongX = tl.x - bl.x
+        val alongZ = tl.z - bl.z
+        val length = kotlin.math.hypot(alongX, alongZ)
+        if (width < 0.05f || length < 0.05f) return null
+        val right = Vec3(dx / width, 0f, dz / width)
+        var away = Vec3(right.z, 0f, -right.x)
+        val alignment = away.x * alongX + away.z * alongZ
+        // Both projected axes need to be distinguishable on the chosen plane.
+        if (kotlin.math.abs(alignment) < length * 0.1f) return null
+        if (alignment < 0f) away = Vec3(-away.x, 0f, -away.z)
+        val center = Vec3(
+            worldCorners.sumOf { it.x.toDouble() }.toFloat() / 4f,
+            worldCorners.sumOf { it.y.toDouble() }.toFloat() / 4f,
+            worldCorners.sumOf { it.z.toDouble() }.toFloat() / 4f,
+        )
+        return HorizontalRectanglePose(center, right, away)
+    }
+
+    /** Whether calibrated table-away matches the conventional -anchor.zAxis direction.
+     * A mirrored projection cannot be represented by an ARCore yaw quaternion alone.
+     */
+    fun awayHandedness(pose: HorizontalRectanglePose): Float {
+        val defaultAwayX = pose.right.z
+        val defaultAwayZ = -pose.right.x
+        return if (defaultAwayX * pose.away.x + defaultAwayZ * pose.away.z < 0f) -1f else 1f
+    }
+
     // --- vector helpers ---
     private fun sub(a: Vec3, b: Vec3) = Vec3(a.x - b.x, a.y - b.y, a.z - b.z)
     private fun add(a: Vec3, b: Vec3) = Vec3(a.x + b.x, a.y + b.y, a.z + b.z)

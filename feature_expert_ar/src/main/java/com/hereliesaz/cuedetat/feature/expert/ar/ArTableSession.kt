@@ -28,6 +28,8 @@ import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.pow
 import kotlin.math.sqrt
+import kotlin.math.sin
+import kotlin.math.cos
 
 /** Felt-vote sampling: a FELT_GRID x FELT_GRID grid across the virtual table. */
 private const val FELT_GRID = 5
@@ -42,9 +44,10 @@ data class CameraAbovePlane(val pitchDegrees: Float, val heightM: Float)
 /**
  * Owns the ARCore [Session] and the world anchors that define the table in expert mode.
  *
- * The table is defined by four world [Anchor]s at its corner pockets (TL, TR, BR, BL). ARCore's
- * visual-inertial tracking keeps them fixed as the user walks around, and every frame
- * [computeFrameUpdate] fits the logical->screen homography the 2D Canvas renderer applies.
+ * A single ARCore [Anchor] tracks the table centre and yaw. All four corners are computed
+ * from its pose and the selected table's immutable metric dimensions, preventing four
+ * independent anchors from skewing or stretching a rigid playing surface. The projected
+ * rectangle still follows the camera's full 6DoF pose every frame.
  *
  * Before Lock, a metric-sized table is placed once in world space using an ARCore depth hit,
  * horizontal-plane hit, or an explicitly estimated starting distance. Its pose survives camera
@@ -81,8 +84,12 @@ class ArTableSession(
     private var previewInitialRotation = 0f
     private var previousPreviewInput: PreviewInput? = null
 
-    // Corner anchors ordered TL, TR, BR, BL. Null until the table is locked.
-    @Volatile private var tableAnchors: List<Anchor>? = null
+    // One locked world anchor, oriented so xAxis is table-right and -zAxis is
+    // table-away. ARCore can refine its whole pose without changing the bed size.
+    private var lockedTableAnchor: Anchor? = null
+    // A screen-space corner order can have either plane handedness. ARCore anchor
+    // rotation alone cannot represent a reflection; retain the calibration parity.
+    private var lockedAwaySign = 1f
 
     /** Screen positions of the virtual table's corners plus their logical twins, awaiting a GL frame. */
     private class LockRequest(
@@ -93,7 +100,7 @@ class ArTableSession(
     private val pendingLock = AtomicReference<LockRequest?>(null)
     private val unlockRequested = AtomicBoolean(false)
 
-    // Ideal logical corner positions (TL, TR, BR, BL) matching [tableAnchors].
+    // Ideal logical rectangle (TL, TR, BR, BL) calibrated against the one anchor.
     @Volatile private var idealCorners: List<Pt> = emptyList()
 
     // Height of the table plane above the corner anchors, in metres, driven by the tableZOffset
@@ -185,8 +192,8 @@ class ArTableSession(
 
     /** Detaches the corner anchors (rescan / cancel). */
     fun clearAnchors() {
-        tableAnchors?.forEach { runCatching { it.detach() } }
-        tableAnchors = null
+        lockedTableAnchor?.detach()
+        lockedTableAnchor = null
         idealCorners = emptyList()
     }
 
@@ -202,8 +209,13 @@ class ArTableSession(
      */
     fun computeFrameUpdate(frame: Frame, vpW: Int, vpH: Int): FrameUpdate {
         if (unlockRequested.getAndSet(false)) {
-            adoptLockedPoseAsPreview()
-            clearAnchors()
+            if (adoptLockedPoseAsPreview()) {
+                clearAnchors()
+            } else {
+                // ARCore can pause an anchor briefly while relocalizing; never
+                // destroy the locked table until its pose has transferred.
+                unlockRequested.set(true)
+            }
         }
 
         val view = FloatArray(16)
@@ -211,7 +223,7 @@ class ArTableSession(
         frame.camera.getViewMatrix(view, 0)
         frame.camera.getProjectionMatrix(proj, 0, 0.01f, 100f)
 
-        if (tableAnchors == null) updatePreview(frame, view, proj, vpW, vpH)
+        if (lockedTableAnchor == null) updatePreview(frame, view, proj, vpW, vpH)
         val lockResult = pendingLock.getAndSet(null)?.let { performLock(frame, it, view, proj, vpW, vpH) }
         return FrameUpdate(buildTableMatrix(view, proj, vpW, vpH), lockResult)
     }
@@ -316,31 +328,22 @@ class ArTableSession(
         previousPreviewInput = input
     }
 
-    /** Unlock adopts the last locked corners; there is no screen-space teleport. */
-    private fun adoptLockedPoseAsPreview() {
-        val corners = tableAnchors?.map { anchorWorld(it) ?: return } ?: return
-        val input = previewInput.get() ?: return
-        if (corners.size != 4) return
-        val center = Vec3(corners.sumOf { it.x.toDouble() }.toFloat() / 4f,
-            corners.sumOf { it.y.toDouble() }.toFloat() / 4f,
-            corners.sumOf { it.z.toDouble() }.toFloat() / 4f)
-        val rx = corners[1].x - corners[0].x
-        val rz = corners[1].z - corners[0].z
-        val ax = corners[0].x - corners[3].x
-        val az = corners[0].z - corners[3].z
-        val r = hypot(rx.toDouble(), rz.toDouble()).toFloat()
-        val a = hypot(ax.toDouble(), az.toDouble()).toFloat()
-        if (r < 1e-4f || a < 1e-4f) return
-        val anchor = try {
-            session?.createAnchor(Pose(floatArrayOf(center.x, center.y, center.z),
-                floatArrayOf(0f, 0f, 0f, 1f)))
-        } catch (_: Exception) { null } ?: return
+    /** Transfer the locked pose to an editable preview without changing its size or heading. */
+    private fun adoptLockedPoseAsPreview(): Boolean {
+        val locked = lockedTableAnchor ?: return false
+        if (locked.trackingState != TrackingState.TRACKING) return false
+        val input = previewInput.get() ?: return false
+        val anchor = try { session?.createAnchor(locked.pose) } catch (_: Exception) { null }
+            ?: return false
         clearPreview()
         previewAnchor = anchor
-        previewRight = Vec3(rx / r, 0f, rz / r)
-        previewAway = Vec3(ax / a, 0f, az / a)
+        val right = anchor.pose.xAxis
+        val zAxis = anchor.pose.zAxis
+        previewRight = Vec3(right[0], 0f, right[2])
+        previewAway = Vec3(-zAxis[0] * lockedAwaySign, 0f, -zAxis[2] * lockedAwaySign)
         previewInitialRotation = input.rotationDegrees
         previousPreviewInput = input
+        return true
     }
 
     private fun clearPreview() {
@@ -375,41 +378,22 @@ class ArTableSession(
             TableFrameHomography.screenToPlane(invViewProj, c.x, c.y, vpW, vpH, planePoint, planeNormal)
                 ?: return false
         }
-        // The surface vote determines a plane, not a new physical table size.
-        // The projected corners determine only centre and heading. Rebuild the four
-        // positions from the selected table's exact metric dimensions so Lock cannot
-        // silently stretch the playing bed when the fitted plane depth differs.
-        val center = Vec3(
-            worlds.sumOf { it.x.toDouble() }.toFloat() / 4f,
-            worlds.sumOf { it.y.toDouble() }.toFloat() / 4f,
-            worlds.sumOf { it.z.toDouble() }.toFloat() / 4f,
+        // Depth/felt votes select a physical plane; projected points supply centre
+        // and heading only. The playing bed always uses exact logical dimensions.
+        val calibrated = TableFrameHomography.calibrateHorizontalRectangle(worlds)
+            ?: return false
+        val yaw = -atan2(calibrated.right.z, calibrated.right.x)
+        val half = yaw / 2f
+        val lockedPose = Pose(
+            floatArrayOf(calibrated.center.x, calibrated.center.y, calibrated.center.z),
+            floatArrayOf(0f, sin(half), 0f, cos(half)),
         )
-        val dx = worlds[1].x - worlds[0].x
-        val dz = worlds[1].z - worlds[0].z
-        val width = hypot(dx.toDouble(), dz.toDouble()).toFloat()
-        if (width < 0.05f) return false
-        val right = Vec3(dx / width, 0f, dz / width)
-        var away = Vec3(right.z, 0f, -right.x)
-        // Keep the virtual TL→BL direction; a 180° table-end flip is not a lock.
-        val alongX = worlds[0].x - worlds[3].x
-        val alongZ = worlds[0].z - worlds[3].z
-        if (away.x * alongX + away.z * alongZ < 0f) {
-            away = Vec3(-away.x, 0f, -away.z)
-        }
-        val metricCorners = TableFrameHomography.metricRectangleCorners(
-            req.logicalCorners, center, right, away, 0f,
-        )
-        val anchors = try {
-            metricCorners.map { w ->
-                s.createAnchor(Pose(floatArrayOf(w.x, w.y, w.z),
-                    planePose.rotationQuaternion))
-            }
-        } catch (_: Exception) {
-            return false
-        }
+        val anchor = try { s.createAnchor(lockedPose) } catch (_: Exception) { return false }
         clearAnchors()
-        idealCorners = req.logicalCorners
-        tableAnchors = anchors
+        clearPreview()
+        lockedAwaySign = TableFrameHomography.awayHandedness(calibrated)
+        idealCorners = req.logicalCorners.toList()
+        lockedTableAnchor = anchor
         return true
     }
 
@@ -475,13 +459,22 @@ class ArTableSession(
     }
 
     private fun buildTableMatrix(view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int): Matrix? {
-        val locked = tableAnchors
+        val locked = lockedTableAnchor
         val cornersWorld: List<Vec3>
         val logical: List<Pt>
         if (locked != null) {
-            if (locked.size != 4 || idealCorners.size != 4) return null
-            cornersWorld = locked.map { anchorWorld(it) ?: return null }
+            if (locked.trackingState != TrackingState.TRACKING || idealCorners.size != 4) return null
+            val pose = locked.pose
+            val xAxis = pose.xAxis
+            val zAxis = pose.zAxis
+            val center = Vec3(pose.tx(), pose.ty(), pose.tz())
             logical = idealCorners
+            cornersWorld = TableFrameHomography.metricRectangleCorners(
+                logical, center,
+                Vec3(xAxis[0], 0f, xAxis[2]),
+                Vec3(-zAxis[0] * lockedAwaySign, 0f, -zAxis[2] * lockedAwaySign),
+                0f,
+            )
         } else {
             val anchor = previewAnchor ?: return null
             val input = previewInput.get() ?: return null
@@ -500,13 +493,7 @@ class ArTableSession(
         return Matrix().apply { setValues(h) }
     }
 
-    private fun anchorWorld(anchor: Anchor): Vec3? {
-        if (anchor.trackingState != TrackingState.TRACKING) return null
-        val p = anchor.pose
-        return Vec3(p.tx(), p.ty(), p.tz())
-    }
-
-    // --- Plane-anchor pitch fallback (used while the table is not locked) ---
+     // --- Plane-anchor pitch fallback (used while the table is not locked) ---
 
     /**
      * Searches updated trackables for a horizontal plane matching pool-table dimensions and anchors
