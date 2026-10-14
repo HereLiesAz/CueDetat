@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -124,6 +125,7 @@ fun AzNavRailMenu(
     // Holds the controller returned by AzHostActivityLayout so the "Tutorial" rail item's onClick —
     // defined inside the non-@Composable content lambda, before `guidance` is assigned — can reach it.
     val guidanceHolder = remember { mutableStateOf<AzGuidanceController?>(null) }
+    val confirmCloudSave = remember { mutableStateOf(false) }
 
     // The rail accent, and every AzNavRail surface drawn in it, follows the app theme (guide §2.B).
     val railAccent = MaterialTheme.colorScheme.primary
@@ -275,6 +277,21 @@ fun AzNavRailMenu(
                         )
                     }
                 )
+                // Cloud hosting is never automatic: explicit confirmation is required.
+                if (uiState.isArTableLocked) {
+                    azRailItemLowerCase(
+                        id = "ar_cloud_save", text = "save 24h",
+                        fillColor = b6G, onClick = { confirmCloudSave.value = true },
+                    )
+                }
+                azRailItemLowerCase(
+                    id = "ar_cloud_restore", text = "restore",
+                    fillColor = b10B, onClick = { onEvent(MainScreenEvent.RestoreCloudPlacement) },
+                )
+                azRailItemLowerCase(
+                    id = "ar_cloud_forget", text = "forget saved",
+                    fillColor = b11R, onClick = { onEvent(MainScreenEvent.ForgetCloudPlacement) },
+                )
             }
 
             // AR: starts the camera (felt capture, then AR tracking); "off" turns it straight off.
@@ -399,6 +416,31 @@ fun AzNavRailMenu(
 
         azDivider()
         azMenuItem(id = "mode", text = "Mode: ${uiState.experienceMode?.name}", fillColor = b2B, onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) })
+    }
+
+    if (confirmCloudSave.value) {
+        AlertDialog(
+            onDismissRequest = { confirmCloudSave.value = false },
+            title = { Text("Save AR table placement for 24 hours?") },
+            text = {
+                Text(
+                    "ARCore will send visual mapping data, camera poses and the table anchor " +
+                        "position to Google's cloud to recognize this table again. " +
+                        "This requires an internet connection. The placement expires within " +
+                        "24 hours and does not make calibration more accurate. " +
+                        "Nothing is uploaded unless you confirm."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmCloudSave.value = false
+                    onEvent(MainScreenEvent.SaveCloudPlacement)
+                }) { Text("Save placement") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmCloudSave.value = false }) { Text("Cancel") }
+            },
+        )
     }
 
     // Cache the controller for the manual "Tutorial" rail item (see guidanceHolder above).

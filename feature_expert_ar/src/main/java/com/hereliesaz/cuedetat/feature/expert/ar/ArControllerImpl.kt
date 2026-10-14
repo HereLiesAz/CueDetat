@@ -82,6 +82,15 @@ class ArControllerImpl(context: Context) : ArController {
 
     override fun unlockTable() = arTableSession.unlock()
 
+    override fun saveCloudPlacement() = arTableSession.requestSaveCloudPlacement()
+
+    override fun restoreCloudPlacement(logicalCorners: List<PointF>) =
+        arTableSession.requestRestoreCloudPlacement(
+            logicalCorners.map { TableFrameHomography.Pt(it.x, it.y) },
+        )
+
+    override fun forgetCloudPlacement() = arTableSession.forgetCloudPlacement()
+
     @Composable
     override fun ArBackground(modifier: Modifier, onEvent: (MainScreenEvent) -> Unit) {
         ArCoreBackground(

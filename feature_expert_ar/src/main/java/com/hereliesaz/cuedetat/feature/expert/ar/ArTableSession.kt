@@ -1,6 +1,7 @@
 package com.hereliesaz.cuedetat.feature.expert.ar
 
 import android.content.Context
+import com.hereliesaz.cuedetat.domain.CloudPlacementRecord
 import android.graphics.Matrix
 import com.google.ar.core.Anchor
 import com.google.ar.core.ArCoreApk
@@ -8,6 +9,8 @@ import com.google.ar.core.Config
 import com.google.ar.core.Coordinates2d
 import com.google.ar.core.DepthPoint
 import com.google.ar.core.Frame
+import com.google.ar.core.HostCloudAnchorFuture
+import com.google.ar.core.ResolveCloudAnchorFuture
 import com.google.ar.core.HitResult
 import com.google.ar.core.Plane
 import com.google.ar.core.Pose
@@ -22,6 +25,8 @@ import com.hereliesaz.cuedetat.domain.TableFrameHomography
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Pt
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Vec3
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.function.BiConsumer
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.atan2
 import kotlin.math.abs
@@ -90,6 +95,194 @@ class ArTableSession(
     // A screen-space corner order can have either plane handedness. ARCore anchor
     // rotation alone cannot represent a reflection; retain the calibration parity.
     private var lockedAwaySign = 1f
+
+    // Cloud operations are never automatic. A deliberate user action in the UI
+    // queues one operation for the GL thread (the owner of Session.update()).
+    private sealed interface CloudRequest {
+        data object Save : CloudRequest
+        data class Restore(val logicalCorners: List<Pt>) : CloudRequest
+        data object Forget : CloudRequest
+    }
+    data class CloudFeedback(val message: String, val restored: Boolean = false)
+    private val cloudRequest = AtomicReference<CloudRequest?>(null)
+    private val cloudFeedbackQueue = ConcurrentLinkedQueue<CloudFeedback>()
+    private var cloudHostFuture: HostCloudAnchorFuture? = null
+    private var cloudResolveFuture: ResolveCloudAnchorFuture? = null
+    // Ignore results from operations cancelled by Forget or session shutdown.
+    @Volatile private var cloudGeneration = 0L
+    // Host success and user Forget must serialize their check/write/clear so
+    // a cancelled callback cannot repopulate the persisted identifier.
+    private val cloudPersistenceLock = Any()
+    private val cloudPrefs by lazy {
+        context.getSharedPreferences("cuedetat_cloud_table", Context.MODE_PRIVATE)
+    }
+
+    fun requestSaveCloudPlacement() { cloudRequest.set(CloudRequest.Save) }
+
+    fun requestRestoreCloudPlacement(logicalCorners: List<Pt>) {
+        cloudRequest.set(CloudRequest.Restore(logicalCorners.toList()))
+    }
+
+    fun forgetCloudPlacement() {
+        // Forget must win over any concurrently completing host callback, even
+        // when AR tracking is paused and the GL thread cannot service a request.
+        val forgotten = synchronized(cloudPersistenceLock) {
+            cloudGeneration++
+            cloudPrefs.edit().clear().commit()
+        }
+        cloudRequest.set(CloudRequest.Forget)
+        cloudMessage(
+            if (forgotten) "Saved cloud placement forgotten on this device. Google's map expires separately."
+            else "Could not persist forgetting this placement; please try again."
+        )
+    }
+
+    private fun cloudMessage(message: String, restored: Boolean = false) {
+        cloudFeedbackQueue.add(CloudFeedback(message, restored))
+    }
+
+    private fun cloudFeedback(): List<CloudFeedback> = buildList {
+        while (true) add(cloudFeedbackQueue.poll() ?: break)
+    }
+
+    private fun savedPlacement(): CloudPlacementRecord? {
+        val id = cloudPrefs.getString("id", null) ?: return null
+        return CloudPlacementRecord(
+            id = id,
+            expiresAtMs = cloudPrefs.getLong("expires", 0L),
+            logicalWidth = cloudPrefs.getFloat("width", Float.NaN),
+            logicalLength = cloudPrefs.getFloat("length", Float.NaN),
+            awaySign = cloudPrefs.getFloat("parity", 1f),
+        )
+    }
+
+    private fun savePlacement(record: CloudPlacementRecord) {
+        cloudPrefs.edit()
+            .putString("id", record.id)
+            .putLong("expires", record.expiresAtMs)
+            .putFloat("width", record.logicalWidth)
+            .putFloat("length", record.logicalLength)
+            .putFloat("parity", record.awaySign)
+            .apply()
+    }
+
+    /** Enable cloud capability only after explicit user action, never for normal AR. */
+    private fun enableCloudMode(s: Session): Boolean = try {
+        val config = s.config
+        if (config.cloudAnchorMode != Config.CloudAnchorMode.ENABLED) {
+            config.cloudAnchorMode = Config.CloudAnchorMode.ENABLED
+            s.configure(config)
+        }
+        true
+    } catch (e: Exception) {
+        cloudMessage("Cloud AR unavailable: ${e.javaClass.simpleName}. Local table Lock still works.")
+        false
+    }
+
+    private fun processCloudRequest() {
+        val request = cloudRequest.getAndSet(null) ?: return
+        if (request == CloudRequest.Forget) {
+            cloudHostFuture?.cancel()
+            cloudResolveFuture?.cancel()
+            cloudHostFuture = null
+            cloudResolveFuture = null
+            return
+        }
+        val s = session ?: run {
+            cloudMessage("ARCore session is not ready."); return
+        }
+        if (cloudHostFuture != null || cloudResolveFuture != null) {
+            cloudMessage("An AR cloud operation is already in progress."); return
+        }
+        when (request) {
+            CloudRequest.Save -> {
+                val anchor = lockedTableAnchor
+                if (anchor == null || anchor.trackingState != TrackingState.TRACKING ||
+                    idealCorners.size != 4
+                ) {
+                    cloudMessage("Lock the table and wait for tracking before saving."); return
+                }
+                if (!enableCloudMode(s)) return
+                val quality = try { s.estimateFeatureMapQualityForHosting(anchor.pose) }
+                    catch (e: Exception) {
+                        cloudMessage("Couldn't evaluate cloud map quality: ${e.javaClass.simpleName}")
+                        return
+                    }
+                if (quality == Session.FeatureMapQuality.INSUFFICIENT) {
+                    cloudMessage("Move slowly around the table for more visual detail, then save again.")
+                    return
+                }
+                val width = idealCorners[1].x - idealCorners[0].x
+                val length = idealCorners[2].y - idealCorners[1].y
+                val parity = lockedAwaySign
+                val generation = cloudGeneration
+                val expiration = System.currentTimeMillis() + CloudPlacementRecord.TTL_MS
+                try {
+                    cloudHostFuture = s.hostCloudAnchorAsync(
+                        anchor, CloudPlacementRecord.TTL_DAYS,
+                        BiConsumer<String, Anchor.CloudAnchorState> { id, state ->
+                            synchronized(cloudPersistenceLock) {
+                                if (session !== s || generation != cloudGeneration) return@BiConsumer
+                                cloudHostFuture = null
+                                if (state == Anchor.CloudAnchorState.SUCCESS && !id.isNullOrBlank()) {
+                                    savePlacement(CloudPlacementRecord(id, expiration, width, length, parity))
+                                    cloudMessage("AR placement saved on this device for up to 24 hours.")
+                                } else {
+                                    cloudMessage("Couldn't save AR placement: $state")
+                                }
+                            }
+                        },
+                    )
+                    cloudMessage("Saving AR placement to Google. Keep the table in view.")
+                } catch (e: Exception) {
+                    cloudMessage("Cloud save failed: ${e.javaClass.simpleName}")
+                }
+            }
+            is CloudRequest.Restore -> {
+                val saved = savedPlacement()
+                val c = request.logicalCorners
+                if (c.size != 4) {
+                    cloudMessage("Select a valid table size before restoring."); return
+                }
+                val width = c[1].x - c[0].x
+                val length = c[2].y - c[1].y
+                if (saved == null || !saved.isUsableAt(System.currentTimeMillis(), width, length)) {
+                    cloudMessage("No unexpired placement for this table size. Lock and save again.")
+                    return
+                }
+                if (!enableCloudMode(s)) return
+                val generation = cloudGeneration
+                try {
+                    cloudResolveFuture = s.resolveCloudAnchorAsync(
+                        saved.id,
+                        BiConsumer<Anchor, Anchor.CloudAnchorState> { anchor, state ->
+                            synchronized(cloudPersistenceLock) {
+                                if (session !== s || generation != cloudGeneration) {
+                                    anchor?.detach()
+                                    return@BiConsumer
+                                }
+                                cloudResolveFuture = null
+                                if (state == Anchor.CloudAnchorState.SUCCESS && anchor != null) {
+                                    clearAnchors()
+                                    clearPreview()
+                                    lockedAwaySign = saved.awaySign
+                                    idealCorners = c.toList()
+                                    lockedTableAnchor = anchor
+                                    cloudMessage("Saved table placement restored. Check pocket alignment.", true)
+                                } else {
+                                    cloudMessage("Could not recognize saved placement: $state")
+                                }
+                            }
+                        },
+                    )
+                    cloudMessage("Looking for the saved table. Scan it from different angles.")
+                } catch (e: Exception) {
+                    cloudMessage("Cloud restore failed: ${e.javaClass.simpleName}")
+                }
+            }
+            CloudRequest.Forget -> Unit
+        }
+    }
 
     /** Screen positions of the virtual table's corners plus their logical twins, awaiting a GL frame. */
     private class LockRequest(
@@ -201,7 +394,11 @@ class ArTableSession(
      * [matrix]: logical->screen homography from the locked table or metric preview.
      * [lockResult]: non-null only on the frame that served a [requestLock] (true = locked).
      */
-    data class FrameUpdate(val matrix: Matrix?, val lockResult: Boolean?)
+    data class FrameUpdate(
+        val matrix: Matrix?,
+        val lockResult: Boolean?,
+        val cloudFeedback: List<CloudFeedback>,
+    )
 
     /**
      * Per-frame update on the GL thread: serves any queued lock/unlock, then fits the
@@ -218,6 +415,8 @@ class ArTableSession(
             }
         }
 
+        processCloudRequest()
+
         val view = FloatArray(16)
         val proj = FloatArray(16)
         frame.camera.getViewMatrix(view, 0)
@@ -225,7 +424,7 @@ class ArTableSession(
 
         if (lockedTableAnchor == null) updatePreview(frame, view, proj, vpW, vpH)
         val lockResult = pendingLock.getAndSet(null)?.let { performLock(frame, it, view, proj, vpW, vpH) }
-        return FrameUpdate(buildTableMatrix(view, proj, vpW, vpH), lockResult)
+        return FrameUpdate(buildTableMatrix(view, proj, vpW, vpH), lockResult, cloudFeedback())
     }
 
     /**
@@ -539,6 +738,13 @@ class ArTableSession(
     fun pause() { session?.pause() }
     fun resume() { try { session?.resume() } catch (_: Exception) {} }
     fun close() {
+        synchronized(cloudPersistenceLock) { cloudGeneration++ }
+        cloudRequest.set(null)
+        cloudHostFuture?.cancel()
+        cloudResolveFuture?.cancel()
+        cloudHostFuture = null
+        cloudResolveFuture = null
+        cloudFeedbackQueue.clear()
         clearAnchors()
         clearPreview()
         clearPlaneAnchor()

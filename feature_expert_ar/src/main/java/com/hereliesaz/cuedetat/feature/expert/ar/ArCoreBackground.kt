@@ -190,6 +190,9 @@ private class ArCoreRenderer(
                 val update = arTableSession.computeFrameUpdate(frame, surfaceWidth, surfaceHeight)
                 onEvent(MainScreenEvent.ArTableMatrixUpdated(matrix = update.matrix))
                 update.lockResult?.let { onEvent(MainScreenEvent.ArTableLockResult(it)) }
+                update.cloudFeedback.forEach { feedback ->
+                    onEvent(MainScreenEvent.CloudPlacementResult(feedback.message, feedback.restored))
+                }
 
                 // Pitch hint from plane geometry (used before the table is locked).
                 arTableSession.findAndAnchorTablePlane(frame)

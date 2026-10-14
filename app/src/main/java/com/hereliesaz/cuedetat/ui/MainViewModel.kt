@@ -417,6 +417,13 @@ class MainViewModel @Inject constructor(
         if (event is MainScreenEvent.UnlockArTable) {
             arController.unlockTable()
         }
+        when (event) {
+            is MainScreenEvent.SaveCloudPlacement -> arController.saveCloudPlacement()
+            is MainScreenEvent.RestoreCloudPlacement ->
+                arController.restoreCloudPlacement(_uiState.value.table.corners)
+            is MainScreenEvent.ForgetCloudPlacement -> arController.forgetCloudPlacement()
+            else -> Unit
+        }
         if (event is MainScreenEvent.RetryArModuleLoad) {
             arModuleLoadJob?.cancel()
             arModuleLoadJob = null

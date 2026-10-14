@@ -84,6 +84,13 @@ class ArControllerFacade @Inject constructor(
 
     override fun unlockTable() = delegate.unlockTable()
 
+    override fun saveCloudPlacement() = delegate.saveCloudPlacement()
+
+    override fun restoreCloudPlacement(logicalCorners: List<android.graphics.PointF>) =
+        delegate.restoreCloudPlacement(logicalCorners)
+
+    override fun forgetCloudPlacement() = delegate.forgetCloudPlacement()
+
     @Composable
     override fun ArBackground(modifier: Modifier, onEvent: (MainScreenEvent) -> Unit) =
         delegate.ArBackground(modifier, onEvent)

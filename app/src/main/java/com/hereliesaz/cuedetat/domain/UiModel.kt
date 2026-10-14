@@ -157,8 +157,8 @@ data class CueDetatState(
     @Transient val arDerivedPitch: Float? = null,
     @Transient val arMeasuredHeightM: Float? = null,
     // World-anchored table (ARCore). arTableMatrix maps logical table space -> screen pixels,
-    // recomputed every AR frame from the camera pose + corner anchors, so the overlay tracks in
-    // full 6DoF as the user walks around. Available from the pre-lock metric preview;
+    // recomputed each AR frame from one rigid centre anchor and metric corners.
+    // Tracks in full 6DoF as the user walks around. Available from the pre-lock metric preview;
     // null only before the initial world anchor or when tracking is unavailable.
     @Transient val arTableMatrix: Matrix? = null,
     // True once the Lock button has anchored the virtual table to the real one in ARCore.
@@ -429,6 +429,13 @@ sealed class MainScreenEvent {
     object LockArTable : MainScreenEvent()
     // Release the lock; the table returns to the sensor-driven pose.
     object UnlockArTable : MainScreenEvent()
+    /** Hosting sends visual mapping data to Google; the UI must confirm first. */
+    object SaveCloudPlacement : MainScreenEvent()
+    /** User-triggered resolution of a previously saved one-day cloud placement. */
+    object RestoreCloudPlacement : MainScreenEvent()
+    /** Forget only the local ID; Google's hosted record expires independently. */
+    object ForgetCloudPlacement : MainScreenEvent()
+    data class CloudPlacementResult(val message: String, val restored: Boolean = false) : MainScreenEvent()
     // Outcome of a lock attempt, from the ARCore GL thread. False when no table plane was found.
     data class ArTableLockResult(val locked: Boolean) : MainScreenEvent()
     // Latest snap fit of the table to the felt (null: nothing to fit to).
