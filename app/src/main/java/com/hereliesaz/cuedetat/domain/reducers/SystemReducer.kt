@@ -82,7 +82,7 @@ private fun handleSizeChanged(
 internal const val COMPASS_FOLLOW_DEADBAND_DEG = 0.5f
 
 /**
- * Turns the virtual table against the phone's compass heading, AR or not: a pool table doesn't
+ * Turns the virtual table against the phone's compass heading in non-AR modes: a pool table doesn't
  * move, so turning the phone right turns the table left on screen (the same rule, sign -1, as
  * TableOrientationLearner). User rotation adds on top; the compass only contributes its change.
  *

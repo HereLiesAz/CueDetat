@@ -379,11 +379,9 @@ class MainViewModel @Inject constructor(
     private fun processEvent(event: MainScreenEvent) {
         // Lock View: sensor-driven transforms are dropped before they reach the reducers.
         if (_uiState.value.isViewLocked &&
-            com.hereliesaz.cuedetat.domain.SensorLock.blocks(event) &&
-            // Lock View prevents sensor-driven editing, not ARCore's projection
-            // of a stationary table into a camera that is physically moving.
-            !(event is MainScreenEvent.ArTableMatrixUpdated &&
-                _uiState.value.cameraMode == CameraMode.AR_ACTIVE)
+            com.hereliesaz.cuedetat.domain.SensorLock.blocks(
+                event, _uiState.value.cameraMode,
+            )
         ) return
         if (event is MainScreenEvent.ScreenGestureStarted || event is MainScreenEvent.LogicalGestureStarted) {
             warningManager.dismissWarning()
