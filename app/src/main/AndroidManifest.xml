@@ -31,6 +31,12 @@
         tools:targetApi="36">
         <!-- ARCore optional: Play Store will offer ARCore install on supported devices -->
         <meta-data android:name="com.google.ar.core" android:value="optional" />
+        <!-- Optional authorization for future hosted ARCore APIs. The API key is
+             embedded in signed artifacts; restrict it to the Android app and ARCore
+             API in Google Cloud. Empty in local builds without ARCORE_API_KEY. -->
+        <meta-data
+            android:name="com.google.android.ar.API_KEY"
+            android:value="${arcoreApiKey}" />
 
         <!-- Meta Wearables DAT Required -->
         <meta-data
