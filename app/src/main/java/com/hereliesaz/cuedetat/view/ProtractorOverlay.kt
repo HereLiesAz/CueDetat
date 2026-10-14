@@ -30,6 +30,9 @@ import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
 private data class DrawSignature(
     val viewOffset: Any?,
     val arDerivedPitch: Any?,
+    // Unlike compass/IMU fields, the AR world-to-screen projection changes
+    // on EVERY camera pose update, including phone roll around the optical axis.
+    val arTableMatrix: Any?,
     val worldRotationDegrees: Float,
     val zoomSliderPosition: Float,
     val tableScanModel: Any?,
@@ -84,6 +87,7 @@ fun ProtractorOverlay(
             DrawSignature(
                 viewOffset = uiState.viewOffset,
                 arDerivedPitch = uiState.arDerivedPitch,
+                arTableMatrix = uiState.arTableMatrix,
                 worldRotationDegrees = uiState.worldRotationDegrees,
                 zoomSliderPosition = uiState.zoomSliderPosition,
                 tableScanModel = uiState.tableScanModel,

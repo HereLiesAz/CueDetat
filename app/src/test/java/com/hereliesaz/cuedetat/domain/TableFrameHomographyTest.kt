@@ -93,6 +93,37 @@ class TableFrameHomographyTest {
     }
 
     @Test
+    fun `camera roll rotates the screen projection without rotating world geometry`() {
+        val table = listOf(
+            Vec3(-0.5f, 0.25f, -2f), Vec3(0.5f, 0.25f, -2f),
+            Vec3(0.5f, 0.25f, -4f), Vec3(-0.5f, 0.25f, -4f),
+        )
+        val projection = floatArrayOf(
+            1f, 0f, 0f, 0f,
+            0f, 1f, 0f, 0f,
+            0f, 0f, -1f, -1f,
+            0f, 0f, 0f, 0f,
+        )
+        val rolledView = floatArrayOf(
+            0f, 1f, 0f, 0f,
+            -1f, 0f, 0f, 0f,
+            0f, 0f, 1f, 0f,
+            0f, 0f, 0f, 1f,
+        )
+        // What rotates is the projection relative to the VIEWPORT; the
+        // corresponding real table in the camera image rotates identically.
+        table.forEach { world ->
+            val before = TableFrameHomography.worldToScreen(identity4, projection, world, 1000, 1000)!!
+            val after = TableFrameHomography.worldToScreen(rolledView, projection, world, 1000, 1000)!!
+            assertEquals(before.y, after.x, 0.01f)
+            assertEquals(1000f - before.x, after.y, 0.01f)
+        }
+        // Physical dimensions are world-fixed regardless of any camera matrix.
+        assertEquals(1f, table[1].x - table[0].x, 1e-4f)
+        assertEquals(-2f, table[2].z - table[1].z, 1e-4f)
+    }
+
+    @Test
     fun `multiplyColMajor applies translation from last column`() {
         val translate = floatArrayOf(
             1f, 0f, 0f, 0f,

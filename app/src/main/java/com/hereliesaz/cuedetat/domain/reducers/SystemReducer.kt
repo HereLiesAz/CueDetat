@@ -93,9 +93,12 @@ internal const val COMPASS_FOLLOW_DEADBAND_DEG = 0.5f
  */
 internal fun followCompass(state: CueDetatState): CueDetatState {
     val yaw = state.currentOrientation.yaw
+    // ARCore is the only authority for the table's orientation throughout AR_ACTIVE,
+    // even during the first frame and temporary loss of its projection. Checking
+    // arTableMatrix != null previously reopened compass-follow exactly when
+    // tracking was unavailable, causing a phantom table spin on phone roll.
     if (state.isBeginnerViewLocked || state.isArTableLocked ||
-        (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.AR_ACTIVE &&
-            state.arTableMatrix != null)) {
+        state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.AR_ACTIVE) {
         return if (state.compassRefYaw == null) state else state.copy(compassRefYaw = null)
     }
     val ref = state.compassRefYaw ?: return state.copy(compassRefYaw = yaw)

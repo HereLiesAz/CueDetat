@@ -1,6 +1,12 @@
 package com.hereliesaz.cuedetat.feature.expert.ar
 
+import android.hardware.display.DisplayManager
 import android.opengl.GLSurfaceView
+import android.os.Handler
+import android.os.Looper
+import android.view.Display
+import android.view.Surface
+import java.util.concurrent.atomic.AtomicInteger
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -59,7 +65,29 @@ fun ArCoreBackground(
             setEGLConfigChooser(8, 8, 8, 8, 16, 0)
         }
 
+        // ARCore's camera projection and the OES camera background MUST
+        // share the actual display orientation. Zero is ROTATION_0, not a
+        // universal "natural" rotation: it is wrong on landscape displays.
+        val displayManager = context.getSystemService(DisplayManager::class.java)
+        val displayId = glSurfaceView.display?.displayId ?: Display.DEFAULT_DISPLAY
+        val displayRotation = AtomicInteger(
+            displayManager.getDisplay(displayId)?.rotation ?: Surface.ROTATION_0,
+        )
+        val displayListener = object : DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) = Unit
+            override fun onDisplayRemoved(displayId: Int) = Unit
+            override fun onDisplayChanged(changedDisplayId: Int) {
+                if (changedDisplayId == displayId) {
+                    displayRotation.set(
+                        displayManager.getDisplay(displayId)?.rotation ?: Surface.ROTATION_0,
+                    )
+                }
+            }
+        }
+        displayManager.registerDisplayListener(displayListener, Handler(Looper.getMainLooper()))
+
         val renderer = ArCoreRenderer(
+            displayRotation = displayRotation,
             session = session,
             arTableSession = arTableSession,
             arFrameProcessor = arFrameProcessor,
@@ -70,6 +98,7 @@ fun ArCoreBackground(
 
         val observer = object : DefaultLifecycleObserver {
             override fun onResume(owner: LifecycleOwner) {
+                displayRotation.set(displayManager.getDisplay(displayId)?.rotation ?: Surface.ROTATION_0)
                 arTableSession.resume()
                 glSurfaceView.onResume()
             }
@@ -84,6 +113,7 @@ fun ArCoreBackground(
         glSurfaceView.onResume()
 
         onDispose {
+            displayManager.unregisterDisplayListener(displayListener)
             lifecycleOwner.lifecycle.removeObserver(observer)
             glSurfaceView.onPause()
             arTableSession.close()
@@ -97,6 +127,7 @@ fun ArCoreBackground(
 // ---------------------------------------------------------------------------
 
 private class ArCoreRenderer(
+    private val displayRotation: AtomicInteger,
     private val session: Session,
     private val arTableSession: ArTableSession,
     private val arFrameProcessor: ArFrameProcessor,
@@ -107,6 +138,7 @@ private class ArCoreRenderer(
     private var surfaceWidth = 1
     private var surfaceHeight = 1
     private var previousTrackingState: TrackingState? = null
+    private var lastGeometryRotation = -1
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         background.createOnGlThread()
@@ -116,12 +148,21 @@ private class ArCoreRenderer(
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         surfaceWidth = width
         surfaceHeight = height
-        // 0 = natural display rotation; ARCore queries the display internally.
-        session.setDisplayGeometry(0, width, height)
+        val rotation = displayRotation.get()
+        session.setDisplayGeometry(rotation, width, height)
+        lastGeometryRotation = rotation
     }
 
     override fun onDrawFrame(gl: GL10?) {
         try {
+            val rotation = displayRotation.get()
+            if (rotation != lastGeometryRotation) {
+                // Display rotation can change without another GL surface resize.
+                // Update before session.update so AR projection and camera UVs
+                // both use the SAME geometry for this frame.
+                session.setDisplayGeometry(rotation, surfaceWidth, surfaceHeight)
+                lastGeometryRotation = rotation
+            }
             val frame: Frame = session.update()
             val camera = frame.camera
             val currentTracking = camera.trackingState

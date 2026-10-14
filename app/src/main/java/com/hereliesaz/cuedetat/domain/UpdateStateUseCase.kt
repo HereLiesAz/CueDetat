@@ -89,15 +89,26 @@ class UpdateStateUseCase @Inject constructor(
         // renderer is unchanged — only the source of the matrix differs — so the overlay tracks the
         // real table in full 6DoF as the user walks around it. Every other mode falls through to the
         // unchanged sensor-pitch path below, so non-AR rendering is untouched.
-        val arMatrix = state.arTableMatrix
-        if (state.cameraMode == CameraMode.AR_ACTIVE && arMatrix != null) {
+        if (state.cameraMode == CameraMode.AR_ACTIVE) {
+            // A missing AR frame must NEVER select the non-AR compass/IMU
+            // perspective path. Hide the table until tracking is available
+            // rather than render a newly spun sensor-based table over the camera.
+            val arMatrix = state.arTableMatrix ?: return state.copy(
+                pitchMatrix = null,
+                railPitchMatrix = null,
+                sizeCalculationMatrix = null,
+                inversePitchMatrix = null,
+                hasInverseMatrix = false,
+                flatMatrix = null,
+                logicalPlaneMatrix = null,
+            )
             val inverse = Matrix()
             val hasInverse = arMatrix.invert(inverse)
             return state.copy(
                 pitchMatrix = arMatrix,
                 railPitchMatrix = arMatrix,
                 sizeCalculationMatrix = arMatrix,
-                inversePitchMatrix = inverse,
+                inversePitchMatrix = if (hasInverse) inverse else null,
                 hasInverseMatrix = hasInverse,
                 flatMatrix = arMatrix,
                 logicalPlaneMatrix = arMatrix
