@@ -168,10 +168,13 @@ private class ArCoreRenderer(
             val currentTracking = camera.trackingState
 
             if (previousTrackingState == TrackingState.TRACKING &&
-                currentTracking == TrackingState.PAUSED) {
-                // The logical plane shouldn't shatter just because reality blinked.
-                // Let ARCore recover; the anchors are retained.
-                Log.w(TAG, "Tracking paused. Holding anchors.")
+                currentTracking != TrackingState.TRACKING) {
+                // ARCore's physical anchor remains in memory, but its last
+                // screen projection is no longer trustworthy while the camera
+                // continues moving. Clear that projection until tracking
+                // resumes instead of painting a stale spinning overlay.
+                Log.w(TAG, "AR tracking paused. Keeping world anchor, hiding stale projection.")
+                onEvent(MainScreenEvent.ArTableMatrixUpdated(matrix = null))
             }
             previousTrackingState = currentTracking
 
