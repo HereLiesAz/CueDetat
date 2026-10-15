@@ -53,6 +53,7 @@ tensorflowLiteMetadata = "0.5.0"
 # ── Play / distribution (play flavor only) ───────────────────────────────────
 billing = "9.1.0"
 playIntegrity = "1.6.0"
+playAppUpdate = "2.1.0"
 playServicesLocation = "21.4.0"
 playServicesWearable = "20.0.1"
 
@@ -134,6 +135,7 @@ tensorflow-lite-metadata = { module = "org.tensorflow:tensorflow-lite-metadata",
 # ── Play / distribution ──────────────────────────────────────────────────────
 androidx-billing-ktx = { module = "com.android.billingclient:billing-ktx", version.ref = "billing" }
 play-integrity = { module = "com.google.android.play:integrity", version.ref = "playIntegrity" }
+play-app-update = { module = "com.google.android.play:app-update", version.ref = "playAppUpdate" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 play-services-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "playServicesWearable" }
 
