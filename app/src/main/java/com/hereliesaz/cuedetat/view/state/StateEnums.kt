@@ -3,8 +3,11 @@
 package com.hereliesaz.cuedetat.view.state
 
 import android.graphics.PointF
+import androidx.annotation.Keep
 import com.hereliesaz.cuedetat.data.BallType
 
+/** Persisted in Gson state by name; the names must survive R8 shrinking. */
+@Keep
 enum class TableSize(val feet: Int, val longSideInches: Float, val shortSideInches: Float) {
     SEVEN_FT(7, 78f, 39f),
     EIGHT_FT(8, 88f, 44f),

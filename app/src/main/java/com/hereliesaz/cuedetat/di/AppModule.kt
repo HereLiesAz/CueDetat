@@ -15,6 +15,8 @@ import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.hereliesaz.cuedetat.data.MergedTFLiteDetector
 import com.hereliesaz.cuedetat.delivery.ModelDelivery
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.view.model.Table
+import com.hereliesaz.cuedetat.view.state.TableSize
 import com.hereliesaz.cuedetat.network.GithubApi
 import com.hereliesaz.cuedetat.ui.composables.tablescan.PocketDetector
 import dagger.Module
@@ -125,6 +127,51 @@ object AppModule {
                 CueDetatState::class.java,
                 InstanceCreator<CueDetatState> { CueDetatState() }
             )
+            // Restore only the table's persisted inputs. Gson's reflective instantiation
+            // bypasses Table.init, leaving derived geometry null, and an unknown enum
+            // value can make Table.size null. Either breaks Table.copy and HaterScreen.
+            .registerTypeAdapter(Table::class.java, object : TypeAdapter<Table>() {
+                override fun write(out: JsonWriter, value: Table?) {
+                    if (value == null) { out.nullValue(); return }
+                    out.beginObject()
+                    out.name("size").value(value.size.name)
+                    out.name("isVisible").value(value.isVisible)
+                    out.endObject()
+                }
+
+                override fun read(input: JsonReader): Table {
+                    var size = TableSize.EIGHT_FT
+                    var visible = false
+                    if (input.peek() != JsonToken.BEGIN_OBJECT) {
+                        input.skipValue()
+                        return Table(size, visible)
+                    }
+                    input.beginObject()
+                    while (input.hasNext()) {
+                        when (input.nextName()) {
+                            "size" -> {
+                                if (input.peek() == JsonToken.STRING) {
+                                    val savedName = input.nextString()
+                                    size = TableSize.entries.firstOrNull { it.name == savedName }
+                                        ?: TableSize.EIGHT_FT
+                                } else {
+                                    input.skipValue()
+                                }
+                            }
+                            "isVisible" -> {
+                                if (input.peek() == JsonToken.BOOLEAN) {
+                                    visible = input.nextBoolean()
+                                } else {
+                                    input.skipValue()
+                                }
+                            }
+                            else -> input.skipValue()
+                        }
+                    }
+                    input.endObject()
+                    return Table(size, visible)
+                }
+            })
             .registerTypeAdapter(PointF::class.java, object : TypeAdapter<PointF>() {
                 override fun write(out: JsonWriter, value: PointF?) {
                     if (value == null) { out.nullValue(); return }
