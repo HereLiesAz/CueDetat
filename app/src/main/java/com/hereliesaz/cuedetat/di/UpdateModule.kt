@@ -8,7 +8,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-/** Binds the GitHub-releases updater, which stands down on Play installs. */
+/** Binds the source-aware updater for both Google Play and GitHub installs. */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class UpdateModule {
