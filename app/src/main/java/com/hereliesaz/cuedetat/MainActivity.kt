@@ -221,6 +221,7 @@ class MainActivity : ComponentActivity() {
             updateInfo?.let { info ->
                 com.hereliesaz.cuedetat.ui.composables.dialogs.AppUpdateDialog(
                     versionName = info.versionName,
+                    source = info.source,
                     onInstall = { viewModel.installUpdate(this@MainActivity) },
                     onDismiss = { viewModel.dismissUpdate() }
                 )

@@ -8,35 +8,39 @@ import android.app.Activity
  * Details of an available update, surfaced to the UI so it can offer a
  * one-tap download + install.
  */
+/** The install channel that owns this application's updates. */
+enum class UpdateSource { GOOGLE_PLAY, GITHUB }
+
+/** A Play-installed copy checks Play; package-installer/sideloaded copies use GitHub. */
+fun updateSourceForInstaller(installerPackageName: String?): UpdateSource =
+    if (installerPackageName == "com.android.vending") UpdateSource.GOOGLE_PLAY
+    else UpdateSource.GITHUB
+
 data class UpdateInfo(
-    /** The release version, e.g. "1.9.0". */
+    /** The release version on GitHub, or Play's available version code. */
     val versionName: String,
-    /** Direct APK download URL, or null if the release has no APK asset. */
+    /** Direct APK download URL, or null for Google Play. */
     val apkUrl: String?,
-    /** The GitHub release page, used as a fallback when [apkUrl] is null. */
+    /** GitHub release page fallback; null for Google Play. */
     val releaseUrl: String?,
+    /** Always matches the source where the running app was installed. */
+    val source: UpdateSource = UpdateSource.GITHUB,
 )
 
 /**
- * In-app update offer. The single build decides at runtime ([GithubAppUpdater]): copies
- * installed by Google Play leave updates to Play; any other install checks GitHub Releases.
+ * In-app update notice. The single build selects Google Play for Play-installed
+ * copies and GitHub Releases for other installs, based on the recorded installer.
  */
 interface AppUpdater {
 
-    /** True when this install updates from GitHub (not installed by Play). */
-    val isSupported: Boolean get() = false
+    /** Both distribution channels can show update notices. */
+    val isSupported: Boolean get() = true
 
-    /**
-     * Returns [UpdateInfo] when a newer release than the running build is
-     * available, else null. Always null for Play installs.
-     */
-    suspend fun checkForUpdate(): UpdateInfo? = null
+    /** Returns source-specific update information when available, otherwise null. */
+    suspend fun checkForUpdate(): UpdateInfo?
 
-    /**
-     * Hands the update to the browser, which downloads the APK and opens the system installer.
-     * Needs an [Activity] to start from. No-op for Play installs.
-     */
-    suspend fun downloadAndInstall(activity: Activity, info: UpdateInfo) {}
+    /** Opens the original distribution channel to let the user update. */
+    suspend fun downloadAndInstall(activity: Activity, info: UpdateInfo)
 }
 
 /**

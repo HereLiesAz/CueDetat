@@ -303,6 +303,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.play.services)
+    // Detect updates offered to this Google Play account/track; do not sideload a Play install.
+    implementation(libs.play.app.update)
 
     // Compose
         implementation(libs.androidx.compose.ui)

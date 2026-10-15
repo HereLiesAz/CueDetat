@@ -8,7 +8,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.arfeature.ArController
-import com.hereliesaz.cuedetat.data.GithubRepository
 import com.hereliesaz.cuedetat.data.MetaWearableRepository
 import com.hereliesaz.cuedetat.data.FullOrientation
 import com.hereliesaz.cuedetat.data.SensorRepository
@@ -65,7 +64,6 @@ class MainViewModel @Inject constructor(
     private val snapReducer: com.hereliesaz.cuedetat.domain.reducers.SnapReducer,
     private val updateStateUseCase: UpdateStateUseCase,
     private val sensorRepository: SensorRepository,
-    private val githubRepository: GithubRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val tableScanRepository: TableScanRepository,
     private val warningManager: WarningManager,
@@ -98,11 +96,7 @@ class MainViewModel @Inject constructor(
     /** Share-sheet intent for the recorded log, or null if nothing is recorded yet. */
     fun debugLogShareIntent(): android.content.Intent? = debugLogRecorder.shareIntent()
 
-    /**
-     * FOSS self-update. Non-null when a newer GitHub release is available; the
-     * UI shows a one-tap "download & install" popup. Always null in Play
-     * (store-managed updates).
-     */
+    /** Newer release from the same source as this install; UI offers the right store. */
     private val _updateInfo = kotlinx.coroutines.flow.MutableStateFlow<com.hereliesaz.cuedetat.update.UpdateInfo?>(null)
     val updateInfo: kotlinx.coroutines.flow.StateFlow<com.hereliesaz.cuedetat.update.UpdateInfo?> =
         _updateInfo.asStateFlow()
@@ -110,14 +104,9 @@ class MainViewModel @Inject constructor(
     init {
         // Before anything else can fail: a debug log that starts late misses the failure.
         debugLogRecorder.resumeIfEnabled()
-        if (appUpdater.isSupported) {
-            viewModelScope.launch {
-                runCatching { appUpdater.checkForUpdate() }.getOrNull()?.let { _updateInfo.value = it }
-            }
-        }
     }
 
-    /** Download the available update APK and launch the system installer (FOSS only). */
+    /** Open the available update in the original distribution channel. */
     fun installUpdate(activity: android.app.Activity) {
         val info = _updateInfo.value ?: return
         viewModelScope.launch {
@@ -707,22 +696,19 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             when (event) {
                 is MainScreenEvent.CheckForUpdate -> {
-                    val versionName = githubRepository.getLatestVersionName()
-                    if (versionName != null) {
-                        _uiState.update { it.copy(latestVersionName = versionName) }
-                    } else {
-                        // Null here is ambiguous (network/API failure vs. a
-                        // genuinely-empty response), but silently doing
-                        // nothing leaves the user thinking "no update
-                        // available" when the check may simply have failed.
-                        // Reuse the existing transient-warning HUD surface
-                        // (same one used for e.g. the stale-table-location
-                        // notice) rather than adding a new UI mechanism.
-                        android.util.Log.w(
-                            "MainViewModel",
-                            "CheckForUpdate: getLatestVersionName() returned null; " +
-                                    "update check may have failed (see GithubRepository logs)"
-                        )
+                    // One source-aware check serves both Play and GitHub installs.
+                    // A null result means no available update (or a logged backend
+                    // failure), not permission to fall through to the other store.
+                    try {
+                        val available = appUpdater.checkForUpdate()
+                        _updateInfo.value = available
+                        if (available != null) {
+                            _uiState.update { it.copy(latestVersionName = available.versionName) }
+                        }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        android.util.Log.w("MainViewModel", "CheckForUpdate failed", e)
                         warningManager.triggerWarning(
                             arrayOf("Couldn't check for updates — check your connection."),
                             viewModelScope

@@ -29,10 +29,15 @@ to Google Play and as a signed APK on GitHub Releases.
 - The ~24 MB TFLite model and the Expert-AR code (ARCore) are compiled into the app. Their
   sources still live in `feature_mlmodel/` and `feature_expert_ar/`, which are plain source
   folders added to `:app`'s main source set, not modules.
-- Updates: `GithubAppUpdater` checks the installer of record. Play installs update through
-  Play and never see the GitHub check (Play forbids self-updating); every other install
-  checks GitHub Releases and opens the new APK in the browser. The app holds no
-  `REQUEST_INSTALL_PACKAGES` permission.
+- Updates: `GithubAppUpdater` acts as the shared source-aware router. When the package
+  installer is `com.android.vending`, it checks the **Google Play In-App Updates** availability
+  API for the version available to the user's account and track. If newer, it shows an in-app
+  notice whose action opens the Google Play listing; it **never checks GitHub or sideloads an APK**
+  for a Play install. Any other recorded installer (including normal GitHub sideloads) checks
+  GitHub Releases and displays an in-app notice whose action opens the APK or release page.
+  The app checks on launch and can handle `CheckForUpdate` events; it does not schedule
+  background/push notifications. Installer identity does not inherently distinguish
+  GitHub downloads from other sideloads. No `REQUEST_INSTALL_PACKAGES` permission is needed.
 - The Meta Wearables SDK is always included, so builds need GitHub Packages credentials
   (`GH_ACTOR`/`GH_TOKEN`, or `gh_user`/`gh_token` in `local.properties`).
 
