@@ -5,6 +5,7 @@ import com.hereliesaz.cuedetat.view.state.DistanceUnit
 import com.hereliesaz.cuedetat.view.state.InteractionMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -55,5 +56,53 @@ class CueDetatStateRestoreTest {
 
         assertEquals(720, copied.viewWidth)
         assertEquals(DistanceUnit.IMPERIAL, copied.distanceUnit)
+    }
+
+    @Test
+    fun missingTableSizeRestoresDefaultAndRetainsVisibility() {
+        val restored = gson.fromJson(
+            """{"table":{"isVisible":true},"viewWidth":1080}""",
+            CueDetatState::class.java
+        )
+
+        assertEquals(8, restored.table.size.feet)
+        assertTrue(restored.table.isVisible)
+        assertEquals(4, restored.table.corners.size)
+        assertEquals(6, restored.table.pockets.size)
+        assertEquals(8, restored.copy(viewWidth = 720).table.copy(isVisible = false).size.feet)
+    }
+
+    @Test
+    fun invalidOrNullTableDoesNotCrashStateRestore() {
+        val invalid = gson.fromJson(
+            """{"table":{"size":"REMOVED_SIZE","isVisible":true}}""",
+            CueDetatState::class.java
+        )
+        val nullTable = gson.fromJson("""{"table":null}""", CueDetatState::class.java)
+
+        assertEquals(8, invalid.table.size.feet)
+        assertTrue(invalid.table.isVisible)
+        assertEquals(8, nullTable.table.size.feet)
+        assertEquals(8, nullTable.copy(viewWidth = 1080).table.size.feet)
+    }
+
+    @Test
+    fun persistedSizeSurvivesAndDerivedGeometryIsRebuilt() {
+        // Legacy snapshots contain derived geometry, which must be ignored and recomputed.
+        val legacyJson = """{"table":{"size":"NINE_FT","isVisible":true,"logicalWidth":0,"corners":null,"pockets":null}}"""
+        val restored = gson.fromJson(legacyJson, CueDetatState::class.java)
+
+        assertEquals(9, restored.table.size.feet)
+        assertTrue(restored.table.isVisible)
+        assertEquals(4, restored.table.corners.size)
+        assertEquals(6, restored.table.pockets.size)
+        assertTrue(restored.table.logicalWidth > 0f)
+        assertTrue(restored.table.logicalHeight > restored.table.logicalWidth)
+
+        val tableJson = com.google.gson.JsonParser.parseString(gson.toJson(restored))
+            .asJsonObject.getAsJsonObject("table")
+        assertEquals(2, tableJson.size())
+        assertEquals("NINE_FT", tableJson.get("size").asString)
+        assertTrue(tableJson.get("isVisible").asBoolean)
     }
 }
