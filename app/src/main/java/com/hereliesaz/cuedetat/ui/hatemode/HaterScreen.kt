@@ -18,15 +18,21 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -44,6 +50,11 @@ import kotlin.math.sqrt
  * The physics canvas is placed in a [background] layer; [TopControls] is placed
  * in an [onscreen] block per the AzNavRail architecture contract.
  *
+ * Entering the mode is driven once per selection by `SingleEvent.InitiateHaterMode`
+ * (MainActivity); this screen does not fire [HaterEvent.EnterHaterMode] itself, which
+ * previously ran two concurrent reveal sequences. Sensor and shake listeners live only
+ * while this screen is composed and the lifecycle is at least STARTED.
+ *
  * @param haterViewModel The ViewModel managing the physics state.
  * @param uiState Global app state (for shared UI elements like the menu).
  * @param onEvent Event dispatcher.
@@ -54,15 +65,27 @@ fun HaterScreen(
     uiState: CueDetatState,
     onEvent: (MainScreenEvent) -> Unit
 ) {
-    val state by haterViewModel.haterState.collectAsStateWithLifecycle()
+    // Kept as a State object, not delegated: the 30 Hz physics state is read only in the draw
+    // phase below, so a physics tick redraws the canvas without recomposing this screen.
+    val stateHolder = haterViewModel.haterState.collectAsStateWithLifecycle()
+    val answerIndex by remember { derivedStateOf { stateHolder.value.answerIndex } }
 
     val navController = rememberNavController()
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
 
-    LaunchedEffect(Unit) {
-        haterViewModel.onEvent(HaterEvent.EnterHaterMode)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            haterViewModel.collectSensors()
+        }
     }
+    DisposableEffect(Unit) {
+        onDispose { haterViewModel.onLeave() }
+    }
+
+    // Draw-loop objects reused across frames instead of reallocated at 30 Hz.
+    val drawCache = remember { DieDrawCache() }
 
     AzNavRailMenu(
         uiState = uiState,
@@ -79,12 +102,13 @@ fun HaterScreen(
 
         // --- Background layer: physics / die canvas ---
         background(weight = 0) {
-            val answerText = HaterResponses.allAnswers.getOrElse(state.answerIndex) { "" }
+            val answerText = HaterResponses.allAnswers.getOrElse(answerIndex) { "" }
             val bitmap: Bitmap = remember(answerText) { createDieFaceBitmap(answerText) }
 
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
+                    .onSizeChanged { haterViewModel.setupBoundaries(it.width.toFloat(), it.height.toFloat()) }
                     .pointerInput(Unit) {
                         detectDragGestures(
                             onDrag = { change, dragAmount ->
@@ -95,7 +119,7 @@ fun HaterScreen(
                         )
                     }
             ) {
-                haterViewModel.setupBoundaries(size.width, size.height)
+                val state = stateHolder.value
                 val centerX = size.width / 2
                 val centerY = size.height / 2
 
@@ -111,12 +135,13 @@ fun HaterScreen(
                 // Build a Camera perspective matrix for the current rock tilt.
                 // Camera.rotateX(+deg) tilts the top away from viewer (top dips into liquid).
                 // Camera.rotateY(+deg) tilts the right side away from viewer (right dips).
-                val cam = Camera()
-                cam.setLocation(0f, 0f, -6f) // closer camera = more pronounced perspective
+                val cam = drawCache.camera
+                cam.save()
                 cam.rotateX(state.rockAngleX)
                 cam.rotateY(state.rockAngleY)
-                val perspMatrix = Matrix()
+                val perspMatrix = drawCache.matrix
                 cam.getMatrix(perspMatrix)
+                cam.restore()
                 // pivot the perspective around the bitmap centre
                 perspMatrix.preTranslate(-hw, -hh)
                 perspMatrix.postTranslate(hw, hh)
@@ -142,7 +167,7 @@ fun HaterScreen(
                     val t          = state.dieScale.coerceIn(0f, 1f)
                     val ghostAlpha = (t * (1f - t) * 4f * 55f).toInt().coerceAtMost(55)
                     if (ghostAlpha > 0) {
-                        val ghostPaint = Paint().apply { alpha = ghostAlpha }
+                        val ghostPaint = drawCache.ghostPaint.apply { alpha = ghostAlpha }
                         canvas.nativeCanvas.save()
                         canvas.nativeCanvas.translate(cx, cy)
                         canvas.nativeCanvas.rotate(state.dieAngle + 60f)
@@ -161,7 +186,7 @@ fun HaterScreen(
                     }
 
                     // --- Main face ---
-                    val mainPaint = Paint().apply {
+                    val mainPaint = drawCache.mainPaint.apply {
                         alpha = (state.dieScale.coerceIn(0f, 1f) * 255f).toInt()
                     }
                     canvas.nativeCanvas.save()
@@ -175,20 +200,7 @@ fun HaterScreen(
                     // Dipping edge: dark gradient merging into the black liquid.
                     // Rising edge: slight brightening as the face lifts clear of the surface.
                     if (darkAlpha > 0) {
-                        val shadePaint = Paint().apply {
-                            shader = LinearGradient(
-                                -gx, -gy,   // bright / rising side
-                                gx, gy,     // dark / dipping side
-                                intArrayOf(
-                                    Color.argb(brightAlpha, 255, 255, 255),
-                                    Color.argb(0, 0, 0, 0),
-                                    Color.argb(darkAlpha, 0, 0, 0)
-                                ),
-                                floatArrayOf(0f, 0.5f, 1f),
-                                Shader.TileMode.CLAMP
-                            )
-                        }
-                        canvas.nativeCanvas.drawRect(-hw, -hh, hw, hh, shadePaint)
+                        canvas.nativeCanvas.drawRect(-hw, -hh, hw, hh, drawCache.shadePaint(gx, gy, brightAlpha, darkAlpha))
                     }
                     canvas.nativeCanvas.restore()
                 }
@@ -207,6 +219,38 @@ fun HaterScreen(
                 onCycleTableSize = { onEvent(MainScreenEvent.CycleTableSize) }
             )
         }
+    }
+}
+
+/**
+ * Per-screen holder for the objects the die canvas needs every frame. The shading gradient
+ * is rebuilt only when its endpoints or alphas change, not on every 30 Hz draw.
+ */
+private class DieDrawCache {
+    val camera = Camera().apply { setLocation(0f, 0f, -6f) } // closer camera = stronger perspective
+    val matrix = Matrix()
+    val ghostPaint = Paint()
+    val mainPaint = Paint()
+    private val shade = Paint()
+    private var key: List<Any>? = null
+
+    fun shadePaint(gx: Float, gy: Float, brightAlpha: Int, darkAlpha: Int): Paint {
+        val k = listOf(gx, gy, brightAlpha, darkAlpha)
+        if (k != key) {
+            key = k
+            shade.shader = LinearGradient(
+                -gx, -gy,   // bright / rising side
+                gx, gy,     // dark / dipping side
+                intArrayOf(
+                    Color.argb(brightAlpha, 255, 255, 255),
+                    Color.argb(0, 0, 0, 0),
+                    Color.argb(darkAlpha, 0, 0, 0)
+                ),
+                floatArrayOf(0f, 0.5f, 1f),
+                Shader.TileMode.CLAMP
+            )
+        }
+        return shade
     }
 }
 

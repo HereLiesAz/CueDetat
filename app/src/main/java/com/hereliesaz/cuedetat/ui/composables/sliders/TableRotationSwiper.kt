@@ -20,6 +20,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.res.stringResource
+import com.hereliesaz.cuedetat.R
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.domain.TableOrientationLearner
 import kotlin.math.floor
@@ -40,7 +43,7 @@ private const val MAJOR_TICK_DEGREES = 45f
  * table as the user walks around it (SystemReducer.followCompass) and is deliberately not shown
  * here: the swiper corrects the table, it doesn't read the heading.
  *
- * Occupies the same space the old rotation slider did (label + 32 dp strip).
+ * Occupies the same space the old rotation slider did (label + 48 dp strip).
  *
  * @param isVisible Visibility flag.
  * @param userRotationDegrees The user's accumulated rotation (CueDetatState.userRotationDegrees).
@@ -61,16 +64,25 @@ fun TableRotationSwiper(
     val minorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
 
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        // wrapSigned180 of the negation: (-180, 180], so 0 reads 0° and a hair under 360 reads
+        // -0°/0°, not -360°.
+        val shownDegrees = TableOrientationLearner.wrapSigned180(-userRotationDegrees).roundToInt()
+        val label = stringResource(R.string.table_rotation_label, shownDegrees)
+        val a11yName = stringResource(R.string.table_rotation_a11y)
         Text(
-            "Table Rotation: ${-TableOrientationLearner.normalize360(userRotationDegrees).roundToInt()}°",
+            label,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
         Canvas(
             modifier = Modifier
-                .semantics { contentDescription = "Table Rotation" }
+                .semantics {
+                    contentDescription = a11yName
+                    stateDescription = label
+                }
                 .fillMaxWidth()
-                .height(32.dp)
+                // 48 dp: the minimum touch target; ticks scale with the strip height.
+                .height(48.dp)
                 .draggable(
                     orientation = Orientation.Horizontal,
                     state = rememberDraggableState { deltaPx ->

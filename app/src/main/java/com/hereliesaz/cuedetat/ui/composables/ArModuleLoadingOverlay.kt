@@ -21,20 +21,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.ArModuleState
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 
 /**
- * Foreground overlay shown while the on-demand Expert-AR module is being
- * downloaded/loaded, or after a load failure. Renders nothing in the IDLE/READY
+ * Foreground overlay shown while the Expert-AR engine is starting, or after a
+ * start failure. The AR sources are compiled into the app (app/build.gradle.kts
+ * sourceSets), so nothing is downloaded here: the wait is ARCore and the scan
+ * pipeline being constructed (ArControllerFacade.ensureLoaded). Renders nothing in the IDLE/READY
  * states, so it can be placed unconditionally in the AR overlay layer.
  *
  * While visible it draws a full-screen scrim that consumes all pointer input, so
  * the user can't interact with the scan/AR UI underneath while the module is
- * preparing or has failed — the only way forward is Retry or Cancel.
+ * preparing or has failed. Cancel is offered in both states (CancelArSetup leaves
+ * the AR camera modes, which hides this overlay; ProtractorScreen gates it on them);
+ * Retry only after a failure.
  *
  * Driven by [CueDetatState.arModuleState], which MainViewModel advances as it runs
  * `arController.ensureLoaded()` on first AR entry.
@@ -67,21 +73,27 @@ fun ArModuleLoadingOverlay(
                     shape = MaterialTheme.shapes.large,
                     tonalElevation = 6.dp,
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalAlignment = Alignment.End,
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
-                        Spacer(Modifier.width(16.dp))
-                        Column {
-                            Text(
-                                text = "Preparing Expert AR…",
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            Text(
-                                text = "Downloading the AR table-scan module. This happens once.",
-                                style = MaterialTheme.typography.bodySmall,
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+                            Spacer(Modifier.width(16.dp))
+                            Column {
+                                Text(
+                                    text = stringResource(R.string.ar_loading_title),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    text = stringResource(R.string.ar_loading_body),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(onClick = { onEvent(MainScreenEvent.CancelArSetup) }) {
+                            Text(stringResource(R.string.action_cancel))
                         }
                     }
                 }
@@ -97,14 +109,14 @@ fun ArModuleLoadingOverlay(
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(
-                            text = "Couldn’t load Expert AR",
+                            text = stringResource(R.string.ar_failed_title),
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Spacer(Modifier.height(8.dp))
                         // The module is compiled in, not downloaded: a failure here is the AR code
                         // itself refusing to start, so show why rather than blaming the network.
                         Text(
-                            text = "The AR engine failed to start.",
+                            text = stringResource(R.string.ar_failed_body),
                             style = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.Center,
                         )
@@ -121,11 +133,11 @@ fun ArModuleLoadingOverlay(
                         Spacer(Modifier.height(16.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             TextButton(onClick = { onEvent(MainScreenEvent.CancelArSetup) }) {
-                                Text("Cancel")
+                                Text(stringResource(R.string.action_cancel))
                             }
                             Spacer(Modifier.width(8.dp))
                             Button(onClick = { onEvent(MainScreenEvent.RetryArModuleLoad) }) {
-                                Text("Retry")
+                                Text(stringResource(R.string.action_retry))
                             }
                         }
                     }

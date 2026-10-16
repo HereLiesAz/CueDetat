@@ -1,18 +1,10 @@
 <resources>
     <string name="app_name">Cue D\’état</string>
-    <string name="zoom_icon">Zoom Icon</string>
-    <string name="reset_view">Reset View</string>
-    <string name="show_helpers">WTF is all this?</string>
-    <string name="hide_helpers">Oh, okay. I get it.</string>
     <string name="permission_denied">Camera permission is required to use this app.</string>
-    <string name="toggle_help_lines">Help</string>
 
-    <string name="update_check_failed">Update check failed.</string>
-    <string name="update_no_new_release">You are on the latest version.</string>
-    <string name="update_available">Version %1$s is available!</string>
+    <string name="update_check_failed">Couldn\u2019t check for updates. Check your connection.</string>
 
 
-    <string name="warning_message_area">Sarcastic Warning Message Area</string>
     <string name="tagline">May your shot be better than your excuses.</string>
 
     <string-array name="insulting_warnings">
@@ -48,13 +40,6 @@
         <item>I can\'t be more disappointed than your dad.</item>
         <item>Consult a physicist. Or a therapist.</item>
         <item>Maybe if you put your phone down once in a while....</item>
-    </string-array>
-
-    <string-array name="hater_mode_responses">
-        <item>HaterIcon01</item>
-        <item>HaterIcon02</item>
-        <item>HaterIcon03</item>
-        <item>HaterIcon04</item>
     </string-array>
 
     <!-- Splash Screen -->
@@ -94,14 +79,67 @@
     </string-array>
 
     <string-array name="tutorial_general">
-        <item>Alright, let\'s get this over with. This isn\'t a toy. It\'s a precision instrument. Try to keep up. Tap \'Next\'.</item>
+        <item>Alright, let\'s get this over with. This isn\'t a toy. It\'s a precision instrument. Try to keep up. Tap to continue.</item>
         <item>That circle with the dot is the Target Ball. Drag it over your object ball. I\'ll wait.</item>
         <item>The crosshairs mark the Ghost Ball—that\'s where you *should* hit the cue ball. Drag a single finger *anywhere* to rotate the aim. The line should point to a pocket. You know what a pocket is, I assume.</item>
-        <item>If you insist, you can toggle the \'Cue Ball\' from the menu. Drag it to where your real cue ball is. The line between it and the Ghost Ball is the shot you\'re supposed to be making. It\'s not rocket science. It\'s just physics.</item>
+        <item>That other ball is the Cue Ball. It\'s already on the table. Drag it to where your real cue ball is. The line between it and the Ghost Ball is the shot you\'re supposed to be making. It\'s not rocket science. It\'s just physics.</item>
         <item>The slider on the right zooms. The one on the bottom rotates the table. I\'m not going to hold your hand on this one.</item>
-        <item>In the menu, there\'s a \'Calculate Bank\' option. If you\'re feeling brave, or foolish, press it. We\'ll see how you handle something that requires actual thought.</item>
+        <item>On the rail, there\'s a \'bank\' button. If you\'re feeling brave, or foolish, press it. We\'ll see how you handle something that requires actual thought.</item>
         <item>That\'s the crash course. The rest is a test of your character, or lack thereof. Don\'t embarrass us both. Press Finish.</item>
     </string-array>
+
+    <!-- Tutorial finish affordance: every final step text says "Finish". -->
+    <string name="tutorial_finish">Finish</string>
+
+    <!-- Rail / on-screen hints -->
+    <string name="rail_support">Support</string>
+    <string name="helpers_tap_icon_hint">Tap the icon for more</string>
+    <string name="ball_selection_tap_cue">Tap the cue ball</string>
+    <string name="ball_selection_tap_target">Tap the target ball</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_retry">Retry</string>
+
+    <!-- Expert AR start-up overlay (the AR engine is compiled in; nothing is downloaded) -->
+    <string name="ar_loading_title">Preparing Expert AR…</string>
+    <string name="ar_loading_body">Starting the AR engine.</string>
+    <string name="ar_failed_title">Couldn\u2019t load Expert AR</string>
+    <string name="ar_failed_body">The AR engine failed to start.</string>
+
+    <!-- AR cloud placement confirmation -->
+    <string name="cloud_save_title">Save AR table placement for 24 hours?</string>
+    <string name="cloud_save_body">ARCore will send visual mapping data, camera poses and the table anchor position to Google\'s cloud to recognize this table again. This requires an internet connection. The placement expires within 24 hours and does not make calibration more accurate. Nothing is uploaded unless you confirm.</string>
+    <string name="cloud_save_confirm">Save placement</string>
+
+    <!-- Spin / massé controls (TalkBack) -->
+    <string name="spin_control_description">Spin control. Drag on the wheel to choose where the cue strikes the ball. Double tap the wheel to reset, or double tap and drag outside it to move it.</string>
+    <string name="masse_control_description">Massé control. Drag on the wheel to choose where the cue strikes the ball. Tilt the phone to set cue elevation.</string>
+    <string name="spin_state_center">Centre ball</string>
+    <string name="spin_state_offset">%1$d percent right, %2$d percent up</string>
+    <string name="masse_state">%1$s, elevation %2$d degrees</string>
+
+    <!-- Table rotation swiper -->
+    <string name="table_rotation_label">Table Rotation: %1$d°</string>
+    <string name="table_rotation_a11y">Table rotation. Swipe left or right to turn the table.</string>
+
+    <!-- Consistency trainer overlay -->
+    <string name="consistency_title">Consistency Trainer</string>
+    <string name="consistency_fluidity">Fluidity:\u0020</string>
+    <string name="consistency_erratic">Erratic Motion Detected!</string>
+    <string name="consistency_heart_rate">HR: %1$d BPM</string>
+
+    <!-- AR tracking badge -->
+    <string name="ar_badge_tracking">AR Tracking</string>
+    <string name="ar_badge_depth">AR Tracking · Depth</string>
+    <string name="ar_badge_depth_distance">AR Tracking · Depth %1$.1fm</string>
+
+    <!-- Training-capture consent (CaptureConsentDialog) -->
+    <string name="capture_consent_title">Training data</string>
+    <string name="capture_consent_disclosure">While the camera is on, Cue D’état saves a camera frame every few seconds, with the phone\'s tilt and heading and what the app detected, and sends them over Wi-Fi to the developer to train the table and ball detection. Your location, accounts and contacts are not included.</string>
+    <string name="capture_consent_ask_before">You got the app for free. Helping make it better is the </string>
+    <string name="capture_consent_ask_emphasis">least</string>
+    <string name="capture_consent_ask_after"> you can do. Either way, you can change this any time with the \'Training data\' item in the menu.</string>
+    <string name="capture_consent_accept">Keep helping</string>
+    <string name="capture_consent_decline">No thanks</string>
 
     <!-- Permissions -->
     <string name="permission_explanation_title">We need a couple of things to get started.</string>
@@ -112,6 +150,8 @@
     <!-- Renderer Labels -->
     <string name="label_aim_pocket">Aim this line at the pocket.</string>
     <string name="label_tangent_line">Tangent Line</string>
+    <string name="label_aiming_line">Aiming Line</string>
+    <string name="label_shot_guide_line">Shot Guide Line</string>
     <string name="label_banking_ball">Banking Ball</string>
     <string name="label_actual_cue_ball">Actual Cue Ball</string>
     <string name="label_target_ball">Target Ball</string>

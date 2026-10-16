@@ -50,7 +50,7 @@ fun GlowStickDialog(
                         steps = 199,
                         modifier = Modifier
                             .semantics { contentDescription = "Glow Stick Intensity" }
-                            .height(32.dp),
+                            .height(48.dp), // 48 dp minimum touch target
                         colors = SliderDefaults.colors(
                             activeTrackColor = MaterialTheme.colorScheme.primary,
                             inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),

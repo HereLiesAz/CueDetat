@@ -24,6 +24,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,12 +49,15 @@ import kotlinx.coroutines.delay
 @Composable
 fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
     // State to trigger the appearance of the question/buttons after delay.
-    var showQuestion by remember { mutableStateOf(false) }
+    // Saveable: a rotation must not replay the 3 s reveal delay.
+    var showQuestion by rememberSaveable { mutableStateOf(false) }
 
-    // Start a timer on launch.
+    // Start a timer on launch (skipped once the question has been revealed).
     LaunchedEffect(Unit) {
-        delay(3000L) // Wait 3 seconds.
-        showQuestion = true // Reveal UI.
+        if (!showQuestion) {
+            delay(3000L) // Wait 3 seconds.
+            showQuestion = true // Reveal UI.
+        }
     }
 
     Box(
@@ -137,7 +142,7 @@ private fun QuestionButton(label: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth(0.8f) // Increased width to 80% for longer text.
-            .clickable { onClick() }
+            .clickable(role = Role.Button) { onClick() }
             .padding(horizontal = 24.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {

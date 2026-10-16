@@ -44,7 +44,7 @@ import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
 import com.hereliesaz.cuedetat.ui.composables.SpinControl
 import com.hereliesaz.cuedetat.ui.composables.TopControls
 import com.hereliesaz.cuedetat.ui.composables.ZoomControls
-import com.hereliesaz.cuedetat.ui.composables.AdvancedOptionsDialog
+import com.hereliesaz.cuedetat.ui.composables.dialogs.AdvancedOptionsDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.CaptureConsentDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.GlowStickDialog
 import com.hereliesaz.cuedetat.ui.composables.dialogs.LuminanceAdjustmentDialog
@@ -194,7 +194,7 @@ fun ProtractorScreen(
                     zoomSliderPosition = uiState.zoomSliderPosition,
                     onZoomChange = { mainViewModel.onEvent(MainScreenEvent.ZoomSliderChanged(it)) },
                     tableHeight = uiState.tableZOffset,
-                    onTableHeightChange = { mainViewModel.onEvent(MainScreenEvent.MoveTableZ(it - uiState.tableZOffset)) },
+                    onTableHeightChange = mainViewModel::setTableHeight,
                     modifier = Modifier
                         .fillMaxHeight(0.6f)
                         .padding(end = 12.dp)
@@ -276,10 +276,9 @@ fun ProtractorScreen(
 
         // --- Onscreen: Kinetic warning overlay ---
         onscreen(alignment = Alignment.Center) {
-            val showWarning = uiState.warningText != null && !uiState.isMasseModeActive && !uiState.isSpinControlVisible
-            if (showWarning) {
-                KineticWarningOverlay(text = uiState.warningText)
-            }
+            // Always composed; null hides it, so its fade-out can play.
+            val showWarning = !uiState.isMasseModeActive && !uiState.isSpinControlVisible
+            KineticWarningOverlay(text = if (showWarning) uiState.warningText else null)
         }
 
         // --- Onscreen HUD: Consistency Trainer Overlay ---
@@ -304,7 +303,7 @@ fun ProtractorScreen(
             }
         }
 
-        // --- Onscreen: Expert-AR module download progress / retry overlay ---
+        // --- Onscreen: Expert-AR start-up progress / cancel / retry overlay ---
         // Only while in the AR flow, so a lingering FAILED state doesn't show the
         // overlay after the user has cancelled back out to a non-AR camera mode.
         onscreen(alignment = Alignment.Center) {

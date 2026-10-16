@@ -170,7 +170,9 @@ class OverlayRenderer {
             "ghostCueBall" to context.getString(R.string.label_ghost_cue_ball),
             "obstacle" to context.getString(R.string.label_obstacle),
             "aimPocket" to context.getString(R.string.label_aim_pocket),
-            "tangentLine" to context.getString(R.string.label_tangent_line)
+            "tangentLine" to context.getString(R.string.label_tangent_line),
+            "aimingLine" to context.getString(R.string.label_aiming_line),
+            "shotGuideLine" to context.getString(R.string.label_shot_guide_line)
         )
         cachedLabelsContext = context
         cachedLabelsLocale = locale

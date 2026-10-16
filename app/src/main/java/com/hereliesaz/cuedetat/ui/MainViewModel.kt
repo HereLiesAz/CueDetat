@@ -148,6 +148,11 @@ class MainViewModel @Inject constructor(
         // Per-event try/catch keeps a single bad event from killing the whole
         // loop (and the app, since uncaught coroutine exceptions force-close).
         viewModelScope.launch(Dispatchers.Default) {
+            // The saved state is loaded and committed by this same coroutine before the first
+            // event is taken from the channel. Loading it on a separate coroutine let early
+            // events (SizeChanged, sensors) be reduced first and then be replaced wholesale by
+            // the loaded state. Events sent meanwhile wait in the channel.
+            loadInitialState()
             for (event in eventChannel) {
                 try {
                     processEvent(event)
@@ -165,8 +170,10 @@ class MainViewModel @Inject constructor(
         }
 
         // Shot advisor driver: recompute the recommendation off-main whenever the advisor is
-        // enabled and the detected ball layout changes. collectLatest cancels superseded work;
-        // the quantized key avoids recomputing on sub-pixel CV jitter.
+        // enabled and the detected ball layout changes. The quantized key avoids recomputing on
+        // sub-pixel CV jitter; while the advisor is off the key is the constant "off", so no
+        // per-emission String is built. recommend() does not suspend, so collectLatest cannot
+        // cancel a computation already running; it only skips keys superseded before it starts.
         viewModelScope.launch(Dispatchers.Default) {
             _uiState
                 .map { s ->
@@ -187,31 +194,13 @@ class MainViewModel @Inject constructor(
                 }
         }
 
-        viewModelScope.launch {
-            val savedState = userPreferencesRepository.stateFlow.first()
-            val savedFeltSamples = tableScanRepository.loadFeltSamples()
-            val currentExperienceMode = _uiState.value.experienceMode
-            // Height and zoom always open at the defaults, not where the last session left them:
-            // a table lifted or zoomed for one game shouldn't greet the next one.
-            val initialState = (savedState ?: CueDetatState()).copy(
-                experienceMode = currentExperienceMode,
-                savedFeltSamples = savedFeltSamples,
-                tableZOffset = com.hereliesaz.cuedetat.domain.DEFAULT_TABLE_Z_OFFSET,
-                zoomSliderPosition = com.hereliesaz.cuedetat.domain.DEFAULT_ZOOM_SLIDER,
-            )
-            processAndEmitState(initialState, UpdateType.FULL)
-
-            // Fire the version check only after the initial state has been
-            // committed, so a network response can't be overwritten by the
-            // saved-state load.
-            onEvent(MainScreenEvent.CheckForUpdate)
-        }
-
-        // Pipe WarningManager's timed messages into uiState.warningText.
-        // update{} is a CAS so it does not race with writes from the event loop.
+        // Pipe WarningManager's timed messages into uiState.warningText through the event loop.
+        // Reducers also write warningText (CvReducer, ControlReducer, ToggleReducer), so the loop
+        // must be its only writer: a direct _uiState.update{} here was overwritten whenever the
+        // loop committed a state it had reduced from a read taken before this write.
         viewModelScope.launch {
             warningManager.currentWarning.collect { warning ->
-                _uiState.update { it.copy(warningText = warning) }
+                onEvent(MainScreenEvent.SetWarning(warning))
             }
         }
 
@@ -272,8 +261,8 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        // Expert-AR is delivered on demand and loaded lazily: the split is only
-        // fetched the first time a user actually enters the AR camera flow. See the
+        // Expert-AR is compiled in but constructed lazily: ARCore and the scan pipeline are
+        // only set up the first time a user actually enters the AR camera flow. See the
         // CycleCameraMode interception in processEvent + ensureArModuleLoaded().
 
         // No saved-scan restore at launch: the camera always starts OFF, so the scan (and the
@@ -311,11 +300,53 @@ class MainViewModel @Inject constructor(
     }
 
     /**
-     * Fetch + load the on-demand Expert-AR module if it isn't already, driving the
+     * Table-height slider: [target] is the absolute height the thumb is at.
+     *
+     * The slider used to send `MoveTableZ(target - uiState.tableZOffset)` from the
+     * composition snapshot; two callbacks before the state round-tripped each computed
+     * their delta against the same stale offset and the reducer summed both. The target
+     * is now held here and converted to a delta inside the event loop, against the state
+     * the reducer will actually apply it to. Only the newest target matters.
+     */
+    fun setTableHeight(target: Float) {
+        pendingTableHeight = target
+        onEvent(MainScreenEvent.MoveTableZ(0f))
+    }
+
+    /** Latest absolute table height from [setTableHeight], consumed by the event loop. */
+    @Volatile private var pendingTableHeight: Float? = null
+
+    /**
+     * Loads the persisted state and commits it as the first state. Runs on the event loop
+     * coroutine before any event is processed, then queues the version check, so a
+     * network response cannot be overwritten by the saved-state load either.
+     */
+    private suspend fun loadInitialState() {
+        try {
+            val savedState = userPreferencesRepository.stateFlow.first()
+            val savedFeltSamples = tableScanRepository.loadFeltSamples()
+            // Height and zoom always open at the defaults, not where the last session left them:
+            // a table lifted or zoomed for one game shouldn't greet the next one.
+            val initialState = (savedState ?: CueDetatState()).copy(
+                experienceMode = _uiState.value.experienceMode,
+                savedFeltSamples = savedFeltSamples,
+                tableZOffset = com.hereliesaz.cuedetat.domain.DEFAULT_TABLE_Z_OFFSET,
+                zoomSliderPosition = com.hereliesaz.cuedetat.domain.DEFAULT_ZOOM_SLIDER,
+            )
+            processAndEmitState(initialState, UpdateType.FULL)
+        } catch (t: Throwable) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            android.util.Log.e("MainViewModel", "Initial state load failed", t)
+        }
+        onEvent(MainScreenEvent.CheckForUpdate)
+    }
+
+    /**
+     * Construct the Expert-AR engine if it isn't already, driving the
      * [CueDetatState.arModuleState] lifecycle so the UI can show progress / retry.
      * Idempotent: a no-op once READY or while a load is already in flight.
-     * `arController.ensureLoaded()` installs the
-     * split (play) before reflectively loading the implementation.
+     * `arController.ensureLoaded()` confirms the feature with the delivery layer, then
+     * constructs the compiled-in implementation.
      */
     private fun ensureArModuleLoaded() {
         if (_uiState.value.arModuleState == ArModuleState.READY) return
@@ -381,8 +412,8 @@ class MainViewModel @Inject constructor(
 
         // Lazy Expert-AR delivery. Entering the AR camera flow (CycleCameraMode
         // from OFF) is the trigger to fetch/load the on-demand module; the reducer
-        // still performs the camera-mode transition, and the UI shows a download
-        // overlay while arModuleState == LOADING. Retry re-runs the same load.
+        // still performs the camera-mode transition, and the UI shows a start-up
+        // overlay (with Cancel) while arModuleState == LOADING. Retry re-runs the same load.
         if (event is MainScreenEvent.CycleCameraMode && _uiState.value.cameraMode == CameraMode.OFF) {
             ensureArModuleLoaded()
             restoreSavedScanForAr()
@@ -423,11 +454,15 @@ class MainViewModel @Inject constructor(
             return
         }
 
+        // Written outside stateReducer: no reducer handles ToggleExperienceModeSelection (it needs
+        // the debounce Job below, which a pure reducer cannot own). It still commits through
+        // commit() on this loop, so it does not race other writers. ApplyPendingExperienceMode,
+        // sent after the debounce, is reduced by ToggleReducer.
         if (event is MainScreenEvent.ToggleExperienceModeSelection) {
             experienceModeUpdateJob?.cancel()
             val currentState = _uiState.value
             val nextMode = currentState.pendingExperienceMode?.next() ?: currentState.experienceMode?.next() ?: ExperienceMode.EXPERT
-            _uiState.value = currentState.copy(pendingExperienceMode = nextMode)
+            commit(currentState.copy(pendingExperienceMode = nextMode))
             experienceModeUpdateJob = viewModelScope.launch {
                 delay(1000)
                 onEvent(MainScreenEvent.ApplyPendingExperienceMode)
@@ -465,6 +500,16 @@ class MainViewModel @Inject constructor(
                 MainScreenEvent.LogicalDragApplied(prevLogical, currLogical, screenDelta)
             }
 
+            is MainScreenEvent.MoveTableZ -> {
+                // An absolute target from setTableHeight() becomes a delta here, against the
+                // state being reduced. A MoveTableZ with no pending target passes through.
+                val target = pendingTableHeight
+                if (target != null) {
+                    pendingTableHeight = null
+                    MainScreenEvent.MoveTableZ(target - currentState.tableZOffset)
+                } else event
+            }
+
             else -> event
         }
 
@@ -472,6 +517,10 @@ class MainViewModel @Inject constructor(
             stateReducer(currentState, logicalEvent, reducerUtils, gestureReducer)
 
         // After CV data is integrated into state, update snap candidates.
+        // State written here, outside stateReducer (StateReducer.kt KDoc lists it): SnapReducer and
+        // the AWAITING_CUE promotion below. Moving the promotion into a reducer is a domain change;
+        // it stays here until then. SetTopDownBitmap is reduced by ToggleReducer and is no longer
+        // re-copied here.
         val finalState = when (logicalEvent) {
             is MainScreenEvent.CvDataUpdated -> {
                 val stateAfterSnap = snapReducer.reduce(reducedState, logicalEvent.visionData)
@@ -486,7 +535,6 @@ class MainViewModel @Inject constructor(
                     stateAfterSnap
                 }
             }
-            is MainScreenEvent.SetTopDownBitmap -> reducedState.copy(topDownBitmap = logicalEvent.bitmap)
             else -> reducedState
         }
 
@@ -620,7 +668,7 @@ class MainViewModel @Inject constructor(
             warningManager.triggerWarning(warningMessages, viewModelScope)
         }
 
-        _uiState.value = derivedState
+        commit(derivedState)
         visionAnalyzer.updateUiState(derivedState)
         arController.updateUiState(derivedState)
         arController.setTableZOffsetLogical(derivedState.tableZOffset)
@@ -664,6 +712,19 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Publishes a state reduced on the event loop. The loop is the single writer of every
+     * field except [CueDetatState.latestVersionName], which the update check writes from its
+     * own coroutine; that one field is taken from the live value inside a CAS so a state
+     * reduced from an older read cannot erase it.
+     */
+    private fun commit(state: CueDetatState) {
+        _uiState.update { live ->
+            if (live.latestVersionName == state.latestVersionName) state
+            else state.copy(latestVersionName = live.latestVersionName)
+        }
+    }
+
     private fun determineUpdateType(
         oldState: CueDetatState,
         newState: CueDetatState,
@@ -704,54 +765,58 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Side effects for the few events that have one. Most events (sensor, vision and AR
+     * ticks at 30-60 Hz) have none, so they return before a coroutine is launched.
+     */
     private fun handleSingleEvents(event: MainScreenEvent) {
-        viewModelScope.launch {
-            when (event) {
-                is MainScreenEvent.CheckForUpdate -> {
-                    // One source-aware check serves both Play and GitHub installs.
-                    // A null result means no available update (or a logged backend
-                    // failure), not permission to fall through to the other store.
-                    try {
-                        val available = appUpdater.checkForUpdate()
-                        _updateInfo.value = available
-                        if (available != null) {
-                            _uiState.update { it.copy(latestVersionName = available.versionName) }
-                        }
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        android.util.Log.w("MainViewModel", "CheckForUpdate failed", e)
-                        warningManager.triggerWarning(
-                            arrayOf("Couldn't check for updates — check your connection."),
-                            viewModelScope
-                        )
+        when (event) {
+            is MainScreenEvent.CheckForUpdate -> viewModelScope.launch {
+                // One source-aware check serves both Play and GitHub installs.
+                // A null result means no available update (or a logged backend
+                // failure), not permission to fall through to the other store.
+                try {
+                    val available = appUpdater.checkForUpdate()
+                    _updateInfo.value = available
+                    if (available != null) {
+                        _uiState.update { it.copy(latestVersionName = available.versionName) }
                     }
-                }
-
-                is MainScreenEvent.ViewArt -> _singleEvent.emit(SingleEvent.OpenUrl("https://herelies.az"))
-                is MainScreenEvent.ViewAboutPage -> _singleEvent.emit(SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat"))
-                is MainScreenEvent.SendFeedback -> _singleEvent.emit(
-                    SingleEvent.SendFeedbackEmail(
-                        "hereliesaz@gmail.com",
-                        "Cue d'Etat Feedback"
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    android.util.Log.w("MainViewModel", "CheckForUpdate failed", e)
+                    warningManager.triggerWarning(
+                        arrayOf(appContext.getString(R.string.update_check_failed)),
+                        viewModelScope
                     )
-                )
-
-                is MainScreenEvent.SingleEventConsumed -> _singleEvent.emit(null)
-                is MainScreenEvent.SetExperienceMode -> {
-                    if (event.mode == ExperienceMode.HATER) {
-                        _singleEvent.emit(SingleEvent.InitiateHaterMode)
-                    }
                 }
-
-                is MainScreenEvent.Shake -> _singleEvent.emit(SingleEvent.HaterShake)
-
-
-                else -> { /* Do nothing for state-changing events */ }
             }
+
+            is MainScreenEvent.ViewArt -> emitSingle(SingleEvent.OpenUrl("https://herelies.az"))
+            is MainScreenEvent.ViewAboutPage -> emitSingle(SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat"))
+            is MainScreenEvent.SendFeedback -> emitSingle(
+                SingleEvent.SendFeedbackEmail(
+                    "hereliesaz@gmail.com",
+                    "Cue d'Etat Feedback"
+                )
+            )
+            // The Support rail item. MainActivity owns the sheet's visibility and opens it on
+            // this event; CueDetatState.showSupportSheet (flipped by AdvancedOptionsReducer)
+            // has no reader.
+            is MainScreenEvent.ToggleSupportSheet -> emitSingle(SingleEvent.ShowSupportSheet)
+
+            is MainScreenEvent.SingleEventConsumed -> emitSingle(null)
+            is MainScreenEvent.SetExperienceMode -> {
+                if (event.mode == ExperienceMode.HATER) emitSingle(SingleEvent.InitiateHaterMode)
+            }
+
+            is MainScreenEvent.Shake -> emitSingle(SingleEvent.HaterShake)
+
+            else -> Unit // State-changing events have no side effect here.
         }
     }
 
-    private companion object {
+    private fun emitSingle(event: SingleEvent?) {
+        viewModelScope.launch { _singleEvent.emit(event) }
     }
 }
