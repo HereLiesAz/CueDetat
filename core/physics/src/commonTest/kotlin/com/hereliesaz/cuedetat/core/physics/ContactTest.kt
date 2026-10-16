@@ -164,7 +164,9 @@ class ContactTest {
     fun aBallLeavingTheCushionIsNotReflected() {
         val away = Vec2(1.0, 1.0).normalized()
         val out = Cushion.rebound(away, Vec2(0.0, 1.0), Speed.MEDIUM, Spin.NONE)
-        assertEquals(away, out.direction)
+        // Re-normalising an already-unit vector may move the last bit, so compare with a tolerance.
+        assertEquals(away.x, out.direction.x, 1e-12)
+        assertEquals(away.y, out.direction.y, 1e-12)
         assertEquals(Speed.MEDIUM, out.speed)
     }
 
