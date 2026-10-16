@@ -46,8 +46,14 @@ class DebugLogRecorder @Inject constructor(
         if (on) start() else stop()
     }
 
+    /**
+     * Spawns the `logcat -f` child unless ours is alive. The child is a separate process that
+     * can outlive an app process that was killed; before spawning, any such orphan still writing
+     * [logFile] is killed ([killOrphanedLoggers]) so two writers never interleave in one file.
+     */
     private fun start() {
         if (process?.isAlive == true) return
+        killOrphanedLoggers()
         process = runCatching {
             // -r: rotate at ROTATE_KB, -n: keep ROTATE_COUNT old files. threadtime has timestamps,
             // PIDs and tags — what a stack trace needs to be read in context.
@@ -57,7 +63,27 @@ class DebugLogRecorder @Inject constructor(
                 "-r", ROTATE_KB.toString(), "-n", ROTATE_COUNT.toString(),
             ).redirectErrorStream(true).start()
         }.onFailure { Log.e(TAG, "Could not start debug log", it) }.getOrNull()
-        Log.i(TAG, "Debug log recording to ${logFile.absolutePath}")
+        if (process != null) Log.i(TAG, "Debug log recording to ${logFile.absolutePath}")
+    }
+
+    /**
+     * Kills leftover `logcat` processes whose command line names [logFile]. Only this app's
+     * own processes are visible in `/proc` (hidepid) and killable, which is exactly the set
+     * that could be an orphan of ours.
+     */
+    private fun killOrphanedLoggers() {
+        val target = logFile.absolutePath
+        val self = android.os.Process.myPid()
+        File("/proc").listFiles()?.forEach { entry ->
+            val pid = entry.name.toIntOrNull() ?: return@forEach
+            if (pid == self) return@forEach
+            val cmdline = runCatching { File(entry, "cmdline").readText() }.getOrNull() ?: return@forEach
+            val args = cmdline.split('\u0000')
+            if (args.firstOrNull()?.endsWith("logcat") == true && target in args) {
+                Log.w(TAG, "Killing orphaned debug logger pid=$pid")
+                android.os.Process.killProcess(pid)
+            }
+        }
     }
 
     private fun stop() {

@@ -65,16 +65,22 @@ class GithubAppUpdater @Inject constructor(
         )
     }
 
-    /** Non-Play installs check only the public GitHub Releases endpoint. */
+    /**
+     * Non-Play installs check only the public GitHub Releases endpoint. A release without a
+     * tag is ignored; URLs from the response are kept only when they are https on a GitHub
+     * host ([isGithubUrl]), since they are later opened with ACTION_VIEW.
+     */
     private suspend fun checkGithub(): UpdateInfo? {
         val release = githubRepository.getLatestRelease() ?: return null
-        val tag = release.tag_name
+        val tag = release.tag_name?.takeIf { it.isNotBlank() } ?: return null
         if (!isNewerVersion(tag, BuildConfig.VERSION_NAME)) return null
-        val apk = release.assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
+        val apk = release.assets.orEmpty().firstOrNull {
+            it.name?.endsWith(".apk", ignoreCase = true) == true
+        }
         return UpdateInfo(
             versionName = tag.removePrefix("v").removePrefix("V"),
-            apkUrl = apk?.browser_download_url,
-            releaseUrl = release.html_url,
+            apkUrl = apk?.browser_download_url?.takeIf(::isGithubUrl),
+            releaseUrl = release.html_url?.takeIf(::isGithubUrl),
             source = UpdateSource.GITHUB,
         )
     }
@@ -88,8 +94,8 @@ class GithubAppUpdater @Inject constructor(
         when (info.source) {
             UpdateSource.GOOGLE_PLAY -> openGooglePlay(activity)
             UpdateSource.GITHUB -> {
-                val url = info.apkUrl?.takeIf { it.isNotBlank() }
-                    ?: info.releaseUrl?.takeIf { it.isNotBlank() }
+                val url = info.apkUrl?.takeIf(::isGithubUrl)
+                    ?: info.releaseUrl?.takeIf(::isGithubUrl)
                     ?: return
                 runCatching {
                     activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
@@ -119,6 +125,14 @@ class GithubAppUpdater @Inject constructor(
         }.onFailure { Log.e(TAG, "No app to open Google Play listing", it) }
     }
 
+    /** True for an https URL whose host is in [GITHUB_HOSTS] (no userinfo tricks). */
+    private fun isGithubUrl(url: String): Boolean {
+        val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return false
+        return uri.scheme.equals("https", ignoreCase = true) &&
+            uri.rawUserInfo == null &&
+            uri.host?.lowercase() in GITHUB_HOSTS
+    }
+
     private fun installationSource(): UpdateSource = updateSourceForInstaller(
         runCatching {
             val pm = context.packageManager
@@ -134,6 +148,9 @@ class GithubAppUpdater @Inject constructor(
 
     private companion object {
         const val TAG = "GithubAppUpdater"
+
+        /** Hosts a release page or release-asset download may live on. */
+        val GITHUB_HOSTS = setOf("github.com", "objects.githubusercontent.com")
         const val PLAY_STORE = "com.android.vending"
     }
 }

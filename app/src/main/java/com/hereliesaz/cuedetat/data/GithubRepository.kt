@@ -6,8 +6,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Repository to fetch data from the project's GitHub page.
- * It is simplified to only fetch the latest release tag name.
+ * Repository to fetch data from the project's GitHub page: the latest release, for the
+ * GitHub-channel in-app updater.
  */
 @Singleton
 class GithubRepository @Inject constructor(private val githubApi: GithubApi) {
@@ -19,30 +19,8 @@ class GithubRepository @Inject constructor(private val githubApi: GithubApi) {
     }
 
     /**
-     * Fetches the latest release version name from the project's GitHub repository.
-     * @return The tag name as a String, or null if the request fails or an error occurs.
-     *   Failures are logged (not just swallowed) so a network/API problem is
-     *   distinguishable from "genuinely no newer release" in logcat, even
-     *   though both currently surface to callers as null.
-     */
-    suspend fun getLatestVersionName(): String? {
-        return try {
-            val response = githubApi.getLatestRelease(REPO_OWNER, REPO_NAME)
-            if (response.isSuccessful) {
-                response.body()?.tag_name
-            } else {
-                Log.w(TAG, "getLatestVersionName: HTTP ${response.code()} ${response.message()}")
-                null
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "getLatestVersionName: request failed", e)
-            null
-        }
-    }
-
-    /**
      * Fetches the full latest release (tag, name, html_url, and downloadable
-     * assets), or null on any failure. Used by the FOSS in-app updater to
+     * assets), or null on any failure. Used by the GitHub-channel in-app updater ([com.hereliesaz.cuedetat.update.GithubAppUpdater]) to
      * locate the APK to download.
      */
     suspend fun getLatestRelease(): com.hereliesaz.cuedetat.network.GithubRelease? {

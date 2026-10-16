@@ -11,9 +11,9 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Binds the base [ArController] to the [ArControllerFacade], which loads the real
- * implementation from the on-demand `:feature_expert_ar` dynamic feature module
- * via reflection once a user requests it (see ArControllerFacade).
+ * Binds the base [ArController] to the [ArControllerFacade], which constructs the real
+ * implementation (`ArControllerImpl`, compiled into the app from feature_expert_ar's source
+ * folder) once a user enters Expert AR (see ArControllerFacade).
  */
 @Module
 @InstallIn(SingletonComponent::class)

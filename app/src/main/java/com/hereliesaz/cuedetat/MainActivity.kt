@@ -2,6 +2,7 @@
 package com.hereliesaz.cuedetat
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
@@ -25,7 +26,9 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
@@ -40,8 +43,7 @@ import com.hereliesaz.cuedetat.ui.theme.CueDetatTheme
 import com.hereliesaz.cuedetat.utils.SecurityUtils
 import com.hereliesaz.cuedetat.view.state.SingleEvent
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -143,19 +145,37 @@ class MainActivity : ComponentActivity() {
     /**
      * Opens an external link through the same allowlist every other outbound
      * link uses. Donation links go through here too — nothing gets a raw intent
-     * just because it is ours.
+     * just because it is ours. A device with no browser gets a toast, not a crash.
      */
     private fun openUrlSafely(url: String) {
         if (SecurityUtils.isSafeUrl(url)) {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(this, "No app can open this link.", Toast.LENGTH_SHORT).show()
+                android.util.Log.w("MainActivity", "No activity for URL: $url", e)
+            }
         } else {
             Toast.makeText(this, "Link blocked for security.", Toast.LENGTH_SHORT).show()
             android.util.Log.w("MainActivity", "Suspicious URL blocked: $url")
         }
     }
 
+    /**
+     * Collects one-shot events only while STARTED, so `startActivity` never fires from a
+     * stopped Activity. `singleEvent` is a no-replay SharedFlow, so an event emitted while
+     * stopped is dropped; every emitter is a user action taken while the UI is visible.
+     */
     private fun observeSingleEvents() {
-        viewModel.singleEvent.onEach { event ->
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.singleEvent.collect { event -> handleSingleEvent(event) }
+            }
+        }
+    }
+
+    private fun handleSingleEvent(event: SingleEvent?) {
+        run {
             when (event) {
                 is SingleEvent.OpenUrl -> {
                     openUrlSafely(event.url)
@@ -167,8 +187,12 @@ class MainActivity : ComponentActivity() {
                         putExtra(Intent.EXTRA_EMAIL, arrayOf(event.email))
                         putExtra(Intent.EXTRA_SUBJECT, event.subject)
                     }
-                    if (intent.resolveActivity(packageManager) != null) {
+                    // No resolveActivity() pre-check: under package visibility it returns null
+                    // unless <queries> lists the intent, which silently swallowed the tap.
+                    try {
                         startActivity(intent)
+                    } catch (e: ActivityNotFoundException) {
+                        Toast.makeText(this, "No email app installed.", Toast.LENGTH_SHORT).show()
                     }
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
@@ -188,7 +212,7 @@ class MainActivity : ComponentActivity() {
                 }
                 null -> { /* Do nothing */ }
             }
-        }.launchIn(lifecycleScope)
+        }
     }
 
     @Composable

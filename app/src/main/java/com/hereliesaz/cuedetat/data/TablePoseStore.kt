@@ -1,11 +1,13 @@
 package com.hereliesaz.cuedetat.data
 
 import android.content.Context
+import android.util.Log
 import androidx.annotation.Keep
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.hereliesaz.cuedetat.domain.TablePosePrior
 import com.hereliesaz.cuedetat.domain.TablePoseSample
+import com.hereliesaz.cuedetat.utils.writeTextAtomically
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
@@ -21,7 +23,8 @@ import javax.inject.Singleton
  * ([LOG_FILE]) kept for training a proper orientation model later. The log holds no location
  * finer than about 1 km.
  *
- * Disk access is synchronous and small; call from a background dispatcher.
+ * Disk access is synchronous and small; call from a background dispatcher. Rewrites of
+ * `table_poses.json` and the log trim are atomic (temp file, then replace).
  */
 @Singleton
 class TablePoseStore @Inject constructor(
@@ -46,12 +49,21 @@ class TablePoseStore @Inject constructor(
 
     private var cache: MutableList<TableRecord>? = null
 
+    /**
+     * The stored records, cached. A file that exists but cannot be read or parsed is moved
+     * aside to `table_poses.json.corrupt` before starting empty, so the next [record] does
+     * not overwrite the only copy.
+     */
     @Synchronized
     private fun records(): MutableList<TableRecord> = cache ?: runCatching {
         if (!file.exists()) return@runCatching mutableListOf<TableRecord>()
         val type = object : TypeToken<List<TableRecord>>() {}.type
         gson.fromJson<List<TableRecord>>(file.readText(), type)?.toMutableList() ?: mutableListOf()
-    }.getOrDefault(mutableListOf()).also { cache = it }
+    }.getOrElse { e ->
+        Log.w(TAG, "table_poses.json unreadable; moved aside", e)
+        runCatching { file.renameTo(File(file.parentFile, file.name + ".corrupt")) }
+        mutableListOf()
+    }.also { cache = it }
 
     /** Poses for the table nearest [lat]/[lon], if one is within [TablePosePrior.SAME_TABLE_METERS]. */
     @Synchronized
@@ -85,7 +97,7 @@ class TablePoseStore @Inject constructor(
         }
         all.add(updated)
         while (all.size > MAX_TABLES) all.remove(all.minByOrNull { it.lastUsedMs })
-        runCatching { file.writeText(gson.toJson(all)) }
+        runCatching { file.writeTextAtomically(gson.toJson(all)) }
         appendLog(sample, lat, lon, tableSize)
     }
 
@@ -100,7 +112,7 @@ class TablePoseStore @Inject constructor(
             if (logFile.exists() && logFile.length() > MAX_LOG_BYTES) {
                 // Keep the newer half.
                 val lines = logFile.readLines()
-                logFile.writeText(lines.takeLast(lines.size / 2).joinToString("\n", postfix = "\n"))
+                logFile.writeTextAtomically(lines.takeLast(lines.size / 2).joinToString("\n", postfix = "\n"))
             }
             val entry = mapOf(
                 "sample" to sample,
@@ -114,6 +126,7 @@ class TablePoseStore @Inject constructor(
     }
 
     companion object {
+        private const val TAG = "TablePoseStore"
         const val LOG_FILE = "table_pose_log.jsonl"
         const val MAX_SAMPLES_PER_TABLE = 40
 

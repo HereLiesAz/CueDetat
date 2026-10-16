@@ -3,29 +3,20 @@
 package com.hereliesaz.cuedetat.delivery
 
 /**
- * Flavor-specific delivery of the `:feature_expert_ar` dynamic feature module
- * (the Expert-only ARCore table-scan flow + ARCore itself).
- *
- *  - **foss**: the module's sources are compiled directly into the APK (the foss
- *    flavor adds the module's java srcDir and ARCore), so the code is always
- *    present and there is nothing to install.
- *  - **play**: the base AAB ships *without* the AR code or ARCore. The split is
- *    delivered on demand via Play Feature Delivery the first time a
- *    user enters Expert AR.
- *
- * Only the install concern lives here; the base resolves the implementation
- * class reflectively (see ArControllerFacade) so the Play-only SplitInstall APIs
- * never leak into the foss build.
+ * Delivery seam for the Expert-AR code (the ARCore table-scan flow). There is one build and
+ * no product flavors: feature_expert_ar's sources are compiled into the app
+ * (app/build.gradle.kts adds its folder to the main source set), and the only binding is the
+ * no-op [BundledArFeatureDelivery]. The interface remains so an on-demand delivery could be
+ * reintroduced without touching ArControllerFacade.
  */
 interface ArFeatureDelivery {
 
-    /** True when the AR code is already loadable in this process. Always true for foss. */
+    /** True when the AR code is already loadable in this process. Always true in the bundled build. */
     val isInstalled: Boolean get() = true
 
     /**
-     * Ensures the AR split is installed (and its classes loadable), requesting it
-     * on demand if necessary. Suspends until install completes (play) or returns
-     * immediately (foss). Returns true when the code is available afterwards.
+     * Ensures the AR code is loadable. Returns true when it is available afterwards; the
+     * bundled build returns true immediately.
      */
     suspend fun ensureInstalled(): Boolean = true
 }

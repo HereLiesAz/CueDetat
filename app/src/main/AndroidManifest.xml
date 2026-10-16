@@ -12,8 +12,29 @@
     <!-- Training capture uploads only on unmetered networks (CaptureRecorder). -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Meta glasses (DAT SDK). API 31+ runtime permissions. No neverForLocation on SCAN:
+         the scanning is done inside the Meta SDK, whose use of results is not ours to vouch
+         for, and the flag makes the system filter some BLE results. -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Legacy equivalents for API 29-30 (minSdk 29), where SCAN/CONNECT do not exist. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+
+    <!-- Package visibility (API 30+): the feedback email (ACTION_SENDTO mailto:) and outbound
+         links (ACTION_VIEW https) target other apps. MainActivity also catches
+         ActivityNotFoundException rather than pre-checking resolveActivity(). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
 
     <application
         android:name=".MyApplication"
@@ -38,10 +59,11 @@
             android:name="com.google.android.ar.API_KEY"
             android:value="${arcoreApiKey}" />
 
-        <!-- Meta Wearables DAT Required -->
+        <!-- Meta Wearables DAT application ID. Supplied at build time (META_APP_ID property/env
+             or meta_app_id in local.properties, see app/build.gradle.kts); empty when unset. -->
         <meta-data
             android:name="com.meta.wearable.mwdat.APPLICATION_ID"
-            android:value="your_app_id_here" />
+            android:value="${metaAppId}" />
 
         <activity
             android:name=".MainActivity"

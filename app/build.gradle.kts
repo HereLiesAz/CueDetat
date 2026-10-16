@@ -121,6 +121,17 @@ android {
         // Ordinary ARCore tracking, planes, anchors and depth work with an empty value.
         manifestPlaceholders["arcoreApiKey"] =
             providers.environmentVariable("ARCORE_API_KEY").orNull?.trim().orEmpty()
+        // Meta Wearables DAT application ID, from the Meta developer console. Read from the
+        // META_APP_ID Gradle property / environment variable, then local.properties
+        // (meta_app_id=…). Empty when unset: the SDK then has no registered app ID.
+        val localProps = Properties().apply {
+            val f = rootProject.file("local.properties")
+            if (f.exists()) f.inputStream().use { load(it) }
+        }
+        manifestPlaceholders["metaAppId"] =
+            (providers.gradleProperty("META_APP_ID").orNull
+                ?: providers.environmentVariable("META_APP_ID").orNull
+                ?: localProps.getProperty("meta_app_id"))?.trim().orEmpty()
         // Training-capture relay (ml/capture-relay). Empty: frames stay on the phone. Set with
         // -PcaptureRelayUrl=https://… or the CAPTURE_RELAY_URL environment variable (CI secret).
         val captureRelayUrl = providers.gradleProperty("captureRelayUrl").orNull
@@ -187,11 +198,26 @@ android {
             buildConfigField("String", "MYRIAD_BASE_URL", "\"http://10.0.2.2:8000/\"")
         }
         release {
+            // No silent debug-key fallback for a release artifact: a debug-signed "release"
+            // published to GitHub cannot update a Play/release-signed install (signature
+            // mismatch). Fail only when a release artifact is actually being produced, so debug
+            // builds and `testReleaseUnitTest` (android-ci.yml) still work without a keystore.
+            // `-Pandroid.injected.signing.store.file` (AGP's command-line signing, used by the
+            // workflows) also satisfies the check, since AGP applies it over this config.
             val releaseConfig = signingConfigs.getByName("release")
+            val injectedSigning = providers.gradleProperty("android.injected.signing.store.file").isPresent
+            val releaseArtifactRequested = gradle.startParameter.taskNames.any { task ->
+                val name = task.substringAfterLast(':')
+                name in setOf("assemble", "bundle", "build") ||
+                    Regex("^(assemble|bundle|install|package|sign|publish)\\w*Release\\w*$").matches(name)
+            }
             if (releaseConfig.storeFile != null) {
                 signingConfig = releaseConfig
-            } else {
-                signingConfig = signingConfigs.getByName("debug")
+            } else if (releaseArtifactRequested && !injectedSigning) {
+                throw GradleException(
+                    "Release build requested but KEYSTORE_PATH is not set (Gradle property or " +
+                        "environment variable). Refusing to sign a release with the debug key."
+                )
             }
             isMinifyEnabled = true
             isShrinkResources = true
@@ -199,9 +225,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Empty URL signals AppModule to skip wiring the Myriad client. Override at
-            // CI time via Gradle property -PmyriadBaseUrl=https://… once a real backend
-            // exists.
+            // MYRIAD_BASE_URL is currently read by nothing in app/src (no Myriad client exists);
+            // the field is kept so a future client has a per-build-type URL. Override with
+            // -PmyriadBaseUrl=https://….
             val myriadUrl = providers.gradleProperty("myriadBaseUrl").orNull ?: ""
             buildConfigField("String", "MYRIAD_BASE_URL", "\"$myriadUrl\"")
         }

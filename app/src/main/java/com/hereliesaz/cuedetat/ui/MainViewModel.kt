@@ -121,6 +121,9 @@ class MainViewModel @Inject constructor(
 
     private var experienceModeUpdateJob: Job? = null
     private var saveJob: Job? = null
+
+    /** Latest state awaiting persistence by [saveJob]; written on the main thread only. */
+    @Volatile private var pendingSaveState: CueDetatState? = null
     private var arModuleLoadJob: Job? = null
     // Bounded so an unbounded burst (sensors + vision + gestures) cannot grow without limit.
     // High-frequency producers (sensors, vision, AR) are conflated upstream so they
@@ -622,8 +625,11 @@ class MainViewModel @Inject constructor(
         arController.updateUiState(derivedState)
         arController.setTableZOffsetLogical(derivedState.tableZOffset)
 
+        // Start only on the transition into META_GLASSES: this function runs on every sensor
+        // tick, and calling startStreaming() each time spawned a new session per tick while the
+        // first was still CONNECTING.
         if (derivedState.cameraMode == CameraMode.META_GLASSES) {
-            metaWearableRepository.startStreaming()
+            if (previousState.cameraMode != CameraMode.META_GLASSES) metaWearableRepository.startStreaming()
         } else if (previousState.cameraMode == CameraMode.META_GLASSES) {
             metaWearableRepository.stopStreaming()
         }
@@ -633,14 +639,20 @@ class MainViewModel @Inject constructor(
                                state.tableScanModel != previousState.tableScanModel ||
                                state.viewOffset != previousState.viewOffset
 
+            // Throttle, not debounce: a low-priority emit leaves an already-pending save in
+            // place and only refreshes the state it will write. Cancelling on every emit meant
+            // the continuous sensor stream (MATRICES_ONLY) starved AIMING-type saves forever.
+            pendingSaveState = derivedState
+            if (!isHighPriority && saveJob?.isActive == true) return
             saveJob?.cancel()
             saveJob = viewModelScope.launch {
                 try {
                     if (!isHighPriority) delay(2000L)
-                    userPreferencesRepository.saveState(derivedState)
-                    tableScanRepository.saveFeltSamples(derivedState.savedFeltSamples)
+                    val toSave = pendingSaveState ?: derivedState
+                    userPreferencesRepository.saveState(toSave)
+                    tableScanRepository.saveFeltSamples(toSave.savedFeltSamples)
                 } catch (t: Throwable) {
-                    // saveJob is cancelled and replaced on every subsequent state emit,
+                    // saveJob is cancelled and replaced by high-priority emits,
                     // so CancellationException is normal here — rethrow to keep
                     // structured concurrency intact and avoid log spam.
                     if (t is kotlinx.coroutines.CancellationException) throw t
