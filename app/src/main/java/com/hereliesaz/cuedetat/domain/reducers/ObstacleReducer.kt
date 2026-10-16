@@ -20,17 +20,20 @@ private fun distanceBetween(a: PointF, b: PointF) =
  * @param state The current state of the application.
  * @param action The obstacle-related event.
  * @param reducerUtils Utility class for default positions.
+ * @param random Source for the random-placement fallback. Defaults to [Random.Default], which
+ *   makes this reducer non-deterministic in production; tests pass a seeded [Random].
  * @return A new [CueDetatState] with the obstacle modifications.
  */
 internal fun reduceObstacleAction(
     state: CueDetatState,
     action: MainScreenEvent,
-    reducerUtils: ReducerUtils
+    reducerUtils: ReducerUtils,
+    random: Random = Random.Default
 ): CueDetatState {
     // Determine the specific obstacle action to perform.
     return when (action) {
         // Case: User requests to add a new obstacle ball.
-        is MainScreenEvent.AddObstacleBall -> handleAddObstacleBall(state, reducerUtils)
+        is MainScreenEvent.AddObstacleBall -> handleAddObstacleBall(state, reducerUtils, random)
 
         // Fallback: If the action is not handled here, return the state unchanged.
         else -> state
@@ -44,7 +47,7 @@ internal fun reduceObstacleAction(
  * real-ball detections, ALL remaining detected balls are added as obstacles at once.
  * Otherwise, a single ball is added using the existing CV / random / grid strategy.
  */
-private fun handleAddObstacleBall(state: CueDetatState, reducerUtils: ReducerUtils): CueDetatState {
+private fun handleAddObstacleBall(state: CueDetatState, reducerUtils: ReducerUtils, random: Random): CueDetatState {
     val newBallRadius = state.onPlaneBall?.radius ?: state.protractorUnit.radius
     val snapRadius = newBallRadius * 1.5f
 
@@ -76,7 +79,7 @@ private fun handleAddObstacleBall(state: CueDetatState, reducerUtils: ReducerUti
     }
 
     // Fallback: add a single ball using CV / random / grid placement.
-    val placement = findNextAvailablePlacement(state, reducerUtils)
+    val placement = findNextAvailablePlacement(state, reducerUtils, random)
     return state.copy(
         obstacleBalls = state.obstacleBalls + OnPlaneBall(center = placement, radius = newBallRadius),
         valuesChangedSinceReset = true
@@ -95,7 +98,7 @@ private fun handleAddObstacleBall(state: CueDetatState, reducerUtils: ReducerUti
  * @param reducerUtils Utility for defaults.
  * @return A PointF representing the center of the new obstacle.
  */
-private fun findNextAvailablePlacement(state: CueDetatState, reducerUtils: ReducerUtils): PointF {
+private fun findNextAvailablePlacement(state: CueDetatState, reducerUtils: ReducerUtils, random: Random): PointF {
     // Get the latest computer vision data. If none exists, default to center table.
     val visionData = state.visionData ?: return reducerUtils.getDefaultTargetBallPosition()
 
@@ -141,9 +144,9 @@ private fun findNextAvailablePlacement(state: CueDetatState, reducerUtils: Reduc
         // Try 10 times to find a random spot that doesn't overlap.
         for (i in 0 until 10) {
             // Generate random X within table width.
-            val randomX = Random.nextFloat() * (maxX - minX) + minX
+            val randomX = random.nextFloat() * (maxX - minX) + minX
             // Generate random Y within table height.
-            val randomY = Random.nextFloat() * (maxY - minY) + minY
+            val randomY = random.nextFloat() * (maxY - minY) + minY
             // Create the candidate point.
             val candidatePoint = PointF(randomX, randomY)
 

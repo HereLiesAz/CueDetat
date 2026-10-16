@@ -18,14 +18,11 @@ object DrawingUtils {
      * On-screen radius of a ball of [logicalRadius] at [logicalCenter] under [matrix], and the
      * screen-up "lift" that places the ball's visual body above its on-table footprint.
      *
-     * Lift = radius * |sin(state.pitchAngle)| * [liftScale]. [liftScale] lets the caller fade
-     * the lift out as the view animates to the orthographic top-down layout (1 = full
-     * perspective, 0 = flat).
-     *
-     * Known mismatch (domain follow-up): `state.pitchAngle` is the raw IMU pitch, whereas the
-     * rail lift and pitchMatrix use UpdateStateUseCase's `effectivePitch` (AR-derived or
-     * depth-derived pitch when available). `effectivePitch` is not stored in CueDetatState, so
-     * the view cannot read it; once the domain exposes it, use it here.
+     * Lift = radius * |sin(pitch)| * [liftScale], where pitch is `state.effectivePitchDegrees`
+     * (the pitch UpdateStateUseCase built pitchMatrix and rail lift with: AR/depth-derived when
+     * available), falling back to the raw IMU `state.pitchAngle` before the first matrix pass.
+     * [liftScale] lets the caller fade the lift out as the view animates to the orthographic
+     * top-down layout (1 = full perspective, 0 = flat).
      */
     fun getPerspectiveRadiusAndLift(
         logicalCenter: PointF,
@@ -48,7 +45,7 @@ object DrawingUtils {
             val edgeY = ptsBuffer[1]
 
             val radiusOnScreen = hypot((centerX - edgeX).toDouble(), (centerY - edgeY).toDouble()).toFloat()
-            val lift = radiusOnScreen * abs(sin(Math.toRadians(state.pitchAngle.toDouble()))).toFloat() * liftScale
+            val lift = radiusOnScreen * abs(sin(Math.toRadians((state.effectivePitchDegrees ?: state.pitchAngle).toDouble()))).toFloat() * liftScale
 
             return PerspectiveRadiusInfo(radiusOnScreen, lift)
         }

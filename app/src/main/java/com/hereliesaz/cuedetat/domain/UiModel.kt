@@ -146,6 +146,13 @@ data class CueDetatState(
     @Transient val flatMatrix: Matrix? = null,
     @Transient val logicalPlaneMatrix: Matrix? = null,
     @Transient val hasInverseMatrix: Boolean = false,
+    /**
+     * Pitch (degrees) actually used to build [pitchMatrix]/[railPitchMatrix]: AR- or
+     * depth-derived when available, else IMU. Written by UpdateStateUseCase.updateMatrices;
+     * null until the first matrix pass. Renderers use it for ball lift so lift matches
+     * the matrix the ball is drawn with (see [pitchAngle] for the raw IMU value).
+     */
+    @Transient val effectivePitchDegrees: Float? = null,
     @Transient val visionData: VisionData? = null,
     @Transient val arConfidenceHistory: List<Float> = emptyList(),
     @Transient val arLowConfidenceFrameCount: Int = 0,
@@ -237,8 +244,8 @@ data class CueDetatState(
     // exactly once in comparableFields() below. Nothing enforces this -- it is
     // maintained by hand -- and a field that is added here but forgotten there
     // is compared by neither equals() nor hashCode(), which silently defeats
-    // StateFlow conflation for that field alone. Verified in sync at 120/120 as
-    // of this commit.
+    // StateFlow conflation for that field alone. Verified in sync at 126/126 (recounted by
+    // script over constructor vs list) as of this change.
     //
     // The list exists because three fields are FloatArray? (relocaliserDeltaQ,
     // lockedHsvColor, lockedHsvStdDev), and the compiler-generated equals() for
@@ -262,7 +269,7 @@ data class CueDetatState(
         masseImpactPoints, masseConnectsTarget, masseGhostBallCenter, spinControlCenter,
         lingeringSpinOffset, spinPathsAlpha, currentOrientation, compassRefYaw, isViewLocked, pitchMatrix, railPitchMatrix,
         sizeCalculationMatrix, inversePitchMatrix, flatMatrix, logicalPlaneMatrix, hasInverseMatrix,
-        visionData, arConfidenceHistory, arLowConfidenceFrameCount, relocaliserDeltaQ?.toList(),
+        effectivePitchDegrees, visionData, arConfidenceHistory, arLowConfidenceFrameCount, relocaliserDeltaQ?.toList(),
         relocaliserAttemptFrames, snapCandidates, tableScanModel, depthPlane, arDerivedPitch,
         arMeasuredHeightM, arTableMatrix, isArTableLocked, tableFit, depthCapability, arModuleState, arModuleError,
         lockedHsvColor?.toList(), lockedHsvStdDev?.toList(), showAdvancedOptionsDialog,

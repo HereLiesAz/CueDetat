@@ -4,7 +4,6 @@ package com.hereliesaz.cuedetat.domain
 
 import android.graphics.PointF
 import javax.inject.Inject
-import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -82,8 +81,11 @@ class CalculateBankShot @Inject constructor() {
                 path.add(intersection)
 
                 // Reflect the direction vector off the rail normal.
-                // Pass spin offset if available to adjust reflection angle (english).
-                direction = state.table.reflect(direction, normal, state.selectedSpinOffset?.x ?: 0f)
+                // Pure mirror reflection. Spin is deliberately NOT passed: Table.reflect's spin term
+                // (0.15 rad per unit spin) has no provenance and rotates the same way on every rail
+                // regardless of the side the ball arrives from, so it bent banks the wrong way on
+                // half the rails. A physical cushion/english model belongs in core/physics.
+                direction = state.table.reflect(direction, normal)
 
                 // Update current point for the next iteration (bounce).
                 currentPoint = intersection
@@ -98,7 +100,9 @@ class CalculateBankShot @Inject constructor() {
     }
 
     /**
-     * Checks if a linear segment intersects with any of the table pockets.
+     * Checks if the segment [start]→[end] (one bank leg, ending at the rail contact) passes
+     * through a pocket's capture circle. Bounded to the segment: a pocket beyond the rail
+     * contact, which the ball never reaches on this leg, does not count.
      *
      * @param start The start point of the segment.
      * @param end The end point of the segment.
@@ -115,8 +119,6 @@ class CalculateBankShot @Inject constructor() {
         val mag = sqrt(dirX * dirX + dirY * dirY)
         if (mag < 0.001f) return Pair(null, null)
 
-        // Extend the checking ray slightly beyond the segment end to ensure we catch pockets near corners.
-        val extendedEnd = PointF(start.x + dirX / mag * 5000f, start.y + dirY / mag * 5000f)
 
         val pockets = state.table.pockets
         // Define effective pocket radius for hit detection (slightly larger than physical hole).
@@ -129,7 +131,7 @@ class CalculateBankShot @Inject constructor() {
         // Check intersection against every pocket on the table.
         pockets.forEachIndexed { index, pocket ->
             // Use math to find intersection between line segment and circle.
-            val intersection = getLineCircleIntersection(start, extendedEnd, pocket, pocketRadius)
+            val intersection = getSegmentCircleEntry(start, end, pocket, pocketRadius)
             if (intersection != null) {
                 // Verify direction: Dot product ensures the pocket is in FRONT of the start point, not behind.
                 val vecToPocketX = pocket.x - start.x
@@ -150,22 +152,13 @@ class CalculateBankShot @Inject constructor() {
     }
 
     /**
-     * Calculates the perpendicular distance from a point to a line segment.
-     * (Currently unused but kept for utility).
-     */
-    private fun linePointDistance(p1: PointF, p2: PointF, p: PointF): Float {
-        val num = abs((p2.x - p1.x) * (p1.y - p.y) - (p1.x - p.x) * (p2.y - p1.y))
-        val den = sqrt((p2.x - p1.x).pow(2) + (p2.y - p1.y).pow(2))
-        return if (den == 0f) 0f else num / den
-    }
-
-    /**
-     * Calculates the intersection point(s) between a line defined by two points and a circle.
-     * Returns the closest intersection point along the line direction, or null if no intersection.
+     * Entry point of the segment [p1]→[p2] into a circle, or null if the segment does not
+     * reach it (entry parameter t outside [0, 1]). A segment starting inside the circle
+     * returns [p1].
      *
      * Solves the quadratic equation derived from substituting the line equation into the circle equation.
      */
-    private fun getLineCircleIntersection(p1: PointF, p2: PointF, circleCenter: PointF, radius: Float): PointF? {
+    private fun getSegmentCircleEntry(p1: PointF, p2: PointF, circleCenter: PointF, radius: Float): PointF? {
         val dx = p2.x - p1.x
         val dy = p2.y - p1.y
         // Coefficients for quadratic equation: at^2 + bt + c = 0
@@ -179,7 +172,11 @@ class CalculateBankShot @Inject constructor() {
         if (delta < 0) return null // No real roots -> No intersection.
 
         // Find t for the first intersection point (using -sqrt(delta)).
-        val t = (-b - sqrt(delta)) / (2 * a)
+        val sq = sqrt(delta)
+        val tEnter = (-b - sq) / (2 * a)
+        val tExit = (-b + sq) / (2 * a)
+        if (tExit < 0f || tEnter > 1f) return null
+        val t = tEnter.coerceAtLeast(0f)
 
         // Calculate coordinates using parameter t.
         return PointF(p1.x + t * dx, p1.y + t * dy)

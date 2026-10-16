@@ -32,18 +32,21 @@ internal fun reduceAction(
             )
         }
 
-        // Stage 2 — UNDO: a pre-reset state exists → restore it, stash current into postResetState
+        // Stage 2 — UNDO: a pre-reset state exists → restore its game/aim fields, stash current into postResetState.
+        // Only the fields Stage 4 resets are restored; live device/view state (view size, orientation,
+        // camera mode, AR lock, table scan, wearable, etc.) stays current. Restoring the whole snapshot
+        // would revert a rotation or camera toggle that happened after the reset.
         state.preResetState != null -> {
-            state.preResetState.copy(
+            restoreGameFields(live = state, snapshot = state.preResetState).copy(
                 preResetState = null,
                 postResetState = state.copy(preResetState = null, postResetState = null),
                 isWorldLocked = false
             )
         }
 
-        // Stage 3 — REDO: a post-reset state exists → restore it, stash current into preResetState
+        // Stage 3 — REDO: a post-reset state exists → restore its game/aim fields, stash current into preResetState
         state.postResetState != null -> {
-            state.postResetState.copy(
+            restoreGameFields(live = state, snapshot = state.postResetState).copy(
                 preResetState = state.copy(preResetState = null, postResetState = null),
                 postResetState = null,
                 isWorldLocked = false
@@ -94,3 +97,29 @@ internal fun reduceAction(
         }
     }
 }
+
+
+/**
+ * Copies onto [live] exactly the game/aim fields that the Stage 4 reset in [reduceAction]
+ * overwrites, taken from [snapshot]. Everything else (device, camera, AR, scan, wearable,
+ * dialogs) keeps its live value. Keep this list in sync with the Stage 4 `copy`.
+ */
+internal fun restoreGameFields(live: CueDetatState, snapshot: CueDetatState): CueDetatState =
+    live.copy(
+        protractorUnit = snapshot.protractorUnit,
+        onPlaneBall = snapshot.onPlaneBall,
+        obstacleBalls = snapshot.obstacleBalls,
+        zoomSliderPosition = snapshot.zoomSliderPosition,
+        worldRotationDegrees = snapshot.worldRotationDegrees,
+        userRotationDegrees = snapshot.userRotationDegrees,
+        bankingAimTarget = snapshot.bankingAimTarget,
+        valuesChangedSinceReset = snapshot.valuesChangedSinceReset,
+        hasCueBallBeenMoved = snapshot.hasCueBallBeenMoved,
+        hasTargetBallBeenMoved = snapshot.hasTargetBallBeenMoved,
+        viewOffset = snapshot.viewOffset,
+        tableZOffset = snapshot.tableZOffset,
+        cueBallCvAnchor = snapshot.cueBallCvAnchor,
+        targetCvAnchor = snapshot.targetCvAnchor,
+        obstacleCvAnchors = snapshot.obstacleCvAnchors,
+        ballSelectionPhase = snapshot.ballSelectionPhase
+    )

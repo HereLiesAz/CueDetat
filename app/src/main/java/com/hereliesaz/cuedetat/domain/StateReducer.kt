@@ -19,9 +19,21 @@ import com.hereliesaz.cuedetat.domain.reducers.reduceToggleAction
  * In MVI, the State is immutable. To change the UI, an [Intent] (or Event) must be fired.
  * The Reducer takes the [currentState] and the [Event], and calculates the [newState].
  *
- * This function is the single entry point for ALL state changes in the main screen.
- * To keep this file manageable, it delegates specific event types to specialized sub-reducers
+ * This function routes most main-screen events to specialized sub-reducers
  * (e.g., [reduceControlAction] for zoom/pan, [reduceCvAction] for vision data).
+ *
+ * It is NOT the single entry point for state changes. Known writers outside it:
+ * - `SnapReducer.reduce`, invoked by MainViewModel after this reducer on CvDataUpdated.
+ * - MainViewModel branches that write state directly or re-copy fields after this reducer
+ *   (ToggleExperienceModeSelection, SetTopDownBitmap, CvDataUpdated phase promotion).
+ * - UpdateStateUseCase, which derives matrices and aiming geometry after every reduction.
+ *
+ * Purity: deterministic given its inputs, except [reduceObstacleAction]'s random-placement
+ * fallback (default [kotlin.random.Random.Default]; injectable for tests). SnapReducer's clock is
+ * likewise injectable via its `nowMs` parameter.
+ *
+ * Every `MainScreenEvent` a sub-reducer pattern-matches must be listed here, or it falls into
+ * `else` and is silently dropped. StateReducerRoutingTest enforces this.
  *
  * @param currentState The state before the event is processed.
  * @param action The event triggered by the UI or System.
@@ -85,7 +97,8 @@ fun stateReducer(
         is MainScreenEvent.LockColor, is MainScreenEvent.ClearSamplePoint,
         is MainScreenEvent.AddFeltSample, is MainScreenEvent.DeleteFeltSamples,
         is MainScreenEvent.MoveFeltSample, is MainScreenEvent.AutoCalibrateCv,
-        is MainScreenEvent.ForceArActive, is MainScreenEvent.SeedRelocaliser ->
+        is MainScreenEvent.ForceArActive, is MainScreenEvent.SeedRelocaliser,
+        is MainScreenEvent.ArSurfaceTapped ->
             reduceCvAction(currentState, action)
 
         // --- OBSTACLES ---
@@ -112,7 +125,8 @@ fun stateReducer(
         // Handled by [SystemReducer].
         // Lifecycle events (resize), theme changes, and warnings.
         is MainScreenEvent.SizeChanged, is MainScreenEvent.FullOrientationChanged,
-        is MainScreenEvent.ThemeChanged, is MainScreenEvent.SetWarning ->
+        is MainScreenEvent.ThemeChanged, is MainScreenEvent.SetWarning,
+        is MainScreenEvent.WearableStateUpdated ->
             reduceSystemAction(currentState, action)
 
         // --- UI TOGGLES ---
@@ -136,14 +150,16 @@ fun stateReducer(
         is MainScreenEvent.SetCameraMode,
         is MainScreenEvent.ToggleTargetType, is MainScreenEvent.ToggleAdvisor,
         is MainScreenEvent.ToggleTopDownView, is MainScreenEvent.ClearTopDownView,
-        is MainScreenEvent.SetTopDownBitmap ->
+        is MainScreenEvent.SetTopDownBitmap,
+        is MainScreenEvent.StartArTracking ->
             reduceToggleAction(currentState, action, reducerUtils)
 
         is MainScreenEvent.RecommendationComputed ->
             currentState.copy(recommendedShot = action.shot)
 
 
-        // Default catch-all (should ideally never happen for known events).
+        // Events handled outside the reducer (MainViewModel intercepts) land here unchanged.
+        // A sub-reducer-handled event landing here is a bug; StateReducerRoutingTest catches it.
         else -> currentState
     }
 

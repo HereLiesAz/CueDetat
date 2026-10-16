@@ -367,7 +367,9 @@ class GestureReducer @Inject constructor() {
                         event.currentLogicalPoint.y - cuePos.y,
                         event.currentLogicalPoint.x - cuePos.x
                     )
-                    val delta = Math.toDegrees(currAngle.toDouble() - prevAngle.toDouble()).toFloat()
+                    val delta = com.hereliesaz.cuedetat.domain.TableOrientationLearner.wrapSigned180(
+                        Math.toDegrees(currAngle.toDouble() - prevAngle.toDouble()).toFloat()
+                    )
                     currentState.copy(
                         masseShotAngleDeg = currentState.masseShotAngleDeg + delta,
                         magnifierSourceCenter = updatedMagnifierCenter
@@ -376,7 +378,10 @@ class GestureReducer @Inject constructor() {
                     val center = currentState.protractorUnit.center
                     val prevAngle = atan2(event.previousLogicalPoint.y - center.y, event.previousLogicalPoint.x - center.x)
                     val currAngle = atan2(event.currentLogicalPoint.y - center.y, event.currentLogicalPoint.x - center.x)
-                    val angleDelta = Math.toDegrees(currAngle.toDouble() - prevAngle.toDouble()).toFloat()
+                    // atan2 jumps by 360 across the -180/180 cut; wrap so a small drag is a small delta.
+                    val angleDelta = com.hereliesaz.cuedetat.domain.TableOrientationLearner.wrapSigned180(
+                        Math.toDegrees(currAngle.toDouble() - prevAngle.toDouble()).toFloat()
+                    )
                     currentState.copy(
                         protractorUnit = currentState.protractorUnit.copy(rotationDegrees = currentState.protractorUnit.rotationDegrees + angleDelta),
                         magnifierSourceCenter = updatedMagnifierCenter,

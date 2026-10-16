@@ -85,9 +85,9 @@ class TableOrientationLearnerTest {
     }
 
     @Test
-    fun `normalize360 wraps into minus 180 to 180`() {
-        assertEquals(-170f, TableOrientationLearner.normalize360(190f), 1e-3f)
-        assertEquals(180f, TableOrientationLearner.normalize360(-180f), 1e-3f)
-        assertEquals(10f, TableOrientationLearner.normalize360(370f), 1e-3f)
+    fun `wrapSigned180 wraps into minus 180 to 180`() {
+        assertEquals(-170f, TableOrientationLearner.wrapSigned180(190f), 1e-3f)
+        assertEquals(180f, TableOrientationLearner.wrapSigned180(-180f), 1e-3f)
+        assertEquals(10f, TableOrientationLearner.wrapSigned180(370f), 1e-3f)
     }
 }

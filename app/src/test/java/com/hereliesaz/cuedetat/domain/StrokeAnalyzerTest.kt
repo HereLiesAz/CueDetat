@@ -90,14 +90,25 @@ class StrokeAnalyzerTest {
 
     @Test
     fun `isErratic fires on large twist penalty even with a near-matching baseline`() {
-        // twistPenalty is coerced into [0, 1], so at a resting heart rate (threshold 1.5)
-        // twist alone can never trip isErratic; an elevated heart rate lowers the
-        // threshold to 0.5, which a maxed-out twist penalty (1.0) does clear.
+        // Elevated heart rate: twist threshold 0.5; a maxed-out twist penalty (1.0) clears it.
         val baseline = smoothStroke()
         val current = (0 until 50).map { i -> profile(time = i.toLong(), ay = 1f, gx = 5f, gz = 5f) }
 
         val result = analyzer.analyzeStroke(baseline = baseline, current = current, heartRate = 140f)
 
+        assertTrue(result.isErratic)
+    }
+
+    @Test
+    fun `violent twist trips isErratic at a resting heart rate`() {
+        // Regression: the resting twist threshold used to be 1.5 while twistPenalty is
+        // clamped to [0, 1], so twist alone could never trip it at rest.
+        val stroke = smoothStroke()
+        val twisted = stroke.map { profile(it.time, it.acceleration[1], gx = 5f, gz = 5f) }
+
+        val result = analyzer.analyzeStroke(baseline = stroke, current = twisted, heartRate = 60f)
+
+        assertEquals(1.0f, result.twistPenalty, 1e-6f)
         assertTrue(result.isErratic)
     }
 
@@ -122,9 +133,8 @@ class StrokeAnalyzerTest {
     @Test
     fun `high heart rate lowers the erratic threshold`() {
         val baseline = smoothStroke(base = 1f, step = 0.05f)
-        // A moderate twist that would not trip the low-HR threshold (1.5)
-        // but should trip the high-HR threshold (0.5).
-        val current = (0 until 50).map { i -> profile(time = i.toLong(), ay = 1f, gx = 0.6f, gz = 0.6f) }
+        // Mean twist 0.3 + 0.3 = 0.6: under the resting threshold (0.8), over the elevated one (0.5).
+        val current = baseline.map { profile(it.time, it.acceleration[1], gx = 0.3f, gz = 0.3f) }
 
         val calmResult = analyzer.analyzeStroke(baseline = baseline, current = current, heartRate = 80f)
         val excitedResult = analyzer.analyzeStroke(baseline = baseline, current = current, heartRate = 140f)
@@ -164,7 +174,8 @@ class StrokeSessionTrackerTest {
 
         // Baseline stroke: smooth.
         repeat(5) { i -> tracker.addSample(profile(i.toLong(), 1f + i * 0.1f), heartRate = 60f) }
-        val baselineSnapshot = tracker.baselineProfiles
+        // Independent expectation: the forward-acceleration values fed in, not the tracker's list.
+        val expectedBaselineAy = (0 until 5).map { i -> 1f + i * 0.1f }
 
         // Second stroke: erratic, should score below 1.0 and not overwrite the baseline.
         var secondResult: AnalyticsResult? = null
@@ -175,7 +186,7 @@ class StrokeSessionTrackerTest {
 
         assertNotNull(secondResult)
         assertTrue(secondResult!!.fluidityScore < 1.0f)
-        assertEquals(baselineSnapshot, tracker.baselineProfiles)
+        assertEquals(expectedBaselineAy, tracker.baselineProfiles.map { it.acceleration[1] })
     }
 
     @Test

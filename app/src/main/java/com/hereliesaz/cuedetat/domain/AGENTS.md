@@ -22,5 +22,5 @@ The properties within `CueDetatState` can be grouped into several categories:
 
 ### Modifying State
 
-- **State Reducers**: All state modifications must be performed within a `StateReducer`. A reducer is a pure function that takes the current state and an event and returns a new state.
+- **State Reducers**: State modifications should be performed within `stateReducer` and its sub-reducers, which take the current state and an event and return a new state. Current exceptions (debt, not design): `SnapReducer` and several `MainViewModel` branches write state outside it — see the `stateReducer` KDoc. Reducers are deterministic except `ObstacleReducer`'s random placement (injectable `Random`) and `SnapReducer`'s clock (injectable `nowMs`). Every event a sub-reducer handles must be routed in `StateReducer.kt`; `StateReducerRoutingTest` enforces it.
 - **Justification**: Any additions to `CueDetatState` must be clearly justified to avoid state pollution. New properties should have a singular, well-defined purpose.
