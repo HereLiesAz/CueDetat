@@ -9,17 +9,12 @@ import android.graphics.PorterDuffXfermode
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.ui.theme.MutedGray
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.config.ball.ActualCueBall
 import com.hereliesaz.cuedetat.view.config.ball.GhostCueBall
 import com.hereliesaz.cuedetat.view.config.ball.TargetBall
-import com.hereliesaz.cuedetat.view.config.line.AimingLine
 import com.hereliesaz.cuedetat.view.config.line.BankLine1
-import com.hereliesaz.cuedetat.view.config.line.BankLine2
-import com.hereliesaz.cuedetat.view.config.line.BankLine3
-import com.hereliesaz.cuedetat.view.config.line.BankLine4
 import com.hereliesaz.cuedetat.view.config.line.ShotGuideLine
 import com.hereliesaz.cuedetat.view.config.line.TangentLine
 import com.hereliesaz.cuedetat.view.config.table.Holes
@@ -109,67 +104,34 @@ class PaintCache {
      * glow-stick key embeds a continuous slider value, so an unbounded map would grow one
      * entry per slider position over a session. Capped to the most-recently-used entries.
      */
-    val glowPaints = object : LinkedHashMap<String, Paint>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: Map.Entry<String, Paint>): Boolean = size > GLOW_CACHE_MAX
+    val glowPaints = object : LinkedHashMap<com.hereliesaz.cuedetat.view.renderer.util.GlowKey, Paint>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<com.hereliesaz.cuedetat.view.renderer.util.GlowKey, Paint>): Boolean = size > GLOW_CACHE_MAX
     }
 
-    // --- Bank Line Paints ---
-    // Paints for each segment of a bank shot to allow distinct styling if needed.
-    val bankLine1Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-    val bankLine2Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-    val bankLine3Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-    val bankLine4Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    /** Reusable lookup probe for [glowPaints] (render thread only). */
+    val glowKeyProbe = com.hereliesaz.cuedetat.view.renderer.util.GlowKey()
 
-    /** Reusable paint object for creating glow effects dynamically. */
-    val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    /** Unit-circle halo gradients keyed by colour/alpha/stops; see drawGlowCircle. LRU-bounded. */
+    val haloShaders = object : LinkedHashMap<Long, android.graphics.RadialGradient>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<Long, android.graphics.RadialGradient>): Boolean = size > GLOW_CACHE_MAX
+    }
+
+    /** Reused local matrix for halo shaders. */
+    val haloMatrix = android.graphics.Matrix()
+
+    // --- Bank Line Paint ---
+    /**
+     * Base paint for every bank-shot segment. LineRenderer copies it per segment and
+     * overrides colour/width from the BankLine1..4 configs, so only one cached paint exists.
+     */
+    val bankLine1Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
 
     /**
      * Reusable paint for the hardware-accelerated RadialGradient glow halo
-     * (see [com.hereliesaz.cuedetat.view.renderer.util.drawGlowCircle]). A
-     * fresh shader is assigned per draw; the Paint itself is reused to avoid
-     * per-frame allocation.
+     * (see [com.hereliesaz.cuedetat.view.renderer.util.drawGlowCircle]). A cached
+     * shader from [haloShaders] is assigned per draw.
      */
     val glowHaloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-
-    /**
-     * Configures and returns the reused [glowPaint] object for the current frame.
-     *
-     * Handles the "Glow Stick" feature logic:
-     * - If [CueDetatState.glowStickValue] is near 0, applies the standard [baseGlowColor].
-     * - If [CueDetatState.glowStickValue] is non-zero, overrides with White/Black and custom blur.
-     *
-     * @param baseGlowColor The default color defined in the config.
-     * @param baseGlowWidth The default width defined in the config.
-     * @param state The current application state.
-     * @return The configured Paint object.
-     */
-    fun getGlowPaint(baseGlowColor: Color, baseGlowWidth: Float, state: CueDetatState): Paint {
-        glowPaint.apply {
-            style = Paint.Style.STROKE
-            strokeWidth = baseGlowWidth
-
-            val glowValue = state.glowStickValue
-            // Check threshold for Glow Stick override.
-            if (kotlin.math.abs(glowValue) > 0.05f) {
-                // Glow Stick override is active (positive = white, negative = black).
-                val glowAlpha = (kotlin.math.abs(glowValue) * 255).toInt()
-                val color = if (glowValue > 0) Color.White.toArgb() else Color.Black.toArgb()
-                // Blur radius scales with intensity.
-                val blurRadius = 15f * kotlin.math.abs(glowValue)
-                this.color = color
-                this.alpha = glowAlpha
-                maskFilter = android.graphics.BlurMaskFilter(blurRadius, android.graphics.BlurMaskFilter.Blur.NORMAL)
-            } else {
-                // Default behavior: Use the config color.
-                this.color = baseGlowColor.toArgb()
-                // Default glow is 70% of the base color's alpha.
-                alpha = (baseGlowColor.alpha * 255 * 0.7f).toInt()
-                // Fixed blur radius for standard glow.
-                maskFilter = android.graphics.BlurMaskFilter(8f, android.graphics.BlurMaskFilter.Blur.NORMAL)
-            }
-        }
-        return glowPaint
-    }
 
     /**
      * Updates the typeface used by the text paint.
@@ -180,72 +142,67 @@ class PaintCache {
     }
 
     /**
-     * Refreshes all Paint colors based on the current theme configuration.
+     * Refreshes all Paint colors from the [com.hereliesaz.cuedetat.view.config] classes,
+     * shifted by the user's global luminance adjustment.
      *
-     * This should be called whenever the theme changes or at initialization.
-     * It reads values from the [view.config] classes and applies them to the Paints.
+     * [luminanceAdjustment] is the same -0.4..0.4 HSL-lightness offset the Compose theme
+     * applies (ui/theme/Theme.kt `adjustLuminance`); it is applied here to every
+     * config-derived overlay colour so the dimmer dialog reaches the canvas too. Alpha is
+     * preserved. System dark mode is deliberately not an input: the overlay is drawn over
+     * the camera feed / felt, not over a theme surface, so it has no light variant.
      *
-     * @param uiState Current state (unused here but kept for API consistency).
-     * @param isDark Boolean indicating if dark mode is active (can be used for logic branches).
+     * @param luminanceAdjustment HSL lightness offset; 0 leaves config colours unchanged.
      */
-    fun updateColors(uiState: CueDetatState, isDark: Boolean) {
+    fun updateColors(luminanceAdjustment: Float) {
+        val lum = luminanceAdjustment
+        fun Color.adj(): Int = adjustLightness(this.toArgb(), lum)
         // Instantiate configuration objects to access their color properties.
         val railConfig = Rail()
         val targetBallConfig = TargetBall()
         val ghostCueBallConfig = GhostCueBall()
         val actualCueBallConfig = ActualCueBall()
         val shotGuideLineConfig = ShotGuideLine()
-        // AimingLine() instantiated but unused? (Logic check: seems like a leftover, safe to ignore for doc)
         val tangentLineConfig = TangentLine()
         val bankLine1Config = BankLine1()
-        val bankLine2Config = BankLine2()
-        val bankLine3Config = BankLine3()
-        val bankLine4Config = BankLine4()
         val holesConfig = Holes()
 
         // Apply config colors and widths to their respective Paint objects.
 
         // Table Rails
-        tableOutlinePaint.color = railConfig.strokeColor.toArgb()
+        tableOutlinePaint.color = railConfig.strokeColor.adj()
         tableOutlinePaint.strokeWidth = railConfig.strokeWidth
 
         // Target Ball
-        targetCirclePaint.color = targetBallConfig.strokeColor.toArgb()
+        targetCirclePaint.color = targetBallConfig.strokeColor.adj()
         targetCirclePaint.strokeWidth = targetBallConfig.strokeWidth
 
         // Ghost Cue Ball
-        cueCirclePaint.color = ghostCueBallConfig.strokeColor.toArgb()
+        cueCirclePaint.color = ghostCueBallConfig.strokeColor.adj()
         cueCirclePaint.strokeWidth = ghostCueBallConfig.strokeWidth
 
         // Actual Cue Ball
-        actualCueBallPaint.color = actualCueBallConfig.strokeColor.toArgb()
+        actualCueBallPaint.color = actualCueBallConfig.strokeColor.adj()
         actualCueBallPaint.strokeWidth = actualCueBallConfig.strokeWidth
 
         // Shot Guide Line
-        shotLinePaint.color = shotGuideLineConfig.strokeColor.toArgb()
+        shotLinePaint.color = shotGuideLineConfig.strokeColor.adj()
         shotLinePaint.strokeWidth = shotGuideLineConfig.strokeWidth
 
         // Tangent Line (Solid part)
-        tangentLineSolidPaint.color = tangentLineConfig.strokeColor.toArgb()
+        tangentLineSolidPaint.color = tangentLineConfig.strokeColor.adj()
         tangentLineSolidPaint.strokeWidth = tangentLineConfig.strokeWidth
 
         // Tangent Line (Dotted part)
-        tangentLineDottedPaint.color = tangentLineConfig.strokeColor.toArgb()
+        tangentLineDottedPaint.color = tangentLineConfig.strokeColor.adj()
         tangentLineDottedPaint.strokeWidth = tangentLineConfig.strokeWidth
         tangentLineDottedPaint.alpha = (tangentLineConfig.opacity * 255).toInt()
 
-        // Bank Shot Segments
-        bankLine1Paint.color = bankLine1Config.strokeColor.toArgb()
+        // Bank Shot Segments (base paint; per-segment overrides happen in LineRenderer)
+        bankLine1Paint.color = bankLine1Config.strokeColor.adj()
         bankLine1Paint.strokeWidth = bankLine1Config.strokeWidth
-        bankLine2Paint.color = bankLine2Config.strokeColor.toArgb()
-        bankLine2Paint.strokeWidth = bankLine2Config.strokeWidth
-        bankLine3Paint.color = bankLine3Config.strokeColor.toArgb()
-        bankLine3Paint.strokeWidth = bankLine3Config.strokeWidth
-        bankLine4Paint.color = bankLine4Config.strokeColor.toArgb()
-        bankLine4Paint.strokeWidth = bankLine4Config.strokeWidth
 
         // Pockets
-        pocketFillPaint.color = holesConfig.fillColor.toArgb()
+        pocketFillPaint.color = holesConfig.fillColor.adj()
 
         // Top-down snapshot ball markers
         ballOverlayPaint.color = Color.White.toArgb()
@@ -260,5 +217,15 @@ class PaintCache {
 
     private companion object {
         const val GLOW_CACHE_MAX = 32
+
+        /** Shifts HSL lightness by [factor] (clamped 0..1), preserving alpha. */
+        fun adjustLightness(argb: Int, factor: Float): Int {
+            if (factor == 0f) return argb
+            val hsl = FloatArray(3)
+            androidx.core.graphics.ColorUtils.colorToHSL(argb, hsl)
+            hsl[2] = (hsl[2] + factor).coerceIn(0f, 1f)
+            val rgb = androidx.core.graphics.ColorUtils.HSLToColor(hsl)
+            return (argb and 0xFF000000.toInt()) or (rgb and 0x00FFFFFF)
+        }
     }
 }

@@ -10,8 +10,6 @@ import com.hereliesaz.cuedetat.view.config.base.LinesConfig
  * This line represents the path from the Cue Ball to the Ghost Ball (impact point).
  */
 data class AimingLine(
-    /** Label used for identification. */
-    override val label: String = "Aiming Line",
     /** Fully opaque. */
     override val opacity: Float = 1.0f,
     /** Width of the glow effect. */
@@ -22,6 +20,4 @@ data class AimingLine(
     override val strokeWidth: Float = 5f,
     /** Stroke color (Sulfur/Yellow). */
     override val strokeColor: Color = SulfurDust,
-    /** No additional offset. */
-    override val additionalOffset: Float = 0f
 ) : LinesConfig

@@ -10,8 +10,6 @@ import com.hereliesaz.cuedetat.view.config.base.LinesConfig
  * This line represents the path of the Cue Ball *after* impact (the tangent line).
  */
 data class ShotGuideLine(
-    /** Label used for identification. */
-    override val label: String = "Shot Guide Line",
     /** Fully opaque. */
     override val opacity: Float = 1.0f,
     /** Width of the glow effect. */
@@ -22,6 +20,4 @@ data class ShotGuideLine(
     override val strokeWidth: Float = 5f,
     /** Stroke color (Mariner Blue). */
     override val strokeColor: Color = Mariner,
-    /** No additional offset. */
-    override val additionalOffset: Float = 0f
 ) : LinesConfig

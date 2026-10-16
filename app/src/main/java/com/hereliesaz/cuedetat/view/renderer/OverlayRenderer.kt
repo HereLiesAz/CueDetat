@@ -84,26 +84,17 @@ class OverlayRenderer {
                 val halfW = state.table.logicalWidth / 2f
                 val halfH = state.table.logicalHeight / 2f
                 val destRect = android.graphics.RectF(-halfW, -halfH, halfW, halfH)
-                val paint = paints.ballOverlayPaint.apply {
-                    this.alpha = (255 * topDownProgress).toInt()
-                }
+                val paint = paints.ballOverlayPaint
+                val previousAlpha = paint.alpha
+                paint.alpha = (255 * topDownProgress).toInt()
                 this.drawBitmap(state.topDownBitmap, null, destRect, paint)
+                paint.alpha = previousAlpha // shared paint: restore
             }
         }
 
         val matrixFor2DPlane = matrixForPlane
-        val labels = mapOf(
-            "bankingBall" to context.getString(R.string.label_banking_ball),
-            "actualCueBall" to context.getString(R.string.label_actual_cue_ball),
-            "targetBall" to context.getString(R.string.label_target_ball),
-            "ghostCueInstruction" to context.getString(R.string.label_ghost_cue_ball_instruction),
-            "ghostCueBall" to context.getString(R.string.label_ghost_cue_ball),
-            "obstacle" to context.getString(R.string.label_obstacle),
-            "aimPocket" to context.getString(R.string.label_aim_pocket),
-            "tangentLine" to context.getString(R.string.label_tangent_line)
-        )
+        val labels = labelsFor(context)
 
-        // Pass 1: Draw elements on the logical plane (Lines drawn UNDER balls)
         // Pass 1: Draw elements on the logical plane (Lines drawn UNDER balls)
         canvas.withMatrix(matrixFor2DPlane) {
             if (state.table.isVisible) {
@@ -111,7 +102,7 @@ class OverlayRenderer {
                 tableRenderer.drawPockets(this, state, paints)
             }
         }
-        lineRenderer.drawLogicalLines(canvas, state, paints, typeface, matrixFor2DPlane)
+        lineRenderer.drawLogicalLines(canvas, state, paints, typeface, matrixFor2DPlane, labels)
 
         // Pass 2: Draw the "lifted" table rails
         // We only show rails when not in top-down view (or fade them out)
@@ -149,7 +140,7 @@ class OverlayRenderer {
             // Standard/Expert Mode Passes
             
             // Pass 3: Draw all balls and their associated text
-            ballRenderer.draw(canvas, state, paints, typeface, labels)
+            ballRenderer.draw(canvas, state, paints, typeface, labels, matrixFor2DPlane, topDownProgress)
         }
 
         // Pass 4 (topmost): the advisor's recommended shot, when enabled.
@@ -158,6 +149,41 @@ class OverlayRenderer {
         if (topDownProgress <= 0f) drawTableFitGhost(canvas, state, pitchMatrix)
     }
 
+    private var cachedLabels: Map<String, String> = emptyMap()
+    private var cachedLabelsContext: Context? = null
+    private var cachedLabelsLocale: java.util.Locale? = null
+
+    /**
+     * Localized label strings, built once per Context/locale instead of eight getString calls
+     * and a fresh map every frame. Keys: see LineTextRenderer / BallRenderer.
+     * (No string resources exist yet for the expert "Aiming Line"/"Shot Guide Line" names;
+     * LineTextRenderer falls back to English for those keys.)
+     */
+    private fun labelsFor(context: Context): Map<String, String> {
+        val locale = context.resources.configuration.locales[0]
+        if (context === cachedLabelsContext && locale == cachedLabelsLocale) return cachedLabels
+        cachedLabels = mapOf(
+            "bankingBall" to context.getString(R.string.label_banking_ball),
+            "actualCueBall" to context.getString(R.string.label_actual_cue_ball),
+            "targetBall" to context.getString(R.string.label_target_ball),
+            "ghostCueInstruction" to context.getString(R.string.label_ghost_cue_ball_instruction),
+            "ghostCueBall" to context.getString(R.string.label_ghost_cue_ball),
+            "obstacle" to context.getString(R.string.label_obstacle),
+            "aimPocket" to context.getString(R.string.label_aim_pocket),
+            "tangentLine" to context.getString(R.string.label_tangent_line)
+        )
+        cachedLabelsContext = context
+        cachedLabelsLocale = locale
+        return cachedLabels
+    }
+
+    /** Releases native resources (CV debug Mat/Bitmap). Call when the overlay leaves composition. */
+    fun release() {
+        cvDebugRenderer.release()
+        cachedLabelsContext = null
+    }
+
+    /** Renderer-owned (allocated once): the dashed table-fit suggestion is not a themed paint. */
     private val ghostPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
         style = android.graphics.Paint.Style.STROKE
         strokeWidth = 4f

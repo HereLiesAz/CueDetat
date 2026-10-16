@@ -11,8 +11,6 @@ import com.hereliesaz.cuedetat.view.config.base.CenterShape
  * This represents the physical cue ball detected by the camera or placed by the user.
  */
 data class ActualCueBall(
-    /** Label used for identification. */
-    override val label: String = "Actual Cue Ball",
     /** Fully opaque. */
     override val opacity: Float = 1.0f,
     /** Width of the glow effect. */
@@ -23,8 +21,6 @@ data class ActualCueBall(
     override val strokeWidth: Float = 6f,
     /** Stroke color (MutedGray Blue). */
     override val strokeColor: Color = MutedGray,
-    /** No additional 2D offset. */
-    override val additionalOffset: Float = 0f,
     /** Center marker shape is a simple DOT. */
     override val centerShape: CenterShape = CenterShape.DOT,
     /** Center dot size is 20% of the radius. */

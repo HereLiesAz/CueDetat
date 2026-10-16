@@ -8,8 +8,6 @@ import com.hereliesaz.cuedetat.view.config.base.LinesConfig
  * Configuration for the third segment of a Bank Shot path.
  */
 data class BankLine3(
-    /** Label used for identification. */
-    override val label: String = "Bank 3",
     /** Fully opaque. */
     override val opacity: Float = 1.0f,
     /** Width of the glow effect. */
@@ -20,6 +18,4 @@ data class BankLine3(
     override val strokeWidth: Float = 2f,
     /** Stroke color (BankLine3Yellow). */
     override val strokeColor: Color = BankLine3Yellow,
-    /** No additional offset. */
-    override val additionalOffset: Float = 0f
 ) : LinesConfig

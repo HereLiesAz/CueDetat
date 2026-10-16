@@ -17,6 +17,7 @@ import com.hereliesaz.cuedetat.view.config.table.Rail
 import com.hereliesaz.cuedetat.view.renderer.text.LineTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.renderer.util.createGlowPaint
+import com.hereliesaz.cuedetat.view.renderer.renderLensTps
 import com.hereliesaz.cuedetat.view.renderer.warpedBy
 import kotlin.math.pow
 
@@ -26,6 +27,8 @@ class RailRenderer {
     private val railConfig = Rail()
     private val diamondConfig = Diamonds()
     private val textRenderer = LineTextRenderer()
+    private val diamondPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val diamondPath = Path()
 
     fun draw(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?) {
         if (!state.table.isVisible || state.table.corners.size < 4) return
@@ -37,7 +40,7 @@ class RailRenderer {
             state = state,
             paints = paints
         )
-        val diamondPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val diamondPaint = diamondPaint.apply {
             style = Paint.Style.FILL
             color = diamondConfig.fillColor.toArgb()
             alpha = (diamondConfig.opacity * 255).toInt()
@@ -46,7 +49,7 @@ class RailRenderer {
         val railOffsetAmount = LOGICAL_BALL_RADIUS * railVisualOffsetFromEdgeFactor
         val pocketRadius = LOGICAL_BALL_RADIUS * 1.8f
 
-        val tps = state.lensWarpTps
+        val tps = renderLensTps(state)
         val corners = state.table.corners.map { it.warpedBy(tps) }
 
         // Recompute outward normals from warped corner edges.
@@ -94,6 +97,7 @@ class RailRenderer {
 
         // --- Draw Diamonds ---
         val diamondRadius = LOGICAL_BALL_RADIUS * diamondSizeFactor
+        // Logical units outward from the rail line; a visual-placement constant (no physical source).
         val diamondOffset = 50f
         val normals = warpedNormals
 
@@ -167,7 +171,7 @@ class RailRenderer {
     }
 
     private fun drawDiamond(canvas: Canvas, center: PointF, radius: Float, paint: Paint) {
-        val path = Path()
+        val path = diamondPath.apply { reset() }
         path.moveTo(center.x, center.y - radius) // Top
         path.lineTo(center.x + radius, center.y) // Right
         path.lineTo(center.x, center.y + radius) // Bottom
@@ -192,18 +196,21 @@ class RailRenderer {
             this.typeface = typeface
             this.textSize = referenceRadius * 4f
             this.color = MonteCarlo.toArgb()
+            // Shared paint: drop any glow another renderer left on it.
+            clearShadowLayer()
         }
         val textPadding = referenceRadius * 5f
 
         if (!state.table.isVisible || state.table.corners.size < 4) return
-        val tps = state.lensWarpTps
-        val warpedCorners = state.table.corners.map { it.warpedBy(tps) }
+        // Bank/impact points are in the unwarped, unrotated table-logical frame, so the rail is
+        // classified against the unwarped corners (the frame the diamond number is computed in).
+        val logicalCorners = state.table.corners
 
         val pathToLabel = if (state.isBankingMode) state.bankShotPath else state.aimingLineBankPath
         pathToLabel?.let { path ->
             if (path.size > 1) {
                 val bankPoint = path[1]
-                getRailForPoint(bankPoint, warpedCorners)?.let { railType ->
+                getRailForPoint(bankPoint, logicalCorners)?.let { railType ->
                     textRenderer.drawDiamondLabel(
                         canvas,
                         bankPoint,
@@ -220,7 +227,7 @@ class RailRenderer {
             state.tangentLineBankPath?.let { path ->
                 if (path.size > 1) {
                     val tangentBankPoint = path[1]
-                    getRailForPoint(tangentBankPoint, warpedCorners)?.let { railType ->
+                    getRailForPoint(tangentBankPoint, logicalCorners)?.let { railType ->
                         textRenderer.drawDiamondLabel(
                             canvas,
                             tangentBankPoint,
@@ -237,20 +244,20 @@ class RailRenderer {
 
         if (!state.isBankingMode) {
             state.shotGuideImpactPoint?.let { impactPoint ->
-                getRailForPoint(impactPoint, warpedCorners)?.let { railType ->
+                getRailForPoint(impactPoint, logicalCorners)?.let { railType ->
                     textRenderer.drawDiamondLabel(canvas, impactPoint, railType, state, textPaint, textPadding)
                 }
             }
         }
     }
 
-    private fun getRailForPoint(point: PointF, warpedCorners: List<PointF>): LineTextRenderer.RailType? {
+    private fun getRailForPoint(point: PointF, corners: List<PointF>): LineTextRenderer.RailType? {
         val tolerance = 5f
 
-        if (pointToSegmentDistance(point, warpedCorners[0], warpedCorners[1]) < tolerance) return LineTextRenderer.RailType.TOP
-        if (pointToSegmentDistance(point, warpedCorners[1], warpedCorners[2]) < tolerance) return LineTextRenderer.RailType.RIGHT
-        if (pointToSegmentDistance(point, warpedCorners[2], warpedCorners[3]) < tolerance) return LineTextRenderer.RailType.BOTTOM
-        if (pointToSegmentDistance(point, warpedCorners[3], warpedCorners[0]) < tolerance) return LineTextRenderer.RailType.LEFT
+        if (pointToSegmentDistance(point, corners[0], corners[1]) < tolerance) return LineTextRenderer.RailType.TOP
+        if (pointToSegmentDistance(point, corners[1], corners[2]) < tolerance) return LineTextRenderer.RailType.RIGHT
+        if (pointToSegmentDistance(point, corners[2], corners[3]) < tolerance) return LineTextRenderer.RailType.BOTTOM
+        if (pointToSegmentDistance(point, corners[3], corners[0]) < tolerance) return LineTextRenderer.RailType.LEFT
 
         return null
     }

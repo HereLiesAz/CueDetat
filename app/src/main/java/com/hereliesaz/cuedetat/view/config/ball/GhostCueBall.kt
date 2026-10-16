@@ -11,8 +11,6 @@ import com.hereliesaz.cuedetat.view.config.base.CenterShape
  * This represents the predicted position of the cue ball at the moment of impact with the target ball.
  */
 data class GhostCueBall(
-    /** Label used for identification. */
-    override val label: String = "Ghost Cue Ball",
     /** Fully opaque. */
     override val opacity: Float = 1.0f,
     /** Width of the glow effect. */
@@ -23,8 +21,6 @@ data class GhostCueBall(
     override val strokeWidth: Float = 3f,
     /** Stroke color (Gray). */
     override val strokeColor: Color = Mariner,
-    /** No additional 2D offset. */
-    override val additionalOffset: Float = 0f,
     /** Center marker shape is a CROSSHAIR. */
     override val centerShape: CenterShape = CenterShape.CROSSHAIR,
     /** Center marker size is 30% of the radius. */

@@ -11,14 +11,16 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
 import com.hereliesaz.cuedetat.view.PaintCache
 import com.hereliesaz.cuedetat.view.config.table.Holes
+import com.hereliesaz.cuedetat.view.renderer.renderLensTps
 import com.hereliesaz.cuedetat.view.renderer.warpedBy
 
 /**
  * Responsible for rendering the virtual pool table surface, its boundaries, grid lines, and pockets.
  *
- * This renderer operates purely in the 2D "Logical Plane". The `canvas` passed to it typically
- * already has the `state.logicalPlaneMatrix` applied (via `TableRenderer.drawSurface` call site)
- * OR is drawn manually using logical coordinates.
+ * This renderer draws in the 2D "Logical Plane": OverlayRenderer calls it inside
+ * `canvas.withMatrix(matrixFor2DPlane)`, where matrixFor2DPlane is `state.pitchMatrix`
+ * interpolated toward the orthographic top-down layout (NOT `state.logicalPlaneMatrix`, which is
+ * the flat, non-pitched matrix). Lens warp follows [renderLensTps].
  *
  * NOTE: The "Surface" here implies the felt. The "Rails" are rendered separately by [RailRenderer]
  * because rails have height (3D lift), whereas the surface is flat (Z=0).
@@ -33,18 +35,7 @@ class TableRenderer {
     private val pocketOutlinePaint = Paint()
     private val pocketFillPaint = Paint()
 
-    companion object {
-        /**
-         * Returns the logical coordinates of the 6 pockets.
-         *
-         * Used only for rendering (by [drawPockets]). Hit-testing logic (e.g. in
-         * `UpdateStateUseCase`) reads `state.table.pockets` directly instead of going
-         * through this function.
-         */
-        fun getLogicalPockets(state: CueDetatState): List<PointF> {
-            return state.table.pockets
-        }
-    }
+    private val outlinePath = Path()
 
     /**
      * Draws the table outline and the "Diamond System" grid.
@@ -58,7 +49,7 @@ class TableRenderer {
         if (!state.table.isVisible) return
 
         // The corners are defined in Logical Inches relative to the table center (0,0).
-        val tps = state.lensWarpTps
+        val tps = renderLensTps(state)
         val corners = state.table.corners.map { it.warpedBy(tps) }
         if (corners.size < 4) return // Safety check.
 
@@ -67,7 +58,7 @@ class TableRenderer {
 
         // 1. Draw the Table Outline (The Bed).
         // This is a simple rectangle connecting the 4 corners.
-        val path = Path()
+        val path = outlinePath.apply { reset() }
         path.moveTo(corners[0].x, corners[0].y)
         path.lineTo(corners[1].x, corners[1].y)
         path.lineTo(corners[2].x, corners[2].y)
@@ -123,8 +114,8 @@ class TableRenderer {
         if (referenceRadius <= 0) return
 
         val holesConfig = Holes() // Visual config (colors).
-        val tps = state.lensWarpTps
-        val pockets = getLogicalPockets(state).map { it.warpedBy(tps) }
+        val tps = renderLensTps(state)
+        val pockets = state.table.pockets.map { it.warpedBy(tps) }
         val pocketRadius = referenceRadius * 1.8f
 
         // Configure the hoisted paints for different states (Normal, Aimed, Banked).

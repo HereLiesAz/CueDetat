@@ -7,8 +7,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -24,34 +23,15 @@ import com.hereliesaz.cuedetat.view.gestures.detectManualGestures
 import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
 
 /**
- * Subset of state that drives a redraw. data-class equality avoids the per-recomposition
- * Array allocation + contentHashCode walk the previous trigger used.
+ * The main AR/2D overlay canvas.
+ *
+ * Redraw policy: there is no gate. The Canvas draw lambda closes over [uiState] and
+ * [topDownProgress], so Compose redraws whenever this composable recomposes with new
+ * values. A previous `DrawSignature`/`derivedStateOf` "gatekeeper" claimed to suppress
+ * redraws but read plain (non-snapshot) data inside `remember(uiState)`, so it was rebuilt
+ * on every state change and suppressed nothing; it was removed rather than kept as a
+ * comment that lied.
  */
-private data class DrawSignature(
-    val viewOffset: Any?,
-    val arDerivedPitch: Any?,
-    // Unlike compass/IMU fields, the AR world-to-screen projection changes
-    // on EVERY camera pose update, including phone roll around the optical axis.
-    val arTableMatrix: Any?,
-    val worldRotationDegrees: Float,
-    val zoomSliderPosition: Float,
-    val tableScanModel: Any?,
-    val tableZOffset: Float,
-    val onPlaneBall: Any?,
-    val topDownProgress: Float,
-    val recommendedShot: Any?,
-    val protractorUnit: Any?,
-    val obstacleBalls: Any?,
-    val tangentDirection: Float,
-    val isMasseModeActive: Boolean,
-    val spinPaths: Any?,
-    val currentOrientation: Any?,
-    val visionData: Any?,
-    val cameraMode: Any?,
-    val experienceMode: Any?,
-    val isBeginnerViewLocked: Boolean,
-)
-
 @Composable
 fun ProtractorOverlay(
     uiState: CueDetatState,
@@ -74,39 +54,14 @@ fun ProtractorOverlay(
         paints.setTypeface(barbaroTypeface)
     }
 
-    LaunchedEffect(uiState.luminanceAdjustment, systemIsDark) {
-        paints.updateColors(uiState, systemIsDark)
+    // systemIsDark is intentionally not a key: overlay colours do not depend on it
+    // (see PaintCache.updateColors).
+    LaunchedEffect(uiState.luminanceAdjustment) {
+        paints.updateColors(uiState.luminanceAdjustment)
     }
 
-    // The gatekeeper of the Sisyphean Canvas.
-    // We only force a redraw when the geometry actually shifts. derivedStateOf
-    // observes the individual fields directly so no per-recomposition allocation
-    // is needed — Compose handles change tracking via structural equality.
-    val drawTrigger by remember(uiState) {
-        derivedStateOf {
-            DrawSignature(
-                viewOffset = uiState.viewOffset,
-                arDerivedPitch = uiState.arDerivedPitch,
-                arTableMatrix = uiState.arTableMatrix,
-                worldRotationDegrees = uiState.worldRotationDegrees,
-                zoomSliderPosition = uiState.zoomSliderPosition,
-                tableScanModel = uiState.tableScanModel,
-                tableZOffset = uiState.tableZOffset,
-                onPlaneBall = uiState.onPlaneBall,
-                topDownProgress = topDownProgress,
-                recommendedShot = uiState.recommendedShot,
-                protractorUnit = uiState.protractorUnit,
-                obstacleBalls = uiState.obstacleBalls,
-                tangentDirection = uiState.tangentDirection,
-                isMasseModeActive = uiState.isMasseModeActive,
-                spinPaths = uiState.spinPaths,
-                currentOrientation = uiState.currentOrientation,
-                visionData = uiState.visionData,
-                cameraMode = uiState.cameraMode,
-                experienceMode = uiState.experienceMode,
-                isBeginnerViewLocked = uiState.isBeginnerViewLocked,
-            )
-        }
+    DisposableEffect(renderer) {
+        onDispose { renderer.release() }
     }
 
     Canvas(
@@ -117,8 +72,6 @@ fun ProtractorOverlay(
             }
             .detectManualGestures(uiState, onEvent)
     ) {
-        // Read the trigger to inform Compose's invalidation tracker
-        drawTrigger
         drawIntoCanvas { canvas ->
             // Renderer crashes here force-close the app because Compose's drawscope
             // doesn't isolate frame errors. Catch and log so a transient null/NaN
