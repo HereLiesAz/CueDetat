@@ -21,6 +21,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.tasks.await
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -35,6 +36,12 @@ import java.nio.ByteOrder
  * timestamp + 6 little-endian floats per message, matching what
  * `WristWearableRepository.onMessageReceived` parses on path "/trainer/imu") from the raw
  * sensor callback rate, and avoids saturating the MessageClient with two independent streams.
+ *
+ * Lifecycle messages: "/trainer/connected" is sent when streaming starts and
+ * "/trainer/disconnected" when the service is destroyed. The phone also treats the IMU stream
+ * itself as a liveness signal (see `WristWearableRepository.IMU_TIMEOUT_MS`), so a lost
+ * lifecycle message cannot leave its overlay stuck. No "/trainer/hr" is sent: this module holds
+ * no BODY_SENSORS permission and reads no heart-rate sensor.
  */
 class SensorService : Service(), SensorEventListener {
 
@@ -54,23 +61,26 @@ class SensorService : Service(), SensorEventListener {
     @Volatile private var hasAccel = false
     @Volatile private var hasGyro = false
 
+    /** Incremented on every sensor callback; a sample is sent only when it has moved. */
+    @Volatile private var sampleSeq = 0L
+    private var lastSentSeq = -1L
+    private var sensorsRegistered = false
+
     /**
      * The phone's node id, supplied by [WearableMessageService] from the message that started
      * this service (the "/trainer/start" command's source node). Falls back to querying
      * connected nodes if the service was restarted by the system without that extra (e.g.
-     * after process death with START_STICKY).
+     * after process death with START_STICKY). Cleared on any send failure so the next attempt
+     * re-resolves it (the phone may have re-paired or restarted with a new node).
      */
-    private var targetNodeId: String? = null
+    @Volatile private var targetNodeId: String? = null
 
     override fun onCreate() {
         super.onCreate()
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         gyroSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
-
-        // Register listeners at GAME delay (~50Hz)
-        accelSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
-        gyroSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+        // Listeners are registered in onStartCommand, when streaming actually begins.
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -78,24 +88,54 @@ class SensorService : Service(), SensorEventListener {
 
         startForeground(NOTIFICATION_ID, buildNotification())
 
+        if (!sensorsRegistered) {
+            // GAME delay (~50Hz).
+            accelSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+            gyroSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+            sensorsRegistered = true
+        }
+
         if (sendJob == null || sendJob?.isActive != true) {
-            sendJob = scope.launch { sendLoop() }
+            sendJob = scope.launch {
+                sendLifecycle(PATH_CONNECTED)
+                sendLoop()
+            }
         }
 
         return START_STICKY
     }
 
+    /**
+     * Sends at [SEND_INTERVAL_MS] while sends succeed; on failure the wait doubles up to
+     * [MAX_BACKOFF_MS] and the node id is re-resolved.
+     */
     private suspend fun sendLoop() {
+        var waitMs = SEND_INTERVAL_MS
         while (scope.isActive) {
-            if (hasAccel && hasGyro) {
-                sendSample()
+            val seq = sampleSeq
+            if (hasAccel && hasGyro && seq != lastSentSeq) {
+                if (sendSample()) {
+                    lastSentSeq = seq
+                    waitMs = SEND_INTERVAL_MS
+                } else {
+                    // Do not resend this (now stale) sample later; only fresh data goes out.
+                    lastSentSeq = seq
+                    waitMs = (waitMs * 2).coerceAtMost(MAX_BACKOFF_MS)
+                }
             }
-            kotlinx.coroutines.delay(SEND_INTERVAL_MS)
+            kotlinx.coroutines.delay(waitMs)
         }
     }
 
-    private suspend fun sendSample() {
+    private suspend fun sendLifecycle(path: String) {
         val nodeId = resolveNodeId() ?: return
+        runCatching { messageClient.sendMessage(nodeId, path, ByteArray(0)).await() }
+            .onFailure { Log.w(TAG, "Failed to send $path to $nodeId", it); targetNodeId = null }
+    }
+
+    /** @return true if the sample was delivered to the Data Layer. */
+    private suspend fun sendSample(): Boolean {
+        val nodeId = resolveNodeId() ?: return false
         val accel = lastAccel
         val gyro = lastGyro
 
@@ -109,11 +149,12 @@ class SensorService : Service(), SensorEventListener {
             putFloat(gyro[2])
         }.array()
 
-        runCatching {
-            messageClient.sendMessage(nodeId, "/trainer/imu", payload)
+        return runCatching {
+            messageClient.sendMessage(nodeId, PATH_IMU, payload).await()
         }.onFailure {
             Log.w(TAG, "Failed to send IMU sample to $nodeId", it)
-        }
+            targetNodeId = null
+        }.isSuccess
     }
 
     private suspend fun resolveNodeId(): String? {
@@ -131,10 +172,12 @@ class SensorService : Service(), SensorEventListener {
             Sensor.TYPE_ACCELEROMETER -> {
                 lastAccel = floatArrayOf(event.values[0], event.values[1], event.values[2])
                 hasAccel = true
+                sampleSeq++
             }
             Sensor.TYPE_GYROSCOPE -> {
                 lastGyro = floatArrayOf(event.values[0], event.values[1], event.values[2])
                 hasGyro = true
+                sampleSeq++
             }
         }
     }
@@ -173,7 +216,17 @@ class SensorService : Service(), SensorEventListener {
     override fun onDestroy() {
         super.onDestroy()
         sensorManager.unregisterListener(this)
+        sensorsRegistered = false
         scope.cancel()
+        // Best-effort goodbye on a scope that outlives this one, bounded so it cannot leak.
+        val nodeId = targetNodeId
+        val client = messageClient
+        CoroutineScope(Dispatchers.IO).launch {
+            withTimeoutOrNull(LIFECYCLE_TIMEOUT_MS) {
+                val id = nodeId ?: runCatching { nodeClient.connectedNodes.await().firstOrNull()?.id }.getOrNull()
+                if (id != null) runCatching { client.sendMessage(id, PATH_DISCONNECTED, ByteArray(0)).await() }
+            }
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -185,6 +238,16 @@ class SensorService : Service(), SensorEventListener {
 
         /** Send a combined accel+gyro sample at ~20Hz, decoupled from the raw sensor rate. */
         private const val SEND_INTERVAL_MS = 50L
+
+        /** Upper bound on the retry wait after consecutive send failures. */
+        private const val MAX_BACKOFF_MS = 2_000L
+
+        /** Bound on the best-effort "/trainer/disconnected" send from onDestroy. */
+        private const val LIFECYCLE_TIMEOUT_MS = 3_000L
+
+        private const val PATH_IMU = "/trainer/imu"
+        private const val PATH_CONNECTED = "/trainer/connected"
+        private const val PATH_DISCONNECTED = "/trainer/disconnected"
 
         /** Intent extra carrying the phone's node id, set by [WearableMessageService]. */
         const val EXTRA_NODE_ID = "node_id"

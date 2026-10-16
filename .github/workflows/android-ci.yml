@@ -1,8 +1,11 @@
 name: Android CI
 
-# Runs unit tests on every push/PR, then builds and releases a debug APK on push.
+# Runs unit tests on every push/PR, then builds a debug APK; publishes it only on push to main.
 # Auto-detects app name from settings.gradle.kts / settings.gradle.
-# Reads version from version.properties (Major.Minor.Patch.Build).
+# Version: the APK is named from the versionName Gradle actually stamped into it
+# (app/build/outputs/apk/debug/output-metadata.json). Gradle derives it from the uppercase
+# MAJOR/MINOR/PATCH/BUILD keys of version.properties; the camelCase versionMajor/... keys are
+# not read by Gradle or CI.
 #
 # Required secrets (all optional — build falls back to debug key / skips injection):
 #   KEYSTORE_RAW             — base64-encoded release keystore (.jks)
@@ -65,6 +68,12 @@ jobs:
         with:
           cache-read-only: false
           dependency-graph: generate-submit-and-upload
+
+      - name: Run core (KMP) tests
+        # Pure Kotlin core: geometry, physics, aim. Needs no Android SDK or credentials.
+        run: |
+          chmod +x gradlew
+          ./gradlew -Pcuedetat.coreOnly=true allTests --no-daemon --stacktrace
 
       - name: Run unit tests
         # The Meta Wearables SDK resolves only from GitHub Packages (settings.gradle.kts).
@@ -188,14 +197,18 @@ jobs:
             });
 
       - name: Prepare Release Variables
-        if: success() && github.event_name == 'push'
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         id: release_vars
         run: |
-          MAJOR=$(grep '^versionMajor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-          MINOR=$(grep '^versionMinor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-          PATCH=$(grep '^versionPatch=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-          BUILD_NUMBER=$(grep '^versionBuild=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-          VERSION_NAME="$MAJOR.$MINOR.$PATCH.$BUILD_NUMBER"
+          # Same keys Gradle reads (app/build.gradle.kts): uppercase MAJOR/MINOR.
+          MAJOR=$(grep '^MAJOR=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          MINOR=$(grep '^MINOR=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          META=app/build/outputs/apk/debug/output-metadata.json
+          VERSION_NAME=$(jq -r '.elements[0].versionName' "$META")
+          if [ -z "$VERSION_NAME" ] || [ "$VERSION_NAME" = "null" ]; then
+            echo "Error: versionName not found in $META"
+            exit 1
+          fi
           TAG_NAME="latest-debug-v${MAJOR}.${MINOR}"
           if [ -f "settings.gradle.kts" ]; then
             APP_NAME=$(grep 'rootProject.name' settings.gradle.kts | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
@@ -219,7 +232,9 @@ jobs:
           cd build_tools_package && zip -r ../build-tools.zip . && cd ..
 
       - name: Publish Release
-        if: success() && github.event_name == 'push'
+        # Gated on main, as in android_debug_apk_release.yml: this force-moves a shared tag,
+        # so a feature-branch push must not reach it.
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

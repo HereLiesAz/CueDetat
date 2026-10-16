@@ -88,10 +88,8 @@ class TableScanViewModel(
     private val clustersLock = Any()
 
     init {
-        // Kick off on-demand delivery of the TFLite model the moment the scan
-        // flow opens, so the (~24 MB) Play feature split is downloading/installed
-        // by the time the user actually points the camera at a table. No-op for
-        // foss (model bundled) and for play once the split is already installed.
+        // Make sure the TFLite model is loaded the moment the scan flow opens (retries the
+        // asset load if the detector's eager load failed). The model ships in the APK assets.
         scope.launch {
             runCatching { pocketDetector.ensureModelReady() }
         }

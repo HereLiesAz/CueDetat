@@ -22,9 +22,11 @@ import kotlin.math.min
 
 private const val MASTER_MODEL_FILE = "ml/MASTER_POOL_MODEL.tflite"
 private const val INPUT_SIZE = 640
-// Empirically tuned threshold; no formal derivation on record.
+// Score cut-offs below are empirical: hand-tuned against live camera frames, with no
+// validation set, PR curve or other formal derivation on record. Treat them as knobs.
+/** Empirical minimum score for [MergedTFLiteDetector.detect] (pocket head). */
 private const val CONFIDENCE_THRESHOLD = 0.30f
-// Empirically tuned threshold; no formal derivation on record.
+/** Empirical minimum score for [MergedTFLiteDetector.detectPool] (pool head). */
 private const val POOL_CONFIDENCE_THRESHOLD = 0.25f
 private const val MAX_DETECTIONS = 300
 
@@ -41,8 +43,18 @@ private const val SIDE_CLASS_ID = 2
  *
  *  - [detect] (segment [HEAD_POCKET_50E]): returns [MlTableDetection] with pockets and
  *    the table boundary (consumed by AR setup / table scan flows).
- *  - [detectPool] (segment [HEAD_POOL_PIVOT]): returns the raw ball/cue bounding boxes
- *    (consumed by VisionRepository).
+ *  - [detectPool] (segment [HEAD_POOL_PIVOT]): returns raw [PoolDetection] boxes in the
+ *    same 3-class space — pool-table / pool-table-hole / pool-table-side. It does NOT
+ *    detect balls or cues (see [PoolDetection]); consumed by VisionRepository.
+ *
+ * Thread safety: [detect] runs on the table-scan analyzer thread, [detectPool] on
+ * VisionRepository's dispatcher and [ensureModelReady] on IO. The shared input buffer,
+ * output tensors and the interpreter map are all guarded by one monitor ([lock]), so
+ * inference calls serialise against each other and against a model reload.
+ *
+ * Lifetime: provided as a process-wide singleton (di/AppModule.kt), so it is never closed;
+ * interpreters and any delegates are released by process death. The former `close()` had
+ * no caller and was removed.
  *
  * Class name kept for binary compatibility with existing Hilt bindings; the "merged"
  * prefix is historical. The standalone single-model file was removed — it duplicated
@@ -57,9 +69,12 @@ class MergedTFLiteDetector(
     private val HEAD_POCKET_50E = 0
     private val HEAD_POOL_PIVOT = 2
 
+    /** Guards [interpreters], [delegates], [inputBuffer], the output tensors and [intValues]. */
+    private val lock = Any()
+
     private val interpreters = mutableMapOf<Int, Interpreter>()
 
-    // Hardware-acceleration delegates we created, kept so they can be released in close().
+    // Hardware-acceleration delegates we created, released when the model is reloaded.
     private val delegates = mutableListOf<AutoCloseable>()
     private val compatList by lazy { CompatibilityList() }
     private val cpuThreads = min(4, Runtime.getRuntime().availableProcessors())
@@ -130,21 +145,20 @@ class MergedTFLiteDetector(
     }
 
     init {
-        // Eager attempt: succeeds immediately when the model is in the base
-        // assets (foss APK, or play debug where the feature is merged in). For a
-        // play release the model lives in an on-demand split that isn't present
-        // yet — this fails gracefully (logged, no interpreters) and is retried
-        // by [ensureModelReady] once the split is installed.
+        // Eager attempt. The model ships in the base APK's assets (feature_mlmodel's
+        // assets are compiled into :app), so this normally succeeds. If it fails it is
+        // logged and retried by [ensureModelReady].
         loadMasterPackage(context)
     }
 
     /** True once at least one interpreter (i.e. the model) is loaded. */
-    private val isLoaded: Boolean get() = interpreters.isNotEmpty()
+    private val isLoaded: Boolean get() = synchronized(lock) { interpreters.isNotEmpty() }
 
     /**
-     * Ensures the model is installed and loaded. Requests the on-demand split
-     * via [ModelDelivery] when needed, then loads from the split-aware context.
-     * Idempotent and cheap once loaded.
+     * Ensures the model is loaded, retrying the load if the eager attempt in `init` failed.
+     * [ModelDelivery] is the seam for an on-demand split; the shipped binding
+     * (BundledModelDelivery) reports the model as always installed, so in practice this
+     * only re-reads the base assets. Idempotent and cheap once loaded.
      */
     override suspend fun ensureModelReady(): Boolean {
         if (isLoaded) return true
@@ -157,19 +171,24 @@ class MergedTFLiteDetector(
         return isLoaded
     }
 
-    private fun loadMasterPackage(ctx: Context) {
+    private fun loadMasterPackage(ctx: Context): Unit = synchronized(lock) {
         // Re-runnable: drop any interpreters from a previous (failed) attempt so
-        // a retry after an on-demand install starts clean.
+        // a retry starts clean. Delegates are closed after the interpreters using them.
         if (interpreters.isNotEmpty()) {
             interpreters.values.forEach { runCatching { it.close() } }
             interpreters.clear()
         }
+        delegates.forEach { runCatching { it.close() } }
+        delegates.clear()
         try {
-            val fd = ctx.assets.openFd(MASTER_MODEL_FILE)
-            val fullChannel = FileInputStream(fd.fileDescriptor).channel
+            // The descriptor and channel are closed on exit; the MappedByteBuffers handed
+            // to the interpreters stay valid after the channel closes.
+            ctx.assets.openFd(MASTER_MODEL_FILE).use { fd ->
+            FileInputStream(fd.fileDescriptor).use { stream ->
+            val fullChannel = stream.channel
 
             // The master file concatenates 4 sub-models. Only two are ever run —
-            // segment 0 (pocket/table) by detect() and segment 2 (pool/ball) by
+            // segment 0 (pocket/table) by detect() and segment 2 (same 3 classes) by
             // detectPool(). We still walk every offset so segment 2 maps correctly,
             // but only build interpreters for the heads we use: segments 1 and 3 used
             // to be loaded into TFLite interpreters at startup and never invoked,
@@ -187,17 +206,12 @@ class MergedTFLiteDetector(
                 currentOffset += size
             }
             Log.d("MergedTFLiteDetector", "Master package loaded: ${interpreters.size} interpreters active (segments ${usedHeads.sorted()}).")
+            }
+            }
         } catch (e: Exception) {
             Log.e("MergedTFLiteDetector", "Failed to load master binary: ${e.message}")
         }
-    }
-
-    fun close() {
-        interpreters.values.forEach { runCatching { it.close() } }
-        interpreters.clear()
-        // Delegates must be closed after the interpreters that use them.
-        delegates.forEach { runCatching { it.close() } }
-        delegates.clear()
+        Unit
     }
 
     private val inputBuffer: ByteBuffer by lazy {
@@ -227,7 +241,7 @@ class MergedTFLiteDetector(
         inputBuffer.rewind()
     }
 
-    override fun detect(bitmap: Bitmap): MlTableDetection? {
+    override fun detect(bitmap: Bitmap): MlTableDetection? = synchronized(lock) {
         val interp = interpreters[HEAD_POCKET_50E] ?: return null
         return try {
             preprocess(bitmap)
@@ -240,7 +254,7 @@ class MergedTFLiteDetector(
         }
     }
 
-    fun detectPool(bitmap: Bitmap): List<PoolDetection> {
+    fun detectPool(bitmap: Bitmap): List<PoolDetection> = synchronized(lock) {
         val interp = interpreters[HEAD_POOL_PIVOT] ?: return emptyList()
         return try {
             preprocess(bitmap)

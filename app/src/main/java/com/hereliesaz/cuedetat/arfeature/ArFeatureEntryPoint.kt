@@ -8,9 +8,9 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 
 /**
- * Hilt entry point exposing the base singletons that the on-demand
- * `:feature_expert_ar` module needs. Hilt does not extend into dynamic feature
- * modules, so `ArControllerImpl` (in the module) pulls these via
+ * Hilt entry point exposing the singletons `ArControllerImpl` needs. That class is
+ * compiled into :app from `feature_expert_ar/` but is constructed by hand by
+ * ArControllerFacade (not by Hilt), so it pulls these via
  * `EntryPointAccessors.fromApplication(context, ArFeatureEntryPoint::class.java)`
  * instead of constructor injection.
  */

@@ -6,7 +6,15 @@ Companion to [`AGENTS.md`](AGENTS.md). What shouldn't live in a prompt. Re-read 
 
 ## Current version
 
-`1.10.8.566` — see [`version.properties`](version.properties). Never revert this file.
+`1.11.0.1` (MAJOR.MINOR.PATCH.BUILD) — see [`version.properties`](version.properties). Never revert this file.
+
+`version.properties` holds two key sets. **Authoritative: the uppercase set**
+(`MAJOR`, `MINOR`, `PATCH`, `BUILD`, `LAST_MAJOR`, `LAST_MINOR`), read by
+`app/build.gradle.kts:11-16` and by both release workflows (`android-ci.yml`,
+`android_debug_apk_release.yml`) for the tag. The APK file name uses the `versionName` Gradle
+stamped (`output-metadata.json`). The camelCase set (`versionMajor`/`versionMinor`/
+`versionPatch`/`versionBuild`) and the written-back `versionCode`/`versionName` lines are not
+read by any build step. Their values are left as they are.
 
 ---
 
@@ -24,10 +32,13 @@ core/state       — shared state primitives used across core/* modules.
 app/             — the Android application: domain/ (use cases, reducers, MVI state),
                    data/ (repositories, OpenCV-backed vision pipeline), ui/ (Compose),
                    view/ (custom canvas renderers), di/, delivery/, network/, update/, utils/.
-feature_expert_ar/ — ARCore-backed table-scan flow (analyzer, session, GL background renderer).
-                     Depends on app's domain/data contracts, not the other way around.
-feature_mlmodel/   — asset-only dynamic-feature module; ships the merged TFLite pocket/ball
-                     detector binary, no code.
+feature_expert_ar/ — NOT a Gradle module: a source directory compiled into :app
+                     (app/build.gradle.kts:170,174). ARCore-backed table-scan flow (analyzer,
+                     session, GL background renderer). Reaches app code only through
+                     arfeature/ArController and ArFeatureEntryPoint.
+feature_mlmodel/   — NOT a Gradle module: an assets directory. app/build.gradle.kts:169 adds
+                     it to :app's assets; it holds the merged 3-class (table / hole / side)
+                     TFLite detector binary, no code.
 wear/               — Wear OS companion (stroke sensor capture, message relay to phone app).
 ```
 
@@ -45,33 +56,40 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
 
 - **`core/*` modules stay pure Kotlin (no Android/OpenCV/ARCore types).**
   Reason: it's the only part of the app that can be tested without an SDK or a
-  device; any Android/CV dependency here silently kills that. Enforced by
-  module `build.gradle.kts` dependency declarations under `core/` — not
-  compiler-enforced, so a careless `import` can violate it without a build
-  failure. Verify by grepping the module's imports before merging.
+  device; any Android/CV dependency here silently kills that.
+  Enforced by: the core-only build (`settings.gradle.kts:81`, the `coreOnly` flag, which
+  skips every Android module) run in CI at `.github/workflows/android-ci.yml:72` and
+  `.github/workflows/android_debug_apk_release.yml:97`. A stray `android.*` import fails to
+  compile there only if the runner has no Android SDK on the classpath of those modules;
+  the core `build.gradle.kts` files declare no Android dependency, which is what makes
+  it fail. Not otherwise checked (no lint rule).
 
 - **`CueDetatState.comparableFields()` stays in sync with the primary
-  constructor field list** (`app/src/main/java/com/hereliesaz/cuedetat/domain/UiModel.kt`).
-  Reason: `equals`/`hashCode` are hand-maintained over ~120 fields; drift here
-  silently breaks state-diffing used for recomposition/undo. Not compiler-enforced
-  — verify by counting both lists before touching `UiModel.kt`.
+  constructor field list** (`app/src/main/java/com/hereliesaz/cuedetat/domain/UiModel.kt`,
+  list at :260, `equals`/`hashCode` at :289/:295).
+  Reason: `equals`/`hashCode` are hand-maintained over 125 fields; drift here
+  silently breaks state-diffing used for recomposition/undo.
+  **Unenforced**: no compiler check or test. Verify by counting both lists
+  (125 and 125 when last recounted).
 
-- **The `foss` flavor builds with zero credentials.** Reason: an outside
-  contributor with a clean clone must be able to build `foss` without a
-  `local.properties` file or any secret. Enforced by the credential-fallback
-  logic in `settings.gradle.kts` (Meta Wearables DAT maven repo is scoped to
-  `com.meta.wearable`, consumed only by `play`) and by `app/build.gradle.kts`
-  flavor-specific dependency blocks. Breaking this means `play`-only code or
-  deps leaked into the shared source set.
+- **Building `:app` needs GitHub Packages credentials; the core does not.**
+  There are no product flavors (no `foss`/`play`). `app/build.gradle.kts:378-380` depends
+  unconditionally on `mwdat-core`, `mwdat-camera` and (debug) `mwdat-mockdevice`, which
+  resolve only from the credentialed GitHub Packages repo declared at
+  `settings.gradle.kts:29-70` (`gh_user`/`gh_token` in `local.properties`, Gradle
+  properties, or `GH_ACTOR`/`GH_TOKEN` env). Without them an `:app` build fails to
+  resolve (the settings file only logs a warning). The credential-free path is
+  `./gradlew -Pcuedetat.coreOnly=true allTests`. A previous version of this file claimed
+  a credential-free `foss` flavor; that never existed in the current tree.
 
 - **`version.properties` is never reverted.** Reason: stated directly in
-  AGENTS.md; it's the single source of truth for build/version numbering
-  across CI release workflows.
+  AGENTS.md; Gradle (`app/build.gradle.kts:11-16`) and the release workflows read the
+  uppercase keys from it. **Unenforced** mechanically (no hook or CI guard).
 
 - **No feature ships partially wired.** Reason: this codebase has a real,
   recurring failure pattern — state added to `UiModel.kt`/reducers with no
   composable ever reading it (dead dialogs, dead screens, dead config fields).
-  Not enforced by anything mechanical. Before marking a feature done, grep
+  **Unenforced.** Before marking a feature done, grep
   that its state has a reader, not just a writer.
 
 ---
@@ -84,11 +102,18 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   emulator. Splitting the pure math into KMP modules under `core/` lets that
   logic run in a plain JVM test task.
 
-- **`feature_mlmodel` is an asset-only dynamic-feature module, not code.**
-  Reason: keeps the merged TFLite model binary out of the base APK/AAB,
-  letting it be delivered on demand via Play Feature Delivery on the `play`
-  flavor. `foss` includes it unconditionally since there's no Play Store
-  delivery mechanism available to that flavor.
+- **`feature_mlmodel/` and `feature_expert_ar/` are source/asset directories compiled into
+  `:app`, not modules.** Reason: split installs of the former dynamic-feature modules failed on
+  real devices (see `docs/RELEASE.md`), so there is one build, one variant, no flavors.
+  `ModelDelivery`/`ArFeatureDelivery` remain as no-op seams (`BundledModelDelivery`,
+  `BundledArFeatureDelivery`); the on-demand path in `MergedTFLiteDetector.ensureModelReady`
+  is effectively a retry of the asset load.
+
+- **`MergedTFLiteDetector` is serialised by one lock.** Reason: `detect` (analyzer thread),
+  `detectPool` (VisionRepository) and the model (re)load (IO) share one input buffer,
+  output tensors and interpreter map; unlocked, they corrupt each other's tensors.
+  Enforced at `data/MergedTFLiteDetector.kt` (`lock`, used by `loadMasterPackage`, `detect`,
+  `detectPool`).
 
 - **Billing/entitlement code was fully removed** (see `REBUILD_PLAN.md` Phase C,
   and `support/SupportLinks.kt`'s own comment on why no billing code remains).
@@ -142,4 +167,4 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   (not `app/.../data/ArDepthSession.kt` — that file has never existed).
 - AR frame bridge / GL background renderer: `feature_expert_ar/.../ArFrameProcessor.kt`,
   `feature_expert_ar/.../ArBackgroundRenderer.kt` (not under `app/.../data/`).
-- Merged pocket/ball TFLite model: `feature_mlmodel/src/main/assets/ml/MASTER_POOL_MODEL.tflite`.
+- Merged 3-class (table / hole / side) TFLite model: `feature_mlmodel/src/main/assets/ml/MASTER_POOL_MODEL.tflite`.

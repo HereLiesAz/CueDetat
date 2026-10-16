@@ -19,7 +19,8 @@ Working plan for the re-envisioning. Tracks what is done and what remains.
 ### A — Toolchain (JDK 21, latest stable, KMP/CMP)
 - [x] Version catalog: every version verified latest-stable from maven-metadata
 - [x] `settings.gradle.kts`: KMP core module graph; drop `mavenLocal()` and the
-      unused Sonatype snapshots repo; scope GitHub Packages to the play flavor
+      unused Sonatype snapshots repo; GitHub Packages is scoped to `com.meta.wearable` only
+      (there are no flavors; building `:app` needs those credentials)
 - [x] Root `build.gradle.kts`: KMP + Compose Multiplatform plugins
 - [x] `gradle.properties`: JDK 21 toolchain, KMP flags
 - [x] Core module build files
@@ -59,7 +60,8 @@ Working plan for the re-envisioning. Tracks what is done and what remains.
 ### E — Build/release hygiene
 - [x] CI runs tests before building
 - [x] Release publish gated on `refs/heads/main`
-- [x] FOSS builds from a clean clone (Meta Wearables → play only)
+- [ ] ~~FOSS builds from a clean clone~~ — not true: no flavors exist and `:app` needs GitHub
+      Packages credentials for Meta Wearables. Only `-Pcuedetat.coreOnly=true` is credential-free.
 - [x] `build.log` untracked, `.gitignore` collapsed (2,947 lines to ~50).
       `ml/` deliberately left tracked — see Follow-up.
 - [~] `blank.yml` deleted; `@main` actions flagged in place but NOT pinned —

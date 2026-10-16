@@ -1,8 +1,25 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
+
+// Versioning. Read-only view of the same uppercase keys app/build.gradle.kts reads from
+// version.properties (MAJOR/MINOR/PATCH/BUILD); this module never writes the file.
+// The watch APK shares the phone's applicationId, and Play requires every APK under one
+// applicationId to carry a distinct versionCode, so the wear code is the phone's BUILD plus
+// WEAR_VERSION_CODE_OFFSET. The offset keeps the two sequences disjoint as long as the phone's
+// versionCode (BUILD, commit count, or the Play workflow's -PversionCodeOverride) stays below it.
+// No workflow currently builds or publishes :wear.
+val wearVersionProps = Properties().apply {
+    val f = rootProject.file("version.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun wearVersionKey(key: String) = wearVersionProps.getProperty(key)?.trim()?.toIntOrNull() ?: 0
+val WEAR_VERSION_CODE_OFFSET = 1_000_000_000
+val wearBuild = wearVersionKey("BUILD")
 
 android {
     namespace = "com.hereliesaz.cuedetat.wear"
@@ -12,8 +29,8 @@ android {
         applicationId = "com.hereliesaz.cuedetat"
         minSdk = 30
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = WEAR_VERSION_CODE_OFFSET + wearBuild
+        versionName = "${wearVersionKey("MAJOR")}.${wearVersionKey("MINOR")}.${wearVersionKey("PATCH")}.$wearBuild"
     }
 
     buildTypes {
@@ -39,9 +56,9 @@ dependencies {
     implementation(libs.play.services.wearable)
 
     // Compose for Wear OS
-    implementation("androidx.wear.compose:compose-material:1.7.0")
-    implementation("androidx.wear.compose:compose-foundation:1.7.0")
-    
+    implementation(libs.wear.compose.material)
+    implementation(libs.wear.compose.foundation)
+
     // Core & Jetpack
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

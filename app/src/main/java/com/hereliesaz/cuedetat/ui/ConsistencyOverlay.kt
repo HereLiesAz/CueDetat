@@ -43,9 +43,10 @@ fun ConsistencyOverlay(
                 color = Color.White
             )
 
-            // Fluidity / Consistency Score
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val scorePercent = (wearableState.consistencyScore * 100).toInt()
+            // Fluidity / Consistency Score: shown only once a stroke has been scored.
+            val score = wearableState.consistencyScore
+            if (score != null) Row(verticalAlignment = Alignment.CenterVertically) {
+                val scorePercent = (score * 100).toInt()
                 val scoreColor = when {
                     scorePercent > 80 -> Color.Green
                     scorePercent > 50 -> Color.Yellow
@@ -68,7 +69,7 @@ fun ConsistencyOverlay(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Icon(
                         imageVector = Icons.Default.Warning,
-                        contentDescription = null // the adjacent text says it,
+                        contentDescription = null, // the adjacent text says it
                         tint = Color.Red,
                         modifier = Modifier.size(16.dp)
                     )
@@ -80,11 +81,11 @@ fun ConsistencyOverlay(
                 }
             }
 
-            // HR reading. WearableState.heartRate defaults to 0f before the watch sends one;
-            // no living player has 0 BPM, so a non-positive value is "no reading", not shown.
-            if (wearableState.heartRate > 0f) {
+            // HR reading: null until the watch sends one, and then nothing is shown.
+            val heartRate = wearableState.heartRate
+            if (heartRate != null) {
                 Text(
-                    text = stringResource(R.string.consistency_heart_rate, wearableState.heartRate.toInt()),
+                    text = stringResource(R.string.consistency_heart_rate, heartRate.toInt()),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.7f)
                 )

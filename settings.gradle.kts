@@ -22,10 +22,10 @@ dependencyResolutionManagement {
             content { includeGroupByRegex("com\\.github\\..*") }
         }
 
-        // Meta Wearables DAT. Consumed ONLY by the `play` flavor (see
-        // app/build.gradle.kts) so that a clean clone can build `foss` with no
-        // credentials — previously :app depended on these unconditionally and an
-        // outside contributor could not build the FOSS flavor at all.
+        // Meta Wearables DAT (mwdat-core/camera/mockdevice). :app depends on these
+        // unconditionally (there are no product flavors), so building :app needs
+        // GitHub Packages credentials (below). The core-only build
+        // (-Pcuedetat.coreOnly=true) never resolves them and needs none.
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/facebook/meta-wearables-dat-android")

@@ -14,13 +14,12 @@ import com.hereliesaz.cuedetat.domain.TableFrameHomography
 import dagger.hilt.android.EntryPointAccessors
 
 /**
- * The on-demand-module implementation of the base [ArController] interface.
+ * The implementation of the base [ArController] interface.
  *
- * Instantiated reflectively by ArControllerFacade once the `:feature_expert_ar`
- * split is installed (play) or compiled in (foss). It owns the AR singletons and
- * the scan controller, building them manually — Hilt does not extend into a
- * dynamic feature module, so base dependencies are pulled through the
- * [ArFeatureEntryPoint] Hilt entry point instead of constructor injection.
+ * `feature_expert_ar/` is not a Gradle module: its sources are compiled straight into :app
+ * (app/build.gradle.kts sourceSets). ArControllerFacade constructs it directly (a
+ * `Context` constructor). It builds the AR singletons manually and pulls base
+ * dependencies through the [ArFeatureEntryPoint] Hilt entry point.
  *
  * Must expose a single public constructor taking a [Context] (that is the
  * contract the facade's reflection relies on).
@@ -47,19 +46,8 @@ class ArControllerImpl(context: Context) : ArController {
         )
     }
 
-    override fun probeCapability(): DepthCapability =
-        if (arTableSession.isArCoreAvailable()) {
-            val testSession = arTableSession.createSession()
-            if (testSession != null) {
-                val cap = arTableSession.capability
-                arTableSession.close()
-                cap
-            } else {
-                DepthCapability.NONE
-            }
-        } else {
-            DepthCapability.NONE
-        }
+    /** Uses a throwaway probe session; never closes the live AR session (see ArTableSession.probeCapability). */
+    override fun probeCapability(): DepthCapability = arTableSession.probeCapability()
 
     override fun updateUiState(state: CueDetatState) {
         arFrameProcessor.updateUiState(state)
