@@ -84,7 +84,6 @@ internal fun reduceToggleAction(
             if (state.pendingOrientationLock == null) return state
             state.copy(orientationLock = state.pendingOrientationLock, pendingOrientationLock = null)
         }
-        is MainScreenEvent.OrientationChanged -> state.copy(orientationLock = action.orientationLock)
         is MainScreenEvent.SetExperienceMode -> handleSetExperienceMode(state, action.mode, reducerUtils)
         is MainScreenEvent.ApplyPendingExperienceMode -> {
             if (state.pendingExperienceMode == null) return state

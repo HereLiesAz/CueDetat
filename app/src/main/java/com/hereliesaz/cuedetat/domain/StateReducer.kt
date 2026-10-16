@@ -66,8 +66,7 @@ fun stateReducer(
         is MainScreenEvent.ToggleAdvancedOptionsDialog, is MainScreenEvent.ToggleCvMask,
         is MainScreenEvent.EnterCvMaskTestMode, is MainScreenEvent.ExitCvMaskTestMode,
         is MainScreenEvent.StartCalibrationMode, is MainScreenEvent.SampleColorAt,
-        is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2,
-        is MainScreenEvent.ToggleSupportSheet ->
+        is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2 ->
             reduceAdvancedOptionsAction(currentState, action)
 
         // --- CONTROLS & TRANSFORMS ---
@@ -77,6 +76,7 @@ fun stateReducer(
         is MainScreenEvent.TableRotationApplied, is MainScreenEvent.TableRotationChanged,
         is MainScreenEvent.AdjustLuminance, is MainScreenEvent.AdjustGlow,
         is MainScreenEvent.PanView, is MainScreenEvent.MoveTableZ,
+        is MainScreenEvent.SetTableZ,
         is MainScreenEvent.ApplyQuickAlign,
         is MainScreenEvent.LoadTableScan, is MainScreenEvent.ClearTableScan,
         is MainScreenEvent.UpdateArPose, is MainScreenEvent.UpdateTableScanClusters,
@@ -140,7 +140,7 @@ fun stateReducer(
         is MainScreenEvent.ToggleHelp,
         is MainScreenEvent.ToggleOrientationLock, is MainScreenEvent.ApplyPendingOrientationLock,
         is MainScreenEvent.ApplyPendingExperienceMode,
-        is MainScreenEvent.OrientationChanged, is MainScreenEvent.SetExperienceMode,
+        is MainScreenEvent.SetExperienceMode,
         is MainScreenEvent.UnlockBeginnerView, is MainScreenEvent.LockBeginnerView,
         is MainScreenEvent.ToggleCalibrationScreen,
         is MainScreenEvent.ExitToSplash,

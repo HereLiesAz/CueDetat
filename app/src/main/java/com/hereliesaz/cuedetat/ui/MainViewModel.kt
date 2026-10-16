@@ -300,23 +300,6 @@ class MainViewModel @Inject constructor(
     }
 
     /**
-     * Table-height slider: [target] is the absolute height the thumb is at.
-     *
-     * The slider used to send `MoveTableZ(target - uiState.tableZOffset)` from the
-     * composition snapshot; two callbacks before the state round-tripped each computed
-     * their delta against the same stale offset and the reducer summed both. The target
-     * is now held here and converted to a delta inside the event loop, against the state
-     * the reducer will actually apply it to. Only the newest target matters.
-     */
-    fun setTableHeight(target: Float) {
-        pendingTableHeight = target
-        onEvent(MainScreenEvent.MoveTableZ(0f))
-    }
-
-    /** Latest absolute table height from [setTableHeight], consumed by the event loop. */
-    @Volatile private var pendingTableHeight: Float? = null
-
-    /**
      * Loads the persisted state and commits it as the first state. Runs on the event loop
      * coroutine before any event is processed, then queues the version check, so a
      * network response cannot be overwritten by the saved-state load either.
@@ -498,16 +481,6 @@ class MainViewModel @Inject constructor(
                     event.currentPosition.y - event.previousPosition.y
                 )
                 MainScreenEvent.LogicalDragApplied(prevLogical, currLogical, screenDelta)
-            }
-
-            is MainScreenEvent.MoveTableZ -> {
-                // An absolute target from setTableHeight() becomes a delta here, against the
-                // state being reduced. A MoveTableZ with no pending target passes through.
-                val target = pendingTableHeight
-                if (target != null) {
-                    pendingTableHeight = null
-                    MainScreenEvent.MoveTableZ(target - currentState.tableZOffset)
-                } else event
             }
 
             else -> event
@@ -745,12 +718,12 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.SizeChanged, is MainScreenEvent.ZoomScaleChanged, is MainScreenEvent.ZoomSliderChanged,
             is MainScreenEvent.PanView, is MainScreenEvent.TableRotationChanged,
             is MainScreenEvent.TableRotationApplied, is MainScreenEvent.SetExperienceMode, is MainScreenEvent.ToggleBankingMode,
-            is MainScreenEvent.SetTableSize, is MainScreenEvent.RestoreState,
+            is MainScreenEvent.SetTableSize,
             // MoveTableZ (table-height slider) feeds the rendering matrices in
             // UpdateStateUseCase.updateMatricesAndTransforms (screen-space vertical lift). Without a
             // FULL recompute the new tableZOffset is stored but never applied, so the table doesn't
             // move until some other event happens to recompute the matrices.
-            is MainScreenEvent.MoveTableZ,
+            is MainScreenEvent.MoveTableZ, is MainScreenEvent.SetTableZ,
             // Snap / remembered pose moves the table like a pan-rotate-zoom does.
             is MainScreenEvent.ApplyTablePose,
             // Lock may snap the table onto the felt fit first (ControlReducer).
@@ -801,8 +774,7 @@ class MainViewModel @Inject constructor(
                 )
             )
             // The Support rail item. MainActivity owns the sheet's visibility and opens it on
-            // this event; CueDetatState.showSupportSheet (flipped by AdvancedOptionsReducer)
-            // has no reader.
+            // this event; no reducer handles it.
             is MainScreenEvent.ToggleSupportSheet -> emitSingle(SingleEvent.ShowSupportSheet)
 
             is MainScreenEvent.SingleEventConsumed -> emitSingle(null)

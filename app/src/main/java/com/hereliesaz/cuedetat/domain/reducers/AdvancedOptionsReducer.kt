@@ -21,10 +21,6 @@ internal fun reduceAdvancedOptionsAction(state: CueDetatState, action: MainScree
             state.copy(showAdvancedOptionsDialog = !state.showAdvancedOptionsDialog)
         }
 
-        is MainScreenEvent.ToggleSupportSheet -> {
-            state.copy(showSupportSheet = !state.showSupportSheet)
-        }
-
         // Enable/Disable the CV mask overlay (seeing the world as the AI does).
         is MainScreenEvent.ToggleCvMask -> {
             state.copy(showCvMask = !state.showCvMask)

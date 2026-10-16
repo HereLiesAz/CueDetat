@@ -183,7 +183,6 @@ data class CueDetatState(
     val lockedHsvColor: FloatArray? = null,
     val lockedHsvStdDev: FloatArray? = null,
     val showAdvancedOptionsDialog: Boolean = false,
-    val showSupportSheet: Boolean = false,
     val showCalibrationScreen: Boolean = false,
     val showTableScanScreen: Boolean = false,
     val useCustomModel: Boolean = false,
@@ -244,7 +243,7 @@ data class CueDetatState(
     // exactly once in comparableFields() below. Nothing enforces this -- it is
     // maintained by hand -- and a field that is added here but forgotten there
     // is compared by neither equals() nor hashCode(), which silently defeats
-    // StateFlow conflation for that field alone. Verified in sync at 126/126 (recounted by
+    // StateFlow conflation for that field alone. Verified in sync at 125/125 (recounted by
     // script over constructor vs list) as of this change.
     //
     // The list exists because three fields are FloatArray? (relocaliserDeltaQ,
@@ -273,7 +272,7 @@ data class CueDetatState(
         relocaliserAttemptFrames, snapCandidates, tableScanModel, depthPlane, arDerivedPitch,
         arMeasuredHeightM, arTableMatrix, isArTableLocked, tableFit, depthCapability, arModuleState, arModuleError,
         lockedHsvColor?.toList(), lockedHsvStdDev?.toList(), showAdvancedOptionsDialog,
-        showSupportSheet, showCalibrationScreen, showTableScanScreen,
+        showCalibrationScreen, showTableScanScreen,
         useCustomModel, isSnappingEnabled, hasTargetBallBeenMoved, hasCueBallBeenMoved,
         cannyThreshold1, cannyThreshold2, isAutoCalibrating, showCvMask, isTestingCvMask,
         isCalibratingColor, colorSamplePoint, cameraMatrix, distCoeffs, shotLineAnchor,
@@ -320,6 +319,8 @@ sealed class MainScreenEvent {
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
     data class PanView(val delta: PointF) : MainScreenEvent()
     data class MoveTableZ(val delta: Float) : MainScreenEvent()
+    /** Absolute table height (the slider's thumb value); clamped like [MoveTableZ]. */
+    data class SetTableZ(val value: Float) : MainScreenEvent()
     object ToggleSpinControl : MainScreenEvent()
     object ToggleMasseMode : MainScreenEvent()
     data class SpinApplied(val offset: PointF) : MainScreenEvent()
@@ -355,8 +356,6 @@ sealed class MainScreenEvent {
     data class SetWarning(val warning: String?) : MainScreenEvent()
     object ToggleOrientationLock : MainScreenEvent()
     object ApplyPendingOrientationLock : MainScreenEvent()
-    data class OrientationChanged(val orientationLock: CueDetatState.OrientationLock) :
-        MainScreenEvent()
 
     object UnlockBeginnerView : MainScreenEvent()
     object LockBeginnerView : MainScreenEvent()
@@ -396,7 +395,6 @@ sealed class MainScreenEvent {
     object SingleEventConsumed : MainScreenEvent()
     object Shake : MainScreenEvent()
     object ExitToSplash : MainScreenEvent()
-    data class RestoreState(val state: CueDetatState) : MainScreenEvent()
 
     // Table scan events
     data class LoadTableScan(val model: TableScanModel) : MainScreenEvent()

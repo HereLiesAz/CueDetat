@@ -59,6 +59,11 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             tableZOffset = (state.tableZOffset + action.delta).coerceIn(-50f, 50f)
         )
 
+        // Absolute slider value; set, not summed, so stale composition snapshots can't stack.
+        is MainScreenEvent.SetTableZ -> state.copy(
+            tableZOffset = action.value.coerceIn(-50f, 50f)
+        )
+
         is MainScreenEvent.ApplyQuickAlign -> {
             val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode)
             val newZoomSliderPos = ZoomMapping.zoomToSlider(action.scale, minZoom, maxZoom)
