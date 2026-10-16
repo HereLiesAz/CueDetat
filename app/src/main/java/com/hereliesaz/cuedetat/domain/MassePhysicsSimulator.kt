@@ -156,8 +156,6 @@ object MassePhysicsSimulator {
             points = worldPoints,
             pocketIndex = pocketIndex,
             impactPoints = worldImpacts,
-            isAirborne = false,
-            peakHeight = 0f
         )
     }
 }

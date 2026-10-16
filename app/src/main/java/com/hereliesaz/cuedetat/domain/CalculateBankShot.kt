@@ -64,7 +64,7 @@ class CalculateBankShot @Inject constructor() {
                 val (intersection, normal) = intersectionResult
 
                 // Check if the ball goes into a pocket on its way to the rail or exactly at the rail/corner.
-                val (pocketedOnSegment, pocketIntersectionPoint) = checkPocketAim(
+                val (pocketedOnSegment, pocketIntersectionPoint) = findPocketAim(
                     currentPoint,
                     intersection,
                     state
@@ -100,93 +100,75 @@ class CalculateBankShot @Inject constructor() {
     }
 
     /**
-     * Checks if the segment [start]→[end] (one bank leg, ending at the rail contact) passes
-     * through a pocket's capture circle. Bounded to the segment: a pocket beyond the rail
-     * contact, which the ball never reaches on this leg, does not count.
-     *
-     * @param start The start point of the segment.
-     * @param end The end point of the segment.
-     * @param state The current state.
-     * @return A Pair containing the index of the hit pocket (or null) and the intersection point.
-     */
-    private fun checkPocketAim(
-        start: PointF,
-        end: PointF,
-        state: CueDetatState
-    ): Pair<Int?, PointF?> {
-        val dirX = end.x - start.x
-        val dirY = end.y - start.y
-        val mag = sqrt(dirX * dirX + dirY * dirY)
-        if (mag < 0.001f) return Pair(null, null)
-
-
-        val pockets = state.table.pockets
-        // Define effective pocket radius for hit detection (slightly larger than physical hole).
-        val pocketRadius = state.protractorUnit.radius * 1.8f
-
-        var closestIntersection: PointF? = null
-        var closestPocketIndex: Int? = null
-        var minDistanceSq = Float.MAX_VALUE
-
-        // Check intersection against every pocket on the table.
-        pockets.forEachIndexed { index, pocket ->
-            // Use math to find intersection between line segment and circle.
-            val intersection = getSegmentCircleEntry(start, end, pocket, pocketRadius)
-            if (intersection != null) {
-                // Verify direction: Dot product ensures the pocket is in FRONT of the start point, not behind.
-                val vecToPocketX = pocket.x - start.x
-                val vecToPocketY = pocket.y - start.y
-                val dotProduct = vecToPocketX * (dirX / mag) + vecToPocketY * (dirY / mag)
-                if (dotProduct > 0) {
-                    // Check if this pocket is closer than any previously found pocket (find the FIRST hit).
-                    val distSq = (intersection.x - start.x).pow(2) + (intersection.y - start.y).pow(2)
-                    if (distSq < minDistanceSq) {
-                        minDistanceSq = distSq
-                        closestIntersection = intersection
-                        closestPocketIndex = index
-                    }
-                }
-            }
-        }
-        return Pair(closestPocketIndex, closestIntersection)
-    }
-
-    /**
-     * Entry point of the segment [p1]→[p2] into a circle, or null if the segment does not
-     * reach it (entry parameter t outside [0, 1]). A segment starting inside the circle
-     * returns [p1].
-     *
-     * Solves the quadratic equation derived from substituting the line equation into the circle equation.
-     */
-    private fun getSegmentCircleEntry(p1: PointF, p2: PointF, circleCenter: PointF, radius: Float): PointF? {
-        val dx = p2.x - p1.x
-        val dy = p2.y - p1.y
-        // Coefficients for quadratic equation: at^2 + bt + c = 0
-        val a = dx * dx + dy * dy
-        if (a < 0.0001f) return null // Line length is zero.
-
-        val b = 2 * (dx * (p1.x - circleCenter.x) + dy * (p1.y - circleCenter.y))
-        val c = (p1.x - circleCenter.x).pow(2) + (p1.y - circleCenter.y).pow(2) - radius * radius
-
-        val delta = b * b - 4 * a * c
-        if (delta < 0) return null // No real roots -> No intersection.
-
-        // Find t for the first intersection point (using -sqrt(delta)).
-        val sq = sqrt(delta)
-        val tEnter = (-b - sq) / (2 * a)
-        val tExit = (-b + sq) / (2 * a)
-        if (tExit < 0f || tEnter > 1f) return null
-        val t = tEnter.coerceAtLeast(0f)
-
-        // Calculate coordinates using parameter t.
-        return PointF(p1.x + t * dx, p1.y + t * dy)
-    }
-
-    /**
      * Normalizes a vector to have a magnitude of 1.
      */
     private fun normalize(p: PointF): PointF {
         val mag = kotlin.math.hypot(p.x.toDouble(), p.y.toDouble()).toFloat()
         return if (mag > 0.001f) PointF(p.x / mag, p.y / mag) else PointF(0f, 0f)
     }
+}
+
+/** Effective pocket capture radius, as a multiple of the ball radius. */
+private const val POCKET_CAPTURE_RADIUS_FACTOR = 1.8f
+
+/**
+ * Checks if the segment [start]→[end] passes through a pocket's capture circle (the single shared
+ * pocket-aim test for bank legs and direct/banked aim lines). Bounded to the segment: a pocket
+ * beyond [end] does not count, so callers wanting a ray pass an already-extended [end].
+ *
+ * @return the index of the first pocket hit along the segment (or null) and its entry point.
+ */
+internal fun findPocketAim(
+    start: PointF,
+    end: PointF,
+    state: CueDetatState,
+): Pair<Int?, PointF?> {
+    val dirX = end.x - start.x
+    val dirY = end.y - start.y
+    val mag = sqrt(dirX * dirX + dirY * dirY)
+    if (mag < 0.001f) return Pair(null, null)
+
+    val pocketRadius = state.protractorUnit.radius * POCKET_CAPTURE_RADIUS_FACTOR
+
+    var closestIntersection: PointF? = null
+    var closestPocketIndex: Int? = null
+    var minDistanceSq = Float.MAX_VALUE
+
+    state.table.pockets.forEachIndexed { index, pocket ->
+        val intersection = segmentCircleEntry(start, end, pocket, pocketRadius)
+        if (intersection != null) {
+            // The pocket must be in FRONT of the start point, not behind.
+            val dot = (pocket.x - start.x) * (dirX / mag) + (pocket.y - start.y) * (dirY / mag)
+            if (dot > 0) {
+                val distSq = (intersection.x - start.x).pow(2) + (intersection.y - start.y).pow(2)
+                if (distSq < minDistanceSq) {
+                    minDistanceSq = distSq
+                    closestIntersection = intersection
+                    closestPocketIndex = index
+                }
+            }
+        }
+    }
+    return Pair(closestPocketIndex, closestIntersection)
+}
+
+/**
+ * Entry point of the segment [p1]→[p2] into a circle, or null if the segment does not reach it
+ * (entry parameter t outside [0, 1]). A segment starting inside the circle returns [p1].
+ */
+private fun segmentCircleEntry(p1: PointF, p2: PointF, circleCenter: PointF, radius: Float): PointF? {
+    val dx = p2.x - p1.x
+    val dy = p2.y - p1.y
+    val a = dx * dx + dy * dy
+    if (a < 0.0001f) return null
+    val b = 2 * (dx * (p1.x - circleCenter.x) + dy * (p1.y - circleCenter.y))
+    val c = (p1.x - circleCenter.x).pow(2) + (p1.y - circleCenter.y).pow(2) - radius * radius
+    val delta = b * b - 4 * a * c
+    if (delta < 0) return null
+    val sq = sqrt(delta)
+    val tEnter = (-b - sq) / (2 * a)
+    val tExit = (-b + sq) / (2 * a)
+    if (tExit < 0f || tEnter > 1f) return null
+    val t = tEnter.coerceAtLeast(0f)
+    return PointF(p1.x + t * dx, p1.y + t * dy)
 }

@@ -2,6 +2,8 @@
 
 package com.hereliesaz.cuedetat.ui.composables.sliders
 
+import androidx.compose.ui.res.stringResource
+import com.hereliesaz.cuedetat.R
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -37,7 +39,7 @@ fun LockViewButton(
     ) {
         Icon(
             imageVector = if (isLocked) Icons.Filled.Lock else Icons.Filled.LockOpen,
-            contentDescription = if (isLocked) "Unlock view" else "Lock view",
+            contentDescription = stringResource(if (isLocked) R.string.lock_view_unlock else R.string.lock_view_lock),
             tint = if (isLocked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
         )
     }

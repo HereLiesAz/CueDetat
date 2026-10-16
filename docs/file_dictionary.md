@@ -105,7 +105,6 @@ This file contains a list of all non-ignored files in the repository and a brief
 *   `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/CameraBackground.kt`: Standard CameraX preview composable bound to `ImageAnalysis`. Used when `cameraMode` is `CAMERA` or `CAMERA_ONLY`.
 *   `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/CuedetatButton.kt`: Custom Material 3 button composable matching the app's visual style.
 *   `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/MasseControl.kt`: Draggable widget for selecting the massé impact point and attack angle.
-*   `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/MasseShot.kt`: Composable that visualizes the massé shot trajectory overlay.
 *   `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/SpinControl.kt`: Composable widget for selecting sidespin (English) magnitude and angle via a circular touch target.
 *   `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/SplashScreen.kt`: Initial splash composable that presents the experience-mode selection on first launch.
 *   `app/src/main/java/com/hereliesaz/cuedetat/ui/composables/TopControls.kt`: Top-of-screen overlay controls (e.g., color lock picker).

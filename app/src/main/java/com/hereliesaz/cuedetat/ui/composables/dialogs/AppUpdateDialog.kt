@@ -2,10 +2,12 @@
 
 package com.hereliesaz.cuedetat.ui.composables.dialogs
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.update.UpdateSource
 
 /**
@@ -24,14 +26,14 @@ fun AppUpdateDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(if (fromPlay) "Google Play update available" else "GitHub update available")
+            Text(stringResource(if (fromPlay) R.string.update_play_title else R.string.update_github_title))
         },
         text = {
             Text(
                 if (fromPlay) {
-                    "A newer Google Play build ($versionName) is available. Open Google Play to update?"
+                    stringResource(R.string.update_play_body, versionName)
                 } else {
-                    "Version $versionName is available on GitHub. Download it now?"
+                    stringResource(R.string.update_github_body, versionName)
                 }
             )
         },
@@ -39,10 +41,10 @@ fun AppUpdateDialog(
             TextButton(onClick = {
                 onInstall()
                 onDismiss()
-            }) { Text(if (fromPlay) "Open Google Play" else "Download") }
+            }) { Text(stringResource(if (fromPlay) R.string.update_play_action else R.string.update_github_action)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Later") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_later)) }
         },
     )
 }

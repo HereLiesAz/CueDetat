@@ -2,6 +2,8 @@
 
 package com.hereliesaz.cuedetat.ui.composables
 
+import androidx.compose.ui.res.stringResource
+import com.hereliesaz.cuedetat.R
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -44,6 +46,8 @@ fun TopControls(
     onCycleTableSize: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val changeSizeAction = stringResource(R.string.top_table_size_change_action)
+    val tableSizeA11y = stringResource(R.string.top_table_size_a11y, tableSizeFeet)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -64,18 +68,18 @@ fun TopControls(
                         horizontalAlignment = Alignment.End,
                         modifier = Modifier
                             .clickable(
-                                onClickLabel = "Change Table Size",
+                                onClickLabel = changeSizeAction,
                                 role = Role.Button,
                                 onClick = onCycleTableSize
                             )
                             // No "double tap to cycle": TalkBack announces the click action itself.
                             .semantics {
-                                contentDescription = "Current table size: ${tableSizeFeet} feet."
+                                contentDescription = tableSizeA11y
                             }
                             .padding(8.dp)
                     ) {
                         Text(
-                            text = "Table Size",
+                            text = stringResource(R.string.top_table_size_label),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
@@ -95,17 +99,17 @@ fun TopControls(
                             if (distanceUnit == DistanceUnit.IMPERIAL) {
                                 val feet = (targetBallDistance / 12).toInt()
                                 val inches = (targetBallDistance % 12).toInt()
-                                "$feet ft $inches in"
+                                stringResource(R.string.distance_ft_in, feet, inches)
                             } else {
                                 val cm = (targetBallDistance * 2.54).toInt()
-                                "$cm cm"
+                                stringResource(R.string.distance_cm, cm)
                             }
                         } else {
                             "--"
                         }
 
                         Text(
-                            text = "Distance",
+                            text = stringResource(R.string.top_distance_label),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )

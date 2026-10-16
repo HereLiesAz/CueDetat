@@ -463,7 +463,7 @@ class GestureReducer @Inject constructor() {
         )
         if (currentTargetRadiusScreen <= 0f) return state.zoomSliderPosition
 
-        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode)
+        val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked)
         val currentZoom = ZoomMapping.sliderToZoom(state.zoomSliderPosition, minZoom, maxZoom)
         val ratio = bboxRadiusCanvas / currentTargetRadiusScreen
         val newZoom = (currentZoom * ratio).coerceIn(minZoom, maxZoom)

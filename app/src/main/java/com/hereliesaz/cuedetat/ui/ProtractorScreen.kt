@@ -1,6 +1,8 @@
 // app/src/main/java/com/hereliesaz/cuedetat/ui/ProtractorScreen.kt
 package com.hereliesaz.cuedetat.ui
 
+import androidx.compose.ui.res.stringResource
+import com.hereliesaz.cuedetat.R
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -86,6 +88,7 @@ fun ProtractorScreen(
     val captureNeedsConsent by mainViewModel.captureNeedsConsent.collectAsStateWithLifecycle()
     val debugLogEnabled by mainViewModel.debugLogEnabled.collectAsStateWithLifecycle()
     val shareContext = androidx.compose.ui.platform.LocalContext.current
+    val nothingLoggedText = stringResource(R.string.toast_nothing_logged)
 
     AzNavRailMenu(
         uiState = uiState,
@@ -99,7 +102,7 @@ fun ProtractorScreen(
         onShareDebugLog = {
             val intent = mainViewModel.debugLogShareIntent()
             if (intent != null) shareContext.startActivity(intent)
-            else android.widget.Toast.makeText(shareContext, "Nothing logged yet.", android.widget.Toast.LENGTH_SHORT).show()
+            else android.widget.Toast.makeText(shareContext, nothingLoggedText, android.widget.Toast.LENGTH_SHORT).show()
         },
     ) {
         // --- Background layer 0: Camera ---

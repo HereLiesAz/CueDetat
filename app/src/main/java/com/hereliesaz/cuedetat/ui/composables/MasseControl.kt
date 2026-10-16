@@ -72,6 +72,7 @@ fun MasseControl(
     }
     val stickPath = remember { Path() }
     val masseDescription = stringResource(R.string.masse_control_description)
+    val wheelLabel = stringResource(R.string.masse_wheel_label)
     val masseState = stringResource(
         R.string.masse_state,
         spinStateDescription(selectedSpinOffset ?: lingeringSpinOffset),
@@ -163,7 +164,7 @@ fun MasseControl(
                 drawIntoCanvas { canvas ->
                     labelPaint.color = android.graphics.Color.argb((180 * spinPathAlpha).toInt(), 30, 30, 30)
                     labelPaint.textSize = labelTextSize
-                    canvas.nativeCanvas.drawText("TOP", center.x, center.y + labelTextSize * 0.35f, labelPaint)
+                    canvas.nativeCanvas.drawText(wheelLabel, center.x, center.y + labelTextSize * 0.35f, labelPaint)
                 }
 
                 // Indicators

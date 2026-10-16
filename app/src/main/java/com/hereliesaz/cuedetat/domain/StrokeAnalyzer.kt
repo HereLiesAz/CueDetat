@@ -60,11 +60,17 @@ class StrokeAnalyzer {
         const val DTW_THRESHOLD_ELEVATED = 5f
     }
 
+    /**
+     * Compares [current] against [baseline]. Returns null when either is empty: with no baseline
+     * there is no similarity to measure, and a default score of 1.0 would bless that absence.
+     */
     fun analyzeStroke(
         baseline: List<StrokeProfile>,
         current: List<StrokeProfile>,
         heartRate: Float
-    ): AnalyticsResult {
+    ): AnalyticsResult? {
+        // No baseline (or no stroke) means nothing to compare against: no score, not a perfect one.
+        if (baseline.isEmpty() || current.isEmpty()) return null
         // Extract forward acceleration (assuming Y-axis is along the cue stick)
         val baselineY = baseline.map { it.acceleration[1] }.toFloatArray()
         val currentY = current.map { it.acceleration[1] }.toFloatArray()

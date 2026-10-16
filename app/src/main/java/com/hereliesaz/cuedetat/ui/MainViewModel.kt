@@ -120,6 +120,12 @@ class MainViewModel @Inject constructor(
     }
 
     private var experienceModeUpdateJob: Job? = null
+
+    /** Debounce for the orientation-lock cycler; mirrors [experienceModeUpdateJob]. */
+    private var orientationLockApplyJob: Job? = null
+
+    /** Fades the spin paths after the dial is released; see [startSpinPathDecay]. */
+    private var spinDecayJob: Job? = null
     private var saveJob: Job? = null
 
     /** Latest state awaiting persistence by [saveJob]; written on the main thread only. */
@@ -524,6 +530,44 @@ class MainViewModel @Inject constructor(
 
         handleSingleEvents(logicalEvent)
         tableSnapSideEffects(logicalEvent, currentState, _uiState.value)
+        timedSideEffects(logicalEvent)
+    }
+
+    /**
+     * Timers a pure reducer cannot own. [MainScreenEvent.ToggleOrientationLock] only stages
+     * `pendingOrientationLock`; after the user stops cycling, [MainScreenEvent.ApplyPendingOrientationLock]
+     * commits it, which MainActivity's `requestedOrientation` effect observes. Spin paths fade via
+     * [MainScreenEvent.SpinPathTick] from release until alpha reaches 0.
+     */
+    private fun timedSideEffects(event: MainScreenEvent) {
+        when (event) {
+            is MainScreenEvent.ToggleOrientationLock -> {
+                orientationLockApplyJob?.cancel()
+                orientationLockApplyJob = viewModelScope.launch {
+                    delay(ORIENTATION_LOCK_DEBOUNCE_MS)
+                    onEvent(MainScreenEvent.ApplyPendingOrientationLock)
+                }
+            }
+            is MainScreenEvent.SpinSelectionEnded -> startSpinPathDecay()
+            // A fresh spin (alpha back to 1) or a cleared/closed dial ends any running fade.
+            is MainScreenEvent.SpinApplied, is MainScreenEvent.ClearSpinState,
+            is MainScreenEvent.ToggleSpinControl, is MainScreenEvent.ToggleMasseMode -> {
+                spinDecayJob?.cancel()
+                spinDecayJob = null
+            }
+            else -> Unit
+        }
+    }
+
+    /** Bounded: ticks every [SPIN_DECAY_TICK_MS] and stops once `spinPathsAlpha` hits 0 (about 20 ticks). */
+    private fun startSpinPathDecay() {
+        spinDecayJob?.cancel()
+        spinDecayJob = viewModelScope.launch {
+            while (_uiState.value.spinPathsAlpha > 0f) {
+                delay(SPIN_DECAY_TICK_MS)
+                onEvent(MainScreenEvent.SpinPathTick)
+            }
+        }
     }
 
     // --- Table snap and pose memory (see TableSnapPolicy, TablePosePrior) --------------------
@@ -792,3 +836,9 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { _singleEvent.emit(event) }
     }
 }
+
+/** Pause after the last orientation-lock tap before the lock is applied. */
+private const val ORIENTATION_LOCK_DEBOUNCE_MS = 1000L
+
+/** Interval between [MainScreenEvent.SpinPathTick]s; the reducer removes 0.05 alpha per tick. */
+private const val SPIN_DECAY_TICK_MS = 50L

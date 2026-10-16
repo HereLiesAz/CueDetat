@@ -38,7 +38,7 @@ class StrokeAnalyzerTest {
     @Test
     fun `identical sequences produce a perfect fluidity score`() {
         val stroke = smoothStroke()
-        val result = analyzer.analyzeStroke(baseline = stroke, current = stroke, heartRate = 60f)
+        val result = analyzer.analyzeStroke(baseline = stroke, current = stroke, heartRate = 60f)!!
 
         assertEquals(1.0f, result.fluidityScore, 0.001f)
     }
@@ -48,7 +48,7 @@ class StrokeAnalyzerTest {
         val baseline = smoothStroke(base = 1f, step = 0.05f)
         val current = erraticStroke()
 
-        val result = analyzer.analyzeStroke(baseline = baseline, current = current, heartRate = 60f)
+        val result = analyzer.analyzeStroke(baseline = baseline, current = current, heartRate = 60f)!!
 
         assertTrue(
             "Expected fluidityScore < 1.0 for a divergent stroke but was ${result.fluidityScore}",
@@ -67,23 +67,27 @@ class StrokeAnalyzerTest {
             baseline = baseline,
             current = smoothStroke(base = 1f, step = 0.05f),
             heartRate = 60f
-        ).fluidityScore
+        )!!.fluidityScore
 
         val divergentScore = analyzer.analyzeStroke(
             baseline = baseline,
             current = erraticStroke(),
             heartRate = 60f
-        ).fluidityScore
+        )!!.fluidityScore
 
         assertTrue(divergentScore < closeMatchScore)
         assertTrue(divergentScore < 1.0f)
     }
 
     @Test
-    fun `empty baseline still returns a defined result without throwing`() {
-        // No baseline captured yet (e.g. before the first calibration stroke).
-        val result = analyzer.analyzeStroke(baseline = emptyList(), current = smoothStroke(), heartRate = 60f)
-        assertEquals(1.0f, result.fluidityScore, 0.001f)
+    fun `empty baseline yields no score rather than a perfect one`() {
+        // No baseline captured yet: there is nothing to compare against, so no result at all.
+        assertNull(analyzer.analyzeStroke(baseline = emptyList(), current = smoothStroke(), heartRate = 60f))
+    }
+
+    @Test
+    fun `empty current stroke yields no score`() {
+        assertNull(analyzer.analyzeStroke(baseline = smoothStroke(), current = emptyList(), heartRate = 60f))
     }
 
     // --- isErratic ---
@@ -94,7 +98,7 @@ class StrokeAnalyzerTest {
         val baseline = smoothStroke()
         val current = (0 until 50).map { i -> profile(time = i.toLong(), ay = 1f, gx = 5f, gz = 5f) }
 
-        val result = analyzer.analyzeStroke(baseline = baseline, current = current, heartRate = 140f)
+        val result = analyzer.analyzeStroke(baseline = baseline, current = current, heartRate = 140f)!!
 
         assertTrue(result.isErratic)
     }
@@ -106,7 +110,7 @@ class StrokeAnalyzerTest {
         val stroke = smoothStroke()
         val twisted = stroke.map { profile(it.time, it.acceleration[1], gx = 5f, gz = 5f) }
 
-        val result = analyzer.analyzeStroke(baseline = stroke, current = twisted, heartRate = 60f)
+        val result = analyzer.analyzeStroke(baseline = stroke, current = twisted, heartRate = 60f)!!
 
         assertEquals(1.0f, result.twistPenalty, 1e-6f)
         assertTrue(result.isErratic)
@@ -117,7 +121,7 @@ class StrokeAnalyzerTest {
         val baseline = smoothStroke(base = 1f, step = 0.05f)
         val current = erraticStroke()
 
-        val result = analyzer.analyzeStroke(baseline = baseline, current = current, heartRate = 60f)
+        val result = analyzer.analyzeStroke(baseline = baseline, current = current, heartRate = 60f)!!
 
         assertTrue(result.isErratic)
     }
@@ -125,7 +129,7 @@ class StrokeAnalyzerTest {
     @Test
     fun `isErratic does not fire for a smooth stroke matching the baseline`() {
         val stroke = smoothStroke()
-        val result = analyzer.analyzeStroke(baseline = stroke, current = stroke, heartRate = 60f)
+        val result = analyzer.analyzeStroke(baseline = stroke, current = stroke, heartRate = 60f)!!
 
         assertFalse(result.isErratic)
     }
@@ -136,8 +140,8 @@ class StrokeAnalyzerTest {
         // Mean twist 0.3 + 0.3 = 0.6: under the resting threshold (0.8), over the elevated one (0.5).
         val current = baseline.map { profile(it.time, it.acceleration[1], gx = 0.3f, gz = 0.3f) }
 
-        val calmResult = analyzer.analyzeStroke(baseline = baseline, current = current, heartRate = 80f)
-        val excitedResult = analyzer.analyzeStroke(baseline = baseline, current = current, heartRate = 140f)
+        val calmResult = analyzer.analyzeStroke(baseline = baseline, current = current, heartRate = 80f)!!
+        val excitedResult = analyzer.analyzeStroke(baseline = baseline, current = current, heartRate = 140f)!!
 
         assertFalse(calmResult.isErratic)
         assertTrue(excitedResult.isErratic)

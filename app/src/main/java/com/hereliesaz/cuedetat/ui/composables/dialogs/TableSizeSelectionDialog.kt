@@ -1,5 +1,6 @@
 package com.hereliesaz.cuedetat.ui.composables.dialogs
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,6 +11,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.view.state.TableSize
@@ -31,7 +33,7 @@ fun TableSizeSelectionDialog(
     if (uiState.showTableSizeDialog) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Select Table Size", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            title = { Text(stringResource(R.string.table_size_dialog_title), color = MaterialTheme.colorScheme.onSurfaceVariant) },
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f),
             text = {
                 Column(
@@ -43,14 +45,14 @@ fun TableSizeSelectionDialog(
                             onClick = { onEvent(MainScreenEvent.SetTableSize(size)); onDismiss() },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(text = "${size.feet}' Table")
+                            Text(text = stringResource(R.string.table_size_option, size.feet))
                         }
                     }
                 }
             },
             confirmButton = {
                 TextButton(onClick = onDismiss) {
-                    Text("Cancel", color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.action_cancel), color = MaterialTheme.colorScheme.primary)
                 }
             }
         )

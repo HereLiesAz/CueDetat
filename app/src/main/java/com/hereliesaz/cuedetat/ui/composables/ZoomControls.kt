@@ -2,6 +2,9 @@
 
 package com.hereliesaz.cuedetat.ui.composables
 
+import androidx.compose.ui.res.stringResource
+import com.hereliesaz.cuedetat.R
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +29,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 
 
 /**
@@ -58,7 +62,7 @@ fun ZoomControls(
         IconButton(onClick = { onZoomChange(zoomSliderPosition + 1) }) {
             Icon(
                 Icons.Default.Add,
-                contentDescription = "Zoom In",
+                contentDescription = stringResource(R.string.zoom_in_a11y),
                 tint = MaterialTheme.colorScheme.onSurface
             )
         }
@@ -68,7 +72,7 @@ fun ZoomControls(
             VerticalSlider(
                 value = zoomSliderPosition,
                 onValueChange = onZoomChange,
-                description = "Zoom Level"
+                description = stringResource(R.string.zoom_level_a11y)
             )
         }
 
@@ -76,7 +80,7 @@ fun ZoomControls(
         IconButton(onClick = { onZoomChange(zoomSliderPosition - 1) }) {
             Icon(
                 Icons.Default.Remove,
-                contentDescription = "Zoom Out",
+                contentDescription = stringResource(R.string.zoom_out_a11y),
                 tint = MaterialTheme.colorScheme.onSurface
             )
         }
@@ -88,7 +92,7 @@ fun ZoomControls(
             VerticalSlider(
                 value = tableHeight,
                 onValueChange = onTableHeightChange,
-                description = "Table Height"
+                description = stringResource(R.string.table_height_a11y)
             )
         }
     }
@@ -104,6 +108,7 @@ private fun VerticalSlider(
     onValueChange: (Float) -> Unit,
     description: String,
 ) {
+    val valueText = value.roundToInt().toString()
     Slider(
         value = value,
         onValueChange = onValueChange,
@@ -114,7 +119,10 @@ private fun VerticalSlider(
             inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
         ),
         modifier = Modifier
-            .semantics { contentDescription = description }
+            .semantics {
+                contentDescription = description
+                stateDescription = valueText
+            }
             .graphicsLayer {
                 // Rotate the horizontal slider to be vertical.
                 rotationZ = 270f
@@ -135,6 +143,6 @@ private fun VerticalSlider(
                 }
             }
             .fillMaxHeight()
-            .height(32.dp) // Thickness of the slider track/thumb area.
+            .height(48.dp) // Thickness of the slider track/thumb area; 48 dp minimum touch target.
     )
 }
