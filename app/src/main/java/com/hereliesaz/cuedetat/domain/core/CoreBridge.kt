@@ -18,6 +18,10 @@ import com.hereliesaz.cuedetat.view.state.TableSize
 /**
  * The seam between the app's legacy logical plane and the metric core.
  *
+ * Status: this object currently has NO callers in app/, feature_expert_ar/ or wear/.
+ * The app still runs its own ShotAdvisor, homography and spin physics; migrating
+ * them onto core through this bridge is tracked in REBUILD_PLAN.md.
+ *
  * ## Why a bridge rather than a rewrite
  *
  * The app still computes and renders in the old dimensionless plane, where
@@ -50,6 +54,12 @@ object CoreBridge {
     const val LOGICAL_UNITS_PER_METER: Double = LOGICAL_UNITS_PER_INCH / METERS_PER_INCH
 
     // ── Conversions ─────────────────────────────────────────────────────────
+    //
+    // Handedness: the legacy logical plane is drawn with +y toward the bottom of the screen
+    // (the head spot sits at +logicalHeight/4), i.e. a left-handed frame seen from above.
+    // The core table frame is right-handed with z up, where positive angles are
+    // counter-clockwise from above. Points therefore cross with y NEGATED, so that a core
+    // CCW angle is CCW on screen and right english deflects the way the player sees it.
 
     fun Float.logicalToLength(): Length = Length(this / LOGICAL_UNITS_PER_METER)
 
@@ -57,11 +67,11 @@ object CoreBridge {
 
     /** A legacy logical point as a metric table-plane point. */
     fun PointF.toTablePlane(): Vec2 =
-        Vec2(x / LOGICAL_UNITS_PER_METER, y / LOGICAL_UNITS_PER_METER)
+        Vec2(x / LOGICAL_UNITS_PER_METER, -y / LOGICAL_UNITS_PER_METER)
 
     /** A metric table-plane point back in legacy logical coordinates. */
     fun Vec2.toLogicalPoint(): PointF =
-        PointF((x * LOGICAL_UNITS_PER_METER).toFloat(), (y * LOGICAL_UNITS_PER_METER).toFloat())
+        PointF((x * LOGICAL_UNITS_PER_METER).toFloat(), (-y * LOGICAL_UNITS_PER_METER).toFloat())
 
     // ── Specs ───────────────────────────────────────────────────────────────
 
@@ -74,15 +84,17 @@ object CoreBridge {
     /**
      * Reads the tip offset the spin dial has set.
      *
-     * The dial's `selectedSpinOffset` is already normalised to −1..1 in each
-     * axis, which is exactly the miscue-limit convention [Spin] uses, so this is
-     * a rename rather than a conversion. It is clamped into the miscue circle
+     * The dial's `selectedSpinOffset` is normalised to −1..1 in each axis, the
+     * miscue-limit convention [Spin] uses, but its y is screen-down (+y = strike
+     * low = draw; see SpinReducer.SpinApplied) while [Spin.vertical] is +1 = follow,
+     * so y is negated. Side is shooter-relative and crosses unchanged (+x = right
+     * english = [Spin.side] > 0). It is clamped into the miscue circle
      * because the dial's corners are outside it — you cannot strike a ball at
      * full right *and* full draw.
      */
     fun spinFrom(state: CueDetatState): Spin {
         val offset = state.selectedSpinOffset ?: state.lingeringSpinOffset ?: return Spin.NONE
-        return Spin(side = offset.x.toDouble(), vertical = offset.y.toDouble())
+        return Spin(side = offset.x.toDouble(), vertical = -offset.y.toDouble())
             .clampedToMiscueLimit()
     }
 
@@ -95,6 +107,12 @@ object CoreBridge {
      * Returns `null` when the state has no cue ball placed — in dynamic beginner
      * mode the shot line is anchored to the bottom of the screen rather than to
      * a ball, and there is nothing physical to solve.
+     *
+     * A non-null result may still have `isPossible == false` (cut beyond what
+     * contact can deliver); callers must check it. `cueBallDeparture` may be the
+     * zero vector (a full-ball stun shot leaves the cue ball at rest) — do not
+     * normalise it blindly. Angles in the result are core-frame: positive = CCW
+     * seen from above, which after the y-flip in [toTablePlane] is CCW on screen.
      */
     fun solveAim(
         state: CueDetatState,
@@ -119,15 +137,18 @@ object CoreBridge {
      *
      * This is a number the old app could not produce at all, and it is the one
      * players most need: it says how far off the textbook ghost ball the real
-     * aim is, and which way.
+     * aim is, and which way. Null when there is no cue ball or the cut is
+     * impossible (an impossible shot has no meaningful throw). Sign: positive =
+     * CCW on screen (core frame, y-flipped at the boundary).
      */
     fun throwAngleFor(state: CueDetatState, target: PointF): Angle? =
-        solveAim(state, target)?.throwAngle
+        solveAim(state, target)?.takeIf { it.isPossible }?.throwAngle
 
     /**
      * Distance between two logical points, as a real length.
      *
-     * Replaces the old readout, which was `1200f / screenRadiusInPixels`
+     * Intended to replace the old readout — NOT yet wired: UpdateStateUseCase
+     * still computes targetBallDistance the old way, which is `1200f / screenRadiusInPixels`
      * displayed as feet and inches — a number that changed when the user moved
      * the zoom slider, because it was derived from the projection rather than
      * from the table.

@@ -11,9 +11,9 @@ enum class PocketId { TL, TR, BL, BR, SL, SR }
 /**
  * One pocket's accumulated observation data.
  *
- * logicalPosition: current best estimate of pocket centre in logical (inch) space.
+ * logicalPosition: current best estimate of pocket centre in logical space (logical units, ≈22.2 per inch; see TableFrameHomography.LOGICAL_UNITS_PER_INCH).
  * observationCount: number of times this pocket has been detected. More observations → lower variance.
- * variance: spread of detections (logical inches²). Shrinks with more observations.
+ * variance: spread of detections (logical units²). Shrinks with more observations.
  */
 @Keep
 data class PocketCluster(

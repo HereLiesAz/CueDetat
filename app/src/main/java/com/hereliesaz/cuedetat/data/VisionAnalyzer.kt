@@ -7,8 +7,6 @@ import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import com.hereliesaz.cuedetat.domain.CueDetatState
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,9 +17,6 @@ class VisionAnalyzer @Inject constructor(
 ) : ImageAnalysis.Analyzer {
 
     private val uiStateRef = AtomicReference<CueDetatState?>(null)
-
-    private val _currentFrameBitmap = MutableStateFlow<Bitmap?>(null)
-    val currentFrameBitmap: StateFlow<Bitmap?> = _currentFrameBitmap
 
     fun updateUiState(newState: CueDetatState) {
         uiStateRef.set(newState)
@@ -45,7 +40,6 @@ class VisionAnalyzer @Inject constructor(
     }
 
     fun analyze(bitmap: Bitmap?, state: CueDetatState, imageProxy: ImageProxy? = null) {
-        _currentFrameBitmap.value = bitmap
         if (state.experienceMode == com.hereliesaz.cuedetat.domain.ExperienceMode.HATER) {
             imageProxy?.close()
             return
@@ -62,6 +56,11 @@ class VisionAnalyzer @Inject constructor(
     private var outputBitmap: Bitmap? = null
     private var pixelBuffer: IntArray? = null
 
+    /**
+     * YUV_420_888 to ARGB in raw sensor orientation; rotation is deliberately not applied here.
+     * VisionRepository reads `imageInfo.rotationDegrees` itself and rotates / maps with
+     * CameraViewMapping.fillCenter, so rotating here would double-rotate.
+     */
     @OptIn(ExperimentalGetImage::class)
     private fun ImageProxy.toBitmap(): Bitmap? {
         val image = this.image ?: return null

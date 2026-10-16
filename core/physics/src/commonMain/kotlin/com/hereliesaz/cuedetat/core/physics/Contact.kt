@@ -47,6 +47,26 @@ import kotlin.math.sin
  * players know: throw peaks at slow speed and moderate cut, and washes out as
  * speed rises.
  *
+ * ## Frame and sign conventions
+ *
+ * All vectors are in the right-handed table frame: `x`, `y` in the cloth plane,
+ * `z` up out of the cloth, so a positive [Angle] is a counter-clockwise rotation
+ * seen from above and `Vec2.perpendicular` is the vector's **left** when looking
+ * along it.
+ *
+ *  - **Cut-induced throw.** At contact the cue ball's surface slides across the
+ *    object ball with the cue ball's velocity component perpendicular to the
+ *    line of centres. Friction on the *object* ball acts along that sliding
+ *    motion, so the object ball is thrown **toward the side the cue ball is
+ *    travelling**, i.e. the line of centres rotates toward the approach and the
+ *    shot is undercut. The aim must therefore be *over*cut to compensate.
+ *  - **Spin-induced throw.** Right english (`Spin.side > 0`, tip right of
+ *    centre) gives the cue ball counter-clockwise spin seen from above
+ *    (`ω_z > 0`: a forward push right of centre has torque `r × F` along `+z`).
+ *    The surface at the front contact point then moves along
+ *    `ω_z ẑ × (R·lineOfCenters) = +ω_z R · lineOfCenters.perpendicular`, i.e. to
+ *    the left, so right english alone throws the object ball **left**.
+ *
  * Constants are from published measurements of ball-ball friction (the
  * exponential fit for `mu` against relative surface speed is the standard one
  * used in the billiards-physics literature). They are dimensional and stated in
@@ -72,8 +92,12 @@ object Contact {
      *
      * @param objectBallDirection true direction the object ball departs, i.e. the
      *   line of centres already corrected for throw.
-     * @param cueBallDirection direction the cue ball departs.
-     * @param throwAngle signed correction applied to the line of centres.
+     * @param cueBallDirection direction the cue ball departs, or [Vec2.ZERO] when
+     *   it has no departure direction at all (a dead-straight stun shot: the cue
+     *   ball stops on the spot).
+     * @param throwAngle signed rotation from the line of centres to
+     *   [objectBallDirection]; positive is counter-clockwise (see the frame
+     *   conventions on [Contact]).
      * @param cutAngle angle between the cue ball's path and the line of centres.
      */
     data class Result(
@@ -105,19 +129,21 @@ object Contact {
         val cosCut = cos(cutAngle.radians)
         val sinCut = sin(cutAngle.radians)
 
-        // Which side of the line of centres the cue ball is cutting from.
-        // Positive means the object ball is thrown toward +perpendicular.
+        // Which side of the line of centres the cue ball's tangential motion is
+        // on: +1 when it moves toward lineOfCenters.perpendicular (left).
         val cutSide = if ((loc cross a) >= 0.0) 1.0 else -1.0
 
         val normalSpeed = speed.metersPerSecond * cosCut
 
-        // Relative surface speed at the contact point has two contributions:
+        // Sliding velocity of the cue-ball surface at the contact point, as a
+        // signed component along lineOfCenters.perpendicular. Two contributions:
         // the tangential component of the cue ball's travel, and the surface
-        // speed of any side spin. English can add to or cancel the sliding, which
-        // is exactly why english changes throw — spin-induced throw.
+        // speed of side spin (right english moves the front surface toward
+        // +perpendicular — see the class KDoc). English can add to or cancel the
+        // sliding, which is exactly why english changes throw.
         val tangentialFromCut = speed.metersPerSecond * sinCut * cutSide
         val tangentialFromSpin = spin.surfaceSpeed(speed, ball).metersPerSecond
-        val relativeSurface = tangentialFromCut - tangentialFromSpin
+        val relativeSurface = tangentialFromCut + tangentialFromSpin
 
         val mu = frictionCoefficient(Speed(abs(relativeSurface)))
         val frictionLimited = mu * normalSpeed
@@ -127,9 +153,11 @@ object Contact {
         val throwMagnitude =
             if (normalSpeed <= 1e-9) 0.0 else atan(tangentialTransfer / normalSpeed)
 
-        // Friction opposes relative sliding, so the object ball is thrown
-        // opposite the direction the cue-ball surface is moving.
-        val throwSign = -sign(relativeSurface)
+        // Friction on the object ball acts along the cue-ball surface's sliding
+        // motion (it opposes the *cue* ball's slip, and the reaction on the
+        // object ball is the opposite of that), so the object ball is thrown the
+        // same way the cue-ball surface moves.
+        val throwSign = sign(relativeSurface)
         val throwAngle = (throwMagnitude * throwSign).radians
 
         val objectBallDirection = loc.rotatedBy(throwAngle)
@@ -154,11 +182,16 @@ object Contact {
      * Cue-ball departure direction.
      *
      * For a stun shot the cue ball leaves exactly along the tangent line (the
-     * 90° rule). Topspin or backspin surviving the collision adds a component
-     * along the original path, rotating the departure off the tangent by the
-     * *cue ball deflection angle*. With natural roll the classic result is a
-     * departure roughly
-     * `atan(tan(cut) * 5/7)` off the line of centres.
+     * 90° rule) with relative speed `sin(cut)`. Topspin or backspin surviving the
+     * collision adds `vertical · (5/7) · cos(cut)` along the original path, so the
+     * departure is the normalised sum
+     * `tangent · sin(cut) + approach · vertical · (5/7) · cos(cut)`.
+     * This is a heuristic blend, not the textbook natural-roll result (which,
+     * after cloth friction converts the spin, adds `(2/7) · cos(cut)` along the
+     * line of centres rather than the approach).
+     *
+     * A dead-straight stun hit (cut 0, no vertical spin) has no departure at all:
+     * the cue ball stops, and [Vec2.ZERO] is returned.
      */
     private fun cueBallDeparture(
         approach: Vec2,
@@ -178,37 +211,13 @@ object Contact {
         val forwardComponent = spin.vertical * (5.0 / 7.0) * cos(cutAngle.radians)
 
         val departure = tangent * tangentComponent + approach.normalized() * forwardComponent
-        return if (departure.lengthSquared < 1e-18) tangent else departure.normalized()
+        return if (departure.lengthSquared < 1e-18) Vec2.ZERO else departure.normalized()
     }
 
     /**
-     * The angle by which throw shifts the *aim* for a given cut.
-     *
-     * This is the number the aim solver needs: to send the object ball along a
-     * desired line, aim as if the target line were rotated the other way by this
-     * much.
-     */
-    fun throwAngleFor(
-        cutAngle: Angle,
-        speed: Speed,
-        spin: Spin = Spin.NONE,
-        ball: BallSpec = BallSpec.AMERICAN_POOL,
-    ): Angle {
-        val cosCut = cos(cutAngle.radians)
-        val sinCut = sin(cutAngle.radians)
-        val normalSpeed = speed.metersPerSecond * cosCut
-        if (normalSpeed <= 1e-9) return Angle.ZERO
-
-        val relativeSurface =
-            speed.metersPerSecond * sinCut - spin.surfaceSpeed(speed, ball).metersPerSecond
-        val mu = frictionCoefficient(Speed(abs(relativeSurface)))
-        val transfer = min(mu * normalSpeed, ROLLING_LIMIT_FRACTION * abs(relativeSurface))
-        return (atan(transfer / normalSpeed) * -sign(relativeSurface)).radians
-    }
-
-    /**
-     * Cut angle needed for a ghost-ball construction, given the geometric angle
-     * between the shot line and the object-ball-to-target line.
+     * Centre of the naive ghost ball: the point one ball diameter (two
+     * [ballRadius]) behind [objectBallCenter], opposite [targetDirection]. No
+     * throw correction is applied.
      */
     fun ghostBallCenter(
         objectBallCenter: Vec2,

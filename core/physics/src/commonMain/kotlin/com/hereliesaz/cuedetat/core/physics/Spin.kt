@@ -17,6 +17,12 @@ import kotlin.math.sqrt
  * physically impossible to hit). The miscue limit is about half a ball radius —
  * beyond roughly `R/2` the tip slides off however much chalk is on it.
  *
+ * Values outside the miscue circle are accepted (so a UI can report
+ * [wouldMiscue]), but every physical quantity derived here — [surfaceSpeed],
+ * [angularVelocity], the tip offsets and [CueSpec.squirtAngle] — is computed
+ * from [clampedToMiscueLimit], so an out-of-range dial can never produce more
+ * spin than a cue can actually impart.
+ *
  * @param side  −1 (maximum left english) … +1 (maximum right english)
  * @param vertical −1 (maximum draw) … +1 (maximum follow)
  */
@@ -26,7 +32,7 @@ data class Spin(val side: Double = 0.0, val vertical: Double = 0.0) {
         require(side.isFinite() && vertical.isFinite()) { "spin must be finite" }
     }
 
-    /** Magnitude of the tip offset, clamped to the miscue circle. */
+    /** Magnitude of the tip offset as given, *not* clamped (1.0 = on the miscue circle). */
     val magnitude: Double get() = hypot(side, vertical)
 
     /** True when this tip offset lies outside the miscue limit. */
@@ -38,20 +44,29 @@ data class Spin(val side: Double = 0.0, val vertical: Double = 0.0) {
         return if (m <= 1.0) this else Spin(side / m, vertical / m)
     }
 
-    /** Tip offset as a fraction of the ball radius. */
-    val offsetFractionOfRadius: Double get() = side * MISCUE_LIMIT_FRACTION
-    val verticalOffsetFractionOfRadius: Double get() = vertical * MISCUE_LIMIT_FRACTION
+    /** Side tip offset as a fraction of the ball radius, after clamping to the miscue circle. */
+    val offsetFractionOfRadius: Double get() = clampedToMiscueLimit().side * MISCUE_LIMIT_FRACTION
+
+    /** Vertical tip offset as a fraction of the ball radius, after clamping to the miscue circle. */
+    val verticalOffsetFractionOfRadius: Double get() = clampedToMiscueLimit().vertical * MISCUE_LIMIT_FRACTION
 
     /**
      * Equatorial surface speed produced by the side spin.
      *
      * Striking a ball at offset `b` from centre imparts `omega = 5·b·v / (2·R²)`,
      * so the surface speed at the equator is `omega·R = (5/2)·(b/R)·v`.
+     * The radius cancels, so [ball] does not affect the result; it is kept for
+     * signature symmetry with [angularVelocity].
+     *
+     * Sign: positive for right english. Right english spins the ball
+     * counter-clockwise seen from above (`ω_z > 0` in the right-handed table
+     * frame, `z` up), so a positive value means the surface at the front of the
+     * ball moves to the ball's **left** (see [Contact]).
      */
     fun surfaceSpeed(ballSpeed: Speed, ball: BallSpec = BallSpec.AMERICAN_POOL): Speed =
         Speed(2.5 * offsetFractionOfRadius * ballSpeed.metersPerSecond)
 
-    /** Spin about the vertical axis, in radians per second. */
+    /** Spin about the vertical axis, in radians per second; positive (counter-clockwise from above) for right english. */
     fun angularVelocity(ballSpeed: Speed, ball: BallSpec = BallSpec.AMERICAN_POOL): Double =
         2.5 * offsetFractionOfRadius * ballSpeed.metersPerSecond / ball.radius.meters
 
@@ -94,10 +109,13 @@ data class CueSpec(
      * predicted cue-ball path but never the aim line the app told you to shoot
      * along, which is the opposite of what a player has to do.
      *
-     * Sign convention: right english (`side > 0`) deflects the ball to the left.
+     * Sign convention: right english (`side > 0`) deflects the ball to the
+     * **left** of the cue's line. In the right-handed table frame (`z` up) left
+     * is a counter-clockwise rotation, so the returned angle is **positive** for
+     * right english: the cue ball travels along `aim.rotatedBy(squirtAngle)`.
      */
     fun squirtAngle(spin: Spin): Angle =
-        Angle(-squirtAtFullRadius.radians * spin.offsetFractionOfRadius)
+        Angle(squirtAtFullRadius.radians * spin.offsetFractionOfRadius)
 
     companion object {
         val STANDARD = CueSpec(8.0.degrees, "Standard maple")
@@ -141,9 +159,14 @@ const val GRAVITY: Double = 9.80665
  *    angle, and the cushion also imparts spin. This is what "running english"
  *    and "reverse english" mean at the rail.
  *
- * The rebound angle also *shortens* relative to the incident angle as speed
- * rises, because the cushion compresses further and the ball leaves with more
- * forward roll. That is captured by scaling the tangential component.
+ * Speed dependence enters only through restitution, which falls as impact
+ * speed rises; the tangential component is scaled by a constant
+ * [TANGENT_RETENTION]. Harder hits therefore come off with a smaller normal
+ * component and a *wider* rebound angle in this model. The real-table
+ * "shortening" from cushion compression and forward roll is not modelled.
+ *
+ * The cushion can never add energy: the outgoing speed is capped at the
+ * incoming speed even when running english adds tangential speed.
  */
 object Cushion {
 
@@ -153,6 +176,12 @@ object Cushion {
         val spin: Spin,
     )
 
+    /**
+     * Rebound off a cushion whose [inwardNormal] points back onto the table.
+     *
+     * If [incoming] is not moving into the cushion (`incoming · inwardNormal >= 0`)
+     * there is no contact and the input is returned unchanged.
+     */
     fun rebound(
         incoming: com.hereliesaz.cuedetat.core.geometry.Vec2,
         inwardNormal: com.hereliesaz.cuedetat.core.geometry.Vec2,
@@ -168,6 +197,9 @@ object Cushion {
         val vNormal = dir dot n            // negative: approaching
         val vTangent = dir dot t
 
+        // Not moving into the cushion: no contact, nothing to reflect.
+        if (vNormal >= 0.0) return Rebound(dir, speed, spin)
+
         // Restitution falls with impact speed; the fit is normalised so the
         // nominal value applies around 2 m/s.
         val impactSpeed = abs(vNormal) * speed.metersPerSecond
@@ -182,8 +214,10 @@ object Cushion {
         val outTangent = vTangent * TANGENT_RETENTION + railThrow
 
         val outDir = (n * outNormal + t * outTangent).normalized()
+        // A passive cushion cannot speed the ball up; cap at the incoming speed.
         val outSpeed = Speed(
-            speed.metersPerSecond * sqrt(outNormal * outNormal + outTangent * outTangent)
+            speed.metersPerSecond *
+                sqrt(outNormal * outNormal + outTangent * outTangent).coerceAtMost(1.0)
         )
 
         // The cushion reverses part of the side spin.

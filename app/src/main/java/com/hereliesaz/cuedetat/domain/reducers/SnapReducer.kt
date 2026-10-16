@@ -38,16 +38,21 @@ class SnapReducer @Inject constructor() {
      *
      * @param currentState The current application state.
      * @param visionData The latest frame of computer vision detections.
+     * @param nowMs Wall-clock time for the hysteresis. Defaults to [System.currentTimeMillis],
+     *   so production calls are time-dependent; tests pass an explicit value.
      * @return The updated state with refreshed [CueDetatState.snapCandidates].
      */
-    fun reduce(currentState: CueDetatState, visionData: VisionData): CueDetatState {
+    fun reduce(
+        currentState: CueDetatState,
+        visionData: VisionData,
+        nowMs: Long = System.currentTimeMillis()
+    ): CueDetatState {
         // If snapping logic is globally disabled, clear all candidates and return.
         if (!currentState.isSnappingEnabled) {
             return currentState.copy(snapCandidates = emptyList())
         }
 
-        // Get the current system time to calculate duration.
-        val currentTime = System.currentTimeMillis()
+        val currentTime = nowMs
 
         // Use typed DetectedBall list when available (has BallType classification),
         // falling back to the legacy untyped lists for paths that don't populate it.

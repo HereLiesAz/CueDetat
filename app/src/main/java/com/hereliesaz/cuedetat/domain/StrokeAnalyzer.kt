@@ -43,6 +43,23 @@ class StrokeAnalyzer {
         return dtw[n][m] / (n + m).toFloat() // Normalized distance
     }
 
+    /**
+     * Thresholds. All are unmeasured, hand-picked prototype values: no stroke dataset or
+     * study backs them. They are named here so they can be tuned in one place.
+     */
+    companion object {
+        /** DTW distance at which fluidity reaches 0. */
+        const val DTW_FULL_SCALE = 20f
+        /** Heart rate above which thresholds tighten. */
+        const val ELEVATED_HR_BPM = 120f
+        /** Mean |gyro X|+|gyro Z| (rad/s, clamped to 1) above which the stroke is erratic. */
+        const val TWIST_THRESHOLD_RESTING = 0.8f
+        const val TWIST_THRESHOLD_ELEVATED = 0.5f
+        /** DTW distance above which the stroke is erratic. */
+        const val DTW_THRESHOLD_RESTING = 15f
+        const val DTW_THRESHOLD_ELEVATED = 5f
+    }
+
     fun analyzeStroke(
         baseline: List<StrokeProfile>,
         current: List<StrokeProfile>,
@@ -54,8 +71,9 @@ class StrokeAnalyzer {
 
         // 1. Fluidity via DTW
         val dtwDist = computeDTWDistance(baselineY, currentY)
-        // Convert distance to a 0.0 - 1.0 score (arbitrary scaling for the prototype)
-        val fluidityScore = (1.0f - (dtwDist / 20f)).coerceIn(0f, 1f)
+        // Convert distance to a 0.0 - 1.0 score. DTW_FULL_SCALE is an unmeasured prototype
+        // constant (no recorded stroke data behind it); tune against real captures.
+        val fluidityScore = (1.0f - (dtwDist / DTW_FULL_SCALE)).coerceIn(0f, 1f)
 
         // 2. Lateral Twist Penalty
         // Sum up absolute deviation on roll/yaw axes (X and Z gyro)
@@ -66,9 +84,12 @@ class StrokeAnalyzer {
         val twistPenalty = (totalTwist / current.size.coerceAtLeast(1)).coerceIn(0f, 1f)
 
         // 3. Erratic/Shake check
-        // High HR lowers the threshold for what we consider an erratic stroke
-        val hrThreshold = if (heartRate > 120f) 0.5f else 1.5f
-        val isErratic = twistPenalty > hrThreshold || dtwDist > (hrThreshold * 10f)
+        // High HR lowers both thresholds. The twist threshold must stay inside twistPenalty's
+        // [0, 1] range or twist can never trip it (it previously used 1.5 at rest: unreachable).
+        val elevated = heartRate > ELEVATED_HR_BPM
+        val twistThreshold = if (elevated) TWIST_THRESHOLD_ELEVATED else TWIST_THRESHOLD_RESTING
+        val dtwThreshold = if (elevated) DTW_THRESHOLD_ELEVATED else DTW_THRESHOLD_RESTING
+        val isErratic = twistPenalty > twistThreshold || dtwDist > dtwThreshold
 
         return AnalyticsResult(
             fluidityScore = fluidityScore,
@@ -100,7 +121,7 @@ class StrokeSessionTracker(
     private val _baselineProfiles = mutableListOf<StrokeProfile>()
 
     /** The stroke profile currently used as the calibration baseline, if any. */
-    val baselineProfiles: List<StrokeProfile> get() = _baselineProfiles
+    val baselineProfiles: List<StrokeProfile> get() = _baselineProfiles.toList()
 
     /** True once a baseline stroke has been captured. */
     val hasBaseline: Boolean get() = _baselineProfiles.isNotEmpty()

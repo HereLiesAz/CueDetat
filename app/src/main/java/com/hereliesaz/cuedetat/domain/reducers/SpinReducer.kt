@@ -78,7 +78,10 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
             val density = state.screenDensity
             val radiusPx = 60f * density
             
-            // Convert raw screen pixels (0..120dp) to normalized units (-1..1)
+            // Convert raw screen pixels (0..120dp) to normalized units (-1..1).
+            // Convention: y is SCREEN-DOWN, matching the dial's indicator drawing. +y = striking
+            // below centre = draw. Physics consumers (SpinPhysicsCalculator, CoreBridge.spinFrom)
+            // use +y = follow and must negate y at their boundary.
             val nx = (rawOffset.x - radiusPx) / radiusPx
             val ny = (rawOffset.y - radiusPx) / radiusPx
             val dist = sqrt((nx * nx + ny * ny).toDouble()).toFloat()

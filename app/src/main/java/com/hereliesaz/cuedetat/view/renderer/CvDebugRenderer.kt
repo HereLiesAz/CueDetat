@@ -29,6 +29,16 @@ class CvDebugRenderer {
     /** Reusable Mat for the BGRA-converted mask, to avoid a fresh allocation every frame. */
     private val coloredMask = Mat()
 
+    /** Reused mask→view transform. */
+    private val maskMatrix = android.graphics.Matrix()
+
+    /** Frees the native Mat and Bitmap. The renderer must not be drawn with afterwards. */
+    fun release() {
+        coloredMask.release()
+        bmp?.recycle()
+        bmp = null
+    }
+
     companion object {
         private const val TAG = "CvDebugRenderer"
     }
@@ -68,19 +78,25 @@ class CvDebugRenderer {
 
             // Draw the bitmap onto the canvas.
             bmp?.let {
-                // Calculate scaling factors to stretch the bitmap to fill the view.
-                // The CV frame (e.g., 640x480) might differ from the Screen size (e.g., 1080x1920).
+                // Same transform BallRenderer.drawBoundingBoxes uses for the same frames, so the
+                // mask lines up with the preview and the boxes: CameraBackground's FILL_CENTER is
+                // centre-crop with the sensor rotation (uniform scale, no stretching).
                 val destWidth = canvas.width.toFloat()
                 val destHeight = canvas.height.toFloat()
                 val srcWidth = it.width.toFloat()
                 val srcHeight = it.height.toFloat()
+                val rotation = (state.visionData?.sourceImageRotation ?: 0).toFloat()
+                val rotatedW = if (rotation % 180f == 0f) srcWidth else srcHeight
+                val rotatedH = if (rotation % 180f == 0f) srcHeight else srcWidth
+                val scale = maxOf(destWidth / rotatedW, destHeight / rotatedH)
 
-                // Create a matrix for the scale transformation.
-                val matrix = android.graphics.Matrix()
-                matrix.setScale(destWidth / srcWidth, destHeight / srcHeight)
+                maskMatrix.reset()
+                maskMatrix.postTranslate(-srcWidth / 2f, -srcHeight / 2f)
+                maskMatrix.postRotate(rotation)
+                maskMatrix.postScale(scale, scale)
+                maskMatrix.postTranslate(destWidth / 2f, destHeight / 2f)
 
-                // Draw the scaled bitmap with the semi-transparent paint.
-                canvas.drawBitmap(it, matrix, maskPaint)
+                canvas.drawBitmap(it, maskMatrix, maskPaint)
             }
 
             // Note: We do NOT release 'coloredMask' here, since it is a reused class-level

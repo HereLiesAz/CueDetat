@@ -88,7 +88,7 @@ class WristWearableRepositoryTest {
         assertTrue(tracker.hasBaseline)
         assertEquals(5, tracker.baselineProfiles.size)
         // The calibration stroke itself is reported as a perfect match.
-        assertEquals(1.0f, state.consistencyScore, 0.001f)
+        assertEquals(1.0f, state.consistencyScore!!, 0.001f)
         assertFalse(state.isShaking)
     }
 
@@ -121,7 +121,7 @@ class WristWearableRepositoryTest {
         assertEquals(baselineAfterFirstStroke, tracker.baselineProfiles)
         assertTrue(
             "Expected consistencyScore < 1.0 for an erratic stroke but was ${state.consistencyScore}",
-            state.consistencyScore < 1.0f
+            state.consistencyScore!! < 1.0f
         )
         assertTrue(state.isShaking)
     }

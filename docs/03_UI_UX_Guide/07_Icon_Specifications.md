@@ -10,5 +10,5 @@ icons are reserved for specific UI affordances.
       `areHelpersVisible = true`), the icon is replaced by the app title and tagline text.
 
 * **Other Icons**
-    * Other vector icons (e.g., `ic_help_outline_24`, `ic_zoom_in_24`) are used within the menu or
-      as decorative elements and are not primary interactive components on the main screen.
+    * The app ships no other drawable icons; rail items are text buttons and in-app icons come from
+      Material Icons (e.g. `Icons.Default.OpenWith` on the spin control).

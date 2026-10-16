@@ -176,7 +176,10 @@ data class TableSpec(
         /** 8-foot: 88 × 44 in. */
         val EIGHT_FOOT = TableSpec(88.0.inches, 44.0.inches, label = "8 ft")
 
-        /** 7-foot bar box: 78 × 39 in. Bar tables commonly have tighter corners. */
+        /**
+         * 7-foot bar box: 78 × 39 in. Uses the default pocket mouths; real bar
+         * tables often have tighter corners, which this preset does not encode.
+         */
         val SEVEN_FOOT = TableSpec(78.0.inches, 39.0.inches, label = "7 ft")
 
         val ALL = listOf(SEVEN_FOOT, EIGHT_FOOT, NINE_FOOT)
@@ -272,8 +275,10 @@ class Table(val spec: TableSpec) {
 
     /**
      * The first cushion a ball of [ballRadius] starting at [from] and travelling
-     * along [direction] would contact, or `null` if it reaches no cushion (which
-     * means it is heading for a pocket mouth or is already off-table).
+     * along [direction] would contact, or `null` if it reaches no cushion
+     * segment within [maxDistance]. Cushion segments stop at the jaw tips and the
+     * jaws themselves are not modelled, so `null` covers a ball heading into a
+     * pocket mouth, one striking a jaw knuckle, and one already off-table.
      */
     fun firstCushionHit(
         from: Vec2,

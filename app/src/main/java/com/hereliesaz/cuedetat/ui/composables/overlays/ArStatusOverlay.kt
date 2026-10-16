@@ -14,14 +14,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.res.stringResource
+import com.hereliesaz.cuedetat.R
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,7 +42,9 @@ fun ArTrackingBadge(
     distanceMeters: Float? = null,
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "ar_pulse")
-    val dotAlpha by infiniteTransition.animateFloat(
+    // Held as State and read only inside drawBehind: the pulse redraws the dot each frame
+    // without recomposing the badge (and rebuilding its label) 60 times a second.
+    val dotAlpha = infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = 0.2f,
         animationSpec = infiniteRepeatable(
@@ -62,16 +65,13 @@ fun ArTrackingBadge(
         Box(
             modifier = Modifier
                 .size(8.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF4CAF50).copy(alpha = dotAlpha))
+                .drawBehind { drawCircle(color = TRACKING_GREEN.copy(alpha = dotAlpha.value)) }
         )
         Spacer(modifier = Modifier.width(6.dp))
-        val label = buildString {
-            append("AR Tracking")
-            if (hasDepth) {
-                append(" · Depth")
-                if (distanceMeters != null) append(" %.1fm".format(distanceMeters))
-            }
+        val label = when {
+            !hasDepth -> stringResource(R.string.ar_badge_tracking)
+            distanceMeters != null -> stringResource(R.string.ar_badge_depth_distance, distanceMeters)
+            else -> stringResource(R.string.ar_badge_depth)
         }
         Text(
             text = label,
@@ -81,3 +81,5 @@ fun ArTrackingBadge(
         )
     }
 }
+
+private val TRACKING_GREEN = Color(0xFF4CAF50)

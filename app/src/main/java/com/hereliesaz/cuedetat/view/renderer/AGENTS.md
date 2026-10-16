@@ -17,5 +17,7 @@ The transformation from the 2D logical plane to the 3D screen view is a sacred a
 
 1.  All transformations are calculated in `UpdateStateUseCase` and stored in the `CueDetatState` as `Matrix` objects.
 2.  Renderers receive the `CueDetatState` and the relevant `Paint` objects from `PaintCache`.
-3.  Renderers use the matrices from the state to draw the UI elements on the `Canvas`. **Renderers must not create their own `Paint` objects or perform their own transformations.**
-4.  For glow effects, use the `getGlowPaint` method from `PaintCache`. Do not create new `Paint` objects for glows.
+3.  Renderers use the matrices from the state to draw the UI elements on the `Canvas`. Renderers must not perform their own transformations. **Renderers must not allocate `Paint`, `Path`, `Matrix`, shaders or mask filters inside a draw call.** Themed paints live in `PaintCache`; a renderer may own a private `Paint`/`Path` field allocated once and reconfigured per use (via `set(base)` or `reset()`), as BallRenderer, LineRenderer, RecommendationRenderer and OverlayRenderer do.
+4.  For line/rail glows use `createGlowPaint` (PaintUtils; cached in `PaintCache.glowPaints`). For ball halos use `drawGlowCircle` (cached RadialGradient). Treat returned glow paints as read-only.
+5.  Lens warp: every renderer gets its TPS via `renderLensTps(state)` (TpsUtils) and line distortion arrays via `LensArrayCache`, so table, rails, balls, labels and lines are gated identically.
+6.  The plane matrix used for a frame is OverlayRenderer's `matrixFor2DPlane` (pitch interpolated toward top-down). Anything drawn on the plane, balls included, uses that matrix.

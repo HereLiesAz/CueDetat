@@ -212,17 +212,30 @@ data class TablePose(val rotation: Mat3, val translation: Vec3) {
          * Builds a pose from a camera position and what it is looking at.
          *
          * Camera convention is the standard pinhole one: `+x` right, `+y` down,
-         * `+z` forward along the optical axis. Rows of the rotation are the
-         * camera basis expressed in table coordinates.
+         * `+z` forward along the optical axis — a right-handed frame
+         * (`right × down = forward`), so the rotation has determinant `+1` and the
+         * image is not mirrored. Rows of the rotation are the camera basis
+         * expressed in table coordinates (also right-handed, `z` up), built as
+         * `right = forward × worldUp`, `down = forward × right`.
+         *
+         * @throws IllegalArgumentException if the camera coincides with [target]
+         *   or looks along [worldUp] (e.g. straight down at the table with the
+         *   default up vector): the horizontal axis is then undefined.
          */
         fun lookAt(
             cameraPosition: Vec3,
             target: Vec3 = Vec3.ZERO,
             worldUp: Vec3 = Vec3(0.0, 0.0, 1.0),
         ): TablePose {
-            val forward = (target - cameraPosition).normalized()
-            val right = (worldUp cross forward).normalized()
-            val down = (right cross forward).normalized()
+            val toTarget = target - cameraPosition
+            require((toTarget dot toTarget) > 1e-18) { "camera position coincides with target" }
+            val forward = toTarget.normalized()
+            val side = forward cross worldUp
+            require((side dot side) > 1e-12) {
+                "viewing direction is parallel to worldUp; pass a different worldUp"
+            }
+            val right = side.normalized()
+            val down = (forward cross right).normalized()
 
             val rotation = Mat3(
                 doubleArrayOf(
@@ -236,7 +249,7 @@ data class TablePose(val rotation: Mat3, val translation: Vec3) {
 
         /**
          * A camera [height] above the cloth and [distance] back along `-x`,
-         * aimed at the table centre.
+         * aimed at the table centre. [distance] must be non-zero (see [lookAt]).
          *
          * This is what the no-camera protractor mode uses. It is an honest
          * synthetic viewpoint chosen by the app, not a fudged version of a real
@@ -346,7 +359,14 @@ class Projector(
  * This is what a four-corner tap gives you, and it is enough on its own to draw
  * a correctly registered overlay without any ARCore at all.
  *
- * Returns `null` if the system is degenerate (collinear points, duplicates).
+ * Points are Hartley-normalised (centroid to the origin, mean distance √2)
+ * before the DLT and the result denormalised, so metre table coordinates and
+ * pixel screen coordinates do not wreck the conditioning of `AᵀA`.
+ *
+ * Returns `null` if there are fewer than four correspondences, or if either
+ * point set is degenerate: it does not contain four points of which no three
+ * are collinear (this catches duplicates and collinear sets), or the solved
+ * homography is singular.
  */
 fun homographyFromCorrespondences(
     tablePoints: List<Vec2>,
@@ -354,20 +374,71 @@ fun homographyFromCorrespondences(
 ): Mat3? {
     require(tablePoints.size == screenPoints.size) { "correspondence count mismatch" }
     if (tablePoints.size < 4) return null
+    val table = tablePoints.map { doubleArrayOf(it.x, it.y) }
+    val screen = screenPoints.map { doubleArrayOf(it.x, it.y) }
+    if (!hasFourInGeneralPosition(table) || !hasFourInGeneralPosition(screen)) return null
+
+    val tNorm = normalizingTransform(table) ?: return null
+    val sNorm = normalizingTransform(screen) ?: return null
+    val sNormInv = sNorm.inverse() ?: return null
 
     // Each correspondence contributes two rows to A·h = 0.
     val rows = ArrayList<DoubleArray>(tablePoints.size * 2)
     for (i in tablePoints.indices) {
-        val (x, y) = tablePoints[i]
-        val u = screenPoints[i].x
-        val v = screenPoints[i].y
+        val tp = tNorm * Vec3(table[i][0], table[i][1], 1.0)
+        val sp = sNorm * Vec3(screen[i][0], screen[i][1], 1.0)
+        val x = tp.x / tp.z
+        val y = tp.y / tp.z
+        val u = sp.x / sp.z
+        val v = sp.y / sp.z
         rows += doubleArrayOf(-x, -y, -1.0, 0.0, 0.0, 0.0, u * x, u * y, u)
         rows += doubleArrayOf(0.0, 0.0, 0.0, -x, -y, -1.0, v * x, v * y, v)
     }
-    val h = solveNullspace(rows) ?: return null
+    val hn = solveNullspace(rows) ?: return null
+    // Undo the normalisation: H = S⁻¹ · Hn · T.
+    val h = (sNormInv * Mat3(hn) * tNorm).m
     if (abs(h[8]) < 1e-12) return null
     // Normalise so h33 == 1, which keeps the numbers comparable and readable.
-    return Mat3(DoubleArray(9) { h[it] / h[8] })
+    val result = Mat3(DoubleArray(9) { h[it] / h[8] })
+    return if (result.inverse() == null) null else result
+}
+
+/**
+ * True when [points] contains four points of which no three are collinear —
+ * the minimum for a homography to be determined. Collinearity is judged
+ * relative to the spread of the point set.
+ */
+private fun hasFourInGeneralPosition(points: List<DoubleArray>): Boolean {
+    val n = points.size
+    if (n < 4) return false
+    val cx = points.sumOf { it[0] } / n
+    val cy = points.sumOf { it[1] } / n
+    val spread = points.maxOf { (it[0] - cx) * (it[0] - cx) + (it[1] - cy) * (it[1] - cy) }
+    if (spread <= 0.0) return false
+    val tol = 1e-9 * spread
+    fun collinear(a: Int, b: Int, c: Int): Boolean {
+        val (ax, ay) = points[a].let { it[0] to it[1] }
+        val cr = (points[b][0] - ax) * (points[c][1] - ay) - (points[b][1] - ay) * (points[c][0] - ax)
+        return abs(cr) <= tol
+    }
+    for (a in 0 until n) for (b in a + 1 until n) for (c in b + 1 until n) {
+        if (collinear(a, b, c)) continue
+        for (d in c + 1 until n) {
+            if (!collinear(a, b, d) && !collinear(a, c, d) && !collinear(b, c, d)) return true
+        }
+    }
+    return false
+}
+
+/** Hartley normalisation: translate the centroid to the origin, scale mean distance to √2. */
+private fun normalizingTransform(points: List<DoubleArray>): Mat3? {
+    val n = points.size
+    val cx = points.sumOf { it[0] } / n
+    val cy = points.sumOf { it[1] } / n
+    val meanDist = points.sumOf { sqrt((it[0] - cx) * (it[0] - cx) + (it[1] - cy) * (it[1] - cy)) } / n
+    if (meanDist <= 0.0) return null
+    val s = sqrt(2.0) / meanDist
+    return Mat3(doubleArrayOf(s, 0.0, -s * cx, 0.0, s, -s * cy, 0.0, 0.0, 1.0))
 }
 
 /**

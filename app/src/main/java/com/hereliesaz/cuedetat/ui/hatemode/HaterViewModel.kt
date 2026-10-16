@@ -7,10 +7,12 @@ import com.hereliesaz.cuedetat.data.ShakeDetector
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -34,19 +36,40 @@ class HaterViewModel @Inject constructor(
         remainingIndices = HaterResponses.allAnswers.indices.shuffled().toMutableList()
     }
 
-    init {
-        viewModelScope.launch {
+    /** The running enter or shake reveal sequence; a new one cancels the old. */
+    private var revealJob: Job? = null
+
+    /**
+     * Collects orientation and shake for as long as the caller's coroutine lives.
+     * HaterScreen runs this inside `repeatOnLifecycle(STARTED)`, so the hardware listeners
+     * (cold callbackFlows) are registered only while Hater mode is on screen and the app
+     * is visible. This ViewModel outlives the screen (Activity-scoped), so collecting in
+     * `init` kept the listeners live, and shakes firing reveals, after the user left.
+     */
+    suspend fun collectSensors() = coroutineScope {
+        launch {
             sensorRepository.fullOrientationFlow.collect { orientation ->
                 onEvent(HaterEvent.SensorChanged(orientation.roll, orientation.pitch))
             }
         }
-        viewModelScope.launch {
+        launch {
             shakeDetector.shakeFlow.collect { onEvent(HaterEvent.ShakeDetected) }
         }
     }
 
+    /** Stops the reveal and the physics loop when Hater mode leaves the screen. */
+    fun onLeave() {
+        revealJob?.cancel()
+        revealJob = null
+        physicsJob?.cancel()
+        physicsJob = null
+        physicsManager.setPhase(TriangleState.IDLE)
+        _haterState.update { it.copy(triangleState = TriangleState.IDLE) }
+    }
+
     override fun onCleared() {
         super.onCleared()
+        revealJob?.cancel()
         physicsJob?.cancel()
         physicsManager.destroy()
     }
@@ -84,13 +107,14 @@ class HaterViewModel @Inject constructor(
 
     private fun enterHaterMode() {
         reshuffleAnswers()
-        viewModelScope.launch {
+        revealJob?.cancel()
+        revealJob = viewModelScope.launch {
             physicsManager.setPhase(TriangleState.EMERGING)
-            _haterState.value = _haterState.value.copy(triangleState = TriangleState.EMERGING)
+            _haterState.update { it.copy(triangleState = TriangleState.EMERGING) }
             startPhysics()
             delay(1000L)
             physicsManager.setPhase(TriangleState.SETTLING)
-            _haterState.value = _haterState.value.copy(triangleState = TriangleState.SETTLING)
+            _haterState.update { it.copy(triangleState = TriangleState.SETTLING) }
         }
     }
 
@@ -110,13 +134,17 @@ class HaterViewModel @Inject constructor(
             // a floating die and halves the per-frame CPU vs the old 60fps.
             while (isActive) {
                 physicsManager.step()
-                _haterState.value = _haterState.value.copy(
-                    diePosition = physicsManager.diePosition,
-                    dieAngle    = physicsManager.dieAngle,
-                    dieScale    = physicsManager.currentDieScale,
-                    rockAngleX  = physicsManager.currentRockX,
-                    rockAngleY  = physicsManager.currentRockY,
-                )
+                // update{} (CAS), not value = value.copy(): the Main-thread reveal writes
+                // triangleState/answerIndex concurrently and a blind copy would revert them.
+                _haterState.update {
+                    it.copy(
+                        diePosition = physicsManager.diePosition,
+                        dieAngle    = physicsManager.dieAngle,
+                        dieScale    = physicsManager.currentDieScale,
+                        rockAngleX  = physicsManager.currentRockX,
+                        rockAngleY  = physicsManager.currentRockY,
+                    )
+                }
                 // Battery: stop stepping once everything has settled. A perturbing input
                 // (drag, shake, tilt, phase change) relaunches the loop via ensurePhysicsRunning().
                 if (physicsManager.isAtRest) break
@@ -132,10 +160,11 @@ class HaterViewModel @Inject constructor(
     private fun onShake() {
         val currentState = _haterState.value.triangleState
         if ((currentState == TriangleState.IDLE) || (currentState == TriangleState.SETTLING)) {
-            viewModelScope.launch {
+            revealJob?.cancel()
+            revealJob = viewModelScope.launch {
                 ensurePhysicsRunning() // loop may have paused while settled
                 physicsManager.setPhase(TriangleState.SUBMERGING)
-                _haterState.value = _haterState.value.copy(triangleState = TriangleState.SUBMERGING)
+                _haterState.update { it.copy(triangleState = TriangleState.SUBMERGING) }
 
                 physicsManager.agitate(viewModelScope) {
                     viewModelScope.launch {
@@ -151,13 +180,13 @@ class HaterViewModel @Inject constructor(
 
                 if (remainingIndices.isEmpty()) reshuffleAnswers()
                 val newIndex = remainingIndices.removeAt(0)
-                _haterState.value = _haterState.value.copy(answerIndex = newIndex)
+                _haterState.update { it.copy(answerIndex = newIndex) }
 
                 physicsManager.setPhase(TriangleState.EMERGING)
-                _haterState.value = _haterState.value.copy(triangleState = TriangleState.EMERGING)
+                _haterState.update { it.copy(triangleState = TriangleState.EMERGING) }
                 delay(1000L)
                 physicsManager.setPhase(TriangleState.SETTLING)
-                _haterState.value = _haterState.value.copy(triangleState = TriangleState.SETTLING)
+                _haterState.update { it.copy(triangleState = TriangleState.SETTLING) }
             }
         }
     }

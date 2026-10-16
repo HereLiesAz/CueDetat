@@ -34,8 +34,10 @@ fun ImageProxy.toMat(dst: Mat = Mat()): Mat {
     val uvPixelStride = uPlane.pixelStride
 
     // 1. Pre-allocate a contiguous YUV Mat [Height * 1.5, Width]
+    // Released in finally: a buffer underflow or cvtColor failure must not leak native memory.
     val yuvMat = Mat(height + height / 2, width, CvType.CV_8UC1)
-    
+    try {
+
     // 2. Copy Y plane row-by-row
     val yRowData = ByteArray(width)
     for (row in 0 until height) {
@@ -77,7 +79,8 @@ fun ImageProxy.toMat(dst: Mat = Mat()): Mat {
         }
         Imgproc.cvtColor(yuvMat, dst, Imgproc.COLOR_YUV2BGR_I420)
     }
-
-    yuvMat.release()
+    } finally {
+        yuvMat.release()
+    }
     return dst
 }

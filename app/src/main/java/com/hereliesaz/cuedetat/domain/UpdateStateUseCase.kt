@@ -228,7 +228,8 @@ class UpdateStateUseCase @Inject constructor(
         )
         val flatMatrix = createFullMatrix(stateWithCoercedPan, 1f, flatPerspectiveMatrix)
         val logicalPlaneMatrix = createFullMatrix(stateWithCoercedPan, zoomFactor, flatPerspectiveMatrix)
-        val sizeCalculationMatrix = createFullMatrix(state, zoomFactor, perspectiveMatrix)
+        // Same pan-coerced state as every sibling matrix, so radius/lift are measured where the ball is drawn.
+        val sizeCalculationMatrix = createFullMatrix(stateWithCoercedPan, zoomFactor, perspectiveMatrix)
 
         return stateWithCoercedPan.copy(
             pitchMatrix = finalPitchMatrix,
@@ -236,6 +237,7 @@ class UpdateStateUseCase @Inject constructor(
             sizeCalculationMatrix = sizeCalculationMatrix,
             inversePitchMatrix = inverseMatrix,
             hasInverseMatrix = hasFinalInverse,
+            effectivePitchDegrees = effectivePitch,
             flatMatrix = flatMatrix,
             logicalPlaneMatrix = logicalPlaneMatrix
         )
@@ -249,8 +251,9 @@ class UpdateStateUseCase @Inject constructor(
                 pocketedBankShotPocketIndex = bankResult.pocketedPocketIndex,
                 isGeometricallyImpossible = false,
                 isObstructed = false,
-                isTiltBeyondLimit = false,
-                warningText = null
+                isTiltBeyondLimit = false
+                // warningText deliberately untouched: reducers (e.g. ArTableLockResult) set it
+                // immediately before an AIMING pass, and nulling it here erased them.
             )
         }
 
@@ -262,7 +265,7 @@ class UpdateStateUseCase @Inject constructor(
                 isGeometricallyImpossible = false,
                 isObstructed = false,
                 isTiltBeyondLimit = false,
-                warningText = null,
+                // warningText preserved; see banking branch above.
                 isStraightShot = true,
                 aimingLineBankPath = extendedPath,
                 aimingLineEndPoint = extendedPath.last()
@@ -345,12 +348,15 @@ class UpdateStateUseCase @Inject constructor(
             state.protractorUnit.center
         )
 
-        val isObstructed = checkForObstructions(state)
+        // Obstruction and rail-impact read state.shotLineAnchor; give them this pass's anchor,
+        // not the previous pass's (which lagged one event and was null on the first pass).
+        val anchoredState = state.copy(shotLineAnchor = logicalShotLineAnchor)
+        val isObstructed = checkForObstructions(anchoredState)
 
         val targetBallDistance = calculateDistance(state, state.pitchMatrix ?: Matrix())
 
         val shotGuideImpactPoint = if (state.table.isVisible && !state.isBankingMode) {
-            calculateShotGuideImpact(state, useShotGuideLine = true)
+            calculateShotGuideImpact(anchoredState, useShotGuideLine = true)
         } else {
             null
         }
@@ -430,7 +436,9 @@ class UpdateStateUseCase @Inject constructor(
             ).toFloat()
             
             val path = SpinPhysicsCalculator.calculatePath(
-                spinOffset = Vector2(stored.x, stored.y),
+                // The dial stores y screen-down (SpinReducer.SpinApplied: touch below centre = +y,
+                // i.e. striking low = draw). SpinPhysicsCalculator treats +y as follow, so flip.
+                spinOffset = Vector2(stored.x, -stored.y),
                 cueBallPos = cueBallPos.toVector2(),
                 targetBallPos = targetBallPos.toVector2(),
                 shotAngle = shotAngle,
@@ -708,8 +716,14 @@ class UpdateStateUseCase @Inject constructor(
         end: PointF,
         state: CueDetatState
     ): List<PointF> {
-        val dirX = end.x - start.x
-        val dirY = end.y - start.y
+        // Normalise first: callers pass ghost->target (|d| = 2r), and extending the raw vector
+        // produced ~1e9-unit endpoints after reflection. Matches getExtendedLinePath/checkPocketAim.
+        val rawX = end.x - start.x
+        val rawY = end.y - start.y
+        val mag = sqrt(rawX * rawX + rawY * rawY)
+        if (mag < 0.001f) return listOf(start, end)
+        val dirX = rawX / mag
+        val dirY = rawY / mag
         val extendedEnd =
             PointF(start.x + dirX * lineExtensionFactor, start.y + dirY * lineExtensionFactor)
 
@@ -720,7 +734,7 @@ class UpdateStateUseCase @Inject constructor(
             )
 
         val (intersectionPoint, railNormal) = intersectionResult
-        val incidentVector = PointF(extendedEnd.x - start.x, extendedEnd.y - start.y)
+        val incidentVector = PointF(dirX, dirY)
 
         val reflectedDir = state.table.reflect(incidentVector, railNormal)
 

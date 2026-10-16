@@ -5,9 +5,10 @@ import com.hereliesaz.cuedetat.core.geometry.TableSpec
 import com.hereliesaz.cuedetat.core.geometry.Vec2
 import com.hereliesaz.cuedetat.core.units.degrees
 import com.hereliesaz.cuedetat.core.units.meters
-import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -131,6 +132,56 @@ class ProjectionTest {
     fun aPointBehindTheCameraDoesNotProject() {
         // Well behind the viewpoint along -x, where the camera is looking away.
         val behind = Vec2(-50.0, 0.0)
-        assertTrue(projector.tableToScreen(behind) == null || abs(behind.x) > 0)
+        // Hand check: camera at (-2, 0, 1.4) looking at the origin has forward
+        // (2, 0, -1.4)/|.|; (behind - camera) = (-48, 0, -1.4) gives a forward
+        // depth of (-96 + 1.96)/2.44 < 0, i.e. behind the camera.
+        assertNull(projector.tableToScreen(behind))
+        assertNull(projector.tableToScreen(Vec3(-50.0, 0.0, 0.0)))
+    }
+
+    @Test
+    fun theCameraBasisIsNotMirrored() {
+        // Camera behind the foot end at -x, looking toward +x with z up. In a
+        // right-handed table frame (x forward, z up) +y is to the viewer's LEFT,
+        // so a point at +y must land left of the table centre on screen.
+        val centre = assertNotNull(projector.tableToScreen(Vec2.ZERO))
+        val left = assertNotNull(projector.tableToScreen(Vec2(0.0, 0.5)))
+        assertTrue(left.x < centre.x, "+y should be screen-left: centre ${centre.x}, +y ${left.x}")
+        assertEquals(1.0, pose.rotation.determinant, 1e-9)
+    }
+
+    @Test
+    fun lookingStraightAlongWorldUpIsRejected() {
+        assertFailsWith<IllegalArgumentException> {
+            TablePose.lookAt(Vec3(0.0, 0.0, 2.0))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            TablePose.elevatedView(height = 1.0.meters, distance = 0.0.meters)
+        }
+    }
+
+    @Test
+    fun homographyFromCollinearPointsIsNull() {
+        val pts = listOf(Vec2(0.0, 0.0), Vec2(1.0, 0.0), Vec2(2.0, 0.0), Vec2(3.0, 0.0))
+        val scr = listOf(ScreenPoint(0.0, 0.0), ScreenPoint(10.0, 5.0), ScreenPoint(30.0, 2.0), ScreenPoint(5.0, 40.0))
+        assertNull(homographyFromCorrespondences(pts, scr))
+    }
+
+    @Test
+    fun homographyWithDuplicatePointsIsNull() {
+        val pts = listOf(Vec2(0.0, 0.0), Vec2(1.0, 0.0), Vec2(1.0, 0.0), Vec2(0.0, 1.0))
+        val scr = listOf(ScreenPoint(0.0, 0.0), ScreenPoint(100.0, 0.0), ScreenPoint(100.0, 1.0), ScreenPoint(0.0, 100.0))
+        assertNull(homographyFromCorrespondences(pts, scr))
+    }
+
+    @Test
+    fun homographyRecoversAPureScaleAndShift() {
+        // Hand-built map: u = 100 x + 50, v = 200 y + 10. Expected matrix written
+        // out directly, not derived from the projector.
+        val pts = listOf(Vec2(0.0, 0.0), Vec2(1.0, 0.0), Vec2(1.0, 1.0), Vec2(0.0, 1.0))
+        val scr = listOf(ScreenPoint(50.0, 10.0), ScreenPoint(150.0, 10.0), ScreenPoint(150.0, 210.0), ScreenPoint(50.0, 210.0))
+        val h = assertNotNull(homographyFromCorrespondences(pts, scr))
+        val expected = doubleArrayOf(100.0, 0.0, 50.0, 0.0, 200.0, 10.0, 0.0, 0.0, 1.0)
+        for (i in 0 until 9) assertEquals(expected[i], h.m[i], 1e-6, "entry $i")
     }
 }

@@ -9,8 +9,12 @@ import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.input.pointer.pointerInput
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
@@ -27,11 +31,24 @@ import kotlin.math.abs
  * - Two-finger Pan: Pans the camera view.
  * - Three-finger Drag: Moves the table up/down along its Z-axis.
  *
+ * The pointer-input coroutine is keyed on `Unit` so it is never restarted mid-drag; the
+ * latest [uiState] and [onEvent] are read through [rememberUpdatedState], so gating
+ * (table visibility, world lock, ball-selection phase, beginner lock) always reflects the
+ * current state rather than the state of the first composition.
+ *
+ * When the number of pressed pointers changes (a finger lands or lifts) the tracked
+ * centroid is re-seeded and no movement is emitted for that event, so lifting one finger
+ * of a pinch does not teleport a dragged ball by half the finger spread.
+ *
  * @param uiState The current state (used to gate specific gestures based on mode).
  * @param onEvent Callback to dispatch detected gesture events to the ViewModel.
  */
-fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEvent) -> Unit) =
-    this.pointerInput(Unit) {
+@Composable
+fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEvent) -> Unit): Modifier {
+    val currentState by rememberUpdatedState(uiState)
+    val currentOnEvent by rememberUpdatedState(onEvent)
+    return this.pointerInput(Unit) {
+        val onEvent: (MainScreenEvent) -> Unit = { currentOnEvent(it) }
         // Wait for each gesture sequence (down -> move -> up/cancel).
         awaitEachGesture {
             // Wait for the first pointer to touch the screen.
@@ -45,6 +62,7 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
 
             // Track the centroid (center point of fingers) to calculate movement.
             var lastCentroid: Offset = down.position
+            var lastPressedCount = 1
 
             // Loop to handle drag/move events until all fingers are lifted.
             var hasMovedDramatically = false
@@ -52,7 +70,16 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                 val event = awaitPointerEvent()
                 val canceled = event.changes.any { it.isConsumed }
                 if (!canceled) {
+                    val uiState = currentState
                     val centroid = event.calculateCentroid()
+                    val pressedCount = event.changes.count { it.pressed }
+                    if (pressedCount != lastPressedCount) {
+                        // Finger landed or lifted: re-seed and emit nothing this event.
+                        lastPressedCount = pressedCount
+                        if (centroid.isSpecified) lastCentroid = centroid
+                        event.changes.forEach { if (it.pressed) it.consume() }
+                        continue
+                    }
                     val isDynamicBeginner = uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked
 
                     // Check how many pointers are active.
@@ -99,12 +126,13 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                             }
                         }
                     }
-                    lastCentroid = centroid
+                    if (centroid.isSpecified) lastCentroid = centroid
                 }
                 event.changes.forEach { if (it.pressed) it.consume() }
             } while (!canceled && event.changes.any { it.pressed })
 
             // Gesture sequence ended (all fingers up).
+            val uiState = currentState
             if (!hasMovedDramatically && uiState.cameraMode != com.hereliesaz.cuedetat.domain.CameraMode.OFF) {
                 // If it was a tap during ball selection phase, handle it
                 if (uiState.ballSelectionPhase != com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE) {
@@ -114,3 +142,4 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
             onEvent(MainScreenEvent.GestureEnded)
         }
     }
+}

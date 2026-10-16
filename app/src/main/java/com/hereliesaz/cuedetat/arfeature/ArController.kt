@@ -12,22 +12,18 @@ import com.hereliesaz.cuedetat.domain.MainScreenEvent
 /**
  * Boundary for the Expert-only ARCore table-scan feature.
  *
- * Defined in the base module so the base never references ARCore or the AR
- * implementation classes (ArTableSession / ArFrameProcessor / ArCoreBackground /
- * TableScanViewModel) directly. That decoupling is what lets the implementation
- * eventually live in the on-demand `:feature_expert_ar` dynamic feature module,
- * delivered on demand the first time AR is requested.
- *
- * Step 1 of the extraction: the implementation (BaseArController) still lives in
- * the base and is Hilt-bound, so behaviour is unchanged. Step 2 moves the
- * implementation + ARCore into the dynamic feature module behind this same
- * interface, loaded via SplitInstall + reflection.
+ * Keeps the rest of the app from referencing the AR implementation classes
+ * (ArTableSession / ArFrameProcessor / ArCoreBackground / TableScanViewModel) directly.
+ * The implementation, `ArControllerImpl`, lives under `feature_expert_ar/`, which is a
+ * source directory compiled into :app (app/build.gradle.kts sourceSets), not a Gradle or
+ * dynamic-feature module. ArControllerFacade constructs it directly; there is
+ * no SplitInstall, reflection or on-demand delivery.
  */
 interface ArController {
 
     /**
-     * Ensure the Expert-AR implementation is available, requesting the on-demand
-     * `:feature_expert_ar` split if necessary. Available to everyone.
+     * Ensure the Expert-AR implementation is available (in the single bundled build
+     * this only loads the compiled-in class). Available to everyone.
      * Implemented by the
      * facade; the loaded implementation and the no-op both use the default.
      */

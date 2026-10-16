@@ -28,6 +28,7 @@ import com.hereliesaz.cuedetat.view.model.LogicalCircular
 import com.hereliesaz.cuedetat.view.renderer.text.BallTextRenderer
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
 import com.hereliesaz.cuedetat.view.renderer.util.drawGlowCircle
+import com.hereliesaz.cuedetat.view.renderer.renderLensTps
 import com.hereliesaz.cuedetat.view.renderer.warpedBy
 import kotlin.math.hypot
 import androidx.core.graphics.withMatrix
@@ -65,8 +66,47 @@ class BallRenderer {
     private val centerCrosshair = Paint()
     private val boundingBoxPaint = Paint()
 
-    fun draw(canvas: Canvas, state: CueDetatState, paints: PaintCache, typeface: Typeface?, labels: Map<String, String>) {
-        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+    // Native blur filters built once; BlurMaskFilter is immutable, so sharing is safe.
+    private val detectionBlur = android.graphics.BlurMaskFilter(18f, android.graphics.BlurMaskFilter.Blur.NORMAL)
+
+    // Per-frame scratch, reused.
+    private val logicalBallsScratch = ArrayList<LogicalCircular>(8)
+
+    // Ball configs are immutable; build once instead of per ball per frame.
+    private val bankingBallConfig = BankingBall()
+    private val targetBallConfig = TargetBall()
+    private val ghostCueBallConfig = GhostCueBall()
+    private val actualCueBallConfig = ActualCueBall()
+    private val obstacleBallConfig = ObstacleBall()
+
+    // Matrix/lift for the current draw() call (set at the top of draw()).
+    private var planeMatrix: Matrix? = null
+    private var sizeMatrix: Matrix? = null
+    private var liftScale: Float = 1f
+
+    /**
+     * Draws all non-beginner balls, detection rings, labels and centres.
+     *
+     * @param planeMatrix the matrix the table and lines were drawn with this frame
+     *   (OverlayRenderer's matrixFor2DPlane: pitchMatrix interpolated toward the orthographic
+     *   top-down layout). Balls must use it or they detach from the table during/after the
+     *   top-down transition.
+     * @param topDownProgress 0 = perspective, 1 = orthographic; fades the ball lift to 0 and
+     *   switches radius measurement from sizeCalculationMatrix to [planeMatrix].
+     */
+    fun draw(
+        canvas: Canvas,
+        state: CueDetatState,
+        paints: PaintCache,
+        typeface: Typeface?,
+        labels: Map<String, String>,
+        planeMatrix: Matrix? = state.pitchMatrix,
+        topDownProgress: Float = 0f
+    ) {
+        val tps = renderLensTps(state)
+        this.planeMatrix = planeMatrix
+        this.liftScale = (1f - topDownProgress).coerceIn(0f, 1f)
+        this.sizeMatrix = if (topDownProgress <= 0f) (state.sizeCalculationMatrix ?: planeMatrix) else planeMatrix
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
 
         if (isBeginnerLocked) {
@@ -79,11 +119,11 @@ class BallRenderer {
         // 1a. Draw Main Balls (Banking or Protractor)
         if (state.isBankingMode) {
             state.onPlaneBall?.let { ball ->
-                drawBallBody(canvas, ball, BankingBall(), state, paints, tps)
+                drawBallBody(canvas, ball, bankingBallConfig, state, paints, tps)
             }
         } else {
             val protractor = state.protractorUnit
-            drawBallBody(canvas, protractor, TargetBall(), state, paints, tps)
+            drawBallBody(canvas, protractor, targetBallConfig, state, paints, tps)
 
             if (!state.isMasseModeActive || state.masseConnectsTarget) {
                 val ghostCenter = if (state.isMasseModeActive) state.masseGhostBallCenter else null
@@ -91,17 +131,17 @@ class BallRenderer {
                     override val center = ghostCenter ?: protractor.ghostCueBallCenter
                     override val radius = protractor.radius
                 }
-                drawBallBody(canvas, ghostBall, GhostCueBall(), state, paints, tps)
+                drawBallBody(canvas, ghostBall, ghostCueBallConfig, state, paints, tps)
             }
 
             state.onPlaneBall?.let { ball ->
-                drawBallBody(canvas, ball, ActualCueBall(), state, paints, tps)
+                drawBallBody(canvas, ball, actualCueBallConfig, state, paints, tps)
             }
         }
 
         // 1b. Draw Obstacle Balls
         state.obstacleBalls.forEach { obstacle ->
-            drawBallBody(canvas, obstacle, ObstacleBall(), state, paints, tps)
+            drawBallBody(canvas, obstacle, obstacleBallConfig, state, paints, tps)
         }
 
         // 1c. Draw Detection UI (Snapped rings, passive glows, tap targets)
@@ -120,11 +160,11 @@ class BallRenderer {
         // 3a. Draw Main Ball Centers
         if (state.isBankingMode) {
             state.onPlaneBall?.let { ball ->
-                drawBallCenter(canvas, ball, BankingBall(), state, paints, tps)
+                drawBallCenter(canvas, ball, bankingBallConfig, state, paints, tps)
             }
         } else {
             val protractor = state.protractorUnit
-            drawBallCenter(canvas, protractor, TargetBall(), state, paints, tps)
+            drawBallCenter(canvas, protractor, targetBallConfig, state, paints, tps)
 
             if (!state.isMasseModeActive || state.masseConnectsTarget) {
                 val ghostCenter = if (state.isMasseModeActive) state.masseGhostBallCenter else null
@@ -132,22 +172,22 @@ class BallRenderer {
                     override val center = ghostCenter ?: protractor.ghostCueBallCenter
                     override val radius = protractor.radius
                 }
-                drawBallCenter(canvas, ghostBall, GhostCueBall(), state, paints, tps)
+                drawBallCenter(canvas, ghostBall, ghostCueBallConfig, state, paints, tps)
             }
 
             state.onPlaneBall?.let { ball ->
-                drawBallCenter(canvas, ball, ActualCueBall(), state, paints, tps)
+                drawBallCenter(canvas, ball, actualCueBallConfig, state, paints, tps)
             }
         }
 
         // 3b. Draw Obstacle Ball Centers
         state.obstacleBalls.forEach { obstacle ->
-            drawBallCenter(canvas, obstacle, ObstacleBall(), state, paints, tps)
+            drawBallCenter(canvas, obstacle, obstacleBallConfig, state, paints, tps)
         }
     }
 
     fun drawBeginnerStaticCircles(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
-        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+        val tps = renderLensTps(state)
         forEachBeginnerBall(state) { ball, config ->
             val logicalBallMatrix = state.logicalPlaneMatrix ?: return@forEachBeginnerBall
             val drawCenter = ball.center.warpedBy(tps)
@@ -171,7 +211,7 @@ class BallRenderer {
     }
 
     fun drawBeginnerBubbleElements(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
-        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+        val tps = renderLensTps(state)
         forEachBeginnerBall(state) { ball, config ->
             val logicalBallMatrix = state.logicalPlaneMatrix ?: return@forEachBeginnerBall
             val drawCenter = ball.center.warpedBy(tps)
@@ -212,7 +252,7 @@ class BallRenderer {
     }
 
     fun drawBeginnerStaticCenters(canvas: Canvas, state: CueDetatState, paints: PaintCache) {
-        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) null else state.lensWarpTps
+        val tps = renderLensTps(state)
         forEachBeginnerBall(state) { ball, _ ->
             val logicalBallMatrix = state.logicalPlaneMatrix ?: return@forEachBeginnerBall
             val drawCenter = ball.center.warpedBy(tps)
@@ -237,7 +277,7 @@ class BallRenderer {
 
     private inline fun forEachBeginnerBall(state: CueDetatState, action: (LogicalCircular, BallsConfig) -> Unit) {
         val protractor = state.protractorUnit
-        action(protractor, TargetBall())
+        action(protractor, targetBallConfig)
 
         if (!state.isMasseModeActive || state.masseConnectsTarget) {
             val ghostCenter = if (state.isMasseModeActive) state.masseGhostBallCenter else null
@@ -245,16 +285,17 @@ class BallRenderer {
                 override val center = ghostCenter ?: protractor.ghostCueBallCenter
                 override val radius = protractor.radius
             }
-            action(ghostBall, GhostCueBall())
+            action(ghostBall, ghostCueBallConfig)
         }
 
-        state.onPlaneBall?.let { action(it, ActualCueBall()) }
-        state.obstacleBalls.forEach { action(it, ObstacleBall()) }
+        state.onPlaneBall?.let { action(it, actualCueBallConfig) }
+        state.obstacleBalls.forEach { action(it, obstacleBallConfig) }
     }
 
     private fun drawDetectionRings(canvas: Canvas, state: CueDetatState, paints: PaintCache, tps: com.hereliesaz.cuedetat.domain.TpsWarpData?) {
-        val detectedBalls = (state.visionData?.genericBalls ?: emptyList()) + 
-                           (state.visionData?.balls?.map { it.position } ?: emptyList())
+        val genericBalls = state.visionData?.genericBalls.orEmpty()
+        val typedBalls = state.visionData?.balls.orEmpty()
+        val matrixForRings = planeMatrix
         val snappedPaint = snappedRingPaint.apply {
             set(paints.targetCirclePaint)
             color = SulfurDust.toArgb()
@@ -263,13 +304,20 @@ class BallRenderer {
         }
 
         // Snapped Ball Indicators
-        val allLogicalBalls = (listOfNotNull(state.onPlaneBall, state.protractorUnit) + state.obstacleBalls)
+        // A detection within SNAP_TOLERANCE logical units of a logical ball is treated as the
+        // ball it was snapped to. Allocation-free: no concatenated detection list.
+        val allLogicalBalls = logicalBallsScratch.apply {
+            clear()
+            state.onPlaneBall?.let { add(it) }
+            add(state.protractorUnit)
+            addAll(state.obstacleBalls)
+        }
         allLogicalBalls.forEach { logicalBall ->
-            val isSnapped = detectedBalls.any { detected ->
-                hypot((logicalBall.center.x - detected.x).toDouble(), (logicalBall.center.y - detected.y).toDouble()) < 5.0
-            }
+            fun near(x: Float, y: Float) =
+                hypot((logicalBall.center.x - x).toDouble(), (logicalBall.center.y - y).toDouble()) < SNAP_TOLERANCE
+            val isSnapped = genericBalls.any { near(it.x, it.y) } || typedBalls.any { near(it.position.x, it.position.y) }
             if (isSnapped) {
-                state.pitchMatrix?.let { matrix ->
+                matrixForRings?.let { matrix ->
                     val drawCenter = logicalBall.center.warpedBy(tps)
                     canvas.withMatrix(matrix) {
                         drawCircle(
@@ -288,7 +336,7 @@ class BallRenderer {
         if (state.cameraMode != com.hereliesaz.cuedetat.domain.CameraMode.OFF &&
             state.ballSelectionPhase == BallSelectionPhase.NONE) {
             val candidates = state.snapCandidates ?: emptyList()
-            state.pitchMatrix?.let { matrix ->
+            matrixForRings?.let { matrix ->
                 candidates.forEach { candidate ->
                     val glowPaint = passiveGlowPaint.apply {
                         reset()
@@ -296,7 +344,7 @@ class BallRenderer {
                         strokeWidth = 14f
                         color = android.graphics.Color.WHITE
                         alpha = if (candidate.isConfirmed) 180 else 40
-                        maskFilter = android.graphics.BlurMaskFilter(18f, android.graphics.BlurMaskFilter.Blur.NORMAL)
+                        maskFilter = detectionBlur
                     }
                     val ringPaint = passiveRingPaint.apply {
                         reset()
@@ -332,9 +380,9 @@ class BallRenderer {
                 set(candidateRingPaint)
                 strokeWidth = 14f
                 alpha = 60
-                maskFilter = android.graphics.BlurMaskFilter(18f, android.graphics.BlurMaskFilter.Blur.NORMAL)
+                maskFilter = detectionBlur
             }
-            state.pitchMatrix?.let { matrix ->
+            matrixForRings?.let { matrix ->
                 candidates.forEach { candidate ->
                     val drawCenter = candidate.detectedPoint.warpedBy(tps)
                     canvas.withMatrix(matrix) {
@@ -397,10 +445,10 @@ class BallRenderer {
 
         } else {
             // Expert/Dynamic Mode logic for Bodies
-            val positionMatrix = state.pitchMatrix ?: return
-            val sizeMatrix = state.sizeCalculationMatrix ?: positionMatrix
+            val positionMatrix = planeMatrix ?: return
+            val sizeMatrix = this.sizeMatrix ?: positionMatrix
             val drawCenter = ball.center.warpedBy(tps)
-            val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(drawCenter, ball.radius, state, sizeMatrix)
+            val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(drawCenter, ball.radius, state, sizeMatrix, liftScale)
             val logicalScreenPos = DrawingUtils.mapPoint(drawCenter, positionMatrix)
             val yPosLifted = logicalScreenPos.y - radiusInfo.lift
 
@@ -480,9 +528,9 @@ class BallRenderer {
 
         } else {
             // Expert/Dynamic Mode logic for Centers
-            val positionMatrix = state.pitchMatrix ?: return
+            val positionMatrix = planeMatrix ?: return
             val drawCenter = ball.center.warpedBy(tps)
-            val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(drawCenter, ball.radius, state, state.sizeCalculationMatrix ?: positionMatrix)
+            val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(drawCenter, ball.radius, state, sizeMatrix ?: positionMatrix, liftScale)
             val logicalScreenPos = DrawingUtils.mapPoint(drawCenter, positionMatrix)
             val yPosLifted = logicalScreenPos.y - radiusInfo.lift
 
@@ -597,6 +645,22 @@ class BallRenderer {
         }
     }
 
+    /** Labels follow the bodies: the current plane matrix in standard mode, pitchMatrix otherwise. */
+    private fun labelMatrix(state: CueDetatState): Matrix? {
+        val beginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
+        return if (beginnerLocked) state.pitchMatrix else (planeMatrix ?: state.pitchMatrix)
+    }
+
+    private fun labelLift(state: CueDetatState): Float {
+        val beginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
+        return if (beginnerLocked) 1f else liftScale
+    }
+
+    private companion object {
+        /** Logical distance below which a CV detection counts as the logical ball it snapped to. */
+        const val SNAP_TOLERANCE = 5.0
+    }
+
     private fun colorForBallType(type: com.hereliesaz.cuedetat.data.BallType): Color = when (type) {
         // Solids vs stripes are deliberately on opposite sides of the wheel so
         // they can't be confused at a glance against the green felt.
@@ -625,7 +689,7 @@ class BallRenderer {
                 "actualCueBall" to LabelConfig.actualCueBall
             }
             val label = labels[labelKey] ?: labelKey
-            textRenderer.draw(canvas, textPaint, it, label, config, state)
+            textRenderer.draw(canvas, textPaint, it, label, config, state, matrix = labelMatrix(state), liftScale = labelLift(state))
         }
 
         if (!state.isBankingMode) {
@@ -636,7 +700,8 @@ class BallRenderer {
                 state.protractorUnit,
                 targetLabel,
                 LabelConfig.targetBall,
-                state
+                state,
+                matrix = labelMatrix(state), liftScale = labelLift(state)
             )
 
             val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
@@ -649,7 +714,7 @@ class BallRenderer {
             textRenderer.draw(canvas, textPaint, object : LogicalCircular {
                 override val center = state.protractorUnit.ghostCueBallCenter
                 override val radius = state.protractorUnit.radius
-            }, ghostCueText, LabelConfig.ghostCueBall, state, drawBelow = true)
+            }, ghostCueText, LabelConfig.ghostCueBall, state, drawBelow = true, matrix = labelMatrix(state), liftScale = labelLift(state))
         }
 
         state.obstacleBalls.forEachIndexed { index, obstacle ->
@@ -660,7 +725,8 @@ class BallRenderer {
                 obstacle,
                 obstacleLabel,
                 LabelConfig.obstacleBall,
-                state
+                state,
+                matrix = labelMatrix(state), liftScale = labelLift(state)
             )
         }
     }

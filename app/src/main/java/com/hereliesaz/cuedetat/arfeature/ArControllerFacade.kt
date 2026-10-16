@@ -24,9 +24,9 @@ import javax.inject.Singleton
  * swapping its [delegate] from [NoOpArController] to the real implementation the
  * first time AR is requested (ARCore setup is deferred until someone uses it).
  *
- * The implementation (feature_expert_ar sources, compiled into this module since the
- * flavor merge) is constructed directly. It used to be resolved reflectively from a
- * dynamic feature split; that indirection let a build silently ship without it.
+ * The implementation (feature_expert_ar sources, compiled into :app) is constructed directly. It used to be
+ * resolved reflectively from a dynamic feature split; that indirection let a build silently
+ * ship without it.
  *
  * [delegate] is a Compose [mutableStateOf] so the @Composable surfaces recompose
  * onto the real implementation the moment it loads.

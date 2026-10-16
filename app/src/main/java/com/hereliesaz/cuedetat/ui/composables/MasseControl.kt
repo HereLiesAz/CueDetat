@@ -21,28 +21,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.core.content.res.ResourcesCompat
 import com.hereliesaz.cuedetat.R
 import kotlin.math.roundToInt
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.theme.WarningRed
-import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
 import kotlinx.coroutines.withTimeoutOrNull
 
 @Composable
@@ -57,38 +56,35 @@ fun MasseControl(
     var isMoveModeActive by remember { mutableStateOf(false) }
     val moveIconPainter = rememberVectorPainter(image = Icons.Default.OpenWith)
     val viewConfig = LocalViewConfiguration.current
-    val density = LocalDensity.current.density
     val context = LocalContext.current
     val barbaroTypeface = remember {
         try { ResourcesCompat.getFont(context, R.font.barbaro) } catch (e: Exception) { null }
     }
-    val colorWheelBitmap = remember(density) {
-        val sizePx = (120f * density).toInt().coerceAtLeast(1)
-        val bmp = android.graphics.Bitmap.createBitmap(sizePx, sizePx, android.graphics.Bitmap.Config.ARGB_8888)
-        val bmpCanvas = android.graphics.Canvas(bmp)
-        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-        val rectF = android.graphics.RectF(0f, 0f, sizePx.toFloat(), sizePx.toFloat())
-        val numArcs = 72
-        val arcAngle = 360f / numArcs
-        for (i in 0 until numArcs) {
-            val startAngle = i * arcAngle
-            paint.color = SpinColorUtils.getColorFromAngleAndDistance(startAngle + arcAngle / 2, 1.0f).toArgb()
-            bmpCanvas.drawArc(rectF, startAngle, arcAngle, true, paint)
+    val colorWheelBitmap = rememberSpinColorWheel()
+    val labelPaint = rememberSpinLabelPaint()
+    val degreePaint = remember(barbaroTypeface) {
+        android.graphics.Paint().apply {
+            color = android.graphics.Color.argb(204, 255, 255, 255)  // 80% white
+            textAlign = android.graphics.Paint.Align.RIGHT
+            isAntiAlias = true
+            typeface = barbaroTypeface
         }
-        val center = sizePx / 2f
-        val gradientPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-        gradientPaint.shader = android.graphics.RadialGradient(
-            center, center, center,
-            intArrayOf(android.graphics.Color.WHITE, android.graphics.Color.TRANSPARENT),
-            null, android.graphics.Shader.TileMode.CLAMP
-        )
-        bmpCanvas.drawCircle(center, center, center, gradientPaint)
-        bmp.asImageBitmap()
     }
+    val stickPath = remember { Path() }
+    val masseDescription = stringResource(R.string.masse_control_description)
+    val masseState = stringResource(
+        R.string.masse_state,
+        spinStateDescription(selectedSpinOffset ?: lingeringSpinOffset),
+        elevationAngle.roundToInt(),
+    )
 
     Box(
         modifier = modifier
             .size(120.dp)
+            .semantics {
+                contentDescription = masseDescription
+                stateDescription = masseState
+            }
             .pointerInput(Unit) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
@@ -165,27 +161,18 @@ fun MasseControl(
                 // Center label
                 val labelTextSize = 12.dp.toPx()
                 drawIntoCanvas { canvas ->
-                    canvas.nativeCanvas.drawText(
-                        "TOP",
-                        center.x,
-                        center.y + labelTextSize * 0.35f,
-                        android.graphics.Paint().apply {
-                            color = android.graphics.Color.argb((180 * spinPathAlpha).toInt(), 30, 30, 30)
-                            textAlign = android.graphics.Paint.Align.CENTER
-                            textSize = labelTextSize
-                            isFakeBoldText = true
-                            isAntiAlias = true
-                        }
-                    )
+                    labelPaint.color = android.graphics.Color.argb((180 * spinPathAlpha).toInt(), 30, 30, 30)
+                    labelPaint.textSize = labelTextSize
+                    canvas.nativeCanvas.drawText("TOP", center.x, center.y + labelTextSize * 0.35f, labelPaint)
                 }
 
                 // Indicators
                 lingeringSpinOffset?.let { 
-                    drawLogicalIndicator(it, center, radius, Color.White.copy(alpha = 0.6f * spinPathAlpha)) 
+                    drawSpinIndicator(it, center, radius, Color.White.copy(alpha = 0.6f * spinPathAlpha)) 
                 }
 
                 selectedSpinOffset?.let { activePos ->
-                    drawLogicalIndicator(activePos, center, radius, Color.White)
+                    drawSpinIndicator(activePos, center, radius, Color.White)
                 }
 
                 if (isMoveModeActive) {
@@ -231,7 +218,8 @@ fun MasseControl(
                 val tipHalfThicknessPx = 2.dp.toPx()
                 val buttHalfThicknessPx = 6.dp.toPx()
 
-                val stickPath = Path().apply {
+                stickPath.apply {
+                    reset()
                     moveTo(0f, -tipHalfThicknessPx) // Tip top
                     lineTo(stickLength, -buttHalfThicknessPx) // Butt top
                     lineTo(stickLength, buttHalfThicknessPx) // Butt bottom
@@ -261,25 +249,9 @@ fun MasseControl(
                     "${elevationAngle.roundToInt()}°",
                     size.width - 12.dp.toPx(),
                     size.height - 8.dp.toPx(),
-                    android.graphics.Paint().apply {
-                        color = android.graphics.Color.argb(204, 255, 255, 255)  // 80% white
-                        textAlign = android.graphics.Paint.Align.RIGHT
-                        textSize = 14.dp.toPx()
-                        isAntiAlias = true
-                        typeface = barbaroTypeface
-                    }
+                    degreePaint.apply { textSize = 14.dp.toPx() }
                 )
             }
         }
     }
-}
-
-private fun DrawScope.drawLogicalIndicator(normalizedOffset: PointF, center: Offset, radius: Float, color: Color) {
-    // Map normalized -1..1 to local pixels
-    val indicatorX = center.x + (normalizedOffset.x * radius)
-    val indicatorY = center.y + (normalizedOffset.y * radius)
-    val indicatorCenter = Offset(indicatorX, indicatorY)
-    
-    drawCircle(color = color, radius = 5.dp.toPx(), center = indicatorCenter)
-    drawCircle(color = Color.Black.copy(alpha = 0.3f), radius = 5.dp.toPx(), center = indicatorCenter, style = Stroke(width = 1.dp.toPx()))
 }

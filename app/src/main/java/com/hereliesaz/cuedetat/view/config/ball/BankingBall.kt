@@ -11,8 +11,6 @@ import com.hereliesaz.cuedetat.view.config.base.CenterShape
  * This is the virtual ball used in Banking Mode, placed at the table center.
  */
 data class BankingBall(
-    /** Label used for identification. */
-    override val label: String = "Banking Ball",
     /** Fully opaque. */
     override val opacity: Float = 1.0f,
     /** Width of the glow effect. */
@@ -23,8 +21,6 @@ data class BankingBall(
     override val strokeWidth: Float = 6f,
     /** Stroke color (Sulfur/Yellow). */
     override val strokeColor: Color = SulfurDust,
-    /** No additional 2D offset. */
-    override val additionalOffset: Float = 0f,
     /** Center marker shape is a CROSSHAIR for precise alignment. */
     override val centerShape: CenterShape = CenterShape.CROSSHAIR,
     /** Center marker size is 30% of the radius. */

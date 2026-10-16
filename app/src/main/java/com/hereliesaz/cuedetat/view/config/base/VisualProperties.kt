@@ -20,11 +20,9 @@ enum class CenterShape {
  * Base interface for all visual configuration objects.
  *
  * Provides common properties for styling rendered elements such as opacity,
- * glow effects, stroke styles, and labeling.
+ * glow effects and stroke styles.
  */
 interface VisualProperties {
-    /** The human-readable label for this element (used in debug or UI). */
-    val label: String
     /** The opacity (alpha) of the element, from 0.0 to 1.0. */
     val opacity: Float
     /** The width of the outer glow effect in pixels. Set to 0 to disable. */
@@ -35,8 +33,6 @@ interface VisualProperties {
     val strokeWidth: Float
     /** The color of the main stroke. */
     val strokeColor: Color
-    /** An additional 2D offset applied to the element's position on the logical plane. */
-    val additionalOffset: Float
 }
 
 /**

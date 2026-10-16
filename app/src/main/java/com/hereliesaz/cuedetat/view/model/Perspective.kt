@@ -93,7 +93,7 @@ object Perspective {
                     // Calculate the size of the input range (e.g., 75 - 60 = 15 degrees).
                     val physicalRange = physicalMaxPitch - smoothingZoneStart
 
-                    // Calculate the size of the output range (e.g., 87 - virtualSmoothingStart).
+                    // Calculate the size of the output range (virtualMaxPitch 78 - virtualSmoothingStart 62.4 = 15.6).
                     val virtualRangeToEase = virtualMaxPitch - virtualSmoothingStart
 
                     // Normalize the current input to a 0.0 - 1.0 progress value within the zone.

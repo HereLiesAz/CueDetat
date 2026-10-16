@@ -19,3 +19,21 @@ fun PointF.warpedBy(tps: TpsWarpData?): PointF {
         warped
     }
 }
+
+/**
+ * The single lens-warp gate for every renderer.
+ *
+ * Returns null (no residual TPS warp) when:
+ * - the camera is in LITE_AR: the residual TPS was fitted against the full-AR projection, and
+ *   LITE_AR draws the plane without it;
+ * - the beginner view is locked: that view draws on the flat logicalPlaneMatrix, not the
+ *   camera projection the TPS was fitted to.
+ *
+ * Table, rails, pockets, balls, labels and all lines must use this so they agree.
+ */
+fun renderLensTps(state: com.hereliesaz.cuedetat.domain.CueDetatState): TpsWarpData? {
+    if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR) return null
+    if (state.experienceMode == com.hereliesaz.cuedetat.domain.ExperienceMode.BEGINNER &&
+        state.isBeginnerViewLocked) return null
+    return state.lensWarpTps
+}

@@ -8,12 +8,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import com.hereliesaz.cuedetat.R
 
 /**
  * One-time consent for training capture ([com.hereliesaz.cuedetat.data.CaptureRecorder]).
@@ -21,7 +23,8 @@ import androidx.compose.ui.window.DialogProperties
  * Shown until answered: it can't be dismissed by tapping outside, because the answer is the
  * consent. The first paragraph says plainly what is sent (the disclosure app stores require
  * before camera images leave the phone); the rest is the ask. Either answer can be changed later
- * from the menu's "Training data" item.
+ * from the rail's "Training data" item (AzNavRailMenu, id "training_data"), which the copy names;
+ * the app has no Settings screen. The decline button is neutral.
  *
  * @param onAnswer true to turn capture on, false to leave it off
  */
@@ -30,26 +33,28 @@ fun CaptureConsentDialog(onAnswer: (Boolean) -> Unit) {
     AlertDialog(
         onDismissRequest = {},
         properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
-        title = { Text("Training data") },
+        title = { Text(stringResource(R.string.capture_consent_title)) },
         text = {
             Column {
-                Text(
-                    "While the camera is on, Cue D’état saves a camera frame every few seconds, " +
-                        "with the phone's tilt and heading and what the app detected, and sends " +
-                        "them over Wi-Fi to the developer to train the table and ball detection. " +
-                        "Your location, accounts and contacts are not included."
-                )
+                Text(stringResource(R.string.capture_consent_disclosure))
                 Spacer(Modifier.height(12.dp))
                 Text(
                     buildAnnotatedString {
-                        append("You got the app for free. Helping make it better is the ")
-                        withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append("least") }
-                        append(" you can do. But if you must, you can enable your selfishness by disabling the option in Settings.")
+                        append(stringResource(R.string.capture_consent_ask_before))
+                        withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
+                            append(stringResource(R.string.capture_consent_ask_emphasis))
+                        }
+                        append(stringResource(R.string.capture_consent_ask_after))
                     }
                 )
             }
         },
-        confirmButton = { TextButton(onClick = { onAnswer(true) }) { Text("Keep helping") } },
-        dismissButton = { TextButton(onClick = { onAnswer(false) }) { Text("Be selfish") } },
+        confirmButton = {
+            TextButton(onClick = { onAnswer(true) }) { Text(stringResource(R.string.capture_consent_accept)) }
+        },
+        // Neutral decline: a consent prompt that gates camera-frame upload must not shame "no".
+        dismissButton = {
+            TextButton(onClick = { onAnswer(false) }) { Text(stringResource(R.string.capture_consent_decline)) }
+        },
     )
 }

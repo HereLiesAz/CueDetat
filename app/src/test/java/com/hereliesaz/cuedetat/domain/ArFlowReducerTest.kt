@@ -38,7 +38,7 @@ class ArFlowReducerTest {
 
     @Test
     fun `CycleCameraMode from AR_ACTIVE transitions to LITE_AR`() {
-        // ToggleReducer:45 — AR_ACTIVE deliberately drops to LITE_AR rather than OFF
+        // ToggleReducer:46 — AR_ACTIVE deliberately drops to LITE_AR rather than OFF
         // so users keep a usable camera view after AR session ends.
         val s = base.copy(cameraMode = CameraMode.AR_ACTIVE)
         val result = reduceToggleAction(s, MainScreenEvent.CycleCameraMode, utils)

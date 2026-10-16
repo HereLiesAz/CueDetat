@@ -322,20 +322,47 @@ class ArTableSession(
      */
     fun createSession(): Session? {
         if (!isArCoreAvailable()) return null
+        // A previous session (e.g. a composition that never disposed) is closed, not leaked:
+        // ARCore holds the camera per Session.
+        if (session != null) close()
+        var s: Session? = null
         return try {
-            val s = Session(context)
-            supportsDepth = s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
-            val config = Config(s).apply {
-                depthMode = if (supportsDepth) Config.DepthMode.AUTOMATIC else Config.DepthMode.DISABLED
+            val created = Session(context).also { s = it }
+            val depth = created.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
+            val config = Config(created).apply {
+                depthMode = if (depth) Config.DepthMode.AUTOMATIC else Config.DepthMode.DISABLED
                 updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                 lightEstimationMode = Config.LightEstimationMode.DISABLED
                 planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
             }
-            s.configure(config)
-            session = s
-            s
+            created.configure(config)
+            synchronized(frameLock) {
+                supportsDepth = depth
+                session = created
+            }
+            created
         } catch (_: Exception) {
+            runCatching { s?.close() }
             null
+        }
+    }
+
+    /**
+     * Reports [DepthCapability] without disturbing a live session. If one is open its
+     * capability is returned directly; otherwise a throwaway probe Session is created, queried
+     * and closed. The shared [session] is never created or closed here.
+     */
+    fun probeCapability(): DepthCapability {
+        if (!isArCoreAvailable()) return DepthCapability.NONE
+        if (session != null) return capability
+        val probe = try { Session(context) } catch (_: Exception) { return DepthCapability.NONE }
+        return try {
+            if (probe.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) DepthCapability.DEPTH_API
+            else DepthCapability.WORLD_TRACKING
+        } catch (_: Exception) {
+            DepthCapability.WORLD_TRACKING
+        } finally {
+            runCatching { probe.close() }
         }
     }
 
@@ -737,7 +764,14 @@ class ArTableSession(
 
     fun pause() { session?.pause() }
     fun resume() { try { session?.resume() } catch (_: Exception) {} }
-    fun close() {
+    /**
+     * Held by the GL renderer for each whole frame (ArCoreBackground.onDrawFrame) and by
+     * [close] and the session swap in [createSession], so the Session is never closed or
+     * replaced while `session.update()` is running.
+     */
+    val frameLock = Any()
+
+    fun close(): Unit = synchronized(frameLock) {
         synchronized(cloudPersistenceLock) { cloudGeneration++ }
         cloudRequest.set(null)
         cloudHostFuture?.cancel()

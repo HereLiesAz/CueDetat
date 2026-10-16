@@ -124,8 +124,19 @@ data class Table(
     }
 
     /**
-     * Reflects a vector with an optional spin value.
-     * Default spin=0f maintains behavior for legacy calls.
+     * Mirrors [v] about the rail with unit normal [n] (sign of [n] is irrelevant), then rotates
+     * the result by `spin * 0.15` radians.
+     *
+     * Provenance of the spin term: none. `0.15 rad` per unit of spin is an unmeasured,
+     * hand-picked heuristic, not a cushion/english model; it rotates the same way on every
+     * rail regardless of which side of the normal the ball arrives from, and the pure
+     * reflection in core/geometry (`reflect(direction, normal)`) has no such term. With the
+     * default spin = 0 the result is the exact mirror reflection.
+     *
+     * Only caller passing spin: domain/CalculateBankShot.kt (`selectedSpinOffset.x`, which
+     * SpinControl documents as normalised -1..1, i.e. up to ±8.6°). The term is kept, not
+     * removed, because removing it changes bank-shot output owned by the domain layer; the
+     * domain should decide to replace it with a physical model or drop it.
      */
     fun reflect(v: PointF, n: PointF, spin: Float = 0f): PointF {
         val dot = v.x * n.x + v.y * n.y

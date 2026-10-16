@@ -37,6 +37,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
 import com.hereliesaz.aznavrail.tutorial.AzGuidanceController
 import com.hereliesaz.aznavrail.tutorial.AzInstructionStep
 import com.hereliesaz.aznavrail.tutorial.LocalAzGuidanceController
@@ -93,8 +94,8 @@ fun AzNavRailMenu(
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val b1Y = Color(0xFFFFEB3B); val b2B = Color(0xFF2196F3); val b3R = Color(0xFFF44336)
     val b4P = Color(0xFF9C27B0); val b5O = Color(0xFFFF9800); val b6G = Color(0xFF4CAF50)
-    val b7M = Color(0xFFE91E63); val b8K = Color(0xFF212121); val b9Y = Color(0xFFFFF59D)
-    val b10B = Color(0xFF64B5F6); val b11R = Color(0xFFE57373); val b12P = Color(0xFFBA68C8)
+    val b7M = Color(0xFFE91E63); val b8K = Color(0xFF212121)
+    val b10B = Color(0xFF64B5F6); val b11R = Color(0xFFE57373)
     val b13O = Color(0xFFFFB74D); val b14G = Color(0xFF81C784); val b15M = Color(0xFFF06292)
 
     // Tutorial flows for the AzNavRail 10.18 guidance framework. Each flow reuses the verbatim step
@@ -129,6 +130,8 @@ fun AzNavRailMenu(
 
     // The rail accent, and every AzNavRail surface drawn in it, follows the app theme (guide §2.B).
     val railAccent = MaterialTheme.colorScheme.primary
+    // The rail DSL lambda is not @Composable, so resolve its strings here.
+    val supportLabel = stringResource(R.string.rail_support)
 
     val guidance = AzHostActivityLayout(
         navController = navController,
@@ -160,7 +163,7 @@ fun AzNavRailMenu(
         }
 
         // Finish affordance: the framework leaves the final step non-tappable, so surface an explicit
-        // "OK" that marks the active tutorial goal reached (target-independent; persists immediately).
+        // "Finish" button (the label the step texts name) that marks the active tutorial goal reached (target-independent; persists immediately).
         onscreen(alignment = Alignment.BottomCenter) {
             val controller = LocalAzGuidanceController.current
             val finishGoalId = controller?.currentInstructions?.firstOrNull { snap ->
@@ -175,7 +178,7 @@ fun AzNavRailMenu(
                         .background(railAccent, RoundedCornerShape(24.dp))
                         .padding(horizontal = 24.dp, vertical = 2.dp)
                 ) {
-                    Text(text = "OK", color = Color.Black)
+                    Text(text = stringResource(R.string.tutorial_finish), color = Color.Black)
                 }
             }
         }
@@ -184,7 +187,7 @@ fun AzNavRailMenu(
         if (uiState.areHelpersVisible) {
             onscreen(alignment = Alignment.TopStart) {
                 Text(
-                    text = "Tap the icon for more",
+                    text = stringResource(R.string.helpers_tap_icon_hint),
                     fontSize = 14.sp,
                     color = Color.White.copy(alpha = 0.55f),
                     modifier = Modifier.padding(start = 4.dp, top = 2.dp)
@@ -195,7 +198,7 @@ fun AzNavRailMenu(
         if (uiState.ballSelectionPhase == BallSelectionPhase.AWAITING_CUE) {
             onscreen(alignment = Alignment.BottomCenter) {
                 Text(
-                    text = "Tap the cue ball",
+                    text = stringResource(R.string.ball_selection_tap_cue),
                     fontSize = 16.sp,
                     color = Color.White.copy(alpha = 0.9f),
                     modifier = Modifier.padding(bottom = 32.dp)
@@ -204,7 +207,7 @@ fun AzNavRailMenu(
         } else if (uiState.ballSelectionPhase == BallSelectionPhase.AWAITING_TARGET) {
             onscreen(alignment = Alignment.BottomCenter) {
                 Text(
-                    text = "Tap the target ball",
+                    text = stringResource(R.string.ball_selection_tap_target),
                     fontSize = 16.sp,
                     color = Color.White.copy(alpha = 0.9f),
                     modifier = Modifier.padding(bottom = 32.dp)
@@ -406,10 +409,11 @@ fun AzNavRailMenu(
 
         // Replaces the old "Billing & License" item, which shipped a tester-
         // license console to every user in every build with no debug or
-        // entitlement gate at all.
+        // entitlement gate at all. MainViewModel turns ToggleSupportSheet into
+        // SingleEvent.ShowSupportSheet; MainActivity owns the sheet.
         azMenuItem(
             id = "support",
-            text = "Support",
+            text = supportLabel,
             fillColor = b1Y,
             onClick = { onEvent(MainScreenEvent.ToggleSupportSheet) },
         )
@@ -421,24 +425,16 @@ fun AzNavRailMenu(
     if (confirmCloudSave.value) {
         AlertDialog(
             onDismissRequest = { confirmCloudSave.value = false },
-            title = { Text("Save AR table placement for 24 hours?") },
-            text = {
-                Text(
-                    "ARCore will send visual mapping data, camera poses and the table anchor " +
-                        "position to Google's cloud to recognize this table again. " +
-                        "This requires an internet connection. The placement expires within " +
-                        "24 hours and does not make calibration more accurate. " +
-                        "Nothing is uploaded unless you confirm."
-                )
-            },
+            title = { Text(stringResource(R.string.cloud_save_title)) },
+            text = { Text(stringResource(R.string.cloud_save_body)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmCloudSave.value = false
                     onEvent(MainScreenEvent.SaveCloudPlacement)
-                }) { Text("Save placement") }
+                }) { Text(stringResource(R.string.cloud_save_confirm)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmCloudSave.value = false }) { Text("Cancel") }
+                TextButton(onClick = { confirmCloudSave.value = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }

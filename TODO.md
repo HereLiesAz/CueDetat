@@ -32,5 +32,9 @@ project.
   creating new instances on every frame, reducing GC pressure.
 - Refine Proguard rules to be more specific (e.g., using `@Keep` annotations on model classes)
   instead of using broad wildcard rules, which will help reduce final APK size.
-- Optimize the `VisionAnalyzer`'s `ImageProxy.toBitmap()` conversion. It is computationally
-  expensive and should be made conditional or replaced with a more efficient method.
+- Optimize the `VisionAnalyzer`'s `ImageProxy.toBitmap()` conversion (a per-pixel Kotlin loop).
+  It is already gated by `VisionRepository.shouldAcceptFrame`, and the unused
+  `currentFrameBitmap` StateFlow it fed has been removed. Remaining: HATER mode and
+  beginner-locked frames still pay for the conversion before `analyze(bitmap, ...)` discards
+  it; skip it for those, or replace it with the OpenCV path (`ImageProxy.toMat`) that
+  `VisionRepository` already uses.

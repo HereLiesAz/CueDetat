@@ -1,6 +1,8 @@
 package com.hereliesaz.cuedetat.data
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
@@ -17,9 +19,11 @@ import javax.inject.Singleton
 
 data class WearableState(
     val isConnected: Boolean = false,
-    val heartRate: Float = 0f,
+    /** Latest heart rate in BPM; null until a watch actually sends one (the current wear build never does). */
+    val heartRate: Float? = null,
     val isShaking: Boolean = false,
-    val consistencyScore: Float = 1.0f // 1.0 = Perfect DTW match
+    /** Fluidity of the last completed stroke (1.0 = perfect DTW match); null until one completes. */
+    val consistencyScore: Float? = null
 )
 
 @Singleton
@@ -37,33 +41,45 @@ class WristWearableRepository @Inject constructor(
     private val _wearableState = MutableStateFlow(WearableState())
     val wearableState: StateFlow<WearableState> = _wearableState.asStateFlow()
 
+    /**
+     * Liveness watchdog. The watch announces "/trainer/connected" / "/trainer/disconnected"
+     * itself, but those single messages can be lost (watch process killed, Bluetooth drop), so
+     * the stream is also treated as the source of truth: any "/trainer/imu" sample marks the
+     * watch connected, and [IMU_TIMEOUT_MS] without one marks it disconnected.
+     */
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val disconnectOnSilence = Runnable { markConnected(false) }
+
     init {
         messageClient.addListener(this)
+    }
+
+    private fun markConnected(connected: Boolean) {
+        mainHandler.removeCallbacks(disconnectOnSilence)
+        if (connected) mainHandler.postDelayed(disconnectOnSilence, IMU_TIMEOUT_MS)
+        if (_wearableState.value.isConnected != connected) {
+            _wearableState.value = _wearableState.value.copy(isConnected = connected)
+        }
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
         val path = messageEvent.path
         val payload = messageEvent.data
 
-        // Parse Wear OS data (e.g., HR, raw IMU buffers)
-        // For now, stubbing state updates based on path
         when (path) {
+            // Heart rate is accepted if a watch build ever sends it (UTF-8 decimal string), but
+            // the current wear module does not: it holds no BODY_SENSORS permission. It is
+            // recorded for display/analysis only and does not by itself flag shaking.
             "/trainer/hr" -> {
-                val hr = String(payload).toFloatOrNull() ?: 0f
-                _wearableState.value = _wearableState.value.copy(
-                    heartRate = hr,
-                    isShaking = hr > 120f // simple arbitrary baseline heuristic
-                )
+                val hr = String(payload).toFloatOrNull()?.takeIf { it > 0f }
+                _wearableState.value = _wearableState.value.copy(heartRate = hr)
             }
             "/trainer/imu" -> {
+                markConnected(true)
                 _wearableState.value = processImuSample(payload, sessionTracker, _wearableState.value)
             }
-            "/trainer/connected" -> {
-                _wearableState.value = _wearableState.value.copy(isConnected = true)
-            }
-            "/trainer/disconnected" -> {
-                _wearableState.value = _wearableState.value.copy(isConnected = false)
-            }
+            "/trainer/connected" -> markConnected(true)
+            "/trainer/disconnected" -> markConnected(false)
         }
     }
 
@@ -91,6 +107,13 @@ class WristWearableRepository @Inject constructor(
     companion object {
         /** Wire format: 1 little-endian long timestamp + 6 little-endian floats (3-axis accel, 3-axis gyro). */
         const val IMU_PAYLOAD_MIN_SIZE = 32
+
+        /**
+         * Silence after which the watch is considered gone. The watch streams at ~20 Hz
+         * (wear `SensorService.SEND_INTERVAL_MS` = 50 ms) and backs off to at most 2 s between
+         * retries on send failure, so 5 s of nothing means the stream has stopped.
+         */
+        const val IMU_TIMEOUT_MS = 5_000L
 
         /**
          * Parses a raw `/trainer/imu` message payload into a [StrokeProfile].
@@ -126,9 +149,11 @@ fun processImuSample(
     currentState: WearableState
 ): WearableState {
     val profile = WristWearableRepository.parseImuPayload(payload) ?: return currentState
-    val result = tracker.addSample(profile, currentState.heartRate) ?: return currentState
+    val result = tracker.addSample(profile, currentState.heartRate ?: 0f) ?: return currentState
     return currentState.copy(
         consistencyScore = result.fluidityScore,
-        isShaking = result.isErratic || currentState.heartRate > 120f
+        // Shaking is the stroke analyser's erratic flag only. A former `heartRate > 120` term
+        // was an unprovenanced threshold on a signal the watch never sends; removed.
+        isShaking = result.isErratic
     )
 }

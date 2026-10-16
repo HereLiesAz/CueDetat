@@ -80,11 +80,16 @@ class LineTextRenderer {
         canvas.restore()
     }
 
+    // Reused per call (render thread only) to avoid per-label allocations.
+    private val matrixValues = FloatArray(9)
+    private val projectPts = FloatArray(2)
+
     /** Logical point → screen, the way [DrawingUtils.buildDistortedLinePath] draws lines; null behind the camera. */
     private fun project(x: Float, y: Float, matrix: Matrix, camArray: DoubleArray?, distArray: DoubleArray?): PointF? {
-        val v = FloatArray(9).also { matrix.getValues(it) }
+        val v = matrixValues.also { matrix.getValues(it) }
         if (v[Matrix.MPERSP_0] * x + v[Matrix.MPERSP_1] * y + v[Matrix.MPERSP_2] <= 0f) return null
-        val pts = floatArrayOf(x, y)
+        val pts = projectPts
+        pts[0] = x; pts[1] = y
         matrix.mapPoints(pts)
         return if (camArray != null && distArray != null && camArray.size == 9) {
             DrawingUtils.applyBarrelDistortion(pts[0], pts[1], camArray, distArray)
@@ -93,6 +98,13 @@ class LineTextRenderer {
         }
     }
 
+    /**
+     * Draws the expert-mode line names along the aiming, shot-guide and tangent lines.
+     *
+     * Text comes from [labels] (built once from string resources by OverlayRenderer) under the
+     * keys `aimingLine`, `shotGuideLine` and `tangentLine`; the English literal is only a
+     * fallback for a missing key.
+     */
     fun drawProtractorLabels(
         canvas: Canvas,
         state: CueDetatState,
@@ -100,7 +112,8 @@ class LineTextRenderer {
         typeface: Typeface?,
         matrix: Matrix,
         camArray: DoubleArray?,
-        distArray: DoubleArray?
+        distArray: DoubleArray?,
+        labels: Map<String, String>
     ) {
         val textPaint = paints.textPaint.apply { this.typeface = typeface }
         textPaint.textSize = getDynamicFontSize(38f, state)
@@ -121,7 +134,7 @@ class LineTextRenderer {
         // Aiming Line Label - beyond the target ball, along the aiming line
         draw(
             canvas,
-            "Aiming Line",
+            labels["aimingLine"] ?: "Aiming Line",
             target,
             aimDirection,
             state.protractorUnit.radius * 5.0f * zoomFactor,
@@ -134,7 +147,7 @@ class LineTextRenderer {
         state.shotLineAnchor?.let { anchor ->
             draw(
                 canvas,
-                "Shot Guide Line",
+                labels["shotGuideLine"] ?: "Shot Guide Line",
                 ghost,
                 atan2((anchor.y - ghost.y).toDouble(), (anchor.x - ghost.x).toDouble()),
                 state.protractorUnit.radius * 4.0f * zoomFactor,
@@ -146,10 +159,11 @@ class LineTextRenderer {
 
         // Tangent Line Labels - both sides of the ghost ball, along the tangent
         val tangentDistance = state.protractorUnit.radius * 3.0f * zoomFactor
-        for (side in listOf(1.0, -1.0)) {
+        val tangentText = labels["tangentLine"] ?: "Tangent Line"
+        for (side in TANGENT_SIDES) {
             draw(
                 canvas,
-                "Tangent Line",
+                tangentText,
                 ghost,
                 aimDirection + side * Math.PI / 2,
                 tangentDistance,
@@ -160,7 +174,26 @@ class LineTextRenderer {
         }
     }
 
-    fun drawAngleLabel(canvas: Canvas, center: PointF, referencePoint: PointF, angleDegrees: Float, paint: Paint, radius: Float) {
+    /**
+     * Draws a protractor angle label ("10°" etc.) [radius]*16.5 logical units from [center]
+     * along the guide at [angleDegrees] from the center→[referencePoint] direction.
+     *
+     * [center]/[referencePoint] are logical-plane points; the canvas is the raw screen canvas
+     * (LineRenderer projects its lines manually), so the label position is projected through
+     * [matrix] (plus lens distortion when calibrated) exactly like the guide it labels.
+     * Nothing is drawn when the label point is behind the camera.
+     */
+    fun drawAngleLabel(
+        canvas: Canvas,
+        center: PointF,
+        referencePoint: PointF,
+        angleDegrees: Float,
+        paint: Paint,
+        radius: Float,
+        matrix: Matrix,
+        camArray: DoubleArray?,
+        distArray: DoubleArray?
+    ) {
         val config = LabelConfig.angleGuide
         if (!config.isPersistentlyVisible) return // Assuming this is a helper label
 
@@ -168,12 +201,12 @@ class LineTextRenderer {
         val labelAngleRad = initialAngleRad + Math.toRadians(angleDegrees.toDouble())
         val labelDistance = radius * 16.5f
 
-        val text = "${angleDegrees.toInt()}°"
-        val textX = center.x + (labelDistance * cos(labelAngleRad)).toFloat()
-        val textY = center.y + (labelDistance * sin(labelAngleRad)).toFloat()
+        val logicalX = center.x + (labelDistance * cos(labelAngleRad)).toFloat()
+        val logicalY = center.y + (labelDistance * sin(labelAngleRad)).toFloat()
+        val screen = project(logicalX, logicalY, matrix, camArray, distArray) ?: return
 
         paint.color = config.color.copy(alpha = config.opacity).toArgb()
-        canvas.drawText(text, textX, textY, paint)
+        canvas.drawText("${angleDegrees.toInt()}°", screen.x, screen.y, paint)
     }
 
     fun drawDiamondLabel(
@@ -235,20 +268,15 @@ class LineTextRenderer {
         val table = state.table
         if (!table.isVisible || table.logicalWidth <= 0 || table.logicalHeight <= 0) return null
 
-        // De-rotate the impact point to align with the un-rotated table for easier calculation
-        val deRotatedPoint = PointF()
-        val angleRad = Math.toRadians(-state.worldRotationDegrees.toDouble())
-        val cosA = cos(angleRad).toFloat()
-        val sinA = sin(angleRad).toFloat()
-        deRotatedPoint.x = point.x * cosA - point.y * sinA
-        deRotatedPoint.y = point.x * sinA + point.y * cosA
-
-
+        // [point] is already in the UNROTATED table-logical frame: bank paths and impact points
+        // are computed there, RailRenderer.getRailForPoint matches them against unrotated
+        // corners, and world rotation exists only in the projection matrix. Rotating by
+        // -worldRotationDegrees here (as this code once did) de-rotated twice.
         val halfW = table.logicalWidth / 2f
         val halfH = table.logicalHeight / 2f
 
-        val logicalX = deRotatedPoint.x
-        val logicalY = deRotatedPoint.y
+        val logicalX = point.x
+        val logicalY = point.y
 
         val diamondValue = when (railType) {
             RailType.TOP -> if (table.logicalWidth > 0) ((logicalX + halfW) / table.logicalWidth) * 4.0 else 0.0
@@ -263,5 +291,8 @@ class LineTextRenderer {
     private companion object {
         /** Screen gap in pixels between a line and the label riding on it. */
         const val LINE_GAP = 12f
+
+        /** Both tangent directions (+90° / -90° from the aim). */
+        val TANGENT_SIDES = doubleArrayOf(1.0, -1.0)
     }
 }

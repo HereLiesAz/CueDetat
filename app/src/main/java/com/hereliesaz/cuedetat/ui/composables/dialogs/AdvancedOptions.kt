@@ -1,5 +1,5 @@
 // FILE: app/src/main/java/com/hereliesaz/cuedetat/ui/composables/dialogs/AdvancedOptions.kt
-package com.hereliesaz.cuedetat.ui.composables
+package com.hereliesaz.cuedetat.ui.composables.dialogs
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*

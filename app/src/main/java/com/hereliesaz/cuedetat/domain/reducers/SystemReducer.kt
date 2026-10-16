@@ -103,10 +103,10 @@ internal fun followCompass(state: CueDetatState): CueDetatState {
         return if (state.compassRefYaw == null) state else state.copy(compassRefYaw = null)
     }
     val ref = state.compassRefYaw ?: return state.copy(compassRefYaw = yaw)
-    val delta = TableOrientationLearner.normalize360(yaw - ref)
+    val delta = TableOrientationLearner.wrapSigned180(yaw - ref)
     if (kotlin.math.abs(delta) < COMPASS_FOLLOW_DEADBAND_DEG) return state
     return state.copy(
-        worldRotationDegrees = TableOrientationLearner.normalize360(state.worldRotationDegrees - delta),
+        worldRotationDegrees = TableOrientationLearner.wrapSigned180(state.worldRotationDegrees - delta),
         compassRefYaw = yaw,
     )
 }

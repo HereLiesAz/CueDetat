@@ -11,11 +11,14 @@ import kotlin.math.cos
 import kotlin.math.hypot
 
 /**
- * Pure, stateless shot evaluator. Phase 1: enumerate every (target ball × pocket) DIRECT pot,
- * reject the impossible/obstructed ones, score the rest by make-probability (cut angle dominant,
- * distance secondary), and return the best — or null when nothing clears the confidence floor.
+ * Pure, stateless shot evaluator. Enumerates DIRECT pots for every (target ball × pocket), plus
+ * BANK, KICK and COMBO candidates and a SAFETY fallback when a table is supplied; rejects the
+ * impossible/obstructed ones, scores by make-probability (cut angle dominant, distance
+ * secondary) weighted by the cue leave, and returns the best — or null when nothing clears the
+ * confidence floor.
  *
- * All geometry is in the logical plane (table centered at origin, inches). No app types, so the
+ * All geometry is in the logical plane (table centered at origin, logical units: 1 unit =
+ * 1/LOGICAL_UNITS_PER_INCH inch, LOGICAL_UNITS_PER_INCH = 50/2.25 ≈ 22.2; see TableFrameHomography). No app types, so the
  * whole thing is trivially unit-testable; a thin adapter extracts [AdvisorInput] from app state.
  */
 class ShotAdvisor @Inject constructor() {
@@ -87,7 +90,8 @@ class ShotAdvisor @Inject constructor() {
                 if (pathV.isEmpty()) continue
                 val resting = pathV.last()
                 val scratched = pathV.any { pv -> input.pockets.any { hypot(pv.x - it.x, pv.y - it.y) < r * 1.8f } }
-                val oppBest = opponentBestPot(PointF(resting.x, resting.y), input, r)
+                // The cue has moved to `resting`: its original spot is no longer an obstacle.
+                val oppBest = opponentBestPot(PointF(resting.x, resting.y), input, r, obstaclesAfter(input))
                 val score = (1f - oppBest) * (if (scratched) SCRATCH_PENALTY else 1f)
                 if (score > localBest) {
                     localBest = score
@@ -111,11 +115,11 @@ class ShotAdvisor @Inject constructor() {
     }
 
     /** Best make-probability of any direct pot the opponent has from a hypothetical cue position. */
-    private fun opponentBestPot(cue: PointF, input: AdvisorInput, r: Float): Float {
+    private fun opponentBestPot(cue: PointF, input: AdvisorInput, r: Float, obstacles: List<PointF>): Float {
         var best = 0f
         for (target in input.opponentBalls) {
             for (pocket in input.pockets) {
-                val c = evaluateDirect(cue, target, pocket, input, r) ?: continue
+                val c = evaluateDirect(cue, target, pocket, input, r, obstacles) ?: continue
                 if (c.makeProbability > best) best = c.makeProbability
             }
         }
@@ -163,19 +167,30 @@ class ShotAdvisor @Inject constructor() {
 
     /** Best make-probability of any direct pot on the remaining group from a hypothetical cue position. */
     private fun bestNextPot(cue: PointF, justPotted: PointF, input: AdvisorInput, r: Float): Float {
+        // After the shot the cue ball has left its original spot and the potted ball is gone:
+        // neither may block the next shot.
+        val obstacles = obstaclesAfter(input, justPotted)
         var best = 0f
         for (target in input.targetBalls) {
             if (isSamePoint(target, justPotted)) continue
             for (pocket in input.pockets) {
-                val c = evaluateDirect(cue, target, pocket, input, r) ?: continue
+                val c = evaluateDirect(cue, target, pocket, input, r, obstacles) ?: continue
                 if (c.makeProbability > best) best = c.makeProbability
             }
         }
         return best
     }
 
+    /**
+     * Balls still on the table after the shot: [AdvisorInput.allBalls] minus the cue ball's
+     * original position (it has moved) and minus [potted], if any.
+     */
+    private fun obstaclesAfter(input: AdvisorInput, potted: PointF? = null): List<PointF> =
+        input.allBalls.filterNot { b -> isSamePoint(b, input.cue) || (potted != null && isSamePoint(b, potted)) }
+
     private fun evaluateDirect(
         cue: PointF, target: PointF, pocket: PointF, input: AdvisorInput, r: Float,
+        obstacles: List<PointF> = input.allBalls,
     ): RecommendedShot? {
         // Object ball must travel target → pocket.
         val toPocketX = pocket.x - target.x
@@ -202,8 +217,8 @@ class ShotAdvisor @Inject constructor() {
         if (cutRad >= MAX_CUT_RAD) return null  // ≳83°: contact geometrically impossible/absurd
 
         // Both travel paths must be clear of other balls.
-        if (isBlocked(cue, ghost, input.allBalls, listOf(cue, target), r)) return null
-        if (isBlocked(target, pocket, input.allBalls, listOf(target), r)) return null
+        if (isBlocked(cue, ghost, obstacles, listOf(cue, target), r)) return null
+        if (isBlocked(target, pocket, obstacles, listOf(target), r)) return null
 
         // Score: cut angle dominates (cos², 0° → 1, 90° → 0), distance is a secondary penalty.
         val cutFactor = cos(cutRad).coerceAtLeast(0f).let { it * it }
@@ -218,7 +233,7 @@ class ShotAdvisor @Inject constructor() {
             ghostCuePos = ghost,
             cutAngleDeg = Math.toDegrees(cutRad.toDouble()).toFloat(),
             hardness = hardnessFor(distTotal, input.tableDiagonal),
-            spin = PointF(0f, 0f), // Phase 2 computes position-aware spin
+            spin = PointF(0f, 0f), // withPositionSpin computes position-aware spin
             makeProbability = make,
             confidence = make,
             shotPath = listOf(PointF(cue.x, cue.y), ghost, PointF(target.x, target.y), PointF(pocket.x, pocket.y)),

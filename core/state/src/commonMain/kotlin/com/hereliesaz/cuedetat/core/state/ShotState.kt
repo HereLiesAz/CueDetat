@@ -35,8 +35,13 @@ sealed interface ShotMode {
     /**
      * Bank or kick: send the cue ball off one or more cushions first.
      * [aimTarget] is where the player has dragged the bank aim, in table metres.
+     * [maxCushions] must be at least 1.
      */
-    data class Bank(val aimTarget: Vec2? = null, val maxCushions: Int = 3) : ShotMode
+    data class Bank(val aimTarget: Vec2? = null, val maxCushions: Int = 3) : ShotMode {
+        init {
+            require(maxCushions >= 1) { "maxCushions must be at least 1, was $maxCushions" }
+        }
+    }
 
     /**
      * Massé: an elevated cue curving the ball around an obstruction.
@@ -103,7 +108,8 @@ data class TableState(
     val cloth: ClothSpec = ClothSpec.WORSTED,
     val isVisible: Boolean = true,
 ) {
-    val table: Table get() = Table(spec)
+    /** Geometry for [spec], built once per [TableState] instance rather than on every read. */
+    val table: Table by lazy { Table(spec) }
 }
 
 /**

@@ -68,8 +68,9 @@ fun TopControls(
                                 role = Role.Button,
                                 onClick = onCycleTableSize
                             )
+                            // No "double tap to cycle": TalkBack announces the click action itself.
                             .semantics {
-                                contentDescription = "Current table size: ${tableSizeFeet} feet. Double tap to cycle."
+                                contentDescription = "Current table size: ${tableSizeFeet} feet."
                             }
                             .padding(8.dp)
                     ) {

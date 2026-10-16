@@ -50,14 +50,14 @@ tensorflowLite = "2.17.0"
 tensorflowLiteSupport = "0.5.0"
 tensorflowLiteMetadata = "0.5.0"
 
-# ── Play / distribution (play flavor only) ───────────────────────────────────
-billing = "9.1.0"
-playIntegrity = "1.6.0"
+# ── Play / distribution ──────────────────────────────────────────────────────
 playAppUpdate = "2.1.0"
 playServicesLocation = "21.4.0"
 playServicesWearable = "20.0.1"
+# Wear OS Compose (wear module only)
+wearCompose = "1.7.0"
 
-# ── Wearables (play flavor only — see app/build.gradle.kts) ──────────────────
+# ── Wearables (Meta DAT; credentialed GitHub Packages — see settings.gradle.kts) ──
 metaWearableDat = "1.0.0"
 
 # ── Networking ───────────────────────────────────────────────────────────────
@@ -133,13 +133,14 @@ tensorflow-lite-support = { module = "org.tensorflow:tensorflow-lite-support", v
 tensorflow-lite-metadata = { module = "org.tensorflow:tensorflow-lite-metadata", version.ref = "tensorflowLiteMetadata" }
 
 # ── Play / distribution ──────────────────────────────────────────────────────
-androidx-billing-ktx = { module = "com.android.billingclient:billing-ktx", version.ref = "billing" }
-play-integrity = { module = "com.google.android.play:integrity", version.ref = "playIntegrity" }
 play-app-update = { module = "com.google.android.play:app-update", version.ref = "playAppUpdate" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 play-services-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "playServicesWearable" }
 
-# ── Meta Wearables DAT (private GitHub Packages — play flavor only) ──────────
+wear-compose-material = { module = "androidx.wear.compose:compose-material", version.ref = "wearCompose" }
+wear-compose-foundation = { module = "androidx.wear.compose:compose-foundation", version.ref = "wearCompose" }
+
+# ── Meta Wearables DAT (private GitHub Packages; needs credentials, see settings.gradle.kts) ──
 mwdat-core = { module = "com.meta.wearable:mwdat-core", version.ref = "metaWearableDat" }
 mwdat-camera = { module = "com.meta.wearable:mwdat-camera", version.ref = "metaWearableDat" }
 mwdat-mockdevice = { module = "com.meta.wearable:mwdat-mockdevice", version.ref = "metaWearableDat" }

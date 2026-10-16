@@ -4,9 +4,9 @@ import android.graphics.Matrix
 import android.graphics.PointF
 import com.hereliesaz.aznavrail.tutorial.AzGuideShape
 import com.hereliesaz.aznavrail.tutorial.AzPathCmd
-import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
+import com.hereliesaz.cuedetat.view.renderer.renderLensTps
 import com.hereliesaz.cuedetat.view.renderer.warpedBy
 
 /**
@@ -19,8 +19,8 @@ import com.hereliesaz.cuedetat.view.renderer.warpedBy
 private fun activeMatrix(state: CueDetatState): Matrix? =
     if (state.isBeginnerViewLocked) state.logicalPlaneMatrix else state.pitchMatrix
 
-private fun activeTps(state: CueDetatState) =
-    if (state.cameraMode == CameraMode.LITE_AR || state.isBeginnerViewLocked) null else state.lensWarpTps
+/** Same lens-warp gate as the renderers, so spotlights land where the overlay draws. */
+private fun activeTps(state: CueDetatState) = renderLensTps(state)
 
 private fun circleAround(
     state: CueDetatState,

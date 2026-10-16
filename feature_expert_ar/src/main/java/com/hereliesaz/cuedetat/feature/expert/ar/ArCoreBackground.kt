@@ -116,6 +116,8 @@ fun ArCoreBackground(
             displayManager.unregisterDisplayListener(displayListener)
             lifecycleOwner.lifecycle.removeObserver(observer)
             glSurfaceView.onPause()
+            // close() takes ArTableSession.frameLock, which onDrawFrame holds for the whole
+            // frame, so this waits out any in-flight session.update() on the GL thread.
             arTableSession.close()
             Log.d(TAG, "ARCore session closed — camera released")
         }
@@ -153,7 +155,11 @@ private class ArCoreRenderer(
         lastGeometryRotation = rotation
     }
 
-    override fun onDrawFrame(gl: GL10?) {
+    override fun onDrawFrame(gl: GL10?): Unit = synchronized(arTableSession.frameLock) {
+        // Holding frameLock for the whole frame means ArTableSession.close() (main thread,
+        // onDispose) can never close the Session in the middle of session.update(); and a
+        // frame that starts after close() sees a different/no session and draws nothing.
+        if (arTableSession.getSession() !== session) return@synchronized
         try {
             val rotation = displayRotation.get()
             if (rotation != lastGeometryRotation) {

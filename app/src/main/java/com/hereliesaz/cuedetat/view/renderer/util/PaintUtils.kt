@@ -30,6 +30,14 @@ import kotlin.math.abs
  * The halo peaks at the ring and fades to transparent both inward and outward,
  * with the spread scaled to the ring so the glow looks consistent at every
  * zoom level (a fixed-pixel blur, by contrast, vanished when zoomed in).
+ *
+ * Scope of the replacement: only ball halos moved off BlurMaskFilter. Line and
+ * rail glows still use BlurMaskFilter via [createGlowPaint] (cached, so the
+ * native filter is not reallocated per frame).
+ *
+ * Allocation: the gradient is built once per (colour, alpha, stops) in a unit
+ * circle at the origin and cached in [PaintCache.haloShaders]; per draw only its
+ * local matrix is updated (translate to the ball, scale to the outer radius).
  */
 fun drawGlowCircle(
     canvas: Canvas,
@@ -65,12 +73,22 @@ fun drawGlowCircle(
     val innerStop = ((ringRadius - spread) / outer).coerceIn(0f, 0.98f)
     val ringStop = (ringRadius / outer).coerceIn(innerStop + 0.001f, 0.999f)
 
-    val shader = RadialGradient(
-        cx, cy, outer,
-        intArrayOf(transparent, peak, transparent),
-        floatArrayOf(innerStop, ringStop, 1f),
-        Shader.TileMode.CLAMP,
-    )
+    // Quantize stops to 1/256 so the cache key space stays small.
+    val qInner = (innerStop * 256f).toInt()
+    val qRing = (ringStop * 256f).toInt().coerceAtLeast(qInner + 1)
+    val key = (peak.toLong() shl 32) or ((qInner.toLong() and 0xFFFF) shl 16) or (qRing.toLong() and 0xFFFF)
+    val shader = paints.haloShaders.getOrPut(key) {
+        RadialGradient(
+            0f, 0f, 1f,
+            intArrayOf(transparent, peak, transparent),
+            floatArrayOf(qInner / 256f, qRing / 256f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+    }
+    paints.haloMatrix.reset()
+    paints.haloMatrix.setScale(outer, outer)
+    paints.haloMatrix.postTranslate(cx, cy)
+    shader.setLocalMatrix(paints.haloMatrix)
     val paint = paints.glowHaloPaint.apply {
         this.shader = shader
         style = Paint.Style.FILL
@@ -81,18 +99,18 @@ fun drawGlowCircle(
 }
 
 /**
- * Creates and configures a [Paint] object for glow effects.
+ * Returns a cached [Paint] for a blurred line/rail glow, honouring the global "Glow Stick"
+ * override (white for positive, black for negative values).
  *
- * This utility centralizes the logic for creating glows, including the
- * global "Glow Stick" override effect (which forces glows to white/black based on user input).
- * It ensures a new, correctly configured Paint object is created and cached for each draw context,
- * preventing shared state issues.
+ * Paints are cached in [PaintCache.glowPaints] (LRU) under a reusable [GlowKey] probe, so the
+ * steady-state lookup allocates nothing: no String key, no new BlurMaskFilter. The glow-stick
+ * value is quantized to 1/100 so a moving slider cannot create unbounded entries.
+ * Callers must treat the returned Paint as read-only (copy via `Paint.set` before mutating).
  *
  * @param baseGlowColor The default color of the glow when the Glow Stick is not active.
  * @param baseGlowWidth The stroke width for the glow.
  * @param state The current CueDetatState, used to check for the Glow Stick value.
- * @param paints The [com.hereliesaz.cuedetat.view.PaintCache] to reuse paint objects from.
- * @return A configured Paint object ready for drawing a glow.
+ * @param paints The [com.hereliesaz.cuedetat.view.PaintCache] holding the cache.
  */
 fun createGlowPaint(
     baseGlowColor: Color,
@@ -101,42 +119,36 @@ fun createGlowPaint(
     paints: com.hereliesaz.cuedetat.view.PaintCache,
     blurType: android.graphics.BlurMaskFilter.Blur = android.graphics.BlurMaskFilter.Blur.NORMAL
 ): Paint {
-    // Determine a cache key based on the glow stick state.
-    // If glow stick is active, key depends on its value.
-    // If inactive, key depends on the base color and width.
-    val glowValue = state.glowStickValue
-    val key = if (abs(glowValue) > 0.05f) {
-        "glow_${glowValue}_${blurType.name}_${baseGlowWidth}_${baseGlowColor}"
+    val rawGlow = state.glowStickValue
+    val stickActive = abs(rawGlow) > 0.05f
+    val glowQ = if (stickActive) kotlin.math.round(rawGlow * 100f).toInt() else 0
+    val colorInt = baseGlowColor.toArgb()
+
+    val probe = paints.glowKeyProbe.apply {
+        color = colorInt; widthBits = baseGlowWidth.toRawBits(); blur = blurType.ordinal; glow = glowQ
+    }
+    paints.glowPaints[probe]?.let { return it }
+
+    val glowValue = glowQ / 100f
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL_AND_STROKE
+        strokeWidth = baseGlowWidth
+    }
+    if (stickActive) {
+        // Override active: Glow color becomes white (positive) or black (negative).
+        paint.color = if (glowValue > 0) AndroidColor.WHITE else AndroidColor.BLACK
+        paint.alpha = (abs(glowValue) * 255).toInt().coerceIn(0, 255)
+        // Blur radius increases with intensity.
+        paint.maskFilter = BlurMaskFilter(15f * abs(glowValue), blurType)
     } else {
-        "glow_${baseGlowColor}_${baseGlowWidth}_${blurType.name}"
+        paint.color = colorInt
+        // Default glow is 70% opacity of the base color.
+        paint.alpha = (baseGlowColor.alpha * 255 * 0.7f).toInt()
+        paint.maskFilter = BlurMaskFilter(8f, blurType)
     }
-
-    // Retrieve from cache or create new.
-    return paints.glowPaints.getOrPut(key) {
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL_AND_STROKE
-            strokeWidth = baseGlowWidth
-        }
-
-        // Check if Glow Stick override is active.
-        if (abs(glowValue) > 0.05f) {
-            // Override active: Glow color becomes white (positive) or black (negative).
-            val glowAlpha = (abs(glowValue) * 255).toInt()
-            val color = if (glowValue > 0) Color.White.toArgb() else Color.Black.toArgb()
-            // Blur radius increases with intensity.
-            val blurRadius = 15f * abs(glowValue)
-
-            paint.color = color
-            paint.alpha = glowAlpha
-            paint.maskFilter = BlurMaskFilter(blurRadius, blurType)
-        } else {
-            // Default behavior: Use the provided base color.
-            paint.color = baseGlowColor.toArgb()
-            // Default glow is 70% opacity of the base color.
-            paint.alpha = (baseGlowColor.alpha * 255 * 0.7f).toInt()
-            // Fixed blur radius for standard UI elements.
-            paint.maskFilter = BlurMaskFilter(8f, blurType)
-        }
-        paint
-    }
+    paints.glowPaints[probe.copy()] = paint
+    return paint
 }
+
+/** Mutable cache key for [createGlowPaint]; stored entries are immutable copies. */
+data class GlowKey(var color: Int = 0, var widthBits: Int = 0, var blur: Int = 0, var glow: Int = 0)

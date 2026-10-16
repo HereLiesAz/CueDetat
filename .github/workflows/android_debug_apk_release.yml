@@ -91,8 +91,8 @@ jobs:
         run: chmod +x gradlew
 
       # The pure Kotlin Multiplatform core carries the geometry, physics and aim
-      # maths, and needs no SDK -- so it gates the build directly. The :core:*
-      # suite also runs standalone in core-tests.yml for faster PR feedback.
+      # maths, and needs no SDK -- so it gates the build directly. The same suite
+      # also runs in android-ci.yml ("Run core (KMP) tests").
       - name: Run unit tests
         run: ./gradlew -Pcuedetat.coreOnly=true allTests --stacktrace
 
@@ -205,19 +205,18 @@ jobs:
         run: |
           export BUILD_NUMBER=$(git rev-list --count HEAD)
           
-          # Extract version info from properties file
-          MAJOR=$(grep '^MAJOR=' version.properties | cut -d'=' -f2)
-          MINOR=$(grep '^MINOR=' version.properties | cut -d'=' -f2)
+          # Same keys Gradle reads (app/build.gradle.kts): uppercase MAJOR/MINOR.
+          MAJOR=$(grep '^MAJOR=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          MINOR=$(grep '^MINOR=' version.properties | cut -d'=' -f2 | tr -d '\r ')
 
-          # Calculate Patch version programmatically based on commits since Minor update
-          MINOR_COMMIT=$(git blame -L '/^MINOR=/',+1 version.properties | awk '{print $1}' | tr -d '^')
-          if [ -n "$MINOR_COMMIT" ]; then
-            PATCH=$(git rev-list --count $MINOR_COMMIT..HEAD)
-          else
-            PATCH=$(grep '^PATCH=' version.properties | cut -d'=' -f2)
+          # Name the APK from the versionName Gradle actually stamped into it (built above with
+          # -PversionBuild=$BUILD_NUMBER), not a separately recomputed patch number.
+          META=app/build/outputs/apk/debug/output-metadata.json
+          VERSION_NAME=$(jq -r '.elements[0].versionName' "$META")
+          if [ -z "$VERSION_NAME" ] || [ "$VERSION_NAME" = "null" ]; then
+             echo "Error: versionName not found in $META"
+             exit 1
           fi
-
-          VERSION_NAME="$MAJOR.$MINOR.$PATCH.$BUILD_NUMBER"
           
           TAG_NAME="v${MAJOR}.${MINOR}-debug"
           

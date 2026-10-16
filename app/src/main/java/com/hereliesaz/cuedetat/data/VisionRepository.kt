@@ -53,9 +53,10 @@ class VisionRepository @Inject constructor(
     private val _visionDataFlow = MutableStateFlow(VisionData())
     val visionDataFlow = _visionDataFlow.asStateFlow()
 
-    // Fire-once on-demand model fetch (Play). The aiming/ball-detection path
-    // can be reached without opening table-scan, so the first processed frame
-    // also kicks off model delivery. No-op for foss (model bundled) and after
+    // Fire-once model readiness check. The aiming/ball-detection path can be reached
+    // without opening table-scan, so the first processed frame also calls
+    // ensureModelReady(), which retries the asset load if init's eager load failed
+    // (the model is bundled in the APK; there is no on-demand delivery). No-op after
     // the first call. detectPool() degrades gracefully until the model loads.
     private val modelRequested = AtomicBoolean(false)
     private fun ensureModelOnce() {
@@ -75,7 +76,24 @@ class VisionRepository @Inject constructor(
     private var maskRingIndex = 0
 
     private val reusableFrameMat = Mat()
+    /**
+     * Upright quarter-scale frame. Written on the analysis thread; read by
+     * [captureRectifiedSnapshot] from the view-model's thread. Every write and the snapshot's
+     * copy hold [rotatedMatLock], so the snapshot never sees a half-written Mat.
+     */
     private val reusableRotatedMat = Mat()
+    private val rotatedMatLock = Any()
+
+    /**
+     * Maps a view point to a pixel of an upright image the preview shows centre-cropped
+     * (FILL_CENTER): the inverse of [CameraViewMapping.fillCenter] with rotation 0, the same
+     * mapping used for balls and the table fit.
+     */
+    private fun viewToUpright(imageW: Int, imageH: Int, viewW: Int, viewH: Int, x: Float, y: Float): Pair<Float, Float> {
+        val m = CameraViewMapping.fillCenter(imageW, imageH, 0, viewW, viewH)
+        // Rotation 0: m = [s 0 tx; 0 s ty].
+        return Pair((x - m[2]) / m[0], (y - m[5]) / m[4])
+    }
     private val reusableFullHsvMat = Mat()
     private val reusableHsvMat = Mat()
     private val reusableMean = MatOfDouble()
@@ -217,25 +235,27 @@ class VisionRepository @Inject constructor(
             val rawDetections = poolDetector.detectPool(scaledBitmap)
             updateAdaptiveInterval(state, currentTime, rawDetections)
 
-            val matToUse: Mat
-            when (rotationDegrees) {
-                90 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_CLOCKWISE); matToUse = reusableRotatedMat }
-                180 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_180); matToUse = reusableRotatedMat }
-                270 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_COUNTERCLOCKWISE); matToUse = reusableRotatedMat }
-                // rotationDegrees == 0: no rotation needed, but captureRectifiedSnapshot()
-                // unconditionally reads reusableRotatedMat and bails if it's still empty
-                // from a prior frame. Keep it populated regardless of this frame's
-                // rotation so the top-down snapshot feature works on devices that never
-                // hit the 90/180/270 branches above.
-                else -> { originalMat.copyTo(reusableRotatedMat); matToUse = originalMat }
+            val matToUse: Mat = synchronized(rotatedMatLock) {
+                when (rotationDegrees) {
+                    90 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_CLOCKWISE); reusableRotatedMat }
+                    180 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_180); reusableRotatedMat }
+                    270 -> { Core.rotate(originalMat, reusableRotatedMat, Core.ROTATE_90_COUNTERCLOCKWISE); reusableRotatedMat }
+                    // rotationDegrees == 0: no rotation needed, but captureRectifiedSnapshot()
+                    // reads reusableRotatedMat and bails if it's still empty. Keep it populated
+                    // regardless of this frame's rotation.
+                    else -> { originalMat.copyTo(reusableRotatedMat); originalMat }
+                }
             }
 
             Imgproc.cvtColor(matToUse, reusableHsvMat, Imgproc.COLOR_BGR2HSV)
             val hsvMat = reusableHsvMat
 
             val hsvTuple = state.colorSamplePoint?.let {
-                val imageX = (it.x * (hsvMat.cols() / state.viewWidth.toFloat())).toInt()
-                val imageY = (it.y * (hsvMat.rows() / state.viewHeight.toFloat())).toInt()
+                // The preview shows this upright frame centre-cropped, so undo the crop, not
+                // just the scale (the same mapping maybeFitTable uses below).
+                val (ix, iy) = viewToUpright(hsvMat.cols(), hsvMat.rows(), state.viewWidth, state.viewHeight, it.x, it.y)
+                val imageX = ix.toInt()
+                val imageY = iy.toInt()
 
                 val patchSize = 5
                 // Coerce both axes — the original code only clamped X, so a sample
@@ -586,11 +606,13 @@ class VisionRepository @Inject constructor(
                 state.tableScanModel != null && state.depthCapability == DepthCapability.NONE) {
                 arFrameCounter++
                 if (arFrameCounter % 5 == 0) {
-                    when (rotationDegrees) {
-                        90 -> Core.rotate(smallMat, reusableRotatedMat, Core.ROTATE_90_CLOCKWISE)
-                        180 -> Core.rotate(smallMat, reusableRotatedMat, Core.ROTATE_180)
-                        270 -> Core.rotate(smallMat, reusableRotatedMat, Core.ROTATE_90_COUNTERCLOCKWISE)
-                        else -> smallMat.copyTo(reusableRotatedMat)
+                    synchronized(rotatedMatLock) {
+                        when (rotationDegrees) {
+                            90 -> Core.rotate(smallMat, reusableRotatedMat, Core.ROTATE_90_CLOCKWISE)
+                            180 -> Core.rotate(smallMat, reusableRotatedMat, Core.ROTATE_180)
+                            270 -> Core.rotate(smallMat, reusableRotatedMat, Core.ROTATE_90_COUNTERCLOCKWISE)
+                            else -> smallMat.copyTo(reusableRotatedMat)
+                        }
                     }
                     currentConfidence = runArTrackingPass(
                         reusableRotatedMat, state, reusableRotatedMat.cols(), reusableRotatedMat.rows(), rotationDegrees
@@ -746,6 +768,16 @@ class VisionRepository @Inject constructor(
         return relocaliserUseCase.validateHistograms(saved, currentHistograms)
     }
 
+    /**
+     * Felt-colour contour fallback for AR tracking when no depth is available.
+     *
+     * [TableScanModel.feltColorHsv] is stored in Android's HSV convention (`Color.RGBToHSV`:
+     * H 0..360, S and V 0..1; see feature_expert_ar YuvHsvSampler). OpenCV's 8-bit HSV is
+     * H 0..180, S and V 0..255, so hue is halved and S/V scaled before thresholding, and a hue
+     * band that crosses 0/180 (red felt) is split into two ranges and OR-ed.
+     *
+     * Every Mat allocated here is released on every path, including the early returns.
+     */
     internal fun runEdgeFallback(
         mat: Mat,
         state: CueDetatState,
@@ -754,111 +786,124 @@ class VisionRepository @Inject constructor(
         rotationDegrees: Int
     ): Float {
         val model = state.tableScanModel ?: return 0f
-        val hsv = floatArrayOf(model.feltColorHsv[0], model.feltColorHsv[1], model.feltColorHsv[2])
+        val hueCv = (model.feltColorHsv[0] / 2.0).mod(180.0)
+        val satCv = model.feltColorHsv[1] * 255.0
+        val valCv = model.feltColorHsv[2] * 255.0
+        val hueHalfWidth = 20.0 // OpenCV hue units (= 40 degrees)
+
         val hsvMat = Mat()
-        Imgproc.cvtColor(mat, hsvMat, Imgproc.COLOR_BGR2HSV)
-
-        val lower = Scalar(
-            maxOf(0.0, hsv[0] - 20.0),
-            maxOf(0.0, hsv[1] * 255 - 60.0),
-            maxOf(0.0, hsv[2] * 255 - 60.0)
-        )
-        val upper = Scalar(
-            minOf(180.0, hsv[0] + 20.0),
-            minOf(255.0, hsv[1] * 255 + 60.0),
-            minOf(255.0, hsv[2] * 255 + 60.0)
-        )
-
         val mask = Mat()
-        Core.inRange(hsvMat, lower, upper, mask)
-        hsvMat.release()
-
+        val wrapMask = Mat()
         val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(9.0, 9.0))
-        Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, kernel)
-        Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_OPEN, kernel)
-
-        val contours = mutableListOf<MatOfPoint>()
         val contourHierarchy = Mat()
-        try {
-            Imgproc.findContours(mask, contours, contourHierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
-        } finally {
-            contourHierarchy.release()
-            mask.release()
-            kernel.release()
-        }
-
-        val largest = contours.maxByOrNull { Geometry.contourArea(it) } ?: return 0f
-        if (Geometry.contourArea(largest) < mat.rows() * mat.cols() * 0.05) return 0f
-
+        val contours = mutableListOf<MatOfPoint>()
         val approx = MatOfPoint2f()
-        val contour2f = MatOfPoint2f(*largest.toArray())
-        var epsilonCoeff = 0.01
-        val perimeter = Geometry.arcLength(contour2f, true)
+        var contour2f: MatOfPoint2f? = null
+        var srcMat: MatOfPoint2f? = null
+        var dstMat: MatOfPoint2f? = null
+        var h: Mat? = null
+        try {
+            Imgproc.cvtColor(mat, hsvMat, Imgproc.COLOR_BGR2HSV)
 
-        while (epsilonCoeff < 0.1) {
-            Geometry.approxPolyDP(contour2f, approx, epsilonCoeff * perimeter, true)
-            if (approx.rows() == 4) break
-            epsilonCoeff += 0.01
-        }
+            val sLo = maxOf(0.0, satCv - 60.0)
+            val sHi = minOf(255.0, satCv + 60.0)
+            val vLo = maxOf(0.0, valCv - 60.0)
+            val vHi = minOf(255.0, valCv + 60.0)
+            val hLo = hueCv - hueHalfWidth
+            val hHi = hueCv + hueHalfWidth
+            when {
+                hLo < 0.0 -> {
+                    Core.inRange(hsvMat, Scalar(0.0, sLo, vLo), Scalar(hHi, sHi, vHi), mask)
+                    Core.inRange(hsvMat, Scalar(hLo + 180.0, sLo, vLo), Scalar(180.0, sHi, vHi), wrapMask)
+                    Core.bitwise_or(mask, wrapMask, mask)
+                }
+                hHi > 180.0 -> {
+                    Core.inRange(hsvMat, Scalar(hLo, sLo, vLo), Scalar(180.0, sHi, vHi), mask)
+                    Core.inRange(hsvMat, Scalar(0.0, sLo, vLo), Scalar(hHi - 180.0, sHi, vHi), wrapMask)
+                    Core.bitwise_or(mask, wrapMask, mask)
+                }
+                else -> Core.inRange(hsvMat, Scalar(hLo, sLo, vLo), Scalar(hHi, sHi, vHi), mask)
+            }
 
-        val pts: Array<org.opencv.core.Point>
-        var confidence = 0.8f
-        if (approx.rows() == 4) {
-            pts = approx.toArray()
-        } else {
-            val rect = Geometry.minAreaRect(contour2f)
-            val rectPts = arrayOfNulls<org.opencv.core.Point>(4)
-            rect.points(rectPts)
-            pts = Array(4) { rectPts[it]!! }
-            confidence = 0.6f
-        }
+            Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, kernel)
+            Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_OPEN, kernel)
+            Imgproc.findContours(mask, contours, contourHierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE)
 
-        approx.release()
-        contour2f.release()
-        contours.forEach { it.release() }
+            val largest = contours.maxByOrNull { Geometry.contourArea(it) } ?: return 0f
+            if (Geometry.contourArea(largest) < mat.rows() * mat.cols() * 0.05) return 0f
 
-        val imageCenter = org.opencv.core.Point(mat.cols() / 2.0, mat.rows() / 2.0)
-        val sortedCorners = pts.sortedBy { Math.atan2(it.y - imageCenter.y, it.x - imageCenter.x) }
+            val c2f = MatOfPoint2f(*largest.toArray()).also { contour2f = it }
+            var epsilonCoeff = 0.01
+            val perimeter = Geometry.arcLength(c2f, true)
 
-        val logicalWidth = state.table.logicalWidth
-        val logicalHeight = state.table.logicalHeight
-        val logicalCorners = listOf(
-            org.opencv.core.Point(-logicalWidth / 2.0, -logicalHeight / 2.0),
-            org.opencv.core.Point(logicalWidth / 2.0, -logicalHeight / 2.0),
-            org.opencv.core.Point(logicalWidth / 2.0, logicalHeight / 2.0),
-            org.opencv.core.Point(-logicalWidth / 2.0, logicalHeight / 2.0)
-        )
+            while (epsilonCoeff < 0.1) {
+                Geometry.approxPolyDP(c2f, approx, epsilonCoeff * perimeter, true)
+                if (approx.rows() == 4) break
+                epsilonCoeff += 0.01
+            }
 
-        val srcMat = MatOfPoint2f(*sortedCorners.toTypedArray())
-        val dstMat = MatOfPoint2f(*logicalCorners.toTypedArray())
-
-        val h = Geometry.findHomography(srcMat, dstMat, Geometry.RANSAC, 5.0)
-        srcMat.release()
-        dstMat.release()
-
-        if (h.empty()) return 0f
-
-        val (rawT, rawR, rawS) = decomposeHomography(h, imageWidth.toFloat(), imageHeight.toFloat())
-
-        applyPoseUpdate(rawT, rawR, rawS, state)
-
-        if (state.relocaliserDeltaQ != null) {
-            val isValidTable = validatePocketSurrounds(mat, model, h, imageWidth, imageHeight)
-            if (isValidTable) {
-                _arEvents.tryEmit(MainScreenEvent.ForceArActive)
-                relocaliserFailFrames = 0
+            val pts: Array<org.opencv.core.Point>
+            var confidence = 0.8f
+            if (approx.rows() == 4) {
+                pts = approx.toArray()
             } else {
-                relocaliserFailFrames++
-                if (relocaliserFailFrames >= 5) {
+                val rect = Geometry.minAreaRect(c2f)
+                val rectPts = arrayOfNulls<org.opencv.core.Point>(4)
+                rect.points(rectPts)
+                pts = Array(4) { rectPts[it]!! }
+                confidence = 0.6f
+            }
+
+            val imageCenter = org.opencv.core.Point(mat.cols() / 2.0, mat.rows() / 2.0)
+            val sortedCorners = pts.sortedBy { Math.atan2(it.y - imageCenter.y, it.x - imageCenter.x) }
+
+            val logicalWidth = state.table.logicalWidth
+            val logicalHeight = state.table.logicalHeight
+            val logicalCorners = listOf(
+                org.opencv.core.Point(-logicalWidth / 2.0, -logicalHeight / 2.0),
+                org.opencv.core.Point(logicalWidth / 2.0, -logicalHeight / 2.0),
+                org.opencv.core.Point(logicalWidth / 2.0, logicalHeight / 2.0),
+                org.opencv.core.Point(-logicalWidth / 2.0, logicalHeight / 2.0)
+            )
+
+            val src = MatOfPoint2f(*sortedCorners.toTypedArray()).also { srcMat = it }
+            val dst = MatOfPoint2f(*logicalCorners.toTypedArray()).also { dstMat = it }
+
+            val homography = Geometry.findHomography(src, dst, Geometry.RANSAC, 5.0).also { h = it }
+            if (homography.empty()) return 0f
+
+            val (rawT, rawR, rawS) = decomposeHomography(homography, imageWidth.toFloat(), imageHeight.toFloat())
+
+            applyPoseUpdate(rawT, rawR, rawS, state)
+
+            if (state.relocaliserDeltaQ != null) {
+                val isValidTable = validatePocketSurrounds(mat, model, homography, imageWidth, imageHeight)
+                if (isValidTable) {
+                    _arEvents.tryEmit(MainScreenEvent.ForceArActive)
                     relocaliserFailFrames = 0
-                    _arEvents.tryEmit(MainScreenEvent.SeedRelocaliser(null))
+                } else {
+                    relocaliserFailFrames++
+                    if (relocaliserFailFrames >= 5) {
+                        relocaliserFailFrames = 0
+                        _arEvents.tryEmit(MainScreenEvent.SeedRelocaliser(null))
+                    }
                 }
             }
+
+            return confidence
+        } finally {
+            h?.release()
+            dstMat?.release()
+            srcMat?.release()
+            contour2f?.release()
+            approx.release()
+            contours.forEach { it.release() }
+            contourHierarchy.release()
+            kernel.release()
+            wrapMask.release()
+            mask.release()
+            hsvMat.release()
         }
-
-        h.release()
-
-        return confidence
     }
 
     private fun getTransformationMatrix(
@@ -872,9 +917,22 @@ class VisionRepository @Inject constructor(
         return matrix
     }
 
+    /**
+     * Warps the latest upright frame to a top-down image of the table. Works on a private copy
+     * of [reusableRotatedMat] taken under [rotatedMatLock], so it is safe from any thread.
+     */
     fun captureRectifiedSnapshot(state: CueDetatState) {
-        val mat = if (reusableRotatedMat.empty()) null else reusableRotatedMat
-        if (mat == null) return
+        val mat = synchronized(rotatedMatLock) {
+            if (reusableRotatedMat.empty()) null else reusableRotatedMat.clone()
+        } ?: return
+        try {
+            rectifyInto(mat, state)
+        } finally {
+            mat.release()
+        }
+    }
+
+    private fun rectifyInto(mat: Mat, state: CueDetatState) {
 
         val width = mat.cols()
         val height = mat.rows()
@@ -893,8 +951,9 @@ class VisionRepository @Inject constructor(
         )
 
         val pitchMatrix = state.pitchMatrix ?: return
+        // Same centre-crop mapping as the colour sample and table fit (not a per-axis stretch).
         val imageToScreen = Matrix().apply {
-            postScale(state.viewWidth.toFloat() / width.toFloat(), state.viewHeight.toFloat() / height.toFloat())
+            setValues(CameraViewMapping.fillCenter(width, height, 0, state.viewWidth, state.viewHeight))
         }
         val screenToImage = Matrix().apply { imageToScreen.invert(this) }
 

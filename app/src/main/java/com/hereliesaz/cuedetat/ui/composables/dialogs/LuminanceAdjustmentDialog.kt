@@ -48,7 +48,7 @@ fun LuminanceAdjustmentDialog(
                         steps = 79,
                         modifier = Modifier
                             .semantics { contentDescription = "Luminance Adjustment" }
-                            .height(32.dp),
+                            .height(48.dp), // 48 dp minimum touch target
                         colors = SliderDefaults.colors(
                             activeTrackColor = MaterialTheme.colorScheme.primary,
                             inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),

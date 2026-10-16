@@ -71,7 +71,7 @@ After impact, the cue ball travels perpendicular to the line connecting the two 
 
     tangentDir = perpendicular(normalize(G → T))
 
-This is the theoretical trajectory of the cue ball post-impact (zero English). Sidespin modifies the actual path — see Spin Paths in `CalculateSpinPaths.kt`.
+This is the theoretical trajectory of the cue ball post-impact (zero English). Sidespin modifies the actual path — see `SpinPhysicsCalculator.calculatePath` (`app/src/main/java/com/hereliesaz/cuedetat/domain/SpinPhysicsCalculator.kt`), called from `UpdateStateUseCase.updateSpinCalculations`.
 
 ### Cut Angle
 

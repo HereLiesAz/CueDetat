@@ -11,8 +11,15 @@ import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.config.ui.LabelProperties
 import com.hereliesaz.cuedetat.view.model.LogicalCircular
 import com.hereliesaz.cuedetat.view.renderer.util.DrawingUtils
+import com.hereliesaz.cuedetat.view.renderer.renderLensTps
 import com.hereliesaz.cuedetat.view.renderer.warpedBy
 
+/**
+ * Draws a ball's label above (or below) its lifted on-screen body.
+ *
+ * The caller passes the same [matrix]/liftScale used for the ball body so labels stay attached
+ * during the top-down transition. Lens warp follows [renderLensTps].
+ */
 class BallTextRenderer {
 
     private val baseFontSize = 30f
@@ -26,10 +33,12 @@ class BallTextRenderer {
         text: String,
         config: LabelProperties,
         state: CueDetatState,
-        drawBelow: Boolean = false
+        drawBelow: Boolean = false,
+        matrix: android.graphics.Matrix? = state.pitchMatrix,
+        liftScale: Float = 1f
     ) {
         if (!state.areHelpersVisible && !config.isPersistentlyVisible) return
-        val matrix = state.pitchMatrix ?: return
+        val matrix = matrix ?: return
 
         val isBeginnerLocked = state.experienceMode == ExperienceMode.BEGINNER && state.isBeginnerViewLocked
 
@@ -48,10 +57,10 @@ class BallTextRenderer {
 
         paint.textAlign = Paint.Align.CENTER
 
-        val tps = if (state.cameraMode == com.hereliesaz.cuedetat.domain.CameraMode.LITE_AR || isBeginnerLocked) null else state.lensWarpTps
+        val tps = renderLensTps(state)
         val drawCenter = ball.center.warpedBy(tps)
 
-        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(drawCenter, ball.radius, state, matrix)
+        val radiusInfo = DrawingUtils.getPerspectiveRadiusAndLift(drawCenter, ball.radius, state, matrix, liftScale)
         val screenPos = DrawingUtils.mapPoint(drawCenter, matrix)
 
         val visualLift = if (isBeginnerLocked) 0f else radiusInfo.lift
@@ -78,5 +87,8 @@ class BallTextRenderer {
             canvas.drawText(line, safeX, currentBaseline, paint)
             currentBaseline += lineHeight
         }
+        // [paint] is the shared PaintCache.textPaint; never leave the beginner glow on it for
+        // the next renderer (rail diamond labels reuse it).
+        paint.clearShadowLayer()
     }
 }

@@ -82,7 +82,7 @@ object TableOrientationLearner {
         val (heading180, agreement) = circularMean180(samples.map { it.rotationDeg - sign * it.yawDeg })
         val headingDeg = samples.filter { it.anchor }.maxByOrNull { it.timestampMs }
             ?.let { resolveEnd(heading180, it.rotationDeg - sign * it.yawDeg) }
-        val rotation = if (headingDeg != null) normalize360(sign * yawDeg + headingDeg)
+        val rotation = if (headingDeg != null) wrapSigned180(sign * yawDeg + headingDeg)
         else normalize180(sign * yawDeg + heading180)
 
         val zoom = predictZoom(samples, pitchDeg)
@@ -150,16 +150,26 @@ object TableOrientationLearner {
 
     /** Of [heading180] and its half-turn, the one nearer [anchorHeadingDeg] (full circle). */
     fun resolveEnd(heading180: Float, anchorHeadingDeg: Float): Float =
-        if (abs(normalize360(heading180 - anchorHeadingDeg)) <= 90f) heading180
-        else normalize360(heading180 + 180f)
+        if (abs(wrapSigned180(heading180 - anchorHeadingDeg)) <= 90f) heading180
+        else wrapSigned180(heading180 + 180f)
 
-    /** Angle wrapped into (-180, 180]. */
-    fun normalize360(deg: Float): Float {
+    /**
+     * Angle wrapped into the signed range (-180, 180]. Not 0..360: callers such as
+     * [com.hereliesaz.cuedetat.domain.reducers.followCompass] rely on the sign.
+     */
+    fun wrapSigned180(deg: Float): Float {
         var a = deg % 360f
         if (a <= -180f) a += 360f
         if (a > 180f) a -= 360f
         return a
     }
+
+    /**
+     * Misnamed legacy alias of [wrapSigned180]: returns (-180, 180], NOT 0..360.
+     * Kept only for the remaining ui/ caller (TableRotationSwiper).
+     */
+    @Deprecated("Returns (-180, 180], not 0..360", ReplaceWith("wrapSigned180(deg)"))
+    fun normalize360(deg: Float): Float = wrapSigned180(deg)
 
     /** Angle folded into (-90, 90]. */
     fun normalize180(deg: Float): Float {

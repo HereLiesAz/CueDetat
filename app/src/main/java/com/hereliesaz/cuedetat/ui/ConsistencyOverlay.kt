@@ -14,7 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.data.WearableState
@@ -38,21 +38,22 @@ fun ConsistencyOverlay(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Consistency Trainer",
+                text = stringResource(R.string.consistency_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White
             )
 
-            // Fluidity / Consistency Score
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val scorePercent = (wearableState.consistencyScore * 100).toInt()
+            // Fluidity / Consistency Score: shown only once a stroke has been scored.
+            val score = wearableState.consistencyScore
+            if (score != null) Row(verticalAlignment = Alignment.CenterVertically) {
+                val scorePercent = (score * 100).toInt()
                 val scoreColor = when {
                     scorePercent > 80 -> Color.Green
                     scorePercent > 50 -> Color.Yellow
                     else -> Color.Red
                 }
                 Text(
-                    text = "Fluidity: ",
+                    text = stringResource(R.string.consistency_fluidity),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White
                 )
@@ -68,24 +69,27 @@ fun ConsistencyOverlay(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Icon(
                         imageVector = Icons.Default.Warning,
-                        contentDescription = "Warning",
+                        contentDescription = null, // the adjacent text says it
                         tint = Color.Red,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = "Erratic Motion Detected!",
+                        text = stringResource(R.string.consistency_erratic),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Red
                     )
                 }
             }
 
-            // HR reading
-            Text(
-                text = "HR: ${wearableState.heartRate.toInt()} BPM",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.7f)
-            )
+            // HR reading: null until the watch sends one, and then nothing is shown.
+            val heartRate = wearableState.heartRate
+            if (heartRate != null) {
+                Text(
+                    text = stringResource(R.string.consistency_heart_rate, heartRate.toInt()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+            }
         }
     }
 }

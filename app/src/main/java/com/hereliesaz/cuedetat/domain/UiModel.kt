@@ -146,6 +146,13 @@ data class CueDetatState(
     @Transient val flatMatrix: Matrix? = null,
     @Transient val logicalPlaneMatrix: Matrix? = null,
     @Transient val hasInverseMatrix: Boolean = false,
+    /**
+     * Pitch (degrees) actually used to build [pitchMatrix]/[railPitchMatrix]: AR- or
+     * depth-derived when available, else IMU. Written by UpdateStateUseCase.updateMatrices;
+     * null until the first matrix pass. Renderers use it for ball lift so lift matches
+     * the matrix the ball is drawn with (see [pitchAngle] for the raw IMU value).
+     */
+    @Transient val effectivePitchDegrees: Float? = null,
     @Transient val visionData: VisionData? = null,
     @Transient val arConfidenceHistory: List<Float> = emptyList(),
     @Transient val arLowConfidenceFrameCount: Int = 0,
@@ -176,7 +183,6 @@ data class CueDetatState(
     val lockedHsvColor: FloatArray? = null,
     val lockedHsvStdDev: FloatArray? = null,
     val showAdvancedOptionsDialog: Boolean = false,
-    val showSupportSheet: Boolean = false,
     val showCalibrationScreen: Boolean = false,
     val showTableScanScreen: Boolean = false,
     val useCustomModel: Boolean = false,
@@ -237,8 +243,8 @@ data class CueDetatState(
     // exactly once in comparableFields() below. Nothing enforces this -- it is
     // maintained by hand -- and a field that is added here but forgotten there
     // is compared by neither equals() nor hashCode(), which silently defeats
-    // StateFlow conflation for that field alone. Verified in sync at 120/120 as
-    // of this commit.
+    // StateFlow conflation for that field alone. Verified in sync at 125/125 (recounted by
+    // script over constructor vs list) as of this change.
     //
     // The list exists because three fields are FloatArray? (relocaliserDeltaQ,
     // lockedHsvColor, lockedHsvStdDev), and the compiler-generated equals() for
@@ -262,11 +268,11 @@ data class CueDetatState(
         masseImpactPoints, masseConnectsTarget, masseGhostBallCenter, spinControlCenter,
         lingeringSpinOffset, spinPathsAlpha, currentOrientation, compassRefYaw, isViewLocked, pitchMatrix, railPitchMatrix,
         sizeCalculationMatrix, inversePitchMatrix, flatMatrix, logicalPlaneMatrix, hasInverseMatrix,
-        visionData, arConfidenceHistory, arLowConfidenceFrameCount, relocaliserDeltaQ?.toList(),
+        effectivePitchDegrees, visionData, arConfidenceHistory, arLowConfidenceFrameCount, relocaliserDeltaQ?.toList(),
         relocaliserAttemptFrames, snapCandidates, tableScanModel, depthPlane, arDerivedPitch,
         arMeasuredHeightM, arTableMatrix, isArTableLocked, tableFit, depthCapability, arModuleState, arModuleError,
         lockedHsvColor?.toList(), lockedHsvStdDev?.toList(), showAdvancedOptionsDialog,
-        showSupportSheet, showCalibrationScreen, showTableScanScreen,
+        showCalibrationScreen, showTableScanScreen,
         useCustomModel, isSnappingEnabled, hasTargetBallBeenMoved, hasCueBallBeenMoved,
         cannyThreshold1, cannyThreshold2, isAutoCalibrating, showCvMask, isTestingCvMask,
         isCalibratingColor, colorSamplePoint, cameraMatrix, distCoeffs, shotLineAnchor,
@@ -313,6 +319,8 @@ sealed class MainScreenEvent {
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
     data class PanView(val delta: PointF) : MainScreenEvent()
     data class MoveTableZ(val delta: Float) : MainScreenEvent()
+    /** Absolute table height (the slider's thumb value); clamped like [MoveTableZ]. */
+    data class SetTableZ(val value: Float) : MainScreenEvent()
     object ToggleSpinControl : MainScreenEvent()
     object ToggleMasseMode : MainScreenEvent()
     data class SpinApplied(val offset: PointF) : MainScreenEvent()
@@ -348,8 +356,6 @@ sealed class MainScreenEvent {
     data class SetWarning(val warning: String?) : MainScreenEvent()
     object ToggleOrientationLock : MainScreenEvent()
     object ApplyPendingOrientationLock : MainScreenEvent()
-    data class OrientationChanged(val orientationLock: CueDetatState.OrientationLock) :
-        MainScreenEvent()
 
     object UnlockBeginnerView : MainScreenEvent()
     object LockBeginnerView : MainScreenEvent()
@@ -389,7 +395,6 @@ sealed class MainScreenEvent {
     object SingleEventConsumed : MainScreenEvent()
     object Shake : MainScreenEvent()
     object ExitToSplash : MainScreenEvent()
-    data class RestoreState(val state: CueDetatState) : MainScreenEvent()
 
     // Table scan events
     data class LoadTableScan(val model: TableScanModel) : MainScreenEvent()

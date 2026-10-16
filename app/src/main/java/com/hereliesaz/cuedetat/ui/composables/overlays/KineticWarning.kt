@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
@@ -39,15 +40,22 @@ import kotlin.random.Random
  * The text appears at random positions on the screen, split into lines that dynamically
  * resize to fill the width, creating a forceful visual impact.
  *
- * @param text The warning message to display. If null, the overlay is hidden.
+ * @param text The warning message to display. If null, the overlay fades out. The caller must
+ *   keep this composed and pass null to hide it (not remove it from composition), or the
+ *   1 s fade-out never plays. The last non-null text stays on screen while it fades.
  * @param modifier Styling modifier.
  */
 @OptIn(ExperimentalTextApi::class)
 @Composable
 fun KineticWarningOverlay(text: String?, modifier: Modifier = Modifier) {
+    // Text shown during the exit fade, after the caller has already passed null.
+    val lastText = remember { mutableStateOf<String?>(null) }
+    if (text != null) lastText.value = text
+    val shownText = text ?: lastText.value
+
     // Determine a random screen position for the text block each time the text changes.
-    val randomAlignment = remember(text) {
-        if (text == null) Alignment.Center else
+    val randomAlignment = remember(shownText) {
+        if (shownText == null) Alignment.Center else
             BiasAlignment(
                 horizontalBias = Random.nextDouble(-0.5, 0.5).toFloat(),
                 verticalBias = Random.nextDouble(-0.7, 0.7).toFloat()
@@ -66,7 +74,8 @@ fun KineticWarningOverlay(text: String?, modifier: Modifier = Modifier) {
                 .padding(16.dp),
             contentAlignment = randomAlignment
         ) {
-            if (text != null) {
+            if (shownText != null) {
+                val text: String = shownText
                 val textMeasurer = rememberTextMeasurer()
 
                 // Calculate base font size relative to screen width.
