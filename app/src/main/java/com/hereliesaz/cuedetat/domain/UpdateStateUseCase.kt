@@ -631,7 +631,7 @@ class UpdateStateUseCase @Inject constructor(
         end: PointF,
         state: CueDetatState
     ): Triple<List<PointF>, Int?, PointF> {
-        val (directPocketIndex, directIntersection) = checkPocketAim(start, end, state)
+        val (directPocketIndex, directIntersection) = pocketAimOnRay(start, end, state)
         if (directPocketIndex != null && directIntersection != null) {
             return Triple(listOf(start, directIntersection), directPocketIndex, directIntersection)
         }
@@ -639,11 +639,7 @@ class UpdateStateUseCase @Inject constructor(
         val bankPath = calculateSingleBank(start, end, state)
 
         if (bankPath.size > 2) {
-            val (bankedPocketIndex, bankedIntersection) = checkPocketAim(
-                bankPath[1],
-                bankPath[2],
-                state
-            )
+            val (bankedPocketIndex, bankedIntersection) = pocketAimOnRay(bankPath[1], bankPath[2], state)
             if (bankedPocketIndex != null && bankedIntersection != null) {
                 return Triple(
                     listOf(bankPath[0], bankPath[1], bankedIntersection),
@@ -655,45 +651,14 @@ class UpdateStateUseCase @Inject constructor(
         return Triple(bankPath, null, bankPath.last())
     }
 
-    private fun checkPocketAim(
-        start: PointF,
-        end: PointF,
-        state: CueDetatState
-    ): Pair<Int?, PointF?> {
+    /** [findPocketAim] along the ray through [start]→[end], extended by [lineExtensionFactor]. */
+    private fun pocketAimOnRay(start: PointF, end: PointF, state: CueDetatState): Pair<Int?, PointF?> {
         val dirX = end.x - start.x
         val dirY = end.y - start.y
         val mag = sqrt(dirX * dirX + dirY * dirY)
         if (mag < 0.001f) return Pair(null, null)
-        val extendedEnd = PointF(
-            start.x + dirX / mag * lineExtensionFactor,
-            start.y + dirY / mag * lineExtensionFactor
-        )
-
-        val pockets = state.table.pockets
-        val pocketRadius = state.protractorUnit.radius * 1.8f
-
-        var closestIntersection: PointF? = null
-        var closestPocketIndex: Int? = null
-        var minDistanceSq = Float.MAX_VALUE
-
-        pockets.forEachIndexed { index, pocket ->
-            val intersection = getLineCircleIntersection(start, extendedEnd, pocket, pocketRadius)
-            if (intersection != null) {
-                val vecToPocketX = pocket.x - start.x
-                val vecToPocketY = pocket.y - start.y
-                val dotProduct = vecToPocketX * (dirX / mag) + vecToPocketY * (dirY / mag)
-                if (dotProduct > 0) {
-                    val distSq =
-                        (intersection.x - start.x).pow(2) + (intersection.y - start.y).pow(2)
-                    if (distSq < minDistanceSq) {
-                        minDistanceSq = distSq
-                        closestIntersection = intersection
-                        closestPocketIndex = index
-                    }
-                }
-            }
-        }
-        return Pair(closestPocketIndex, closestIntersection)
+        val extendedEnd = PointF(start.x + dirX / mag * lineExtensionFactor, start.y + dirY / mag * lineExtensionFactor)
+        return findPocketAim(start, extendedEnd, state)
     }
 
     private fun calculateShotGuideImpact(
@@ -717,7 +682,7 @@ class UpdateStateUseCase @Inject constructor(
         state: CueDetatState
     ): List<PointF> {
         // Normalise first: callers pass ghost->target (|d| = 2r), and extending the raw vector
-        // produced ~1e9-unit endpoints after reflection. Matches getExtendedLinePath/checkPocketAim.
+        // produced ~1e9-unit endpoints after reflection. Matches getExtendedLinePath/findPocketAim.
         val rawX = end.x - start.x
         val rawY = end.y - start.y
         val mag = sqrt(rawX * rawX + rawY * rawY)
@@ -796,23 +761,5 @@ class UpdateStateUseCase @Inject constructor(
             (center.y - projection.y).toDouble()
         ).toFloat()
         return dist < minDist
-    }
-
-    private fun getLineCircleIntersection(
-        p1: PointF,
-        p2: PointF,
-        circleCenter: PointF,
-        radius: Float
-    ): PointF? {
-        val dx = p2.x - p1.x
-        val dy = p2.y - p1.y
-        val a = dx * dx + dy * dy
-        if (a < 0.0001f) return null
-        val b = 2 * (dx * (p1.x - circleCenter.x) + dy * (p1.y - circleCenter.y))
-        val c = (p1.x - circleCenter.x).pow(2) + (p1.y - circleCenter.y).pow(2) - radius * radius
-        val delta = b * b - 4 * a * c
-        if (delta < 0) return null
-        val t = (-b - sqrt(delta)) / (2 * a)
-        return PointF(p1.x + t * dx, p1.y + t * dy)
     }
 }

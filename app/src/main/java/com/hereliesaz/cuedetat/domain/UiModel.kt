@@ -196,6 +196,12 @@ data class CueDetatState(
     val isTestingCvMask: Boolean = false,
     val isCalibratingColor: Boolean = false,
     val colorSamplePoint: Offset? = null,
+    /**
+     * Lens intrinsics for distortion correction. KNOWN GAP (not implemented, see BACKLOG.md):
+     * nothing assigns [cameraMatrix] or [distCoeffs] (grep `cameraMatrix =` finds no writer), so
+     * they are always null and the lens-distortion path in `DrawingUtils` never runs. A
+     * calibration flow would have to produce and store them.
+     */
     @Transient val cameraMatrix: Mat? = null,
     @Transient val distCoeffs: Mat? = null,
     @Transient val shotLineAnchor: PointF? = null,

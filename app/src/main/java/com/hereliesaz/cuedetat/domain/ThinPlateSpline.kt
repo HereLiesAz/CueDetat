@@ -76,6 +76,10 @@ object ThinPlateSpline {
         // Bottom-right 3×3 is zero (already initialized)
 
         val (wX, wY) = solveLinearSystem(A, bX, bY)
+        // One summary per failed solve, not one line per warped point (evaluate() runs per frame).
+        if (wX.any { !it.isFinite() } || wY.any { !it.isFinite() }) {
+            Log.w("ThinPlateSpline", "Singular TPS solve ($n control points); warp falls back to identity")
+        }
         return SolvedTps(srcPoints, wX, wY)
     }
 
@@ -96,7 +100,6 @@ object ThinPlateSpline {
         // NaN/Infinity weights that would otherwise propagate silently through every warped point.
         // Fall back to an identity (unwarped) mapping for this point rather than returning garbage.
         if (!x.isFinite() || !y.isFinite()) {
-            Log.w("ThinPlateSpline", "Non-finite TPS result for $point; falling back to identity warp")
             return point
         }
         return PointF(x.toFloat(), y.toFloat())

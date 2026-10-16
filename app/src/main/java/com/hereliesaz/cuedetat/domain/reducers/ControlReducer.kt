@@ -15,7 +15,7 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
         }
 
         is MainScreenEvent.ZoomScaleChanged -> {
-            val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode)
+            val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked)
             val oldZoomSliderPos = state.zoomSliderPosition
             val currentZoomValue = ZoomMapping.sliderToZoom(oldZoomSliderPos, minZoom, maxZoom)
             val newZoomValue = (currentZoomValue * action.scaleFactor).coerceIn(minZoom, maxZoom)
@@ -65,7 +65,7 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
         )
 
         is MainScreenEvent.ApplyQuickAlign -> {
-            val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode)
+            val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked)
             val newZoomSliderPos = ZoomMapping.zoomToSlider(action.scale, minZoom, maxZoom)
             state.copy(
                 viewOffset = PointF(action.translation.x, action.translation.y),
@@ -94,7 +94,7 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
         )
 
         is MainScreenEvent.UpdateArPose -> {
-            val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode)
+            val (minZoom, maxZoom) = ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked)
             val newZoomSliderPos = ZoomMapping.zoomToSlider(action.scale, minZoom, maxZoom)
             state.copy(
                 viewOffset = PointF(action.translation.x, action.translation.y),

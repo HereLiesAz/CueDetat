@@ -645,8 +645,8 @@ class VisionRepository @Inject constructor(
                 rotation = state.worldRotationDegrees,
                 scale = com.hereliesaz.cuedetat.ui.ZoomMapping.sliderToZoom(
                     targetSlider,
-                    com.hereliesaz.cuedetat.ui.ZoomMapping.getZoomRange(state.experienceMode).first,
-                    com.hereliesaz.cuedetat.ui.ZoomMapping.getZoomRange(state.experienceMode).second,
+                    com.hereliesaz.cuedetat.ui.ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked).first,
+                    com.hereliesaz.cuedetat.ui.ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked).second,
                 ),
             ))
         }
@@ -682,8 +682,8 @@ class VisionRepository @Inject constructor(
         val blendedRotation = alpha * rawR + (1f - alpha) * state.worldRotationDegrees
         val currentZoom = ZoomMapping.sliderToZoom(
             state.zoomSliderPosition,
-            ZoomMapping.getZoomRange(state.experienceMode).first,
-            ZoomMapping.getZoomRange(state.experienceMode).second
+            ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked).first,
+            ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked).second
         )
         val blendedScale = alpha * rawS + (1f - alpha) * currentZoom
 
