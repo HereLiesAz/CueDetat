@@ -168,19 +168,21 @@ private fun findNextAvailablePlacement(state: CueDetatState, reducerUtils: Reduc
         return reducerUtils.getDefaultTargetBallPosition()
     } else {
         // Strategy 3: No table, no free detected balls. Use a fixed grid pattern.
-        // Get the current count to determine position index.
-        val numObstacles = state.obstacleBalls.size
-        // Cycle through 4 quadrants.
-        val quadrantIndex = numObstacles % 4
-        // Get ball radius for spacing.
-        val radius = state.protractorUnit.radius
-
-        // Calculate X offset: alternate left/right.
-        val xOffset = if (quadrantIndex % 2 == 0) -radius * 3 else radius * 3
-        // Calculate Y offset: top two vs bottom two.
-        val yOffset = if (quadrantIndex < 2) -radius * 6 else radius * 6
-
+        val (gridX, gridY) = gridSlotOffset(state.obstacleBalls.size, state.protractorUnit.radius)
         // Return the grid-calculated point.
-        return PointF(xOffset, yOffset)
+        return PointF(gridX, gridY)
     }
+}
+
+/**
+ * Offset of the fixed-grid fallback slot for the [index]-th obstacle.
+ *
+ * Slots cycle through four quadrants (left/right alternating, top pair then bottom pair), spaced
+ * in units of the ball [radius]. Kept free of Android types so it can be unit-tested directly.
+ */
+internal fun gridSlotOffset(index: Int, radius: Float): Pair<Float, Float> {
+    val quadrant = index % 4
+    val x = if (quadrant % 2 == 0) -radius * 3 else radius * 3
+    val y = if (quadrant < 2) -radius * 6 else radius * 6
+    return x to y
 }
