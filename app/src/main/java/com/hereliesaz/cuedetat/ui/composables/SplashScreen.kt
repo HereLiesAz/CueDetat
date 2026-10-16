@@ -73,7 +73,7 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
         ) {
             Image(
                 painter = painterResource(id = R.drawable.logo_cue_detat),
-                contentDescription = "Application Logo",
+                contentDescription = stringResource(id = R.string.splash_logo_a11y),
                 modifier = Modifier.size(256.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))

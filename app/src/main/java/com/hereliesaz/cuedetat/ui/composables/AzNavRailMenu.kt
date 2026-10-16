@@ -132,6 +132,46 @@ fun AzNavRailMenu(
     val railAccent = MaterialTheme.colorScheme.primary
     // The rail DSL lambda is not @Composable, so resolve its strings here.
     val supportLabel = stringResource(R.string.rail_support)
+    val rail_stripesText = stringResource(R.string.rail_stripes)
+    val rail_solidsText = stringResource(R.string.rail_solids)
+    val rail_shakeText = stringResource(R.string.rail_shake)
+    val rail_exitText = stringResource(R.string.rail_exit)
+    val rail_wtfText = stringResource(R.string.rail_wtf)
+    val rail_tutorialText = stringResource(R.string.rail_tutorial)
+    val rail_unlockText = stringResource(R.string.rail_unlock)
+    val rail_lockText = stringResource(R.string.rail_lock)
+    val rail_save_24hText = stringResource(R.string.rail_save_24h)
+    val rail_restoreText = stringResource(R.string.rail_restore)
+    val rail_forget_savedText = stringResource(R.string.rail_forget_saved)
+    val rail_offText = stringResource(R.string.rail_off)
+    val rail_arText = stringResource(R.string.rail_ar)
+    val rail_phoneText = stringResource(R.string.rail_phone)
+    val rail_glassesText = stringResource(R.string.rail_glasses)
+    val rail_backText = stringResource(R.string.rail_back)
+    val rail_viewText = stringResource(R.string.rail_view)
+    val rail_spinText = stringResource(R.string.rail_spin)
+    val rail_masseText = stringResource(R.string.rail_masse)
+    val rail_advisorText = stringResource(R.string.rail_advisor)
+    val rail_aimText = stringResource(R.string.rail_aim)
+    val rail_bankText = stringResource(R.string.rail_bank)
+    val rail_addText = stringResource(R.string.rail_add)
+    val rail_dynamicText = stringResource(R.string.rail_dynamic)
+    val rail_staticText = stringResource(R.string.rail_static)
+    val rail_clearText = stringResource(R.string.rail_clear)
+    val rail_undoText = stringResource(R.string.rail_undo)
+    val rail_redoText = stringResource(R.string.rail_redo)
+    val rail_resetText = stringResource(R.string.rail_reset)
+    val rail_table_sizeText = stringResource(R.string.rail_table_size)
+    val rail_metricText = stringResource(R.string.rail_metric)
+    val rail_imperialText = stringResource(R.string.rail_imperial)
+    val rail_orientationText = stringResource(R.string.rail_orientation)
+    val rail_training_data_onText = stringResource(R.string.rail_training_data_on)
+    val rail_training_data_offText = stringResource(R.string.rail_training_data_off)
+    val rail_advancedText = stringResource(R.string.rail_advanced)
+    val rail_debug_log_onText = stringResource(R.string.rail_debug_log_on)
+    val rail_debug_log_offText = stringResource(R.string.rail_debug_log_off)
+    val rail_share_debug_logText = stringResource(R.string.rail_share_debug_log)
+    val railModeFormat = stringResource(R.string.rail_mode, uiState.experienceMode?.name.orEmpty())
 
     val guidance = AzHostActivityLayout(
         navController = navController,
@@ -229,7 +269,7 @@ fun AzNavRailMenu(
             azRailToggle(
                 id = "target_type",
                 isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
-                toggleOnText = "Stripes", toggleOffText = "Solids",
+                toggleOnText = rail_stripesText, toggleOffText = rail_solidsText,
                 fillColor = if (uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES) b4P else b8K,
                 onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
             )
@@ -237,8 +277,8 @@ fun AzNavRailMenu(
 
         // [SECTION 4] Mode-specific Rail Items
         if (uiState.experienceMode == ExperienceMode.HATER) {
-            azRailItemLowerCase(id = "shake", text = "Shake", fillColor = b1Y, onClick = { onEvent(MainScreenEvent.Shake) })
-            azRailItemLowerCase(id = "exit", text = "Exit", fillColor = b2B, onClick = { onEvent(MainScreenEvent.ExitToSplash) })
+            azRailItemLowerCase(id = "shake", text = rail_shakeText, fillColor = b1Y, onClick = { onEvent(MainScreenEvent.Shake) })
+            azRailItemLowerCase(id = "exit", text = rail_exitText, fillColor = b2B, onClick = { onEvent(MainScreenEvent.ExitToSplash) })
             return@AzHostActivityLayout // Hater Mode doesn't show standard nav
         }
 
@@ -246,14 +286,14 @@ fun AzNavRailMenu(
             // "wtf", not "help": AzNavRail reserves its own auto-placed help item.
             id = "wtf",
             isChecked = uiState.areHelpersVisible,
-            toggleOnText = "wtf?",
-            toggleOffText = "wtf?",
+            toggleOnText = rail_wtfText,
+            toggleOffText = rail_wtfText,
             fillColor = b1Y,
             onClick = { onEvent(MainScreenEvent.ToggleHelp) }
         )
         azMenuItem(
             id = "tutorial",
-            text = "Tutorial",
+            text = rail_tutorialText,
             fillColor = b2B,
             onClick = {
                 if (uiState.cameraMode == CameraMode.OFF) {
@@ -271,7 +311,7 @@ fun AzNavRailMenu(
                 azRailToggle(
                     id = "lock",
                     isChecked = uiState.isArTableLocked,
-                    toggleOnText = "unlock", toggleOffText = "lock",
+                    toggleOnText = rail_unlockText, toggleOffText = rail_lockText,
                     fillColor = b10B,
                     onClick = {
                         onEvent(
@@ -283,16 +323,16 @@ fun AzNavRailMenu(
                 // Cloud hosting is never automatic: explicit confirmation is required.
                 if (uiState.isArTableLocked) {
                     azRailItemLowerCase(
-                        id = "ar_cloud_save", text = "save 24h",
+                        id = "ar_cloud_save", text = rail_save_24hText,
                         fillColor = b6G, onClick = { confirmCloudSave.value = true },
                     )
                 }
                 azRailItemLowerCase(
-                    id = "ar_cloud_restore", text = "restore",
+                    id = "ar_cloud_restore", text = rail_restoreText,
                     fillColor = b10B, onClick = { onEvent(MainScreenEvent.RestoreCloudPlacement) },
                 )
                 azRailItemLowerCase(
-                    id = "ar_cloud_forget", text = "forget saved",
+                    id = "ar_cloud_forget", text = rail_forget_savedText,
                     fillColor = b11R, onClick = { onEvent(MainScreenEvent.ForgetCloudPlacement) },
                 )
             }
@@ -302,7 +342,7 @@ fun AzNavRailMenu(
             azRailToggle(
                 id = "ar",
                 isChecked = isCameraOn,
-                toggleOnText = "off", toggleOffText = "ar",
+                toggleOnText = rail_offText, toggleOffText = rail_arText,
                 fillColor = b3R,
                 onClick = {
                     onEvent(if (isCameraOn) MainScreenEvent.TurnCameraOff else MainScreenEvent.CycleCameraMode)
@@ -313,7 +353,7 @@ fun AzNavRailMenu(
             if (SHOW_GLASSES) azRailToggle(
                 id = "meta_glasses",
                 isChecked = uiState.cameraMode == CameraMode.META_GLASSES,
-                toggleOnText = "phone", toggleOffText = "glasses",
+                toggleOnText = rail_phoneText, toggleOffText = rail_glassesText,
                 fillColor = b5O,
                 onClick = {
                     if (uiState.cameraMode == CameraMode.META_GLASSES) {
@@ -330,7 +370,7 @@ fun AzNavRailMenu(
                     azRailToggle(
                         id = "top_down_view",
                         isChecked = uiState.isTopDownViewActive,
-                        toggleOnText = "back", toggleOffText = "view",
+                        toggleOnText = rail_backText, toggleOffText = rail_viewText,
                         fillColor = b8K,
                         onClick = { 
                             if (uiState.isTopDownViewActive) onEvent(MainScreenEvent.ClearTopDownView)
@@ -343,22 +383,22 @@ fun AzNavRailMenu(
         azDivider()
 
         if (uiState.experienceMode != ExperienceMode.BEGINNER) {
-            azRailToggle(id = "spin", isChecked = uiState.isSpinControlVisible, toggleOnText = "Spin", toggleOffText = "Spin", fillColor = b4P, onClick = { onEvent(MainScreenEvent.ToggleSpinControl) })
-            azRailToggle(id = "masse", isChecked = uiState.isMasseModeActive, toggleOnText = "Massé", toggleOffText = "Massé", fillColor = b5O, onClick = { onEvent(MainScreenEvent.ToggleMasseMode) })
+            azRailToggle(id = "spin", isChecked = uiState.isSpinControlVisible, toggleOnText = rail_spinText, toggleOffText = rail_spinText, fillColor = b4P, onClick = { onEvent(MainScreenEvent.ToggleSpinControl) })
+            azRailToggle(id = "masse", isChecked = uiState.isMasseModeActive, toggleOnText = rail_masseText, toggleOffText = rail_masseText, fillColor = b5O, onClick = { onEvent(MainScreenEvent.ToggleMasseMode) })
             // Advisor hidden for the foreseeable future.
-            if (SHOW_ADVISOR) azRailToggle(id = "advisor", isChecked = uiState.isAdvisorEnabled, toggleOnText = "Advisor", toggleOffText = "Advisor", fillColor = b13O, onClick = { onEvent(MainScreenEvent.ToggleAdvisor) })
+            if (SHOW_ADVISOR) azRailToggle(id = "advisor", isChecked = uiState.isAdvisorEnabled, toggleOnText = rail_advisorText, toggleOffText = rail_advisorText, fillColor = b13O, onClick = { onEvent(MainScreenEvent.ToggleAdvisor) })
         }
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azRailToggle(id = "bank", isChecked = uiState.isBankingMode, toggleOnText = "aim", toggleOffText = "bank", fillColor = b6G, onClick = { onEvent(MainScreenEvent.ToggleBankingMode) })
-            azRailItemLowerCase(id = "add_obstacle", text = "add", fillColor = b7M, onClick = { onEvent(MainScreenEvent.AddObstacleBall) })
+            azRailToggle(id = "bank", isChecked = uiState.isBankingMode, toggleOnText = rail_aimText, toggleOffText = rail_bankText, fillColor = b6G, onClick = { onEvent(MainScreenEvent.ToggleBankingMode) })
+            azRailItemLowerCase(id = "add_obstacle", text = rail_addText, fillColor = b7M, onClick = { onEvent(MainScreenEvent.AddObstacleBall) })
         }
 
         if (uiState.experienceMode == ExperienceMode.BEGINNER) {
             azRailToggle(
                 id = "view_mode",
                 isChecked = !uiState.isBeginnerViewLocked,
-                toggleOnText = "dynamic", toggleOffText = "static",
+                toggleOnText = rail_dynamicText, toggleOffText = rail_staticText,
                 fillColor = if (!uiState.isBeginnerViewLocked) b6G else b7M,
                 onClick = {
                     if (uiState.isBeginnerViewLocked) onEvent(MainScreenEvent.UnlockBeginnerView)
@@ -370,41 +410,41 @@ fun AzNavRailMenu(
                 azRailToggle(
                     id = "target_type",
                     isChecked = uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES,
-                    toggleOnText = "Stripes", toggleOffText = "Solids",
+                    toggleOnText = rail_stripesText, toggleOffText = rail_solidsText,
                     fillColor = if (uiState.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES) b4P else b8K,
                     onClick = { onEvent(MainScreenEvent.ToggleTargetType) }
                 )
             }
         } else {
             val resetLabel = when {
-                uiState.obstacleBalls.isNotEmpty() -> "clear"
-                uiState.targetCvAnchor != null -> "undo"
-                uiState.preResetState != null -> "undo"
-                uiState.postResetState != null -> "redo"
-                else -> "reset"
+                uiState.obstacleBalls.isNotEmpty() -> rail_clearText
+                uiState.targetCvAnchor != null -> rail_undoText
+                uiState.preResetState != null -> rail_undoText
+                uiState.postResetState != null -> rail_redoText
+                else -> rail_resetText
             }
             azRailItemLowerCase(id = "reset", text = resetLabel, fillColor = b8K, onClick = { onEvent(MainScreenEvent.Reset) })
         }
         azDivider()
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azMenuItem(id = "size", text = "Table Size", fillColor = b13O, onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) })
-            azMenuItem(id = "units", text = if (uiState.distanceUnit == DistanceUnit.METRIC) "Metric" else "Imperial", fillColor = b14G, onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) })
+            azMenuItem(id = "size", text = rail_table_sizeText, fillColor = b13O, onClick = { onEvent(MainScreenEvent.ToggleTableSizeDialog) })
+            azMenuItem(id = "units", text = if (uiState.distanceUnit == DistanceUnit.METRIC) rail_metricText else rail_imperialText, fillColor = b14G, onClick = { onEvent(MainScreenEvent.ToggleDistanceUnit) })
             azDivider()
         }
 
-        azMenuItem(id = "orientation", text = "Orientation", fillColor = b15M, onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) })
+        azMenuItem(id = "orientation", text = rail_orientationText, fillColor = b15M, onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) })
         // Training capture (CaptureRecorder): the setting the consent dialog points to.
-        azMenuItem(id = "training_data", text = if (captureEnabled) "Training data: on" else "Training data: off", fillColor = b10B, onClick = onToggleCapture)
+        azMenuItem(id = "training_data", text = if (captureEnabled) rail_training_data_onText else rail_training_data_offText, fillColor = b10B, onClick = onToggleCapture)
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
-            azMenuItem(id = "advanced", text = "Advanced", fillColor = b1Y, onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) })
+            azMenuItem(id = "advanced", text = rail_advancedText, fillColor = b1Y, onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) })
         }
 
         // Debug log (DebugLogRecorder): records this app's logcat so failures can be sent without adb.
-        azMenuItem(id = "debug_log", text = if (debugLogEnabled) "Debug log: on" else "Debug log: off", fillColor = b10B, onClick = onToggleDebugLog)
+        azMenuItem(id = "debug_log", text = if (debugLogEnabled) rail_debug_log_onText else rail_debug_log_offText, fillColor = b10B, onClick = onToggleDebugLog)
         if (debugLogEnabled) {
-            azMenuItem(id = "share_debug_log", text = "Share debug log", fillColor = b10B, onClick = onShareDebugLog)
+            azMenuItem(id = "share_debug_log", text = rail_share_debug_logText, fillColor = b10B, onClick = onShareDebugLog)
         }
 
         // Replaces the old "Billing & License" item, which shipped a tester-
@@ -419,7 +459,7 @@ fun AzNavRailMenu(
         )
 
         azDivider()
-        azMenuItem(id = "mode", text = "Mode: ${uiState.experienceMode?.name}", fillColor = b2B, onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) })
+        azMenuItem(id = "mode", text = railModeFormat, fillColor = b2B, onClick = { onEvent(MainScreenEvent.ToggleExperienceModeSelection) })
     }
 
     if (confirmCloudSave.value) {

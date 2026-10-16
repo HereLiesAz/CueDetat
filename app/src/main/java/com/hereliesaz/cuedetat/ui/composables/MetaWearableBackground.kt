@@ -1,5 +1,7 @@
 package com.hereliesaz.cuedetat.ui.composables
 
+import androidx.compose.ui.res.stringResource
+import com.hereliesaz.cuedetat.R
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -36,7 +38,7 @@ fun MetaWearableBackground(
         if (frame != null) {
             Image(
                 bitmap = frame.asImageBitmap(),
-                contentDescription = "Meta Glasses Stream",
+                contentDescription = stringResource(R.string.meta_stream_a11y),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
@@ -44,13 +46,13 @@ fun MetaWearableBackground(
             // No frame yet — give the user visible feedback instead of a blank screen
             // so the "glasses" toggle never appears to do nothing.
             val message = when (status) {
-                MetaConnectionStatus.CONNECTING -> "Connecting to glasses…"
-                MetaConnectionStatus.STREAMING -> "Waiting for video…"
+                MetaConnectionStatus.CONNECTING -> stringResource(R.string.meta_connecting)
+                MetaConnectionStatus.STREAMING -> stringResource(R.string.meta_waiting)
                 MetaConnectionStatus.NO_DEVICE ->
-                    "No Meta glasses found.\nPair them in the Meta AI app, then tap glasses again."
+                    stringResource(R.string.meta_no_device)
                 MetaConnectionStatus.ERROR ->
-                    "Couldn't connect to glasses.${lastError?.let { "\n$it" } ?: ""}"
-                MetaConnectionStatus.IDLE -> "Starting glasses…"
+                    stringResource(R.string.meta_error) + (lastError?.let { "\n$it" } ?: "")
+                MetaConnectionStatus.IDLE -> stringResource(R.string.meta_starting)
             }
             Box(
                 modifier = Modifier

@@ -2,6 +2,11 @@
 
 package com.hereliesaz.cuedetat.ui.hatemode
 
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import com.hereliesaz.cuedetat.R
 import android.graphics.Bitmap
 import android.graphics.Camera
 import android.graphics.Color
@@ -103,12 +108,17 @@ fun HaterScreen(
         // --- Background layer: physics / die canvas ---
         background(weight = 0) {
             val answerText = HaterResponses.allAnswers.getOrElse(answerIndex) { "" }
+            val dieDescription = stringResource(R.string.hater_die_a11y)
             val bitmap: Bitmap = remember(answerText) { createDieFaceBitmap(answerText) }
 
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
                     .onSizeChanged { haterViewModel.setupBoundaries(it.width.toFloat(), it.height.toFloat()) }
+                    .semantics {
+                        contentDescription = dieDescription
+                        stateDescription = answerText
+                    }
                     .pointerInput(Unit) {
                         detectDragGestures(
                             onDrag = { change, dragAmount ->

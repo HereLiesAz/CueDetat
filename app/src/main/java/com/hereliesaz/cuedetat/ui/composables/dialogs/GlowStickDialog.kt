@@ -1,5 +1,6 @@
 package com.hereliesaz.cuedetat.ui.composables.dialogs
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
@@ -13,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 
@@ -32,15 +34,16 @@ fun GlowStickDialog(
     onEvent: (MainScreenEvent) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val sliderA11y = stringResource(R.string.glow_slider_a11y)
     if (uiState.showGlowStickDialog) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Glow Stick", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            title = { Text(stringResource(R.string.glow_dialog_title), color = MaterialTheme.colorScheme.onSurfaceVariant) },
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f),
             text = {
                 Column {
                     Text(
-                        "Current: ${"%.2f".format(uiState.glowStickValue)}",
+                        stringResource(R.string.dialog_current_value, "%.2f".format(uiState.glowStickValue)),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Slider(
@@ -49,7 +52,7 @@ fun GlowStickDialog(
                         valueRange = -1f..1f,
                         steps = 199,
                         modifier = Modifier
-                            .semantics { contentDescription = "Glow Stick Intensity" }
+                            .semantics { contentDescription = sliderA11y }
                             .height(48.dp), // 48 dp minimum touch target
                         colors = SliderDefaults.colors(
                             activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -61,7 +64,7 @@ fun GlowStickDialog(
             },
             confirmButton = {
                 TextButton(onClick = onDismiss) {
-                    Text("Done", color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.action_done), color = MaterialTheme.colorScheme.primary)
                 }
             }
         )

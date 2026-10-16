@@ -1,5 +1,7 @@
 package com.hereliesaz.cuedetat.ui.composables.support
 
+import androidx.compose.ui.res.stringResource
+import com.hereliesaz.cuedetat.R
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.support.SupportLink
 import com.hereliesaz.cuedetat.support.SupportLinks
@@ -47,13 +50,11 @@ fun SupportSheet(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = "It's all free",
+                text = stringResource(R.string.support_title),
                 style = MaterialTheme.typography.headlineSmall,
             )
             Text(
-                text = "Every mode, every line, every insult. There is no paid tier " +
-                    "and nothing to restore. If it has saved you an argument about " +
-                    "whether that was a legal bank, the tip jar is below.",
+                text = stringResource(R.string.support_body),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 12.dp),
@@ -72,7 +73,7 @@ private fun SupportRow(link: SupportLink, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
