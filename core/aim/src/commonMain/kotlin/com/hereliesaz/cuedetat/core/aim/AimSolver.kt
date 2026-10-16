@@ -32,6 +32,12 @@ import kotlin.math.cos
  * Throw depends on the cut angle, and the cut angle depends on where you aim, so
  * the correction is a fixed point. Two or three iterations converge well inside
  * the precision anyone can shoot to.
+ *
+ * Angles follow the right-handed table frame of [Contact] (positive =
+ * counter-clockwise seen from above). Cut-induced throw pulls the object ball
+ * toward the cue ball's side, so the corrected aim is *over*cut relative to the
+ * naive ghost ball; right english squirts the cue ball left, so the cue is
+ * pointed right of [Solution.cueBallPath].
  */
 object AimSolver {
 
@@ -48,19 +54,36 @@ object AimSolver {
          * the chosen english will produce.
          */
         val aimDirection: Vec2,
-        /** Direction the object ball leaves along — by construction, the target line. */
+        /**
+         * Direction the object ball leaves along, as predicted by [Contact.resolve]
+         * for the final aim. Equals the target line to within the fixed-point
+         * residual after [ITERATIONS] passes (far below shootable precision).
+         */
         val objectBallPath: Vec2,
-        /** Direction the cue ball leaves along after contact. */
+        /**
+         * Direction the cue ball leaves along after contact, or [Vec2.ZERO] when it
+         * stops dead (straight stun shot) or the shot is degenerate.
+         */
         val cueBallDeparture: Vec2,
         val cutAngle: Angle,
+        /** Throw the final aim produces; positive = counter-clockwise. */
         val throwAngle: Angle,
+        /** Squirt the chosen english produces; positive (left) for right english. */
         val squirtAngle: Angle,
-        /** False when the geometry cannot be made at all (cut beyond ~85°). */
+        /**
+         * False when the geometry cannot be made at all: cut beyond ~85°, or a
+         * degenerate input (target on the object ball, cue ball already at the
+         * ghost-ball position), in which case the direction vectors are [Vec2.ZERO].
+         */
         val isPossible: Boolean,
     ) {
-        /** The tangent line at contact — where a stun cue ball goes. */
-        fun tangentLine(from: Vec2, length: Length): Segment {
-            val tangent = (ghostBallCenter - from).normalized().perpendicular
+        /**
+         * The tangent line at contact — where a stun cue ball goes: through
+         * [ghostBallCenter], perpendicular to the line of centres from the ghost
+         * ball to [objectBall], extending [length] each way.
+         */
+        fun tangentLine(objectBall: Vec2, length: Length): Segment {
+            val tangent = (objectBall - ghostBallCenter).normalized().perpendicular
             return Segment(ghostBallCenter - tangent * length.meters, ghostBallCenter + tangent * length.meters)
         }
     }
@@ -82,18 +105,33 @@ object AimSolver {
         val desiredObjectPath = (target - objectBall).normalized()
         val separation = ball.radius * 2.0
 
+        // Degenerate: no target direction, or the cue ball already sits where the
+        // ghost ball must go (no approach direction). Report impossible rather
+        // than returning zero vectors flagged as a makeable shot.
+        val naive = objectBall - desiredObjectPath * separation.meters
+        if (desiredObjectPath == Vec2.ZERO || (naive - cueBall).normalized() == Vec2.ZERO) {
+            return Solution(
+                ghostBallCenter = naive,
+                cueBallPath = Vec2.ZERO,
+                aimDirection = Vec2.ZERO,
+                objectBallPath = desiredObjectPath,
+                cueBallDeparture = Vec2.ZERO,
+                cutAngle = Angle.ZERO,
+                throwAngle = Angle.ZERO,
+                squirtAngle = cue.squirtAngle(spin),
+                isPossible = false,
+            )
+        }
+
         // Seed: the naive ghost ball, uncorrected.
         var lineOfCenters = desiredObjectPath
         var ghost = objectBall - lineOfCenters * separation.meters
-        var cutAngle = angleBetween((ghost - cueBall).normalized(), lineOfCenters)
-        var throwAngle = Angle.ZERO
 
         // Fixed-point: the throw depends on the cut, the cut depends on where the
         // ghost ball sits, and the ghost ball sits where it must to pre-compensate
         // the throw. Iterate until it stops moving.
         repeat(ITERATIONS) {
             val approach = (ghost - cueBall).normalized()
-            cutAngle = angleBetween(approach, lineOfCenters)
 
             // Throw the collision *would* produce if aimed along this line.
             val predicted = Contact.resolve(
@@ -103,19 +141,18 @@ object AimSolver {
                 spin = spin,
                 ball = ball,
             )
-            throwAngle = predicted.throwAngle
-
             // Rotate the line of centres the other way by the same amount, so the
             // thrown object ball lands back on the line we actually want.
-            lineOfCenters = desiredObjectPath.rotatedBy(-throwAngle)
+            lineOfCenters = desiredObjectPath.rotatedBy(-predicted.throwAngle)
             ghost = objectBall - lineOfCenters * separation.meters
         }
 
         val cueBallPath = (ghost - cueBall).normalized()
-        cutAngle = angleBetween(cueBallPath, lineOfCenters)
+        val cutAngle = angleBetween(cueBallPath, lineOfCenters)
 
         // Squirt happens at the tip, so the cue must point *back* by the squirt
-        // angle for the cue ball to set off down cueBallPath.
+        // angle for the cue ball to set off down cueBallPath. Right english squirts
+        // left (positive), so the cue points right (clockwise) of the path.
         val squirt = cue.squirtAngle(spin)
         val aimDirection = cueBallPath.rotatedBy(-squirt)
 
@@ -128,7 +165,7 @@ object AimSolver {
             objectBallPath = final.objectBallDirection,
             cueBallDeparture = final.cueBallDirection,
             cutAngle = cutAngle,
-            throwAngle = throwAngle,
+            throwAngle = final.throwAngle,
             squirtAngle = squirt,
             isPossible = cutAngle <= Contact.MAX_PRACTICAL_CUT,
         )

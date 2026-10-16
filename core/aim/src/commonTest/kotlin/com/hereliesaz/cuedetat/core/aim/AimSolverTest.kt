@@ -76,15 +76,16 @@ class AimSolverTest {
     }
 
     @Test
-    fun correctedCutDiffersFromTheNaiveCutByExactlyTheThrowApplied() {
-        // Pre-compensating rotates the line of centres by the throw angle, so the
-        // cut measured against the *corrected* line is the naive cut less the
-        // throw. This is the invariant that ties the two together; asserting a
-        // fixed cut number here would just be asserting the friction model.
+    fun correctedCutIsTheNaiveCutPlusTheThrow() {
+        // Cut-induced throw drags the object ball toward the cue ball's side, so
+        // the shot is undercut and the aim must be OVERcut: the line of centres is
+        // rotated away from the approach by the throw, and the cut measured
+        // against it grows by that much (to within the ghost ball's small move
+        // changing the approach direction).
         for (intended in listOf(15.0, 30.0, 45.0, 60.0)) {
             val (cue, obj, target) = shotAtCut(intended.degrees)
             val s = AimSolver.solve(cue, obj, target, ball = ball)
-            val predicted = intended - abs(s.throwAngle.degrees)
+            val predicted = intended + abs(s.throwAngle.degrees)
             assertEquals(
                 predicted, s.cutAngle.degrees, 0.35,
                 "at ${intended}° naive cut with ${s.throwAngle.degrees}° throw",
@@ -181,7 +182,52 @@ class AimSolverTest {
         assertTrue(shift < ball.radius, "correction ${shift.millimeters} mm is implausibly large")
     }
 
+    @Test
+    fun throwCompensationMovesTheGhostBallTowardTheCueBallsSide() {
+        // Cue ball approaches at +30 deg (from below, -y), object ball must go +x.
+        // Throw pushes the object ball toward +y, so the line of centres must
+        // point slightly toward -y and the ghost ball (obj - 2R * loc) sits at y > 0.
+        val (cue, obj, target) = shotAtCut(30.0.degrees)
+        val s = AimSolver.solve(cue, obj, target, ball = ball)
+        assertTrue(s.ghostBallCenter.y > 0.0, "ghost y ${s.ghostBallCenter.y}")
+        assertTrue(s.throwAngle.degrees > 0.0)
+    }
+
+    @Test
+    fun tangentLineIsPerpendicularToTheLineOfCentres() {
+        val (cue, obj, target) = shotAtCut(30.0.degrees)
+        val s = AimSolver.solve(cue, obj, target, ball = ball)
+        val seg = s.tangentLine(obj, 0.5.meters)
+        val along = (seg.end - seg.start).normalized()
+        val lineOfCentres = (obj - s.ghostBallCenter).normalized()
+        assertEquals(0.0, along dot lineOfCentres, 1e-12)
+    }
+
+    @Test
+    fun aStraightStunShotLeavesTheCueBallStopped() {
+        val s = AimSolver.solve(Vec2(-0.5, 0.0), Vec2.ZERO, Vec2(1.0, 0.0), ball = ball)
+        assertEquals(Vec2.ZERO, s.cueBallDeparture)
+    }
+
+    @Test
+    fun degenerateInputsAreReportedImpossible() {
+        val obj = Vec2.ZERO
+        assertTrue(!AimSolver.solve(Vec2(-0.5, 0.0), obj, obj, ball = ball).isPossible)
+        val ghost = Vec2(-2.0 * r, 0.0)
+        assertTrue(!AimSolver.solve(ghost, obj, Vec2(1.0, 0.0), ball = ball).isPossible)
+    }
+
     // ── Squirt separates aim from cue-ball path ──────────────────────────────
+
+    @Test
+    fun rightEnglishPointsTheCueRightOfTheCueBallPath() {
+        // Right english squirts the cue ball left, so the cue must point right:
+        // clockwise of the path, i.e. path x aim < 0, by exactly 4 degrees.
+        val (cue, obj, target) = shotAtCut(20.0.degrees)
+        val s = AimSolver.solve(cue, obj, target, spin = Spin(side = 1.0), cue = CueSpec.STANDARD, ball = ball)
+        assertTrue((s.cueBallPath cross s.aimDirection) < 0.0)
+        assertEquals(4.0, angleBetween(s.aimDirection, s.cueBallPath).degrees, 1e-9)
+    }
 
     @Test
     fun englishMakesTheAimLineDifferFromTheCueBallPath() {

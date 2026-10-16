@@ -45,7 +45,11 @@ class ShotAdvisor(
     private val table: Table,
     private val ball: BallSpec = BallSpec.AMERICAN_POOL,
     private val cue: CueSpec = CueSpec.STANDARD,
-    /** One standard deviation of the player's aiming error. */
+    /**
+     * One standard deviation of the player's aiming error. The 0.6° default is
+     * an uncalibrated placeholder chosen as a plausible club-level spread; it has
+     * not been fitted to any recorded outcomes.
+     */
     private val aimingSigma: Angle = 0.6.degrees,
 ) {
 
@@ -82,8 +86,9 @@ class ShotAdvisor(
     ): Recommendation {
         val candidates = ArrayList<Candidate>()
 
-        for (target in targets) {
-            val blockers = (targets - target) + others
+        for ((index, target) in targets.withIndex()) {
+            // Exclude only this entry, not every value-equal one.
+            val blockers = targets.filterIndexed { i, _ -> i != index } + others
             for (pocket in table.pockets) {
                 evaluate(cueBall, target, pocket, blockers, speed, spin)?.let { candidates += it }
             }
@@ -148,8 +153,11 @@ class ShotAdvisor(
     /**
      * Probability that a shot of this geometry is made.
      *
-     * Derived, not tuned: the pocket's angular acceptance divided by the aiming
-     * error the geometry amplifies, run through a normal distribution.
+     * The *structure* is derived — the pocket's angular acceptance divided by
+     * the aiming error the geometry amplifies, run through a normal distribution
+     * — but the inputs [aimingSigma] and the thin-cut cap (`cos(cut) ≥ 0.08`,
+     * i.e. at most a 12.5× penalty, reached near 85°) are uncalibrated
+     * placeholders, so the output is a model probability, not a measured one.
      */
     internal fun makeProbability(
         pocket: Pocket,
@@ -193,10 +201,10 @@ class ShotAdvisor(
         return sign * y
     }
 
-    /** Below this the advisor declines to recommend anything at all. */
+    /** Below this the advisor declines to recommend anything at all. Uncalibrated default. */
     var minimumProbability: Double = 0.10
 
-    /** Below this a safety is the better play even though a pot exists. */
+    /** Below this a safety is the better play even though a pot exists. Uncalibrated default. */
     var safetyThreshold: Double = 0.35
 
     companion object {
