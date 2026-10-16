@@ -4,8 +4,17 @@
    See https://developer.android.com/guide/topics/data/autobackup
 -->
 <full-backup-content>
-    <!-- User-facing app state: UI settings, table layout, scan history. Safe to back up. -->
+    <!-- User-facing app state: UI settings, table layout, scan history. -->
     <include domain="file" path="datastore/settings.preferences_pb"/>
     <include domain="sharedpref" path="."/>
+    <!-- Not carried to another device: capture consent + install_id (CaptureRecorder, "capture")
+         must be given again on new hardware; the Meta SDK's EncryptedSharedPreferences are
+         keyed to this device's Keystore and fail with AEADBadTagException when restored
+         (names from PlayMetaWearableRepository.clearMetaWearableStorageWorkaround). -->
+    <exclude domain="sharedpref" path="capture.xml"/>
+    <exclude domain="sharedpref" path="ManifestRecordStore.xml"/>
+    <exclude domain="sharedpref" path="DeviceRecordStore.xml"/>
+    <exclude domain="sharedpref" path="acdc_manifest_store.xml"/>
+    <exclude domain="sharedpref" path="acdc_device_store.xml"/>
 
 </full-backup-content>

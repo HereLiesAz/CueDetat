@@ -116,8 +116,29 @@ class PlayMetaWearableRepository @Inject constructor(
 
     private val scope = CoroutineScope(Dispatchers.Default)
 
+    /** Guards [starting], [generation], [currentSession] and [currentCamera]. */
+    private val lock = Any()
+
+    /** True from [startStreaming] until the attempt succeeds, fails or is stopped. */
+    private var starting = false
+
+    /**
+     * Bumped by every start and every [stopStreaming]. An attempt whose generation is no
+     * longer current when its session/camera arrives stops what it got instead of storing it,
+     * so a stop issued while CONNECTING cannot leak the late session.
+     */
+    private var generation = 0
+
+    /**
+     * Idempotent while a start is in flight or streaming: a second call during CONNECTING is a
+     * no-op rather than a second session (which overwrote [currentSession] and leaked the first).
+     */
     override fun startStreaming() {
-        if (_isStreaming.value) return
+        val myGeneration = synchronized(lock) {
+            if (_isStreaming.value || starting) return
+            starting = true
+            ++generation
+        }
 
         _connectionStatus.value = MetaConnectionStatus.CONNECTING
         _lastError.value = null
@@ -130,23 +151,43 @@ class PlayMetaWearableRepository @Inject constructor(
                 )
 
                 Wearables.createSession(AutoDeviceSelector()).onSuccess { session ->
-                    currentSession = session
-                    session.start()
+                    val current = synchronized(lock) {
+                        (generation == myGeneration).also { if (it) currentSession = session }
+                    }
+                    if (!current) {
+                        Log.d(tag, "Discarding session from a superseded start")
+                        session.stop()
+                    } else {
+                        session.start()
 
-                    // DAT 1.0: a session adds a Camera, which owns the Stream.
-                    session.addCamera(config).onSuccess { camera ->
-                        currentCamera = camera
-                        val stream = camera.stream
-                        stream.start()
-                        _isStreaming.value = true
-                        _connectionStatus.value = MetaConnectionStatus.STREAMING
-                        observeStream(stream)
-                        Log.d(tag, "Meta stream started successfully")
-                    }.onFailure { error, _ ->
-                        Log.e(tag, "Failed to add camera: $error")
-                        _lastError.value = "Stream error: $error"
-                        _connectionStatus.value = MetaConnectionStatus.ERROR
-                        stopStreaming()
+                        // DAT 1.0: a session adds a Camera, which owns the Stream.
+                        session.addCamera(config).onSuccess { camera ->
+                            val stillCurrent = synchronized(lock) {
+                                (generation == myGeneration).also {
+                                    if (it) {
+                                        currentCamera = camera
+                                        starting = false
+                                    }
+                                }
+                            }
+                            if (!stillCurrent) {
+                                Log.d(tag, "Discarding camera from a superseded start")
+                                camera.stop()
+                                session.stop()
+                            } else {
+                                val stream = camera.stream
+                                stream.start()
+                                _isStreaming.value = true
+                                _connectionStatus.value = MetaConnectionStatus.STREAMING
+                                observeStream(stream)
+                                Log.d(tag, "Meta stream started successfully")
+                            }
+                        }.onFailure { error, _ ->
+                            Log.e(tag, "Failed to add camera: $error")
+                            _lastError.value = "Stream error: $error"
+                            _connectionStatus.value = MetaConnectionStatus.ERROR
+                            stopStreaming()
+                        }
                     }
                 }.onFailure { error, _ ->
                     // No paired/available device is the common case here; surface it
@@ -155,6 +196,7 @@ class PlayMetaWearableRepository @Inject constructor(
                     _lastError.value = "Session error: $error"
                     _connectionStatus.value = MetaConnectionStatus.NO_DEVICE
                     _isStreaming.value = false
+                    synchronized(lock) { if (generation == myGeneration) starting = false }
                 }
             } catch (e: Exception) {
                 Log.e(tag, "Unexpected error in startStreaming", e)
@@ -187,10 +229,16 @@ class PlayMetaWearableRepository @Inject constructor(
         Log.d(tag, "Stopping Meta glasses stream/session")
         sessionJob?.cancel()
         sessionJob = null
-        currentCamera?.stop()
-        currentCamera = null
-        currentSession?.stop()
-        currentSession = null
+        val (camera, session) = synchronized(lock) {
+            generation++
+            starting = false
+            val pair = currentCamera to currentSession
+            currentCamera = null
+            currentSession = null
+            pair
+        }
+        camera?.stop()
+        session?.stop()
         _isStreaming.value = false
         _videoFrame.value = null
         // Preserve a freshly-set failure status; only reset to IDLE on a clean stop.

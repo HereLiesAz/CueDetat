@@ -10,6 +10,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.gson.Gson
 import com.hereliesaz.cuedetat.domain.TableScanModel
+import com.hereliesaz.cuedetat.utils.writeTextAtomically
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
@@ -33,9 +34,9 @@ class TableScanRepository @Inject constructor(
         gson.fromJson(file.readText(), TableScanModel::class.java)
     }.getOrNull()
 
-    /** Saves the model to disk. Call from a background coroutine. */
+    /** Saves the model to disk atomically (temp file, then replace). Call from a background coroutine. */
     fun save(model: TableScanModel) {
-        runCatching { file.writeText(gson.toJson(model)) }
+        runCatching { file.writeTextAtomically(gson.toJson(model)) }
     }
 
     /** Clears the saved model from disk. */
@@ -50,9 +51,9 @@ class TableScanRepository @Inject constructor(
         gson.fromJson<List<com.hereliesaz.cuedetat.domain.FeltSample>>(feltSamplesFile.readText(), type) ?: emptyList()
     }.getOrDefault(emptyList())
 
-    /** Saves the felt samples to disk. */
+    /** Saves the felt samples to disk atomically (temp file, then replace). */
     fun saveFeltSamples(samples: List<com.hereliesaz.cuedetat.domain.FeltSample>) {
-        runCatching { feltSamplesFile.writeText(gson.toJson(samples)) }
+        runCatching { feltSamplesFile.writeTextAtomically(gson.toJson(samples)) }
     }
 
     /**

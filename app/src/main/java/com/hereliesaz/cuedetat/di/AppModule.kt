@@ -43,7 +43,7 @@ object AppModule {
 
     /**
      * Provides the Retrofit interface for GitHub API interactions.
-     * Used for checking updates and submitting automated issue reports.
+     * Used only for the GitHub-channel update check.
      *
      * The only endpoint this client ever calls is the public, unauthenticated
      * `GET /repos/hereliesaz/CueDetat/releases/latest` (see [GithubApi] and

@@ -4,10 +4,6 @@ package com.hereliesaz.cuedetat.update
 
 import android.app.Activity
 
-/**
- * Details of an available update, surfaced to the UI so it can offer a
- * one-tap download + install.
- */
 /** The install channel that owns this application's updates. */
 enum class UpdateSource { GOOGLE_PLAY, GITHUB }
 
@@ -16,8 +12,16 @@ fun updateSourceForInstaller(installerPackageName: String?): UpdateSource =
     if (installerPackageName == "com.android.vending") UpdateSource.GOOGLE_PLAY
     else UpdateSource.GITHUB
 
+/**
+ * Details of an available update, surfaced to the UI (AppUpdateDialog) so it can offer to
+ * open the owning channel. Nothing is downloaded or installed in-app.
+ */
 data class UpdateInfo(
-    /** The release version on GitHub, or Play's available version code. */
+    /**
+     * GitHub: the release tag without its leading "v". Google Play: the available
+     * *version code* as a string (Play's API exposes no version name); the dialog words it
+     * as a "build" accordingly.
+     */
     val versionName: String,
     /** Direct APK download URL, or null for Google Play. */
     val apkUrl: String?,

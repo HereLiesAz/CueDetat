@@ -7,19 +7,23 @@ import retrofit2.http.Path
 /**
  * A data class representing the relevant fields from a GitHub Release API response.
  * `tag_name` carries the version string; `assets` carry the downloadable APK(s)
- * used by the FOSS in-app updater; `html_url` is the release page fallback.
+ * used by the GitHub-channel in-app updater; `html_url` is the release page fallback.
+ *
+ * Every field is nullable: Gson instantiates through Unsafe and ignores Kotlin
+ * nullability and defaults, so a field absent from the JSON arrives as null even when
+ * declared non-null — the declared type has to admit that.
  */
 data class GithubRelease(
-    val tag_name: String,
+    val tag_name: String? = null,
     val name: String? = null,
     val html_url: String? = null,
-    val assets: List<GithubAsset> = emptyList()
+    val assets: List<GithubAsset>? = null
 )
 
 /** A single downloadable file attached to a GitHub release. */
 data class GithubAsset(
-    val name: String,
-    val browser_download_url: String
+    val name: String? = null,
+    val browser_download_url: String? = null
 )
 
 /**

@@ -3,6 +3,7 @@ package com.hereliesaz.cuedetat.data
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.ConnectivityManager
+import android.util.Log
 import com.hereliesaz.cuedetat.BuildConfig
 import android.graphics.Matrix
 import com.google.gson.Gson
@@ -20,7 +21,6 @@ import org.opencv.core.Mat
 import org.opencv.core.MatOfDouble
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
-import java.io.DataOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
@@ -28,6 +28,7 @@ import java.net.URL
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -71,8 +72,13 @@ data class CaptureCamera(
  * URL they stay on the phone. At most [MAX_PENDING] frames wait; capture pauses beyond that.
  * Each install sends a random id so frames group by phone without naming anyone.
  *
+ * Only an `https://` relay URL is used; any other scheme is refused and frames stay on the phone.
+ *
  * [offer] is called from the vision worker on every processed frame and returns at once when
- * capture is off or no frame is due; encoding and disk writes run on a single background thread.
+ * capture is off or no frame is due; encoding and disk writes run on a single background thread
+ * ("capture-writer"), uploads on a separate one ("capture-upload"), so a slow or hanging relay
+ * never blocks capture. Each file is written to a `.tmp` name and renamed, JSON before JPEG, so
+ * the uploader (which lists `*.jpg`) never sees a half-written or unpaired frame.
  */
 @Singleton
 class CaptureRecorder @Inject constructor(
@@ -82,6 +88,10 @@ class CaptureRecorder @Inject constructor(
     private val prefs = context.getSharedPreferences("capture", Context.MODE_PRIVATE)
     private val writer = Executors.newSingleThreadExecutor { r -> Thread(r, "capture-writer") }
     private val writerBusy = AtomicBoolean(false)
+    private val uploader = Executors.newSingleThreadExecutor { r -> Thread(r, "capture-upload") }
+
+    /** True while an upload pass is queued or running; collapses repeated requests into one. */
+    private val uploadQueued = AtomicBoolean(false)
 
     private val _enabled = MutableStateFlow(prefs.getString(KEY_CONSENT, null) == CONSENT_YES)
     /** True only after the user agreed. */
@@ -91,7 +101,8 @@ class CaptureRecorder @Inject constructor(
     /** True until the user has answered the consent dialog once. */
     val needsConsent: StateFlow<Boolean> = _needsConsent.asStateFlow()
 
-    @Volatile private var pending = 0
+    /** Frames on disk awaiting upload. Touched by both the writer and the uploader. */
+    private val pending = AtomicInteger(0)
 
     private val installId: String by lazy {
         prefs.getString(KEY_INSTALL_ID, null) ?: UUID.randomUUID().toString().also {
@@ -107,8 +118,8 @@ class CaptureRecorder @Inject constructor(
 
     init {
         writer.execute {
-            pending = countFrames()
-            if (_enabled.value) uploadPending()
+            pending.set(countFrames())
+            if (_enabled.value) scheduleUpload()
         }
     }
 
@@ -117,7 +128,7 @@ class CaptureRecorder @Inject constructor(
         prefs.edit().putString(KEY_CONSENT, if (on) CONSENT_YES else CONSENT_NO).apply()
         _enabled.value = on
         _needsConsent.value = false
-        if (on) writer.execute { uploadPending() }
+        if (on) scheduleUpload()
     }
 
     /**
@@ -138,7 +149,7 @@ class CaptureRecorder @Inject constructor(
         feltStdDev: FloatArray?,
         camera: CaptureCamera?,
     ) {
-        if (!_enabled.value || pending >= MAX_PENDING) return
+        if (!_enabled.value || pending.get() >= MAX_PENDING) return
         val now = System.currentTimeMillis()
         val o = state.currentOrientation
         val orientation = floatArrayOf(o.yaw, o.pitch, o.roll)
@@ -155,8 +166,8 @@ class CaptureRecorder @Inject constructor(
             writer.execute {
                 try {
                     if (write(copy, rotationDegrees, meta)) {
-                        pending++
-                        uploadPending()
+                        pending.incrementAndGet()
+                        scheduleUpload()
                     } else {
                         lastKeptMs = 0L // blurred: try again on the next steady frame
                     }
@@ -173,20 +184,40 @@ class CaptureRecorder @Inject constructor(
         }
     }
 
+    /** Queues one upload pass on [uploader] unless one is already queued or running. */
+    private fun scheduleUpload() {
+        if (!uploadQueued.compareAndSet(false, true)) return
+        try {
+            uploader.execute {
+                try {
+                    uploadPending()
+                } finally {
+                    uploadQueued.set(false)
+                }
+            }
+        } catch (_: Exception) {
+            uploadQueued.set(false)
+        }
+    }
+
     /**
      * Sends waiting frames to the relay, oldest first, deleting each once accepted. Stops at the
-     * first failure (the next kept frame retries). Runs on [writer].
+     * first failure (the next kept frame retries). Runs on [uploader], never on [writer].
      */
     private fun uploadPending() {
         val relay = BuildConfig.CAPTURE_RELAY_URL
         if (relay.isBlank() || !_enabled.value || !unmetered()) return
+        if (!relay.startsWith("https://", ignoreCase = true)) {
+            Log.w(TAG, "Capture relay URL is not https; not uploading")
+            return
+        }
         val images = dir.listFiles { f -> f.name.endsWith(".jpg") }?.sortedBy { it.name }.orEmpty()
         for (jpg in images.take(UPLOADS_PER_PASS)) {
             val json = File(dir, jpg.nameWithoutExtension + ".json")
             if (!json.exists()) { jpg.delete(); continue }
             if (!post(relay, jpg, json)) return
             jpg.delete(); json.delete()
-            pending = (pending - 1).coerceAtLeast(0)
+            pending.updateAndGet { (it - 1).coerceAtLeast(0) }
         }
     }
 
@@ -195,10 +226,27 @@ class CaptureRecorder @Inject constructor(
         cm.activeNetwork != null && !cm.isActiveNetworkMetered
     }.getOrDefault(false)
 
-    /** multipart/form-data POST of one pair to `<relay>/upload`; true on 2xx. */
+    /**
+     * multipart/form-data POST of one pair to `<relay>/upload`; true on 2xx. The body length is
+     * computed up front and sent with fixed-length streaming, so HttpURLConnection streams the
+     * files instead of buffering the whole body in memory.
+     */
     private fun post(relay: String, jpg: File, json: File): Boolean = runCatching {
         val boundary = "cuedetat" + UUID.randomUUID().toString().replace("-", "")
-        val conn = (URL(relay.trimEnd('/') + "/upload").openConnection() as HttpURLConnection).apply {
+        fun header(name: String, file: File, type: String): ByteArray =
+            ("--$boundary\r\n" +
+                "Content-Disposition: form-data; name=\"$name\"; filename=\"${file.name}\"\r\n" +
+                "Content-Type: $type\r\n\r\n").toByteArray(Charsets.US_ASCII)
+        val crlf = "\r\n".toByteArray(Charsets.US_ASCII)
+        val imageHeader = header("image", jpg, "image/jpeg")
+        val metaHeader = header("meta", json, "application/json")
+        val closing = "--$boundary--\r\n".toByteArray(Charsets.US_ASCII)
+        val contentLength = imageHeader.size + jpg.length() + crlf.size +
+            metaHeader.size + json.length() + crlf.size + closing.size
+
+        val url = URL(relay.trimEnd('/') + "/upload")
+        require(url.protocol.equals("https", ignoreCase = true)) { "relay must be https" }
+        val conn = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             doOutput = true
             connectTimeout = 15_000
@@ -206,19 +254,13 @@ class CaptureRecorder @Inject constructor(
             setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
             setRequestProperty("X-Install-Id", installId)
             setRequestProperty("X-App-Version", BuildConfig.VERSION_NAME)
+            setFixedLengthStreamingMode(contentLength)
         }
         try {
-            DataOutputStream(conn.outputStream).use { out ->
-                fun part(name: String, file: File, type: String) {
-                    out.writeBytes("--$boundary\r\n")
-                    out.writeBytes("Content-Disposition: form-data; name=\"$name\"; filename=\"${file.name}\"\r\n")
-                    out.writeBytes("Content-Type: $type\r\n\r\n")
-                    file.inputStream().use { it.copyTo(out) }
-                    out.writeBytes("\r\n")
-                }
-                part("image", jpg, "image/jpeg")
-                part("meta", json, "application/json")
-                out.writeBytes("--$boundary--\r\n")
+            conn.outputStream.buffered().use { out ->
+                out.write(imageHeader); jpg.inputStream().use { it.copyTo(out) }; out.write(crlf)
+                out.write(metaHeader); json.inputStream().use { it.copyTo(out) }; out.write(crlf)
+                out.write(closing)
             }
             conn.responseCode in 200..299
         } finally {
@@ -324,15 +366,24 @@ class CaptureRecorder @Inject constructor(
             if (!CaptureSampler.sharpEnough(variance)) return false
 
             dir.mkdirs()
+            // JSON first, JPEG last, each via tmp + rename: the uploader keys on `*.jpg`, so a
+            // visible JPEG always has its complete JSON beside it.
+            val jsonFile = File(dir, "${meta["id"]}.json")
+            val jsonTmp = File(dir, "${meta["id"]}.json.tmp")
+            jsonTmp.writeText(gson.toJson(meta + ("sharpness" to variance)))
+            if (!jsonTmp.renameTo(jsonFile)) { jsonTmp.delete(); return false }
+
             Imgproc.cvtColor(upright, upright, Imgproc.COLOR_BGR2RGBA)
             val bmp = Bitmap.createBitmap(upright.cols(), upright.rows(), Bitmap.Config.ARGB_8888)
+            val jpgFile = File(dir, meta["image"] as String)
+            val jpgTmp = File(dir, "${meta["image"]}.tmp")
             try {
                 Utils.matToBitmap(upright, bmp)
-                FileOutputStream(File(dir, meta["image"] as String)).use { bmp.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
+                FileOutputStream(jpgTmp).use { bmp.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
             } finally {
                 bmp.recycle()
             }
-            File(dir, "${meta["id"]}.json").writeText(gson.toJson(meta + ("sharpness" to variance)))
+            if (!jpgTmp.renameTo(jpgFile)) { jpgTmp.delete(); jsonFile.delete(); return false }
             return true
         } finally {
             upright.release(); gray.release(); small.release(); lap.release(); mean.release(); sd.release()
@@ -342,6 +393,7 @@ class CaptureRecorder @Inject constructor(
     private fun idOf(ms: Long) = "cap_$ms"
 
     private companion object {
+        const val TAG = "CaptureRecorder"
         const val KEY_CONSENT = "consent"
         const val KEY_INSTALL_ID = "install_id"
         const val CONSENT_YES = "yes"
