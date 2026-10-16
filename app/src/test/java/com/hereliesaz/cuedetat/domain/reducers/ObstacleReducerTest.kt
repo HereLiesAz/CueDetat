@@ -6,6 +6,7 @@ import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.domain.ReducerUtils
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import kotlin.random.Random
 import org.junit.Test
@@ -27,23 +28,13 @@ class ObstacleReducerTest {
         reduceObstacleAction(state, MainScreenEvent.AddObstacleBall, utils, noRandom)
 
     @Test
-    fun `with no table and no detections the first obstacle goes to the top-left grid slot`() {
-        val r = CueDetatState().protractorUnit.radius
-        val out = add(CueDetatState())
-        assertEquals(1, out.obstacleBalls.size)
-        assertEquals(-3f * r, out.obstacleBalls[0].center.x, 1e-4f)
-        assertEquals(-6f * r, out.obstacleBalls[0].center.y, 1e-4f)
-    }
-
-    @Test
     fun `grid slots cycle through four quadrants`() {
-        var s = CueDetatState()
-        repeat(4) { s = add(s) }
-        val r = s.protractorUnit.radius
-        val xs = s.obstacleBalls.map { it.center.x }
-        val ys = s.obstacleBalls.map { it.center.y }
-        assertEquals(listOf(-3f * r, 3f * r, -3f * r, 3f * r), xs)
-        assertEquals(listOf(-6f * r, -6f * r, 6f * r, 6f * r), ys)
+        val r = 10f
+        val slots = (0..3).map { gridSlotOffset(it, r) }
+        assertEquals(listOf(-30f, 30f, -30f, 30f), slots.map { it.first })
+        assertEquals(listOf(-60f, -60f, 60f, 60f), slots.map { it.second })
+        // The fifth obstacle wraps back to the first slot.
+        assertEquals(gridSlotOffset(0, r), gridSlotOffset(4, r))
     }
 
     @Test
@@ -57,11 +48,15 @@ class ObstacleReducerTest {
 
     @Test
     fun `a detected ball under an existing virtual ball is skipped`() {
-        // Protractor unit sits at the origin: a detection on top of it is already claimed.
+        // The detection coincides with the protractor unit's centre, so it is already claimed and
+        // must not be reused; placement falls through to the grid. PointF(x, y) is stubbed to zeros
+        // in JVM unit tests, so assert on identity rather than coordinates.
+        val unit = CueDetatState().protractorUnit
+        val claimed = pf(unit.center.x, unit.center.y)
         @Suppress("DEPRECATION")
-        val state = CueDetatState(visionData = VisionData(genericBalls = listOf(pf(0f, 0f))))
-        val r = state.protractorUnit.radius
+        val state = CueDetatState(visionData = VisionData(genericBalls = listOf(claimed)))
         val out = add(state)
-        assertEquals(-3f * r, out.obstacleBalls.single().center.x, 1e-4f)
+        assertEquals(1, out.obstacleBalls.size)
+        assertNotSame(claimed, out.obstacleBalls.single().center)
     }
 }
