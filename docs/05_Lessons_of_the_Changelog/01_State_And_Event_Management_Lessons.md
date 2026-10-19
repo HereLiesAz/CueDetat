@@ -39,7 +39,7 @@ serving as a guide to avoid repeating past mistakes.
   visual inconsistencies.
 * **Cause:** An incorrect assumption that a Compose `MaterialTheme` would automatically apply its
   properties to a classic `AndroidView`. A redundant `isForceLightMode` flag was added to a
-  different state object.
+  different state object (since deleted: nothing ever set it).
 * **Lesson Learned:** An `AndroidView` within a Compose hierarchy does not automatically obey
   Compose theming. All necessary state, including theme-defining flags, must be passed down from the
   single source of truth (`CueDetatState`) and applied within the `AndroidView`'s update logic (in

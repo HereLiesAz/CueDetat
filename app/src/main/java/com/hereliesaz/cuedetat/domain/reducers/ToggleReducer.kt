@@ -29,10 +29,6 @@ internal fun reduceToggleAction(
             reducerUtils.snapViolatingBalls(newState)
         }
         is MainScreenEvent.ToggleTableSizeDialog -> state.copy(showTableSizeDialog = !state.showTableSizeDialog)
-        is MainScreenEvent.ToggleForceTheme -> {
-            val newMode = when (state.isForceLightMode) { null -> true; true -> false; false -> null }
-            state.copy(isForceLightMode = newMode, valuesChangedSinceReset = true)
-        }
         is MainScreenEvent.CycleCameraMode -> when (state.cameraMode) {
             CameraMode.OFF -> state.copy(
                 cameraMode = CameraMode.AR_SETUP,
@@ -44,7 +40,7 @@ internal fun reduceToggleAction(
                 isArTableLocked = false
             )
             CameraMode.AR_ACTIVE -> state.copy(cameraMode = CameraMode.LITE_AR, isArTableLocked = false)
-            else -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false, isArTableLocked = false, ballSelectionPhase = com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE)
+            else -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false, isArTableLocked = false, isAutoCalibrating = false, ballSelectionPhase = com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE)
         }
         is MainScreenEvent.StartArTracking -> {
             val phase = if (state.experienceMode == ExperienceMode.EXPERT) {
@@ -58,7 +54,7 @@ internal fun reduceToggleAction(
             )
         }
         is MainScreenEvent.CancelArSetup -> state.copy(cameraMode = CameraMode.CAMERA_ONLY, showTableScanScreen = false, isArTableLocked = false)
-        is MainScreenEvent.TurnCameraOff -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false, isArTableLocked = false, ballSelectionPhase = com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE)
+        is MainScreenEvent.TurnCameraOff -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false, isArTableLocked = false, isAutoCalibrating = false, ballSelectionPhase = com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE)
         is MainScreenEvent.SetCameraMode -> state.copy(cameraMode = action.mode)
         is MainScreenEvent.ToggleTargetType -> {
             val nextType = if (state.targetType == com.hereliesaz.cuedetat.domain.TargetType.SOLIDS) {
@@ -75,7 +71,6 @@ internal fun reduceToggleAction(
         is MainScreenEvent.ToggleGlowStickDialog -> state.copy(showGlowStickDialog = !state.showGlowStickDialog)
         is MainScreenEvent.ToggleHelp -> state.copy(areHelpersVisible = !state.areHelpersVisible)
         is MainScreenEvent.ToggleSnapping -> state.copy(isSnappingEnabled = !state.isSnappingEnabled)
-        is MainScreenEvent.ToggleCvModel -> state.copy(useCustomModel = !state.useCustomModel)
         is MainScreenEvent.ToggleOrientationLock -> {
             val current = state.pendingOrientationLock ?: state.orientationLock
             state.copy(pendingOrientationLock = current.next())
@@ -146,9 +141,26 @@ internal fun reduceToggleAction(
             worldRotationDegrees = 0f,
             userRotationDegrees = 0f
         )
-        is MainScreenEvent.ToggleCalibrationScreen -> state.copy(showCalibrationScreen = !state.showCalibrationScreen)
-        is MainScreenEvent.ToggleTableScanScreen ->
-            state.copy(showTableScanScreen = !state.showTableScanScreen)
+        // Closing the scan overlay only hides it. Opening it from an AR mode is a rescan and
+        // starts from the same blank slate CycleCameraMode gives OFF -> AR_SETUP: with the old
+        // scan, locked colour and table lock left in place, CvReducer would auto-advance
+        // AR_SETUP back to AR_ACTIVE while the overlay was still capturing felt.
+        is MainScreenEvent.ToggleTableScanScreen -> when {
+            state.showTableScanScreen -> state.copy(showTableScanScreen = false)
+            state.cameraMode == CameraMode.AR_SETUP || state.cameraMode == CameraMode.AR_ACTIVE ->
+                state.copy(
+                    cameraMode = CameraMode.AR_SETUP,
+                    showTableScanScreen = true,
+                    lockedHsvColor = null,
+                    lockedHsvStdDev = null,
+                    tableScanModel = null,
+                    lensWarpTps = null,
+                    isArTableLocked = false,
+                    arConfidenceHistory = emptyList(),
+                    arLowConfidenceFrameCount = 0
+                )
+            else -> state.copy(showTableScanScreen = true)
+        }
 
         is MainScreenEvent.ExitToSplash -> state.copy(experienceMode = null)
         is MainScreenEvent.ToggleTopDownView -> state.copy(isTopDownViewActive = !state.isTopDownViewActive)

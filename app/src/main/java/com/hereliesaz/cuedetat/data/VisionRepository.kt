@@ -25,7 +25,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.opencv.geometry.Geometry
 import org.opencv.core.Core
 import org.opencv.core.Mat
-import org.opencv.core.MatOfDouble
 import org.opencv.core.MatOfPoint
 import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Scalar
@@ -84,20 +83,8 @@ class VisionRepository @Inject constructor(
     private val reusableRotatedMat = Mat()
     private val rotatedMatLock = Any()
 
-    /**
-     * Maps a view point to a pixel of an upright image the preview shows centre-cropped
-     * (FILL_CENTER): the inverse of [CameraViewMapping.fillCenter] with rotation 0, the same
-     * mapping used for balls and the table fit.
-     */
-    private fun viewToUpright(imageW: Int, imageH: Int, viewW: Int, viewH: Int, x: Float, y: Float): Pair<Float, Float> {
-        val m = CameraViewMapping.fillCenter(imageW, imageH, 0, viewW, viewH)
-        // Rotation 0: m = [s 0 tx; 0 s ty].
-        return Pair((x - m[2]) / m[0], (y - m[5]) / m[4])
-    }
     private val reusableFullHsvMat = Mat()
     private val reusableHsvMat = Mat()
-    private val reusableMean = MatOfDouble()
-    private val reusableStdDev = MatOfDouble()
 
     private val reusableMorphKernel by lazy {
         Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
@@ -250,45 +237,11 @@ class VisionRepository @Inject constructor(
             Imgproc.cvtColor(matToUse, reusableHsvMat, Imgproc.COLOR_BGR2HSV)
             val hsvMat = reusableHsvMat
 
-            val hsvTuple = state.colorSamplePoint?.let {
-                // The preview shows this upright frame centre-cropped, so undo the crop, not
-                // just the scale (the same mapping maybeFitTable uses below).
-                val (ix, iy) = viewToUpright(hsvMat.cols(), hsvMat.rows(), state.viewWidth, state.viewHeight, it.x, it.y)
-                val imageX = ix.toInt()
-                val imageY = iy.toInt()
-
-                val patchSize = 5
-                // Coerce both axes — the original code only clamped X, so a sample
-                // point near the bottom of the frame could send submat() out of bounds.
-                val maxX = (hsvMat.cols() - patchSize).coerceAtLeast(0)
-                val maxY = (hsvMat.rows() - patchSize).coerceAtLeast(0)
-                val roiX = (imageX - patchSize / 2).coerceIn(0, maxX)
-                val roiY = (imageY - patchSize / 2).coerceIn(0, maxY)
-                val roi = OCVRect(roiX, roiY, patchSize, patchSize)
-
-                val sampleRegion = hsvMat.submat(roi)
-                Core.meanStdDev(sampleRegion, reusableMean, reusableStdDev)
-
-                val meanArray = floatArrayOf(
-                    reusableMean.get(0, 0)[0].toFloat(),
-                    reusableMean.get(1, 0)[0].toFloat(),
-                    reusableMean.get(2, 0)[0].toFloat()
-                )
-                val stddevArray = floatArrayOf(
-                    reusableStdDev.get(0, 0)[0].toFloat(),
-                    reusableStdDev.get(1, 0)[0].toFloat(),
-                    reusableStdDev.get(2, 0)[0].toFloat()
-                )
-
-                sampleRegion.release()
-                Pair(meanArray, stddevArray)
-            }
-
-            val autoFelt = if (state.lockedHsvColor == null && hsvTuple == null) {
+            val autoFelt = if (state.lockedHsvColor == null) {
                 feltColorDetector.detect(hsvMat)?.also { lastFeltDetection = it }
             } else null
 
-            val hsv = state.lockedHsvColor ?: hsvTuple?.first ?: autoFelt?.hsv ?: run {
+            val hsv = state.lockedHsvColor ?: autoFelt?.hsv ?: run {
                 val roiWidth = 50
                 val roiHeight = 50
                 val roiX = (hsvMat.cols() - roiWidth) / 2
@@ -352,7 +305,7 @@ class VisionRepository @Inject constructor(
             val balls = detectBallsInFrame(fullMat, frameToView, state, autoFelt)
             captureRecorder.offer(
                 fullMat, rotationDegrees, frameToView, state, balls,
-                feltHsv = hsv, feltStdDev = state.lockedHsvStdDev ?: autoFelt?.stdDev ?: hsvTuple?.second,
+                feltHsv = hsv, feltStdDev = state.lockedHsvStdDev ?: autoFelt?.stdDev,
                 camera = null,
             )
 
@@ -368,7 +321,7 @@ class VisionRepository @Inject constructor(
                 // screen otherwise), which the snap/obstacle/gesture reducers compare against.
                 genericBalls = balls.map { it.position },
                 balls = balls,
-                detectedHsvColor = hsvTuple?.first ?: hsv,
+                detectedHsvColor = hsv,
                 detectedBoundingBoxes = balls.mapNotNull { it.boundingBox },
                 // detectedCues intentionally left at its default (empty): there is no
                 // trained cue-detecting head — see the note above where rawDetections

@@ -10,9 +10,8 @@ This document specifies the application's visual identity.
 
 ## Theme Toggle
 
-* A menu option must exist to toggle between dark, light, and system-default themes.
-* The `isForceLightMode: Boolean?` property in `CueDetatState` controls this: `true` for light,
-  `false` for dark, `null` for system.
+* Not implemented. A force-light/dark toggle (`isForceLightMode` and `ToggleForceTheme`) existed
+  with no UI entry point and was deleted; the app follows the system theme.
 
 ## Glow Effect
 

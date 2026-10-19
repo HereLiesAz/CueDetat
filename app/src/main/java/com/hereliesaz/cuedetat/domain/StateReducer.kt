@@ -64,8 +64,6 @@ fun stateReducer(
         // Handled by [AdvancedOptionsReducer].
         // Covers CV tuning (thresholds), Debug Masks, and hidden developer toggles.
         is MainScreenEvent.ToggleAdvancedOptionsDialog, is MainScreenEvent.ToggleCvMask,
-        is MainScreenEvent.EnterCvMaskTestMode, is MainScreenEvent.ExitCvMaskTestMode,
-        is MainScreenEvent.StartCalibrationMode, is MainScreenEvent.SampleColorAt,
         is MainScreenEvent.UpdateCannyT1, is MainScreenEvent.UpdateCannyT2 ->
             reduceAdvancedOptionsAction(currentState, action)
 
@@ -79,7 +77,7 @@ fun stateReducer(
         is MainScreenEvent.SetTableZ,
         is MainScreenEvent.ApplyQuickAlign,
         is MainScreenEvent.LoadTableScan, is MainScreenEvent.ClearTableScan,
-        is MainScreenEvent.UpdateArPose, is MainScreenEvent.UpdateTableScanClusters,
+        is MainScreenEvent.UpdateArPose,
         is MainScreenEvent.DepthPlaneUpdated, is MainScreenEvent.ArCameraPoseUpdated,
         is MainScreenEvent.DepthCapabilityDetected, is MainScreenEvent.ArTrackingLost,
         is MainScreenEvent.ArTableMatrixUpdated, is MainScreenEvent.LockArTable,
@@ -93,10 +91,9 @@ fun stateReducer(
         // --- COMPUTER VISION DATA ---
         // Handled by [CvReducer].
         // Covers updates flowing in from the VisionRepository and color locking interactions.
-        is MainScreenEvent.CvDataUpdated, is MainScreenEvent.LockOrUnlockColor,
-        is MainScreenEvent.LockColor, is MainScreenEvent.ClearSamplePoint,
+        is MainScreenEvent.CvDataUpdated, is MainScreenEvent.LockColor,
         is MainScreenEvent.AddFeltSample, is MainScreenEvent.DeleteFeltSamples,
-        is MainScreenEvent.MoveFeltSample, is MainScreenEvent.AutoCalibrateCv,
+        is MainScreenEvent.AutoCalibrateCv,
         is MainScreenEvent.ForceArActive, is MainScreenEvent.SeedRelocaliser,
         is MainScreenEvent.ArSurfaceTapped ->
             reduceCvAction(currentState, action)
@@ -133,16 +130,15 @@ fun stateReducer(
         // Handled by [ToggleReducer].
         // Simple boolean flips for showing/hiding dialogs and menus.
         is MainScreenEvent.CycleTableSize, is MainScreenEvent.SetTableSize,
-        is MainScreenEvent.ToggleTableSizeDialog, is MainScreenEvent.ToggleForceTheme,
+        is MainScreenEvent.ToggleTableSizeDialog,
         is MainScreenEvent.CycleCameraMode, is MainScreenEvent.ToggleDistanceUnit,
         is MainScreenEvent.ToggleLuminanceDialog, is MainScreenEvent.ToggleGlowStickDialog,
-        is MainScreenEvent.ToggleCvModel, is MainScreenEvent.ToggleSnapping,
+        is MainScreenEvent.ToggleSnapping,
         is MainScreenEvent.ToggleHelp,
         is MainScreenEvent.ToggleOrientationLock, is MainScreenEvent.ApplyPendingOrientationLock,
         is MainScreenEvent.ApplyPendingExperienceMode,
         is MainScreenEvent.SetExperienceMode,
         is MainScreenEvent.UnlockBeginnerView, is MainScreenEvent.LockBeginnerView,
-        is MainScreenEvent.ToggleCalibrationScreen,
         is MainScreenEvent.ExitToSplash,
         is MainScreenEvent.ToggleBankingMode, is MainScreenEvent.ToggleTableScanScreen,
         is MainScreenEvent.CancelArSetup,

@@ -181,21 +181,6 @@ class MainActivity : ComponentActivity() {
                     openUrlSafely(event.url)
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
-                is SingleEvent.SendFeedbackEmail -> {
-                    val intent = Intent(Intent.ACTION_SENDTO).apply {
-                        data = Uri.parse("mailto:")
-                        putExtra(Intent.EXTRA_EMAIL, arrayOf(event.email))
-                        putExtra(Intent.EXTRA_SUBJECT, event.subject)
-                    }
-                    // No resolveActivity() pre-check: under package visibility it returns null
-                    // unless <queries> lists the intent, which silently swallowed the tap.
-                    try {
-                        startActivity(intent)
-                    } catch (e: ActivityNotFoundException) {
-                        Toast.makeText(this, "No email app installed.", Toast.LENGTH_SHORT).show()
-                    }
-                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
-                }
                 is SingleEvent.InitiateHaterMode -> {
                     haterViewModel.onEvent(HaterEvent.EnterHaterMode)
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)

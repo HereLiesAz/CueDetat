@@ -168,6 +168,10 @@ fun AzNavRailMenu(
     val rail_training_data_onText = stringResource(R.string.rail_training_data_on)
     val rail_training_data_offText = stringResource(R.string.rail_training_data_off)
     val rail_advancedText = stringResource(R.string.rail_advanced)
+    val rail_snapping_onText = stringResource(R.string.rail_snapping_on)
+    val rail_snapping_offText = stringResource(R.string.rail_snapping_off)
+    val rail_scan_tableText = stringResource(R.string.rail_scan_table)
+    val rail_forget_scanText = stringResource(R.string.rail_forget_scan)
     val rail_debug_log_onText = stringResource(R.string.rail_debug_log_on)
     val rail_debug_log_offText = stringResource(R.string.rail_debug_log_off)
     val rail_share_debug_logText = stringResource(R.string.rail_share_debug_log)
@@ -337,6 +341,24 @@ fun AzNavRailMenu(
                 )
             }
 
+            // Rescan: only while an AR camera mode is on, and not while the scan overlay is
+            // already up (the tap would just close it). ToggleReducer resets the old scan.
+            if (uiState.cameraMode == CameraMode.AR_SETUP || uiState.cameraMode == CameraMode.AR_ACTIVE) {
+                if (!uiState.showTableScanScreen) {
+                    azRailItemLowerCase(
+                        id = "ar_scan_table", text = rail_scan_tableText,
+                        fillColor = b10B, onClick = { onEvent(MainScreenEvent.ToggleTableScanScreen) },
+                    )
+                }
+            }
+            // Forget scan: drops the held table model (and the saved copy), only if one exists.
+            if (uiState.tableScanModel != null) {
+                azRailItemLowerCase(
+                    id = "ar_scan_forget", text = rail_forget_scanText,
+                    fillColor = b11R, onClick = { onEvent(MainScreenEvent.ClearTableScan) },
+                )
+            }
+
             // AR: starts the camera (felt capture, then AR tracking); "off" turns it straight off.
             val isCameraOn = uiState.cameraMode != CameraMode.OFF
             azRailToggle(
@@ -434,6 +456,7 @@ fun AzNavRailMenu(
         }
 
         azMenuItem(id = "orientation", text = rail_orientationText, fillColor = b15M, onClick = { onEvent(MainScreenEvent.ToggleOrientationLock) })
+        azMenuItem(id = "snapping", text = if (uiState.isSnappingEnabled) rail_snapping_onText else rail_snapping_offText, fillColor = b14G, onClick = { onEvent(MainScreenEvent.ToggleSnapping) })
         // Training capture (CaptureRecorder): the setting the consent dialog points to.
         azMenuItem(id = "training_data", text = if (captureEnabled) rail_training_data_onText else rail_training_data_offText, fillColor = b10B, onClick = onToggleCapture)
 

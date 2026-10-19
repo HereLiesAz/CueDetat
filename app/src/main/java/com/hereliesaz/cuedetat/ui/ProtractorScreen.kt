@@ -149,7 +149,6 @@ fun ProtractorScreen(
                 ProtractorOverlay(
                     uiState = uiState,
                     systemIsDark = systemIsDark,
-                    isTestingCvMask = uiState.isTestingCvMask,
                     onEvent = mainViewModel::onEvent,
                     topDownProgress = topDownProgress
                 )
