@@ -18,35 +18,18 @@ internal fun reduceAdvancedOptionsAction(state: CueDetatState, action: MainScree
     return when (action) {
         // Toggle the visibility of the deep configuration dialog.
         is MainScreenEvent.ToggleAdvancedOptionsDialog -> {
-            state.copy(showAdvancedOptionsDialog = !state.showAdvancedOptionsDialog)
+            // Closing the dialog also stops a running auto-tune: the loop must not keep
+            // lowering thresholds behind a dialog the user has dismissed.
+            state.copy(
+                showAdvancedOptionsDialog = !state.showAdvancedOptionsDialog,
+                isAutoCalibrating = if (state.showAdvancedOptionsDialog) false else state.isAutoCalibrating
+            )
         }
 
         // Enable/Disable the CV mask overlay (seeing the world as the AI does).
         is MainScreenEvent.ToggleCvMask -> {
             state.copy(showCvMask = !state.showCvMask)
         }
-
-        // Entering the void where only contours and thresholded pixels exist.
-        is MainScreenEvent.EnterCvMaskTestMode -> {
-            state.copy(isTestingCvMask = true)
-        }
-
-        is MainScreenEvent.ExitCvMaskTestMode -> {
-            state.copy(isTestingCvMask = false)
-        }
-
-        // The 'Felt Sacrifice' phase: defining the color of the table.
-        is MainScreenEvent.StartCalibrationMode -> state.copy(showCalibrationScreen = true, showAdvancedOptionsDialog = false)
-
-        is MainScreenEvent.SampleColorAt -> {
-            state.copy(
-                colorSamplePoint = action.screenPosition,
-                // Exit calibration mode once the sacrifice is made.
-                isCalibratingColor = false
-            )
-        }
-
-
 
         is MainScreenEvent.UpdateCannyT1 -> {
             state.copy(cannyThreshold1 = action.value)

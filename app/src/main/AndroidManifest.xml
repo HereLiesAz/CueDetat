@@ -21,14 +21,10 @@
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
 
-    <!-- Package visibility (API 30+): the feedback email (ACTION_SENDTO mailto:) and outbound
-         links (ACTION_VIEW https) target other apps. MainActivity also catches
-         ActivityNotFoundException rather than pre-checking resolveActivity(). -->
+    <!-- Package visibility (API 30+): outbound links (ACTION_VIEW https) target other apps.
+         MainActivity also catches ActivityNotFoundException rather than pre-checking
+         resolveActivity(). -->
     <queries>
-        <intent>
-            <action android:name="android.intent.action.SENDTO" />
-            <data android:scheme="mailto" />
-        </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />

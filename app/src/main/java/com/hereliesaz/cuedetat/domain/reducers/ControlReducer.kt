@@ -105,13 +105,6 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             )
         }
 
-        is MainScreenEvent.UpdateTableScanClusters -> {
-            val current = state.tableScanModel ?: return state
-            state.copy(
-                tableScanModel = current.copy(pockets = action.updatedClusters)
-            )
-        }
-
         is MainScreenEvent.DepthPlaneUpdated ->
             state.copy(depthPlane = action.plane)
 

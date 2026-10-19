@@ -109,7 +109,6 @@ data class CueDetatState(
     @Transient val bankShotPath: List<PointF>? = null,
     @Transient val pocketedBankShotPocketIndex: Int? = null,
     val showTableSizeDialog: Boolean = false,
-    val isForceLightMode: Boolean? = null,
     val luminanceAdjustment: Float = 0f,
     val showLuminanceDialog: Boolean = false,
     val glowStickValue: Float = 0f,
@@ -183,9 +182,7 @@ data class CueDetatState(
     val lockedHsvColor: FloatArray? = null,
     val lockedHsvStdDev: FloatArray? = null,
     val showAdvancedOptionsDialog: Boolean = false,
-    val showCalibrationScreen: Boolean = false,
     val showTableScanScreen: Boolean = false,
-    val useCustomModel: Boolean = false,
     val isSnappingEnabled: Boolean = true,
     val hasTargetBallBeenMoved: Boolean = false,
     val hasCueBallBeenMoved: Boolean = false,
@@ -193,9 +190,6 @@ data class CueDetatState(
     val cannyThreshold2: Float = 120f,
     val isAutoCalibrating: Boolean = false,
     val showCvMask: Boolean = false,
-    val isTestingCvMask: Boolean = false,
-    val isCalibratingColor: Boolean = false,
-    val colorSamplePoint: Offset? = null,
     /**
      * Lens intrinsics for distortion correction. KNOWN GAP (not implemented, see BACKLOG.md):
      * nothing assigns [cameraMatrix] or [distCoeffs] (grep `cameraMatrix =` finds no writer), so
@@ -249,7 +243,7 @@ data class CueDetatState(
     // exactly once in comparableFields() below. Nothing enforces this -- it is
     // maintained by hand -- and a field that is added here but forgotten there
     // is compared by neither equals() nor hashCode(), which silently defeats
-    // StateFlow conflation for that field alone. Verified in sync at 125/125 (recounted by
+    // StateFlow conflation for that field alone. Verified in sync at 119/119 (recounted by
     // script over constructor vs list) as of this change.
     //
     // The list exists because three fields are FloatArray? (relocaliserDeltaQ,
@@ -269,7 +263,7 @@ data class CueDetatState(
         worldRotationDegrees, userRotationDegrees, areHelpersVisible, valuesChangedSinceReset, cameraMode, viewOffset,
         tableZOffset, orientationLock, pendingOrientationLock, isBeginnerViewLocked, isBankingMode,
         bankingAimTarget, bankShotPath, pocketedBankShotPocketIndex, showTableSizeDialog,
-        isForceLightMode, luminanceAdjustment, showLuminanceDialog, glowStickValue, showGlowStickDialog,
+        luminanceAdjustment, showLuminanceDialog, glowStickValue, showGlowStickDialog,
         isSpinControlVisible, isMasseModeActive, masseShotAngleDeg, selectedSpinOffset, spinPaths,
         masseImpactPoints, masseConnectsTarget, masseGhostBallCenter, spinControlCenter,
         lingeringSpinOffset, spinPathsAlpha, currentOrientation, compassRefYaw, isViewLocked, pitchMatrix, railPitchMatrix,
@@ -278,10 +272,10 @@ data class CueDetatState(
         relocaliserAttemptFrames, snapCandidates, tableScanModel, depthPlane, arDerivedPitch,
         arMeasuredHeightM, arTableMatrix, isArTableLocked, tableFit, depthCapability, arModuleState, arModuleError,
         lockedHsvColor?.toList(), lockedHsvStdDev?.toList(), showAdvancedOptionsDialog,
-        showCalibrationScreen, showTableScanScreen,
-        useCustomModel, isSnappingEnabled, hasTargetBallBeenMoved, hasCueBallBeenMoved,
-        cannyThreshold1, cannyThreshold2, isAutoCalibrating, showCvMask, isTestingCvMask,
-        isCalibratingColor, colorSamplePoint, cameraMatrix, distCoeffs, shotLineAnchor,
+        showTableScanScreen,
+        isSnappingEnabled, hasTargetBallBeenMoved, hasCueBallBeenMoved,
+        cannyThreshold1, cannyThreshold2, isAutoCalibrating, showCvMask,
+        cameraMatrix, distCoeffs, shotLineAnchor,
         tangentDirection, isGeometricallyImpossible, isStraightShot, isObstructed, isTiltBeyondLimit,
         warningText, shotGuideImpactPoint, aimedPocketIndex, aimingLineBankPath, tangentLineBankPath,
         inactiveTangentLineBankPath, tangentAimedPocketIndex, aimingLineEndPoint, appControlColorScheme,
@@ -351,7 +345,6 @@ sealed class MainScreenEvent {
     object CycleTableSize : MainScreenEvent()
     data class SetTableSize(val size: TableSize) : MainScreenEvent()
     object ToggleTableSizeDialog : MainScreenEvent()
-    object ToggleForceTheme : MainScreenEvent()
     object CycleCameraMode : MainScreenEvent()
     data class SetCameraMode(val mode: CameraMode) : MainScreenEvent()
     object ToggleLuminanceDialog : MainScreenEvent()
@@ -368,16 +361,12 @@ sealed class MainScreenEvent {
     object AddObstacleBall : MainScreenEvent()
     data class CvDataUpdated(val visionData: VisionData) : MainScreenEvent()
     object AutoCalibrateCv : MainScreenEvent()
-    object LockOrUnlockColor : MainScreenEvent()
     data class LockColor(val hsvMean: FloatArray, val hsvStdDev: FloatArray) : MainScreenEvent()
     data class AddFeltSample(val hsv: List<Float>) : MainScreenEvent()
     data class DeleteFeltSamples(val ids: Set<String>) : MainScreenEvent()
-    data class MoveFeltSample(val fromIndex: Int, val toIndex: Int) : MainScreenEvent()
     object StartArTracking : MainScreenEvent()
-    object ClearSamplePoint : MainScreenEvent()
     object ToggleAdvancedOptionsDialog : MainScreenEvent()
     object ToggleSupportSheet : MainScreenEvent()
-    object ToggleCalibrationScreen : MainScreenEvent()
     data class ApplyQuickAlign(
         val translation: Offset,
         val rotation: Float,
@@ -387,17 +376,9 @@ sealed class MainScreenEvent {
 
     data class UpdateCannyT1(val value: Float) : MainScreenEvent()
     data class UpdateCannyT2(val value: Float) : MainScreenEvent()
-    object ToggleCvModel : MainScreenEvent()
     object ToggleSnapping : MainScreenEvent()
     object ToggleCvMask : MainScreenEvent()
-    object EnterCvMaskTestMode : MainScreenEvent()
-    object ExitCvMaskTestMode : MainScreenEvent()
-    object StartCalibrationMode : MainScreenEvent()
-    data class SampleColorAt(val screenPosition: Offset) : MainScreenEvent()
     object CheckForUpdate : MainScreenEvent()
-    object ViewArt : MainScreenEvent()
-    object ViewAboutPage : MainScreenEvent()
-    object SendFeedback : MainScreenEvent()
     object SingleEventConsumed : MainScreenEvent()
     object Shake : MainScreenEvent()
     object ExitToSplash : MainScreenEvent()
@@ -409,9 +390,6 @@ sealed class MainScreenEvent {
         val translation: Offset,
         val rotation: Float,
         val scale: Float
-    ) : MainScreenEvent()
-    data class UpdateTableScanClusters(
-        val updatedClusters: List<PocketCluster>
     ) : MainScreenEvent()
     object ToggleTableScanScreen : MainScreenEvent()
 

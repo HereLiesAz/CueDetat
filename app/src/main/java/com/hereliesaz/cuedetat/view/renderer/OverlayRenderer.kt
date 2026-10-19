@@ -47,10 +47,6 @@ class OverlayRenderer {
             return
         }
 
-        if (state.isCalibratingColor) {
-            return
-        }
-
         val pitchMatrix = state.pitchMatrix ?: return
         val railPitchMatrix = state.railPitchMatrix ?: pitchMatrix
 

@@ -67,10 +67,10 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
 - **`CueDetatState.comparableFields()` stays in sync with the primary
   constructor field list** (`app/src/main/java/com/hereliesaz/cuedetat/domain/UiModel.kt`,
   list at :260, `equals`/`hashCode` at :289/:295).
-  Reason: `equals`/`hashCode` are hand-maintained over 125 fields; drift here
+  Reason: `equals`/`hashCode` are hand-maintained over 119 fields; drift here
   silently breaks state-diffing used for recomposition/undo.
   **Unenforced**: no compiler check or test. Verify by counting both lists
-  (125 and 125 when last recounted).
+  (119 and 119 when last recounted).
 
 - **Building `:app` needs GitHub Packages credentials; the core does not.**
   There are no product flavors (no `foss`/`play`). `app/build.gradle.kts:378-380` depends

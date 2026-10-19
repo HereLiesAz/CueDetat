@@ -14,7 +14,8 @@ object ArConfidenceConfig {
 internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueDetatState {
     return when (action) {
         is MainScreenEvent.AutoCalibrateCv -> {
-            if (state.lockedHsvColor == null) return state
+            // Starts the low-light loop in CvDataUpdated. It no longer needs a locked felt
+            // colour: it only lowers the Canny thresholds until detections appear.
             state.copy(isAutoCalibrating = true)
         }
 
@@ -89,7 +90,6 @@ internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueD
         }
 
         is MainScreenEvent.LockColor -> state.copy(lockedHsvColor = action.hsvMean, lockedHsvStdDev = action.hsvStdDev)
-        is MainScreenEvent.LockOrUnlockColor -> if (state.lockedHsvColor != null) state.copy(lockedHsvColor = null, lockedHsvStdDev = null) else state
         is MainScreenEvent.AddFeltSample -> {
             val newList = state.savedFeltSamples.toMutableList()
             newList.add(com.hereliesaz.cuedetat.domain.FeltSample(hsv = action.hsv))
@@ -97,14 +97,6 @@ internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueD
         }
         is MainScreenEvent.DeleteFeltSamples -> {
             val newList = state.savedFeltSamples.filterNot { it.id in action.ids }
-            state.copy(savedFeltSamples = newList)
-        }
-        is MainScreenEvent.MoveFeltSample -> {
-            val newList = state.savedFeltSamples.toMutableList()
-            if (action.fromIndex in newList.indices && action.toIndex in newList.indices) {
-                val item = newList.removeAt(action.fromIndex)
-                newList.add(action.toIndex, item)
-            }
             state.copy(savedFeltSamples = newList)
         }
         is MainScreenEvent.ArSurfaceTapped -> {
@@ -144,7 +136,6 @@ internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueD
                 else -> state
             }
         }
-        is MainScreenEvent.ClearSamplePoint -> state.copy(colorSamplePoint = null)
         is MainScreenEvent.ForceArActive -> {
             if (state.cameraMode == CameraMode.AR_ACTIVE) return state
             state.copy(

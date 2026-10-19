@@ -36,7 +36,6 @@ import com.hereliesaz.cuedetat.view.renderer.OverlayRenderer
 fun ProtractorOverlay(
     uiState: CueDetatState,
     systemIsDark: Boolean,
-    isTestingCvMask: Boolean,
     onEvent: (MainScreenEvent) -> Unit,
     topDownProgress: Float
 ) {

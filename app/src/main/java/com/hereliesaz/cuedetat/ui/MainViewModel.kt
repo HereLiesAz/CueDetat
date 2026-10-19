@@ -809,14 +809,11 @@ class MainViewModel @Inject constructor(
                 }
             }
 
-            is MainScreenEvent.ViewArt -> emitSingle(SingleEvent.OpenUrl("https://herelies.az"))
-            is MainScreenEvent.ViewAboutPage -> emitSingle(SingleEvent.OpenUrl("https://github.com/HereLiesAz/CueDetat"))
-            is MainScreenEvent.SendFeedback -> emitSingle(
-                SingleEvent.SendFeedbackEmail(
-                    "hereliesaz@gmail.com",
-                    "Cue d'Etat Feedback"
-                )
-            )
+            // Forget scan: the in-memory model goes through ControlReducer; this drops the saved
+            // copy too, or restoreSavedScanForAr would resurrect it on the next AR entry.
+            is MainScreenEvent.ClearTableScan -> viewModelScope.launch(Dispatchers.IO) {
+                tableScanRepository.clear()
+            }
             // The Support rail item. MainActivity owns the sheet's visibility and opens it on
             // this event; no reducer handles it.
             is MainScreenEvent.ToggleSupportSheet -> emitSingle(SingleEvent.ShowSupportSheet)

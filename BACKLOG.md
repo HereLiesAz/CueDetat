@@ -9,29 +9,35 @@ lens-distortion path in `view/renderer/util/DrawingUtils.kt` and the use in
 estimates intrinsics and distortion coefficients, stores them, and writes them to state. Until
 then, treat lens distortion as unsupported.
 
-## Orphaned features (events with no sender)
+## Orphaned features: resolved
 
-Each event below is handled by a reducer but nothing in the app sends it. Verified by grep for
-the event name outside its declaration and reducer.
+Every `MainScreenEvent` that had a handler and no sender got an owner decision.
 
-- `ViewArt` - opened the art/gallery view. Needs a UI entry point or deletion - owner decision.
-- `ViewAboutPage` - opened the About page. Needs a UI entry point or deletion - owner decision.
-- `SendFeedback` - launched the feedback flow. Needs a UI entry point or deletion - owner decision.
-- `ToggleSnapping` - switched ball snapping (`isSnappingEnabled`) on and off. Needs a UI entry point or deletion - owner decision.
-- `ToggleForceTheme` - forced a light or dark theme regardless of system. Needs a UI entry point or deletion - owner decision.
-- `ToggleCvModel` - switched between the stock and custom CV model (`useCustomModel`). Needs a UI entry point or deletion - owner decision.
-- `ToggleCvMask` - showed the CV debug mask. Needs a UI entry point or deletion - owner decision.
-- `EnterCvMaskTestMode` / `ExitCvMaskTestMode` - entered and left the CV mask test mode. Needs a UI entry point or deletion - owner decision.
-- `StartCalibrationMode` - started colour calibration. Needs a UI entry point or deletion - owner decision.
-- `ToggleCalibrationScreen` - showed the calibration screen. Needs a UI entry point or deletion - owner decision.
-- `SampleColorAt` - sampled a felt colour at a tapped point. Needs a UI entry point or deletion - owner decision.
-- `ClearSamplePoint` - cleared the sampled colour point. Needs a UI entry point or deletion - owner decision.
-- `LockOrUnlockColor` - locked or unlocked the detected colour. Needs a UI entry point or deletion - owner decision.
-- `AutoCalibrateCv` - auto-calibrated CV colour thresholds. Needs a UI entry point or deletion - owner decision.
-- `MoveFeltSample` - reordered saved felt samples. Needs a UI entry point or deletion - owner decision.
-- `ToggleTableScanScreen` - showed the table scan screen. Needs a UI entry point or deletion - owner decision.
-- `UpdateTableScanClusters` - updated the table scan colour clusters. Needs a UI entry point or deletion - owner decision.
-- `ClearTableScan` - discarded the saved table scan. Needs a UI entry point or deletion - owner decision.
+Deleted (event, reducer branch, router entry, and the state it alone fed):
+`ViewArt`, `ViewAboutPage`, `SendFeedback` (with `SingleEvent.SendFeedbackEmail`, its
+`MainActivity` handler and the `mailto` `<queries>` entry), `ToggleForceTheme`
+(`isForceLightMode`), `ToggleCvModel` (`useCustomModel`), `EnterCvMaskTestMode` /
+`ExitCvMaskTestMode` (`isTestingCvMask`), `StartCalibrationMode` / `ToggleCalibrationScreen`
+(`showCalibrationScreen`), `SampleColorAt` / `ClearSamplePoint` (`colorSamplePoint`,
+`isCalibratingColor`, the tapped-point branch in `VisionRepository`), `LockOrUnlockColor`,
+`MoveFeltSample` (handler only; `savedFeltSamples` and its persistence stay),
+`UpdateTableScanClusters`.
+
+Kept after the check: `LockColor` and `lockedHsvColor` / `lockedHsvStdDev`. `LockColor` is not
+an orphan: `TableScanViewModel` emits it when the felt is captured, and the locked colour gates
+the `AR_SETUP -> AR_ACTIVE` auto-advance and the felt branches in `VisionRepository`.
+
+Adopted (given a UI entry point):
+- `ToggleSnapping`: `Snapping: on/off` row in the rail menu.
+- `ToggleCvMask`: switch in the Advanced dialog.
+- `AutoCalibrateCv`: auto-tune button in the Advanced dialog; the locked-colour gate is gone, and
+  closing the dialog or turning the camera off stops the loop.
+- `ToggleTableScanScreen`: `scan table` rail row in an AR mode (hidden while the overlay is up);
+  from an AR mode the reducer now resets to a blank `AR_SETUP`, like `CycleCameraMode` from OFF.
+- `ClearTableScan`: `forget scan` rail row when a scan is held; it also deletes the saved scan.
+
+Follow-up: `SingleEvent.OpenUrl` and its `MainActivity` handler no longer have an emitter
+(`ViewArt` / `ViewAboutPage` were the only ones).
 
 ## Depth plane has no producer
 

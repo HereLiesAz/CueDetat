@@ -171,6 +171,8 @@
     <string name="rail_save_24h">save 24h</string>
     <string name="rail_restore">restore</string>
     <string name="rail_forget_saved">forget saved</string>
+    <string name="rail_scan_table">scan table</string>
+    <string name="rail_forget_scan">forget scan</string>
     <string name="rail_off">off</string>
     <string name="rail_ar">ar</string>
     <string name="rail_phone">phone</string>
@@ -196,6 +198,8 @@
     <string name="rail_training_data_on">Training data: on</string>
     <string name="rail_training_data_off">Training data: off</string>
     <string name="rail_advanced">Advanced</string>
+    <string name="rail_snapping_on">Snapping: on</string>
+    <string name="rail_snapping_off">Snapping: off</string>
     <string name="rail_debug_log_on">Debug log: on</string>
     <string name="rail_debug_log_off">Debug log: off</string>
     <string name="rail_share_debug_log">Share debug log</string>
@@ -219,6 +223,11 @@
     <string name="advanced_title">CV Refinement Parameters</string>
     <string name="advanced_canny_1">Canny Threshold 1: %1$d</string>
     <string name="advanced_canny_2">Canny Threshold 2: %1$d</string>
+    <string name="advanced_cv_mask">Show what the CV sees</string>
+    <string name="advanced_cv_mask_shown">Mask shown</string>
+    <string name="advanced_cv_mask_hidden">Mask hidden</string>
+    <string name="advanced_auto_tune">Auto-tune for bad light</string>
+    <string name="advanced_auto_tuning">Tuning: lowering thresholds until something shows up</string>
     <string name="update_play_title">Google Play update available</string>
     <string name="update_github_title">GitHub update available</string>
     <string name="update_play_body">A newer Google Play build (%1$s) is available. Open Google Play to update?</string>
