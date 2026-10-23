@@ -11,4 +11,12 @@ package com.hereliesaz.cuedetat.domain
 object ArProjectionPolicy {
     fun isWorldTracked(mode: CameraMode, capability: DepthCapability): Boolean =
         mode == CameraMode.AR_ACTIVE && capability != DepthCapability.NONE
+
+    /**
+     * True while ARCore's homography alone places the table on screen. View pan and the zoom
+     * slider then have no effect on rendering, so gestures must not route to them: one-finger
+     * drags go to the balls, and hit radii are not divided by the slider zoom.
+     */
+    fun isTableAnchored(state: CueDetatState): Boolean =
+        isWorldTracked(state.cameraMode, state.depthCapability) && state.arTableMatrix != null
 }
