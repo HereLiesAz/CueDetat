@@ -4,6 +4,7 @@ import com.hereliesaz.cuedetat.ui.ZoomMapping
 import android.graphics.PointF
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.cuedetat.data.BallType
+import com.hereliesaz.cuedetat.domain.ArProjectionPolicy
 import com.hereliesaz.cuedetat.domain.BallSelectionPhase
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
@@ -40,7 +41,9 @@ class GestureReducer @Inject constructor() {
         val spinControlCenter = currentState.spinControlCenter
 
         val zoomLimits = ZoomMapping.getZoomRange(currentState.experienceMode, currentState.isBeginnerViewLocked)
-        val currentZoom = ZoomMapping.sliderToZoom(currentState.zoomSliderPosition, zoomLimits.first, zoomLimits.second)
+        // AR-anchored: logical->screen is ARCore's homography; the slider zoom is not applied.
+        val currentZoom = if (ArProjectionPolicy.isTableAnchored(currentState)) 1f
+            else ZoomMapping.sliderToZoom(currentState.zoomSliderPosition, zoomLimits.first, zoomLimits.second)
         // Generous hit area for ball-drag vs aiming-rotation. The user has the
         // entire rest of the screen for rotation, so a near-hit on a ball
         // should pick the ball.

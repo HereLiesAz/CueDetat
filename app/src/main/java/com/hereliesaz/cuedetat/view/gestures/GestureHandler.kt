@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.input.pointer.pointerInput
+import com.hereliesaz.cuedetat.domain.ArProjectionPolicy
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.ExperienceMode
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
@@ -25,7 +26,8 @@ import kotlin.math.abs
  * A custom Compose modifier that handles multi-touch gestures for the main canvas.
  *
  * It detects:
- * - Single-finger Drag: Moves objects on the table (or pans the camera if locked).
+ * - Single-finger Drag: Moves objects on the table (or pans the camera if world-locked,
+ *   unless the table is AR-anchored, where panning does nothing).
  * - Two-finger Pinch: Controls Zoom.
  * - Two-finger Rotation: Rotates the table/camera.
  * - Two-finger Pan: Pans the camera view.
@@ -114,7 +116,11 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                         if (pan.getDistance() > 2f) hasMovedDramatically = true
                         
                         if (pan != Offset.Zero) {
-                            if (uiState.isWorldLocked && !isDynamicBeginner) {
+                            // An AR-anchored table ignores viewOffset, so a pan would be a dead
+                            // gesture; drags go to the balls instead.
+                            if (uiState.isWorldLocked && !isDynamicBeginner &&
+                                !ArProjectionPolicy.isTableAnchored(uiState)
+                            ) {
                                 onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
                             } else {
                                 val previousPosition = lastCentroid
