@@ -92,6 +92,8 @@ class ArTableSession(
     // One locked world anchor, oriented so xAxis is table-right and -zAxis is
     // table-away. ARCore can refine its whole pose without changing the bed size.
     private var lockedTableAnchor: Anchor? = null
+    /** True once the table is anchored; ends the plane / point-cloud setup feedback. GL thread. */
+    val isTableLocked: Boolean get() = lockedTableAnchor != null
     // A screen-space corner order can have either plane handedness. ARCore anchor
     // rotation alone cannot represent a reflection; retain the calibration parity.
     private var lockedAwaySign = 1f
