@@ -28,7 +28,10 @@ import kotlin.math.abs
  * It detects:
  * - Single-finger Drag: Moves objects on the table (or pans the camera if world-locked,
  *   unless the table is AR-anchored, where panning does nothing).
- * - Two-finger Pinch: Controls Zoom.
+ * - Two-finger Pinch: Controls Zoom (the table's size on screen). With ARCore world tracking the
+ *   table's size is metric, and zoom moves it toward or away from the camera, so the pinch
+ *   resizes the table in place instead ([MainScreenEvent.TableScaleChanged]); the zoom slider
+ *   keeps the range.
  * - Two-finger Rotation: Rotates the table/camera.
  * - Two-finger Pan: Pans the camera view.
  * - Three-finger Drag: Moves the table up/down along its Z-axis.
@@ -101,7 +104,13 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                         // 1. Zoom (Pinch)
                         if (uiState.experienceMode != ExperienceMode.BEGINNER || !uiState.isBeginnerViewLocked) {
                             val zoom = event.calculateZoom()
-                            if (zoom != 1f) onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
+                            if (zoom != 1f) {
+                                if (ArProjectionPolicy.isWorldTracked(uiState.cameraMode, uiState.depthCapability)) {
+                                    onEvent(MainScreenEvent.TableScaleChanged(zoom))
+                                } else {
+                                    onEvent(MainScreenEvent.ZoomScaleChanged(zoom))
+                                }
+                            }
                         }
 
                         // 2. Rotation & Pan

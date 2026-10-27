@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — AR table fitting
+
+- **Table rotation followed the fingers backwards in AR.** The world-frame yaw is counter-clockwise
+  seen from above, the gesture and swiper are clockwise-positive, and nothing converted between
+  them (`TableFrameHomography.clockwiseToWorldYaw`). The sensor path was already right.
+
+### Added — AR table fitting
+
+- **Resize without zooming.** In AR the pinch now resizes the table in place (`tableFitScale`,
+  `TableScaleChanged`) instead of dollying it toward or away from the camera; the zoom slider keeps
+  the range. Applies before and after Lock.
+
 ### Changed — Navigation & Tutorial
 
 - **AzNavRail upgraded 10.1 → 10.18.**

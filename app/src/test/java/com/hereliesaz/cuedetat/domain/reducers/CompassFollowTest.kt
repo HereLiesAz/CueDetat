@@ -100,4 +100,20 @@ class CompassFollowTest {
         assertEquals(-15f, s.worldRotationDegrees, 1e-3f)
         assertEquals(15f, s.userRotationDegrees, 1e-3f)
     }
+
+    @Test
+    fun `pinch resizes the AR table and is clamped`() {
+        val grown = reduceControlAction(
+            CueDetatState(), com.hereliesaz.cuedetat.domain.MainScreenEvent.TableScaleChanged(1.1f),
+        )
+        assertEquals(1.1f, grown.tableFitScale, 1e-4f)
+        val capped = reduceControlAction(
+            CueDetatState(), com.hereliesaz.cuedetat.domain.MainScreenEvent.TableScaleChanged(50f),
+        )
+        assertEquals(com.hereliesaz.cuedetat.domain.MAX_TABLE_FIT_SCALE, capped.tableFitScale, 1e-4f)
+        val floored = reduceControlAction(
+            CueDetatState(), com.hereliesaz.cuedetat.domain.MainScreenEvent.TableScaleChanged(0.001f),
+        )
+        assertEquals(com.hereliesaz.cuedetat.domain.MIN_TABLE_FIT_SCALE, floored.tableFitScale, 1e-4f)
+    }
 }

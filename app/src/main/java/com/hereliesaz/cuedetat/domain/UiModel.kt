@@ -71,6 +71,11 @@ data class FeltSample(
  */
 const val DEFAULT_ZOOM_SLIDER = -8f
 const val DEFAULT_TABLE_Z_OFFSET = 0f
+/** Nominal size: the virtual table is exactly the selected table's metric dimensions. */
+const val DEFAULT_TABLE_FIT_SCALE = 1f
+/** Resize limits: a bar box to a bit over a 10-footer, relative to the selected table. */
+const val MIN_TABLE_FIT_SCALE = 0.6f
+const val MAX_TABLE_FIT_SCALE = 1.6f
 
 @Keep
 data class CueDetatState(
@@ -101,6 +106,13 @@ data class CueDetatState(
     val cameraMode: CameraMode = CameraMode.OFF,
     val viewOffset: PointF = PointF(0f, 0f),
     val tableZOffset: Float = DEFAULT_TABLE_Z_OFFSET,
+    /**
+     * Fine resize of the world-anchored AR table (pinch), independent of zoom: zoom moves the
+     * table toward or away from the camera, this changes its physical size in place. Applied
+     * about the table centre by ARCore's matrix builder; the sensor path has no use for it
+     * because zoom is its size.
+     */
+    val tableFitScale: Float = DEFAULT_TABLE_FIT_SCALE,
     val orientationLock: OrientationLock = OrientationLock.PORTRAIT,
     @Transient val pendingOrientationLock: OrientationLock? = null,
     val isBeginnerViewLocked: Boolean = false,
@@ -261,7 +273,7 @@ data class CueDetatState(
         experienceMode, pendingExperienceMode, haterState, viewWidth, viewHeight, screenDensity,
         protractorUnit, onPlaneBall, obstacleBalls, savedFeltSamples, table, zoomSliderPosition,
         worldRotationDegrees, userRotationDegrees, areHelpersVisible, valuesChangedSinceReset, cameraMode, viewOffset,
-        tableZOffset, orientationLock, pendingOrientationLock, isBeginnerViewLocked, isBankingMode,
+        tableZOffset, tableFitScale, orientationLock, pendingOrientationLock, isBeginnerViewLocked, isBankingMode,
         bankingAimTarget, bankShotPath, pocketedBankShotPocketIndex, showTableSizeDialog,
         luminanceAdjustment, showLuminanceDialog, glowStickValue, showGlowStickDialog,
         isSpinControlVisible, isMasseModeActive, masseShotAngleDeg, selectedSpinOffset, spinPaths,
@@ -316,6 +328,8 @@ sealed class MainScreenEvent {
     data class SizeChanged(val width: Int, val height: Int, val density: Float) : MainScreenEvent()
     data class ZoomScaleChanged(val scaleFactor: Float) : MainScreenEvent()
     data class TableRotationApplied(val degrees: Float) : MainScreenEvent()
+    /** Pinch factor (>1 grows) for the AR table's physical size; clamped by the reducer. */
+    data class TableScaleChanged(val factor: Float) : MainScreenEvent()
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
     data class PanView(val delta: PointF) : MainScreenEvent()
     data class MoveTableZ(val delta: Float) : MainScreenEvent()

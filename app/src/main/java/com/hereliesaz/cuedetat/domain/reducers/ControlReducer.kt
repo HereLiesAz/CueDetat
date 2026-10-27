@@ -4,6 +4,8 @@ import android.graphics.PointF
 import com.hereliesaz.cuedetat.domain.BallSelectionPhase
 import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
+import com.hereliesaz.cuedetat.domain.MAX_TABLE_FIT_SCALE
+import com.hereliesaz.cuedetat.domain.MIN_TABLE_FIT_SCALE
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 
@@ -22,6 +24,12 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             val newSliderPos = ZoomMapping.zoomToSlider(newZoomValue, minZoom, maxZoom)
             state.copy(zoomSliderPosition = newSliderPos, valuesChangedSinceReset = true)
         }
+
+        is MainScreenEvent.TableScaleChanged -> state.copy(
+            tableFitScale = (state.tableFitScale * action.factor)
+                .coerceIn(MIN_TABLE_FIT_SCALE, MAX_TABLE_FIT_SCALE),
+            valuesChangedSinceReset = true
+        )
 
         // Hand rotation (swiper, rotate gesture): moves the table and the user's own tally.
         is MainScreenEvent.TableRotationApplied -> state.copy(
