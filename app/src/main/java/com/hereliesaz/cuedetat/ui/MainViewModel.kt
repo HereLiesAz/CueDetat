@@ -316,7 +316,11 @@ class MainViewModel @Inject constructor(
             val savedFeltSamples = tableScanRepository.loadFeltSamples()
             // Height and zoom always open at the defaults, not where the last session left them:
             // a table lifted or zoomed for one game shouldn't greet the next one.
+            // Camera always opens OFF: a restored AR mode has no ARCore session or loaded module
+            // behind it, so the world-tracked projection never gets a matrix and nothing draws.
             val initialState = (savedState ?: CueDetatState()).copy(
+                cameraMode = CameraMode.OFF,
+                showTableScanScreen = false,
                 experienceMode = _uiState.value.experienceMode,
                 savedFeltSamples = savedFeltSamples,
                 tableZOffset = com.hereliesaz.cuedetat.domain.DEFAULT_TABLE_Z_OFFSET,
