@@ -30,7 +30,8 @@ private const val TAG = "ArCoreBackground"
  * Full-screen camera background powered by ARCore, used for the whole expert-mode AR flow.
  *
  * Each frame the GL renderer:
- * 1. Draws the camera feed as a fullscreen quad.
+ * 1. Draws the camera feed as a fullscreen quad, then (until the table is locked) ARCore's
+ *    detected planes and point cloud via [ArTrackablesRenderer].
  * 2. Feeds the CPU image to [ArFrameProcessor] for ball detection and felt-colour sampling.
  * 3. Runs [ArTableSession.computeFrameUpdate]: anchors the table if Lock was tapped, fits the
  *    logical->screen homography from the metric preview or locked corners, then emits
@@ -137,6 +138,7 @@ private class ArCoreRenderer(
 ) : GLSurfaceView.Renderer {
 
     private val background = ArBackgroundRenderer()
+    private val trackables = ArTrackablesRenderer()
     private var surfaceWidth = 1
     private var surfaceHeight = 1
     private var previousTrackingState: TrackingState? = null
@@ -144,6 +146,7 @@ private class ArCoreRenderer(
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         background.createOnGlThread()
+        trackables.createOnGlThread()
         session.setCameraTextureName(background.getTextureId())
     }
 
@@ -186,6 +189,11 @@ private class ArCoreRenderer(
 
             if (currentTracking != TrackingState.STOPPED) {
                 background.draw(frame)
+            }
+
+            // Setup feedback (planes, point cloud) until the table is locked, then gone.
+            if (currentTracking == TrackingState.TRACKING && !arTableSession.isTableLocked) {
+                trackables.draw(frame, session)
             }
 
             // Ball detection + felt-colour sampling from the ARCore CPU image.
