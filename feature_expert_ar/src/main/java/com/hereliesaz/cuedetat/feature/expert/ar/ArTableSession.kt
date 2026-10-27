@@ -302,6 +302,9 @@ class ArTableSession(
     // slider.
     @Volatile private var tableHeightMeters: Float = 0f
 
+    /** Physical size of the table relative to nominal (CueDetatState.tableFitScale). */
+    @Volatile private var tableScale: Float = 1f
+
     /** True once ARCore world tracking is available on this device. */
     fun isArCoreAvailable(): Boolean = try {
         ArCoreApk.getInstance().checkAvailability(context).isSupported
@@ -372,6 +375,8 @@ class ArTableSession(
 
     /** Update editable table controls without ever re-anchoring on camera-pose updates. */
     fun updatePreviewInput(state: CueDetatState) {
+        // Size applies to the locked table too, so it is taken before the preview early-out.
+        tableScale = state.tableFitScale
         if (state.cameraMode != CameraMode.AR_ACTIVE || !state.table.isVisible) {
             previewInput.set(null)
             return
@@ -702,6 +707,7 @@ class ArTableSession(
                 Vec3(xAxis[0], 0f, xAxis[2]),
                 Vec3(-zAxis[0] * lockedAwaySign, 0f, -zAxis[2] * lockedAwaySign),
                 0f,
+                tableScale,
             )
         } else {
             val anchor = previewAnchor ?: return null
@@ -713,7 +719,9 @@ class ArTableSession(
             logical = input.corners
             cornersWorld = TableFrameHomography.metricRectangleCorners(
                 logical, center, previewRight, previewAway,
-                input.rotationDegrees - previewInitialRotation)
+                TableFrameHomography.clockwiseToWorldYaw(
+                    input.rotationDegrees - previewInitialRotation),
+                tableScale)
         }
         val h = TableFrameHomography.computeLogicalToScreen(
             view, proj, cornersWorld, logical, vpW, vpH, heightMeters = tableHeightMeters

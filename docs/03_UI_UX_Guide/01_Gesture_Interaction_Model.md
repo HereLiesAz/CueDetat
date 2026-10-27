@@ -10,8 +10,14 @@ When a touch gesture begins, its intent is determined by the following order of 
 1. **Multi-Finger Gestures (Highest Priority):** A gesture with more than one pointer manipulates
    the view itself:
 
-    * **Pinching** (`calculateZoom`) dispatches a `ZoomScaleChanged` event.
-    * **Twisting** (`calculateRotation`) dispatches a `TableRotationApplied` event.
+    * **Pinching** (`calculateZoom`) dispatches a `ZoomScaleChanged` event. With ARCore world
+      tracking (`ArProjectionPolicy.isWorldTracked`) it dispatches `TableScaleChanged` instead:
+      the AR table has a metric size, zoom there moves it toward or away from the camera, and the
+      pinch resizes it in place (`tableFitScale`, 0.6–1.6× the selected table; reset by Reset).
+      The zoom slider keeps the range.
+    * **Twisting** (`calculateRotation`) dispatches a `TableRotationApplied` event. Positive is
+      clockwise on screen; the AR session converts it with
+      `TableFrameHomography.clockwiseToWorldYaw` so the table turns with the fingers.
 
 2. **Object Interaction:** A touch that begins directly upon an interactive
    logical element will manipulate that element exclusively. This includes the `SpinControl` (which uses a double-tap-to-drag relocation gesture), `MasseControl` (also uses double-tap-to-drag),

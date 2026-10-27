@@ -33,10 +33,16 @@ object TableFrameHomography {
      * Physical pool-table coordinates in a fixed ARCore world frame. Logical width/length
      * convert to metres through the existing ball-based coordinate scale. This is a *rigid*
      * planar rectangle, regardless of camera position or projected magnification.
+     *
+     * [yawDegrees] is counter-clockwise as seen from above (positive turns [right] toward
+     * [away]); see [clockwiseToWorldYaw] for turning a screen gesture into it. [scale] sizes the
+     * whole rectangle about [center] (1 = the table's nominal metric size), to fit a real table
+     * that is not quite the nominal size; it never moves the table toward or away from the camera.
      */
     fun metricRectangleCorners(
         logical: List<Pt>, center: Vec3, right: Vec3, away: Vec3,
         yawDegrees: Float,
+        scale: Float = 1f,
     ): List<Vec3> {
         val radians = Math.toRadians(yawDegrees.toDouble())
         val c = kotlin.math.cos(radians).toFloat()
@@ -46,12 +52,20 @@ object TableFrameHomography {
         val ax = away.x * c - right.x * s
         val az = away.z * c - right.z * s
         return logical.map { corner ->
-            val x = corner.x / LOGICAL_UNITS_PER_METER
-            val y = -corner.y / LOGICAL_UNITS_PER_METER
+            val x = corner.x * scale / LOGICAL_UNITS_PER_METER
+            val y = -corner.y * scale / LOGICAL_UNITS_PER_METER
             Vec3(center.x + rx * x + ax * y, center.y,
                 center.z + rz * x + az * y)
         }
     }
+
+    /**
+     * World yaw for [metricRectangleCorners] from a rotation measured the way the screen measures
+     * it (clockwise positive: the two-finger rotate gesture and the rotation swiper). The world
+     * frame views the table from above with [metricRectangleCorners]' yaw counter-clockwise, so
+     * the sign flips; without it the table turns against the fingers.
+     */
+    fun clockwiseToWorldYaw(clockwiseDegrees: Float): Float = -clockwiseDegrees
 
     /** A rigid table centre and heading on an ARCore horizontal plane.
      * The table's width/length come from logical dimensions, never from a

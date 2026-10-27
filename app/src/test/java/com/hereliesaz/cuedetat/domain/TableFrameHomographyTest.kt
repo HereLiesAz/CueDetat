@@ -336,4 +336,31 @@ class TableFrameHomographyTest {
         )))
     }
 
+    @Test
+    fun `clockwise screen rotation turns the table clockwise seen from above`() {
+        // Seen from above with x to the right and z down the screen (the camera looks along -z),
+        // a clockwise quarter turn carries the 3 o'clock point (+x) to 6 o'clock (+z).
+        val threeOclock = listOf(Pt(100f, 0f))
+        val turned = TableFrameHomography.metricRectangleCorners(
+            threeOclock, Vec3(0f, 0f, 0f),
+            Vec3(1f, 0f, 0f), Vec3(0f, 0f, -1f),
+            TableFrameHomography.clockwiseToWorldYaw(90f),
+        ).single()
+        assertEquals(0f, turned.x, 1e-4f)
+        assertTrue("3 o'clock should land at 6 o'clock (+z), was ${turned.z}", turned.z > 0.1f)
+    }
+
+    @Test
+    fun `scale resizes the table about its centre without moving it`() {
+        val logical = listOf(Pt(-100f, -50f), Pt(100f, -50f), Pt(100f, 50f), Pt(-100f, 50f))
+        val centre = Vec3(2f, 1f, -3f)
+        val nominal = TableFrameHomography.metricRectangleCorners(
+            logical, centre, Vec3(1f, 0f, 0f), Vec3(0f, 0f, -1f), 0f)
+        val grown = TableFrameHomography.metricRectangleCorners(
+            logical, centre, Vec3(1f, 0f, 0f), Vec3(0f, 0f, -1f), 0f, scale = 1.25f)
+        val nominalWidth = nominal[1].x - nominal[0].x
+        assertEquals(nominalWidth * 1.25f, grown[1].x - grown[0].x, 1e-4f)
+        assertEquals(centre.x, (grown[0].x + grown[2].x) / 2f, 1e-4f)
+        assertEquals(centre.z, (grown[0].z + grown[2].z) / 2f, 1e-4f)
+    }
 }
