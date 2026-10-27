@@ -42,6 +42,14 @@ interface ArController {
     fun setTableZOffsetLogical(tableZOffsetLogical: Float)
 
     /**
+     * Move the unlocked AR table toward ([factor] > 1) or away from the camera by that ratio of
+     * its apparent size, along the camera's line. A relative nudge, not an absolute zoom: the
+     * session clamps the resulting range itself, so a control driving this can never saturate.
+     * Ignored while the table is locked.
+     */
+    fun nudgeTableRange(factor: Float) {}
+
+    /**
      * Anchor the virtual table in the AR world. [screenCorners] are where its corners sit on
      * screen now and [logicalCorners] the same corners in logical space, both TL, TR, BR, BL.
      * The result comes back as [MainScreenEvent.ArTableLockResult].

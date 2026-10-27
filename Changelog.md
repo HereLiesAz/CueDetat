@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seen from above, the gesture and swiper are clockwise-positive, and nothing converted between
   them (`TableFrameHomography.clockwiseToWorldYaw`). The sensor path was already right.
 
+### Fixed — AR sliders pinned at maximum
+
+- **The zoom slider is a self-centring jog under ARCore world tracking.** There, zoom moves the
+  table along the camera line, so an absolute position meant nothing and ran into its end stop with
+  the table still the wrong size. Dragging now nudges the range (`NudgeTableRange` →
+  `ArController.nudgeTableRange`, clamped 0.65–8 m by the session) and the thumb springs back to
+  centre on release; the +/- buttons nudge one unit. Unchanged without ARCore.
+- **A resting thumb no longer drives the table-height slider.** The three-finger height drag now
+  needs three fingers all moving the same way.
+
 ### Added — AR table fitting
 
 - **Resize without zooming.** In AR the pinch now resizes the table in place (`tableFitScale`,

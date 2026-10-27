@@ -34,6 +34,14 @@ object ZoomMapping {
         return minZoom * b.pow(normalizedSlider)
     }
 
+    /**
+     * The zoom ratio of moving the slider by [units] (one unit is the same ratio anywhere on the
+     * standard range, which is what makes the mapping exponential). Used by the AR zoom jog,
+     * which has no absolute position to map.
+     */
+    fun unitsToFactor(units: Float): Float =
+        (STANDARD_MAX_ZOOM / STANDARD_MIN_ZOOM).pow(units / SLIDER_RANGE)
+
     fun zoomToSlider(zoomFactor: Float, minZoom: Float, maxZoom: Float): Float {
         if (zoomFactor <= minZoom) return -50f
         if (zoomFactor >= maxZoom) return 50f

@@ -79,6 +79,8 @@ class ArControllerFacade @Inject constructor(
     override fun setTableZOffsetLogical(tableZOffsetLogical: Float) =
         delegate.setTableZOffsetLogical(tableZOffsetLogical)
 
+    override fun nudgeTableRange(factor: Float) = delegate.nudgeTableRange(factor)
+
     override fun lockTable(screenCorners: List<android.graphics.PointF>, logicalCorners: List<android.graphics.PointF>) =
         delegate.lockTable(screenCorners, logicalCorners)
 

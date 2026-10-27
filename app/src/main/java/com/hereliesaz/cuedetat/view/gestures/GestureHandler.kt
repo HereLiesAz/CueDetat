@@ -34,7 +34,9 @@ import kotlin.math.abs
  *   keeps the range.
  * - Two-finger Rotation: Rotates the table/camera.
  * - Two-finger Pan: Pans the camera view.
- * - Three-finger Drag: Moves the table up/down along its Z-axis.
+ * - Three-finger Drag: Moves the table up/down along its Z-axis. Only when three fingers are down
+ *   and all of them are moving the same way ([isCoherentVerticalDrag]); a thumb resting on the
+ *   screen edge during a two-finger gesture is not a third finger of this one.
  *
  * The pointer-input coroutine is keyed on `Unit` so it is never restarted mid-drag; the
  * latest [uiState] and [onEvent] are read through [rememberUpdatedState], so gating
@@ -94,7 +96,10 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                         // table.isVisible (that is EXPERT-only) so it also works in
                         // dynamic beginner mode.
                         val pan = event.calculatePan()
-                        if (abs(pan.y) > 0.1f) {
+                        val pressed = event.changes.filter { it.pressed }
+                        if (abs(pan.y) > 0.1f &&
+                            isCoherentVerticalDrag(pressed.map { it.position.y - it.previousPosition.y })
+                        ) {
                             onEvent(MainScreenEvent.MoveTableZ(-pan.y * 0.05f))
                         }
                     } else if (event.changes.size == 2) {
@@ -157,4 +162,20 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
             onEvent(MainScreenEvent.GestureEnded)
         }
     }
+}
+
+/** Per-finger vertical travel, in pixels, below which a finger counts as resting. */
+private const val RESTING_FINGER_PX = 1f
+
+/**
+ * True when at least three fingers are down and every one of them moved vertically, all the same
+ * way: the three-finger table-height drag. [verticalDeltas] is each pressed finger's change in y
+ * since the last event. A finger that is not moving (a resting thumb) or moving against the others
+ * makes this false, so it can't drive the height slider.
+ */
+internal fun isCoherentVerticalDrag(verticalDeltas: List<Float>): Boolean {
+    if (verticalDeltas.size < 3) return false
+    val down = verticalDeltas.all { it > RESTING_FINGER_PX }
+    val up = verticalDeltas.all { it < -RESTING_FINGER_PX }
+    return down || up
 }

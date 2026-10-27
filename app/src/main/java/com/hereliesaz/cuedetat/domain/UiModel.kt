@@ -331,6 +331,12 @@ sealed class MainScreenEvent {
     /** Pinch factor (>1 grows) for the AR table's physical size; clamped by the reducer. */
     data class TableScaleChanged(val factor: Float) : MainScreenEvent()
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
+    /**
+     * AR zoom jog / +- buttons: scale the unlocked table's apparent size by [factor] by moving it
+     * along the camera line. Relative and stateless (ArController.nudgeTableRange); under ARCore
+     * world tracking it replaces [ZoomSliderChanged], whose absolute value saturates.
+     */
+    data class NudgeTableRange(val factor: Float) : MainScreenEvent()
     data class PanView(val delta: PointF) : MainScreenEvent()
     data class MoveTableZ(val delta: Float) : MainScreenEvent()
     /** Absolute table height (the slider's thumb value); clamped like [MoveTableZ]. */
