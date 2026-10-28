@@ -4,6 +4,7 @@ package com.hereliesaz.cuedetat.domain.reducers
 
 import com.hereliesaz.cuedetat.data.BallType
 import com.hereliesaz.cuedetat.data.VisionData
+import com.hereliesaz.cuedetat.domain.Assignment
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.TargetType
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
@@ -23,6 +24,9 @@ import kotlin.math.hypot
  * @constructor Injected by Hilt.
  */
 @Singleton
+/** Which virtual ball an anchor belongs to, for matching both to candidates together. */
+private enum class AnchorKind { CUE, TARGET }
+
 class SnapReducer @Inject constructor() {
 
     // The time in milliseconds a ball must be tracked before becoming a confirmed snap target.
@@ -69,30 +73,30 @@ class SnapReducer @Inject constructor() {
         // List to hold the candidates for the NEXT frame.
         val newCandidates = mutableListOf<SnapCandidate>()
 
+        // Match detections to last frame's candidates one-to-one, optimally (Assignment): matching
+        // each detection to its nearest candidate in turn lets an early detection take the
+        // candidate a later one needed, so two close balls could swap or drop a track.
+        val matched = Assignment.match(
+            rows = detectedBalls.size,
+            cols = previousCandidates.size,
+            gate = SNAP_PROXIMITY_THRESHOLD.toDouble(),
+        ) { row, col ->
+            hypot(
+                (previousCandidates[col].detectedPoint.x - detectedBalls[row].first.x).toDouble(),
+                (previousCandidates[col].detectedPoint.y - detectedBalls[row].first.y).toDouble()
+            )
+        }
+
         // Iterate through every detected ball in the current frame.
-        for (ball in detectedBalls) {
+        for ((index, ball) in detectedBalls.withIndex()) {
             val point = ball.first
             val type = ball.second
 
-            // Find the closest existing candidate from the previous frame.
-            val closestExisting = previousCandidates.minByOrNull {
-                // Calculate Euclidean distance to match detection to candidate.
-                hypot(
-                    (it.detectedPoint.x - point.x).toDouble(),
-                    (it.detectedPoint.y - point.y).toDouble()
-                )
-            }
+            // The candidate this detection was matched to, if any (within the proximity threshold).
+            val closestExisting = matched[index].takeIf { it >= 0 }?.let { previousCandidates[it] }
 
-            // Check if the closest candidate is within the proximity threshold.
-            if (closestExisting != null && hypot(
-                    (closestExisting.detectedPoint.x - point.x).toDouble(),
-                    (closestExisting.detectedPoint.y - point.y).toDouble()
-                ) < SNAP_PROXIMITY_THRESHOLD
-            ) {
+            if (closestExisting != null) {
                 // MATCH FOUND: This detection corresponds to an existing candidate.
-
-                // Remove from the 'previous' list so we know it was updated (used for cleanup if needed).
-                previousCandidates.remove(closestExisting)
 
                 // Determine if it is now confirmed.
                 // It is confirmed if it WAS ALREADY confirmed, OR if it has existed longer than the threshold.
@@ -131,37 +135,45 @@ class SnapReducer @Inject constructor() {
         var newCueBallAnchor = currentState.cueBallCvAnchor
         var newTargetAnchor = currentState.targetCvAnchor
 
-        // Cue ball anchor follow — type-agnostic (cue ball is always white)
-        currentState.cueBallCvAnchor?.let { anchor ->
-            val nearest = newCandidates.minByOrNull {
-                hypot((it.detectedPoint.x - anchor.x).toDouble(), (it.detectedPoint.y - anchor.y).toDouble())
-            }
-            val dist = nearest?.let {
-                hypot((it.detectedPoint.x - anchor.x).toDouble(), (it.detectedPoint.y - anchor.y).toDouble())
-            } ?: Double.MAX_VALUE
-            if (nearest != null && dist < anchorFollowThreshold) {
-                newCueBallAnchor = nearest.detectedPoint
-                newOnPlaneBall = newOnPlaneBall?.copy(center = nearest.detectedPoint)
-            }
-            // else: hold last known position — anchor and virtual ball unchanged
+        // Both anchors are matched to candidates together, so two adjacent balls can't both be
+        // claimed by the same candidate: the cue ball is type-agnostic (always white), the target
+        // only follows a candidate of its suit. An anchor with no candidate in range holds its last
+        // known position (anchor and virtual ball unchanged).
+        val matchesTarget: (SnapCandidate) -> Boolean = { candidate ->
+            candidate.ballType == BallType.UNKNOWN ||
+            (currentState.targetType == TargetType.STRIPES && candidate.ballType == BallType.STRIPE) ||
+            (currentState.targetType == TargetType.SOLIDS && candidate.ballType == BallType.SOLID)
         }
-
-        // Target ball anchor follow — filtered by targetType
-        currentState.targetCvAnchor?.let { anchor ->
-            val matchesTarget: (SnapCandidate) -> Boolean = { candidate ->
-                candidate.ballType == BallType.UNKNOWN ||
-                (currentState.targetType == TargetType.STRIPES && candidate.ballType == BallType.STRIPE) ||
-                (currentState.targetType == TargetType.SOLIDS && candidate.ballType == BallType.SOLID)
-            }
-            val nearest = newCandidates.filter(matchesTarget).minByOrNull {
-                hypot((it.detectedPoint.x - anchor.x).toDouble(), (it.detectedPoint.y - anchor.y).toDouble())
-            }
-            val dist = nearest?.let {
-                hypot((it.detectedPoint.x - anchor.x).toDouble(), (it.detectedPoint.y - anchor.y).toDouble())
-            } ?: Double.MAX_VALUE
-            if (nearest != null && dist < anchorFollowThreshold) {
-                newTargetAnchor = nearest.detectedPoint
-                newProtractorUnit = newProtractorUnit.copy(center = nearest.detectedPoint)
+        val anchors = buildList {
+            currentState.cueBallCvAnchor?.let { add(AnchorKind.CUE to it) }
+            currentState.targetCvAnchor?.let { add(AnchorKind.TARGET to it) }
+        }
+        val follow = Assignment.match(
+            rows = anchors.size,
+            cols = newCandidates.size,
+            gate = anchorFollowThreshold.toDouble(),
+        ) { row, col ->
+            val (kind, anchor) = anchors[row]
+            val candidate = newCandidates[col]
+            if (kind == AnchorKind.TARGET && !matchesTarget(candidate)) Double.POSITIVE_INFINITY
+            else hypot(
+                (candidate.detectedPoint.x - anchor.x).toDouble(),
+                (candidate.detectedPoint.y - anchor.y).toDouble()
+            )
+        }
+        anchors.forEachIndexed { row, (kind, _) ->
+            val col = follow[row]
+            if (col < 0) return@forEachIndexed
+            val point = newCandidates[col].detectedPoint
+            when (kind) {
+                AnchorKind.CUE -> {
+                    newCueBallAnchor = point
+                    newOnPlaneBall = newOnPlaneBall?.copy(center = point)
+                }
+                AnchorKind.TARGET -> {
+                    newTargetAnchor = point
+                    newProtractorUnit = newProtractorUnit.copy(center = point)
+                }
             }
         }
 

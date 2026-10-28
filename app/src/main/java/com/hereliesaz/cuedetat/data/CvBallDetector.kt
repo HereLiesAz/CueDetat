@@ -54,6 +54,7 @@ class CvBallDetector {
     private val stats = Mat()
     private val centroids = Mat()
     private val scratch = Mat()
+    private val hueScratch = Mat()
     private val openKernel: Mat by lazy {
         Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(3.0, 3.0))
     }
@@ -135,17 +136,13 @@ class CvBallDetector {
         // Empirically tuned spread; hue is held tighter than saturation/value, which move with
         // shadow and glare across a table. The S/V floor is low so dim or dark felt still masks.
         val k = 2.5
-        val lower = Scalar(
-            max(0.0, felt[0] - k * sd[0] - 5.0),
-            max(25.0, felt[1] - k * sd[1]),
-            max(25.0, felt[2] - k * sd[2]),
+        // Hue is a circle: a window round a red felt crosses the 0/180 seam (HueMask).
+        HueMask.inRangeAround(
+            hsvMat, felt[0].toDouble(), k * sd[0] + 5.0,
+            sLo = max(25.0, felt[1] - k * sd[1]), sHi = min(255.0, felt[1] + k * sd[1]),
+            vLo = max(25.0, felt[2] - k * sd[2]), vHi = min(255.0, felt[2] + k * sd[2]),
+            out = feltMask, scratch = hueScratch,
         )
-        val upper = Scalar(
-            min(180.0, felt[0] + k * sd[0] + 5.0),
-            min(255.0, felt[1] + k * sd[1]),
-            min(255.0, felt[2] + k * sd[2]),
-        )
-        Core.inRange(hsvMat, lower, upper, feltMask)
     }
 
     /**
@@ -244,6 +241,7 @@ class CvBallDetector {
         stats.release()
         centroids.release()
         scratch.release()
+        hueScratch.release()
         openKernel.release()
     }
 

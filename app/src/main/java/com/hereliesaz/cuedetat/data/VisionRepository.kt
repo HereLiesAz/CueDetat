@@ -72,6 +72,7 @@ class VisionRepository @Inject constructor(
     val arEvents: SharedFlow<MainScreenEvent> = _arEvents.asSharedFlow()
 
     private var reusableMask: Mat? = null
+    private var reusableWrapMask: Mat? = null
     private val maskRingBuffer = Array(3) { Mat() }
     private var maskRingIndex = 0
 
@@ -263,26 +264,27 @@ class VisionRepository @Inject constructor(
                     reusableMask = Mat()
                 }
                 val mask = reusableMask!!
+                if (reusableWrapMask == null) reusableWrapMask = Mat()
+                val wrap = reusableWrapMask!!
+                // Hue windows wrap round the 0/180 seam (HueMask); red felt sits across it.
                 if (state.lockedHsvColor != null && state.lockedHsvStdDev != null) {
                     val mean = state.lockedHsvColor
                     val stdDev = state.lockedHsvStdDev
                     val stdDevMultiplier = 2.0
-                    val lowerBound = Scalar(
-                        (mean[0] - stdDevMultiplier * stdDev[0]).coerceAtLeast(0.0),
-                        (mean[1] - stdDevMultiplier * stdDev[1]).coerceAtLeast(40.0),
-                        (mean[2] - stdDevMultiplier * stdDev[2]).coerceAtLeast(40.0)
+                    HueMask.inRangeAround(
+                        hsvMat, mean[0].toDouble(), stdDevMultiplier * stdDev[0],
+                        sLo = (mean[1] - stdDevMultiplier * stdDev[1]).coerceAtLeast(40.0),
+                        sHi = (mean[1] + stdDevMultiplier * stdDev[1]).coerceAtMost(255.0),
+                        vLo = (mean[2] - stdDevMultiplier * stdDev[2]).coerceAtLeast(40.0),
+                        vHi = (mean[2] + stdDevMultiplier * stdDev[2]).coerceAtMost(255.0),
+                        out = mask, scratch = wrap,
                     )
-                    val upperBound = Scalar(
-                        (mean[0] + stdDevMultiplier * stdDev[0]).coerceAtMost(180.0),
-                        (mean[1] + stdDevMultiplier * stdDev[1]).coerceAtMost(255.0),
-                        (mean[2] + stdDevMultiplier * stdDev[2]).coerceAtMost(255.0)
-                    )
-                    Core.inRange(hsvMat, lowerBound, upperBound, mask)
                 } else {
-                    val hueRange = 10.0
-                    val lowerBound = Scalar((hsv[0] - hueRange).coerceAtLeast(0.0), 100.0, 100.0)
-                    val upperBound = Scalar((hsv[0] + hueRange).coerceAtMost(180.0), 255.0, 255.0)
-                    Core.inRange(hsvMat, lowerBound, upperBound, mask)
+                    HueMask.inRangeAround(
+                        hsvMat, hsv[0].toDouble(), 10.0,
+                        sLo = 100.0, sHi = 255.0, vLo = 100.0, vHi = 255.0,
+                        out = mask, scratch = wrap,
+                    )
                 }
 
                 Imgproc.morphologyEx(mask, mask, Imgproc.MORPH_CLOSE, reusableMorphKernel)
@@ -294,6 +296,8 @@ class VisionRepository @Inject constructor(
             } else {
                 reusableMask?.release()
                 reusableMask = null
+                reusableWrapMask?.release()
+                reusableWrapMask = null
                 null
             }
 

@@ -13,6 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seen from above, the gesture and swiper are clockwise-positive, and nothing converted between
   them (`TableFrameHomography.clockwiseToWorldYaw`). The sensor path was already right.
 
+### Fixed — Hue wraps; ball tracks match optimally
+
+- **Hue is a circle everywhere it is averaged or windowed.** OpenCV hue runs 0..180 and wraps, red
+  and maroon felt sits across the seam, and the linear mean of hues 170 and 10 is 90 (green). The
+  felt auto-detector averaged hue linearly, and the felt masks (`TableFitter`, `CvBallDetector`, the
+  CV debug mask) used a linear window that silently matched nothing across the seam. Now a circular
+  mean and spread (`HueMath`, from a hue histogram) and wrapping `inRange` windows (`HueMask`).
+  (`FeltColorMatch` and the plane-estimate mask already wrapped.)
+- **Detections are matched to last frame's tracks, and the cue/target anchors to detections,
+  optimally** (`Assignment`, the Hungarian algorithm) instead of nearest-in-turn, which let an early
+  detection take the track a later one needed: two close balls could swap or drop a track, and both
+  anchors could follow the same candidate. From the Pool-Aid paper's matching idea.
+
 ### Changed — AR tracking loss and the felt fit
 
 - **A table that tracking lost no longer stays lost.** An unlocked table whose anchor ARCore

@@ -153,6 +153,17 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   learner needs no training data, and the pose log feeds a future trained
   model.
 
+- **Hue is averaged and windowed as a circle.** `HueMath` (pure) holds the circular mean/spread
+  of a hue histogram and the wrapping windows; `HueMask` (OpenCV) applies them. Reason: OpenCV hue
+  wraps at 180, red felt straddles the seam, and a linear mean of 170 and 10 is 90.
+  `FeltColorMatch` (Android HSV, degrees) already measured hue distance on the circle.
+
+- **Tracks and anchors are matched with `Assignment` (Hungarian), not nearest-in-turn.** Reason:
+  the greedy match is order-dependent and can leave a later detection without a track that an
+  assignment giving everyone one would have found. Pairs are gated (`SNAP_PROXIMITY_THRESHOLD`,
+  three times that for anchors), so the matching maximises matched pairs within the gate first,
+  then minimises total distance.
+
 - **The AR preview is put back by the felt only when it is suspect, and only by a sure fit.**
   The felt fit still never pulls a world-anchored table frame to frame. But for
   `SUSPECT_NANOS` after tracking returns from a loss, a fresh placement or a dropped lock, a fit
