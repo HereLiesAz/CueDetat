@@ -66,8 +66,6 @@ class TableFitter {
         val orientationConfidence: Float = 1f,
         /** 0..1: how little the outline moved over the last few fits; set by the caller. */
         val stability: Float = 0f,
-        /** Mean distance, in frame pixels, from the outline's edges to the felt's boundary. */
-        val edgeResidualPx: Float = 0f,
     ) {
         /** One number for "is this fit to be believed" ([TableFitQuality]). */
         val quality: Float get() = TableFitQuality.of(iou, stability)
@@ -154,7 +152,6 @@ class TableFitter {
             iou = iou(pose, a, viewToFrame, corners).toFloat(),
             viewQuad = viewQuad(pose, a, corners),
             orientationConfidence = orientationConfidence(best, a, viewToFrame, corners, prior),
-            edgeResidualPx = (edgeResidual(pose, a, viewToFrame, corners) * EDGE_CAP_PX).toFloat(),
         )
     }
 

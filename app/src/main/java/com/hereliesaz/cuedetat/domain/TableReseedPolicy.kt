@@ -30,13 +30,22 @@ class TableReseedPolicy(
         reseeds = 0
     }
 
+    /** Restart the run of disagreements, keeping the count of reseeds already made. */
+    fun restartRun() {
+        disagreeing = 0
+    }
+
     /**
      * @param agreement Overlap (0..1) of the projected table with the fit's outline.
      * @param fitQuality [TableFitQuality.of] for this fit.
      * @param userBusy True while the user has just touched the table; nothing is judged then.
      */
     fun onFit(agreement: Float, fitQuality: Float, userBusy: Boolean): Verdict {
-        if (fitQuality < sureQuality) return Verdict.NONE
+        if (fitQuality < sureQuality) {
+            // An unsure fit (moving camera, glare) breaks the run: "in a row" means in a row.
+            disagreeing = 0
+            return Verdict.NONE
+        }
         if (agreement >= verifiedAgreement) {
             disagreeing = 0
             return Verdict.VERIFIED

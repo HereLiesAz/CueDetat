@@ -67,6 +67,10 @@ private const val SCALE_FIT_MAX = 1.25f
 /** A saved-placement restore keeps looking this long, retrying after each no-match. */
 private const val RESTORE_WINDOW_MS = 60_000L
 private const val RESTORE_RETRY_DELAY_MS = 2_000L
+/** The retry delay grows with each attempt (2 s, 4 s, ...) up to this. */
+private const val RESTORE_RETRY_MAX_DELAY_MS = 8_000L
+/** A restore that fails because the service did is tried this many times, not for the whole window. */
+private const val RESTORE_SERVICE_ATTEMPTS = 3
 
 /** Height and derived pitch for the camera's position above the detected table plane. */
 data class CameraAbovePlane(val pitchDegrees: Float, val heightM: Float)
@@ -315,13 +319,20 @@ class ArTableSession(
                                 } else {
                                     anchor?.detach()
                                     val now = System.currentTimeMillis()
-                                    if (state.name in ArTrackingMessages.retryableResolveStates && now < deadline) {
+                                    // Scanning fixes "not seen yet"; it doesn't fix a service that is down.
+                                    val noMatch = state.name == "ERROR_RESOLVING_LOCALIZATION_NO_MATCH"
+                                    val retry = state.name in ArTrackingMessages.retryableResolveStates &&
+                                        now < deadline && (noMatch || request.attempt < RESTORE_SERVICE_ATTEMPTS)
+                                    if (retry) {
                                         // Not seen yet is not "not here": keep looking while the user scans.
                                         if (request.attempt == 1) cloudMessage(ArTrackingMessages.RESTORE_STILL_LOOKING)
-                                        cloudRequest.compareAndSet(
+                                        val delay = minOf(RESTORE_RETRY_MAX_DELAY_MS, RESTORE_RETRY_DELAY_MS * request.attempt)
+                                        val queued = cloudRequest.compareAndSet(
                                             null,
-                                            CloudRequest.Restore(c, deadline, now + RESTORE_RETRY_DELAY_MS, request.attempt + 1),
+                                            CloudRequest.Restore(c, deadline, now + delay, request.attempt + 1),
                                         )
+                                        // The user asked for something else meanwhile: say the restore stopped.
+                                        if (!queued) cloudMessage("Restore stopped.")
                                     } else {
                                         cloudMessage(ArTrackingMessages.resolveFailed(state.name))
                                     }
@@ -405,6 +416,7 @@ class ArTableSession(
     private var suspectUntilNanos = 0L
     private var lastScreenQuad: List<Pt>? = null
     private var lockedBadSinceNanos = 0L
+    private var previewBadSinceNanos = 0L
     @Volatile private var unlockWaitingSinceNanos = 0L
 
     /** Status lines for the UI, drained each frame ([FrameUpdate.notices]). */
@@ -521,12 +533,27 @@ class ArTableSession(
     fun onTrackingResumed() {
         beginSuspicion()
         cornerSmoother.reset()
+        // Both were last written before the loss: a stale quad would be judged against fresh
+        // fits, and a stale "bad since" would drop a lock that has barely had time to re-track.
+        lastScreenQuad = null
+        lockedBadSinceNanos = 0L
+        previewBadSinceNanos = 0L
     }
 
+    /** A new window: the table was placed fresh, tracking came back, or a lock was dropped. */
     private fun beginSuspicion() {
         suspectUntilNanos = System.nanoTime() + SUSPECT_NANOS
         reseedPolicy.reset()
         lastFitHandled = null
+    }
+
+    /**
+     * After a reseed: judge the result against the next fits, in the same window. The policy's
+     * count of reseeds is kept (that is what bounds them); only the run of disagreements restarts.
+     */
+    private fun continueSuspicion() {
+        suspectUntilNanos = System.nanoTime() + SUSPECT_NANOS
+        reseedPolicy.restartRun()
     }
     fun getSession(): Session? = session
 
@@ -681,8 +708,16 @@ class ArTableSession(
             TableReseedPolicy.Verdict.VERIFIED -> suspectUntilNanos = 0L
             TableReseedPolicy.Verdict.RESEED -> {
                 val input = previewInput.get() ?: return
-                seedPreviewFromQuad(frame, fit.quad, fit.orientationConfidence, input, view, proj, vpW, vpH)
-                    ?.let { suggestedScale = it }
+                val (curRight, curAway) = TableFrameHomography.headingAfterYaw(
+                    previewRight, previewAway,
+                    TableFrameHomography.clockwiseToWorldYaw(input.rotationDegrees - previewInitialRotation),
+                )
+                val before = previewAnchor
+                val ratio = seedPreviewFromQuad(
+                    frame, fit.quad, fit.orientationConfidence, curRight, curAway, input, view, proj, vpW, vpH,
+                )
+                if (previewAnchor !== before) continueSuspicion()
+                ratio?.let { suggestedScale = it }
             }
             TableReseedPolicy.Verdict.NONE -> Unit
         }
@@ -697,11 +732,13 @@ class ArTableSession(
      *
      * The felt can't tell the table's ends apart, so the heading closest to the current one is
      * taken; and when the fit isn't sure of the heading ([orientationConfidence] under
-     * [ORIENTATION_TRUST]) the current heading stays and only the position moves.
+     * [ORIENTATION_TRUST]) the current heading ([curRight], [curAway]: the table's axes as drawn
+     * now, or camera-facing for a first placement) stays and only the position moves.
+     * The caller starts or continues the suspect window.
      */
     private fun seedPreviewFromQuad(
-        frame: Frame, quad: List<Pt>, orientationConfidence: Float, input: PreviewInput,
-        view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int,
+        frame: Frame, quad: List<Pt>, orientationConfidence: Float, curRight: Vec3, curAway: Vec3,
+        input: PreviewInput, view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int,
     ): Float? {
         val s = session ?: return null
         if (quad.size != 4) return null
@@ -727,10 +764,6 @@ class ArTableSession(
         // The preview's axes are always right = (-away.z, away.x); a mirrored reading is no table.
         if (calibrated.right.z * calibrated.away.x - calibrated.right.x * calibrated.away.z <= 0f) return null
 
-        val (curRight, curAway) = TableFrameHomography.headingAfterYaw(
-            previewRight, previewAway,
-            TableFrameHomography.clockwiseToWorldYaw(input.rotationDegrees - previewInitialRotation),
-        )
         val fitRight = calibrated.right
         val fitAway = calibrated.away
         val sameEnds = fitAway.x * curAway.x + fitAway.z * curAway.z >= 0f
@@ -753,7 +786,6 @@ class ArTableSession(
         previewOffset = Vec3(0f, 0f, 0f)
         previewInitialRotation = input.rotationDegrees
         previousPreviewInput = input
-        beginSuspicion()
 
         val measured = hypot((worlds[1].x - worlds[0].x).toDouble(), (worlds[1].z - worlds[0].z).toDouble()).toFloat()
         val nominal = (input.corners[1].x - input.corners[0].x) / TableFrameHomography.LOGICAL_UNITS_PER_METER
@@ -770,22 +802,25 @@ class ArTableSession(
         frame: Frame, input: PreviewInput, view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int,
     ) {
         val s = session ?: return
-        // A fit from just before (the table was lost, not first placed) puts it back on the felt.
-        latestFit?.takeIf {
-            System.nanoTime() - it.atNanos < FIT_FRESH_NANOS && it.quality >= INIT_FIT_QUALITY
-        }?.let { fit ->
-            val ratio = seedPreviewFromQuad(frame, fit.quad, fit.orientationConfidence, input, view, proj, vpW, vpH)
-            if (previewAnchor != null) {
-                ratio?.let { suggestedScale = it }
-                return
-            }
-        }
         val camera = frame.camera.pose
         val cameraBack = camera.zAxis
         val horizontal = hypot(cameraBack[0].toDouble(), cameraBack[2].toDouble()).toFloat()
         if (horizontal < 0.05f) return
         val away = Vec3(-cameraBack[0] / horizontal, 0f, -cameraBack[2] / horizontal)
         val right = Vec3(-away.z, 0f, away.x)
+        // A fit from just before (the table was lost, not first placed) puts it back on the felt.
+        latestFit?.takeIf {
+            System.nanoTime() - it.atNanos < FIT_FRESH_NANOS && it.quality >= INIT_FIT_QUALITY
+        }?.let { fit ->
+            val ratio = seedPreviewFromQuad(
+                frame, fit.quad, fit.orientationConfidence, right, away, input, view, proj, vpW, vpH,
+            )
+            if (previewAnchor != null) {
+                ratio?.let { suggestedScale = it }
+                beginSuspicion()
+                return
+            }
+        }
         val hits = frame.hitTest(vpW / 2f, vpH / 2f)
         val hit = hits.firstOrNull { supportsDepth && it.trackable is DepthPoint }
             ?: hits.firstOrNull { h ->
@@ -841,7 +876,19 @@ class ArTableSession(
             }
             return
         }
-        if (anchor.trackingState != TrackingState.TRACKING) return
+        if (anchor.trackingState != TrackingState.TRACKING) {
+            // Paused is waited out, but not for ever: as for a locked anchor, past the grace the
+            // table is placed again rather than left undrawn.
+            val now = System.nanoTime()
+            if (previewBadSinceNanos == 0L) previewBadSinceNanos = now
+            else if (now - previewBadSinceNanos > LOCK_GRACE_NANOS) {
+                previewBadSinceNanos = 0L
+                clearPreview()
+                notices.add("The table's place wouldn't track. Placing it again.")
+            }
+            return
+        }
+        previewBadSinceNanos = 0L
         val previous = previousPreviewInput ?: input
         val pose = anchor.pose
         val center = Vec3(pose.tx() + previewOffset.x,

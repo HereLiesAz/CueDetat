@@ -255,7 +255,7 @@ data class CueDetatState(
     // exactly once in comparableFields() below. Nothing enforces this -- it is
     // maintained by hand -- and a field that is added here but forgotten there
     // is compared by neither equals() nor hashCode(), which silently defeats
-    // StateFlow conflation for that field alone. Verified in sync at 119/119 (recounted by
+    // StateFlow conflation for that field alone. Verified in sync at 120/120 (recounted by
     // script over constructor vs list) as of this change.
     //
     // The list exists because three fields are FloatArray? (relocaliserDeltaQ,

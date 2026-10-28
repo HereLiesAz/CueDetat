@@ -428,7 +428,12 @@ class VisionRepository @Inject constructor(
     ) {
         val now = System.currentTimeMillis()
         if (now - lastTableFitMs < TABLE_FIT_INTERVAL_MS) return
-        if (state.cameraMode == CameraMode.OFF || state.isArTableLocked || state.isBeginnerViewLocked) return
+        if (state.cameraMode == CameraMode.OFF || state.isArTableLocked || state.isBeginnerViewLocked) {
+            // Not fitting now (camera off, table locked): the next fit must not be averaged with
+            // quads from before.
+            fitStabilizer.reset()
+            return
+        }
         val pitch = state.pitchMatrix ?: return
         val felt = state.lockedHsvColor ?: autoFelt?.hsv ?: lastFeltDetection?.hsv ?: return
         val feltSd = state.lockedHsvStdDev ?: autoFelt?.stdDev ?: lastFeltDetection?.stdDev ?: floatArrayOf(8f, 40f, 50f)

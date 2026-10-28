@@ -6,7 +6,7 @@ Companion to [`AGENTS.md`](AGENTS.md). What shouldn't live in a prompt. Re-read 
 
 ## Current version
 
-`1.11.0.1` (MAJOR.MINOR.PATCH.BUILD) — see [`version.properties`](version.properties). Never revert this file.
+`1.12.2.1` (MAJOR.MINOR.PATCH.BUILD) — see [`version.properties`](version.properties). Never revert this file.
 
 `version.properties` holds two key sets. **Authoritative: the uppercase set**
 (`MAJOR`, `MINOR`, `PATCH`, `BUILD`, `LAST_MAJOR`, `LAST_MINOR`), read by
@@ -66,7 +66,7 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
 
 - **`CueDetatState.comparableFields()` stays in sync with the primary
   constructor field list** (`app/src/main/java/com/hereliesaz/cuedetat/domain/UiModel.kt`,
-  list at :260, `equals`/`hashCode` at :289/:295).
+  list at :272, `equals`/`hashCode` at :301/:307).
   Reason: `equals`/`hashCode` are hand-maintained over 120 fields; drift here
   silently breaks state-diffing used for recomposition/undo.
   **Unenforced**: no compiler check or test. Verify by counting both lists

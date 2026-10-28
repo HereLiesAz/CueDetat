@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the fit is sure of it) and size (if within 0.8-1.25x). At most twice, never while the table is
   being touched or Lock View is on. (`TableReseedPolicy`, `QuadOverlap`,
   `ArTableSession.seedPreviewFromQuad`.)
+  Not covered: a *locked* table that ARCore re-finds in the wrong place with its anchor still
+  tracking (fits are off while locked): Unlock, and the table is re-seeded from the felt.
 - **Saved-placement restore keeps looking.** ARCore answers "no match" until the camera has seen
   enough; Restore now retries every 2 s for up to a minute while the user scans, and each failure
   says what happened (expired, not authorised, service down, no match) instead of an enum name.

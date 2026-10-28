@@ -48,6 +48,22 @@ class TableReseedPolicyTest {
     }
 
     @Test
+    fun `an unsure fit in the run breaks it`() {
+        val p = TableReseedPolicy()
+        p.onFit(0.3f, 0.9f, false); p.onFit(0.3f, 0.9f, false)
+        p.onFit(0.3f, 0.4f, false)
+        assertEquals(Verdict.NONE, p.onFit(0.3f, 0.9f, false))
+    }
+
+    @Test
+    fun `restarting the run keeps the count of reseeds`() {
+        val p = TableReseedPolicy(maxReseeds = 1)
+        repeat(3) { p.onFit(0.3f, 0.9f, false) } // the one reseed
+        p.restartRun()
+        repeat(10) { assertEquals(Verdict.NONE, p.onFit(0.3f, 0.9f, false)) }
+    }
+
+    @Test
     fun `reset starts a new window`() {
         val p = TableReseedPolicy(maxReseeds = 1)
         repeat(3) { p.onFit(0.3f, 0.9f, false) }
