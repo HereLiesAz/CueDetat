@@ -15,6 +15,9 @@ When a touch gesture begins, its intent is determined by the following order of 
       the AR table has a metric size, zoom there moves it toward or away from the camera, and the
       pinch resizes it in place (`tableFitScale`, 0.6–1.6× the selected table; reset by Reset).
       The zoom slider keeps the range.
+    * **A tap while a ball pick is armed** (the rail's Cue / Target buttons, or first-run setup)
+      places that ball (`ArSurfaceTapped`, on release). While a pick is armed, touch-down does
+      nothing else.
     * **Three fingers** dragging vertically move the table's height (`MoveTableZ`), but only when
       all three move the same way (`isCoherentVerticalDrag`); a resting thumb doesn't count.
     * **Twisting** (`calculateRotation`) dispatches a `TableRotationApplied` event. Positive is

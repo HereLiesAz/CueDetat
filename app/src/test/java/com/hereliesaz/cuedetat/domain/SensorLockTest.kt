@@ -20,6 +20,7 @@ class SensorLockTest {
     @Test
     fun `Lock View still freezes the AR projection as promised`() {
         assertTrue(SensorLock.blocks(MainScreenEvent.ArTableMatrixUpdated(null)))
+        assertTrue(SensorLock.blocks(MainScreenEvent.SetTableFitScale(1.1f)))
         assertTrue(SensorLock.blocks(
             MainScreenEvent.FullOrientationChanged(FullOrientation(45f, 0f, 0f))
         ))

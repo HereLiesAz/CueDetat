@@ -155,6 +155,8 @@ fun AzNavRailMenu(
     val rail_aimText = stringResource(R.string.rail_aim)
     val rail_bankText = stringResource(R.string.rail_bank)
     val rail_addText = stringResource(R.string.rail_add)
+    val rail_cue_ballText = stringResource(R.string.rail_cue_ball)
+    val rail_target_ballText = stringResource(R.string.rail_target_ball)
     val rail_dynamicText = stringResource(R.string.rail_dynamic)
     val rail_staticText = stringResource(R.string.rail_static)
     val rail_clearText = stringResource(R.string.rail_clear)
@@ -412,6 +414,22 @@ fun AzNavRailMenu(
         }
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
+            // Tap one, then tap that ball on the screen: set both balls up, then drag to aim.
+            // Coloured as the virtual balls are drawn (the cue ball's ring, the target's).
+            azRailToggle(
+                id = "pick_cue",
+                isChecked = uiState.ballSelectionPhase == BallSelectionPhase.AWAITING_CUE,
+                toggleOnText = rail_cue_ballText, toggleOffText = rail_cue_ballText,
+                fillColor = com.hereliesaz.cuedetat.view.config.ball.ActualCueBall().strokeColor,
+                onClick = { onEvent(MainScreenEvent.BeginBallSelection(BallSelectionPhase.AWAITING_CUE)) }
+            )
+            azRailToggle(
+                id = "pick_target",
+                isChecked = uiState.ballSelectionPhase == BallSelectionPhase.AWAITING_TARGET,
+                toggleOnText = rail_target_ballText, toggleOffText = rail_target_ballText,
+                fillColor = com.hereliesaz.cuedetat.view.config.ball.TargetBall().strokeColor,
+                onClick = { onEvent(MainScreenEvent.BeginBallSelection(BallSelectionPhase.AWAITING_TARGET)) }
+            )
             azRailToggle(id = "bank", isChecked = uiState.isBankingMode, toggleOnText = rail_aimText, toggleOffText = rail_bankText, fillColor = b6G, onClick = { onEvent(MainScreenEvent.ToggleBankingMode) })
             azRailItemLowerCase(id = "add_obstacle", text = rail_addText, fillColor = b7M, onClick = { onEvent(MainScreenEvent.AddObstacleBall) })
         }

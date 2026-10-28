@@ -608,8 +608,10 @@ class MainViewModel @Inject constructor(
                 lastUserTableAdjustMs = now
 
             is MainScreenEvent.TableFitUpdated -> {
-                // World-fixed preview cannot be pulled by a noisy frame-by-frame felt fit.
-                if (after.cameraMode == CameraMode.AR_ACTIVE && after.arTableMatrix != null) return
+                // World-fixed preview cannot be pulled by a noisy frame-by-frame felt fit. Not just
+                // while the matrix exists: during a tracking loss it is null, and a pull then would
+                // change pan and zoom, which the AR session reads as the user's hand on the table.
+                if (com.hereliesaz.cuedetat.domain.ArProjectionPolicy.isWorldTracked(after.cameraMode, after.depthCapability)) return
                 val fit = event.fit ?: return
                 val current = poseOf(after)
                 com.hereliesaz.cuedetat.domain.TableSnapPolicy.pullStep(
@@ -645,7 +647,9 @@ class MainViewModel @Inject constructor(
                 val prior = tablePrior(state.currentOrientation.yaw, state.currentOrientation.pitch)?.prediction
                 // A GPS fix can take seconds; if the user has touched the table since, leave it.
                 if (prior != null && prior.confidence >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.PRIOR_APPLY_CONFIDENCE &&
-                    lastUserTableAdjustMs <= startedMs && !state.isBeginnerViewLocked && !state.isArTableLocked
+                    lastUserTableAdjustMs <= startedMs && !state.isBeginnerViewLocked && !state.isArTableLocked &&
+                    // The sensor-model pose means nothing to a world-anchored table.
+                    !com.hereliesaz.cuedetat.domain.ArProjectionPolicy.isWorldTracked(state.cameraMode, state.depthCapability)
                 ) {
                     onEvent(MainScreenEvent.ApplyTablePose(state.viewOffset.x, state.viewOffset.y, prior.rotationDeg, prior.zoom))
                 }
@@ -768,6 +772,7 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.SizeChanged, is MainScreenEvent.ZoomScaleChanged, is MainScreenEvent.ZoomSliderChanged,
             is MainScreenEvent.PanView, is MainScreenEvent.TableRotationChanged,
             is MainScreenEvent.TableRotationApplied, is MainScreenEvent.TableScaleChanged,
+            is MainScreenEvent.SetTableFitScale,
             is MainScreenEvent.SetExperienceMode, is MainScreenEvent.ToggleBankingMode,
             is MainScreenEvent.SetTableSize,
             // MoveTableZ (table-height slider) feeds the rendering matrices in

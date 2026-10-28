@@ -185,6 +185,8 @@
     <string name="rail_aim">aim</string>
     <string name="rail_bank">bank</string>
     <string name="rail_add">add</string>
+    <string name="rail_cue_ball">cue</string>
+    <string name="rail_target_ball">target</string>
     <string name="rail_dynamic">dynamic</string>
     <string name="rail_static">static</string>
     <string name="rail_clear">clear</string>

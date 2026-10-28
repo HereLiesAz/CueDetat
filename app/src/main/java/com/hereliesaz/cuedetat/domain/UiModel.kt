@@ -255,7 +255,7 @@ data class CueDetatState(
     // exactly once in comparableFields() below. Nothing enforces this -- it is
     // maintained by hand -- and a field that is added here but forgotten there
     // is compared by neither equals() nor hashCode(), which silently defeats
-    // StateFlow conflation for that field alone. Verified in sync at 119/119 (recounted by
+    // StateFlow conflation for that field alone. Verified in sync at 120/120 (recounted by
     // script over constructor vs list) as of this change.
     //
     // The list exists because three fields are FloatArray? (relocaliserDeltaQ,
@@ -330,6 +330,12 @@ sealed class MainScreenEvent {
     data class TableRotationApplied(val degrees: Float) : MainScreenEvent()
     /** Pinch factor (>1 grows) for the AR table's physical size; clamped by the reducer. */
     data class TableScaleChanged(val factor: Float) : MainScreenEvent()
+    /** The AR session measured the real table's size: set [CueDetatState.tableFitScale] to [scale]. */
+    data class SetTableFitScale(val scale: Float) : MainScreenEvent()
+    /** A status line from AR tracking (null clears it): why tracking is lost, that it is back. */
+    data class ArNotice(val message: String?) : MainScreenEvent()
+    /** The AR session lost the locked table's anchor for good; it is no longer locked. */
+    data class ArTableLockLost(val message: String) : MainScreenEvent()
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
     /**
      * AR zoom jog / +- buttons: scale the unlocked table's apparent size by [factor] by moving it
@@ -458,6 +464,8 @@ sealed class MainScreenEvent {
     object TurnCameraOff : MainScreenEvent()
     object ArTrackingLost : MainScreenEvent()
     data class ArSurfaceTapped(val screenPoint: PointF) : MainScreenEvent()
+    /** The Cue ball / Target ball buttons: arm that pick (the next tap places it); again disarms. */
+    data class BeginBallSelection(val phase: BallSelectionPhase) : MainScreenEvent()
     object ToggleTargetType : MainScreenEvent()
     object ToggleTopDownView : MainScreenEvent()
     object ClearTopDownView : MainScreenEvent()

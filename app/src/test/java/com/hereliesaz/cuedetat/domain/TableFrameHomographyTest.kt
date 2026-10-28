@@ -363,4 +363,14 @@ class TableFrameHomographyTest {
         assertEquals(centre.x, (grown[0].x + grown[2].x) / 2f, 1e-4f)
         assertEquals(centre.z, (grown[0].z + grown[2].z) / 2f, 1e-4f)
     }
+
+    @Test
+    fun `a counter-clockwise quarter turn carries east to north and north to west`() {
+        // Seen from above, camera looking along -z: right = east (+x), away = north (-z).
+        val (right, away) = TableFrameHomography.headingAfterYaw(
+            Vec3(1f, 0f, 0f), Vec3(0f, 0f, -1f), 90f,
+        )
+        assertEquals(0f, right.x, 1e-5f); assertEquals(-1f, right.z, 1e-5f)
+        assertEquals(-1f, away.x, 1e-5f); assertEquals(0f, away.z, 1e-5f)
+    }
 }

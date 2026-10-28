@@ -6,7 +6,7 @@ Companion to [`AGENTS.md`](AGENTS.md). What shouldn't live in a prompt. Re-read 
 
 ## Current version
 
-`1.11.0.1` (MAJOR.MINOR.PATCH.BUILD) — see [`version.properties`](version.properties). Never revert this file.
+`1.12.2.1` (MAJOR.MINOR.PATCH.BUILD) — see [`version.properties`](version.properties). Never revert this file.
 
 `version.properties` holds two key sets. **Authoritative: the uppercase set**
 (`MAJOR`, `MINOR`, `PATCH`, `BUILD`, `LAST_MAJOR`, `LAST_MINOR`), read by
@@ -66,7 +66,7 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
 
 - **`CueDetatState.comparableFields()` stays in sync with the primary
   constructor field list** (`app/src/main/java/com/hereliesaz/cuedetat/domain/UiModel.kt`,
-  list at :260, `equals`/`hashCode` at :289/:295).
+  list at :272, `equals`/`hashCode` at :301/:307).
   Reason: `equals`/`hashCode` are hand-maintained over 120 fields; drift here
   silently breaks state-diffing used for recomposition/undo.
   **Unenforced**: no compiler check or test. Verify by counting both lists
@@ -152,6 +152,20 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   the user asked for snapping with persistence and a prediction model; the
   learner needs no training data, and the pose log feeds a future trained
   model.
+
+- **The AR preview is put back by the felt only when it is suspect, and only by a sure fit.**
+  The felt fit still never pulls a world-anchored table frame to frame. But for
+  `SUSPECT_NANOS` after tracking returns from a loss, a fresh placement or a dropped lock, a fit
+  of quality >= 0.8 (overlap discounted by how steady the last five fits were:
+  `TableFitQuality`, `TableFitStabilizer`) that overlaps the projected table < 0.9 on three
+  fits in a row re-seeds the preview from the fit's outline (`ArTableSession.seedPreviewFromQuad`;
+  at most twice a window, `TableReseedPolicy`), never while the user is touching the table or
+  Lock View is on. Heading is taken from the fit only if its orientation confidence is >= 0.5,
+  and the end closest to the current one is kept (the felt can't tell head from foot). A locked
+  anchor ARCore has stopped (or not tracked for 5 s) drops the lock rather than leave a "locked"
+  table that is never drawn. Reason: after tracking loss ARCore may re-find the world somewhere
+  else, the anchors then agree with themselves and nothing inside ARCore can say they are wrong;
+  the image can.
 
 - **Felt colour picks the table's plane.** At lock, points across the virtual
   table are sampled from the camera image; only felt-coloured ones

@@ -31,6 +31,15 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             valuesChangedSinceReset = true
         )
 
+        is MainScreenEvent.SetTableFitScale -> state.copy(
+            tableFitScale = action.scale.coerceIn(MIN_TABLE_FIT_SCALE, MAX_TABLE_FIT_SCALE),
+        )
+
+        is MainScreenEvent.ArNotice -> state.copy(warningText = action.message)
+
+        is MainScreenEvent.ArTableLockLost ->
+            state.copy(isArTableLocked = false, warningText = action.message)
+
         // Hand rotation (swiper, rotate gesture): moves the table and the user's own tally.
         is MainScreenEvent.TableRotationApplied -> state.copy(
             worldRotationDegrees = state.worldRotationDegrees + action.degrees,
