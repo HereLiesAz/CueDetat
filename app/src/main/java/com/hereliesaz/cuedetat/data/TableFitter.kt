@@ -226,7 +226,7 @@ class TableFitter {
     private fun buildEdgeField() {
         Imgproc.morphologyEx(feltMask, edgeMask, Imgproc.MORPH_GRADIENT, gradientKernel)
         Core.bitwise_not(edgeMask, edgeInverse)
-        Imgproc.distanceTransform(edgeInverse, edgeDistance, Imgproc.DIST_L2, 3)
+        Imgproc.distanceTransform(edgeInverse, edgeDistance, DIST_L2, 3)
         edgeW = edgeDistance.cols()
         edgeH = edgeDistance.rows()
         val n = edgeW * edgeH
@@ -380,6 +380,8 @@ class TableFitter {
         const val EVALUATIONS_PER_START = 90
         const val REFINE_EVALUATIONS = 60
         const val RIVAL_EVALUATIONS = 60
+        /** cv::DIST_L2: this OpenCV binding's Imgproc has no DIST_L2 constant. */
+        const val DIST_L2 = 2
         const val K_SIGMA = 2.5
         const val LOOSE_K = 3.5
         const val INNER_FRACTION = 0.7f
