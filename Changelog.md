@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seen from above, the gesture and swiper are clockwise-positive, and nothing converted between
   them (`TableFrameHomography.clockwiseToWorldYaw`). The sensor path was already right.
 
+### Added — Ball detector training from the labelling pipeline
+
+- **`ml/cuedetat_ball_detector_kaggle.py` (+ `.ipynb`) trains a YOLOv8n ball detector** from the
+  Label Studio pipeline's export, with a per-class gate, TFLite/ONNX export and a report.
+  `ml/dataset/make_ball_dataset.py` turns `ls_to_yolo.py`'s seventeen classes into the app's
+  cue / eight / solid / stripe (or keeps all seventeen); `ball_classes.py` holds the mapping
+  (`prelabel.py` now imports `BALL_LABELS` from it), with tests (`python3 -m unittest
+  test_ball_classes`). Not wired into the app, and nothing has been trained yet.
+
 ### Fixed — Hue wraps; ball tracks match optimally
 
 - **Hue is a circle everywhere it is averaged or windowed.** OpenCV hue runs 0..180 and wraps, red

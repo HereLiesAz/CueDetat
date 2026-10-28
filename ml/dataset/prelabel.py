@@ -42,9 +42,9 @@ import cv2
 import numpy as np
 import requests
 
+from ball_classes import BALL_LABELS
 from perspective_score import felt_quad
 
-BALL_LABELS = ["cue"] + [str(n) for n in range(1, 16)] + ["ball"]
 
 # OpenCV hue (0-180) bands for the solid colours, and the number each names.
 HUE_BANDS = [
