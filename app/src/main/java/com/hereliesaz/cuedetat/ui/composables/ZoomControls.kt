@@ -2,8 +2,17 @@
 
 package com.hereliesaz.cuedetat.ui.composables
 
+import androidx.compose.animation.core.animate
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import com.hereliesaz.cuedetat.R
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,8 +48,15 @@ import kotlin.math.roundToInt
  * Material3 Slider is horizontal by default; [VerticalSlider] rotates it 270° and swaps its
  * layout constraints to render vertically.
  *
- * @param zoomSliderPosition Current zoom value (-50..50).
- * @param onZoomChange Callback for zoom changes.
+ * With ARCore world tracking the zoom slider is a self-centring jog ([isJog]): zoom there moves the
+ * table along the camera line by whatever it is told, so an absolute position means nothing and
+ * would only run into its end stops. Dragging nudges ([onNudge], in slider units) and the thumb
+ * springs back to centre on release; the +/- buttons nudge one unit.
+ *
+ * @param zoomSliderPosition Current zoom value (-50..50). Unused while [isJog].
+ * @param onZoomChange Callback for zoom changes. Unused while [isJog].
+ * @param isJog True under ARCore world tracking: the zoom slider and buttons nudge instead.
+ * @param onNudge Relative zoom change, in slider units (positive = closer), while [isJog].
  * @param tableHeight Current table Z offset (-50..50).
  * @param onTableHeightChange Callback for table-height changes (absolute value).
  * @param modifier Styling modifier.
@@ -51,7 +67,9 @@ fun ZoomControls(
     onZoomChange: (Float) -> Unit,
     tableHeight: Float,
     onTableHeightChange: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isJog: Boolean = false,
+    onNudge: (Float) -> Unit = {},
 ) {
     Column(
         modifier = modifier.fillMaxHeight(),
@@ -59,7 +77,7 @@ fun ZoomControls(
         verticalArrangement = Arrangement.Center
     ) {
         // Zoom In Button (+).
-        IconButton(onClick = { onZoomChange(zoomSliderPosition + 1) }) {
+        IconButton(onClick = { if (isJog) onNudge(1f) else onZoomChange(zoomSliderPosition + 1) }) {
             Icon(
                 Icons.Default.Add,
                 contentDescription = stringResource(R.string.zoom_in_a11y),
@@ -69,15 +87,19 @@ fun ZoomControls(
 
         // Zoom slider — takes half of the remaining space.
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            VerticalSlider(
-                value = zoomSliderPosition,
-                onValueChange = onZoomChange,
-                description = stringResource(R.string.zoom_level_a11y)
-            )
+            if (isJog) {
+                JogSlider(onNudge = onNudge, description = stringResource(R.string.zoom_level_a11y))
+            } else {
+                VerticalSlider(
+                    value = zoomSliderPosition,
+                    onValueChange = onZoomChange,
+                    description = stringResource(R.string.zoom_level_a11y)
+                )
+            }
         }
 
         // Zoom Out Button (-).
-        IconButton(onClick = { onZoomChange(zoomSliderPosition - 1) }) {
+        IconButton(onClick = { if (isJog) onNudge(-1f) else onZoomChange(zoomSliderPosition - 1) }) {
             Icon(
                 Icons.Default.Remove,
                 contentDescription = stringResource(R.string.zoom_out_a11y),
@@ -99,6 +121,31 @@ fun ZoomControls(
 }
 
 /**
+ * A [VerticalSlider] that rests at centre. Each drag step reports its change in slider units
+ * through [onNudge]; on release the thumb springs back to centre without reporting, so what the
+ * thumb shows is only the drag in progress and it can always be dragged further.
+ */
+@Composable
+private fun JogSlider(onNudge: (Float) -> Unit, description: String) {
+    var jog by remember { mutableFloatStateOf(0f) }
+    var returning by remember { mutableStateOf<Job?>(null) }
+    val scope = rememberCoroutineScope()
+    VerticalSlider(
+        value = jog,
+        onValueChange = { v ->
+            returning?.cancel()
+            val delta = v - jog
+            jog = v
+            onNudge(delta)
+        },
+        description = description,
+        onValueChangeFinished = {
+            returning = scope.launch { animate(jog, 0f) { v, _ -> jog = v } }
+        },
+    )
+}
+
+/**
  * A vertical Material3 [Slider] (rotated 270°), filling the height of its parent box.
  * Value range is fixed to -50..50 to match the zoom and table-Z clamps.
  */
@@ -107,11 +154,13 @@ private fun VerticalSlider(
     value: Float,
     onValueChange: (Float) -> Unit,
     description: String,
+    onValueChangeFinished: (() -> Unit)? = null,
 ) {
     val valueText = value.roundToInt().toString()
     Slider(
         value = value,
         onValueChange = onValueChange,
+        onValueChangeFinished = onValueChangeFinished,
         valueRange = -50f..50f,
         colors = SliderDefaults.colors(
             thumbColor = MaterialTheme.colorScheme.primary,

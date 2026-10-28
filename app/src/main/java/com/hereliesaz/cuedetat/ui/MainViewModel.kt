@@ -434,6 +434,7 @@ class MainViewModel @Inject constructor(
             arController.unlockTable()
         }
         when (event) {
+            is MainScreenEvent.NudgeTableRange -> arController.nudgeTableRange(event.factor)
             is MainScreenEvent.SaveCloudPlacement -> arController.saveCloudPlacement()
             is MainScreenEvent.RestoreCloudPlacement ->
                 arController.restoreCloudPlacement(_uiState.value.table.corners)
@@ -602,7 +603,7 @@ class MainViewModel @Inject constructor(
             // Any hand on the table (or the screen) holds the pull off.
             is MainScreenEvent.PanView, is MainScreenEvent.ZoomSliderChanged, is MainScreenEvent.ZoomScaleChanged,
             is MainScreenEvent.TableRotationChanged, is MainScreenEvent.TableRotationApplied,
-            is MainScreenEvent.TableScaleChanged,
+            is MainScreenEvent.TableScaleChanged, is MainScreenEvent.NudgeTableRange,
             is MainScreenEvent.ScreenGestureStarted, is MainScreenEvent.LogicalGestureStarted ->
                 lastUserTableAdjustMs = now
 
@@ -762,7 +763,7 @@ class MainViewModel @Inject constructor(
             // World-anchored table pose arrives ~30-60Hz from the ARCore GL thread. It must
             // recompute the matrices each frame so the overlay tracks as the user walks; routing it
             // to AIMING (the default) would silently freeze the table at its first pose.
-            is MainScreenEvent.ArTableMatrixUpdated -> UpdateType.MATRICES_ONLY
+            is MainScreenEvent.ArTableMatrixUpdated, is MainScreenEvent.NudgeTableRange -> UpdateType.MATRICES_ONLY
 
             is MainScreenEvent.SizeChanged, is MainScreenEvent.ZoomScaleChanged, is MainScreenEvent.ZoomSliderChanged,
             is MainScreenEvent.PanView, is MainScreenEvent.TableRotationChanged,

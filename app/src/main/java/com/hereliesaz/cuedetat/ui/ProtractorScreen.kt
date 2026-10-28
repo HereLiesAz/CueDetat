@@ -197,6 +197,14 @@ fun ProtractorScreen(
                     onZoomChange = { mainViewModel.onEvent(MainScreenEvent.ZoomSliderChanged(it)) },
                     tableHeight = uiState.tableZOffset,
                     onTableHeightChange = { mainViewModel.onEvent(MainScreenEvent.SetTableZ(it)) },
+                    isJog = com.hereliesaz.cuedetat.domain.ArProjectionPolicy.isWorldTracked(
+                        uiState.cameraMode, uiState.depthCapability,
+                    ),
+                    onNudge = { units ->
+                        mainViewModel.onEvent(
+                            MainScreenEvent.NudgeTableRange(ZoomMapping.unitsToFactor(units)),
+                        )
+                    },
                     modifier = Modifier
                         .fillMaxHeight(0.6f)
                         .padding(end = 12.dp)

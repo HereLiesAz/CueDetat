@@ -305,6 +305,23 @@ class ArTableSession(
     /** Physical size of the table relative to nominal (CueDetatState.tableFitScale). */
     @Volatile private var tableScale: Float = 1f
 
+    /**
+     * Range nudges from the UI thread (ArController.nudgeTableRange), multiplied together until
+     * the GL thread takes them. A ratio of apparent size: 2 puts the table at half the range.
+     */
+    private val nudgeLock = Any()
+    private var pendingRangeNudge = 1f
+
+    /** UI thread. Accumulates a relative range change for the next frame; see [takeRangeNudge]. */
+    fun nudgeRange(factor: Float) {
+        if (!factor.isFinite() || factor <= 0f) return
+        synchronized(nudgeLock) { pendingRangeNudge = (pendingRangeNudge * factor).coerceIn(0.05f, 20f) }
+    }
+
+    private fun takeRangeNudge(): Float = synchronized(nudgeLock) {
+        pendingRangeNudge.also { pendingRangeNudge = 1f }
+    }
+
     /** True once ARCore world tracking is available on this device. */
     fun isArCoreAvailable(): Boolean = try {
         ArCoreApk.getInstance().checkAvailability(context).isSupported
@@ -456,7 +473,9 @@ class ArTableSession(
         frame.camera.getViewMatrix(view, 0)
         frame.camera.getProjectionMatrix(proj, 0, 0.01f, 100f)
 
-        if (lockedTableAnchor == null) updatePreview(frame, view, proj, vpW, vpH)
+        // Taken every frame so a nudge made while locked is dropped, not applied on Unlock.
+        val rangeNudge = takeRangeNudge()
+        if (lockedTableAnchor == null) updatePreview(frame, view, proj, vpW, vpH, rangeNudge)
         val lockResult = pendingLock.getAndSet(null)?.let { performLock(frame, it, view, proj, vpW, vpH) }
         return FrameUpdate(buildTableMatrix(view, proj, vpW, vpH), lockResult, cloudFeedback())
     }
@@ -505,7 +524,9 @@ class ArTableSession(
      * zoom changes camera-to-table range with the pinhole 1/d law; it cannot scale the table
      * itself or deform its perspective as the camera pans.
      */
-    private fun updatePreview(frame: Frame, view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int) {
+    private fun updatePreview(
+        frame: Frame, view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int, rangeNudge: Float,
+    ) {
         val input = previewInput.get()
         if (input == null) {
             clearPreview()
@@ -544,21 +565,28 @@ class ArTableSession(
             }
         }
         if (previous.zoom > 0f && input.zoom > 0f && abs(input.zoom - previous.zoom) > 1e-5f) {
-            val cam = frame.camera.pose
-            val relX = pose.tx() + previewOffset.x - cam.tx()
-            val relZ = pose.tz() + previewOffset.z - cam.tz()
-            val currentRange = hypot(relX.toDouble(), relZ.toDouble()).toFloat()
-            if (currentRange > 0.05f) {
-                val desiredRange = (currentRange * previous.zoom / input.zoom)
-                    .coerceIn(0.65f, 8f)
-                previewOffset = Vec3(
-                    previewOffset.x + relX * (desiredRange / currentRange - 1f),
-                    previewOffset.y,
-                    previewOffset.z + relZ * (desiredRange / currentRange - 1f),
-                )
-            }
+            dollyPreview(frame, pose, previous.zoom / input.zoom)
         }
+        if (rangeNudge != 1f) dollyPreview(frame, pose, 1f / rangeNudge)
         previousPreviewInput = input
+    }
+
+    /**
+     * Moves the preview along the camera's line to the table so its range becomes [rangeRatio]
+     * times what it is now, within 0.65-8 m. The table keeps its size and heading.
+     */
+    private fun dollyPreview(frame: Frame, anchorPose: Pose, rangeRatio: Float) {
+        val cam = frame.camera.pose
+        val relX = anchorPose.tx() + previewOffset.x - cam.tx()
+        val relZ = anchorPose.tz() + previewOffset.z - cam.tz()
+        val currentRange = hypot(relX.toDouble(), relZ.toDouble()).toFloat()
+        if (currentRange <= 0.05f) return
+        val desiredRange = (currentRange * rangeRatio).coerceIn(0.65f, 8f)
+        previewOffset = Vec3(
+            previewOffset.x + relX * (desiredRange / currentRange - 1f),
+            previewOffset.y,
+            previewOffset.z + relZ * (desiredRange / currentRange - 1f),
+        )
     }
 
     /** Transfer the locked pose to an editable preview without changing its size or heading. */
