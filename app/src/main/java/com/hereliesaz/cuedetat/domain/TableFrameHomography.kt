@@ -265,6 +265,9 @@ object TableFrameHomography {
      * [heightMeters] lifts the whole table plane along its normal (the AR table-height / Z-slider
      * fix: height is applied in world space, in the same transform as the projection, so it always
      * points straight out of the real table).
+     *
+     * [smooth], when given, is applied to the four projected screen corners before the
+     * homography is solved (see [ScreenCornerSmoother]).
      */
     fun computeLogicalToScreen(
         view: FloatArray,
@@ -273,7 +276,8 @@ object TableFrameHomography {
         idealCornersLogical: List<Pt>,   // size 4, same order
         vpW: Int,
         vpH: Int,
-        heightMeters: Float = 0f
+        heightMeters: Float = 0f,
+        smooth: ((List<Pt>) -> List<Pt>)? = null,
     ): FloatArray? {
         if (cornersWorld.size != 4 || idealCornersLogical.size != 4) return null
         // planeNormal takes TL, TR, BL -> indices 0, 1, 3.
@@ -281,6 +285,6 @@ object TableFrameHomography {
         val screen = cornersWorld.map { corner ->
             worldToScreen(view, proj, raise(corner, n, heightMeters), vpW, vpH) ?: return null
         }
-        return solveHomography(idealCornersLogical, screen)
+        return solveHomography(idealCornersLogical, smooth?.invoke(screen) ?: screen)
     }
 }

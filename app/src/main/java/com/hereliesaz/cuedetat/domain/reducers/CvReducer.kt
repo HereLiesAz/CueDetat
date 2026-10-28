@@ -1,6 +1,10 @@
 package com.hereliesaz.cuedetat.domain.reducers
 
+import com.hereliesaz.cuedetat.domain.BallPlacement
+import com.hereliesaz.cuedetat.domain.BallSelectionPhase
 import com.hereliesaz.cuedetat.domain.CameraMode
+import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
+import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 
@@ -99,41 +103,46 @@ internal fun reduceCvAction(state: CueDetatState, action: MainScreenEvent): CueD
             val newList = state.savedFeltSamples.filterNot { it.id in action.ids }
             state.copy(savedFeltSamples = newList)
         }
+        // The Cue ball / Target ball buttons: arm that pick, or disarm it if it is already armed.
+        is MainScreenEvent.BeginBallSelection ->
+            state.copy(
+                ballSelectionPhase =
+                    if (state.ballSelectionPhase == action.phase) BallSelectionPhase.NONE else action.phase,
+            )
+
+        // The tap that completes a pick. Snaps to a detected ball within BallPlacement.SNAP_RADIUS,
+        // else goes where the finger landed; moves the virtual ball there either way.
         is MainScreenEvent.ArSurfaceTapped -> {
             val inverse = state.inversePitchMatrix ?: return state
-            val tappedLogical = com.hereliesaz.cuedetat.view.model.Perspective.screenToLogical(
-                android.graphics.PointF(action.screenPoint.x, action.screenPoint.y), 
+            val tapped = com.hereliesaz.cuedetat.view.model.Perspective.screenToLogical(
+                android.graphics.PointF(action.screenPoint.x, action.screenPoint.y),
                 inverse
             )
-            
-            val allDetectedBalls = state.visionData?.balls ?: emptyList()
-            
-            val nearestBallPos = allDetectedBalls.minByOrNull { ball ->
-                val dist = kotlin.math.hypot((ball.position.x - tappedLogical.x).toDouble(), (ball.position.y - tappedLogical.y).toDouble())
-                
-                // Preference matching: if we are looking for a specific type, prefer those detections
-                val isMatchingType = when (state.ballSelectionPhase) {
-                    com.hereliesaz.cuedetat.domain.BallSelectionPhase.AWAITING_TARGET -> {
-                        val targetIsStripe = state.targetType == com.hereliesaz.cuedetat.domain.TargetType.STRIPES
-                        (ball.type == com.hereliesaz.cuedetat.data.BallType.STRIPE && targetIsStripe) ||
-                        (ball.type == com.hereliesaz.cuedetat.data.BallType.SOLID && !targetIsStripe)
-                    }
-                    else -> false
-                }
-                
-                if (isMatchingType) dist * 0.5 else dist // 50% distance bonus for matching types
-            }?.position ?: tappedLogical
-
+            val placed = BallPlacement.resolve(
+                tapped, state.ballSelectionPhase, state.targetType,
+                state.snapCandidates, state.visionData?.balls,
+            )
+            // Only a snapped pick follows its detection; a free placement stays where it was put.
+            val anchor = if (placed.snapped) placed.position else null
             when (state.ballSelectionPhase) {
-                com.hereliesaz.cuedetat.domain.BallSelectionPhase.AWAITING_CUE -> state.copy(
-                    cueBallCvAnchor = nearestBallPos,
-                    ballSelectionPhase = com.hereliesaz.cuedetat.domain.BallSelectionPhase.AWAITING_TARGET
+                BallSelectionPhase.AWAITING_CUE -> state.copy(
+                    onPlaneBall = (state.onPlaneBall ?: OnPlaneBall(placed.position, LOGICAL_BALL_RADIUS))
+                        .copy(center = placed.position),
+                    cueBallCvAnchor = anchor,
+                    hasCueBallBeenMoved = true,
+                    // First-run setup carries on to the target; re-picking the cue ball does not.
+                    ballSelectionPhase = if (state.hasTargetBallBeenMoved || state.targetCvAnchor != null)
+                        BallSelectionPhase.NONE else BallSelectionPhase.AWAITING_TARGET,
+                    valuesChangedSinceReset = true,
                 )
-                com.hereliesaz.cuedetat.domain.BallSelectionPhase.AWAITING_TARGET -> state.copy(
-                    targetCvAnchor = nearestBallPos,
-                    ballSelectionPhase = com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE
+                BallSelectionPhase.AWAITING_TARGET -> state.copy(
+                    protractorUnit = state.protractorUnit.copy(center = placed.position),
+                    targetCvAnchor = anchor,
+                    hasTargetBallBeenMoved = true,
+                    ballSelectionPhase = BallSelectionPhase.NONE,
+                    valuesChangedSinceReset = true,
                 )
-                else -> state
+                BallSelectionPhase.NONE -> state
             }
         }
         is MainScreenEvent.ForceArActive -> {

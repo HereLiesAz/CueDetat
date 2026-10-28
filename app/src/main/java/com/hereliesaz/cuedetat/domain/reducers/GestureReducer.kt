@@ -50,41 +50,10 @@ class GestureReducer @Inject constructor() {
         val ballDragHitRadius = (LOGICAL_BALL_RADIUS * 8.0f) / currentZoom
         val touchRadius = ballDragHitRadius
 
-        // 0. Ball Selection Phase: tap near a confirmed snap candidate to attach a virtual ball.
-        // Needs detections, not a table scan: the phase is only entered with the camera on.
-        if (currentState.ballSelectionPhase != BallSelectionPhase.NONE) {
-            
-            val confirmed = currentState.snapCandidates?.filter { it.isConfirmed } ?: emptyList()
-            
-            val filteredConfirmed = when (currentState.ballSelectionPhase) {
-                BallSelectionPhase.AWAITING_TARGET -> confirmed.filter {
-                    it.ballType == BallType.UNKNOWN ||
-                    (currentState.targetType == TargetType.STRIPES && it.ballType == BallType.STRIPE) ||
-                    (currentState.targetType == TargetType.SOLIDS && it.ballType == BallType.SOLID)
-                }
-                else -> confirmed
-            }
-
-            val snapTapRadius = touchRadius * 2f
-            val closest = filteredConfirmed.minByOrNull { getDistance(event.logicalPoint, it.detectedPoint) }
-            if (closest != null && getDistance(event.logicalPoint, closest.detectedPoint) < snapTapRadius) {
-                return when (currentState.ballSelectionPhase) {
-                    BallSelectionPhase.AWAITING_CUE -> currentState.copy(
-                        onPlaneBall = currentState.onPlaneBall?.copy(center = closest.detectedPoint)
-                            ?: OnPlaneBall(center = closest.detectedPoint, radius = LOGICAL_BALL_RADIUS),
-                        cueBallCvAnchor = closest.detectedPoint,
-                        ballSelectionPhase = BallSelectionPhase.AWAITING_TARGET
-                    )
-                    BallSelectionPhase.AWAITING_TARGET -> currentState.copy(
-                        protractorUnit = currentState.protractorUnit.copy(center = closest.detectedPoint),
-                        targetCvAnchor = closest.detectedPoint,
-                        ballSelectionPhase = BallSelectionPhase.NONE
-                    )
-                    BallSelectionPhase.NONE -> currentState
-                }
-            }
-            // Tap missed all candidates — fall through to normal interaction
-        }
+        // 0. Ball Selection Phase: the pick is completed by the tap itself (ArSurfaceTapped, on
+        // release, so a drag or pinch is not a pick); the touch-down must not also place the ball
+        // or start moving something, or one tap would answer two prompts.
+        if (currentState.ballSelectionPhase != BallSelectionPhase.NONE) return currentState
 
         // LITE AR Snapping (Dynamic Beginner)
         if (currentState.experienceMode == ExperienceMode.BEGINNER && !currentState.isBeginnerViewLocked) {

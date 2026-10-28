@@ -153,11 +153,12 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
 
             // Gesture sequence ended (all fingers up).
             val uiState = currentState
-            if (!hasMovedDramatically && uiState.cameraMode != com.hereliesaz.cuedetat.domain.CameraMode.OFF) {
-                // If it was a tap during ball selection phase, handle it
-                if (uiState.ballSelectionPhase != com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE) {
-                    onEvent(MainScreenEvent.ArSurfaceTapped(PointF(down.position.x, down.position.y)))
-                }
+            // A tap while a ball pick is armed (Cue / Target button, or first-run setup) places it.
+            // Works with the camera off too: the pick is the user's explicit choice.
+            if (!hasMovedDramatically &&
+                uiState.ballSelectionPhase != com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE
+            ) {
+                onEvent(MainScreenEvent.ArSurfaceTapped(PointF(down.position.x, down.position.y)))
             }
             onEvent(MainScreenEvent.GestureEnded)
         }

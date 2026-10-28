@@ -13,6 +13,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seen from above, the gesture and swiper are clockwise-positive, and nothing converted between
   them (`TableFrameHomography.clockwiseToWorldYaw`). The sensor path was already right.
 
+### Added — Cue / Target ball buttons
+
+- **Two rail buttons, coloured as the virtual balls are drawn (the cue ball's ring, the target's).**
+  Tap one, then tap that ball on the screen: set both balls up, then drag to aim. A tap snaps to a
+  detected ball within three ball radii, otherwise the ball goes exactly where the finger landed;
+  pressing the armed button again cancels. Works with the camera off. Placing the cue ball carries
+  on to the target only while the target hasn't been placed.
+  (`MainScreenEvent.BeginBallSelection`, `BallPlacement`.)
+- **A pick is completed by the tap-up alone.** The touch-down used to place the ball from a
+  confirmed detection and the release then answered the next prompt too, so one tap could set the
+  cue and the target to the same ball. Previously a tap also moved nothing unless a detection was
+  near (it only set an anchor), and snapped to the nearest detection however far away.
+
+### Changed — AR table jitter
+
+- **The table's projected corners are smoothed (`ScreenCornerSmoother`, a One Euro filter).**
+  Tracking noise at rest is filtered hard; real motion (walking, panning, resizing) barely at all,
+  so the table steadies without swimming. Restarts on lock/unlock, tracking loss and any jump over
+  150 px. Not a fix for tracking that is lost or wrong.
+
 ### Fixed — AR sliders pinned at maximum
 
 - **The zoom slider is a self-centring jog under ARCore world tracking.** There, zoom moves the

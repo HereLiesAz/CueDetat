@@ -458,6 +458,8 @@ sealed class MainScreenEvent {
     object TurnCameraOff : MainScreenEvent()
     object ArTrackingLost : MainScreenEvent()
     data class ArSurfaceTapped(val screenPoint: PointF) : MainScreenEvent()
+    /** The Cue ball / Target ball buttons: arm that pick (the next tap places it); again disarms. */
+    data class BeginBallSelection(val phase: BallSelectionPhase) : MainScreenEvent()
     object ToggleTargetType : MainScreenEvent()
     object ToggleTopDownView : MainScreenEvent()
     object ClearTopDownView : MainScreenEvent()

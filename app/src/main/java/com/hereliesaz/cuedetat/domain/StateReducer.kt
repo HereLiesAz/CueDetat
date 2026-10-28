@@ -96,7 +96,7 @@ fun stateReducer(
         is MainScreenEvent.AddFeltSample, is MainScreenEvent.DeleteFeltSamples,
         is MainScreenEvent.AutoCalibrateCv,
         is MainScreenEvent.ForceArActive, is MainScreenEvent.SeedRelocaliser,
-        is MainScreenEvent.ArSurfaceTapped ->
+        is MainScreenEvent.ArSurfaceTapped, is MainScreenEvent.BeginBallSelection ->
             reduceCvAction(currentState, action)
 
         // --- OBSTACLES ---

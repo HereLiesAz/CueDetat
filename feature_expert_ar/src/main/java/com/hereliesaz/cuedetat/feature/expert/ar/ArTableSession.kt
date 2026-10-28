@@ -21,6 +21,7 @@ import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.domain.FeltColorMatch
+import com.hereliesaz.cuedetat.domain.ScreenCornerSmoother
 import com.hereliesaz.cuedetat.domain.TableFrameHomography
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Pt
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Vec3
@@ -302,6 +303,13 @@ class ArTableSession(
     // slider.
     @Volatile private var tableHeightMeters: Float = 0f
 
+    /**
+     * Steadies the projected corners (GL thread only). Reset whenever there is no matrix, and when
+     * the table changes between preview and locked, so it never smooths across a discontinuity.
+     */
+    private val cornerSmoother = ScreenCornerSmoother()
+    private var smoothedLocked: Boolean? = null
+
     /** Physical size of the table relative to nominal (CueDetatState.tableFitScale). */
     @Volatile private var tableScale: Float = 1f
 
@@ -477,7 +485,9 @@ class ArTableSession(
         val rangeNudge = takeRangeNudge()
         if (lockedTableAnchor == null) updatePreview(frame, view, proj, vpW, vpH, rangeNudge)
         val lockResult = pendingLock.getAndSet(null)?.let { performLock(frame, it, view, proj, vpW, vpH) }
-        return FrameUpdate(buildTableMatrix(view, proj, vpW, vpH), lockResult, cloudFeedback())
+        val matrix = buildTableMatrix(view, proj, vpW, vpH, frame.timestamp)
+        if (matrix == null) cornerSmoother.reset()
+        return FrameUpdate(matrix, lockResult, cloudFeedback())
     }
 
     /**
@@ -719,8 +729,14 @@ class ArTableSession(
         }
     }
 
-    private fun buildTableMatrix(view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int): Matrix? {
+    private fun buildTableMatrix(
+        view: FloatArray, proj: FloatArray, vpW: Int, vpH: Int, frameNanos: Long,
+    ): Matrix? {
         val locked = lockedTableAnchor
+        if (smoothedLocked != (locked != null)) {
+            smoothedLocked = locked != null
+            cornerSmoother.reset()
+        }
         val cornersWorld: List<Vec3>
         val logical: List<Pt>
         if (locked != null) {
@@ -752,7 +768,8 @@ class ArTableSession(
                 tableScale)
         }
         val h = TableFrameHomography.computeLogicalToScreen(
-            view, proj, cornersWorld, logical, vpW, vpH, heightMeters = tableHeightMeters
+            view, proj, cornersWorld, logical, vpW, vpH, heightMeters = tableHeightMeters,
+            smooth = { corners -> cornerSmoother.filter(corners, frameNanos) },
         ) ?: return null
         return Matrix().apply { setValues(h) }
     }
