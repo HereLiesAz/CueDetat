@@ -82,6 +82,7 @@ class TableFitter {
     private var edgeH = 0
     private val innerMask = Mat()
     private val looseMask = Mat()
+    private val hueScratch = Mat()
     private val meanBuf = MatOfDouble()
     private val stdBuf = MatOfDouble()
     private val gradientKernel: Mat by lazy {
@@ -296,10 +297,13 @@ class TableFitter {
         val m = meanBuf.toArray()
         val sd = stdBuf.toArray()
         if (m.size < 3 || sd.size < 3) return false
-        val felt = floatArrayOf(m[0].toFloat(), m[1].toFloat(), m[2].toFloat())
+        // Saturation and value average on a line; hue averages round a circle (meanStdDev's hue
+        // is wrong for any cloth near the seam).
+        val hue = HueMask.stats(hsv, scratch) ?: return false
+        val felt = floatArrayOf(hue.mean.toFloat(), m[1].toFloat(), m[2].toFloat())
         // A measured spread can be very tight on a clean patch; keep the mask from going brittle.
         val spread = floatArrayOf(
-            maxOf(sd[0].toFloat(), oldSd[0] * MIN_SD_FRACTION),
+            maxOf(hue.std.toFloat(), oldSd[0] * MIN_SD_FRACTION),
             maxOf(sd[1].toFloat(), oldSd[1] * MIN_SD_FRACTION),
             maxOf(sd[2].toFloat(), oldSd[2] * MIN_SD_FRACTION),
         )
@@ -355,18 +359,19 @@ class TableFitter {
     }
 
     private fun buildFeltMaskInto(out: Mat, hsv: Mat, felt: FloatArray, sd: FloatArray, k: Double) {
-        Core.inRange(
-            hsv,
-            Scalar(maxOf(0.0, felt[0] - k * sd[0] - 5.0), maxOf(25.0, felt[1] - k * sd[1]), maxOf(25.0, felt[2] - k * sd[2])),
-            Scalar(minOf(180.0, felt[0] + k * sd[0] + 5.0), minOf(255.0, felt[1] + k * sd[1]), minOf(255.0, felt[2] + k * sd[2])),
-            out,
+        // Hue is a circle: a window round a red felt crosses the 0/180 seam (HueMask).
+        HueMask.inRangeAround(
+            hsv, felt[0].toDouble(), k * sd[0] + 5.0,
+            sLo = maxOf(25.0, felt[1] - k * sd[1]), sHi = minOf(255.0, felt[1] + k * sd[1]),
+            vLo = maxOf(25.0, felt[2] - k * sd[2]), vHi = minOf(255.0, felt[2] + k * sd[2]),
+            out = out, scratch = hueScratch,
         )
     }
 
     fun release() {
         feltMask.release(); quadMask.release(); scratch.release(); closeKernel.release()
         edgeMask.release(); edgeInverse.release(); edgeDistance.release(); gradientKernel.release()
-        innerMask.release(); looseMask.release(); meanBuf.release(); stdBuf.release()
+        innerMask.release(); looseMask.release(); hueScratch.release(); meanBuf.release(); stdBuf.release()
     }
 
     private companion object {

@@ -83,13 +83,16 @@ class FeltColorDetector {
         Core.compare(labels, Scalar(bestLabel.toDouble()), componentMask, Core.CMP_EQ)
         Core.meanStdDev(hsvMat, mean, stdDev, componentMask)
 
+        // Hue averages round a circle, not along a line: red felt has hues either side of the
+        // 0/180 seam, and their linear mean is a green-ish 90. Saturation and value are linear.
+        val hue = HueMask.stats(hsvMat, componentMask) ?: return null
         val hsv = floatArrayOf(
-            mean.get(0, 0)[0].toFloat(),
+            hue.mean.toFloat(),
             mean.get(1, 0)[0].toFloat(),
             mean.get(2, 0)[0].toFloat(),
         )
         val sd = floatArrayOf(
-            stdDev.get(0, 0)[0].toFloat(),
+            hue.std.toFloat(),
             stdDev.get(1, 0)[0].toFloat(),
             stdDev.get(2, 0)[0].toFloat(),
         )

@@ -13,6 +13,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seen from above, the gesture and swiper are clockwise-positive, and nothing converted between
   them (`TableFrameHomography.clockwiseToWorldYaw`). The sensor path was already right.
 
+### Added — Ball detector training from the labelling pipeline
+
+- **`ml/cuedetat_ball_detector_kaggle.py` (+ `.ipynb`) trains a YOLOv8n ball detector** from the
+  Label Studio pipeline's export, with a per-class gate, TFLite/ONNX export and a report.
+  `ml/dataset/make_ball_dataset.py` turns `ls_to_yolo.py`'s seventeen classes into the app's
+  cue / eight / solid / stripe (or keeps all seventeen); `ball_classes.py` holds the mapping
+  (`prelabel.py` now imports `BALL_LABELS` from it), with tests (`python3 -m unittest
+  test_ball_classes`). Not wired into the app, and nothing has been trained yet.
+
+### Fixed — Hue wraps; ball tracks match optimally
+
+- **Hue is a circle everywhere it is averaged or windowed.** OpenCV hue runs 0..180 and wraps, red
+  and maroon felt sits across the seam, and the linear mean of hues 170 and 10 is 90 (green). The
+  felt auto-detector averaged hue linearly, and the felt masks (`TableFitter`, `CvBallDetector`, the
+  CV debug mask) used a linear window that silently matched nothing across the seam. Now a circular
+  mean and spread (`HueMath`, from a hue histogram) and wrapping `inRange` windows (`HueMask`).
+  (`FeltColorMatch` and the plane-estimate mask already wrapped.)
+- **Detections are matched to last frame's tracks, and the cue/target anchors to detections,
+  optimally** (`Assignment`, the Hungarian algorithm) instead of nearest-in-turn, which let an early
+  detection take the track a later one needed: two close balls could swap or drop a track, and both
+  anchors could follow the same candidate. From the Pool-Aid paper's matching idea.
+
 ### Changed — AR tracking loss and the felt fit
 
 - **A table that tracking lost no longer stays lost.** An unlocked table whose anchor ARCore

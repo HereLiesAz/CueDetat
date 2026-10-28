@@ -98,6 +98,34 @@ from disk instead, run `prelabel.py --local-root $PWD/data` and start Label Stud
 splits train/val by a hash of the image id, so re-exports keep the split. Table corners that
 fall outside the frame are kept, flagged as not visible.
 
+### Ball detector
+
+`ls_to_yolo.py` writes `yolo/balls` with the pipeline's seventeen classes (`cue`, `1`..`15`, `ball`;
+see `ball_classes.py`). The app only needs cue / eight / solid / stripe (`BallType`), and about
+1,700 boxes spread over fifteen number classes is roughly a hundred each, so the detector trains on
+the coarse set by default:
+
+~~~
+python3 make_ball_dataset.py yolo/balls --out yolo/balls_type          # cue / eight / solid / stripe
+python3 make_ball_dataset.py yolo/balls --out yolo/balls_number --scheme number   # all seventeen
+python3 -m unittest test_ball_classes                                  # the mapping, no packages needed
+~~~
+
+Upload the output folder as a Kaggle dataset, set `BALLS_DATASET` in
+`ml/cuedetat_ball_detector_kaggle.py` (notebook: `.ipynb` beside it) and run it on a GPU. It trains
+YOLOv8n, validates per class, applies a gate (mAP50 >= 0.80 and every class mAP50-95 >= 0.40), and
+exports `ball_detector_fp16.tflite` and ONNX.
+
+- **`ball` boxes** (round and on the table, number unknown) have no type. In the type scheme an
+  image containing one is left out whole: dropping just the box would leave a ball labelled as
+  background and teach the detector to ignore balls. `--unknown keep` does the other thing.
+- **Only reviewed labels count.** `ls_to_yolo.py` skips bare pre-labels; the pre-labels are colour
+  guesses and often wrong, so the size of the set is the number of tasks you have actually
+  corrected, not the number of links.
+- **Not wired into the app.** `CvBallDetector` finds balls today. A model that passes the gate is
+  the start of replacing or backing it, and validation here is the held-out split of the same
+  labelled set: add in-app captures to `val` before trusting it on other tables or phones.
+
 ### In-app captures
 
 With the user's consent the app sends its own player's-eye frames, with sensor readings, the
