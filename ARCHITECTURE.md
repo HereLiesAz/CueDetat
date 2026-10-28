@@ -153,6 +153,20 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   learner needs no training data, and the pose log feeds a future trained
   model.
 
+- **The AR preview is put back by the felt only when it is suspect, and only by a sure fit.**
+  The felt fit still never pulls a world-anchored table frame to frame. But for
+  `SUSPECT_NANOS` after tracking returns from a loss, a fresh placement or a dropped lock, a fit
+  of quality >= 0.8 (overlap discounted by how steady the last five fits were:
+  `TableFitQuality`, `TableFitStabilizer`) that overlaps the projected table < 0.9 on three
+  fits in a row re-seeds the preview from the fit's outline (`ArTableSession.seedPreviewFromQuad`;
+  at most twice a window, `TableReseedPolicy`), never while the user is touching the table or
+  Lock View is on. Heading is taken from the fit only if its orientation confidence is >= 0.5,
+  and the end closest to the current one is kept (the felt can't tell head from foot). A locked
+  anchor ARCore has stopped (or not tracked for 5 s) drops the lock rather than leave a "locked"
+  table that is never drawn. Reason: after tracking loss ARCore may re-find the world somewhere
+  else, the anchors then agree with themselves and nothing inside ARCore can say they are wrong;
+  the image can.
+
 - **Felt colour picks the table's plane.** At lock, points across the virtual
   table are sampled from the camera image; only felt-coloured ones
   (`FeltColorMatch`) are hit-tested, and the plane they hit most wins. Reason:

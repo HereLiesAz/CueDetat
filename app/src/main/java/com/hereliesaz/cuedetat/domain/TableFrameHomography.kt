@@ -44,19 +44,27 @@ object TableFrameHomography {
         yawDegrees: Float,
         scale: Float = 1f,
     ): List<Vec3> {
-        val radians = Math.toRadians(yawDegrees.toDouble())
-        val c = kotlin.math.cos(radians).toFloat()
-        val s = kotlin.math.sin(radians).toFloat()
-        val rx = right.x * c + away.x * s
-        val rz = right.z * c + away.z * s
-        val ax = away.x * c - right.x * s
-        val az = away.z * c - right.z * s
+        val (turnedRight, turnedAway) = headingAfterYaw(right, away, yawDegrees)
+        val rx = turnedRight.x; val rz = turnedRight.z
+        val ax = turnedAway.x; val az = turnedAway.z
         return logical.map { corner ->
             val x = corner.x * scale / LOGICAL_UNITS_PER_METER
             val y = -corner.y * scale / LOGICAL_UNITS_PER_METER
             Vec3(center.x + rx * x + ax * y, center.y,
                 center.z + rz * x + az * y)
         }
+    }
+
+    /**
+     * The table's right and away axes after turning it [yawDegrees] counter-clockwise seen from
+     * above (positive turns [right] toward [away]); the turn [metricRectangleCorners] applies.
+     */
+    fun headingAfterYaw(right: Vec3, away: Vec3, yawDegrees: Float): Pair<Vec3, Vec3> {
+        val radians = Math.toRadians(yawDegrees.toDouble())
+        val c = kotlin.math.cos(radians).toFloat()
+        val s = kotlin.math.sin(radians).toFloat()
+        return Vec3(right.x * c + away.x * s, 0f, right.z * c + away.z * s) to
+            Vec3(away.x * c - right.x * s, 0f, away.z * c - right.z * s)
     }
 
     /**

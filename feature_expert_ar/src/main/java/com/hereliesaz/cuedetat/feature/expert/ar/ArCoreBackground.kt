@@ -20,11 +20,15 @@ import androidx.lifecycle.LifecycleOwner
 import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import com.hereliesaz.cuedetat.domain.ArTrackingMessages
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 private const val TAG = "ArCoreBackground"
+
+/** Tracking lost for this long raises a notice saying why. */
+private const val LOST_NOTICE_AFTER_NANOS = 1_500_000_000L
 
 /**
  * Full-screen camera background powered by ARCore, used for the whole expert-mode AR flow.
@@ -143,6 +147,8 @@ private class ArCoreRenderer(
     private var surfaceHeight = 1
     private var previousTrackingState: TrackingState? = null
     private var lastGeometryRotation = -1
+    private var trackingLostSinceNanos = 0L
+    private var lostNoticeShown = false
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         background.createOnGlThread()
@@ -185,6 +191,25 @@ private class ArCoreRenderer(
                 Log.w(TAG, "AR tracking paused. Keeping world anchor, hiding stale projection.")
                 onEvent(MainScreenEvent.ArTableMatrixUpdated(matrix = null))
             }
+            val now = System.nanoTime()
+            if (currentTracking != TrackingState.TRACKING) {
+                if (trackingLostSinceNanos == 0L) trackingLostSinceNanos = now
+                // A glance away is not worth a message; a real loss says why and what to do.
+                if (!lostNoticeShown && now - trackingLostSinceNanos > LOST_NOTICE_AFTER_NANOS) {
+                    lostNoticeShown = true
+                    onEvent(MainScreenEvent.ArNotice(
+                        ArTrackingMessages.trackingLost(camera.trackingFailureReason.name),
+                    ))
+                }
+            } else {
+                if (previousTrackingState != null && previousTrackingState != TrackingState.TRACKING) {
+                    // Back after a loss: the world may have been re-found in the wrong place.
+                    arTableSession.onTrackingResumed()
+                }
+                if (lostNoticeShown) onEvent(MainScreenEvent.ArNotice(null))
+                lostNoticeShown = false
+                trackingLostSinceNanos = 0L
+            }
             previousTrackingState = currentTracking
 
             if (currentTracking != TrackingState.STOPPED) {
@@ -204,6 +229,9 @@ private class ArCoreRenderer(
                 val update = arTableSession.computeFrameUpdate(frame, surfaceWidth, surfaceHeight)
                 onEvent(MainScreenEvent.ArTableMatrixUpdated(matrix = update.matrix))
                 update.lockResult?.let { onEvent(MainScreenEvent.ArTableLockResult(it)) }
+                update.lockLost?.let { onEvent(MainScreenEvent.ArTableLockLost(it)) }
+                update.suggestedScale?.let { onEvent(MainScreenEvent.SetTableFitScale(it)) }
+                update.notices.forEach { onEvent(MainScreenEvent.ArNotice(it)) }
                 update.cloudFeedback.forEach { feedback ->
                     onEvent(MainScreenEvent.CloudPlacementResult(feedback.message, feedback.restored))
                 }

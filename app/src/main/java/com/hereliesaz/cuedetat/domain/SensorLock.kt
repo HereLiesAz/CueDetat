@@ -16,6 +16,8 @@ object SensorLock {
         is MainScreenEvent.ApplyTablePose,
         // Vision / AR / depth tracking.
         is MainScreenEvent.UpdateArPose,
+        // The AR session fitting the table's size to the felt it sees.
+        is MainScreenEvent.SetTableFitScale,
         is MainScreenEvent.ArTableMatrixUpdated,
         is MainScreenEvent.ArCameraPoseUpdated,
         is MainScreenEvent.DepthPlaneUpdated -> true

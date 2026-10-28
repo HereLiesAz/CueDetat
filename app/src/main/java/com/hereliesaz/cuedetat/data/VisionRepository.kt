@@ -6,6 +6,7 @@ import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.camera.core.ImageProxy
 import androidx.compose.ui.geometry.Offset
+import com.hereliesaz.cuedetat.domain.TableFrameHomography
 import com.hereliesaz.cuedetat.domain.CameraMode
 import com.hereliesaz.cuedetat.domain.CameraViewMapping
 import com.hereliesaz.cuedetat.domain.CueDetatState
@@ -114,6 +115,7 @@ class VisionRepository @Inject constructor(
     private val feltColorDetector = FeltColorDetector()
     private val cvBallDetector = CvBallDetector()
     private val tableFitter = TableFitter()
+    private val fitStabilizer = com.hereliesaz.cuedetat.domain.TableFitStabilizer()
     private var lastTableFitMs = 0L
 
     /**
@@ -444,7 +446,19 @@ class VisionRepository @Inject constructor(
         val fit = runCatching {
             tableFitter.fit(hsv, felt, feltSd, frameToView(), current, pitch, state.table.corners, prior)
         }.getOrNull()
-        emitEvent(MainScreenEvent.TableFitUpdated(fit))
+        // The outline reported is the median of the last few fits, with how steady they were; a
+        // missed fit forgets them, so a table seen again later isn't averaged with an old one.
+        val steadied = if (fit == null) {
+            fitStabilizer.reset()
+            null
+        } else {
+            val stable = fitStabilizer.add(fit.viewQuad.map { TableFrameHomography.Pt(it.x, it.y) })
+            fit.copy(
+                viewQuad = stable.quad.map { PointF(it.x, it.y) },
+                stability = stable.stability,
+            )
+        }
+        emitEvent(MainScreenEvent.TableFitUpdated(steadied))
     }
 
     /** The playing surface and ball size in frame pixels, derived from the table pose. */

@@ -330,6 +330,12 @@ sealed class MainScreenEvent {
     data class TableRotationApplied(val degrees: Float) : MainScreenEvent()
     /** Pinch factor (>1 grows) for the AR table's physical size; clamped by the reducer. */
     data class TableScaleChanged(val factor: Float) : MainScreenEvent()
+    /** The AR session measured the real table's size: set [CueDetatState.tableFitScale] to [scale]. */
+    data class SetTableFitScale(val scale: Float) : MainScreenEvent()
+    /** A status line from AR tracking (null clears it): why tracking is lost, that it is back. */
+    data class ArNotice(val message: String?) : MainScreenEvent()
+    /** The AR session lost the locked table's anchor for good; it is no longer locked. */
+    data class ArTableLockLost(val message: String) : MainScreenEvent()
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
     /**
      * AR zoom jog / +- buttons: scale the unlocked table's apparent size by [factor] by moving it

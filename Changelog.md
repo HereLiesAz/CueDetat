@@ -13,6 +13,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seen from above, the gesture and swiper are clockwise-positive, and nothing converted between
   them (`TableFrameHomography.clockwiseToWorldYaw`). The sensor path was already right.
 
+### Changed — AR tracking loss and the felt fit
+
+- **A table that tracking lost no longer stays lost.** An unlocked table whose anchor ARCore
+  stopped is placed again (it stayed hidden for the rest of the session); a locked one whose anchor
+  stopped, or went untracked for 5 s, drops its lock with a message instead of staying "locked" and
+  never drawn, and an Unlock that can't transfer its pose gives up after 3 s instead of retrying
+  forever. Tracking lost for 1.5 s says why (too dark, too fast, not enough to see) and clears when
+  it returns. (`ArTrackingMessages`, `ArNotice`, `ArTableLockLost`.)
+- **A table that comes back wrong is put back by the felt.** For 12 s after tracking returns, a
+  table is placed or its lock is dropped, a sure fit (quality >= 0.8) that disagrees with the
+  projected table on three fits in a row re-seeds it from the fit's outline: position, heading (if
+  the fit is sure of it) and size (if within 0.8-1.25x). At most twice, never while the table is
+  being touched or Lock View is on. (`TableReseedPolicy`, `QuadOverlap`,
+  `ArTableSession.seedPreviewFromQuad`.)
+- **Saved-placement restore keeps looking.** ARCore answers "no match" until the camera has seen
+  enough; Restore now retries every 2 s for up to a minute while the user scans, and each failure
+  says what happened (expired, not authorised, service down, no match) instead of an enum name.
+- **Felt fit.** The outline is scored on edge distance as well as overlap (distance transform of
+  the felt boundary), the felt colour is re-measured inside the answer and the fit refined against
+  it, the reported outline is the median of the last five fits, and each fit carries a quality
+  (overlap x steadiness) and an orientation confidence (how sharply the score worsens when turned
+  3 degrees, and how far the quarter-turned reading trails). (`TableFitter`, `TableFitStabilizer`.)
+
 ### Added — Cue / Target ball buttons
 
 - **Two rail buttons, coloured as the virtual balls are drawn (the cue ball's ring, the target's).**
