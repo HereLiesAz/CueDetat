@@ -251,9 +251,12 @@ class VisionRepository @Inject constructor(
                 val roiY = (hsvMat.rows() - roiHeight) / 2
                 val centerRoi = hsvMat.submat(OCVRect(roiX, roiY, roiWidth, roiHeight))
                 val meanColor = Core.mean(centerRoi)
+                // Hue averages round a circle (a red felt straddles the 0/180 seam); Core.mean's
+                // linear hue would be a green-ish 90. Saturation and value are fine as they are.
+                val hueMean = HueMask.stats(centerRoi, Mat())?.mean ?: meanColor.`val`[0]
                 centerRoi.release()
                 floatArrayOf(
-                    meanColor.`val`[0].toFloat(),
+                    hueMean.toFloat(),
                     meanColor.`val`[1].toFloat(),
                     meanColor.`val`[2].toFloat()
                 )

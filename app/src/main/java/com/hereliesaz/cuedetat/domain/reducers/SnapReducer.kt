@@ -12,6 +12,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.hypot
 
+/** Which virtual ball an anchor belongs to, for matching both to candidates together. */
+private enum class AnchorKind { CUE, TARGET }
+
 /**
  * A dedicated reducer for managing "Snap Candidates".
  *
@@ -24,9 +27,6 @@ import kotlin.math.hypot
  * @constructor Injected by Hilt.
  */
 @Singleton
-/** Which virtual ball an anchor belongs to, for matching both to candidates together. */
-private enum class AnchorKind { CUE, TARGET }
-
 class SnapReducer @Inject constructor() {
 
     // The time in milliseconds a ball must be tracked before becoming a confirmed snap target.

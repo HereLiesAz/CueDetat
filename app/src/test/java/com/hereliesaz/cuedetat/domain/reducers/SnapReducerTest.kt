@@ -95,8 +95,8 @@ class SnapReducerTest {
         val cue = out.cueBallCvAnchor!!
         val target = out.targetCvAnchor!!
         assertTrue("both anchors on (${cue.x}, ${cue.y})", cue.x != target.x || cue.y != target.y)
-        // Each moved onto a detection rather than holding.
-        assertTrue(cue.x == 5f || cue.x == 40f)
-        assertTrue(target.x == 5f || target.x == 40f)
+        // Costs [[5, 40], [1, 34]]: cue -> 5 and target -> 40 total 39, the other pairing 41.
+        assertEquals(5f, cue.x, 0f)
+        assertEquals(40f, target.x, 0f)
     }
 }
