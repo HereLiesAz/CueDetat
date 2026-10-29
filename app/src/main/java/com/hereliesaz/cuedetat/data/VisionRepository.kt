@@ -46,26 +46,11 @@ import kotlinx.coroutines.launch
 
 @Singleton
 class VisionRepository @Inject constructor(
-    private val poolDetector: MergedTFLiteDetector,
     private val relocaliserUseCase: com.hereliesaz.cuedetat.domain.RelocaliserUseCase,
     private val captureRecorder: CaptureRecorder,
 ) {
     private val _visionDataFlow = MutableStateFlow(VisionData())
     val visionDataFlow = _visionDataFlow.asStateFlow()
-
-    // Fire-once model readiness check. The aiming/ball-detection path can be reached
-    // without opening table-scan, so the first processed frame also calls
-    // ensureModelReady(), which retries the asset load if init's eager load failed
-    // (the model is bundled in the APK; there is no on-demand delivery). No-op after
-    // the first call. detectPool() degrades gracefully until the model loads.
-    private val modelRequested = AtomicBoolean(false)
-    private fun ensureModelOnce() {
-        if (modelRequested.compareAndSet(false, true)) {
-            CoroutineScope(Dispatchers.IO).launch {
-                runCatching { poolDetector.ensureModelReady() }
-            }
-        }
-    }
 
     private var arFrameCounter = 0
     private val _arEvents = MutableSharedFlow<MainScreenEvent>(extraBufferCapacity = 16)
@@ -92,27 +77,6 @@ class VisionRepository @Inject constructor(
         Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
     }
 
-    // Battery: pooled destination for the per-frame downscaled ML bitmap, plus the Canvas,
-    // Paint and Rects to scale into it — replaces a createScaledBitmap allocation (and a
-    // recycle) every frame. Safe to reuse: both ML consumers read it synchronously before
-    // processImage returns.
-    private var pooledScaledBitmap: android.graphics.Bitmap? = null
-    private val scaleCanvas = android.graphics.Canvas()
-    private val scalePaint = android.graphics.Paint().apply { isFilterBitmap = false }
-    private val scaleSrcRect = android.graphics.Rect()
-    private val scaleDstRect = android.graphics.Rect()
-
-    private fun scaleIntoPool(src: android.graphics.Bitmap, w: Int, h: Int): android.graphics.Bitmap {
-        val dst = pooledScaledBitmap?.takeIf { it.width == w && it.height == h && !it.isRecycled }
-            ?: android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
-                .also { pooledScaledBitmap = it }
-        scaleSrcRect.set(0, 0, src.width, src.height)
-        scaleDstRect.set(0, 0, w, h)
-        scaleCanvas.setBitmap(dst)
-        scaleCanvas.drawBitmap(src, scaleSrcRect, scaleDstRect, scalePaint)
-        return dst
-    }
-
     private val feltColorDetector = FeltColorDetector()
     private val cvBallDetector = CvBallDetector()
     private val tableFitter = TableFitter()
@@ -137,13 +101,16 @@ class VisionRepository @Inject constructor(
     private var lastFrameAcceptedTime = 0L
     private var adaptiveIntervalMs = ACTIVE_INTERVAL_MS
     private var lastMotionTime = 0L
-    private var lastBallSignature = Long.MIN_VALUE
+    private val motionGray = Mat()
+    private val motionPrev = Mat()
+    private val motionDiff = Mat()
 
     private companion object {
         const val ACTIVE_INTERVAL_MS = 33L    // ~30fps while the scene is moving / AR tracking
         const val IDLE_INTERVAL_MS = 80L      // ~12fps once detections have been stable
         const val MOTION_HOLD_MS = 1500L      // stay responsive this long after the last change
-        const val SIGNATURE_EPSILON = 6.0f    // scaled px a detection must move to count as motion
+        const val MOTION_LEVEL = 25.0         // grey levels a pixel must change to count (above sensor noise)
+        const val MOTION_PIXELS = 12          // changed quarter-scale pixels that make a frame "moving"
         const val TABLE_FIT_INTERVAL_MS = 300L // table snap fit cadence
     }
 
@@ -157,22 +124,33 @@ class VisionRepository @Inject constructor(
         now - lastFrameAcceptedTime >= adaptiveIntervalMs
 
     /**
-     * Recompute the adaptive interval from a cheap fingerprint of the current detections.
-     * Any change (a ball moved / appeared / vanished), or being in AR tracking, resets the
-     * motion timer and keeps us at the responsive rate; a scene that has been still for
-     * MOTION_HOLD_MS drops to the idle rate.
+     * True when the quarter-scale frame differs from the previous one by more than sensor noise:
+     * at least [MOTION_PIXELS] pixels moved by more than [MOTION_LEVEL] grey levels. A ball is a
+     * few dozen pixels at this scale and crosses that bar easily; a still table does not. The first
+     * frame (or a size change) counts as motion.
      */
-    private fun updateAdaptiveInterval(state: CueDetatState, now: Long, detections: List<PoolDetection>) {
+    private fun sceneMoved(small: Mat): Boolean {
+        Imgproc.cvtColor(small, motionGray, Imgproc.COLOR_BGR2GRAY)
+        val comparable = !motionPrev.empty() &&
+            motionPrev.size() == motionGray.size() && motionPrev.type() == motionGray.type()
+        var moved = true
+        if (comparable) {
+            Core.absdiff(motionGray, motionPrev, motionDiff)
+            Imgproc.threshold(motionDiff, motionDiff, MOTION_LEVEL, 255.0, Imgproc.THRESH_BINARY)
+            moved = Core.countNonZero(motionDiff) >= MOTION_PIXELS
+        }
+        motionGray.copyTo(motionPrev)
+        return moved
+    }
+
+    /**
+     * Recompute the adaptive interval. Motion, or being in AR tracking, resets the motion timer
+     * and keeps us at the responsive rate; a scene that has been still for [MOTION_HOLD_MS] drops to
+     * the idle rate.
+     */
+    private fun updateAdaptiveInterval(state: CueDetatState, now: Long, moved: Boolean) {
         val isArTracking = state.cameraMode == CameraMode.AR_ACTIVE || state.cameraMode == CameraMode.AR_SETUP
-        var sig = 1L
-        for (d in detections) {
-            sig = sig * 31 + (d.rect.centerX() / SIGNATURE_EPSILON).toLong()
-            sig = sig * 31 + (d.rect.centerY() / SIGNATURE_EPSILON).toLong()
-        }
-        if (sig != lastBallSignature || isArTracking) {
-            lastBallSignature = sig
-            lastMotionTime = now
-        }
+        if (moved || isArTracking) lastMotionTime = now
         adaptiveIntervalMs = if (isArTracking || now - lastMotionTime < MOTION_HOLD_MS) {
             ACTIVE_INTERVAL_MS
         } else {
@@ -182,7 +160,6 @@ class VisionRepository @Inject constructor(
 
     @SuppressLint("UnsafeOptInUsageError")
     fun processImage(imageProxy: ImageProxy?, bitmap: android.graphics.Bitmap, state: CueDetatState) {
-        ensureModelOnce()
         if (!isProcessing.compareAndSet(false, true)) {
             imageProxy?.close()
             return
@@ -214,16 +191,14 @@ class VisionRepository @Inject constructor(
             // debug mask, edge tracking, snapshot).
             val scaledWidth = (fullMat.cols() / 4).coerceAtLeast(1)
             val scaledHeight = (fullMat.rows() / 4).coerceAtLeast(1)
-            val scaledBitmap = scaleIntoPool(bitmap, scaledWidth, scaledHeight)
             Imgproc.resize(fullMat, originalMat, Size(scaledWidth.toDouble(), scaledHeight.toDouble()))
 
-            // detectPool() (HEAD_POOL_PIVOT / segment 2) is trained on the 3-class
-            // table/hole/side scheme documented in PoolDetection.kt and ml/metadata.yaml;
-            // there is no ball/cue head. Its output is only a cheap motion signal for the
-            // adaptive frame-rate throttle.
-            // TODO(ml): if a ball-trained head is ever added, merge its output with the CV balls.
-            val rawDetections = poolDetector.detectPool(scaledBitmap)
-            updateAdaptiveInterval(state, currentTime, rawDetections)
+            // The adaptive frame-rate throttle's motion signal is the frame itself: the scene is
+            // moving when enough quarter-scale pixels changed since the last frame. It used to be
+            // the pocket detector's boxes (table / hole / side), which never include a ball, so a
+            // moving ball on a still table was read as "still" and the rate dropped to idle, and
+            // a 640x640 inference ran on every accepted frame to produce that wrong answer.
+            updateAdaptiveInterval(state, currentTime, sceneMoved(originalMat))
 
             val matToUse: Mat = synchronized(rotatedMatLock) {
                 when (rotationDegrees) {
@@ -333,8 +308,8 @@ class VisionRepository @Inject constructor(
                 detectedHsvColor = hsv,
                 detectedBoundingBoxes = balls.mapNotNull { it.boundingBox },
                 // detectedCues intentionally left at its default (empty): there is no
-                // trained cue-detecting head — see the note above where rawDetections
-                // is computed.
+                // trained cue-detecting head (the TFLite model only finds table / hole / side
+                // and is not run on this path).
                 cvMask = cvMask,
                 // Boxes are in raw full-frame pixels; the renderer rotates and centre-crops
                 // them with these.
@@ -359,7 +334,6 @@ class VisionRepository @Inject constructor(
             e.printStackTrace()
         } finally {
             originalMat.release()
-            // The scaled bitmap is pooled — do NOT recycle; it is reused next frame.
             imageProxy?.close()
             isProcessing.set(false)
         }
@@ -527,7 +501,6 @@ class VisionRepository @Inject constructor(
         frameToView: Matrix? = null,
         camera: CaptureCamera? = null,
     ) {
-        ensureModelOnce()
         if (!isProcessing.compareAndSet(false, true)) {
             return
         }
@@ -575,11 +548,6 @@ class VisionRepository @Inject constructor(
                 sourceImageRotation = rotationDegrees,
             )
 
-            val depth = state.depthPlane
-            if (depth != null && depth.confidence > 0.6f && state.tableScanModel == null) {
-                runDepthOnlyScaleUpdate(depth, state)
-            }
-
             var currentConfidence = state.visionData?.tableOverlayConfidence ?: 0f
             if ((state.cameraMode == CameraMode.AR_ACTIVE || state.cameraMode == CameraMode.AR_SETUP) &&
                 state.tableScanModel != null && state.depthCapability == DepthCapability.NONE) {
@@ -605,29 +573,6 @@ class VisionRepository @Inject constructor(
         } finally {
             smallMat.release()
             isProcessing.set(false)
-        }
-    }
-
-    private fun runDepthOnlyScaleUpdate(
-        depth: com.hereliesaz.cuedetat.domain.DepthPlane,
-        state: CueDetatState,
-    ) {
-        val clampedDist = depth.distanceMeters.coerceIn(0.5f, 3.0f)
-        val normalised = (clampedDist - 0.5f) / 2.5f
-        val targetSlider = 50f * (1f - normalised) - 25f
-        val currentSlider = state.zoomSliderPosition
-        val delta = abs(targetSlider - currentSlider)
-
-        if (delta > 3f) {
-            emitEvent(MainScreenEvent.UpdateArPose(
-                translation = androidx.compose.ui.geometry.Offset(state.viewOffset.x, state.viewOffset.y),
-                rotation = state.worldRotationDegrees,
-                scale = com.hereliesaz.cuedetat.ui.ZoomMapping.sliderToZoom(
-                    targetSlider,
-                    com.hereliesaz.cuedetat.ui.ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked).first,
-                    com.hereliesaz.cuedetat.ui.ZoomMapping.getZoomRange(state.experienceMode, state.isBeginnerViewLocked).second,
-                ),
-            ))
         }
     }
 

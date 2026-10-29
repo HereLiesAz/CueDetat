@@ -1,6 +1,11 @@
 name: Android CI
 
-# Runs unit tests on every push/PR, then builds a debug APK; publishes it only on push to main.
+# Runs unit tests on every push/PR, then builds a debug APK. It publishes that APK only on push to
+# main AND only when the repository variable ANDROID_CI_PUBLISH is 'true' (off by default):
+# android_debug_apk_release.yml publishes the debug APK on every main push, with the release key
+# and a commit-count versionCode, under its own tag. This workflow builds with the checked-in
+# BUILD number and Gradle's debug key, so publishing both gave two APKs a phone could not update
+# between (a downgrade and a signature mismatch).
 # Auto-detects app name from settings.gradle.kts / settings.gradle.
 # Version: the APK is named from the versionName Gradle actually stamped into it
 # (app/build/outputs/apk/debug/output-metadata.json). Gradle derives it from the uppercase
@@ -166,7 +171,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GH_ACTOR: ${{ secrets.GH_ACTOR }}
-          KEYSTORE_FILE: ${{ github.workspace }}/app/keystore.jks
+          # (No KEYSTORE_FILE here: Gradle reads KEYSTORE_PATH, which only the release build wants,
+          # so this debug build is signed with the default debug key.)
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -197,7 +203,7 @@ jobs:
             });
 
       - name: Prepare Release Variables
-        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.ANDROID_CI_PUBLISH == 'true'
         id: release_vars
         run: |
           # Same keys Gradle reads (app/build.gradle.kts): uppercase MAJOR/MINOR.
@@ -234,7 +240,7 @@ jobs:
       - name: Publish Release
         # Gated on main, as in android_debug_apk_release.yml: this force-moves a shared tag,
         # so a feature-branch push must not reach it.
-        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.ANDROID_CI_PUBLISH == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

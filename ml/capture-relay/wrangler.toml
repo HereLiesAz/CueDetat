@@ -15,3 +15,14 @@ namespace_id = "1001"
   [ratelimits.simple]
   limit = 30
   period = 60
+
+# Per-IP limit: the install id above is chosen by the client, so it cannot stop a caller who
+# invents a new one per request. One IP gets 60 uploads a minute (a household of phones, or
+# one phone flushing a backlog); beyond that it is slowed down whatever id it claims.
+[[ratelimits]]
+name = "UPLOAD_LIMIT_IP"
+namespace_id = "1002"
+
+  [ratelimits.simple]
+  limit = 60
+  period = 60

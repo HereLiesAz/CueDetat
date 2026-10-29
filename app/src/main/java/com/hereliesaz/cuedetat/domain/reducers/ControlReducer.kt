@@ -130,9 +130,6 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
             )
         }
 
-        is MainScreenEvent.DepthPlaneUpdated ->
-            state.copy(depthPlane = action.plane)
-
         is MainScreenEvent.ArCameraPoseUpdated ->
             state.copy(
                 arDerivedPitch = action.pitchDegrees,
@@ -190,12 +187,6 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
 
         is MainScreenEvent.ArModuleLoadFailed ->
             state.copy(arModuleState = com.hereliesaz.cuedetat.domain.ArModuleState.FAILED, arModuleError = action.reason)
-
-        is MainScreenEvent.ArTrackingLost -> {
-            // The nuclear payload has been disarmed.
-            // If reality stutters, we float on the last known matrix rather than burning the world down.
-            state
-        }
 
         else -> state
     }

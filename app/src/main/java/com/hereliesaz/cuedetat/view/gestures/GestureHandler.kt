@@ -128,14 +128,18 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                         }
 
                         // 2. Rotation & Pan
-                        if (uiState.table.isVisible) {
+                        // Dynamic Beginner has no table drawn (table.isVisible is false there) but is
+                        // documented to keep two-finger rotation; pan stays suppressed in it.
+                        if (uiState.table.isVisible || isDynamicBeginner) {
                             val rotation = event.calculateRotation()
                             val pan = event.calculatePan()
                             // A pinch never lands perfectly: ignore the small twist and drift
                             // that ride along until the fingers clearly mean to rotate or pan.
                             val intent = twoFingerIntent.accept(rotation, pan.x, pan.y)
                             if (intent.rotate && rotation != 0f) onEvent(MainScreenEvent.TableRotationApplied(rotation))
-                            if (intent.pan && (abs(pan.y) > 0.1f || abs(pan.x) > 0.1f)) onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
+                            if (uiState.table.isVisible && intent.pan && (abs(pan.y) > 0.1f || abs(pan.x) > 0.1f)) {
+                                onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
+                            }
                         }
                     } else if (event.changes.size == 1) {
                         val pan = event.calculatePan()

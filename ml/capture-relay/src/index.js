@@ -9,13 +9,19 @@
  * The relay checks the upload and commits both files to a private GitHub repo:
  *   captures/<yyyy-mm-dd>/<install-id>/<id>.jpg|.json
  * It holds the GitHub token so the app never does; a leaked app can only send frames through
- * these checks, not touch the repo.
+ * these checks, not touch the repo. The checks bound what an upload can be (a JPEG of limited size
+ * with a well-formed sidecar) and how fast it can come (per install and per client IP); they do
+ * not prove an upload came from the real app, so treat the stored frames as untrusted data when
+ * building a dataset from them.
  *
  * Environment:
  *   GITHUB_TOKEN   secret: fine-grained token, Contents read/write on GITHUB_REPO only
  *   GITHUB_REPO    owner/name of the private data repo
  *   GITHUB_BRANCH  branch to commit to (default main)
- *   UPLOAD_LIMIT   optional rate-limit binding, keyed per install id
+ *   UPLOAD_LIMIT     optional rate-limit binding, keyed per install id
+ *   UPLOAD_LIMIT_IP  optional rate-limit binding, keyed per client IP (CF-Connecting-IP). The install
+ *                    id is chosen by the client, so on its own it limits nobody: a fresh UUID per
+ *                    request would never be limited.
  */
 
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
@@ -32,6 +38,11 @@ export default {
     const installId = (request.headers.get("X-Install-Id") || "").toLowerCase();
     if (!UUID.test(installId)) return text(400, "bad install id");
 
+    if (env.UPLOAD_LIMIT_IP) {
+      const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+      const { success } = await env.UPLOAD_LIMIT_IP.limit({ key: ip });
+      if (!success) return text(429, "slow down");
+    }
     if (env.UPLOAD_LIMIT) {
       const { success } = await env.UPLOAD_LIMIT.limit({ key: installId });
       if (!success) return text(429, "slow down");

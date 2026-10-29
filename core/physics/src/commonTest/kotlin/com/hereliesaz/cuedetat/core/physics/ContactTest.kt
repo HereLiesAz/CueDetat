@@ -99,6 +99,16 @@ class ContactTest {
     }
 
     @Test
+    fun verticalSpinBeyondTheMiscueCircleDoesNotFollowHarderThanTheLimit() {
+        val loc = Vec2(1.0, 0.0)
+        val approach = Vec2.polar(30.0.degrees)
+        val atLimit = Contact.resolve(approach, loc, Speed.MEDIUM, Spin(vertical = 1.0), ball)
+        val wild = Contact.resolve(approach, loc, Speed.MEDIUM, Spin(vertical = 5.0), ball)
+        assertEquals(atLimit.cueBallDirection.x, wild.cueBallDirection.x, 1e-12)
+        assertEquals(atLimit.cueBallDirection.y, wild.cueBallDirection.y, 1e-12)
+    }
+
+    @Test
     fun rightEnglishSquirtsTheCueBallLeft() {
         // 8 degrees at full radius, half at the miscue limit = 4 degrees. Left of
         // the cue line is counter-clockwise in the right-handed table frame, i.e.

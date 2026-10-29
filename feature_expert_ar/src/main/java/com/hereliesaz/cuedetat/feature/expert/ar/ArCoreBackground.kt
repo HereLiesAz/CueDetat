@@ -109,10 +109,27 @@ fun ArCoreBackground(
         glSurfaceView.setRenderer(renderer)
         glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
 
+        // A resume that fails (the camera is held by another app) leaves a black view; say so, and
+        // clear it when a later resume works.
+        var resumeFailed = false
+        fun resumeSession() {
+            val ok = arTableSession.resume()
+            if (!ok) {
+                resumeFailed = true
+                onEvent(MainScreenEvent.ArNotice(
+                    "AR could not start the camera. Close any other app using it, then come back.",
+                    persistent = true,
+                ))
+            } else if (resumeFailed) {
+                resumeFailed = false
+                onEvent(MainScreenEvent.ArNotice(null))
+            }
+        }
+
         val observer = object : DefaultLifecycleObserver {
             override fun onResume(owner: LifecycleOwner) {
                 displayRotation.set(displayManager.getDisplay(displayId)?.rotation ?: Surface.ROTATION_0)
-                arTableSession.resume()
+                resumeSession()
                 glSurfaceView.onResume()
             }
             override fun onPause(owner: LifecycleOwner) {
@@ -122,7 +139,7 @@ fun ArCoreBackground(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
 
-        arTableSession.resume()
+        resumeSession()
         glSurfaceView.onResume()
 
         onDispose {

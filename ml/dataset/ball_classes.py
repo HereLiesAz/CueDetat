@@ -22,7 +22,9 @@ SCHEME_NUMBER = "number"
 SCHEME_TYPE = "type"
 SCHEMES = (SCHEME_NUMBER, SCHEME_TYPE)
 
-# Same order as BallType.CUE / EIGHT / SOLID / STRIPE.
+# The names of BallType's four known values, NOT its enum order (BallType is UNKNOWN, SOLID,
+# STRIPE, CUE, EIGHT): a trained model's class id i is decoded by this name, never as
+# BallType.entries[i]. test_names_are_the_apps_balltype_values reads VisionData.kt to hold the names.
 TYPE_NAMES = ["cue", "eight", "solid", "stripe"]
 
 UNKNOWN_LABEL = "ball"

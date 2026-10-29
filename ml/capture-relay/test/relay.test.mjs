@@ -48,3 +48,23 @@ test("refuses bad install id, path-like capture id, non-JPEG, wrong method and p
   assert.equal((await relay.fetch(new Request("https://relay/other", { method: "POST" }), env)).status, 404);
   assert.equal(calls.length, 0);
 });
+
+test("the per-IP limit holds against a caller who invents a new install id each time", async () => {
+  const calls = stubGithub();
+  const seen = [];
+  const limited = {
+    ...env,
+    // An IP limiter that allows two uploads, keyed as the relay keys it.
+    UPLOAD_LIMIT_IP: { limit: async ({ key }) => { seen.push(key); return { success: seen.length <= 2 }; } },
+  };
+  const ids = ["123e4567-e89b-12d3-a456-426614174001", "123e4567-e89b-12d3-a456-426614174002", "123e4567-e89b-12d3-a456-426614174003"];
+  const statuses = [];
+  for (const install of ids) {
+    const req = upload({ id: "cap_1790000000000" }, { install });
+    req.headers.set("CF-Connecting-IP", "203.0.113.9");
+    statuses.push((await relay.fetch(req, limited)).status);
+  }
+  assert.deepEqual(statuses, [201, 201, 429]);
+  assert.deepEqual(seen, ["203.0.113.9", "203.0.113.9", "203.0.113.9"]);
+  assert.equal(calls.length, 4); // only the two accepted uploads reached GitHub
+});

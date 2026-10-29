@@ -16,6 +16,12 @@ on:
 
 jobs:
   handle_issue:
+    # The issue text goes straight into an autonomous agent's prompt, and anyone can open an issue
+    # on a public repo: only the owner's side (owner, members, collaborators) or a manual dispatch
+    # may drive it. A stranger's issue otherwise steers an agent that opens pull requests.
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
     runs-on: ubuntu-latest
     permissions:
       contents: read

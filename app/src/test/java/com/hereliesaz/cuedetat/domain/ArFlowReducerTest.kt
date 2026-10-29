@@ -60,42 +60,6 @@ class ArFlowReducerTest {
     }
 
     @Test
-    fun `ArTrackingLost preserves AR session state (float on last known matrix)`() {
-        // ControlReducer:138 — ArTrackingLost is a deliberate no-op; the app floats on
-        // the last known matrix rather than tearing down the AR session whenever the
-        // tracker hiccups. Test guards against accidentally restoring the old
-        // "nuclear payload" behaviour.
-        val tps = TpsWarpData(
-            srcPoints = listOf(PointF(0f, 0f)),
-            dstPoints = listOf(PointF(1f, 1f))
-        )
-        val scan = TableScanModel(
-            pockets = emptyList(),
-            lensWarpTps = tps,
-            tableSize = TableSize.EIGHT_FT,
-            feltColorHsv = listOf(0f, 0f, 0f),
-            scanLatitude = null,
-            scanLongitude = null
-        )
-        val s = base.copy(
-            cameraMode = CameraMode.AR_ACTIVE,
-            tableScanModel = scan,
-            lensWarpTps = scan.lensWarpTps
-        )
-        val result = reduceControlAction(s, MainScreenEvent.ArTrackingLost)
-        assertEquals(CameraMode.AR_ACTIVE, result.cameraMode)
-        assertEquals(scan, result.tableScanModel)
-        assertEquals(scan.lensWarpTps, result.lensWarpTps)
-    }
-
-    @Test
-    fun `ArTrackingLost when not AR_ACTIVE does not change cameraMode`() {
-        val s = base.copy(cameraMode = CameraMode.CAMERA_ONLY)
-        val result = reduceControlAction(s, MainScreenEvent.ArTrackingLost)
-        assertEquals(CameraMode.CAMERA_ONLY, result.cameraMode)
-    }
-
-    @Test
     fun `CvDataUpdated auto-advances to AR_ACTIVE when all conditions met`() {
         val tps = TpsWarpData(
             srcPoints = listOf(PointF(0f, 0f)),

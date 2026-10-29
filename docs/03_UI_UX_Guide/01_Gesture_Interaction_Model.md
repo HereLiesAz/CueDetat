@@ -20,6 +20,9 @@ When a touch gesture begins, its intent is determined by the following order of 
       nothing else.
     * **Three fingers** dragging vertically move the table's height (`MoveTableZ`), but only when
       all three move the same way (`isCoherentVerticalDrag`); a resting thumb doesn't count.
+    * **Intent**: a pinch never lands perfectly, so the twist and drift that ride along are ignored
+      until they pass a threshold (about 3° of accumulated rotation, 16 px of accumulated pan;
+      `TwoFingerIntent`). Each channel opens independently and stays open for the rest of the gesture.
     * **Twisting** (`calculateRotation`) dispatches a `TableRotationApplied` event. Positive is
       clockwise on screen; the AR session converts it with
       `TableFrameHomography.clockwiseToWorldYaw` so the table turns with the fingers.
@@ -27,7 +30,7 @@ When a touch gesture begins, its intent is determined by the following order of 
 2. **Object Interaction:** A touch that begins directly upon an interactive
    logical element will manipulate that element exclusively. This includes the `SpinControl` (which uses a double-tap-to-drag relocation gesture), `MasseControl` (also uses double-tap-to-drag),
    `ActualCueBall`, `TargetBall`, `GhostCueBall`, and any `ObstacleBall`. The touch target for these
-   balls is a generous `radius * 3.5f`.
+   balls is a generous `LOGICAL_BALL_RADIUS * 8 / zoom` (`GestureReducer`), so a near-miss still picks the ball. With an AR-anchored table the slider zoom is not applied, so the divisor is 1.
 
 3. **Banking Mode Aiming:** If `isBankingMode` is true, any drag gesture that does **not** begin on
    the `BankingBall` is interpreted as `InteractionMode.AIMING_BANK_SHOT`.

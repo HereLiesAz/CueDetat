@@ -65,18 +65,22 @@ fun ImageProxy.toMat(dst: Mat = Mat()): Mat {
         
         Imgproc.cvtColor(yuvMat, dst, if (isNv21) Imgproc.COLOR_YUV2BGR_NV21 else Imgproc.COLOR_YUV2BGR_NV12)
     } else {
-        // Planar layout (I420)
-        val uRowData = ByteArray(width / 2)
-        val vRowData = ByteArray(width / 2)
-        for (row in 0 until height / 2) {
-            uBuffer.position(row * uStride)
-            uBuffer.get(uRowData, 0, width / 2)
-            yuvMat.put(height + row, 0, uRowData)
-
-            vBuffer.position(row * vStride)
-            vBuffer.get(vRowData, 0, width / 2)
-            yuvMat.put(height + row, width / 2, vRowData)
+        // Planar layout (I420). OpenCV reads the (h * 3/2) x w Mat as one contiguous byte run: the
+        // Y plane, then the whole U plane (w/2 * h/2 bytes), then the whole V plane. U and V are
+        // NOT side by side within each chroma row, which is how this once wrote them (and scrambled
+        // the colour on devices with planar chroma). Same layout as Image.toMat.
+        val chromaW = width / 2
+        val chromaH = height / 2
+        val vPixelStride = vPlane.pixelStride
+        val chroma = ByteArray(2 * chromaW * chromaH)
+        val vBase = chromaW * chromaH
+        for (row in 0 until chromaH) {
+            for (col in 0 until chromaW) {
+                chroma[row * chromaW + col] = uBuffer.get(row * uStride + col * uvPixelStride)
+                chroma[vBase + row * chromaW + col] = vBuffer.get(row * vStride + col * vPixelStride)
+            }
         }
+        yuvMat.put(height, 0, chroma)
         Imgproc.cvtColor(yuvMat, dst, Imgproc.COLOR_YUV2BGR_I420)
     }
     } finally {

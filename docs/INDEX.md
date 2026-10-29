@@ -27,8 +27,9 @@ stability.
 To resolve any potential conflicts in the documentation, follow this order of precedence. Later
 documents in this list supersede earlier ones.
 
-1. **[`04_Feature_Specs/08_Changelog_And_Issues.md`](04_Feature_Specs/08_Changelog_And_Issues.md)**: This is the definitive source for the current project status,
-   including open tasks and a log of completed work.
+1. **[`Changelog.md`](../Changelog.md)** (repository root): the definitive record of what changed and
+   what is open. [`04_Feature_Specs/08_Changelog_And_Issues.md`](04_Feature_Specs/08_Changelog_And_Issues.md)
+   is the older log, current only through release 0.9.3.
 2. **Interaction Model Documents**: The final implementation for any gesture must satisfy the
    specifications in [`03_UI_UX_Guide/01_Gesture_Interaction_Model.md`](03_UI_UX_Guide/01_Gesture_Interaction_Model.md), [`03_UI_UX_Guide/09_Slider_Specifications.md`](03_UI_UX_Guide/09_Slider_Specifications.md), and
    [`04_Feature_Specs/01_Feature_Protractor_Mode.md`](04_Feature_Specs/01_Feature_Protractor_Mode.md).

@@ -1,11 +1,18 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
-
+# Dependabot version updates. Security advisories are separate (repository settings).
 version: 2
-updates: 
-  - package-ecosystem: "" # See documentation for possible values
-    directory: "/" # Location of package manifests
+updates:
+  # Gradle: the version catalog and every module's build files.
+  - package-ecosystem: "gradle"
+    directory: "/"
     schedule:
       interval: "weekly"
+  # The workflows' pinned actions.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+  # The capture relay's (dependency-free) package manifest and tests.
+  - package-ecosystem: "npm"
+    directory: "/ml/capture-relay"
+    schedule:
+      interval: "monthly"

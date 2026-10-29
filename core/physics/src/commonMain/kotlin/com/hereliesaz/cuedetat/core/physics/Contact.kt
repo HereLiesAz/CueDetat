@@ -208,7 +208,9 @@ object Contact {
         // Speed retained along the original direction from surviving roll/draw.
         // vertical = +1 full follow, -1 full draw. A rolling ball retains 5/7 of
         // its forward speed as the follow component after the collision.
-        val forwardComponent = spin.vertical * (5.0 / 7.0) * cos(cutAngle.radians)
+        // Clamped like every other quantity derived from a Spin: a dial reading past the miscue
+        // circle must not follow or draw harder than the cue can.
+        val forwardComponent = spin.clampedToMiscueLimit().vertical * (5.0 / 7.0) * cos(cutAngle.radians)
 
         val departure = tangent * tangentComponent + approach.normalized() * forwardComponent
         return if (departure.lengthSquared < 1e-18) Vec2.ZERO else departure.normalized()

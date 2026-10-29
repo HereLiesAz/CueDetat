@@ -2,11 +2,13 @@
 
 package com.hereliesaz.cuedetat.ui.hatemode
 
+import androidx.annotation.Keep
 import androidx.compose.ui.geometry.Offset
 
 /**
  * State representing the animation phase of the 8-ball reveal.
  */
+@Keep
 enum class TriangleState {
     IDLE,
     SUBMERGING, // Die fading into the darkness.
@@ -23,6 +25,7 @@ enum class TriangleState {
  * @property answerIndex Index into [HaterResponses.allAnswers] for the text displayed on the die.
  * @property triangleState The current phase of the reveal animation.
  */
+@Keep
 data class HaterState(
     val diePosition: Offset = Offset.Zero,
     val dieAngle: Float = 0f,

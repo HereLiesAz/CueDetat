@@ -6,7 +6,8 @@ Companion to [`AGENTS.md`](AGENTS.md). What shouldn't live in a prompt. Re-read 
 
 ## Current version
 
-`1.12.2.1` (MAJOR.MINOR.PATCH.BUILD) — see [`version.properties`](version.properties). Never revert this file.
+`1.14.0.1` (MAJOR.MINOR.PATCH.BUILD) — see [`version.properties`](version.properties), which CI bumps on
+every merge, so this line trails it. Never revert that file.
 
 `version.properties` holds two key sets. **Authoritative: the uppercase set**
 (`MAJOR`, `MINOR`, `PATCH`, `BUILD`, `LAST_MAJOR`, `LAST_MINOR`), read by
@@ -27,7 +28,8 @@ core/physics     — contact, spin, throw/squirt physics. Pure Kotlin.
 core/aim         — the aim solver. Depends on units/geometry/physics only.
 core/advisor     — shot advisor / candidate ranking. Depends on aim/geometry/physics.
 core/projection  — homography, DLT pose-from-correspondences, Mat3/Vec3.
-core/state       — shared state primitives used across core/* modules.
+core/state       — shot state: sealed Interaction and ShotMode, per-concern slices. No other
+                   module depends on it, and the app does not use it yet (see REBUILD_PLAN.md).
 
 app/             — the Android application: domain/ (use cases, reducers, MVI state),
                    data/ (repositories, OpenCV-backed vision pipeline), ui/ (Compose),

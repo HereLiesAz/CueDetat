@@ -337,11 +337,10 @@ fun ProtractorScreen(
             // without ARCore (CV fallback) and while tracking is lost, when "AR Tracking" would lie.
             if (isOnMain && uiState.cameraMode == CameraMode.AR_ACTIVE
                 && uiState.arTableMatrix != null
-                && (uiState.tableScanModel != null || uiState.depthPlane != null)) {
+                && uiState.tableScanModel != null) {
                 ArTrackingBadge(
                     modifier = Modifier.padding(start = 16.dp, bottom = 72.dp),
                     hasDepth = uiState.depthCapability == com.hereliesaz.cuedetat.domain.DepthCapability.DEPTH_API,
-                    distanceMeters = uiState.depthPlane?.distanceMeters,
                 )
             }
         }

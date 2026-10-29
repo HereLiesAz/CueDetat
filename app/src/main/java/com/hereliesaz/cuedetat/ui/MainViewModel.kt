@@ -145,6 +145,8 @@ class MainViewModel @Inject constructor(
         capacity = 256,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
+    private val latestArMatrix = java.util.concurrent.atomic.AtomicReference<MainScreenEvent?>(null)
+    private val latestArPose = java.util.concurrent.atomic.AtomicReference<MainScreenEvent?>(null)
     private val _uiState = MutableStateFlow(CueDetatState())
     val uiState = _uiState.asStateFlow()
 
@@ -166,8 +168,14 @@ class MainViewModel @Inject constructor(
             // events (SizeChanged, sensors) be reduced first and then be replaced wholesale by
             // the loaded state. Events sent meanwhile wait in the channel.
             loadInitialState()
-            for (event in eventChannel) {
+            for (queued in eventChannel) {
                 try {
+                    // A coalesced event is a wake-up: process the latest one in its slot.
+                    val event = when (queued) {
+                        is MainScreenEvent.ArTableMatrixUpdated -> latestArMatrix.getAndSet(null) ?: continue
+                        is MainScreenEvent.ArCameraPoseUpdated -> latestArPose.getAndSet(null) ?: continue
+                        else -> queued
+                    }
                     processEvent(event)
                 } catch (t: Throwable) {
                     // Let cancellation propagate so structured concurrency keeps working
@@ -175,7 +183,7 @@ class MainViewModel @Inject constructor(
                     if (t is kotlinx.coroutines.CancellationException) throw t
                     android.util.Log.e(
                         "MainViewModel",
-                        "Reducer crashed processing $event",
+                        "Reducer crashed processing $queued",
                         t
                     )
                 }
@@ -309,7 +317,23 @@ class MainViewModel @Inject constructor(
     }
 
     fun onEvent(event: MainScreenEvent) {
+        when (event) {
+            // ARCore sends these every frame from the GL thread. Only the latest of each matters, so
+            // keep it in a slot: the loop reduces the slot's content once per burst and skips the
+            // wake-ups that follow it for free, instead of running a reducer pass per stale frame
+            // while the 256-slot channel fills (and DROP_OLDEST evicts a GestureEnded or a Lock).
+            is MainScreenEvent.ArTableMatrixUpdated -> coalesce(latestArMatrix, event)
+            is MainScreenEvent.ArCameraPoseUpdated -> coalesce(latestArPose, event)
+            else -> eventChannel.trySend(event)
+        }
+    }
+
+    private fun coalesce(slot: java.util.concurrent.atomic.AtomicReference<MainScreenEvent?>, event: MainScreenEvent) {
+        slot.set(event)
+        // A wake-up per event, not per burst: a wake-up lost to the channel's overflow would
+        // otherwise leave the slot full and every later event waiting on it.
         eventChannel.trySend(event)
+    }
     }
 
     /**
@@ -332,6 +356,20 @@ class MainViewModel @Inject constructor(
                 savedFeltSamples = savedFeltSamples,
                 tableZOffset = com.hereliesaz.cuedetat.domain.DEFAULT_TABLE_Z_OFFSET,
                 zoomSliderPosition = com.hereliesaz.cuedetat.domain.DEFAULT_ZOOM_SLIDER,
+                // Moments, not settings: they are saved with the rest of the state, so a process
+                // killed with a dialog open or a drag in progress would reopen that next launch.
+                showTableSizeDialog = false,
+                showLuminanceDialog = false,
+                showGlowStickDialog = false,
+                showAdvancedOptionsDialog = false,
+                isAutoCalibrating = false,
+                interactionMode = com.hereliesaz.cuedetat.view.state.InteractionMode.NONE,
+                isMagnifierVisible = false,
+                isTopDownViewActive = false,
+                wearableState = com.hereliesaz.cuedetat.data.WearableState(),
+                // The Advisor's rail item is hidden (AzNavRailMenu SHOW_ADVISOR); a flag saved by a
+                // build that showed it could otherwise never be turned off.
+                isAdvisorEnabled = false,
             )
             processAndEmitState(initialState, UpdateType.FULL)
         } catch (t: Throwable) {
@@ -817,7 +855,10 @@ class MainViewModel @Inject constructor(
             // World-anchored table pose arrives ~30-60Hz from the ARCore GL thread. It must
             // recompute the matrices each frame so the overlay tracks as the user walks; routing it
             // to AIMING (the default) would silently freeze the table at its first pose.
-            is MainScreenEvent.ArTableMatrixUpdated, is MainScreenEvent.NudgeTableRange -> UpdateType.MATRICES_ONLY
+            // ArCameraPoseUpdated arrives every ARCore frame too, and only feeds the pitch the matrices
+            // use; the default (AIMING) recomputed the whole aim 30-60 times a second for it.
+            is MainScreenEvent.ArTableMatrixUpdated, is MainScreenEvent.NudgeTableRange,
+            is MainScreenEvent.ArCameraPoseUpdated -> UpdateType.MATRICES_ONLY
 
             is MainScreenEvent.SizeChanged, is MainScreenEvent.ZoomScaleChanged, is MainScreenEvent.ZoomSliderChanged,
             is MainScreenEvent.PanView, is MainScreenEvent.TableRotationChanged,

@@ -10,7 +10,7 @@ import com.hereliesaz.cuedetat.view.renderer.renderLensTps
 import com.hereliesaz.cuedetat.view.renderer.warpedBy
 
 /**
- * Resolves the in-camera elements that the AzNavRail 10.18 guidance framework spotlights during the
+ * Resolves the in-camera elements that the AzNavRail 11.50 guidance framework spotlights during the
  * tutorial. Each function maps the current [CueDetatState] to an [AzGuideShape] in window-space pixels
  * (or null ⇒ text-only callout). The geometry mirrors the math that the old TutorialOverlay used for its
  * pulsing highlights; the framework now draws the dim + spotlight itself via these shapes.

@@ -1,47 +1,51 @@
 # Privacy Policy for Cue d'Etat
 
-**Effective Date:** September 25, 2026
+**Effective Date:** October 29, 2026
 
 This privacy policy outlines the data practices for the Cue d'Etat application.
 
 ### Information We Collect
 
-The application does not transmit any personally identifiable information off your device. All data processing, including the coarse location described below, occurs on your device, with one exception you choose: **Training Data**, below, which is sent only if you agree to it.
+The application does not transmit any personally identifiable information off your device. All data processing, including the coarse location described below, occurs on your device, with two exceptions you choose: **Training Data** and **Saved AR placement**, below, each sent only if you agree to it.
 
-* [cite_start]**Camera Data:** The application requires access to your device's camera[cite: 605]. [cite_start]The camera feed is processed in real-time on your device to provide the core functionality of overlaying aiming guides[cite: 618]. Unless you have agreed to share Training Data (below), this video data is not stored, saved, or transmitted off your device, and each frame is processed and immediately discarded[cite: 618].
+* **Camera Data:** The application requires access to your device's camera. The camera feed is processed in real-time on your device to provide the core functionality of overlaying aiming guides. Unless you have agreed to share Training Data (below), this video data is not stored, saved, or transmitted off your device, and each frame is processed and immediately discarded.
 
-* [cite_start]**Sensor Data:** The application uses your device's rotation vector sensor to determine its physical orientation (pitch, roll, and yaw)[cite: 607]. [cite_start]This data is used solely to create the 3D perspective effect on the screen and is not stored or transmitted[cite: 607, 702].
+* **Sensor Data:** The application uses your device's rotation vector sensor to determine its physical orientation (pitch, roll, and yaw). This data is used solely to create the 3D perspective effect on the screen and is not stored or transmitted.
 
-* [cite_start]**User Preferences:** The application saves your chosen settings locally on your device using Jetpack DataStore[cite: 614]. This includes preferences such as:
-    * [cite_start]Table size [cite: 615]
-    * [cite_start]Distance units (Imperial/Metric) [cite: 614]
-    * [cite_start]Visual and Computer Vision (CV) tuning parameters [cite: 616]
+* **User Preferences:** The application saves your chosen settings locally on your device using Jetpack DataStore. This includes preferences such as:
+    * Table size
+    * Distance units (Imperial/Metric)
+    * Visual and Computer Vision (CV) tuning parameters
 
 * **Location Data:** The application requests coarse location (`ACCESS_COARSE_LOCATION`) to attach an approximate GPS coordinate to a saved table-scan profile, so it can recognize when you're back at a table you've already scanned and skip re-scanning it. This location data is stored only on your device, alongside the rest of the scan profile, and is never transmitted anywhere.
 
+* **Table orientation history:** To start the virtual table facing the right way when you come back to a table, the app keeps a log on your device (`table_pose_log.jsonl`) of how the table sat on screen: its orientation, the phone's heading and tilt, the table size, the time, and a position rounded to about one kilometre. It never leaves your device, and it is capped in size (the older half is dropped when it is full).
+
+* **Saved AR placement (optional, asked each time):** In Expert mode you can choose to save where the table is, so it can be found again. This uses Google's ARCore Cloud Anchors: if you confirm, ARCore sends visual mapping data, camera poses and the table's anchor position to Google's cloud, where it is held for up to 24 hours. Nothing is uploaded unless you confirm, each time. It is governed by Google's terms for ARCore.
+
 * **Bluetooth:** The application requests `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT`, requested together with location at first launch, to discover and connect to optional Meta smart-glasses hardware for the glasses camera-feed feature (`MetaWearableRepository`). These permissions are used only for that device pairing and are not used to collect data about other nearby devices.
 
-* **Training Data (optional, asked once):** On first use the app asks whether you'll help train its table and ball detection. If you agree, then while the camera is on it saves a camera frame about every two seconds (only when the phone is steady), together with the phone's orientation (pitch, roll, yaw), the virtual table's position on screen, the felt colour, what the app detected, camera lens parameters, and a random identifier created for this installation. These are sent over Wi-Fi only (never mobile data) to the developer and stored in a private GitHub repository, and deleted from your device once sent. Frames show whatever the camera sees, which may include people or surroundings near the table. No location, account, contact or device identifier is included. You can turn this off at any time from the menu's "Training data" item; frames not yet sent are then kept on the device and not sent.
+* **Training Data (optional, asked once):** On first use the app asks whether you'll help train its table and ball detection. If you agree, then while the camera is on it saves a camera frame about every two seconds (only when the phone is steady), together with the phone's orientation (pitch, roll, yaw), the virtual table's position on screen, the felt colour, what the app detected, camera lens parameters, and a random identifier created for this installation (it is not tied to your name, account or device, and can be reset by reinstalling). These are sent over Wi-Fi or another unmetered connection only (never mobile data) to the developer and stored in a private GitHub repository, and deleted from your device once sent. Frames show whatever the camera sees, which may include people or surroundings near the table. No location, account, contact or hardware device identifier is included. You can turn this off at any time from the menu's "Training data" item; frames not yet sent are then kept on the device and not sent.
 
-* [cite_start]**Network Information:** The application uses the internet to check the project's public GitHub repository for the latest version number[cite: 606, 626] and, only if you agreed, to send Training Data. This process is anonymous and does not send any user or device information.
+* **Network Information:** The application uses the internet to check the project's public GitHub repository for the latest version number and, only if you agreed, to send Training Data. This process is anonymous and does not send any user or device information.
 
 ### How We Use Your Information
 
 Your information is used exclusively to provide the features of the application.
 
-* [cite_start]**Camera and sensor data** are used to power the on-screen aiming guides and perspective transformations[cite: 618, 702].
+* **Camera and sensor data** are used to power the on-screen aiming guides and perspective transformations.
 * **Training Data** is used only to train and test the app's table and ball detection.
-* [cite_start]**Locally stored preferences** are used to remember your settings between sessions for your convenience[cite: 614].
+* **Locally stored preferences** are used to remember your settings between sessions for your convenience.
 
 ### Data Storage and Sharing
 
-[cite_start]All data generated by or for the application is processed and stored on your device[cite: 614], except Training Data you agreed to send. Training Data passes through a Cloudflare Worker (a relay run by the developer) into a private GitHub repository; Cloudflare and GitHub act only as hosting providers. We do not sell or share data with anyone else. [cite_start]The singular network call made to GitHub for version checking is anonymous and does not involve sharing user data[cite: 606].
+All data generated by or for the application is processed and stored on your device, except Training Data you agreed to send. Training Data passes through a Cloudflare Worker (a relay run by the developer) into a private GitHub repository; Cloudflare and GitHub act only as hosting providers. We do not sell or share data with anyone else. The singular network call made to GitHub for version checking is anonymous and does not involve sharing user data.
 
 ### Permissions
 
-* [cite_start]**CAMERA:** This permission is essential for the application's primary function of analyzing the view of the pool table and overlaying aiming guides[cite: 605, 618].
-* [cite_start]**INTERNET:** Used to check for application updates on GitHub[cite: 605, 626] and, only if you agreed, to send Training Data.
-* **ACCESS_NETWORK_STATE:** Used to send Training Data only on Wi-Fi (unmetered networks).
+* **CAMERA:** This permission is essential for the application's primary function of analyzing the view of the pool table and overlaying aiming guides.
+* **INTERNET:** Used to check for application updates on GitHub, to send Training Data if you agreed, and for ARCore Cloud Anchors if you confirm a saved placement.
+* **ACCESS_NETWORK_STATE:** Used to send Training Data only on unmetered networks (typically Wi-Fi).
 * **ACCESS_COARSE_LOCATION:** Used to attach an approximate GPS coordinate to a saved table-scan profile, so the app can recognize a previously-scanned table and skip re-scanning it. Stored locally only; never transmitted.
 * **BLUETOOTH_SCAN / BLUETOOTH_CONNECT:** Used to discover and connect to optional Meta smart-glasses hardware for the glasses camera-feed feature. Not used to collect data about other nearby devices.
 

@@ -27,7 +27,7 @@ data class PocketCluster(
  * Persistent table model produced by the scan phase.
  *
  * Stored separately from CueDetatState (via TableScanRepository) so it survives
- * app reinstalls and does not bloat the main preferences store.
+ * app restarts (it lives in filesDir, which Auto Backup does not carry to a new install) and does not bloat the main preferences store.
  * CueDetatState.tableScanModel holds the runtime in-memory copy only (@Transient).
  *
  * feltColorHsv: mean HSV of the table felt, sampled during scan. Used to seed

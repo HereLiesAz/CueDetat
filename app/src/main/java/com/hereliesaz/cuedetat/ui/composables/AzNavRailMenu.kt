@@ -98,7 +98,7 @@ fun AzNavRailMenu(
     val b10B = Color(0xFF64B5F6); val b11R = Color(0xFFE57373)
     val b13O = Color(0xFFFFB74D); val b14G = Color(0xFF81C784); val b15M = Color(0xFFF06292)
 
-    // Tutorial flows for the AzNavRail 10.18 guidance framework. Each flow reuses the verbatim step
+    // Tutorial flows for the AzNavRail 11.50 guidance framework. Each flow reuses the verbatim step
     // text from strings.xml; per-step highlightTargetId points the spotlight at the in-camera element
     // (registered below via azGuidanceTarget).
     val tutorialFlows = listOf(
@@ -202,7 +202,7 @@ fun AzNavRailMenu(
         azTheme(defaultShape = AzButtonShape.CIRCLE, activeColor = railAccent)
         azAdvanced(isLoading = false, helpEnabled = true, onDismissHelp = {})
 
-        // [SECTION 1b] Tutorial guidance (AzNavRail 10.18 status-driven framework).
+        // [SECTION 1b] Tutorial guidance (AzNavRail 11.50 status-driven framework).
         // Register the moving on-screen highlight targets; the framework auto-draws the spotlight.
         azGuidanceTarget("cue.targetBall") { tutorialTargetBallShape(uiState) }
         azGuidanceTarget("cue.ghostBall") { tutorialGhostBallShape(uiState) }

@@ -17,5 +17,12 @@ The `WarningManager` class manages the display of user-facing warnings.
 * **Display Timing**:
 * **Immediate Feedback**: The `shotLine` and `ghostCueBall` outlines must change to a warning color
   *immediately* when a warning flag in the `CueDetatState` becomes `true`.
-* **Delayed Feedback**: The kinetic text warning message must only be displayed *after* the user's
-  gesture has concluded, triggered by the `GestureEnded` event.
+* **Kinetic text**: the insult appears when the shot *first becomes* impossible, obstructed or too
+  steeply tilted (`MainViewModel.processAndEmitState`), led by a short plain statement of which of
+  the three it is ("No such shot.", "Something is in the way.", "Too steep a tilt."). It is
+  dismissed when the next gesture starts and otherwise fades after three seconds
+  (`WarningManager`).
+* **Notices**: AR and cloud notices, lock failures and CV hints are written into `warningText` by
+  reducers and fade after five seconds (`MainViewModel.fadeReducerNotice`). A *persistent* notice
+  (`ArNotice(persistent = true)`: tracking lost, the camera or ARCore failing to start) stays
+  until its resolution clears it.

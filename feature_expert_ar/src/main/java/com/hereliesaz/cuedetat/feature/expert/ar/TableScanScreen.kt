@@ -40,10 +40,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import kotlinx.coroutines.delay
@@ -172,7 +174,7 @@ fun TableScanScreen(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 TextButton(onClick = { viewModel.deleteSelectedSamples() }) {
-                    Text("Delete", color = Color.Red.copy(alpha = 0.8f))
+                    Text(stringResource(R.string.scan_delete), color = Color.Red.copy(alpha = 0.8f))
                 }
             }
         }
@@ -224,7 +226,7 @@ fun TableScanScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = if (hasFeltSample) "Point at the felt and tap below" else "Waiting for the camera...",
+                    text = stringResource(if (hasFeltSample) R.string.scan_prompt else R.string.scan_waiting),
                     color = Color.White,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -238,6 +240,7 @@ fun TableScanScreen(
                             useCenter = false, style = Stroke(width = 4.dp.toPx())
                         )
                     }
+                    val captureLabel = stringResource(R.string.scan_capture_a11y)
                     Box(
                         modifier = Modifier
                             .align(Alignment.Center).size(64.dp).clip(CircleShape)
@@ -245,10 +248,10 @@ fun TableScanScreen(
                             .background(Color.White).border(4.dp, Color.LightGray, CircleShape)
                             .clickable(
                                 enabled = hasFeltSample,
-                                onClickLabel = "Capture felt colour",
+                                onClickLabel = captureLabel,
                                 role = Role.Button,
                             ) { isCapturing = true; viewModel.captureFeltAndComplete() }
-                            .semantics { contentDescription = "Capture felt colour" }
+                            .semantics { contentDescription = captureLabel }
                     )
                 }
             }

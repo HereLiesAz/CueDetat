@@ -13,6 +13,7 @@ import com.hereliesaz.cuedetat.core.units.Length
 import com.hereliesaz.cuedetat.core.units.Speed
 import com.hereliesaz.cuedetat.core.units.degrees
 import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * Solves "where do I actually have to aim?".
@@ -233,9 +234,12 @@ object AimSolver {
      * ball, dead straight) down to 0.0 (a thin edge-clip at 90°).
      *
      * This is the "half-ball hit"/"quarter-ball hit" vocabulary players use, and
-     * it is a more natural readout than a raw cut angle.
+     * it is a more natural readout than a raw cut angle. At contact the cue ball's
+     * centre line passes `2R·sin(cut)` from the object ball's centre, across the
+     * `2R` width the two balls share when straight, so the overlap is
+     * `1 − sin(cut)`: a half-ball hit is a 30° cut, a quarter-ball about 49°.
      */
-    fun ballFraction(cutAngle: Angle): Double = cos(cutAngle.radians).coerceIn(0.0, 1.0)
+    fun ballFraction(cutAngle: Angle): Double = (1.0 - sin(cutAngle.radians)).coerceIn(0.0, 1.0)
 
     /**
      * Distance from the cue ball to first contact with the object ball, i.e. how

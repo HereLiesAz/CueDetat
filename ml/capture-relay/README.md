@@ -8,7 +8,10 @@ URL.
 What it accepts: `POST /upload`, multipart with `image` (JPEG, ≤ 6 MB) and `meta` (JSON,
 ≤ 64 KB, `id` like `cap_<ms>`), header `X-Install-Id` (UUID). Anything else is refused.
 Frames land at `captures/<yyyy-mm-dd>/<install-id>/<id>.jpg|.json`, one commit per file.
-Uploads are rate-limited per install (30 a minute).
+Uploads are rate-limited per install (30 a minute) and per client IP (60 a minute); the install id
+is chosen by the client, so the IP limit is the one that holds against a caller who invents ids.
+The checks bound size, type and rate; they do not prove a frame came from the app, so treat
+stored captures as untrusted when building a dataset.
 
 ## Set up (once)
 

@@ -166,11 +166,11 @@ class MainActivity : ComponentActivity() {
             try {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
             } catch (e: ActivityNotFoundException) {
-                Toast.makeText(this, "No app can open this link.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, R.string.link_no_app, Toast.LENGTH_SHORT).show()
                 android.util.Log.w("MainActivity", "No activity for URL: $url", e)
             }
         } else {
-            Toast.makeText(this, "Link blocked for security.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.link_blocked, Toast.LENGTH_SHORT).show()
             android.util.Log.w("MainActivity", "Suspicious URL blocked: $url")
         }
     }

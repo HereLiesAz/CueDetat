@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — audit of the whole app (UI/UX and engine)
+
+Two independent read-only audits, then fixes. Nothing here was run on a device; Kotlin/Android code
+is compiled by CI only. Core (`:core:*`) tests, the Python tests and the capture-relay tests were run.
+
+- **Expert inherited Beginner's locked view.** `isBeginnerViewLocked` is saved and gates the CV
+  analyzer, compass follow and the table fit, but only Beginner's branch set it; Expert now clears it.
+- **"Tap the cue ball" re-armed itself.** The first-run prompt fired on every vision frame with one
+  confirmed candidate, undoing a disarm and blocking drags while armed. Now once per camera session,
+  never after the cue ball is placed.
+- **Reset only toggled the first two layouts.** After undo/redo it restored the snapshot taken before
+  the first reset, discarding whatever had been set up since. A change since the last toggle now makes
+  Reset start fresh (the rail label follows).
+- **Reducer-written notices never faded.** AR/cloud notices, lock failures and CV hints sat on screen
+  at display size until overwritten. They fade after five seconds; tracking-lost and camera-start
+  failures (`ArNotice(persistent = true)`) stay until resolved. Shot warnings now name the cause.
+- **Brightness and Glow stick dialogs had no way to open.** Drawer items added.
+- **Felt capture could save an invented green.** The shutter waits for a real sample; the dead "Move"
+  button and duplicate long-press are gone; the shutter has an accessibility label.
+- **"AR Tracking" badge, lock and cloud items** now follow ARCore (badge only with a live projection;
+  lock/cloud hidden without ARCore).
+- Lock View leaves static Beginner; Mode and Orientation items show what a tap will apply; the spin
+  dial stays on screen; a recreated Activity releases a stale AR lock; Tutorial replays the current
+  mode's; selection rings wear the balls' colours; two-finger rotate/pan wait for intent; the
+  three-finger height drag judges accumulated travel; dynamic Beginner keeps two-finger rotation as
+  documented; edge drags are excluded from the system back gesture; the canvas and HUD got
+  descriptions, a text halo and an "~" on the estimated distance.
+- Permissions: Bluetooth is explained; a camera refusal no longer closes the app (Settings link when
+  the system will not ask again); camera and ARCore start failures are shown.
+- Removed controls that changed nothing: the Canny sliders and "auto-tune" (no code read them).
+- **Planar-YUV frames had scrambled chroma** (`ImageProxy.toMat`); **AR frames assumed portrait**
+  (rotation hard-coded to 90, now read from ARCore's own mapping); the adaptive frame-rate throttle
+  watched a pocket detector that never sees balls, costing a TFLite pass per frame (now a frame
+  difference, and the model is no longer run there); locked/Hater frames were converted before being
+  dropped; Beginner-locked and similar state is no longer restored from disk; the per-frame AR events
+  coalesce instead of filling the event channel; `TableScanAnalyzer` averaged hue linearly.
+- **Core:** `AimSolver.ballFraction` was the cosine of the cut (a half-ball hit is 30°, not 60°) and
+  its test restated the formula; `Contact` followed/drew harder than the miscue limit.
+- **Capture relay:** rate limit keyed on a client-chosen header now also keys on client IP.
+- **CI/repo:** `dependabot.yml` was an empty template; `android-ci.yml` no longer publishes a second,
+  differently-signed debug APK unless `ANDROID_CI_PUBLISH` is set; the Jules issue workflows only
+  accept the owner's side.
+- **Docs:** PrivacyPolicy (citations removed; Cloud Anchors, orientation log, install id), RELEASE,
+  ALGORITHMS, ARCHITECTURE, REBUILD_PLAN, README and the UI guides now match the code; the README and
+  plan say plainly that the metric core is not yet driving the on-screen aim.
+
+
 ### Fixed — AR table fitting
 
 - **Table rotation followed the fingers backwards in AR.** The world-frame yaw is counter-clockwise

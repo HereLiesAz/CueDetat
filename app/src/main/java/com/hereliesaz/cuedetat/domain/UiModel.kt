@@ -33,8 +33,9 @@ enum class ExperienceMode {
 
     /**
      * The primary mode control toggles between the two modes that are actually
-     * the product. Hater mode is still reachable -- from the splash screen and
-     * by shaking the device -- but it is no longer a third stop on this cycle.
+     * the product. Hater mode is still reachable from the splash screen (shown on every launch,
+     * since the mode is not restored) but is no longer a third stop on this cycle. Shaking the device
+     * does not enter it: the shake only re-rolls the die once inside Hater mode.
      *
      * It used to be, which meant the single most load-bearing control in the nav
      * rail put a physics-dice joke screen between Beginner and Expert: one tap in
@@ -171,7 +172,6 @@ data class CueDetatState(
     @Transient val relocaliserAttemptFrames: Int = 0,
     @Transient val snapCandidates: List<SnapCandidate>? = null,
     @Transient val tableScanModel: TableScanModel? = null,
-    @Transient val depthPlane: DepthPlane? = null,
     @Transient val arDerivedPitch: Float? = null,
     @Transient val arMeasuredHeightM: Float? = null,
     // World-anchored table (ARCore). arTableMatrix maps logical table space -> screen pixels,
@@ -281,7 +281,7 @@ data class CueDetatState(
         lingeringSpinOffset, spinPathsAlpha, currentOrientation, compassRefYaw, isViewLocked, pitchMatrix, railPitchMatrix,
         sizeCalculationMatrix, inversePitchMatrix, flatMatrix, logicalPlaneMatrix, hasInverseMatrix,
         effectivePitchDegrees, visionData, arConfidenceHistory, arLowConfidenceFrameCount, relocaliserDeltaQ?.toList(),
-        relocaliserAttemptFrames, snapCandidates, tableScanModel, depthPlane, arDerivedPitch,
+        relocaliserAttemptFrames, snapCandidates, tableScanModel, arDerivedPitch,
         arMeasuredHeightM, arTableMatrix, isArTableLocked, tableFit, depthCapability, arModuleState, arModuleError,
         lockedHsvColor?.toList(), lockedHsvStdDev?.toList(), showAdvancedOptionsDialog,
         showTableScanScreen,
@@ -437,7 +437,6 @@ sealed class MainScreenEvent {
     object RetryArModuleLoad : MainScreenEvent()
 
     // Depth / ARCore events
-    data class DepthPlaneUpdated(val plane: DepthPlane) : MainScreenEvent()
     data class DepthCapabilityDetected(val capability: DepthCapability) : MainScreenEvent()
     data class ArCameraPoseUpdated(
         val pitchDegrees: Float,
@@ -471,7 +470,6 @@ sealed class MainScreenEvent {
     // AR setup / lifecycle events
     object CancelArSetup : MainScreenEvent()
     object TurnCameraOff : MainScreenEvent()
-    object ArTrackingLost : MainScreenEvent()
     data class ArSurfaceTapped(val screenPoint: PointF) : MainScreenEvent()
     /** The Cue ball / Target ball buttons: arm that pick (the next tap places it); again disarms. */
     data class BeginBallSelection(val phase: BallSelectionPhase) : MainScreenEvent()

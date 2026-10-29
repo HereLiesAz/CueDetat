@@ -152,8 +152,7 @@ class OverlayRenderer {
     /**
      * Localized label strings, built once per Context/locale instead of eight getString calls
      * and a fresh map every frame. Keys: see LineTextRenderer / BallRenderer.
-     * (No string resources exist yet for the expert "Aiming Line"/"Shot Guide Line" names;
-     * LineTextRenderer falls back to English for those keys.)
+     * (The expert "Aiming Line"/"Shot Guide Line" names are resources too; see strings.xml.)
      */
     private fun labelsFor(context: Context): Map<String, String> {
         val locale = context.resources.configuration.locales[0]

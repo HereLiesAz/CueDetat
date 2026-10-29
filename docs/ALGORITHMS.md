@@ -11,7 +11,7 @@ The application renders a virtual pool table over a camera feed. This requires m
     *   Origin (0,0): Center of the table.
     *   Y-axis: Length of the table (positive is down/towards player).
     *   X-axis: Width of the table.
-    *   Unit: 1.0 = 1 inch (approx).
+    *   Unit: 1 logical unit = 1/22.2 of an inch (`TableFrameHomography.LOGICAL_UNITS_PER_INCH` = ball diameter 50 / 2.25 in), so a 2.25 in ball is 50 units across.
     *   *This space is invariant to zoom/pan.*
 
 2.  **Screen Space (Pixels):**
@@ -94,7 +94,7 @@ The AR overlay uses a **Thin-Plate Spline (TPS)** residual warp to correct for l
 
 ### AR Overlay Confidence & Auto-Advance
 
-`VisionData.tableOverlayConfidence` (0–1) is derived from the TPS homography fit residual quality. The `fitQuality` is computed as `1.0f - (meanResidual / 50.0f)` bounded between `0.0f` and `1.0f`. `CvReducer` maintains a rolling average (`AR_CONFIDENCE_WINDOW` of 20 frames) of this confidence during `AR_SETUP`.
+`VisionData.tableOverlayConfidence` (0–1) comes from `VisionRepository.runEdgeFallback`, the only tracking pass left (the pocket ML detector is not run after the scan): 0 when no table-sized contour is found (under 5% of the frame), 0.8 when the largest contour simplifies to a quadrilateral, and 0.6 when it needs the minimum-area rectangle instead. It is a coarse three-level signal, not a fit residual. `CvReducer` maintains a rolling average (`AR_CONFIDENCE_WINDOW` of 20 frames) of this confidence during `AR_SETUP`.
 
 Normal auto-advance (`AR_SETUP → AR_ACTIVE`) triggers when the smoothed confidence is `>= 0.8`.
 

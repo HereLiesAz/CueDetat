@@ -1,6 +1,7 @@
 // app/src/main/java/com/hereliesaz/cuedetat/data/SensorRepository.kt
 package com.hereliesaz.cuedetat.data
 
+import androidx.annotation.Keep
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -20,6 +21,7 @@ import javax.inject.Singleton
  * Pitch: Rotation around X-axis.
  * Roll: Rotation around Y-axis.
  */
+@Keep
 data class FullOrientation(val yaw: Float, val pitch: Float, val roll: Float)
 
 @Singleton
