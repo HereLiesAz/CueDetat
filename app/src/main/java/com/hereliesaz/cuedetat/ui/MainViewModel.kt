@@ -334,7 +334,6 @@ class MainViewModel @Inject constructor(
         // otherwise leave the slot full and every later event waiting on it.
         eventChannel.trySend(event)
     }
-    }
 
     /**
      * Loads the persisted state and commits it as the first state. Runs on the event loop
