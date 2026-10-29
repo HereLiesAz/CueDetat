@@ -10,7 +10,11 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -29,15 +33,21 @@ private const val TAG = "CameraBackground"
  * @param analyzer The CV analyzer to attach to the ImageAnalysis use case.
  *                 Pass **null** to run preview-only (no ImageAnalysis bound at all) —
  *                 use this for static beginner mode where CV must not run.
+ * @param onStatus Reports a bind failure to the user (a camera held by another app, or an
+ *                 unavailable one, otherwise shows only a black view), and its recovery.
  */
 @Composable
 fun CameraBackground(
     modifier: Modifier = Modifier,
-    analyzer: ImageAnalysis.Analyzer?
+    analyzer: ImageAnalysis.Analyzer?,
+    /** Called with a reason when the camera cannot be bound, and with null once a bind succeeds after a failure. */
+    onStatus: (String?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember { PreviewView(context) }
+    val currentOnStatus by rememberUpdatedState(onStatus)
+    var bindFailed by remember { mutableStateOf(false) }
 
     // Re-runs when lifecycleOwner or analyzer changes (null ↔ non-null causes rebind).
     // The executor is created fresh on every rerun (and shut down in this same
@@ -73,8 +83,14 @@ fun CameraBackground(
                     cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
                     Log.d(TAG, "Camera bound: Preview only (CV disabled).")
                 }
+                if (bindFailed) {
+                    bindFailed = false
+                    currentOnStatus(null)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Use case binding failed", e)
+                bindFailed = true
+                currentOnStatus("The camera could not start. Close any other app using it, then try again.")
             }
         }
 

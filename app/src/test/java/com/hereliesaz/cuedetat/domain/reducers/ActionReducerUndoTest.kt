@@ -33,4 +33,31 @@ class ActionReducerUndoTest {
         assertEquals(720, redone.viewWidth)
         assertEquals(afterReset.zoomSliderPosition, redone.zoomSliderPosition, 0f)
     }
+
+    @Test
+    fun `reset after rearranging takes a fresh snapshot instead of toggling the first two layouts`() {
+        val start = CueDetatState().copy(zoomSliderPosition = 25f)
+        val reset1 = reduceAction(start, MainScreenEvent.Reset, utils)
+        val undone = reduceAction(reset1, MainScreenEvent.Reset, utils)
+        assertEquals(25f, undone.zoomSliderPosition, 0f)
+
+        // The user rearranges, then resets: this must reset (and remember the new layout),
+        // not redo the first reset.
+        val rearranged = undone.copy(zoomSliderPosition = -30f, valuesChangedSinceReset = true)
+        val reset2 = reduceAction(rearranged, MainScreenEvent.Reset, utils)
+        assertEquals(reset1.zoomSliderPosition, reset2.zoomSliderPosition, 0f)
+        assertEquals(-30f, reset2.preResetState!!.zoomSliderPosition, 0f)
+
+        // And undoing it brings the rearranged layout back, not the very first one.
+        val undone2 = reduceAction(reset2, MainScreenEvent.Reset, utils)
+        assertEquals(-30f, undone2.zoomSliderPosition, 0f)
+    }
+
+    @Test
+    fun `undo and redo leave the restored layout as the unchanged baseline`() {
+        val reset = reduceAction(CueDetatState().copy(valuesChangedSinceReset = true), MainScreenEvent.Reset, utils)
+        val undone = reduceAction(reset, MainScreenEvent.Reset, utils)
+        assertEquals(false, undone.valuesChangedSinceReset)
+        assertEquals(false, reduceAction(undone, MainScreenEvent.Reset, utils).valuesChangedSinceReset)
+    }
 }

@@ -81,11 +81,17 @@ class TableScanRepository @Inject constructor(
             suspendCancellableCoroutine { cont ->
                 val cts = CancellationTokenSource()
                 cont.invokeOnCancellation { cts.cancel() }
-                client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
-                    .addOnSuccessListener { location ->
-                        cont.resume(location?.let { Pair(it.latitude, it.longitude) })
-                    }
-                    .addOnFailureListener { cont.resume(null) }
+                // A revoked or denied location permission throws here, synchronously, rather than
+                // reaching the failure listener; location is optional, so it means "no fix".
+                try {
+                    client.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token)
+                        .addOnSuccessListener { location ->
+                            cont.resume(location?.let { Pair(it.latitude, it.longitude) })
+                        }
+                        .addOnFailureListener { cont.resume(null) }
+                } catch (e: SecurityException) {
+                    cont.resume(null)
+                }
             }
         }
         // Fall back to a stale cache rather than nothing if the active fix timed out.

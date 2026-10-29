@@ -2,6 +2,7 @@
 
 package com.hereliesaz.cuedetat.ui.composables.sliders
 
+import com.hereliesaz.cuedetat.ui.theme.asHud
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -61,7 +62,8 @@ fun TableRotationSwiper(
     val density = LocalDensity.current
     val currentOnRotate by rememberUpdatedState(onRotate)
     val majorColor = MaterialTheme.colorScheme.primary
-    val minorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+    // Ticks sit over the feed too: white, as the label above them.
+    val minorColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f)
 
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         // wrapSigned180 of the negation: (-180, 180], so 0 reads 0° and a hair under 360 reads
@@ -71,8 +73,7 @@ fun TableRotationSwiper(
         val a11yName = stringResource(R.string.table_rotation_a11y)
         Text(
             label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            style = MaterialTheme.typography.bodyMedium.asHud()
         )
         Canvas(
             modifier = Modifier

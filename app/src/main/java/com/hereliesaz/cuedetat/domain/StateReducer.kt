@@ -73,7 +73,7 @@ fun stateReducer(
         is MainScreenEvent.ZoomSliderChanged, is MainScreenEvent.ZoomScaleChanged,
         is MainScreenEvent.TableRotationApplied, is MainScreenEvent.TableRotationChanged,
         is MainScreenEvent.TableScaleChanged, is MainScreenEvent.SetTableFitScale,
-        is MainScreenEvent.ArNotice, is MainScreenEvent.ArTableLockLost,
+        is MainScreenEvent.ArNotice, is MainScreenEvent.ArSessionStarted, is MainScreenEvent.ArTableLockLost,
         is MainScreenEvent.AdjustLuminance, is MainScreenEvent.AdjustGlow,
         is MainScreenEvent.PanView, is MainScreenEvent.MoveTableZ,
         is MainScreenEvent.SetTableZ,

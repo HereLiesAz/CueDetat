@@ -370,9 +370,11 @@ class BallRenderer {
                 reset()
                 style = Paint.Style.STROKE
                 strokeWidth = 5f
+                // The colour of the ball being picked, as the rail button and the virtual ball
+                // wear it: a yellow ring for the cue ball contradicted the gold target ball.
                 color = when (state.ballSelectionPhase) {
-                    BallSelectionPhase.AWAITING_CUE -> Color(0xFFFFEB3B).toArgb()
-                    else -> Color(0xFF4FC3F7).toArgb()
+                    BallSelectionPhase.AWAITING_CUE -> actualCueBallConfig.strokeColor.toArgb()
+                    else -> targetBallConfig.strokeColor.toArgb()
                 }
                 alpha = 200
             }

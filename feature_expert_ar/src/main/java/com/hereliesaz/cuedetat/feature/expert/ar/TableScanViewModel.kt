@@ -39,6 +39,9 @@ private const val MIN_OBSERVATIONS_TO_FIT = 3
 /** Max distance (logical inches) to merge a new detection into an existing cluster. */
 private const val CLUSTER_MERGE_DISTANCE = 3.0f
 
+/** Felt colour recorded by the multi-frame pocket scan when no frame ever produced a sample. */
+private val LEGACY_SCAN_FELT_HSV = listOf(120f, 0.5f, 0.4f)
+
 /**
  * Drives the table-scan flow. Formerly a @HiltViewModel; now an app-scoped
  * @Singleton owned by the AR controller, so it can be relocated into the
@@ -87,6 +90,16 @@ class TableScanViewModel(
     private val clusters = mutableMapOf<PocketId, MutableList<PointF>>()
     private val clustersLock = Any()
 
+    // Declared before init: the init block's collector writes both, and may run immediately.
+    // Felt colour sampled from recent frames (rolling mean HSV of centre crop). Null until a frame
+    // has produced one: the shutter stays disabled until then rather than saving an invented green
+    // as the table's felt (a failed camera session never produces a sample).
+    @Volatile private var lastFeltHsv: FloatArray? = null
+
+    private val _hasFeltSample = MutableStateFlow(false)
+    /** True once a real felt colour has been sampled; gates the capture shutter. */
+    val hasFeltSample: StateFlow<Boolean> = _hasFeltSample.asStateFlow()
+
     init {
         // Make sure the TFLite model is loaded the moment the scan flow opens (retries the
         // asset load if the detector's eager load failed). The model ships in the APK assets.
@@ -98,7 +111,10 @@ class TableScanViewModel(
         // (ArFrameProcessor) rather than the CameraX analyzer.
         scope.launch {
             arFrameProcessor.latestFeltHsv.collect { hsv ->
-                if (hsv != null) lastFeltHsv = hsv
+                if (hsv != null) {
+                    lastFeltHsv = hsv
+                    _hasFeltSample.value = true
+                }
             }
         }
 
@@ -122,9 +138,6 @@ class TableScanViewModel(
             }
         }
     }
-
-    // Felt colour sampled from recent frames (rolling mean HSV of centre crop).
-    @Volatile private var lastFeltHsv: FloatArray = floatArrayOf(120f, 0.5f, 0.4f)
 
     @Volatile private var currentViewOffset = PointF(0f, 0f)
     @Volatile private var currentRotation = 0f
@@ -154,7 +167,10 @@ class TableScanViewModel(
     }
 
     /** Called by TableScanAnalyzer each frame with the mean HSV of the centre crop of the felt. */
-    fun onFeltColorSampled(hsv: FloatArray) { lastFeltHsv = hsv }
+    fun onFeltColorSampled(hsv: FloatArray) {
+        lastFeltHsv = hsv
+        _hasFeltSample.value = true
+    }
 
     /**
      * Called by TableScanAnalyzer on each frame.
@@ -350,7 +366,7 @@ class TableScanViewModel(
             )
         }
 
-        val feltColorHsv = lastFeltHsv.toList()
+        val feltColorHsv = lastFeltHsv?.toList() ?: LEGACY_SCAN_FELT_HSV
         val location = tableScanRepository.getCurrentLocation()
         val model = TableScanModel(
             pockets = pocketClusters,
@@ -388,8 +404,9 @@ class TableScanViewModel(
      * Immediately completes the scan using the captured felt color and a default table pose.
      */
     fun captureFeltAndComplete() {
+        val sampled = lastFeltHsv ?: return // the shutter is disabled until there is a sample
         scope.launch {
-            val hsv = lastFeltHsv.toList()
+            val hsv = sampled.toList()
             _scanResult.emit(MainScreenEvent.AddFeltSample(hsv))
 
             val tableSize = _selectedTableSize.value
@@ -427,9 +444,9 @@ class TableScanViewModel(
             
             // Convert Android Compose HSV (0-360, 0-1, 0-1) to OpenCV HSV (0-180, 0-255, 0-255)
             val opencvHsv = floatArrayOf(
-                lastFeltHsv[0] / 2f,
-                lastFeltHsv[1] * 255f,
-                lastFeltHsv[2] * 255f
+                sampled[0] / 2f,
+                sampled[1] * 255f,
+                sampled[2] * 255f
             )
 
             // Lock the color and place the table immediately with the default pose.
@@ -443,7 +460,7 @@ class TableScanViewModel(
                 scale = 1.0f
             ))
             
-            _capturedFeltHsv.value = lastFeltHsv
+            _capturedFeltHsv.value = sampled
             // Felt capture is the whole scan: signal completion so the screen hands off to AR tracking.
             _scanComplete.value = true
         }

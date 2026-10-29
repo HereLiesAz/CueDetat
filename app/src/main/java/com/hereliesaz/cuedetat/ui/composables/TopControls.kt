@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.cuedetat.domain.ExperienceMode
+import com.hereliesaz.cuedetat.ui.theme.asHud
 import com.hereliesaz.cuedetat.view.state.DistanceUnit
 
 /**
@@ -80,13 +81,11 @@ fun TopControls(
                     ) {
                         Text(
                             text = stringResource(R.string.top_table_size_label),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            style = MaterialTheme.typography.labelSmall.asHud(0.8f)
                         )
                         Text(
                             text = "${tableSizeFeet}'",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                            style = MaterialTheme.typography.bodyLarge.asHud(0.95f),
                             modifier = Modifier.padding(top = 4.dp)
                         )
                     }
@@ -110,13 +109,11 @@ fun TopControls(
 
                         Text(
                             text = stringResource(R.string.top_distance_label),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            style = MaterialTheme.typography.labelSmall.asHud(0.8f)
                         )
                         Text(
                             text = distanceText,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                            style = MaterialTheme.typography.bodyLarge.asHud(0.95f),
                             modifier = Modifier.padding(top = 4.dp)
                         )
                     }

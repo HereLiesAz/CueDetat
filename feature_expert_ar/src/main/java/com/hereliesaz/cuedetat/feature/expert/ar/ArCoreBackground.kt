@@ -61,8 +61,16 @@ fun ArCoreBackground(
     DisposableEffect(lifecycleOwner) {
         val session = arTableSession.createSession() ?: run {
             Log.w(TAG, "ARCore session unavailable on this device")
+            // Otherwise a black view and an "off" switch that reads on.
+            onEvent(MainScreenEvent.ArNotice(
+                "AR could not start. Close any other app using the camera, then turn AR off and on.",
+                persistent = true,
+            ))
             return@DisposableEffect onDispose {}
         }
+
+        // The session just built holds no anchors; release any lock the state still claims.
+        onEvent(MainScreenEvent.ArSessionStarted)
 
         glSurfaceView.apply {
             preserveEGLContextOnPause = true
@@ -199,6 +207,7 @@ private class ArCoreRenderer(
                     lostNoticeShown = true
                     onEvent(MainScreenEvent.ArNotice(
                         ArTrackingMessages.trackingLost(camera.trackingFailureReason.name),
+                        persistent = true,
                     ))
                 }
             } else {

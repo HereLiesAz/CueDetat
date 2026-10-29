@@ -23,7 +23,12 @@ import com.hereliesaz.cuedetat.ui.composables.CuedetatButton
 
 @Composable
 fun PermissionExplanationScreen(
-    onConfirm: () -> Unit
+    onConfirm: () -> Unit,
+    /** The camera was refused: say so here instead of closing the app. */
+    denied: Boolean = false,
+    /** The system will no longer ask (refused with "don't ask again"): only Settings can grant it. */
+    permanentlyDenied: Boolean = false,
+    onOpenSettings: () -> Unit = {},
 ) {
     Box(
         modifier = Modifier
@@ -56,12 +61,36 @@ fun PermissionExplanationScreen(
                 color = Color.LightGray,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(32.dp))
-            CuedetatButton(
-                text = stringResource(id = R.string.permission_confirm_button),
-                onClick = onConfirm,
-                modifier = Modifier.width(200.dp)
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = stringResource(id = R.string.permission_bluetooth_explanation),
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.LightGray,
+                textAlign = TextAlign.Center
             )
+            if (denied) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = stringResource(id = R.string.permission_denied),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+            }
+            Spacer(modifier = Modifier.height(32.dp))
+            if (denied && permanentlyDenied) {
+                CuedetatButton(
+                    text = stringResource(id = R.string.permission_open_settings),
+                    onClick = onOpenSettings,
+                    modifier = Modifier.width(200.dp)
+                )
+            } else {
+                CuedetatButton(
+                    text = stringResource(id = R.string.permission_confirm_button),
+                    onClick = onConfirm,
+                    modifier = Modifier.width(200.dp)
+                )
+            }
         }
     }
 }

@@ -116,6 +116,7 @@ internal fun reduceToggleAction(
 
             state.copy(
                 isBeginnerViewLocked = true,
+                isViewLocked = false, // static Beginner has no Lock View button to undo it
                 areHelpersVisible = true, // Force help on
                 // Beginner has no camera-mode control, so never leave it in one
                 // it cannot exit. See handleSetExperienceMode for the detail.
@@ -188,11 +189,16 @@ private fun handleSetExperienceMode(
         bankingAimTarget = null,
         valuesChangedSinceReset = false,
         isWorldLocked = false,
+        // Lock View freezes the sensors; a mode change starts live.
+        isViewLocked = false,
         viewOffset = PointF(0f, 0f)
     )
 
     return when (mode) {
         ExperienceMode.EXPERT -> newState.copy(
+            // Beginner's locked view is a Beginner-only state: the flag is persisted and gates the
+            // CV analyzer, compass follow and table fit everywhere, so Expert must not inherit it.
+            isBeginnerViewLocked = false,
             table = newState.table.copy(isVisible = true),
             onPlaneBall = OnPlaneBall(center = reducerUtils.getDefaultCueBallPosition(newState), radius = LOGICAL_BALL_RADIUS),
             areHelpersVisible = false
@@ -215,7 +221,7 @@ private fun handleSetExperienceMode(
             },
             zoomSliderPosition = 0f
         )
-        ExperienceMode.HATER -> newState
+        ExperienceMode.HATER -> newState.copy(isBeginnerViewLocked = false)
     }
 }
 

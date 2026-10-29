@@ -61,6 +61,8 @@ class MainActivity : ComponentActivity() {
     // whether they originate inside composition.
     private lateinit var cameraPermissionGrantedState: MutableState<Boolean>
     private lateinit var showSupportSheetState: MutableState<Boolean>
+    private val cameraDenied = mutableStateOf(false)
+    private val cameraPermanentlyDenied = mutableStateOf(false)
 
     private val requestPermissionsLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
@@ -75,13 +77,14 @@ class MainActivity : ComponentActivity() {
                     (application as? MyApplication)?.initializeWearables()
                 }
             } else {
-                // Heresy is not tolerated. The user will comply or they will not use the app.
-                Toast.makeText(
-                    this,
-                    R.string.permission_denied,
-                    Toast.LENGTH_LONG
-                ).show()
-                finish()
+                // The app is a camera app and cannot run without it, but closing it on a refusal
+                // left no way back except relaunching. Stay on the explanation screen, which says
+                // so, and offer Settings once the system will not ask again.
+                cameraDenied.value = true
+                cameraPermanentlyDenied.value =
+                    !androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(
+                        this, Manifest.permission.CAMERA
+                    )
             }
         }
 
@@ -105,7 +108,18 @@ class MainActivity : ComponentActivity() {
                 AppContent(showSupport)
             } else {
                 CueDetatTheme {
-                    PermissionExplanationScreen(onConfirm = {
+                    PermissionExplanationScreen(
+                        denied = cameraDenied.value,
+                        permanentlyDenied = cameraPermanentlyDenied.value,
+                        onOpenSettings = {
+                            startActivity(
+                                Intent(
+                                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    Uri.fromParts("package", packageName, null)
+                                )
+                            )
+                        },
+                        onConfirm = {
                         val permissions = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                             arrayOf(
                                 Manifest.permission.CAMERA,

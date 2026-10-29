@@ -34,6 +34,13 @@ class UpdateStateUseCase @Inject constructor(
 ) {
 
     private val railHeightToTableHeightRatio = 0.025f
+    /**
+     * Empirical scale for the HUD's cue-to-target readout: distance (inches) = this / the target
+     * ball's on-screen radius (pixels). It has no derivation. It does not account for screen
+     * density, zoom or the camera's field of view, so the readout is an estimate and is shown with
+     * a "~" (see `distance_ft_in`/`distance_cm`). A metric figure would come from the ARCore
+     * homography, which knows the table's real size.
+     */
     private val distanceReferenceConstant = 1200f
     private val lineExtensionFactor = 5000f
 

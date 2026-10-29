@@ -7,6 +7,9 @@
 
     <string name="tagline">May your shot be better than your excuses.</string>
 
+    <string name="warning_reason_impossible">No such shot.</string>
+    <string name="warning_reason_obstructed">Something is in the way.</string>
+    <string name="warning_reason_tilt">Too steep a tilt.</string>
     <string-array name="insulting_warnings">
         <item>Physics called. It wants your law degree back.</item>
         <item>A fine example of geometric optimism.</item>
@@ -145,7 +148,9 @@
     <string name="permission_explanation_title">We need a couple of things to get started.</string>
     <string name="permission_camera_explanation">CAMERA: This app works by looking at the table through your lens. Without it, we\'re just a black screen.</string>
     <string name="permission_location_explanation">LOCATION: This is optional, but it lets us remember which table you\'ve scanned so you don\'t have to re-calibrate every time you come back.</string>
+    <string name="permission_bluetooth_explanation">BLUETOOTH: This is optional too. It is used only to find a wrist wearable, if you have one.</string>
     <string name="permission_confirm_button">I understand</string>
+    <string name="permission_open_settings">Open settings</string>
 
     <!-- Renderer Labels -->
     <string name="label_aim_pocket">Aim this line at the pocket.</string>
@@ -196,10 +201,13 @@
     <string name="rail_table_size">Table Size</string>
     <string name="rail_metric">Metric</string>
     <string name="rail_imperial">Imperial</string>
-    <string name="rail_orientation">Orientation</string>
+    <string name="rail_orientation">Orientation: %1$s</string>
     <string name="rail_training_data_on">Training data: on</string>
     <string name="rail_training_data_off">Training data: off</string>
     <string name="rail_advanced">Advanced</string>
+    <string name="overlay_a11y">Pool table overlay. Drag a ball to move it or drag to aim. Pinch to zoom, twist with two fingers to rotate the table.</string>
+    <string name="rail_luminance">Brightness</string>
+    <string name="rail_glow_stick">Glow stick</string>
     <string name="rail_snapping_on">Snapping: on</string>
     <string name="rail_snapping_off">Snapping: off</string>
     <string name="rail_debug_log_on">Debug log: on</string>
@@ -211,8 +219,8 @@
     <string name="top_table_size_a11y">Current table size: %1$d feet.</string>
     <string name="top_table_size_label">Table Size</string>
     <string name="top_distance_label">Distance</string>
-    <string name="distance_ft_in">%1$d ft %2$d in</string>
-    <string name="distance_cm">%1$d cm</string>
+    <string name="distance_ft_in">~%1$d ft %2$d in</string>
+    <string name="distance_cm">~%1$d cm</string>
     <string name="zoom_in_a11y">Zoom In</string>
     <string name="zoom_out_a11y">Zoom Out</string>
     <string name="zoom_level_a11y">Zoom Level</string>

@@ -124,6 +124,13 @@ class MainViewModel @Inject constructor(
     /** Debounce for the orientation-lock cycler; mirrors [experienceModeUpdateJob]. */
     private var orientationLockApplyJob: Job? = null
 
+    /** The reducer-written warning a fade is pending for, and that fade. Event-loop confined. */
+    private var fadingNotice: String? = null
+    private var noticeFadeJob: Job? = null
+
+    /** Whether this camera session has already offered the first-run cue pick; event-loop confined. */
+    private var autoPickOffered = false
+
     /** Fades the spin paths after the dial is released; see [startSpinPathDecay]. */
     private var spinDecayJob: Job? = null
     private var saveJob: Job? = null
@@ -508,12 +515,19 @@ class MainViewModel @Inject constructor(
         val finalState = when (logicalEvent) {
             is MainScreenEvent.CvDataUpdated -> {
                 val stateAfterSnap = snapReducer.reduce(reducedState, logicalEvent.visionData)
-                // Camera on, not "table scanned": detections exist without a scan.
-                if (stateAfterSnap.cameraMode != CameraMode.OFF &&
+                // Camera on, not "table scanned": detections exist without a scan. Offered once per
+                // camera session and never once the cue ball is placed: re-arming on every vision
+                // frame undid the user's disarm and blocked drags and aiming while armed.
+                if (stateAfterSnap.cameraMode == CameraMode.OFF) autoPickOffered = false
+                if (!autoPickOffered &&
+                    stateAfterSnap.cameraMode != CameraMode.OFF &&
                     stateAfterSnap.experienceMode == ExperienceMode.EXPERT &&
                     stateAfterSnap.ballSelectionPhase == BallSelectionPhase.NONE &&
+                    !stateAfterSnap.hasCueBallBeenMoved &&
+                    stateAfterSnap.cueBallCvAnchor == null &&
                     stateAfterSnap.snapCandidates?.any { it.isConfirmed } == true
                 ) {
+                    autoPickOffered = true
                     stateAfterSnap.copy(ballSelectionPhase = BallSelectionPhase.AWAITING_CUE)
                 } else {
                     stateAfterSnap
@@ -532,10 +546,41 @@ class MainViewModel @Inject constructor(
         val updateType = determineUpdateType(currentState, finalState, logicalEvent)
 
         processAndEmitState(finalState, updateType)
+        fadeReducerNotice(logicalEvent, currentState.warningText, finalState.warningText)
 
         handleSingleEvents(logicalEvent)
         tableSnapSideEffects(logicalEvent, currentState, _uiState.value)
         timedSideEffects(logicalEvent)
+    }
+
+    /**
+     * Fades a warning a reducer wrote straight into `warningText` (AR and cloud notices, lock
+     * failures, CV hints). Only [WarningManager]'s own messages had a timer; these stayed up,
+     * enormous, until something happened to overwrite them. A persistent AR notice (tracking lost)
+     * is a condition, not an event, and is cleared by its resolution instead. Clears only if the
+     * text is still the one this timer was started for. [before] is the warning prior to [event].
+     */
+    private fun fadeReducerNotice(event: MainScreenEvent, before: String?, text: String?) {
+        if (event is MainScreenEvent.SetWarning) return // WarningManager owns its own timer
+        if (text == null) {
+            noticeFadeJob?.cancel()
+            fadingNotice = null
+            return
+        }
+        if (event is MainScreenEvent.ArNotice && event.persistent) {
+            noticeFadeJob?.cancel()
+            fadingNotice = null
+            return
+        }
+        // Only the event that wrote the text starts its timer; later events carry it along unchanged.
+        if (text == before || text == fadingNotice) return
+        fadingNotice = text
+        noticeFadeJob?.cancel()
+        noticeFadeJob = viewModelScope.launch {
+            delay(NOTICE_FADE_MS)
+            if (_uiState.value.warningText == text) onEvent(MainScreenEvent.SetWarning(null))
+            fadingNotice = null
+        }
     }
 
     /**
@@ -692,7 +737,12 @@ class MainViewModel @Inject constructor(
         val wasWarning = previousState.isGeometricallyImpossible || previousState.isObstructed || previousState.isTiltBeyondLimit
         val isWarning = derivedState.isGeometricallyImpossible || derivedState.isObstructed || derivedState.isTiltBeyondLimit
         if (isWarning && !wasWarning && warningMessages.isNotEmpty()) {
-            warningManager.triggerWarning(warningMessages, viewModelScope)
+            val reason = when {
+                derivedState.isGeometricallyImpossible -> appContext.getString(R.string.warning_reason_impossible)
+                derivedState.isObstructed -> appContext.getString(R.string.warning_reason_obstructed)
+                else -> appContext.getString(R.string.warning_reason_tilt)
+            }
+            warningManager.triggerWarning(warningMessages, viewModelScope, reason)
         }
 
         commit(derivedState)
@@ -848,6 +898,9 @@ class MainViewModel @Inject constructor(
 
 /** Pause after the last orientation-lock tap before the lock is applied. */
 private const val ORIENTATION_LOCK_DEBOUNCE_MS = 1000L
+
+/** How long a reducer-written notice stays up; long enough to read a sentence. */
+private const val NOTICE_FADE_MS = 5000L
 
 /** Interval between [MainScreenEvent.SpinPathTick]s; the reducer removes 0.05 alpha per tick. */
 private const val SPIN_DECAY_TICK_MS = 50L

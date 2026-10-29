@@ -37,6 +37,14 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
 
         is MainScreenEvent.ArNotice -> state.copy(warningText = action.message)
 
+        // The new session has no anchor, whatever the state says: the Activity was recreated (a
+        // rotation, a font-scale change) and ARCore's anchors went with the old session.
+        is MainScreenEvent.ArSessionStarted ->
+            if (state.isArTableLocked) state.copy(
+                isArTableLocked = false,
+                warningText = "AR restarted, so the table lock was released. Line the table up and lock it again.",
+            ) else state
+
         is MainScreenEvent.ArTableLockLost ->
             state.copy(isArTableLocked = false, warningText = action.message)
 

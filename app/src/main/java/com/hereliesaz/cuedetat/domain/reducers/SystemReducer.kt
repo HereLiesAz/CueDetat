@@ -65,10 +65,12 @@ private fun handleSizeChanged(
     state: CueDetatState,
     action: MainScreenEvent.SizeChanged
 ): CueDetatState {
+    // First measurement places the dial; every later one (rotation, split screen) pulls a
+    // dial that no longer fits back inside the new bounds.
     val newSpinCenter = if (state.spinControlCenter == null && action.width > 0 && action.height > 0) {
         PointF(action.width / 2f, 116f * action.density)
     } else {
-        state.spinControlCenter
+        state.spinControlCenter?.let { clampSpinControlCenter(it, action.width, action.height, action.density) }
     }
 
     return state.copy(

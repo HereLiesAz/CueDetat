@@ -138,6 +138,8 @@ fun ProtractorScreen(
                     CameraBackground(
                         modifier = Modifier.fillMaxSize(),
                         analyzer = activeAnalyzer,
+                        // A failed bind otherwise leaves a black view and a rail that reads "off".
+                        onStatus = { mainViewModel.onEvent(MainScreenEvent.ArNotice(it, persistent = true)) },
                     )
                 }
             }
@@ -232,7 +234,10 @@ fun ProtractorScreen(
 
         // --- Onscreen HUD: Lock View (main route only, hidden during felt capture) ---
         onscreen(alignment = Alignment.BottomEnd) {
-            if (isOnMain && !uiState.showTableScanScreen) {
+            // Not in Beginner's static view: its bubble level is sensor-driven, and a stray tap here
+            // would freeze it with only a small icon to say why.
+            val staticBeginner = uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked
+            if (isOnMain && !uiState.showTableScanScreen && !staticBeginner) {
                 com.hereliesaz.cuedetat.ui.composables.sliders.LockViewButton(
                     isLocked = uiState.isViewLocked,
                     onToggle = { mainViewModel.onEvent(MainScreenEvent.ToggleViewLock) },
@@ -328,7 +333,10 @@ fun ProtractorScreen(
 
         // --- Onscreen: AR tracking badge (bottom-start, when AR is actively tracking) ---
         onscreen(alignment = Alignment.BottomStart) {
+            // Only while ARCore is delivering a live projection: arTableMatrix is null on a device
+            // without ARCore (CV fallback) and while tracking is lost, when "AR Tracking" would lie.
             if (isOnMain && uiState.cameraMode == CameraMode.AR_ACTIVE
+                && uiState.arTableMatrix != null
                 && (uiState.tableScanModel != null || uiState.depthPlane != null)) {
                 ArTrackingBadge(
                     modifier = Modifier.padding(start = 16.dp, bottom = 72.dp),

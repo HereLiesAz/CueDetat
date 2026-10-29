@@ -15,6 +15,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.isSpecified
+import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.pointerInput
 import com.hereliesaz.cuedetat.domain.ArProjectionPolicy
 import com.hereliesaz.cuedetat.domain.CueDetatState
@@ -70,6 +71,10 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
             // Track the centroid (center point of fingers) to calculate movement.
             var lastCentroid: Offset = down.position
             var lastPressedCount = 1
+            // Per-gesture: two-finger rotation/pan only start after a deliberate amount of travel,
+            // and each finger's vertical travel since the third one landed (the height drag).
+            val twoFingerIntent = TwoFingerIntent()
+            val heightTravel = HashMap<PointerId, Float>()
 
             // Loop to handle drag/move events until all fingers are lifted.
             var hasMovedDramatically = false
@@ -83,6 +88,7 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                     if (pressedCount != lastPressedCount) {
                         // Finger landed or lifted: re-seed and emit nothing this event.
                         lastPressedCount = pressedCount
+                        heightTravel.clear()
                         if (centroid.isSpecified) lastCentroid = centroid
                         event.changes.forEach { if (it.pressed) it.consume() }
                         continue
@@ -97,8 +103,11 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                         // dynamic beginner mode.
                         val pan = event.calculatePan()
                         val pressed = event.changes.filter { it.pressed }
+                        // Judged on each finger's travel since the third landed, not per event: a
+                        // slow, deliberate drag moves under a pixel per event and never qualified.
+                        pressed.forEach { heightTravel[it.id] = (heightTravel[it.id] ?: 0f) + (it.position.y - it.previousPosition.y) }
                         if (abs(pan.y) > 0.1f &&
-                            isCoherentVerticalDrag(pressed.map { it.position.y - it.previousPosition.y })
+                            isCoherentVerticalDrag(pressed.map { heightTravel[it.id] ?: 0f }, HEIGHT_DRAG_ENGAGE_PX)
                         ) {
                             onEvent(MainScreenEvent.MoveTableZ(-pan.y * 0.05f))
                         }
@@ -121,9 +130,12 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
                         // 2. Rotation & Pan
                         if (uiState.table.isVisible) {
                             val rotation = event.calculateRotation()
-                            if (rotation != 0f) onEvent(MainScreenEvent.TableRotationApplied(rotation))
                             val pan = event.calculatePan()
-                            if (abs(pan.y) > 0.1f || abs(pan.x) > 0.1f) onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
+                            // A pinch never lands perfectly: ignore the small twist and drift
+                            // that ride along until the fingers clearly mean to rotate or pan.
+                            val intent = twoFingerIntent.accept(rotation, pan.x, pan.y)
+                            if (intent.rotate && rotation != 0f) onEvent(MainScreenEvent.TableRotationApplied(rotation))
+                            if (intent.pan && (abs(pan.y) > 0.1f || abs(pan.x) > 0.1f)) onEvent(MainScreenEvent.PanView(PointF(pan.x, pan.y)))
                         }
                     } else if (event.changes.size == 1) {
                         val pan = event.calculatePan()
@@ -169,14 +181,61 @@ fun Modifier.detectManualGestures(uiState: CueDetatState, onEvent: (MainScreenEv
 private const val RESTING_FINGER_PX = 1f
 
 /**
+ * Travel, in pixels, every one of the three fingers must have made (all the same way) since the
+ * third landed before the table-height drag engages. A resting thumb never gets there.
+ */
+private const val HEIGHT_DRAG_ENGAGE_PX = 6f
+
+/**
  * True when at least three fingers are down and every one of them moved vertically, all the same
  * way: the three-finger table-height drag. [verticalDeltas] is each pressed finger's change in y
  * since the last event. A finger that is not moving (a resting thumb) or moving against the others
  * makes this false, so it can't drive the height slider.
  */
-internal fun isCoherentVerticalDrag(verticalDeltas: List<Float>): Boolean {
+internal fun isCoherentVerticalDrag(
+    verticalDeltas: List<Float>,
+    restingPx: Float = RESTING_FINGER_PX,
+): Boolean {
     if (verticalDeltas.size < 3) return false
-    val down = verticalDeltas.all { it > RESTING_FINGER_PX }
-    val up = verticalDeltas.all { it < -RESTING_FINGER_PX }
+    val down = verticalDeltas.all { it > restingPx }
+    val up = verticalDeltas.all { it < -restingPx }
     return down || up
+}
+
+/**
+ * Decides, per two-finger gesture, when its rotation and pan are deliberate. Travel accumulates
+ * (signed, so jitter cancels) from the gesture's start; a channel opens once its accumulated
+ * travel passes its slop and stays open for the rest of the gesture, as Compose's own transform
+ * detector does. Without this every pinch also twisted and dragged the table a little.
+ */
+internal class TwoFingerIntent(
+    private val rotationSlopDeg: Float = ROTATION_SLOP_DEG,
+    private val panSlopPx: Float = PAN_SLOP_PX,
+) {
+    data class Intent(val rotate: Boolean, val pan: Boolean)
+
+    private var rotation = 0f
+    private var panX = 0f
+    private var panY = 0f
+    private var rotating = false
+    private var panning = false
+
+    /** Feeds one event's rotation (degrees) and pan (pixels); returns what may be applied now. */
+    fun accept(rotationDeg: Float, panDx: Float, panDy: Float): Intent {
+        if (!rotating) {
+            rotation += rotationDeg
+            if (abs(rotation) >= rotationSlopDeg) rotating = true
+        }
+        if (!panning) {
+            panX += panDx
+            panY += panDy
+            if (kotlin.math.hypot(panX, panY) >= panSlopPx) panning = true
+        }
+        return Intent(rotate = rotating, pan = panning)
+    }
+
+    companion object {
+        const val ROTATION_SLOP_DEG = 3f
+        const val PAN_SLOP_PX = 16f
+    }
 }

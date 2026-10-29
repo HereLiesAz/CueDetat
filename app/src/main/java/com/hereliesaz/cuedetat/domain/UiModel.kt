@@ -332,8 +332,17 @@ sealed class MainScreenEvent {
     data class TableScaleChanged(val factor: Float) : MainScreenEvent()
     /** The AR session measured the real table's size: set [CueDetatState.tableFitScale] to [scale]. */
     data class SetTableFitScale(val scale: Float) : MainScreenEvent()
-    /** A status line from AR tracking (null clears it): why tracking is lost, that it is back. */
-    data class ArNotice(val message: String?) : MainScreenEvent()
+    /**
+     * A fresh ARCore session now owns the camera. Its anchors do not carry over from a previous one
+     * (the Activity was recreated, say), so a lock the state still claims is released.
+     */
+    object ArSessionStarted : MainScreenEvent()
+    /**
+     * A status line from AR tracking (null clears it). [persistent] notices describe a condition
+     * that outlasts any timer (tracking lost) and are cleared by `ArNotice(null)`; the rest are
+     * momentary and fade like every other warning.
+     */
+    data class ArNotice(val message: String?, val persistent: Boolean = false) : MainScreenEvent()
     /** The AR session lost the locked table's anchor for good; it is no longer locked. */
     data class ArTableLockLost(val message: String) : MainScreenEvent()
     data class ZoomSliderChanged(val position: Float) : MainScreenEvent()
