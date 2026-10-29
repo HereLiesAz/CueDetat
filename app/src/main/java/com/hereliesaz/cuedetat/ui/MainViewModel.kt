@@ -124,9 +124,19 @@ class MainViewModel @Inject constructor(
     /** Debounce for the orientation-lock cycler; mirrors [experienceModeUpdateJob]. */
     private var orientationLockApplyJob: Job? = null
 
-    /** The reducer-written warning a fade is pending for, and that fade. Event-loop confined. */
-    private var fadingNotice: String? = null
+    /**
+     * The reducer-written warning a fade is pending for, and that fade. The loop starts it; the
+     * fade job (main dispatcher) clears it, hence volatile.
+     */
+    @Volatile private var fadingNotice: String? = null
     private var noticeFadeJob: Job? = null
+
+    /**
+     * The persistent notice currently up (tracking lost, camera or ARCore failed to start), written
+     * on the event loop only. A [MainScreenEvent.SetWarning] with null (the end of a shot warning's
+     * three seconds) would wipe it, and its source never re-raises it, so that clear puts it back.
+     */
+    private var persistentNotice: String? = null
 
     /** Whether this camera session has already offered the first-run cue pick; event-loop confined. */
     private var autoPickOffered = false
@@ -436,7 +446,20 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun processEvent(event: MainScreenEvent) {
+    private fun processEvent(rawEvent: MainScreenEvent) {
+        // The end of a shot warning's three seconds must not wipe a persistent notice: put it back.
+        val event = if (rawEvent is MainScreenEvent.SetWarning && rawEvent.warning == null &&
+            persistentNotice != null
+        ) MainScreenEvent.SetWarning(persistentNotice) else rawEvent
+        // ARCore sends the camera's pitch and height every frame, and they barely change: only a
+        // real change is worth a reduce and an aim recompute.
+        if (event is MainScreenEvent.ArCameraPoseUpdated) {
+            val live = _uiState.value
+            if (live.arDerivedPitch != null && live.arMeasuredHeightM != null &&
+                kotlin.math.abs(live.arDerivedPitch - event.pitchDegrees) < 0.5f &&
+                kotlin.math.abs(live.arMeasuredHeightM - event.heightAboveSurfaceM) < 0.01f
+            ) return
+        }
         // Lock View: sensor-driven transforms are dropped before they reach the reducers.
         // Lock View freezes screen-space sensor-driven transforms by design.
         // It is distinct from AR table Lock (a physical world anchor).
@@ -555,7 +578,6 @@ class MainViewModel @Inject constructor(
                 // Camera on, not "table scanned": detections exist without a scan. Offered once per
                 // camera session and never once the cue ball is placed: re-arming on every vision
                 // frame undid the user's disarm and blocked drags and aiming while armed.
-                if (stateAfterSnap.cameraMode == CameraMode.OFF) autoPickOffered = false
                 if (!autoPickOffered &&
                     stateAfterSnap.cameraMode != CameraMode.OFF &&
                     stateAfterSnap.experienceMode == ExperienceMode.EXPERT &&
@@ -583,6 +605,9 @@ class MainViewModel @Inject constructor(
         val updateType = determineUpdateType(currentState, finalState, logicalEvent)
 
         processAndEmitState(finalState, updateType)
+        // A new camera session may offer the first-run cue pick again (checked on every event: the
+        // vision flow stops emitting once the camera is off).
+        if (finalState.cameraMode == CameraMode.OFF) autoPickOffered = false
         fadeReducerNotice(logicalEvent, currentState.warningText, finalState.warningText)
 
         handleSingleEvents(logicalEvent)
@@ -602,11 +627,13 @@ class MainViewModel @Inject constructor(
         if (text == null) {
             noticeFadeJob?.cancel()
             fadingNotice = null
+            persistentNotice = null
             return
         }
         if (event is MainScreenEvent.ArNotice && event.persistent) {
             noticeFadeJob?.cancel()
             fadingNotice = null
+            persistentNotice = text
             return
         }
         // Only the event that wrote the text starts its timer; later events carry it along unchanged.
@@ -854,10 +881,7 @@ class MainViewModel @Inject constructor(
             // World-anchored table pose arrives ~30-60Hz from the ARCore GL thread. It must
             // recompute the matrices each frame so the overlay tracks as the user walks; routing it
             // to AIMING (the default) would silently freeze the table at its first pose.
-            // ArCameraPoseUpdated arrives every ARCore frame too, and only feeds the pitch the matrices
-            // use; the default (AIMING) recomputed the whole aim 30-60 times a second for it.
-            is MainScreenEvent.ArTableMatrixUpdated, is MainScreenEvent.NudgeTableRange,
-            is MainScreenEvent.ArCameraPoseUpdated -> UpdateType.MATRICES_ONLY
+            is MainScreenEvent.ArTableMatrixUpdated, is MainScreenEvent.NudgeTableRange -> UpdateType.MATRICES_ONLY
 
             is MainScreenEvent.SizeChanged, is MainScreenEvent.ZoomScaleChanged, is MainScreenEvent.ZoomSliderChanged,
             is MainScreenEvent.PanView, is MainScreenEvent.TableRotationChanged,

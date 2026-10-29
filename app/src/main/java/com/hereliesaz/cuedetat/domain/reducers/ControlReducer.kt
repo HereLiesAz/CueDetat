@@ -126,7 +126,8 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
                 worldRotationDegrees = action.rotation,
                 zoomSliderPosition = newZoomSliderPos,
                 isWorldLocked = true,
-                valuesChangedSinceReset = true
+                // Not valuesChangedSinceReset: this is the CV pose blend, not the user's layout.
+                // Counting it made Reset's undo/redo unreachable while the camera was on.
             )
         }
 
@@ -211,6 +212,7 @@ internal fun applyTablePose(
         viewOffset = PointF(offsetX, offsetY.coerceIn(-limit, limit)),
         worldRotationDegrees = rotationDeg,
         zoomSliderPosition = ZoomMapping.zoomToSlider(z, minZoom, maxZoom),
-        valuesChangedSinceReset = true,
+        // Not valuesChangedSinceReset: the felt-fit pull and the remembered-pose seed call this
+        // on their own, and counting them made Reset's undo/redo unreachable with the camera on.
     )
 }

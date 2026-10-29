@@ -389,6 +389,10 @@ class TableScanViewModel(
     }
 
     fun resetScan() {
+        // A new scan must not capture the last scan's colour: drop it and wait for a fresh sample
+        // (the AR frame processor publishes a new array about every 100 ms, so one arrives).
+        lastFeltHsv = null
+        _hasFeltSample.value = false
         synchronized(clustersLock) { clusters.clear() }
         _scanProgress.value = emptyMap()
         _scanComplete.value = false

@@ -66,6 +66,8 @@ class MainActivity : ComponentActivity() {
 
     private val requestPermissionsLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            // An interrupted request (the dialog closed by the system) returns nothing: not a refusal.
+            if (permissions.isEmpty()) return@registerForActivityResult
             val cameraGranted = permissions[Manifest.permission.CAMERA] ?: false
             val bluetoothGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                 permissions[Manifest.permission.BLUETOOTH_CONNECT] ?: false

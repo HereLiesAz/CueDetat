@@ -60,4 +60,21 @@ class ActionReducerUndoTest {
         assertEquals(false, undone.valuesChangedSinceReset)
         assertEquals(false, reduceAction(undone, MainScreenEvent.Reset, utils).valuesChangedSinceReset)
     }
+
+    @Test
+    fun `the table snapping itself back into place does not make undo unreachable`() {
+        // Reset, then the felt-fit pull (ApplyTablePose) and the CV pose blend (UpdateArPose) move
+        // the table on their own: the user changed nothing, so Reset must still undo.
+        val start = CueDetatState().copy(zoomSliderPosition = 25f)
+        val reset = reduceAction(start, MainScreenEvent.Reset, utils)
+        val pulled = applyTablePose(reset, 10f, 10f, 5f, 1f)
+        assertEquals(false, pulled.valuesChangedSinceReset)
+        val blended = reduceControlAction(
+            pulled,
+            MainScreenEvent.UpdateArPose(androidx.compose.ui.geometry.Offset(1f, 1f), 2f, 1f),
+        )
+        assertEquals(false, blended.valuesChangedSinceReset)
+        val undone = reduceAction(blended, MainScreenEvent.Reset, utils)
+        assertEquals(25f, undone.zoomSliderPosition, 0f)
+    }
 }
