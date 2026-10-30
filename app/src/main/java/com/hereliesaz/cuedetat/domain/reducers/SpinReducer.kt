@@ -112,7 +112,12 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
 
         is MainScreenEvent.DragSpinControl -> {
             val currentCenter = state.spinControlCenter ?: return state
-            state.copy(spinControlCenter = PointF(currentCenter.x + action.delta.x, currentCenter.y + action.delta.y))
+            state.copy(
+                spinControlCenter = clampSpinControlCenter(
+                    PointF(currentCenter.x + action.delta.x, currentCenter.y + action.delta.y),
+                    state.viewWidth, state.viewHeight, state.screenDensity,
+                )
+            )
         }
 
         is MainScreenEvent.ClearSpinState -> {
@@ -121,4 +126,28 @@ internal fun reduceSpinAction(state: CueDetatState, action: MainScreenEvent): Cu
 
         else -> state
     }
+}
+
+/** Half the spin/masse dial's 120 dp square: the dial's centre must stay at least this far inside the view. */
+private const val SPIN_CONTROL_HALF_SIZE_DP = 60f
+
+/**
+ * Keeps the dial's centre where the whole 120 dp square is on screen. The centre is persisted in
+ * absolute pixels, so a drag toward an edge, or a rotation to a smaller dimension, could otherwise
+ * leave the dial unreachable while its rail toggle still read "on". A view not yet measured
+ * ([width] or [height] not positive) leaves [center] alone.
+ */
+internal fun clampSpinControlCenter(center: PointF, width: Int, height: Int, density: Float): PointF {
+    if (width <= 0 || height <= 0) return center
+    return PointF(
+        clampSpinControlCoordinate(center.x, width, density),
+        clampSpinControlCoordinate(center.y, height, density),
+    )
+}
+
+/** One axis of [clampSpinControlCenter]; pure, so it is unit-testable off-device. */
+internal fun clampSpinControlCoordinate(value: Float, extent: Int, density: Float): Float {
+    val half = SPIN_CONTROL_HALF_SIZE_DP * density
+    // A view smaller than the dial: centre it rather than produce an inverted range.
+    return if (extent <= 2 * half) extent / 2f else value.coerceIn(half, extent - half)
 }

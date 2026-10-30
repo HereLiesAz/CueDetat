@@ -61,8 +61,16 @@ fun ArCoreBackground(
     DisposableEffect(lifecycleOwner) {
         val session = arTableSession.createSession() ?: run {
             Log.w(TAG, "ARCore session unavailable on this device")
+            // Otherwise a black view and an "off" switch that reads on.
+            onEvent(MainScreenEvent.ArNotice(
+                "AR could not start. Close any other app using the camera, then turn AR off and on.",
+                persistent = true,
+            ))
             return@DisposableEffect onDispose {}
         }
+
+        // The session just built holds no anchors; release any lock the state still claims.
+        onEvent(MainScreenEvent.ArSessionStarted)
 
         glSurfaceView.apply {
             preserveEGLContextOnPause = true
@@ -101,10 +109,27 @@ fun ArCoreBackground(
         glSurfaceView.setRenderer(renderer)
         glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
 
+        // A resume that fails (the camera is held by another app) leaves a black view; say so, and
+        // clear it when a later resume works.
+        var resumeFailed = false
+        fun resumeSession() {
+            val ok = arTableSession.resume()
+            if (!ok) {
+                resumeFailed = true
+                onEvent(MainScreenEvent.ArNotice(
+                    "AR could not start the camera. Close any other app using it, then come back.",
+                    persistent = true,
+                ))
+            } else if (resumeFailed) {
+                resumeFailed = false
+                onEvent(MainScreenEvent.ArNotice(null))
+            }
+        }
+
         val observer = object : DefaultLifecycleObserver {
             override fun onResume(owner: LifecycleOwner) {
                 displayRotation.set(displayManager.getDisplay(displayId)?.rotation ?: Surface.ROTATION_0)
-                arTableSession.resume()
+                resumeSession()
                 glSurfaceView.onResume()
             }
             override fun onPause(owner: LifecycleOwner) {
@@ -114,7 +139,7 @@ fun ArCoreBackground(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
 
-        arTableSession.resume()
+        resumeSession()
         glSurfaceView.onResume()
 
         onDispose {
@@ -199,6 +224,7 @@ private class ArCoreRenderer(
                     lostNoticeShown = true
                     onEvent(MainScreenEvent.ArNotice(
                         ArTrackingMessages.trackingLost(camera.trackingFailureReason.name),
+                        persistent = true,
                     ))
                 }
             } else {

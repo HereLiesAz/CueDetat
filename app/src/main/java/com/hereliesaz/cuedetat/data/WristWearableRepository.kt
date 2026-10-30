@@ -1,5 +1,6 @@
 package com.hereliesaz.cuedetat.data
 
+import androidx.annotation.Keep
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -17,6 +18,7 @@ import java.nio.ByteOrder
 import javax.inject.Inject
 import javax.inject.Singleton
 
+@Keep
 data class WearableState(
     val isConnected: Boolean = false,
     /** Latest heart rate in BPM; null until a watch actually sends one (the current wear build never does). */

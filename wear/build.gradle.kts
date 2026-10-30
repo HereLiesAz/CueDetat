@@ -12,7 +12,8 @@ plugins {
 // applicationId to carry a distinct versionCode, so the wear code is the phone's BUILD plus
 // WEAR_VERSION_CODE_OFFSET. The offset keeps the two sequences disjoint as long as the phone's
 // versionCode (BUILD, commit count, or the Play workflow's -PversionCodeOverride) stays below it.
-// No workflow currently builds or publishes :wear.
+// Every :app assemble* task builds :wear:assembleDebug (app/build.gradle.kts), but no workflow
+// publishes :wear.
 val wearVersionProps = Properties().apply {
     val f = rootProject.file("version.properties")
     if (f.exists()) f.inputStream().use { load(it) }

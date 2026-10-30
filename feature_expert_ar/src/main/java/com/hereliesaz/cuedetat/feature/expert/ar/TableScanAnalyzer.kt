@@ -1,6 +1,7 @@
 // app/src/main/java/com/hereliesaz/cuedetat/ui/composables/tablescan/TableScanAnalyzer.kt
 package com.hereliesaz.cuedetat.feature.expert.ar
 
+import com.hereliesaz.cuedetat.data.HueMask
 import android.graphics.Bitmap
 import android.graphics.PointF
 import android.util.Log
@@ -111,8 +112,13 @@ class TableScanAnalyzer(
             val centerVNormalised: Float
             val centerHistogram: List<Float>
             val meanHsv: org.opencv.core.Scalar
+            // Hue is a circle: a red or maroon felt straddles the 0/180 seam, where the plain mean
+            // of 175 and 5 is 90 (green). S and V are ordinary quantities, so they stay on meanHsv.
+            val circularHue: Double?
             try {
                 meanHsv = Core.mean(crop)
+                val noMask = Mat()
+                circularHue = try { HueMask.stats(crop, noMask)?.mean } finally { noMask.release() }
 
                 // Sample centre region V channel and 16-bin histogram for pocket darkness check
                 centerVNormalised = (meanHsv.`val`[2] / 255f).toFloat()
@@ -148,7 +154,7 @@ class TableScanAnalyzer(
             onCenterVSampled(centerVNormalised, centerHistogram)
 
             val sampledHsv = floatArrayOf(
-                meanHsv.`val`[0].toFloat() * 2f, // 0-180 -> 0-360
+                (circularHue ?: meanHsv.`val`[0]).toFloat() * 2f, // 0-180 -> 0-360
                 meanHsv.`val`[1].toFloat() / 255f, // 0-255 -> 0-1
                 meanHsv.`val`[2].toFloat() / 255f  // 0-255 -> 0-1
             )
@@ -189,7 +195,7 @@ class TableScanAnalyzer(
             } else {
                 // --- Strategy 2: Felt-Boundary Extraction Fallback ---
                 try {
-                    val h = meanHsv.`val`[0]
+                    val h = circularHue ?: meanHsv.`val`[0]
                     val hRange = 15.0
                     val sMin = 40.0
                     val vMin = 40.0

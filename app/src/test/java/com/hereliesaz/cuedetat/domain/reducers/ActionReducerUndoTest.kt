@@ -33,4 +33,48 @@ class ActionReducerUndoTest {
         assertEquals(720, redone.viewWidth)
         assertEquals(afterReset.zoomSliderPosition, redone.zoomSliderPosition, 0f)
     }
+
+    @Test
+    fun `reset after rearranging takes a fresh snapshot instead of toggling the first two layouts`() {
+        val start = CueDetatState().copy(zoomSliderPosition = 25f)
+        val reset1 = reduceAction(start, MainScreenEvent.Reset, utils)
+        val undone = reduceAction(reset1, MainScreenEvent.Reset, utils)
+        assertEquals(25f, undone.zoomSliderPosition, 0f)
+
+        // The user rearranges, then resets: this must reset (and remember the new layout),
+        // not redo the first reset.
+        val rearranged = undone.copy(zoomSliderPosition = -30f, valuesChangedSinceReset = true)
+        val reset2 = reduceAction(rearranged, MainScreenEvent.Reset, utils)
+        assertEquals(reset1.zoomSliderPosition, reset2.zoomSliderPosition, 0f)
+        assertEquals(-30f, reset2.preResetState!!.zoomSliderPosition, 0f)
+
+        // And undoing it brings the rearranged layout back, not the very first one.
+        val undone2 = reduceAction(reset2, MainScreenEvent.Reset, utils)
+        assertEquals(-30f, undone2.zoomSliderPosition, 0f)
+    }
+
+    @Test
+    fun `undo and redo leave the restored layout as the unchanged baseline`() {
+        val reset = reduceAction(CueDetatState().copy(valuesChangedSinceReset = true), MainScreenEvent.Reset, utils)
+        val undone = reduceAction(reset, MainScreenEvent.Reset, utils)
+        assertEquals(false, undone.valuesChangedSinceReset)
+        assertEquals(false, reduceAction(undone, MainScreenEvent.Reset, utils).valuesChangedSinceReset)
+    }
+
+    @Test
+    fun `the table snapping itself back into place does not make undo unreachable`() {
+        // Reset, then the felt-fit pull (ApplyTablePose) and the CV pose blend (UpdateArPose) move
+        // the table on their own: the user changed nothing, so Reset must still undo.
+        val start = CueDetatState().copy(zoomSliderPosition = 25f)
+        val reset = reduceAction(start, MainScreenEvent.Reset, utils)
+        val pulled = applyTablePose(reset, 10f, 10f, 5f, 1f)
+        assertEquals(false, pulled.valuesChangedSinceReset)
+        val blended = reduceControlAction(
+            pulled,
+            MainScreenEvent.UpdateArPose(androidx.compose.ui.geometry.Offset(1f, 1f), 2f, 1f),
+        )
+        assertEquals(false, blended.valuesChangedSinceReset)
+        val undone = reduceAction(blended, MainScreenEvent.Reset, utils)
+        assertEquals(25f, undone.zoomSliderPosition, 0f)
+    }
 }

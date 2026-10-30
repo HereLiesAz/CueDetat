@@ -86,7 +86,9 @@ fun SplashScreen(onRoleSelected: (ExperienceMode) -> Unit) {
                 Text(
                     text = stringResource(id = R.string.tagline),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // The splash is black in every theme; the light scheme's onSurfaceVariant is
+                    // near-black and left the tagline at ~1.5:1.
+                    color = Color.White.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center
                 )
             }

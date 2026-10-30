@@ -40,7 +40,7 @@ internal fun reduceToggleAction(
                 isArTableLocked = false
             )
             CameraMode.AR_ACTIVE -> state.copy(cameraMode = CameraMode.LITE_AR, isArTableLocked = false)
-            else -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false, isArTableLocked = false, isAutoCalibrating = false, ballSelectionPhase = com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE)
+            else -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false, isArTableLocked = false, isAutoCalibrating = false, ballSelectionPhase = com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE, warningText = null)
         }
         is MainScreenEvent.StartArTracking -> {
             val phase = if (state.experienceMode == ExperienceMode.EXPERT) {
@@ -54,7 +54,9 @@ internal fun reduceToggleAction(
             )
         }
         is MainScreenEvent.CancelArSetup -> state.copy(cameraMode = CameraMode.CAMERA_ONLY, showTableScanScreen = false, isArTableLocked = false)
-        is MainScreenEvent.TurnCameraOff -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false, isArTableLocked = false, isAutoCalibrating = false, ballSelectionPhase = com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE)
+        // warningText cleared with the camera: a persistent camera/AR notice ("could not start")
+        // is about the session being turned off.
+        is MainScreenEvent.TurnCameraOff -> state.copy(cameraMode = CameraMode.OFF, showTableScanScreen = false, isArTableLocked = false, isAutoCalibrating = false, ballSelectionPhase = com.hereliesaz.cuedetat.domain.BallSelectionPhase.NONE, warningText = null)
         is MainScreenEvent.SetCameraMode -> state.copy(cameraMode = action.mode)
         is MainScreenEvent.ToggleTargetType -> {
             val nextType = if (state.targetType == com.hereliesaz.cuedetat.domain.TargetType.SOLIDS) {
@@ -116,6 +118,7 @@ internal fun reduceToggleAction(
 
             state.copy(
                 isBeginnerViewLocked = true,
+                isViewLocked = false, // static Beginner has no Lock View button to undo it
                 areHelpersVisible = true, // Force help on
                 // Beginner has no camera-mode control, so never leave it in one
                 // it cannot exit. See handleSetExperienceMode for the detail.
@@ -188,11 +191,16 @@ private fun handleSetExperienceMode(
         bankingAimTarget = null,
         valuesChangedSinceReset = false,
         isWorldLocked = false,
+        // Lock View freezes the sensors; a mode change starts live.
+        isViewLocked = false,
         viewOffset = PointF(0f, 0f)
     )
 
     return when (mode) {
         ExperienceMode.EXPERT -> newState.copy(
+            // Beginner's locked view is a Beginner-only state: the flag is persisted and gates the
+            // CV analyzer, compass follow and table fit everywhere, so Expert must not inherit it.
+            isBeginnerViewLocked = false,
             table = newState.table.copy(isVisible = true),
             onPlaneBall = OnPlaneBall(center = reducerUtils.getDefaultCueBallPosition(newState), radius = LOGICAL_BALL_RADIUS),
             areHelpersVisible = false
@@ -215,7 +223,7 @@ private fun handleSetExperienceMode(
             },
             zoomSliderPosition = 0f
         )
-        ExperienceMode.HATER -> newState
+        ExperienceMode.HATER -> newState.copy(isBeginnerViewLocked = false)
     }
 }
 

@@ -30,9 +30,12 @@ jobs:
       issues: write
     steps:
       - name: Invoke Jules for Security Issue
+        # Only the owner's side may drive it: the issue text is the agent's prompt, and this job
+        # can write contents and open pull requests (see jules-issue-handler.yml).
         if: |
           github.event_name == 'workflow_dispatch' ||
           (github.event_name == 'issues' &&
+           contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association) &&
            (contains(github.event.issue.labels.*.name, 'security') || contains(github.event.issue.title, 'security')))
         # SUPPLY CHAIN: unpinned. This action runs with repository secrets in
         # scope, and @main means whatever its author pushes next runs here with

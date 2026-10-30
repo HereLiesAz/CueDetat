@@ -37,6 +37,14 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
 
         is MainScreenEvent.ArNotice -> state.copy(warningText = action.message)
 
+        // The new session has no anchor, whatever the state says: the Activity was recreated (a
+        // rotation, a font-scale change) and ARCore's anchors went with the old session.
+        is MainScreenEvent.ArSessionStarted ->
+            if (state.isArTableLocked) state.copy(
+                isArTableLocked = false,
+                warningText = "AR restarted, so the table lock was released. Line the table up and lock it again.",
+            ) else state
+
         is MainScreenEvent.ArTableLockLost ->
             state.copy(isArTableLocked = false, warningText = action.message)
 
@@ -118,12 +126,10 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
                 worldRotationDegrees = action.rotation,
                 zoomSliderPosition = newZoomSliderPos,
                 isWorldLocked = true,
-                valuesChangedSinceReset = true
+                // Not valuesChangedSinceReset: this is the CV pose blend, not the user's layout.
+                // Counting it made Reset's undo/redo unreachable while the camera was on.
             )
         }
-
-        is MainScreenEvent.DepthPlaneUpdated ->
-            state.copy(depthPlane = action.plane)
 
         is MainScreenEvent.ArCameraPoseUpdated ->
             state.copy(
@@ -183,12 +189,6 @@ internal fun reduceControlAction(state: CueDetatState, action: MainScreenEvent):
         is MainScreenEvent.ArModuleLoadFailed ->
             state.copy(arModuleState = com.hereliesaz.cuedetat.domain.ArModuleState.FAILED, arModuleError = action.reason)
 
-        is MainScreenEvent.ArTrackingLost -> {
-            // The nuclear payload has been disarmed.
-            // If reality stutters, we float on the last known matrix rather than burning the world down.
-            state
-        }
-
         else -> state
     }
 }
@@ -212,6 +212,7 @@ internal fun applyTablePose(
         viewOffset = PointF(offsetX, offsetY.coerceIn(-limit, limit)),
         worldRotationDegrees = rotationDeg,
         zoomSliderPosition = ZoomMapping.zoomToSlider(z, minZoom, maxZoom),
-        valuesChangedSinceReset = true,
+        // Not valuesChangedSinceReset: the felt-fit pull and the remembered-pose seed call this
+        // on their own, and counting them made Reset's undo/redo unreachable with the camera on.
     )
 }

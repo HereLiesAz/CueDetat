@@ -25,8 +25,20 @@ class TypeMapping(unittest.TestCase):
         self.assertEqual(bc.type_name("cue"), "cue")
         self.assertIsNone(bc.type_name("ball"))
 
-    def test_type_names_match_the_apps_balltype_order(self):
-        self.assertEqual(bc.TYPE_NAMES, ["cue", "eight", "solid", "stripe"])
+    def test_names_are_the_apps_balltype_values(self):
+        # The app's enum, read from its source rather than copied here: the names must be exactly
+        # BallType's known values (UNKNOWN is the absence of a class). The order is deliberately
+        # not compared: BallType's is UNKNOWN, SOLID, STRIPE, CUE, EIGHT, ours is the model's
+        # class-id order, and the two must be joined by name.
+        src = os.path.join(os.path.dirname(__file__), "..", "..", "app", "src", "main", "java",
+                           "com", "hereliesaz", "cuedetat", "data", "VisionData.kt")
+        with open(src, encoding="utf-8") as f:
+            text = f.read()
+        body = text.split("enum class BallType", 1)[1].split("}", 1)[0]
+        values = {v.strip().lower() for v in body.replace("{", " ").split(",") if v.strip()}
+        values.discard("unknown")
+        self.assertEqual(set(bc.TYPE_NAMES), values)
+        self.assertEqual(len(bc.TYPE_NAMES), len(values))
 
 
 class Remap(unittest.TestCase):

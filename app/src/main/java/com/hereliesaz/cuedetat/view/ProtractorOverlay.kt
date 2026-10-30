@@ -4,6 +4,7 @@ package com.hereliesaz.cuedetat.view
 import android.graphics.Typeface
 import android.view.View
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -15,6 +16,9 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.core.content.res.ResourcesCompat
 import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
@@ -41,6 +45,7 @@ fun ProtractorOverlay(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
+    val overlayDescription = stringResource(R.string.overlay_a11y)
     val paints = remember { PaintCache() }
     val renderer = remember { OverlayRenderer() }
     val barbaroTypeface: Typeface? = remember {
@@ -69,6 +74,10 @@ fun ProtractorOverlay(
             .onSizeChanged { size ->
                 onEvent(MainScreenEvent.SizeChanged(size.width, size.height, density))
             }
+            // The whole screen is a drag surface: keep the system back gesture from claiming a
+            // drag that starts at the edge (the platform caps this at 200 dp per edge).
+            .systemGestureExclusion()
+            .semantics { contentDescription = overlayDescription }
             .detectManualGestures(uiState, onEvent)
     ) {
         drawIntoCanvas { canvas ->

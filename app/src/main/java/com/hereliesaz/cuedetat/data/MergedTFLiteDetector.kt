@@ -195,6 +195,18 @@ class MergedTFLiteDetector(
             // wasting ~12 MB of RAM and the load-time CPU.
             val modelSizes = listOf(6242868L, 6242869L, 6243331L, 6242869L)
             val usedHeads = setOf(HEAD_POCKET_50E, HEAD_POOL_PIVOT)
+            // These lengths are the exported file's, hard-coded. A re-exported model with other
+            // sizes would be sliced at the wrong offsets and fail (or worse, load a wrong model)
+            // with no explanation, so refuse it here, by name.
+            val expected = modelSizes.sum()
+            if (fd.length != expected) {
+                Log.e(
+                    "MergedTFLiteDetector",
+                    "$MASTER_MODEL_FILE is ${fd.length} bytes; the segment table in MergedTFLiteDetector " +
+                        "describes $expected. Update modelSizes for the re-exported model. Not loading.",
+                )
+                return@use
+            }
             var currentOffset = fd.startOffset
 
             for (i in 0 until 4) {

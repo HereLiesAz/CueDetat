@@ -19,8 +19,7 @@ object SensorLock {
         // The AR session fitting the table's size to the felt it sees.
         is MainScreenEvent.SetTableFitScale,
         is MainScreenEvent.ArTableMatrixUpdated,
-        is MainScreenEvent.ArCameraPoseUpdated,
-        is MainScreenEvent.DepthPlaneUpdated -> true
+        is MainScreenEvent.ArCameraPoseUpdated -> true
         else -> false
     }
 }

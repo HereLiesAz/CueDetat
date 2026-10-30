@@ -14,8 +14,9 @@ import org.opencv.android.OpenCVLoader
 class MyApplication : Application() {
 
     /**
-     * Injected rather than referenced directly: the vendor SDK is play-flavour
-     * only, and `src/main` must not name it (see [MetaWearableRepository]).
+     * Injected rather than referenced directly: the vendor SDK is reached only through
+     * [MetaWearableRepository] (there are no build flavours; the SDK needs GitHub Packages
+     * credentials, see settings.gradle.kts).
      */
     @javax.inject.Inject
     lateinit var metaWearableRepository: MetaWearableRepository

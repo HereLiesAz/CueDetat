@@ -70,7 +70,9 @@ Android, OpenCV or ARCore types anywhere in them:
 ./gradlew -Pcuedetat.coreOnly=true allTests   # no Android SDK required
 ```
 
-Three things this buys that the previous architecture could not:
+Three things this buys that the previous architecture could not. These are properties of the
+core; the on-screen aim, distance readout and pockets are not yet driven by it (`CoreBridge` has
+no callers, and [`REBUILD_PLAN.md`](REBUILD_PLAN.md) phase D tracks the wiring):
 
 * **Real units.** The world is metres. It used to be a dimensionless plane scaled
   from `LOGICAL_BALL_RADIUS = 25f`, which is how spin decay constants ended up

@@ -25,13 +25,12 @@ class VisionAnalyzer @Inject constructor(
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(image: ImageProxy) {
         val state = uiStateRef.get() ?: run { image.close(); return }
-        // Battery: drop frames the pipeline would only throttle away *before* paying for
-        // the per-pixel YUV→RGB conversion. HATER mode and beginner-locked frames are
-        // closed downstream in analyze(bitmap, ...); the time gate covers everything else.
-        if (state.experienceMode != com.hereliesaz.cuedetat.domain.ExperienceMode.HATER &&
-            !state.isBeginnerViewLocked &&
-            !visionRepository.shouldAcceptFrame(System.currentTimeMillis())
-        ) {
+        // Battery: drop frames the pipeline would only throw away *before* paying for the per-pixel
+        // YUV->RGB conversion: HATER mode and Beginner's locked view never use CV (analyze(bitmap, ...)
+        // would close them anyway, after the conversion), and the time gate covers everything else.
+        val cvOff = state.experienceMode == com.hereliesaz.cuedetat.domain.ExperienceMode.HATER ||
+            state.isBeginnerViewLocked
+        if (cvOff || !visionRepository.shouldAcceptFrame(System.currentTimeMillis())) {
             image.close()
             return
         }

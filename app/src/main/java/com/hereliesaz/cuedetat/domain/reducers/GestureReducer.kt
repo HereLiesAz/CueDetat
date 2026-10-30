@@ -166,7 +166,10 @@ class GestureReducer @Inject constructor() {
             InteractionMode.MOVING_SPIN_CONTROL -> {
                 val currentCenter = currentState.spinControlCenter ?: return currentState
                 currentState.copy(
-                    spinControlCenter = PointF(currentCenter.x + event.screenDelta.x, currentCenter.y + event.screenDelta.y),
+                    spinControlCenter = clampSpinControlCenter(
+                        PointF(currentCenter.x + event.screenDelta.x, currentCenter.y + event.screenDelta.y),
+                        currentState.viewWidth, currentState.viewHeight, currentState.screenDensity,
+                    ),
                     magnifierSourceCenter = updatedMagnifierCenter
                 )
             }

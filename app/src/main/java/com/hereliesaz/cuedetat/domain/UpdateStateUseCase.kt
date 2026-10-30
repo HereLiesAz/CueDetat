@@ -34,6 +34,13 @@ class UpdateStateUseCase @Inject constructor(
 ) {
 
     private val railHeightToTableHeightRatio = 0.025f
+    /**
+     * Empirical scale for the HUD's cue-to-target readout: distance (inches) = this / the target
+     * ball's on-screen radius (pixels). It has no derivation. It does not account for screen
+     * density, zoom or the camera's field of view, so the readout is an estimate and is shown with
+     * a "~" (see `distance_ft_in`/`distance_cm`). A metric figure would come from the ARCore
+     * homography, which knows the table's real size.
+     */
     private val distanceReferenceConstant = 1200f
     private val lineExtensionFactor = 5000f
 
@@ -43,7 +50,6 @@ class UpdateStateUseCase @Inject constructor(
 
     // Assumed camera height above the table surface when no ARCore anchor is available.
     // Derived from: user eye height ≈ 4.5 ft above floor, pool table ≈ 3 ft above floor → 1.5 ft ≈ 0.45 m.
-    private val assumedHeightAboveTableM = 0.45f
 
     operator fun invoke(state: CueDetatState, type: UpdateType): CueDetatState {
         if (state.viewWidth == 0 || state.viewHeight == 0) return state
@@ -166,25 +172,11 @@ class UpdateStateUseCase @Inject constructor(
 
         // Determine the best available pitch estimate:
         //   1. ARCore anchor: exact atan2(height, horizontal) from camera-above-plane geometry
-        //   2. Depth fallback: atan2(assumed 0.45m height, sqrt(depth²−0.45²))
-        //   3. IMU pitch: raw sensor data (existing behavior)
+        //   2. IMU pitch: raw sensor data (existing behavior)
         val effectivePitch: Float = when {
             stateWithCoercedPan.cameraMode == CameraMode.AR_ACTIVE
                     && stateWithCoercedPan.arDerivedPitch != null ->
                 stateWithCoercedPan.arDerivedPitch
-
-            stateWithCoercedPan.depthPlane != null
-                    && stateWithCoercedPan.depthPlane!!.confidence > 0.6f -> {
-                val depth = stateWithCoercedPan.depthPlane!!.distanceMeters
-                val heightM = stateWithCoercedPan.arMeasuredHeightM ?: assumedHeightAboveTableM
-                if (depth > heightM) {
-                    val horizontal = sqrt(depth * depth - heightM * heightM)
-                    Math.toDegrees(atan2(heightM.toDouble(), horizontal.toDouble()))
-                        .toFloat().coerceIn(5f, 85f)
-                } else {
-                    stateWithCoercedPan.currentOrientation.pitch
-                }
-            }
 
             else -> stateWithCoercedPan.currentOrientation.pitch
         }

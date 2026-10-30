@@ -7,6 +7,9 @@
 
     <string name="tagline">May your shot be better than your excuses.</string>
 
+    <string name="warning_reason_impossible">No such shot.</string>
+    <string name="warning_reason_obstructed">Something is in the way.</string>
+    <string name="warning_reason_tilt">Too steep a tilt.</string>
     <string-array name="insulting_warnings">
         <item>Physics called. It wants your law degree back.</item>
         <item>A fine example of geometric optimism.</item>
@@ -88,7 +91,7 @@
         <item>That\'s the crash course. The rest is a test of your character, or lack thereof. Don\'t embarrass us both. Press Finish.</item>
     </string-array>
 
-    <!-- Tutorial finish affordance: every final step text says "Finish". -->
+    <!-- Tutorial finish affordance: the Finish button is drawn by AzNavMenu on the last step whatever the step text says (most final steps also say "Finish"). -->
     <string name="tutorial_finish">Finish</string>
 
     <!-- Rail / on-screen hints -->
@@ -134,10 +137,10 @@
 
     <!-- Training-capture consent (CaptureConsentDialog) -->
     <string name="capture_consent_title">Training data</string>
-    <string name="capture_consent_disclosure">While the camera is on, Cue D’état saves a camera frame every few seconds, with the phone\'s tilt and heading and what the app detected, and sends them over Wi-Fi to the developer to train the table and ball detection. Your location, accounts and contacts are not included.</string>
-    <string name="capture_consent_ask_before">You got the app for free. Helping make it better is the </string>
-    <string name="capture_consent_ask_emphasis">least</string>
-    <string name="capture_consent_ask_after"> you can do. Either way, you can change this any time with the \'Training data\' item in the menu.</string>
+    <string name="capture_consent_disclosure">While the camera is on, Cue D’état saves a camera frame every few seconds, with the phone\'s tilt and heading and what the app detected, and sends them to the developer, on Wi-Fi or another unmetered connection and never on mobile data, to train the table and ball detection. Your location, accounts and contacts are not included.</string>
+    <string name="capture_consent_ask_before">Helping is </string>
+    <string name="capture_consent_ask_emphasis">entirely optional</string>
+    <string name="capture_consent_ask_after">: the app works the same either way, and you can change your answer any time with the \'Training data\' item in the menu.</string>
     <string name="capture_consent_accept">Keep helping</string>
     <string name="capture_consent_decline">No thanks</string>
 
@@ -145,7 +148,9 @@
     <string name="permission_explanation_title">We need a couple of things to get started.</string>
     <string name="permission_camera_explanation">CAMERA: This app works by looking at the table through your lens. Without it, we\'re just a black screen.</string>
     <string name="permission_location_explanation">LOCATION: This is optional, but it lets us remember which table you\'ve scanned so you don\'t have to re-calibrate every time you come back.</string>
+    <string name="permission_bluetooth_explanation">BLUETOOTH: This is optional too. It is used only to find Meta smart glasses, if you have a pair, and the app works without them.</string>
     <string name="permission_confirm_button">I understand</string>
+    <string name="permission_open_settings">Open settings</string>
 
     <!-- Renderer Labels -->
     <string name="label_aim_pocket">Aim this line at the pocket.</string>
@@ -196,10 +201,19 @@
     <string name="rail_table_size">Table Size</string>
     <string name="rail_metric">Metric</string>
     <string name="rail_imperial">Imperial</string>
-    <string name="rail_orientation">Orientation</string>
+    <string name="rail_orientation">Orientation: %1$s</string>
     <string name="rail_training_data_on">Training data: on</string>
     <string name="rail_training_data_off">Training data: off</string>
     <string name="rail_advanced">Advanced</string>
+    <string name="overlay_a11y">Pool table overlay. Drag a ball to move it or drag to aim. Pinch to zoom, twist with two fingers to rotate the table.</string>
+    <string name="scan_delete">Delete</string>
+    <string name="scan_prompt">Point at the felt and tap below</string>
+    <string name="scan_waiting">Waiting for the camera…</string>
+    <string name="scan_capture_a11y">Capture felt colour</string>
+    <string name="link_no_app">No app can open this link.</string>
+    <string name="link_blocked">Link blocked for security.</string>
+    <string name="rail_luminance">Brightness</string>
+    <string name="rail_glow_stick">Glow stick</string>
     <string name="rail_snapping_on">Snapping: on</string>
     <string name="rail_snapping_off">Snapping: off</string>
     <string name="rail_debug_log_on">Debug log: on</string>
@@ -211,8 +225,8 @@
     <string name="top_table_size_a11y">Current table size: %1$d feet.</string>
     <string name="top_table_size_label">Table Size</string>
     <string name="top_distance_label">Distance</string>
-    <string name="distance_ft_in">%1$d ft %2$d in</string>
-    <string name="distance_cm">%1$d cm</string>
+    <string name="distance_ft_in">~%1$d ft %2$d in</string>
+    <string name="distance_cm">~%1$d cm</string>
     <string name="zoom_in_a11y">Zoom In</string>
     <string name="zoom_out_a11y">Zoom Out</string>
     <string name="zoom_level_a11y">Zoom Level</string>
@@ -223,13 +237,9 @@
     <string name="action_close">Close</string>
     <string name="dialog_current_value">Current: %1$s</string>
     <string name="advanced_title">CV Refinement Parameters</string>
-    <string name="advanced_canny_1">Canny Threshold 1: %1$d</string>
-    <string name="advanced_canny_2">Canny Threshold 2: %1$d</string>
     <string name="advanced_cv_mask">Show what the CV sees</string>
     <string name="advanced_cv_mask_shown">Mask shown</string>
     <string name="advanced_cv_mask_hidden">Mask hidden</string>
-    <string name="advanced_auto_tune">Auto-tune for bad light</string>
-    <string name="advanced_auto_tuning">Tuning: lowering thresholds until something shows up</string>
     <string name="update_play_title">Google Play update available</string>
     <string name="update_github_title">GitHub update available</string>
     <string name="update_play_body">A newer Google Play build (%1$s) is available. Open Google Play to update?</string>

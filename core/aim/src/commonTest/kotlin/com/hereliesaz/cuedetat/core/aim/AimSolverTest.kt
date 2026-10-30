@@ -12,6 +12,8 @@ import com.hereliesaz.cuedetat.core.units.degrees
 import com.hereliesaz.cuedetat.core.units.inches
 import com.hereliesaz.cuedetat.core.units.meters
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -126,8 +128,23 @@ class AimSolverTest {
     @Test
     fun ballFractionIsOneForStraightAndZeroAtNinetyDegrees() {
         assertEquals(1.0, AimSolver.ballFraction(0.0.degrees), 1e-9)
-        assertEquals(0.5, AimSolver.ballFraction(60.0.degrees), 1e-9)   // half-ball hit
         assertEquals(0.0, AimSolver.ballFraction(90.0.degrees), 1e-9)
+    }
+
+    @Test
+    fun ballFractionIsTheOverlapOfTheTwoBallsNotTheCosineOfTheCut() {
+        // Built from the touching-balls geometry with Pythagoras, not the implementation's sin:
+        // at contact the centres are 2 apart (unit radius), the line of centres makes the cut
+        // angle with the cue ball's travel, so the object ball's centre is 2*cos(cut) ahead along
+        // the path and sqrt(2^2 - (2*cos)^2) to the side of it. The balls share a width of 2
+        // when straight, so the overlap is 1 - side/2.
+        for (degrees in listOf(10.0, 30.0, 45.0, 60.0, 80.0)) {
+            val ahead = 2.0 * cos(degrees.degrees.radians)
+            val side = sqrt(4.0 - ahead * ahead)
+            assertEquals(1.0 - side / 2.0, AimSolver.ballFraction(degrees.degrees), 1e-9, "cut $degrees")
+        }
+        // The well-known landmark: a half-ball hit is a 30 degree cut, not 60.
+        assertEquals(0.5, AimSolver.ballFraction(30.0.degrees), 1e-9)
     }
 
     // ── The point of the whole exercise ──────────────────────────────────────

@@ -146,8 +146,9 @@ class ArTableSession(
     data class CloudFeedback(val message: String, val restored: Boolean = false)
     private val cloudRequest = AtomicReference<CloudRequest?>(null)
     private val cloudFeedbackQueue = ConcurrentLinkedQueue<CloudFeedback>()
-    private var cloudHostFuture: HostCloudAnchorFuture? = null
-    private var cloudResolveFuture: ResolveCloudAnchorFuture? = null
+    // Written by ARCore's callback threads and cleared on the GL thread: not guarded by one lock.
+    @Volatile private var cloudHostFuture: HostCloudAnchorFuture? = null
+    @Volatile private var cloudResolveFuture: ResolveCloudAnchorFuture? = null
     // Ignore results from operations cancelled by Forget or session shutdown.
     @Volatile private var cloudGeneration = 0L
     // Host success and user Forget must serialize their check/write/clear so
@@ -271,7 +272,7 @@ class ArTableSession(
                                 cloudHostFuture = null
                                 if (state == Anchor.CloudAnchorState.SUCCESS && !id.isNullOrBlank()) {
                                     savePlacement(CloudPlacementRecord(id, expiration, width, length, parity))
-                                    cloudMessage("AR placement saved on this device for up to 24 hours.")
+                                    cloudMessage("AR placement saved to Google's cloud for up to 24 hours.")
                                 } else {
                                     cloudMessage("Couldn't save AR placement: $state")
                                 }
@@ -1162,7 +1163,17 @@ class ArTableSession(
     }
 
     fun pause() { session?.pause() }
-    fun resume() { try { session?.resume() } catch (_: Exception) {} }
+    /**
+     * Resumes the ARCore session. False when it could not start (the camera is held by another
+     * app, say), so the caller can tell the user instead of leaving a black view.
+     */
+    fun resume(): Boolean = try {
+        session?.resume()
+        true
+    } catch (e: Exception) {
+        android.util.Log.w("ArTableSession", "ARCore session resume failed", e)
+        false
+    }
     /**
      * Held by the GL renderer for each whole frame (ArCoreBackground.onDrawFrame) and by
      * [close] and the session swap in [createSession], so the Session is never closed or

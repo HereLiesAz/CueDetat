@@ -53,9 +53,9 @@ different package); those users install once more.
 1. Gradle properties: `KEYSTORE_PATH`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`
 2. Environment variables of the same names
 
-If none are present, the release build falls back to the debug keystore (so local
-release builds don’t fail for contributors without the keystore). **A real
-release must supply the keystore.**
+If none are present, a release build **fails**: `app/build.gradle.kts` throws a
+`GradleException` ("Refusing to sign a release with the debug key") rather than sign a
+release with the debug key. A release must supply the keystore.
 
 Two equivalent ways to sign a release build:
 
@@ -116,8 +116,9 @@ Gson/Retrofit, Parcelable, `@Keep`). No change was needed here.
 Both used to be on-demand dynamic feature modules. Split installs failed on real devices
 (ARCore's native library invisible to the process), so both are now compiled into the base.
 `ModelDelivery` and `ArFeatureDelivery` remain as interfaces with no-op implementations
-(`BundledModelDelivery`, `BundledArFeatureDelivery`); `ArControllerFacade` still resolves
-`ArControllerImpl` reflectively, and `app/proguard-rules.pro` keeps it.
+(`BundledModelDelivery`, `BundledArFeatureDelivery`); `ArControllerFacade` constructs
+`ArControllerImpl` directly (the old reflective lookup is gone); the keep rule in
+`app/proguard-rules.pro` is a belt-and-braces leftover.
 
 ---
 
@@ -138,13 +139,13 @@ a single edit to:
 
 Promoting the production draft is a human step in the Play Console.
 
-`android_release.yml` builds the signed APK for GitHub Releases.
+`android-github-release.yml` builds the signed APK for GitHub Releases.
 
 ---
 
 ## 6. Required repository secrets
 
-Signing (already used by `android_release.yml`):
+Signing (already used by `android-github-release.yml`):
 
 | Secret | Purpose |
 |--------|---------|
@@ -193,7 +194,7 @@ Build support (already used elsewhere; pass-through, all optional/graceful):
 
 The app processes camera frames on-device. The one exception is optional **training data**
 (`CaptureRecorder`, see `PrivacyPolicy.md`): only after the user agrees in the consent
-dialog, steady camera frames with sensor readings and detections are sent over Wi-Fi to the
+dialog, steady camera frames with sensor readings and detections are sent over Wi-Fi (any unmetered connection) to the
 developer (via the Cloudflare relay into a private GitHub repo).
 
 When filling out the Play Console **Data safety** form:
@@ -203,7 +204,10 @@ When filling out the Play Console **Data safety** form:
   improvement. Deletion requests go to the developer.
 - **App info and performance / device identifiers**: none beyond a random per-install id sent
   with training frames; no advertising id, no `AD_ID` permission, no ads SDK.
-- **Location**: coarse location stays on the device (table profiles); not collected.
+- **Location**: coarse location stays on the device (table profiles and the table-orientation
+  log); not collected.
+- **Cloud Anchors** (user-confirmed, per save): ARCore uploads visual mapping data and the table's
+  anchor to Google for up to 24 hours. Declare it as data shared with Google.
 - A public **privacy policy URL** is required; host `PrivacyPolicy.md` and link it in the
   listing.
 
@@ -218,8 +222,9 @@ For future **Geospatial API** or **Cloud Anchors** use, set `ARCORE_API_KEY` in
 Both canonical central release builds pass it **only to the Gradle build step**.
 The application module writes it to the merged Android manifest via Gradle's
 `arcoreApiKey` placeholder. Local builds without the key remain valid (empty
-metadata value). This integration does **not** enable Geospatial or Cloud
-Anchors in `Config`; those features require deliberate future implementation.
+metadata value). The Geospatial API is not enabled. **Cloud Anchors are**: `ArTableSession` sets
+`cloudAnchorMode = ENABLED`, and the rail's save / restore / forget items use them (§ above and
+the privacy policy), only after the user confirms each upload.
 
 API keys included in APKs/AABs are recoverable by users. **Restrict this key
 in Google Cloud** to the ARCore API and to the Android package

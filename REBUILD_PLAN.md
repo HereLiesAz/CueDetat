@@ -27,20 +27,25 @@ Working plan for the re-envisioning. Tracks what is done and what remains.
 
 ### B — The metric core (`:core:*`, KMP commonMain)
 - [x] `:core:units` — Length/Angle/Speed value classes, SI-backed
-- [x] `:core:geometry` — Vec2, Pose2, cushions, **pocket apertures**, intersections
+- [x] `:core:geometry` — Vec2, Table (cushions, **pocket apertures**), intersections
 - [x] `:core:physics` — speed-aware collision with **cut-induced throw**, squirt at
-      cue-tip, swerve, cushion restitution + throw
+      cue-tip, cushion restitution + throw (no swerve: the word appears only in a comment)
 - [x] `:core:projection` — CameraIntrinsics + TablePose + Projector (generalises
       the old `TableFrameHomography`, which was the one correct file in the repo)
 - [x] `:core:aim` — AimSolver: ghost ball as seed, throw/squirt correct the line
 - [x] `:core:advisor` — shot advisor ported onto the metric core
-- [x] `:core:state` — sealed `InteractionMode`, per-concern state slices
+- [x] `:core:state` — sealed `Interaction`, per-concern state slices
 - [x] Tests: known-good billiards constructions to sub-degree tolerance
+- [~] **None of `:core:advisor`, `:core:state` or `:core:projection` is used by `:app`, `:wear` or
+      `:feature_expert_ar` (only their own tests). `CoreBridge` has no callers.** `:core:aim`,
+      `:core:physics` and `:core:geometry` reach the app only through that bridge, so the shipped
+      aim is still the ghost-ball geometry in `UpdateStateUseCase`, and the README's throw/squirt
+      claims describe the core, not what the screen shows. Wiring is phase D.
 
 ### C — Donation model (replaces the paid gateway)
 - [x] Delete all billing/entitlement/paywall/integrity code (~30 files)
 - [x] Expert mode free for everyone; no gating
-- [x] `SupportRepository` + donation sheet (external links, no billing dep)
+- [x] `SupportLinks` + donation sheet (external links, no billing dep)
 - [x] Drop `billing-ktx` / `play-integrity` / credentials deps
 - [x] Remove entitlement fields from state and reducers
 
@@ -53,7 +58,9 @@ Working plan for the re-envisioning. Tracks what is done and what remains.
       where a ball centre is `(x, y, radius)` and lift is not a separate term.
 - [~] `CoreBridge.distanceBetween` returns a real length; `TopControls` still
       renders the old `1200 / screenRadius` value.
-- [x] Fix: banking/massé mutual exclusion via sealed mode
+- [~] Banking/massé mutual exclusion: a sealed `ShotMode` exists in `:core:state` (unused by the
+      app); the app still has two booleans, kept exclusive by a clear in `ToggleReducer` and
+      `SpinReducer`
 - [x] Fix: Beginner + glasses dead end
 - [x] Hater mode out of the primary mode cycle
 
@@ -79,7 +86,7 @@ Working plan for the re-envisioning. Tracks what is done and what remains.
   pitch curve, the 30% roll and the hardcoded viewing distance should go, and
   every draw site should read one `ProjectedBall` rather than re-deriving lift.
   This is the change that fixes the guide lines not landing on the ball.
-- **`ml/`** — 52 MB of unreferenced training artifacts. `git rm --cached` would
+- **`ml/`** — about 79 MiB of tracked training artifacts (sum of `git ls-files ml`). `git rm --cached` would
   not reclaim clone cost (the blobs stay in history); needs a history rewrite or
   an LFS migration, and an explicit decision from the owner.
 - **Pin the `@main` GitHub Actions** to commit SHAs. Flagged in place; the SHAs

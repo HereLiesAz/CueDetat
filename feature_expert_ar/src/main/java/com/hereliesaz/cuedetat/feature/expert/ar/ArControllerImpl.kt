@@ -21,8 +21,7 @@ import dagger.hilt.android.EntryPointAccessors
  * `Context` constructor). It builds the AR singletons manually and pulls base
  * dependencies through the [ArFeatureEntryPoint] Hilt entry point.
  *
- * Must expose a single public constructor taking a [Context] (that is the
- * contract the facade's reflection relies on).
+ * Keeps a single public constructor taking a [Context], which is what the facade calls.
  */
 @Suppress("unused")
 class ArControllerImpl(context: Context) : ArController {

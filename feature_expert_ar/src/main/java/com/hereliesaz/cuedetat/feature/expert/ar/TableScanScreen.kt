@@ -8,7 +8,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,7 +40,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.cuedetat.R
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import kotlinx.coroutines.delay
@@ -125,6 +129,7 @@ fun TableScanScreen(
         // State hoisted above conditionals (Compose rule: no @Composable calls in if/when blocks)
         val selectedIds by viewModel.selectedSampleIds.collectAsState()
         val mlConfidence by viewModel.mlConfidence.collectAsState()
+        val hasFeltSample by viewModel.hasFeltSample.collectAsState()
 
         // Top Gallery: Felt Samples
         if (uiState.savedFeltSamples.isNotEmpty()) {
@@ -152,10 +157,7 @@ fun TableScanScreen(
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
                                 shape = CircleShape
                             )
-                            .combinedClickable(
-                                onClick = { viewModel.toggleSampleSelection(sample.id) },
-                                onLongClick = { viewModel.toggleSampleSelection(sample.id) }
-                            )
+                            .clickable { viewModel.toggleSampleSelection(sample.id) }
                     )
                 }
             }
@@ -171,11 +173,8 @@ fun TableScanScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                TextButton(onClick = { /* TODO Move */ }) {
-                    Text("Move", color = Color.White)
-                }
                 TextButton(onClick = { viewModel.deleteSelectedSamples() }) {
-                    Text("Delete", color = Color.Red.copy(alpha = 0.8f))
+                    Text(stringResource(R.string.scan_delete), color = Color.Red.copy(alpha = 0.8f))
                 }
             }
         }
@@ -227,7 +226,7 @@ fun TableScanScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Point at the felt and tap below",
+                    text = stringResource(if (hasFeltSample) R.string.scan_prompt else R.string.scan_waiting),
                     color = Color.White,
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -241,11 +240,18 @@ fun TableScanScreen(
                             useCenter = false, style = Stroke(width = 4.dp.toPx())
                         )
                     }
+                    val captureLabel = stringResource(R.string.scan_capture_a11y)
                     Box(
                         modifier = Modifier
                             .align(Alignment.Center).size(64.dp).clip(CircleShape)
+                            .alpha(if (hasFeltSample) 1f else 0.35f)
                             .background(Color.White).border(4.dp, Color.LightGray, CircleShape)
-                            .clickable { isCapturing = true; viewModel.captureFeltAndComplete() }
+                            .clickable(
+                                enabled = hasFeltSample,
+                                onClickLabel = captureLabel,
+                                role = Role.Button,
+                            ) { isCapturing = true; viewModel.captureFeltAndComplete() }
+                            .semantics { contentDescription = captureLabel }
                     )
                 }
             }

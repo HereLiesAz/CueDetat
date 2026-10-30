@@ -45,7 +45,7 @@ class ArFrameProcessor(
     private val workerBusy = AtomicBoolean(false)
 
     private val _latestFeltHsv = MutableStateFlow<FloatArray?>(null)
-    /** Rolling mean HSV (H 0-360, S/V 0-1) of the centre crop of the AR camera image. */
+    /** Mean HSV (H 0-360, S/V 0-1) of the centre crop of the latest sampled AR camera image. */
     val latestFeltHsv: StateFlow<FloatArray?> = _latestFeltHsv.asStateFlow()
 
     fun updateUiState(state: CueDetatState) {
@@ -101,13 +101,11 @@ class ArFrameProcessor(
         }
         val frameToView = mapping
         val frameCamera = camera
+        val uprightRotation = uprightRotationDegrees(frameToView)
         try {
             worker.execute {
                 try {
-                    // ARCore's CPU image sensor orientation matches the display orientation
-                    // configured via session.setDisplayGeometry(); for portrait-primary Android
-                    // apps this is 90°. Used only when ARCore's own mapping is unavailable.
-                    visionRepository.processArFrame(mat, 90, state, frameToView, frameCamera)
+                    visionRepository.processArFrame(mat, uprightRotation, state, frameToView, frameCamera)
                 } catch (_: Exception) {
                     // Skip the frame.
                 } finally {
@@ -136,6 +134,20 @@ class ArFrameProcessor(
         } catch (_: Exception) {
             null
         }
+    }
+
+    /**
+     * Clockwise degrees (0/90/180/270) that turn the CPU image upright on screen, read off ARCore's
+     * own image -> view mapping: where the image's +x axis lands in the view. It was a fixed 90, true
+     * only for a portrait-held phone; in landscape the ball boxes, the zoom-to-ball ratio and the
+     * rotated training JPEGs were all turned a quarter. With no mapping, 90 (portrait-primary).
+     */
+    private fun uprightRotationDegrees(mapping: Matrix?): Int {
+        if (mapping == null) return 90
+        val xAxis = floatArrayOf(1f, 0f)
+        mapping.mapVectors(xAxis)
+        val degrees = Math.toDegrees(kotlin.math.atan2(xAxis[1].toDouble(), xAxis[0].toDouble()))
+        return ((Math.round(degrees / 90.0).toInt() * 90) % 360 + 360) % 360
     }
 
     /**

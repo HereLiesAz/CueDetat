@@ -13,7 +13,7 @@ import org.opencv.imgproc.Imgproc
  * `inRange` on a hue window that crosses the 0/180 seam silently matches nothing (or the wrong
  * thing); red and maroon cloth sits across it.
  */
-internal object HueMask {
+object HueMask {
 
     /**
      * Writes to [out] the pixels of 8-bit HSV [hsv] whose hue is in any of [windows]

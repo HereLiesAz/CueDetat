@@ -98,7 +98,7 @@ fun AzNavRailMenu(
     val b10B = Color(0xFF64B5F6); val b11R = Color(0xFFE57373)
     val b13O = Color(0xFFFFB74D); val b14G = Color(0xFF81C784); val b15M = Color(0xFFF06292)
 
-    // Tutorial flows for the AzNavRail 10.18 guidance framework. Each flow reuses the verbatim step
+    // Tutorial flows for the AzNavRail 11.50 guidance framework. Each flow reuses the verbatim step
     // text from strings.xml; per-step highlightTargetId points the spotlight at the in-camera element
     // (registered below via azGuidanceTarget).
     val tutorialFlows = listOf(
@@ -166,10 +166,17 @@ fun AzNavRailMenu(
     val rail_table_sizeText = stringResource(R.string.rail_table_size)
     val rail_metricText = stringResource(R.string.rail_metric)
     val rail_imperialText = stringResource(R.string.rail_imperial)
-    val rail_orientationText = stringResource(R.string.rail_orientation)
+    // Shows the lock a tap is about to apply (taps cycle it; a 1 s debounce commits), so a tap on a
+    // device already in that orientation still visibly does something.
+    val rail_orientationText = stringResource(
+        R.string.rail_orientation,
+        (uiState.pendingOrientationLock ?: uiState.orientationLock).name.lowercase().replaceFirstChar { it.uppercase() },
+    )
     val rail_training_data_onText = stringResource(R.string.rail_training_data_on)
     val rail_training_data_offText = stringResource(R.string.rail_training_data_off)
     val rail_advancedText = stringResource(R.string.rail_advanced)
+    val rail_luminanceText = stringResource(R.string.rail_luminance)
+    val rail_glow_stickText = stringResource(R.string.rail_glow_stick)
     val rail_snapping_onText = stringResource(R.string.rail_snapping_on)
     val rail_snapping_offText = stringResource(R.string.rail_snapping_off)
     val rail_scan_tableText = stringResource(R.string.rail_scan_table)
@@ -177,7 +184,11 @@ fun AzNavRailMenu(
     val rail_debug_log_onText = stringResource(R.string.rail_debug_log_on)
     val rail_debug_log_offText = stringResource(R.string.rail_debug_log_off)
     val rail_share_debug_logText = stringResource(R.string.rail_share_debug_log)
-    val railModeFormat = stringResource(R.string.rail_mode, uiState.experienceMode?.name.orEmpty())
+    // The mode a tap is about to apply (taps cycle it, then a 1 s debounce commits), not the old one:
+    // switching starts the table over, so the user must see which mode they are landing on.
+    val railModeName = (uiState.pendingExperienceMode ?: uiState.experienceMode)?.name.orEmpty()
+        .lowercase().replaceFirstChar { it.uppercase() }
+    val railModeFormat = stringResource(R.string.rail_mode, railModeName)
 
     val guidance = AzHostActivityLayout(
         navController = navController,
@@ -191,7 +202,7 @@ fun AzNavRailMenu(
         azTheme(defaultShape = AzButtonShape.CIRCLE, activeColor = railAccent)
         azAdvanced(isLoading = false, helpEnabled = true, onDismissHelp = {})
 
-        // [SECTION 1b] Tutorial guidance (AzNavRail 10.18 status-driven framework).
+        // [SECTION 1b] Tutorial guidance (AzNavRail 11.50 status-driven framework).
         // Register the moving on-screen highlight targets; the framework auto-draws the spotlight.
         azGuidanceTarget("cue.targetBall") { tutorialTargetBallShape(uiState) }
         azGuidanceTarget("cue.ghostBall") { tutorialGhostBallShape(uiState) }
@@ -302,10 +313,18 @@ fun AzNavRailMenu(
             text = rail_tutorialText,
             fillColor = b2B,
             onClick = {
-                if (uiState.cameraMode == CameraMode.OFF) {
+                // Replay the tutorial for the mode the user is in. Only the dynamic Beginner flows
+                // teach with the camera, so only they turn it on.
+                val dynamicBeginner = uiState.experienceMode == ExperienceMode.BEGINNER && !uiState.isBeginnerViewLocked
+                val goal = when {
+                    uiState.experienceMode == ExperienceMode.EXPERT -> "tutorial.expert"
+                    uiState.experienceMode == ExperienceMode.BEGINNER && uiState.isBeginnerViewLocked -> "tutorial.beginnerStatic"
+                    uiState.cameraMode == CameraMode.LITE_AR -> "tutorial.dynamicAr"
+                    else -> "tutorial.dynamicNonAr"
+                }
+                if (dynamicBeginner && uiState.cameraMode == CameraMode.OFF) {
                     onEvent(MainScreenEvent.SetCameraMode(CameraMode.CAMERA))
                 }
-                val goal = if (uiState.cameraMode == CameraMode.LITE_AR) "tutorial.dynamicAr" else "tutorial.dynamicNonAr"
                 guidanceHolder.value?.let { it.resetGuidance(goal); it.activate(goal) } // activate() no-ops on finished/skipped goals
             }
         )
@@ -313,7 +332,10 @@ fun AzNavRailMenu(
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             // Lock: once AR is tracking, line the virtual table up over the real one and tap to
             // anchor it in the AR world; tap again to unlock and realign.
-            if (uiState.cameraMode == CameraMode.AR_ACTIVE) {
+            // ARCore only: without it nothing drains the lock or cloud requests and the items would
+            // sit there doing nothing.
+            if (uiState.cameraMode == CameraMode.AR_ACTIVE &&
+                uiState.depthCapability != com.hereliesaz.cuedetat.domain.DepthCapability.NONE) {
                 azRailToggle(
                     id = "lock",
                     isChecked = uiState.isArTableLocked,
@@ -459,8 +481,9 @@ fun AzNavRailMenu(
             val resetLabel = when {
                 uiState.obstacleBalls.isNotEmpty() -> rail_clearText
                 uiState.targetCvAnchor != null -> rail_undoText
-                uiState.preResetState != null -> rail_undoText
-                uiState.postResetState != null -> rail_redoText
+                // Undo/redo only while nothing has changed since; after that Reset starts fresh.
+                uiState.preResetState != null && !uiState.valuesChangedSinceReset -> rail_undoText
+                uiState.postResetState != null && !uiState.valuesChangedSinceReset -> rail_redoText
                 else -> rail_resetText
             }
             azRailItemLowerCase(id = "reset", text = resetLabel, fillColor = b8K, onClick = { onEvent(MainScreenEvent.Reset) })
@@ -477,6 +500,11 @@ fun AzNavRailMenu(
         azMenuItem(id = "snapping", text = if (uiState.isSnappingEnabled) rail_snapping_onText else rail_snapping_offText, fillColor = b14G, onClick = { onEvent(MainScreenEvent.ToggleSnapping) })
         // Training capture (CaptureRecorder): the setting the consent dialog points to.
         azMenuItem(id = "training_data", text = if (captureEnabled) rail_training_data_onText else rail_training_data_offText, fillColor = b10B, onClick = onToggleCapture)
+
+        // Overlay brightness and the glow-stick lines, for a bright or dark feed. Their dialogs were
+        // built and routed but nothing opened them.
+        azMenuItem(id = "luminance", text = rail_luminanceText, fillColor = b1Y, onClick = { onEvent(MainScreenEvent.ToggleLuminanceDialog) })
+        azMenuItem(id = "glow_stick", text = rail_glow_stickText, fillColor = b4P, onClick = { onEvent(MainScreenEvent.ToggleGlowStickDialog) })
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {
             azMenuItem(id = "advanced", text = rail_advancedText, fillColor = b1Y, onClick = { onEvent(MainScreenEvent.ToggleAdvancedOptionsDialog) })

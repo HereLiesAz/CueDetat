@@ -36,8 +36,12 @@ internal fun reduceAction(
         // Only the fields Stage 4 resets are restored; live device/view state (view size, orientation,
         // camera mode, AR lock, table scan, wearable, etc.) stays current. Restoring the whole snapshot
         // would revert a rotation or camera toggle that happened after the reset.
-        state.preResetState != null -> {
+        // Only while nothing has changed since: once the user rearranges the table the snapshots are
+        // stale, and Stage 4 takes a fresh one. Otherwise Reset would only ever toggle between the
+        // first two layouts, discarding whatever the user had just set up.
+        state.preResetState != null && !state.valuesChangedSinceReset -> {
             restoreGameFields(live = state, snapshot = state.preResetState).copy(
+                valuesChangedSinceReset = false,
                 preResetState = null,
                 postResetState = state.copy(preResetState = null, postResetState = null),
                 isWorldLocked = false
@@ -45,15 +49,16 @@ internal fun reduceAction(
         }
 
         // Stage 3 — REDO: a post-reset state exists → restore its game/aim fields, stash current into preResetState
-        state.postResetState != null -> {
+        state.postResetState != null && !state.valuesChangedSinceReset -> {
             restoreGameFields(live = state, snapshot = state.postResetState).copy(
+                valuesChangedSinceReset = false,
                 preResetState = state.copy(preResetState = null, postResetState = null),
                 postResetState = null,
                 isWorldLocked = false
             )
         }
 
-        // Stage 4 — RESET: no obstacles, no saved states → full reset, save current to preResetState
+        // Stage 4 — RESET: no obstacles, no usable saved state → full reset, save current to preResetState
         else -> {
             val stateToSave = state.copy()
             val targetBallCenter = reducerUtils.getDefaultTargetBallPosition()
