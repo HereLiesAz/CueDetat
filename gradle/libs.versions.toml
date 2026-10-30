@@ -58,7 +58,7 @@ playServicesWearable = "20.0.1"
 wearCompose = "1.7.0"
 
 # ── Wearables (Meta DAT; credentialed GitHub Packages — see settings.gradle.kts) ──
-metaWearableDat = "1.0.0"
+metaWearableDat = "1.0.1"
 
 # ── Networking ───────────────────────────────────────────────────────────────
 retrofit = "3.0.0"
