@@ -63,7 +63,7 @@ jobs:
           # echo "CUSTOM_API_KEY=$CUSTOM_API_KEY" >> local.properties
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -149,7 +149,7 @@ jobs:
           echo "Keystore decoded to app/keystore.jks ($(stat -c%s app/keystore.jks) bytes)"
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           java-version: '21'
           distribution: 'temurin'
