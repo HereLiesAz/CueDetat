@@ -175,18 +175,32 @@ private class ArCoreRenderer(
     private var trackingLostSinceNanos = 0L
     private var lostNoticeShown = false
 
-    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        background.createOnGlThread()
-        trackables.createOnGlThread()
-        session.setCameraTextureName(background.getTextureId())
+    // Both surface callbacks run on the GL thread with nothing above them: an exception here (a
+    // Session closed by a fast AR off/on, say) would end the process, not just this frame. Under
+    // frameLock, as onDrawFrame is, so close() cannot interleave.
+    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?): Unit = synchronized(arTableSession.frameLock) {
+        try {
+            background.createOnGlThread()
+            trackables.createOnGlThread()
+            if (arTableSession.getSession() === session) {
+                session.setCameraTextureName(background.getTextureId())
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "ARCore surface setup failed", e)
+        }
     }
 
-    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int): Unit = synchronized(arTableSession.frameLock) {
         surfaceWidth = width
         surfaceHeight = height
-        val rotation = displayRotation.get()
-        session.setDisplayGeometry(rotation, width, height)
-        lastGeometryRotation = rotation
+        if (arTableSession.getSession() !== session) return@synchronized
+        try {
+            val rotation = displayRotation.get()
+            session.setDisplayGeometry(rotation, width, height)
+            lastGeometryRotation = rotation
+        } catch (e: Exception) {
+            Log.e(TAG, "ARCore display geometry failed", e)
+        }
     }
 
     override fun onDrawFrame(gl: GL10?): Unit = synchronized(arTableSession.frameLock) {

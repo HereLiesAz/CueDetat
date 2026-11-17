@@ -36,7 +36,7 @@ This document defines the rules for all sliders in the application.
 * **Orientation:** Horizontal.
 * **Visibility:** Only visible when the table is visible (`uiState.table.isVisible` is `true`). This
   slider is not available in Beginner Mode.
-* **Layout:** A horizontal swiper (not a centred slider), left-aligned at the bottom of the screen above the navigation bar, `ROTATION_SWIPER_WIDTH` (367 dp) wide so it clears the Lock View button. Dragging right turns the table the way the finger moves.
+* **Layout:** A horizontal swiper (not a centred slider), left-aligned at the bottom of the screen above the navigation bar, filling the width beside the rail and stopping `ROTATION_SWIPER_END_CLEARANCE` (80 dp: the Lock View button's 16 dp margin, 48 dp diameter and a 16 dp gap) short of the end, so it clears the Lock View button on any screen width. Dragging right turns the table the way the finger moves.
 
 ### Other Sliders
 
