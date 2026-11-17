@@ -6,6 +6,7 @@ import org.opencv.core.Mat
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import android.media.Image
+import android.util.Log
 import com.google.ar.core.Coordinates2d
 import com.google.ar.core.Frame
 import com.hereliesaz.cuedetat.data.CaptureCamera
@@ -90,6 +91,13 @@ class ArFrameProcessor(
             // A bad frame is skipped; the next one gets a fresh image.
             copy?.release()
             copy = null
+        } catch (e: LinkageError) {
+            // OpenCV's native library or a class R8 stripped is missing. An Error, so the Exception
+            // guard misses it, and it would end the process on the first frame after the camera
+            // starts. Detection is lost; the camera feed is not.
+            reportLinkageFailure(e)
+            copy?.release()
+            copy = null
         } finally {
             cpuImage.close()
         }
@@ -108,6 +116,9 @@ class ArFrameProcessor(
                     visionRepository.processArFrame(mat, uprightRotation, state, frameToView, frameCamera)
                 } catch (_: Exception) {
                     // Skip the frame.
+                } catch (e: LinkageError) {
+                    // As in the copy above: lose detection, not the process.
+                    reportLinkageFailure(e)
                 } finally {
                     mat.release()
                     workerBusy.set(false)
@@ -117,6 +128,15 @@ class ArFrameProcessor(
             // Executor shut down or rejected: nothing will release the copy but us.
             mat.release()
             workerBusy.set(false)
+        }
+    }
+
+    private val linkageFailureLogged = AtomicBoolean(false)
+
+    /** Logs the first linkage failure with its stack; later ones would repeat it every frame. */
+    private fun reportLinkageFailure(e: LinkageError) {
+        if (linkageFailureLogged.compareAndSet(false, true)) {
+            Log.e("ArFrameProcessor", "AR detection unavailable (linkage failure); camera continues", e)
         }
     }
 

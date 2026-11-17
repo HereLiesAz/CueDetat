@@ -61,8 +61,12 @@ import com.hereliesaz.cuedetat.view.ProtractorOverlay
 
 private const val ROUTE_MAIN = "main"
 
-/** Rotation swiper width (label + tick strip); see the swiper's onscreen block. */
-private val ROTATION_SWIPER_WIDTH = 367.dp
+/**
+ * Space the rotation swiper leaves clear at its end for the Lock View button: the button's
+ * 16 dp end margin, its 48 dp diameter (LockViewButton) and a 16 dp gap. Computed, not a fixed
+ * strip width, so it holds on any screen width.
+ */
+private val ROTATION_SWIPER_END_CLEARANCE = 16.dp + 48.dp + 16.dp
 
 @Composable
 fun ProtractorScreen(
@@ -216,8 +220,8 @@ fun ProtractorScreen(
         }
 
         // --- Onscreen HUD: Table rotation swiper (main route only, hidden during felt capture) ---
-        // Fixed width, left-aligned; AzNavRail lays it out beside the rail. 367 dp ends the strip
-        // where it was cut on a reference phone, clear of the Lock View button.
+        // Fills the width AzNavRail leaves beside the rail, stopping short of the Lock View button
+        // by ROTATION_SWIPER_END_CLEARANCE.
         onscreen(alignment = Alignment.BottomStart) {
             if (isOnMain && !uiState.showTableScanScreen) {
                 TableRotationSwiper(
@@ -225,9 +229,9 @@ fun ProtractorScreen(
                     userRotationDegrees = uiState.userRotationDegrees,
                     onRotate = { mainViewModel.onEvent(MainScreenEvent.TableRotationApplied(it)) },
                     modifier = Modifier
+                        .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(bottom = 16.dp, start = 16.dp)
-                        .width(ROTATION_SWIPER_WIDTH)
+                        .padding(bottom = 16.dp, start = 16.dp, end = ROTATION_SWIPER_END_CLEARANCE)
                 )
             }
         }
