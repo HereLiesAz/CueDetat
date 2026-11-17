@@ -65,6 +65,14 @@ private fun buildTutorialSteps(
     }
 
 /** Rail items hidden, not deleted; flip to restore. */
+/**
+ * Rail button diameter (AzNavRail's default is 72 dp) and the collapsed strip it sits in (default
+ * 100 dp): the strip keeps ~10 dp either side of a button, and the HUD beside the rail gets the
+ * width back. Button labels are AutoSizeText, so they scale with the button.
+ */
+private val RAIL_ITEM_SIZE = 65.dp
+private val RAIL_STRIP_WIDTH = 85.dp
+
 private const val SHOW_GLASSES = false
 private const val SHOW_ADVISOR = false
 
@@ -198,8 +206,15 @@ fun AzNavRailMenu(
         initiallyExpanded = false
     ) {
         // [SECTION 1] Configuration (DSL) - MANDATORY TOP POSITION
-        azConfig(dockingSide = AzDockingSide.LEFT, packButtons = false, showFooter = true)
-        azTheme(defaultShape = AzButtonShape.CIRCLE, activeColor = railAccent)
+        azConfig(
+            dockingSide = AzDockingSide.LEFT,
+            packButtons = false,
+            showFooter = true,
+            railItemWidth = RAIL_ITEM_SIZE,
+            collapsedWidth = RAIL_STRIP_WIDTH,
+        )
+        // Borderless by default; only the ball buttons (cue, target) keep a circle.
+        azTheme(defaultShape = AzButtonShape.NONE, activeColor = railAccent)
         azAdvanced(isLoading = false, helpEnabled = true, onDismissHelp = {})
 
         // [SECTION 1b] Tutorial guidance (AzNavRail 11.50 status-driven framework).
@@ -440,6 +455,7 @@ fun AzNavRailMenu(
             // Coloured as the virtual balls are drawn (the cue ball's ring, the target's).
             azRailToggle(
                 id = "pick_cue",
+                shape = AzButtonShape.CIRCLE,
                 isChecked = uiState.ballSelectionPhase == BallSelectionPhase.AWAITING_CUE,
                 toggleOnText = rail_cue_ballText, toggleOffText = rail_cue_ballText,
                 fillColor = com.hereliesaz.cuedetat.view.config.ball.ActualCueBall().strokeColor,
@@ -447,6 +463,7 @@ fun AzNavRailMenu(
             )
             azRailToggle(
                 id = "pick_target",
+                shape = AzButtonShape.CIRCLE,
                 isChecked = uiState.ballSelectionPhase == BallSelectionPhase.AWAITING_TARGET,
                 toggleOnText = rail_target_ballText, toggleOffText = rail_target_ballText,
                 fillColor = com.hereliesaz.cuedetat.view.config.ball.TargetBall().strokeColor,
