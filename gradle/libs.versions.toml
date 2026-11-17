@@ -42,7 +42,7 @@ hilt = "2.60.1"
 hiltNavigationCompose = "1.4.0"
 
 # ── Vision / AR (Android-only) ───────────────────────────────────────────────
-arcore = "1.56.0"
+arcore = "1.57.0"
 mlkitObjectDetection = "17.0.2"
 mlkitVisionCommon = "17.3.0"
 opencv = "5.0.0.1"
