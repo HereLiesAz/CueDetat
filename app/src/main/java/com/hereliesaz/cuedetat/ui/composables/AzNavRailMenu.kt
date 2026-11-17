@@ -70,8 +70,8 @@ private fun buildTutorialSteps(
  * 100 dp): the strip keeps ~10 dp either side of a button, and the HUD beside the rail gets the
  * width back. Button labels are AutoSizeText, so they scale with the button.
  */
-private val RAIL_ITEM_SIZE = 56.dp
-private val RAIL_STRIP_WIDTH = 76.dp
+private val RAIL_ITEM_SIZE = 65.dp
+private val RAIL_STRIP_WIDTH = 85.dp
 
 private const val SHOW_GLASSES = false
 private const val SHOW_ADVISOR = false

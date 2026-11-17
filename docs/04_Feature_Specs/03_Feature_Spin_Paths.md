@@ -30,8 +30,8 @@ This document defines the behavior of spin path visualizations.
 
 ## AzNavRail Item Size
 
-* `AzNavRailMenu.kt` sets `railItemWidth = RAIL_ITEM_SIZE` (56 dp; library default 72 dp) and
-  `collapsedWidth = RAIL_STRIP_WIDTH` (76 dp; library default 100 dp). Button labels are
+* `AzNavRailMenu.kt` sets `railItemWidth = RAIL_ITEM_SIZE` (65 dp; library default 72 dp) and
+  `collapsedWidth = RAIL_STRIP_WIDTH` (85 dp; library default 100 dp). Button labels are
   `AutoSizeText`, so they scale with the button.
 
 ## Massé Mode Rules & State
