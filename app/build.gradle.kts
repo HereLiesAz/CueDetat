@@ -240,6 +240,10 @@ android {
     testOptions {
         unitTests {
             isReturnDefaultValues = true
+            // AGP 9.5.0's GenerateComposePreviewRunfilesTask needs compiled Android resources and
+            // fails project configuration ("Compose Preview failed for ':app'") when they are
+            // excluded from unit tests, which took every Gradle task down, not just the tests.
+            isIncludeAndroidResources = true
         }
     }
     
