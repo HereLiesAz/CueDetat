@@ -143,13 +143,8 @@ fun SpinControl(
 
                 drawImage(colorWheelBitmap, alpha = spinPathAlpha)
                 
-                // Outer ring
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.5f * spinPathAlpha),
-                    radius = radius,
-                    center = center,
-                    style = Stroke(width = 2.dp.toPx())
-                )
+                // Outer ring: does not fade with the wheel (see drawSpinOutline).
+                drawSpinOutline(center, radius)
 
                 // Mis-cue boundary (0.85 radius)
                 drawCircle(
@@ -167,11 +162,12 @@ fun SpinControl(
                     canvas.nativeCanvas.drawText(wheelLabel, center.x, center.y + labelTextSize * 0.35f, labelPaint)
                 }
 
-                lingeringSpinOffset?.let { 
-                    drawSpinIndicator(it, center, radius, Color.White.copy(alpha = 0.6f * spinPathAlpha)) 
+                // The last aim stays marked after the wheel fades (not scaled by spinPathAlpha).
+                lingeringSpinOffset?.let {
+                    drawSpinIndicator(it, center, radius, Color.White.copy(alpha = LINGERING_SPIN_DOT_ALPHA))
                 }
-                selectedSpinOffset?.let { 
-                    drawSpinIndicator(it, center, radius, Color.White) 
+                selectedSpinOffset?.let {
+                    drawSpinIndicator(it, center, radius, Color.White)
                 }
 
                 if (isMoveModeActive) {
@@ -238,6 +234,30 @@ internal fun spinStateDescription(offset: PointF?): String {
     val x = (offset.x * 100).roundToInt()
     val y = (-offset.y * 100).roundToInt()
     return stringResource(R.string.spin_state_offset, x, y)
+}
+
+/** Opacity of the last-aim dot once the shot is set; it stays at this when the wheel has faded. */
+internal const val LINGERING_SPIN_DOT_ALPHA = 0.6f
+
+/**
+ * The wheel's outline, shared by [SpinControl] and [MasseControl]. The colour wheel, its label and
+ * the mis-cue ring fade out with `spinPathAlpha` a moment after the aim is set; the outline does
+ * not, or the whole control would vanish with them and leave the player no sign it is there or
+ * what it is set to. A dark under-stroke keeps the white ring readable over a bright feed.
+ */
+internal fun DrawScope.drawSpinOutline(center: Offset, radius: Float) {
+    drawCircle(
+        color = Color.Black.copy(alpha = 0.35f),
+        radius = radius,
+        center = center,
+        style = Stroke(width = 4.dp.toPx())
+    )
+    drawCircle(
+        color = Color.White.copy(alpha = 0.7f),
+        radius = radius,
+        center = center,
+        style = Stroke(width = 2.dp.toPx())
+    )
 }
 
 internal fun DrawScope.drawSpinIndicator(normalizedOffset: PointF, center: Offset, radius: Float, color: Color) {

@@ -18,6 +18,22 @@ This document defines the behavior of spin path visualizations.
 * **`drawLogicalIndicator`** in `SpinControl.kt`: The indicator position uses `Offset(offset.x, offset.y)` directly from the stored raw pixel coords. It does **not** multiply by the radius again (that was a double-application bug that has been fixed).
 * `MasseControl.kt` already used raw coordinates correctly and was not changed.
 
+## Spin / Massé Control Persistence
+
+* The colour wheel, its centre label and the spin control's mis-cue ring fade out with
+  `spinPathsAlpha` (`SpinPathTick`, −0.05 per tick, to 0) a moment after the aim is set.
+* The **outline** (`drawSpinOutline`: white ring over a dark under-stroke) and the **last-aim dot**
+  (`lingeringSpinOffset`, drawn at `LINGERING_SPIN_DOT_ALPHA`) do **not** fade. Without them the whole
+  control vanished with the wheel and the player had no sign it was there or what it was set to.
+* Both live in `SpinControl.kt` and are shared by `SpinControl` and `MasseControl`.
+* With no aim stored (after `ClearSpinState`), only the outline remains; no dot is drawn.
+
+## AzNavRail Item Size
+
+* `AzNavRailMenu.kt` sets `railItemWidth = RAIL_ITEM_SIZE` (56 dp; library default 72 dp) and
+  `collapsedWidth = RAIL_STRIP_WIDTH` (76 dp; library default 100 dp). Button labels are
+  `AutoSizeText`, so they scale with the button.
+
 ## Massé Mode Rules & State
 
 * **`masseShotAngleDeg: Float`**: Stores the massé shot angle in degrees.

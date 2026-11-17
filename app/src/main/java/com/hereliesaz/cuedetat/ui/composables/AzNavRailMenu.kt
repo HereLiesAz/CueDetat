@@ -65,6 +65,14 @@ private fun buildTutorialSteps(
     }
 
 /** Rail items hidden, not deleted; flip to restore. */
+/**
+ * Rail button diameter (AzNavRail's default is 72 dp) and the collapsed strip it sits in (default
+ * 100 dp): the strip keeps ~10 dp either side of a button, and the HUD beside the rail gets the
+ * width back. Button labels are AutoSizeText, so they scale with the button.
+ */
+private val RAIL_ITEM_SIZE = 56.dp
+private val RAIL_STRIP_WIDTH = 76.dp
+
 private const val SHOW_GLASSES = false
 private const val SHOW_ADVISOR = false
 
@@ -198,7 +206,13 @@ fun AzNavRailMenu(
         initiallyExpanded = false
     ) {
         // [SECTION 1] Configuration (DSL) - MANDATORY TOP POSITION
-        azConfig(dockingSide = AzDockingSide.LEFT, packButtons = false, showFooter = true)
+        azConfig(
+            dockingSide = AzDockingSide.LEFT,
+            packButtons = false,
+            showFooter = true,
+            railItemWidth = RAIL_ITEM_SIZE,
+            collapsedWidth = RAIL_STRIP_WIDTH,
+        )
         azTheme(defaultShape = AzButtonShape.CIRCLE, activeColor = railAccent)
         azAdvanced(isLoading = false, helpEnabled = true, onDismissHelp = {})
 

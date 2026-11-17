@@ -21,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -157,7 +156,7 @@ fun MasseControl(
 
                 // Color Wheel (cached bitmap — drawn once per density change)
                 drawImage(colorWheelBitmap, alpha = spinPathAlpha)
-                drawCircle(color = Color.White.copy(alpha = 0.5f * spinPathAlpha), radius = radius, center = center, style = Stroke(width = 2.dp.toPx()))
+                drawSpinOutline(center, radius)
 
                 // Center label
                 val labelTextSize = 12.dp.toPx()
@@ -168,8 +167,8 @@ fun MasseControl(
                 }
 
                 // Indicators
-                lingeringSpinOffset?.let { 
-                    drawSpinIndicator(it, center, radius, Color.White.copy(alpha = 0.6f * spinPathAlpha)) 
+                lingeringSpinOffset?.let {
+                    drawSpinIndicator(it, center, radius, Color.White.copy(alpha = LINGERING_SPIN_DOT_ALPHA))
                 }
 
                 selectedSpinOffset?.let { activePos ->
