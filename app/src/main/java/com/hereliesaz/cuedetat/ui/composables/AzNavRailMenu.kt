@@ -213,7 +213,8 @@ fun AzNavRailMenu(
             railItemWidth = RAIL_ITEM_SIZE,
             collapsedWidth = RAIL_STRIP_WIDTH,
         )
-        azTheme(defaultShape = AzButtonShape.CIRCLE, activeColor = railAccent)
+        // Borderless by default; only the ball buttons (cue, target) keep a circle.
+        azTheme(defaultShape = AzButtonShape.NONE, activeColor = railAccent)
         azAdvanced(isLoading = false, helpEnabled = true, onDismissHelp = {})
 
         // [SECTION 1b] Tutorial guidance (AzNavRail 11.50 status-driven framework).
@@ -454,6 +455,7 @@ fun AzNavRailMenu(
             // Coloured as the virtual balls are drawn (the cue ball's ring, the target's).
             azRailToggle(
                 id = "pick_cue",
+                shape = AzButtonShape.CIRCLE,
                 isChecked = uiState.ballSelectionPhase == BallSelectionPhase.AWAITING_CUE,
                 toggleOnText = rail_cue_ballText, toggleOffText = rail_cue_ballText,
                 fillColor = com.hereliesaz.cuedetat.view.config.ball.ActualCueBall().strokeColor,
@@ -461,6 +463,7 @@ fun AzNavRailMenu(
             )
             azRailToggle(
                 id = "pick_target",
+                shape = AzButtonShape.CIRCLE,
                 isChecked = uiState.ballSelectionPhase == BallSelectionPhase.AWAITING_TARGET,
                 toggleOnText = rail_target_ballText, toggleOffText = rail_target_ballText,
                 fillColor = com.hereliesaz.cuedetat.view.config.ball.TargetBall().strokeColor,

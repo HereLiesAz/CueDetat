@@ -33,6 +33,10 @@ This document defines the behavior of spin path visualizations.
 * `AzNavRailMenu.kt` sets `railItemWidth = RAIL_ITEM_SIZE` (65 dp; library default 72 dp) and
   `collapsedWidth = RAIL_STRIP_WIDTH` (85 dp; library default 100 dp). Button labels are
   `AutoSizeText`, so they scale with the button.
+* Shape: `azTheme(defaultShape = AzButtonShape.NONE)`, so rail items are borderless (a resting
+  border is dropped; the tinted fill and the highlight ring stay). Only the two ball buttons,
+  `pick_cue` and `pick_target`, set `shape = AzButtonShape.CIRCLE`. The default also applies to the
+  library's auto About button.
 
 ## Massé Mode Rules & State
 
