@@ -1,6 +1,10 @@
 package com.hereliesaz.cuedetat.feature.expert.ar
 
+import android.app.Activity
 import android.content.Context
+import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
+import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
+import com.hereliesaz.cuedetat.domain.ArCoreStatus
 import com.hereliesaz.cuedetat.domain.CloudPlacementRecord
 import android.graphics.Matrix
 import com.google.ar.core.Anchor
@@ -39,6 +43,10 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.math.sin
 import kotlin.math.cos
+
+/** How long [ArTableSession.statusWaiting] lets Google Play answer the first availability query. */
+private const val AVAILABILITY_WAIT_MS = 1_500L
+private const val AVAILABILITY_POLL_MS = 100L
 
 /** Felt-vote sampling: a FELT_GRID x FELT_GRID grid across the virtual table. */
 private const val FELT_GRID = 5
@@ -426,11 +434,82 @@ class ArTableSession(
     private var lockLostMessage: String? = null
     private var suggestedScale: Float? = null
 
-    /** True once ARCore world tracking is available on this device. */
-    fun isArCoreAvailable(): Boolean = try {
-        ArCoreApk.getInstance().checkAvailability(context).isSupported
+    /**
+     * Where ARCore stands on this device, from one non-blocking query. While Google Play is still
+     * answering the very first query this is [ArCoreStatus.UNKNOWN]; use [statusWaiting] off the
+     * main thread to wait it out. Never throws.
+     */
+    fun status(): ArCoreStatus = try {
+        statusOf(ArCoreApk.getInstance().checkAvailability(context))
     } catch (_: Exception) {
-        false
+        ArCoreStatus.UNKNOWN
+    } catch (_: LinkageError) {
+        ArCoreStatus.UNKNOWN
+    }
+
+    /**
+     * [status], asking again for up to [AVAILABILITY_WAIT_MS] while Google Play answers the first
+     * query (ARCore reports UNKNOWN_CHECKING until it does). Sleeps: never call it on the main
+     * thread.
+     */
+    fun statusWaiting(): ArCoreStatus {
+        var waited = 0L
+        while (true) {
+            val availability = try {
+                ArCoreApk.getInstance().checkAvailability(context)
+            } catch (_: Exception) {
+                return ArCoreStatus.UNKNOWN
+            } catch (_: LinkageError) {
+                return ArCoreStatus.UNKNOWN
+            }
+            if (availability != ArCoreApk.Availability.UNKNOWN_CHECKING || waited >= AVAILABILITY_WAIT_MS) {
+                return statusOf(availability)
+            }
+            try {
+                Thread.sleep(AVAILABILITY_POLL_MS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return ArCoreStatus.UNKNOWN
+            }
+            waited += AVAILABILITY_POLL_MS
+        }
+    }
+
+    private fun statusOf(availability: ArCoreApk.Availability): ArCoreStatus = when (availability) {
+        ArCoreApk.Availability.SUPPORTED_INSTALLED -> ArCoreStatus.READY
+        ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED -> ArCoreStatus.NOT_INSTALLED
+        ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD -> ArCoreStatus.TOO_OLD
+        ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE -> ArCoreStatus.UNSUPPORTED
+        else -> ArCoreStatus.UNKNOWN
+    }
+
+    /**
+     * True only when ARCore is installed and current, i.e. a Session can be created. This used to be
+     * `checkAvailability().isSupported`, which is also true when Google Play Services for AR is not
+     * installed, so [createSession] and [probeCapability] went on to construct a Session that can
+     * only throw.
+     */
+    fun isArCoreAvailable(): Boolean = status() == ArCoreStatus.READY
+
+    /**
+     * Ask Google Play to install or update Google Play Services for AR. Main thread, with the
+     * foreground [activity]. Returns [ArCoreStatus.READY] if it was already there; otherwise Play
+     * takes over the screen and the status is for [status] to report when the Activity resumes.
+     * Never throws.
+     */
+    fun requestInstall(activity: Activity): ArCoreStatus = try {
+        when (ArCoreApk.getInstance().requestInstall(activity, true)) {
+            ArCoreApk.InstallStatus.INSTALLED -> ArCoreStatus.READY
+            // Play is installing it; this Activity pauses and resumes, and status() decides then.
+            else -> ArCoreStatus.NOT_INSTALLED
+        }
+    } catch (_: UnavailableDeviceNotCompatibleException) {
+        ArCoreStatus.UNSUPPORTED
+    } catch (_: UnavailableUserDeclinedInstallationException) {
+        ArCoreStatus.NOT_INSTALLED
+    } catch (e: Exception) {
+        android.util.Log.w("ArTableSession", "ARCore install request failed", e)
+        ArCoreStatus.UNKNOWN
     }
 
     /** Tracking availability and depth availability are independent capabilities. */

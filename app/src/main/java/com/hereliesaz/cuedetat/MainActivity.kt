@@ -145,6 +145,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Back from Google Play (or from Settings): ARCore may have been installed meanwhile.
+        viewModel.refreshArCapability()
         // Camera permission is only checked once up front in onCreate; if the user revokes
         // it from system Settings while the app is backgrounded, CameraX fails silently
         // inside a swallowed catch(Exception) in CameraBackground, leaving a frozen blank
@@ -203,6 +205,15 @@ class MainActivity : ComponentActivity() {
                 }
                 is SingleEvent.HaterShake -> {
                     haterViewModel.onEvent(HaterEvent.ShakeDetected)
+                    viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
+                }
+                is SingleEvent.RequestArCoreInstall -> {
+                    // Google Play takes over the screen; onResume re-checks when it hands it back.
+                    try {
+                        viewModel.arController.requestArCoreInstall(this)
+                    } catch (e: Exception) {
+                        android.util.Log.w("MainActivity", "ARCore install request failed", e)
+                    }
                     viewModel.onEvent(MainScreenEvent.SingleEventConsumed)
                 }
                 is SingleEvent.ShowSupportSheet -> {

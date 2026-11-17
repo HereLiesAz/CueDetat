@@ -5,6 +5,7 @@ package com.hereliesaz.cuedetat.arfeature
 import androidx.camera.core.ImageAnalysis
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.hereliesaz.cuedetat.domain.ArCoreStatus
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.DepthCapability
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
@@ -34,6 +35,20 @@ interface ArController {
 
     /** Detect ARCore world-tracking capability (creates and closes a probe session). */
     fun probeCapability(): DepthCapability
+
+    /**
+     * Whether Google Play Services for AR is installed and current. May wait a moment (up to about a
+     * second) for Google Play to answer on the first call, so call it off the main thread. Never
+     * throws; [ArCoreStatus.UNKNOWN] when it cannot tell.
+     */
+    fun arCoreStatus(): ArCoreStatus = ArCoreStatus.UNKNOWN
+
+    /**
+     * Ask Google Play to install or update Google Play Services for AR. Main thread, with the
+     * foreground [activity]: Play takes over the screen, and the Activity resumes when it is done,
+     * after which [arCoreStatus] has the answer. Never throws.
+     */
+    fun requestArCoreInstall(activity: android.app.Activity): ArCoreStatus = ArCoreStatus.UNKNOWN
 
     /** Push state to AR ball detection and the editable world-anchored table preview. */
     fun updateUiState(state: CueDetatState)

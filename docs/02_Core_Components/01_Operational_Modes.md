@@ -122,6 +122,26 @@ The AR camera system follows a strict state machine built on the mandatory rule:
   app now floats on the last known table pose and only requires a fresh scan if the user explicitly
   restarts AR setup. See `ArFlowReducerTest.kt` for the regression test guarding this behavior.
 
+### ARCore Not Installed (Google Play Services for AR)
+
+AR needs the **Google Play Services for AR** app. Without it a Session cannot be created.
+
+- **Detection**: `ArController.arCoreStatus()` maps ARCore's availability to `ArCoreStatus`
+  (`READY`, `NOT_INSTALLED`, `TOO_OLD`, `UNSUPPORTED`, `UNKNOWN`). The first query waits up to
+  1.5 s for Google Play to answer (`UNKNOWN_CHECKING`), so `MainViewModel` runs it off the main
+  thread. `ArTableSession.isArCoreAvailable()` is true only for `READY`; it used to be true for
+  "supported", which includes not-installed, so a Session was constructed only to throw.
+- **Install**: on entering AR, a missing or outdated ARCore raises a persistent notice
+  (`ArTrackingMessages.ARCORE_INSTALL_NEEDED`) and one `SingleEvent.RequestArCoreInstall` per AR
+  entry. `MainActivity` handles it with `ArCoreApk.requestInstall`, which opens Google Play.
+  `MainActivity.onResume` calls `MainViewModel.refreshArCapability()` (only while AR is loaded with
+  no capability) so AR comes up once the install finishes and the notice clears.
+- **Unsupported device**: a notice, and the camera view and CV keep working
+  (`DepthCapability.NONE` already selects the CameraX path).
+- **No force close**: `ArCoreBackground` attaches its `GLSurfaceView` only after `setRenderer()`
+  has run. A `GLSurfaceView` that gets a surface before it has a renderer dereferences its GL
+  thread (null until `setRenderer`) and crashes the app; that was what a failed Session start did.
+
 ### AR_SETUP Behavior
 
 - The **Felt** and **Cancel** nav rail items appear immediately when AR is initialized.

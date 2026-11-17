@@ -15,7 +15,10 @@ import com.hereliesaz.cuedetat.data.TableScanRepository
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.data.VisionAnalyzer
 import com.hereliesaz.cuedetat.data.VisionRepository
+import com.hereliesaz.cuedetat.domain.ArCoreStatus
 import com.hereliesaz.cuedetat.domain.ArModuleState
+import com.hereliesaz.cuedetat.domain.ArTrackingMessages
+import com.hereliesaz.cuedetat.domain.DepthCapability
 import com.hereliesaz.cuedetat.domain.SavedScanPlausibility
 import com.hereliesaz.cuedetat.domain.BallSelectionPhase
 import com.hereliesaz.cuedetat.domain.CameraMode
@@ -414,12 +417,56 @@ class MainViewModel @Inject constructor(
                 false
             }
             if (loaded) {
-                onEvent(MainScreenEvent.DepthCapabilityDetected(arController.probeCapability()))
+                detectArCapability(offerInstall = true)
                 onEvent(MainScreenEvent.ArModuleLoadSucceeded)
             } else {
                 onEvent(MainScreenEvent.ArModuleLoadFailed(thrown ?: arController.lastLoadError))
             }
         }
+    }
+
+    /** Whether Google Play has been asked to install ARCore since AR was last entered; once, not a loop. */
+    private var arInstallOffered = false
+
+    /**
+     * Find out what ARCore can do here and act on it: report the capability, and when Google Play
+     * Services for AR is missing or too old say so and (once per AR entry, if [offerInstall]) ask
+     * MainActivity to have Google Play install it. Without it AR cannot start a Session; the camera
+     * view and CV keep working. The first query waits for Google Play to answer, so it runs off the
+     * main thread.
+     */
+    private suspend fun detectArCapability(offerInstall: Boolean) {
+        val status = withContext(Dispatchers.Default) { arController.arCoreStatus() }
+        onEvent(MainScreenEvent.DepthCapabilityDetected(arController.probeCapability()))
+        when {
+            status == ArCoreStatus.READY -> {
+                // Installed since the notice went up (we are back from Google Play).
+                if (_uiState.value.warningText == ArTrackingMessages.ARCORE_INSTALL_NEEDED) {
+                    onEvent(MainScreenEvent.ArNotice(null))
+                }
+            }
+            status.needsInstall -> {
+                onEvent(MainScreenEvent.ArNotice(ArTrackingMessages.ARCORE_INSTALL_NEEDED, persistent = true))
+                if (offerInstall && !arInstallOffered) {
+                    arInstallOffered = true
+                    emitSingle(SingleEvent.RequestArCoreInstall)
+                }
+            }
+            status == ArCoreStatus.UNSUPPORTED ->
+                onEvent(MainScreenEvent.ArNotice(ArTrackingMessages.ARCORE_UNSUPPORTED, persistent = true))
+            else -> Unit
+        }
+    }
+
+    /**
+     * Re-check ARCore when the app comes back to the foreground: the user may have installed it
+     * from Google Play. Only while AR is loaded and has no capability, so an ordinary resume costs
+     * nothing.
+     */
+    fun refreshArCapability() {
+        val state = _uiState.value
+        if (state.arModuleState != ArModuleState.READY || state.depthCapability != DepthCapability.NONE) return
+        viewModelScope.launch { detectArCapability(offerInstall = false) }
     }
 
     /**
@@ -475,7 +522,13 @@ class MainViewModel @Inject constructor(
         // still performs the camera-mode transition, and the UI shows a start-up
         // overlay (with Cancel) while arModuleState == LOADING. Retry re-runs the same load.
         if (event is MainScreenEvent.CycleCameraMode && _uiState.value.cameraMode == CameraMode.OFF) {
+            arInstallOffered = false
             ensureArModuleLoaded()
+            // Already loaded on an earlier entry: ensureArModuleLoaded returns early, so check again
+            // whether ARCore is there (it may have been uninstalled, or installed, since).
+            if (_uiState.value.arModuleState == ArModuleState.READY) {
+                viewModelScope.launch { detectArCapability(offerInstall = true) }
+            }
             restoreSavedScanForAr()
         }
         // Lock: hand ARCore the virtual table's corners as they sit on screen, so the anchors land

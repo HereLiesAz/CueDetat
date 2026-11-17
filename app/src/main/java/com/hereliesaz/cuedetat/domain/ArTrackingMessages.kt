@@ -16,6 +16,14 @@ object ArTrackingMessages {
         else -> "Tracking lost. Hold still and look around the table."
     }
 
+    /** Google Play Services for AR is missing or too old; Play is asked to install it. */
+    const val ARCORE_INSTALL_NEEDED =
+        "AR needs Google Play Services for AR. Install or update it from Google Play, then turn AR on again."
+
+    /** The device cannot run ARCore; the camera view still works. */
+    const val ARCORE_UNSUPPORTED =
+        "This device doesn't support AR. The camera view still works."
+
     /** `CloudAnchorState` names worth trying a resolve again for. */
     val retryableResolveStates: Set<String> = setOf(
         "ERROR_RESOLVING_LOCALIZATION_NO_MATCH",
