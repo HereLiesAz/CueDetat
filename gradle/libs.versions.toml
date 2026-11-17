@@ -35,7 +35,7 @@ material = "1.14.0"
 material3 = "1.4.0"
 material3AdaptiveNavSuite = "1.4.0"
 materialIconsExtended = "1.7.8"
-palette = "1.0.0"
+palette = "1.1.0"
 
 # ── Dependency injection (Android layer only; the KMP core is pure) ──────────
 hilt = "2.60.1"
