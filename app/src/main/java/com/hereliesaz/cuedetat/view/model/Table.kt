@@ -69,6 +69,34 @@ data class Table(
                 point.y >= -halfH && point.y <= halfH
     }
 
+    /**
+     * Whether a ball of [radius] centred at [center] lies wholly on the table. The rails are the
+     * lines through [corners], so a ball is on the table only while its centre is at least [radius]
+     * from every one of them. [isPointInside] tests the centre alone, which lets a ball hang half
+     * over the cushion.
+     */
+    fun containsBall(center: PointF, radius: Float): Boolean {
+        val maxX = halfExtent(logicalWidth, radius)
+        val maxY = halfExtent(logicalHeight, radius)
+        return center.x >= -maxX && center.x <= maxX && center.y >= -maxY && center.y <= maxY
+    }
+
+    /**
+     * [center] moved to the nearest point where a ball of [radius] lies wholly on the table
+     * (see [containsBall]); [center] itself when it already does. A table narrower than the ball
+     * leaves the one point on its axis. Never returns a point outside the table.
+     */
+    fun clampBallCenter(center: PointF, radius: Float): PointF {
+        val maxX = halfExtent(logicalWidth, radius)
+        val maxY = halfExtent(logicalHeight, radius)
+        return PointF().apply {
+            x = center.x.coerceIn(-maxX, maxX)
+            y = center.y.coerceIn(-maxY, maxY)
+        }
+    }
+
+    private fun halfExtent(side: Float, radius: Float): Float = (side / 2f - radius).coerceAtLeast(0f)
+
     fun findRailIntersectionAndNormal(startPoint: PointF, endPoint: PointF): Pair<PointF, PointF>? {
         val rails = listOf(
             corners[0] to corners[1],

@@ -45,3 +45,18 @@ In Expert Mode, certain state updates use a `MATRICES_ONLY` update type to avoid
 skipped. Skipping it leaves `@Transient` aiming fields (`tangentAimedPocketIndex`, `aimedPocketIndex`,
 etc.) stale, which causes the Expert Mode red aiming line to stop updating until a full recalculation
 is triggered. The `MATRICES_ONLY` path now correctly runs `updateAimingCalculations` first.
+
+## Balls Stay On The Table
+
+* With a visible table, the target ball, the cue ball and every obstacle ball are kept wholly on it:
+  a ball's centre may come no closer to a rail than the ball's own radius (`Table.clampBallCenter`).
+  A ball dragged past a rail slides along it and stops; it is never reset or removed for this.
+* Enforced in one place, `BallBounds.confine`, where state leaves `stateReducer` and where
+  `SnapReducer.reduce` returns, so every writer is covered: the three drag modes, tap-to-place,
+  following a detected ball, undo and reset.
+* With no visible table (infinite space) there are no bounds.
+* The ghost cue ball is derived from the target ball and the aim, so it is not moved. Over a rail it
+  is an impossible shot, reported by `isGeometricallyImpossible`.
+* Table resize still resets a target or cue ball whose centre is outside, and removes such
+  obstacles (`ReducerUtils.snapViolatingBalls`); the confinement then slides any ball that is only
+  partly over a rail.

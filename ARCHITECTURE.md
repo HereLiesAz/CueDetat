@@ -88,6 +88,15 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   AGENTS.md; Gradle (`app/build.gradle.kts:11-16`) and the release workflows read the
   uppercase keys from it. **Unenforced** mechanically (no hook or CI guard).
 
+- **With a visible table, no ball (target, cue, obstacle) is ever outside it, by its own radius.**
+  Reason: ball positions are written from many reducers (drags, tap-to-place, detection follow,
+  undo, reset) and none checked the table, so a ball could be dragged or carried off it.
+  Enforced by: `BallBounds.confine` (`domain/BallBounds.kt:28`), applied where state leaves
+  `stateReducer` (`domain/StateReducer.kt:165`) and where `SnapReducer.reduce` returns
+  (`domain/reducers/SnapReducer.kt:182`); geometry in `Table.clampBallCenter`
+  (`view/model/Table.kt:89`). A new ball writer outside those two paths is unenforced. The ghost
+  cue ball is derived, not stored, and is not covered: over a rail it is an impossible shot.
+
 - **No feature ships partially wired.** Reason: this codebase has a real,
   recurring failure pattern — state added to `UiModel.kt`/reducers with no
   composable ever reading it (dead dialogs, dead screens, dead config fields).
