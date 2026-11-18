@@ -95,6 +95,15 @@ data class Table(
         }
     }
 
+    /**
+     * How far from the table's centre, along x and y, the centre of a ball of [radius] may be and
+     * the ball still lie wholly on the table: the limits [clampBallCenter] clamps to.
+     */
+    fun ballCenterLimits(radius: Float): PointF = PointF().apply {
+        x = halfExtent(logicalWidth, radius)
+        y = halfExtent(logicalHeight, radius)
+    }
+
     private fun halfExtent(side: Float, radius: Float): Float = (side / 2f - radius).coerceAtLeast(0f)
 
     fun findRailIntersectionAndNormal(startPoint: PointF, endPoint: PointF): Pair<PointF, PointF>? {

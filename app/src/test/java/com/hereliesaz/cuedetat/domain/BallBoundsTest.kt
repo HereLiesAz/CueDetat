@@ -32,11 +32,16 @@ class BallBoundsTest {
         cue: PointF? = null,
         obstacles: List<OnPlaneBall> = emptyList(),
         visible: Boolean = true,
+        rotation: Float = 0f,
+        banking: Boolean = false,
+        masse: Boolean = false,
     ) = CueDetatState().copy(
         table = Table(TableSize.EIGHT_FT, visible),
-        protractorUnit = ProtractorUnit(target, LOGICAL_BALL_RADIUS, 0f),
+        protractorUnit = ProtractorUnit(target, LOGICAL_BALL_RADIUS, rotation),
         onPlaneBall = cue?.let { OnPlaneBall(it, LOGICAL_BALL_RADIUS) },
         obstacleBalls = obstacles,
+        isBankingMode = banking,
+        isMasseModeActive = masse,
     )
 
     @Test
@@ -97,5 +102,71 @@ class BallBoundsTest {
         // Centre is on the table (488.889 is the rail) but the ball hangs over it.
         assertFalse(table.containsBall(pf(480f, 0f), 25f))
         assertTrue(table.isPointInside(pf(480f, 0f)))
+    }
+
+    // --- The ghost cue ball: target centre + 50 at (-sin a, cos a), so a = 0 puts it 50 below (+y).
+
+    @Test
+    fun `an aim that would put the ghost over a rail turns to the nearest one that does not`() {
+        // Target at the right-hand limit. a = -60 puts the ghost to the right of it (over the rail);
+        // the nearest aim that does not is a = 0, ghost straight along the rail at (463.889, 50),
+        // a 60 degree turn; the other way round is 120.
+        val out = BallBounds.confine(onTable(target = pf(maxX, 0f), rotation = -60f))
+        assertEquals(0f, out.protractorUnit.rotationDegrees, 0.05f)
+        assertEquals(maxX, out.protractorUnit.center.x, eps)
+    }
+
+    @Test
+    fun `in a corner the ghost is turned a quarter to lie along the rail`() {
+        // Target in the corner (463.889, 952.778), aim 0 puts the ghost over the bottom rail. Allowed
+        // aims are 90..180 (ghost left or up); 90 is the nearer: ghost at (413.889, 952.778).
+        val out = BallBounds.confine(onTable(target = pf(maxX, maxY), rotation = 0f))
+        assertEquals(90f, out.protractorUnit.rotationDegrees, 0.05f)
+    }
+
+    @Test
+    fun `the aim keeps its winding when it is turned`() {
+        // 300 is -60 a full turn on; it must come back as 360, not 0.
+        val out = BallBounds.confine(onTable(target = pf(maxX, 0f), rotation = 300f))
+        assertEquals(360f, out.protractorUnit.rotationDegrees, 0.05f)
+    }
+
+    @Test
+    fun `a target dragged off the table is judged from where it ends up`() {
+        // Target clamps to (463.889, 0); then the aim as in the first ghost test.
+        val out = BallBounds.confine(onTable(target = pf(900f, 0f), rotation = -60f))
+        assertEquals(maxX, out.protractorUnit.center.x, eps)
+        assertEquals(0f, out.protractorUnit.rotationDegrees, 0.05f)
+    }
+
+    @Test
+    fun `whatever the aim, the ghost is on the table`() {
+        val targets = listOf(pf(maxX, 0f), pf(-maxX, maxY), pf(maxX, -maxY), pf(0f, maxY), pf(200f, -maxY))
+        for (target in targets) {
+            var a = -360f
+            while (a <= 360f) {
+                val out = BallBounds.confine(onTable(target = target, rotation = a))
+                val rad = Math.toRadians(out.protractorUnit.rotationDegrees.toDouble())
+                val ghostX = out.protractorUnit.center.x - 50f * Math.sin(rad).toFloat()
+                val ghostY = out.protractorUnit.center.y + 50f * Math.cos(rad).toFloat()
+                assertTrue("ghost x $ghostX at aim $a, target (${target.x}, ${target.y})", Math.abs(ghostX) <= maxX + eps)
+                assertTrue("ghost y $ghostY at aim $a, target (${target.x}, ${target.y})", Math.abs(ghostY) <= maxY + eps)
+                a += 15f
+            }
+        }
+    }
+
+    @Test
+    fun `an aim that already fits is not touched`() {
+        val state = onTable(target = pf(0f, 0f), rotation = 123f)
+        assertSame(state, BallBounds.confine(state))
+    }
+
+    @Test
+    fun `no ghost in banking mode, and massé owns its own`() {
+        val banking = onTable(target = pf(maxX, 0f), rotation = -60f, banking = true)
+        assertEquals(-60f, BallBounds.confine(banking).protractorUnit.rotationDegrees, 0f)
+        val masse = onTable(target = pf(maxX, 0f), rotation = -60f, masse = true)
+        assertEquals(-60f, BallBounds.confine(masse).protractorUnit.rotationDegrees, 0f)
     }
 }
