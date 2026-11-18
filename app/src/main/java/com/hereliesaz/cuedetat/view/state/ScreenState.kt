@@ -13,4 +13,10 @@ sealed class SingleEvent {
     data object HaterShake : SingleEvent()
     /** Opens the donation sheet. Nothing is gated; this is a tip jar. */
     data object ShowSupportSheet : SingleEvent()
+
+    /**
+     * Ask Google Play to install or update Google Play Services for AR. Needs the Activity, so
+     * MainActivity performs it (`ArController.requestArCoreInstall`).
+     */
+    data object RequestArCoreInstall : SingleEvent()
 }

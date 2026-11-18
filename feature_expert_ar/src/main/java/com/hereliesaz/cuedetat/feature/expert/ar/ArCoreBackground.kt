@@ -10,7 +10,10 @@ import java.util.concurrent.atomic.AtomicInteger
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -20,6 +23,7 @@ import androidx.lifecycle.LifecycleOwner
 import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import com.hereliesaz.cuedetat.domain.ArCoreStatus
 import com.hereliesaz.cuedetat.domain.ArTrackingMessages
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import javax.microedition.khronos.egl.EGLConfig
@@ -57,13 +61,22 @@ fun ArCoreBackground(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val glSurfaceView = remember { GLSurfaceView(context) }
+    // The view joins the hierarchy only once it has a renderer: a GLSurfaceView whose surface is
+    // created before setRenderer() dereferences its GL thread, which does not exist yet, and takes
+    // the whole app down with a NullPointerException. That was what a failed session start did.
+    var rendererSet by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
         val session = arTableSession.createSession() ?: run {
-            Log.w(TAG, "ARCore session unavailable on this device")
-            // Otherwise a black view and an "off" switch that reads on.
+            val status = arTableSession.status()
+            Log.w(TAG, "ARCore session unavailable on this device (status=$status)")
+            // Otherwise an empty view and an "off" switch that reads on.
             onEvent(MainScreenEvent.ArNotice(
-                "AR could not start. Close any other app using the camera, then turn AR off and on.",
+                when {
+                    status.needsInstall -> ArTrackingMessages.ARCORE_INSTALL_NEEDED
+                    status == ArCoreStatus.UNSUPPORTED -> ArTrackingMessages.ARCORE_UNSUPPORTED
+                    else -> "AR could not start. Close any other app using the camera, then turn AR off and on."
+                },
                 persistent = true,
             ))
             return@DisposableEffect onDispose {}
@@ -108,6 +121,7 @@ fun ArCoreBackground(
         )
         glSurfaceView.setRenderer(renderer)
         glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+        rendererSet = true
 
         // A resume that fails (the camera is held by another app) leaves a black view; say so, and
         // clear it when a later resume works.
@@ -153,7 +167,7 @@ fun ArCoreBackground(
         }
     }
 
-    AndroidView(factory = { glSurfaceView }, modifier = modifier)
+    if (rendererSet) AndroidView(factory = { glSurfaceView }, modifier = modifier)
 }
 
 // ---------------------------------------------------------------------------

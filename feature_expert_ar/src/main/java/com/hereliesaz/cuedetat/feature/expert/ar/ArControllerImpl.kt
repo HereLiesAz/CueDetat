@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.hereliesaz.cuedetat.arfeature.ArController
 import com.hereliesaz.cuedetat.arfeature.ArFeatureEntryPoint
+import com.hereliesaz.cuedetat.domain.ArCoreStatus
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.DepthCapability
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
@@ -47,6 +48,11 @@ class ArControllerImpl(context: Context) : ArController {
 
     /** Uses a throwaway probe session; never closes the live AR session (see ArTableSession.probeCapability). */
     override fun probeCapability(): DepthCapability = arTableSession.probeCapability()
+
+    override fun arCoreStatus(): ArCoreStatus = arTableSession.statusWaiting()
+
+    override fun requestArCoreInstall(activity: android.app.Activity): ArCoreStatus =
+        arTableSession.requestInstall(activity)
 
     override fun updateUiState(state: CueDetatState) {
         arFrameProcessor.updateUiState(state)

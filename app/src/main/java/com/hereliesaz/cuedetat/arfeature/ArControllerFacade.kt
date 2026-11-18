@@ -74,6 +74,10 @@ class ArControllerFacade @Inject constructor(
 
     override fun probeCapability() = delegate.probeCapability()
 
+    override fun arCoreStatus() = delegate.arCoreStatus()
+
+    override fun requestArCoreInstall(activity: android.app.Activity) = delegate.requestArCoreInstall(activity)
+
     override fun updateUiState(state: CueDetatState) = delegate.updateUiState(state)
 
     override fun setTableZOffsetLogical(tableZOffsetLogical: Float) =
