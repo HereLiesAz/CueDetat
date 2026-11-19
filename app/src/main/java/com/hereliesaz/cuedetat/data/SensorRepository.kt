@@ -7,8 +7,8 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import com.hereliesaz.cuedetat.domain.OrientationFilter
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlin.math.abs
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -38,15 +38,12 @@ class SensorRepository @Inject constructor(
         // concurrently via independent callbackFlow invocations; sharing smoothing state
         // across them meant one collector's cancellation (awaitClose) reset the other's
         // in-progress smoothing, causing a visible orientation jump.
-        var smoothedYaw: Float? = null
-        var smoothedPitch: Float? = null
-        var smoothedRoll: Float? = null
+        val filter = OrientationFilter()
 
         // Battery: register at the slow UI rate (~15Hz) by default and bump to the fast
         // GAME rate (~50Hz) only while the phone is actually being moved, dropping back
-        // once it has been still for STILL_TIMEOUT_MS. A still phone is the common case
-        // (lining up a shot), so this cuts sensor callbacks ~3x without costing
-        // responsiveness during a deliberate tilt.
+        // once it has been still for STILL_TIMEOUT_MS. The filter is a function of time, so the
+        // change of rate does not change how the orientation moves; it only changes how often.
         var currentDelay = SensorManager.SENSOR_DELAY_UI
         var lastMovementTime = 0L
         lateinit var listener: SensorEventListener
@@ -64,26 +61,14 @@ class SensorRepository @Inject constructor(
                     val rawPitch = Math.toDegrees(orientationAngles[1].toDouble()).toFloat()
                     val rawRoll = Math.toDegrees(orientationAngles[2].toDouble()).toFloat()
 
-                    // Adaptive EMA: heavy smoothing when phone is still (stabilization),
-                    // lighter smoothing when deliberately tilted (responsiveness).
-                    val deltaP = abs(rawPitch - (smoothedPitch ?: rawPitch))
-                    val deltaR = abs(angleDiff(rawRoll, smoothedRoll ?: rawRoll))
-                    val movement = maxOf(deltaP, deltaR)
-                    val alpha = when {
-                        movement > 4f -> 0.20f  // deliberate tilt
-                        movement > 1.5f -> 0.07f // moderate movement
-                        else -> 0.025f                         // near-still: maximum stabilization
-                    }
-                    // Yaw and roll both wrap at ±180° (roll does when the phone lies face down):
-                    // step along the shortest arc, or the average of 179° and -179° comes out as
-                    // 0°. Pitch from getOrientation is confined to ±90° and cannot wrap.
-                    smoothedYaw = smoothedYaw?.let { emaWrapped(it, rawYaw, alpha) } ?: rawYaw
-                    smoothedPitch = smoothedPitch?.let { (rawPitch * alpha) + (it * (1 - alpha)) } ?: rawPitch
-                    smoothedRoll = smoothedRoll?.let { emaWrapped(it, rawRoll, alpha) } ?: rawRoll
+                    // One Euro filter per axis (see OrientationFilter): heavy while nearly still,
+                    // light while turning, and yaw counts like the other two.
+                    val smoothed = filter.update(rawYaw, rawPitch, rawRoll, event.timestamp)
 
-                    // Adaptive sampling rate: speed up while moving, slow down when still.
+                    // Adaptive sampling rate: speed up while moving, slow down when still. "Moving"
+                    // is the filter's own speed estimate, which noise does not reach.
                     val now = android.os.SystemClock.elapsedRealtime()
-                    if (movement > 1.5f) lastMovementTime = now
+                    if (filter.speedDegPerSecond > MOVING_DEG_PER_SECOND) lastMovementTime = now
                     val desiredDelay =
                         if (now - lastMovementTime < STILL_TIMEOUT_MS) SensorManager.SENSOR_DELAY_GAME
                         else SensorManager.SENSOR_DELAY_UI
@@ -94,7 +79,7 @@ class SensorRepository @Inject constructor(
                     }
 
                     // Send pitch as negative to match existing convention for `pitchAngle` in state.
-                    trySend(FullOrientation(yaw = smoothedYaw!!, pitch = -smoothedPitch!!, roll = smoothedRoll!!))
+                    trySend(FullOrientation(yaw = smoothed.yaw, pitch = -smoothed.pitch, roll = smoothed.roll))
                 }
             }
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) { /* Not used */ }
@@ -113,22 +98,9 @@ class SensorRepository @Inject constructor(
     }
 
     private companion object {
-        /** Signed shortest-arc difference `a - b` in degrees, in [-180, 180]. */
-        fun angleDiff(a: Float, b: Float): Float {
-            var d = a - b
-            if (d > 180f) d -= 360f
-            if (d < -180f) d += 360f
-            return d
-        }
-
-        /** One EMA step from [prev] toward [raw] along the shortest arc, result in (-180, 180]. */
-        fun emaWrapped(prev: Float, raw: Float, alpha: Float): Float {
-            var y = prev + angleDiff(raw, prev) * alpha
-            if (y > 180f) y -= 360f
-            if (y <= -180f) y += 360f
-            return y
-        }
-
         const val STILL_TIMEOUT_MS = 1000L // drop to the slow rate after this long without movement
+
+        /** Faster than this, in degrees a second on any axis, the phone is being moved (use the fast rate). */
+        const val MOVING_DEG_PER_SECOND = 3f
     }
 }
