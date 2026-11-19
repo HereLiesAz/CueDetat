@@ -74,7 +74,7 @@ private val RAIL_ITEM_SIZE = 65.dp
 private val RAIL_STRIP_WIDTH = 85.dp
 
 private const val SHOW_GLASSES = false
-private const val SHOW_ADVISOR = false
+private const val SHOW_ADVISOR = true
 
 private fun AzNavHostScope.azRailItemLowerCase(
     id: String,
