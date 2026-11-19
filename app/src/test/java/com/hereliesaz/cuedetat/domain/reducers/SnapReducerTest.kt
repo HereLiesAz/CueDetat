@@ -96,7 +96,9 @@ class SnapReducerTest {
         val target = out.targetCvAnchor!!
         assertTrue("both anchors on (${cue.x}, ${cue.y})", cue.x != target.x || cue.y != target.y)
         // Costs [[5, 40], [1, 34]]: cue -> 5 and target -> 40 total 39, the other pairing 41.
-        assertEquals(5f, cue.x, 0f)
+        // A ball follows its detection through BallFollow: the cue's 5-unit move takes
+        // 0.25 + 0.75 * (5 - 1) / (6 - 1) = 0.85 of the way (4.25); the target's 34 units, all of it.
+        assertEquals(4.25f, cue.x, 1e-3f)
         assertEquals(40f, target.x, 0f)
     }
 }
