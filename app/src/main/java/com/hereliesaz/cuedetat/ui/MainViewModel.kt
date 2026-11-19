@@ -496,6 +496,10 @@ class MainViewModel @Inject constructor(
                 kotlin.math.abs(live.arMeasuredHeightM - event.heightAboveSurfaceM) < 0.01f
             ) return
         }
+        // The AR table matrix arrives every frame. Once the corner filter has settled it is the same
+        // matrix frame after frame (equal by value), and a reduce, a rebuild and a redraw for an
+        // unchanged table is all it would cost.
+        if (event is MainScreenEvent.ArTableMatrixUpdated && event.matrix == _uiState.value.arTableMatrix) return
         // The sensor filter's output moves a hair on every sample even on a table; only an
         // orientation that has moved enough to show is worth the reduce, the matrices and the redraw.
         if (event is MainScreenEvent.FullOrientationChanged &&
