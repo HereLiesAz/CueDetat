@@ -202,6 +202,25 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
 
 ---
 
+- **The app's logical plane crosses into the core through `ScreenPlane`: `core.x = screen.y`,
+  `core.y = screen.x`, over one scale** (`core/geometry/.../ScreenPlane.kt`; the `PointF` adapter is
+  `app/.../domain/core/TableFrame.kt`; `CoreBridge` delegates to it). Reason: the app's table is
+  portrait with its long axis on logical y and y pointing down the screen; the core's is
+  long-axis-x and right-handed. The old bridge crossed with `(x, -y)` and no swap, which left the
+  long axis on core y: harmless for the aim solver (rotation-invariant), wrong for anything that
+  uses the core `Table` (pockets, cushions), which is what the advisor needs. The swap is a proper
+  rotation once the screen's y-down is counted, so a counter-clockwise turn as seen is
+  counter-clockwise in the core, which keeps the sign of cut, throw and english meaning the same
+  (`ScreenPlaneTest`, which runs under `:core:geometry:jvmTest`). The scale has one source:
+  `TableFrameHomography` (Float, used by the AR code), widened to Double by `TableFrame`. It
+  replaced two separately declared copies.
+
+- **The advisor's balls carry identity and group** (`core/advisor/.../Balls.kt`: `TableBall`,
+  `BallGroup`, `GroupRules`). Reason: it took bare positions, which cannot say "the first ball struck
+  must be yours", so a combination could be recommended that hit the opponent's ball first.
+  Combinations are legal only between two different balls of the shooter's own group; the 8 is never
+  part of one.
+
 ## Where things actually live (correcting known-stale doc claims)
 
 - ARCore session/depth capability: `feature_expert_ar/.../ArTableSession.kt`
