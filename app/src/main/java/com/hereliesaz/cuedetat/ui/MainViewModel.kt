@@ -54,7 +54,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
-import com.hereliesaz.cuedetat.domain.advisor.toAdvisorInput
+import com.hereliesaz.cuedetat.domain.advisor.CoreShotAdvice
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.NonCancellable
@@ -75,7 +75,6 @@ class MainViewModel @Inject constructor(
     val visionAnalyzer: VisionAnalyzer,
     val metaWearableRepository: MetaWearableRepository,
     val arController: ArController,
-    private val shotAdvisor: com.hereliesaz.cuedetat.domain.advisor.ShotAdvisor,
     private val appUpdater: com.hereliesaz.cuedetat.update.AppUpdater,
     val wristWearableRepository: com.hereliesaz.cuedetat.data.WristWearableRepository,
     private val tablePoseStore: com.hereliesaz.cuedetat.data.TablePoseStore,
@@ -204,26 +203,18 @@ class MainViewModel @Inject constructor(
         }
 
         // Shot advisor driver: recompute the recommendation off-main whenever the advisor is
-        // enabled and the detected ball layout changes. The quantized key avoids recomputing on
-        // sub-pixel CV jitter; while the advisor is off the key is the constant "off", so no
-        // per-emission String is built. recommend() does not suspend, so collectLatest cannot
-        // cancel a computation already running; it only skips keys superseded before it starts.
+        // enabled and anything it reads changes (table size, group, detected and hand-placed
+        // balls). The key quantizes positions so sub-pixel CV jitter does not recompute; while the
+        // advisor is off it is the constant "off", so no per-emission String is built. The planner
+        // does not suspend, so collectLatest cannot cancel a computation already running; it only
+        // skips keys superseded before it starts.
         viewModelScope.launch(Dispatchers.Default) {
             _uiState
-                .map { s ->
-                    if (!s.isAdvisorEnabled) "off"
-                    else buildString {
-                        append(s.targetType).append('|').append(s.hasInverseMatrix).append('|')
-                        s.visionData?.balls?.forEach {
-                            append(it.type).append(it.position.x.toInt()).append(',')
-                                .append(it.position.y.toInt()).append(';')
-                        }
-                    }
-                }
+                .map { s -> if (!s.isAdvisorEnabled) "off" else CoreShotAdvice.key(s) }
                 .distinctUntilChanged()
                 .collectLatest {
                     val st = _uiState.value
-                    val shot = if (st.isAdvisorEnabled) st.toAdvisorInput()?.let { shotAdvisor.recommend(it) } else null
+                    val shot = if (st.isAdvisorEnabled) CoreShotAdvice.recommend(st) else null
                     onEvent(com.hereliesaz.cuedetat.domain.MainScreenEvent.RecommendationComputed(shot))
                 }
         }
@@ -379,9 +370,6 @@ class MainViewModel @Inject constructor(
                 isMagnifierVisible = false,
                 isTopDownViewActive = false,
                 wearableState = com.hereliesaz.cuedetat.data.WearableState(),
-                // The Advisor's rail item is hidden (AzNavRailMenu SHOW_ADVISOR); a flag saved by a
-                // build that showed it could otherwise never be turned off.
-                isAdvisorEnabled = false,
             )
             processAndEmitState(initialState, UpdateType.FULL)
         } catch (t: Throwable) {

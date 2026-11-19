@@ -52,12 +52,17 @@ and covers combination shots. Decisions taken with the owner:
   - [x] No shot is offered whose ghost ball (or a striking ball's contact position) would be off the table.
   - [x] Hand-worked layouts for each kind (`ShotPlannerTest`).
   - [ ] Not done, deliberately: 3+ ball chains, safeties, position play, speed/spin choice.
-- [ ] **3. Wiring**
-  - [ ] State -> core input: detected balls plus hand-placed ones (all "mine"), pockets (scanned ones synthesised),
-        table spec; extend the driver key (table size, placed balls, scan pockets), not just detections.
-  - [ ] Map the core result onto `RecommendedShot` so the HUD and renderer keep working.
-  - [ ] Re-enable the rail toggle and stop forcing `isAdvisorEnabled = false` at load.
-  - [ ] Decide the future of `domain/advisor/ShotAdvisor` (delete or keep behind the toggle).
+- [x] **3. Wiring** (`CoreShotAdvice`; `:app` cannot be built in the authoring environment, so CI is the first compile)
+  - [x] State -> core input: cue = detected, else hand-placed; balls = detected (group from CV against the target
+        type; unclassified are only avoided) plus hand-placed obstacle balls (all "mine"), deduplicated. The
+        protractor's target is the advisor's output, not a ball. Pockets and table come from the core table for the
+        chosen size (the same table the logical plane is built from), so scanned pocket positions add nothing.
+  - [x] Driver key covers table size, group, calibration, detections and hand-placed balls.
+  - [x] Core plan mapped onto `RecommendedShot` (HUD and renderer unchanged): path cue -> ghost -> ball -> pocket,
+        banks via the cushion, combos A -> meeting point -> B -> pocket, kicks with `approachOrigin`.
+  - [x] Rail toggle re-enabled (`SHOW_ADVISOR`), and the load no longer forces `isAdvisorEnabled = false`.
+  - [x] The old app `ShotAdvisor`, `AdvisorInputAdapter`, `AdvisorInput` and `ShotAdvisorTest` are deleted
+        (owner's call, to avoid confusion). `SpinPhysicsCalculator` stays: the spin path still uses it.
 - [ ] **4. Auto-aim**
   - [ ] New routed event (`StateReducerRoutingTest` enforces routing): set target, aim, anchors; pause on manual
         drag of the target or aim; a re-arm control.
