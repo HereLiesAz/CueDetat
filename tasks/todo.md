@@ -61,8 +61,8 @@ and covers combination shots. Decisions taken with the owner:
   - [x] Core plan mapped onto `RecommendedShot` (HUD and renderer unchanged): path cue -> ghost -> ball -> pocket,
         banks via the cushion, combos A -> meeting point -> B -> pocket, kicks with `approachOrigin`.
   - [x] Rail toggle re-enabled (`SHOW_ADVISOR`), and the load no longer forces `isAdvisorEnabled = false`.
-  - [ ] Left alone, to decide: the old app `domain/advisor/ShotAdvisor`, `AdvisorInputAdapter` and their tests are
-        now unreferenced by the app (kept; delete in a separate change if wanted).
+  - [x] The old app `ShotAdvisor`, `AdvisorInputAdapter`, `AdvisorInput` and `ShotAdvisorTest` are deleted
+        (owner's call, to avoid confusion). `SpinPhysicsCalculator` stays: the spin path still uses it.
 - [ ] **4. Auto-aim**
   - [ ] New routed event (`StateReducerRoutingTest` enforces routing): set target, aim, anchors; pause on manual
         drag of the target or aim; a re-arm control.

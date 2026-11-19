@@ -17,8 +17,8 @@ import com.hereliesaz.cuedetat.view.state.TableSize
  * The seam between the app's legacy logical plane and the metric core.
  *
  * Status: this object currently has NO callers in app/, feature_expert_ar/ or wear/.
- * The app still runs its own ShotAdvisor, homography and spin physics; migrating
- * them onto core through this bridge is tracked in REBUILD_PLAN.md.
+ * The shot advisor now runs on core (see CoreShotAdvice, via TableFrame); the homography and spin
+ * physics are still the app's own, and migrating them through this bridge is tracked in REBUILD_PLAN.md.
  *
  * ## Why a bridge rather than a rewrite
  *
