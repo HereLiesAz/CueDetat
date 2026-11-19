@@ -97,6 +97,8 @@ fun AzNavRailMenu(
     debugLogEnabled: Boolean = false,
     onToggleDebugLog: () -> Unit = {},
     onShareDebugLog: () -> Unit = {},
+    hasCrashReport: Boolean = false,
+    onClearCrashReport: () -> Unit = {},
     content: AzNavHostScope.() -> Unit = {},
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -193,6 +195,8 @@ fun AzNavRailMenu(
     val rail_debug_log_onText = stringResource(R.string.rail_debug_log_on)
     val rail_debug_log_offText = stringResource(R.string.rail_debug_log_off)
     val rail_share_debug_logText = stringResource(R.string.rail_share_debug_log)
+    val rail_share_crashText = stringResource(R.string.rail_share_crash)
+    val rail_clear_crashText = stringResource(R.string.rail_clear_crash)
     // The mode a tap is about to apply (taps cycle it, then a 1 s debounce commits), not the old one:
     // switching starts the table over, so the user must see which mode they are landing on.
     val railModeName = (uiState.pendingExperienceMode ?: uiState.experienceMode)?.name.orEmpty()
@@ -533,6 +537,12 @@ fun AzNavRailMenu(
         azMenuItem(id = "debug_log", text = if (debugLogEnabled) rail_debug_log_onText else rail_debug_log_offText, fillColor = b10B, onClick = onToggleDebugLog)
         if (debugLogEnabled) {
             azMenuItem(id = "share_debug_log", text = rail_share_debug_logText, fillColor = b10B, onClick = onShareDebugLog)
+        }
+        // The app crashed last time (CrashReport): the report is sent with the debug log, and is
+        // offered even with the log off, since the crash is what there is to send.
+        if (hasCrashReport) {
+            if (!debugLogEnabled) azMenuItem(id = "share_crash", text = rail_share_crashText, fillColor = b10B, onClick = onShareDebugLog)
+            azMenuItem(id = "clear_crash", text = rail_clear_crashText, fillColor = b10B, onClick = onClearCrashReport)
         }
 
         // Replaces the old "Billing & License" item, which shipped a tester-

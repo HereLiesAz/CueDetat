@@ -23,6 +23,7 @@ import androidx.lifecycle.LifecycleOwner
 import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import com.hereliesaz.cuedetat.data.CrashReport
 import com.hereliesaz.cuedetat.domain.ArCoreStatus
 import com.hereliesaz.cuedetat.domain.ArMatrixHold
 import com.hereliesaz.cuedetat.domain.ArTrackingMessages
@@ -68,9 +69,11 @@ fun ArCoreBackground(
     var rendererSet by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
+        CrashReport.breadcrumb("AR: creating the ARCore session")
         val session = arTableSession.createSession() ?: run {
             val status = arTableSession.status()
             Log.w(TAG, "ARCore session unavailable on this device (status=$status)")
+            CrashReport.breadcrumb("AR: session unavailable (status=$status)")
             // Otherwise an empty view and an "off" switch that reads on.
             onEvent(MainScreenEvent.ArNotice(
                 when {
@@ -84,6 +87,7 @@ fun ArCoreBackground(
         }
 
         // The session just built holds no anchors; release any lock the state still claims.
+        CrashReport.breadcrumb("AR: session created")
         onEvent(MainScreenEvent.ArSessionStarted)
 
         glSurfaceView.apply {
@@ -129,6 +133,7 @@ fun ArCoreBackground(
         var resumeFailed = false
         fun resumeSession() {
             val ok = arTableSession.resume()
+            CrashReport.breadcrumb("AR: session resume ok=$ok")
             if (!ok) {
                 resumeFailed = true
                 onEvent(MainScreenEvent.ArNotice(
@@ -197,6 +202,7 @@ private class ArCoreRenderer(
     // Session closed by a fast AR off/on, say) would end the process, not just this frame. Under
     // frameLock, as onDrawFrame is, so close() cannot interleave.
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?): Unit = synchronized(arTableSession.frameLock) {
+        CrashReport.breadcrumb("AR: GL surface created")
         try {
             background.createOnGlThread()
             trackables.createOnGlThread()
@@ -205,6 +211,10 @@ private class ArCoreRenderer(
             }
         } catch (e: Exception) {
             Log.e(TAG, "ARCore surface setup failed", e)
+            CrashReport.breadcrumb("AR: GL surface setup failed: ${e.javaClass.simpleName}")
+        } catch (e: LinkageError) {
+            Log.e(TAG, "ARCore surface setup failed", e)
+            CrashReport.breadcrumb("AR: GL surface setup failed: ${e.javaClass.simpleName}")
         }
     }
 
@@ -217,6 +227,8 @@ private class ArCoreRenderer(
             session.setDisplayGeometry(rotation, width, height)
             lastGeometryRotation = rotation
         } catch (e: Exception) {
+            Log.e(TAG, "ARCore display geometry failed", e)
+        } catch (e: LinkageError) {
             Log.e(TAG, "ARCore display geometry failed", e)
         }
     }
@@ -270,6 +282,7 @@ private class ArCoreRenderer(
                 lostNoticeShown = false
                 trackingLostSinceNanos = 0L
             }
+            if (currentTracking != previousTrackingState) CrashReport.breadcrumb("AR: tracking $currentTracking")
             previousTrackingState = currentTracking
 
             if (currentTracking != TrackingState.STOPPED) {
@@ -313,6 +326,9 @@ private class ArCoreRenderer(
                     )
                 }
             }
+        } catch (e: LinkageError) {
+            Log.e(TAG, "ARCore frame error (a class or library is missing)", e)
+            CrashReport.breadcrumb("AR: frame failed: ${e.javaClass.simpleName}")
         } catch (e: Exception) {
             Log.e(TAG, "ARCore frame error", e)
         }

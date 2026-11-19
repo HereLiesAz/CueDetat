@@ -120,6 +120,22 @@ is compiled by CI only. Core (`:core:*`) tests, the Python tests and the capture
   cue and the target to the same ball. Previously a tap also moved nothing unless a detection was
   near (it only set an anchor), and snapped to the nearest detection however far away.
 
+### Added — a crash report that needs no computer, and AR start-up guards
+
+A Galaxy A16 5G still force-closed when AR was switched on, and no stack trace could be had.
+
+- **`CrashReport`**: a crash handler that writes the stack trace, the device, the app version and the
+  last 60 things the app was doing (breadcrumbs: events, the AR load, the ARCore session, tracking
+  states) to the debug log's folder, then hands the crash on untouched. On Android 11 and later the
+  system's record of how the previous process ended is appended too, so a native crash or a memory
+  kill is at least named. The rail menu offers **Share last crash** (with the debug log's share
+  sheet; the report is sent first) and **Clear crash report**.
+- **Guards at the boundaries the audit found unguarded**: the table-scan analyzer (CameraX does not
+  catch an analyzer's exceptions), the scan view-model's coroutines, the ARCore capability probe
+  (it built a Session on the main thread and caught only `Exception`, not the `Error`s a half-installed
+  ARCore raises), the saved-scan restore, and the GL callbacks (now `LinkageError` too). Each logs and
+  carries on without AR. None of this is known to be the cause of that crash.
+
 ### Changed — camera and table stabilisation
 
 Every number below is from a synthetic signal with known truth (`tools/jitter_sweeps.py`, and the JVM

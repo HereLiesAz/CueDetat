@@ -91,6 +91,7 @@ fun ProtractorScreen(
     val captureEnabled by mainViewModel.captureEnabled.collectAsStateWithLifecycle()
     val captureNeedsConsent by mainViewModel.captureNeedsConsent.collectAsStateWithLifecycle()
     val debugLogEnabled by mainViewModel.debugLogEnabled.collectAsStateWithLifecycle()
+    val hasCrashReport by mainViewModel.hasCrashReport.collectAsStateWithLifecycle()
     val shareContext = androidx.compose.ui.platform.LocalContext.current
     val nothingLoggedText = stringResource(R.string.toast_nothing_logged)
 
@@ -103,6 +104,8 @@ fun ProtractorScreen(
         onToggleCapture = { mainViewModel.setCaptureEnabled(!captureEnabled) },
         debugLogEnabled = debugLogEnabled,
         onToggleDebugLog = { mainViewModel.setDebugLogEnabled(!debugLogEnabled) },
+        hasCrashReport = hasCrashReport,
+        onClearCrashReport = { mainViewModel.clearCrashReport() },
         onShareDebugLog = {
             val intent = mainViewModel.debugLogShareIntent()
             if (intent != null) shareContext.startActivity(intent)

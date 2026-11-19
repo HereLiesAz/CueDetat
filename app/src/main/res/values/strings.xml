@@ -220,6 +220,8 @@
     <string name="rail_debug_log_on">Debug log: on</string>
     <string name="rail_debug_log_off">Debug log: off</string>
     <string name="rail_share_debug_log">Share debug log</string>
+    <string name="rail_share_crash">Share last crash</string>
+    <string name="rail_clear_crash">Clear crash report</string>
     <string name="rail_mode">Mode: %1$s</string>
     <string name="toast_nothing_logged">Nothing logged yet.</string>
     <string name="top_table_size_change_action">Change Table Size</string>

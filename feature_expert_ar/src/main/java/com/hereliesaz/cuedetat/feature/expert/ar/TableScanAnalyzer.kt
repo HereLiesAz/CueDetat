@@ -293,9 +293,26 @@ class TableScanAnalyzer(
                     Log.w(TAG, "Strategy 2 fallback failed", e)
                 }
             }
+        } catch (e: Exception) {
+            // CameraX does not catch an analyzer's exceptions: one escaping here ends the process.
+            // A frame the converter or OpenCV cannot handle is dropped, and the next one tried.
+            logFrameFailure(e)
+        } catch (e: LinkageError) {
+            // OpenCV's native library not loaded (UnsatisfiedLinkError) or a class missing.
+            logFrameFailure(e)
         } finally {
             image.close()
             isProcessing.set(false)
+        }
+    }
+
+    private var failuresLogged = 0
+
+    /** Logs the first few failures (a failing frame repeats at camera rate) and leaves a breadcrumb. */
+    private fun logFrameFailure(e: Throwable) {
+        if (failuresLogged++ < 5) {
+            Log.e(TAG, "Dropping a frame the table-scan analyzer could not process", e)
+            com.hereliesaz.cuedetat.data.CrashReport.breadcrumb("scan analyzer dropped a frame: ${e.javaClass.simpleName}")
         }
     }
 }

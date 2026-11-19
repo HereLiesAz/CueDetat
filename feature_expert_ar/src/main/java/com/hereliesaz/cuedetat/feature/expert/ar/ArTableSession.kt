@@ -560,7 +560,8 @@ class ArTableSession(
     fun probeCapability(): DepthCapability {
         if (!isArCoreAvailable()) return DepthCapability.NONE
         if (session != null) return capability
-        val probe = try { Session(context) } catch (_: Exception) { return DepthCapability.NONE }
+        // A half-installed ARCore raises Errors (UnsatisfiedLinkError, NoClassDefFoundError), not just Exceptions.
+        val probe = try { Session(context) } catch (_: Exception) { return DepthCapability.NONE } catch (_: LinkageError) { return DepthCapability.NONE }
         return try {
             if (probe.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) DepthCapability.DEPTH_API
             else DepthCapability.WORLD_TRACKING

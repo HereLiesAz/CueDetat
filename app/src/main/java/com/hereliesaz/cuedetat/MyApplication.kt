@@ -24,6 +24,10 @@ class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // First, so anything below that dies is recorded (see CrashReport).
+        com.hereliesaz.cuedetat.data.CrashReport.install(this)
+        com.hereliesaz.cuedetat.data.CrashReport.breadcrumb("process started")
+
         // The AEADBadTagException workaround (clearing the Meta SDK's encrypted
         // storage files when the KeyStore falls out of sync with them) now lives
         // in PlayMetaWearableRepository.initialize(), gated on that specific
