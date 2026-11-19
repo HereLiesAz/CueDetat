@@ -120,7 +120,27 @@ is compiled by CI only. Core (`:core:*`) tests, the Python tests and the capture
   cue and the target to the same ball. Previously a tap also moved nothing unless a detection was
   near (it only set an anchor), and snapped to the nearest detection however far away.
 
-### Changed — AR table jitter
+### Changed — camera and table stabilisation
+
+Every number below is from a synthetic signal with known truth (`tools/jitter_sweeps.py`, and the JVM
+tests); none of it has been felt on a device. Real sensor and tracking noise is not white.
+
+- **Gates before the pipeline** (`OrientationGate`, `ArMatrixHold`, `BallFollow`,
+  `CoreShotAdvice.Signature`, an equal-matrix drop in `processEvent`): a sensor orientation within
+  0.03 degrees of the last applied, an AR matrix equal to the current one, and a detection within a
+  unit of a ball's place no longer run the reducers, the matrices, the aim and a redraw; a table
+  matrix missing for up to 250 ms while the camera tracks is held instead of blinking; the advisor
+  recomputes on a 2-unit move with a one-to-one match by ball kind, not on a whole-unit rounding flip.
+- **Sensor filter is time-based** (`OrientationFilter`, one-euro per axis): the same motion lags the
+  same at 16 and 50 Hz; a yaw-only turn no longer drags; rest noise is smoothed to a tenth or less.
+- **AR corner filter**: one speed for the four corners, a 12 px/s noise floor, a 0.15 px hold, and a
+  repeated frame timestamp is no longer a restart. At 30 fps: 0.22 px left at rest (was 0.36), 4 px
+  onset lag at 1000 px/s (was 12.5), 2.7 px steady (was 6.4); a 30 px/s creep lags 2.1 px (was 1.7).
+- **Table pull** (`TableSnapPolicy.TablePull`): the fit is averaged, the pull starts and stops at
+  different thresholds, shares follow time. Same settle time, 0.62 px of wander for 0.80, and a step on
+  38% of fits for 75%.
+
+### Changed — AR table jitter (earlier)
 
 - **The table's projected corners are smoothed (`ScreenCornerSmoother`, a One Euro filter).**
   Tracking noise at rest is filtered hard; real motion (walking, panning, resizing) barely at all,

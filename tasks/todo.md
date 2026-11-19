@@ -112,14 +112,17 @@ checked against the source on 11/19/2026.
       16 and 50 Hz (lag at 5, 20, 60 deg/s identical to 0.1 deg), yaw has its own speed (a yaw-only turn at
       20 deg/s lagged ~50 degrees after ten seconds; now under 1), rest noise 0.05 -> ~0.006 degrees, step
       settles in ~60 ms, the rate switch follows its own speed estimate (noise reads under 1.1 deg/s against a
-      3 deg/s threshold). Constants: min cutoff 0.1 Hz, beta 0.25, max 8 Hz; beta chosen on a sweep (lag at
+      3 deg/s threshold). **Not done:** the listener is still unregistered and registered again at the rate
+      switch (a short gap in samples; the filter takes `dt` so it is harmless to the output, but it is not gone). Constants: min cutoff 0.1 Hz, beta 0.25, max 8 Hz; beta chosen on a sweep (lag at
       5 deg/s halves from 1.3 to 0.6 degrees, rest noise unchanged).
 - [x] **3. AR corner filter** (`ScreenCornerSmoother`): one speed (so one cutoff) for the quad, a 20 px/s noise
       floor so a still camera really gets the minimum cutoff, a 0.15 px hold on the published quad, and an
       unchanged matrix is dropped before the reducers. **Correction to the survey:** it called the old onset
-      lag "over 100 px"; measured on a synthetic 30 fps quad it was 12.5 px at 1000 px/s. The real fault was
-      the speed estimate leaking its own noise (rest residual 0.37 px for 1 px in; now 0.21), so the change is
-      a noise-floor gate, not a retune; lag also halves (6 px onset, 3 px steady). Not done: the 150 px
+      lag "over 100 px"; measured on a synthetic 30 fps quad it was 12.5 px at 1000 px/s. The real faults were
+      the speed estimate leaking its own noise (rest residual 0.36 px for 1 px in) and being the filter's lag
+      over dt, which reads the same motion differently at each frame rate (found by an independent review;
+      now the raw corner's change). Now 0.22 px at rest, 4 px onset lag, 2.7 px steady, 2.1 px on a slow creep
+      (was 1.7), the same lag at 15 to 120 fps. A repeated frame timestamp no longer restarts the filter. Not done: the 150 px
       restart threshold (a snap to the raw position loses only the few pixels of lag).
 - [x] **4. Non-AR fit loop**: `TableSnapPolicy.TablePull` (replaces `pullStep`): the fit pose is averaged
       before the table moves toward it, the pull starts at 1.5 px / 0.3 deg and stops at 0.5 px / 0.1 deg, and

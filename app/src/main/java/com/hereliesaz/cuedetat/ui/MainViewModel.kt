@@ -103,6 +103,9 @@ class MainViewModel @Inject constructor(
     val updateInfo: kotlinx.coroutines.flow.StateFlow<com.hereliesaz.cuedetat.update.UpdateInfo?> =
         _updateInfo.asStateFlow()
 
+    // Declared before any init block starts the event loop, which reaches it from another thread.
+    private val tablePull = com.hereliesaz.cuedetat.domain.TableSnapPolicy.TablePull()
+
     init {
         // Before anything else can fail: a debug log that starts late misses the failure.
         debugLogRecorder.resumeIfEnabled()
@@ -740,7 +743,6 @@ class MainViewModel @Inject constructor(
     // --- Table snap and pose memory (see TableSnapPolicy, TablePosePrior) --------------------
 
     private var lastUserTableAdjustMs = 0L
-    private val tablePull = com.hereliesaz.cuedetat.domain.TableSnapPolicy.TablePull()
     private var lastPoseRecordMs = 0L
     @Volatile private var cachedLocation: Pair<Double, Double>? = null
     @Volatile private var locationSamples: List<com.hereliesaz.cuedetat.domain.TablePoseSample>? = null

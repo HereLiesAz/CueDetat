@@ -89,14 +89,23 @@ object TableSnapPolicy {
                 release()
                 return null
             }
+            // A pose that is not a number (a degenerate fit) must not become the target, or every
+            // later blend with it would be one too.
+            if (!isUsable(fit) || !isUsable(current)) {
+                release()
+                return null
+            }
             val gap = nowMs - lastFitMs
             val previous = target
-            val dt = if (previous == null || lastFitMs == 0L || gap <= 0L || gap > MAX_FIT_GAP_MS) {
-                REFERENCE_INTERVAL_MS
-            } else gap
+            // The clock is wall time and can step back: a fit at or before the last one is skipped.
+            if (previous != null && lastFitMs != 0L && gap <= 0L) return null
+            val stale = previous == null || lastFitMs == 0L || gap > MAX_FIT_GAP_MS
+            // After a gap the pull was not running: no leftover "engaged", the enter threshold applies again.
+            if (stale) engaged = false
+            val dt = if (stale) REFERENCE_INTERVAL_MS else gap
             lastFitMs = nowMs
 
-            val smoothed = if (previous == null || gap > MAX_FIT_GAP_MS) fit else blend(previous, fit, share(TARGET_ALPHA, dt))
+            val smoothed = if (stale || previous == null) fit else blend(previous, fit, share(TARGET_ALPHA, dt))
             target = smoothed
 
             val dRot = TableOrientationLearner.normalize180(smoothed.rotationDeg - current.rotationDeg)
@@ -125,6 +134,9 @@ object TableSnapPolicy {
                 current.zoom * Math.pow(dz.toDouble(), a.toDouble()).toFloat(),
             )
         }
+
+        private fun isUsable(p: Pose) =
+            p.offsetX.isFinite() && p.offsetY.isFinite() && p.rotationDeg.isFinite() && p.zoom.isFinite() && p.zoom > 0f
 
         /** [from] moved the share [a] of the way to [to]: offsets linearly, rotation the short way, zoom as a ratio. */
         private fun blend(from: Pose, to: Pose, a: Float) = Pose(

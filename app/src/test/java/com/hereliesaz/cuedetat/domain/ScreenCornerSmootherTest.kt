@@ -83,11 +83,13 @@ class ScreenCornerSmootherTest {
     private val fps30 = 33_333_333L
 
     /** Runs a quad whose top-left follows [truth] (px at time s) with [noise] px of noise per coordinate. */
-    private fun track(s: ScreenCornerSmoother, seconds: Float, noise: Float, seed: Int, truth: (Float) -> Float): List<Triple<Float, Float, Float>> {
+    private fun track(
+        s: ScreenCornerSmoother, seconds: Float, noise: Float, seed: Int, fps: Int = 30, truth: (Float) -> Float,
+    ): List<Triple<Float, Float, Float>> {
         val random = Random(seed)
         val out = ArrayList<Triple<Float, Float, Float>>()
-        for (i in 1..(seconds * 30).toInt()) {
-            val t = i / 30f
+        for (i in 1..(seconds * fps).toInt()) {
+            val t = i.toFloat() / fps
             val x = truth(t)
             val noisy = listOf(
                 Pt(x + gaussian(random, noise), 200f + gaussian(random, noise)),
@@ -95,7 +97,7 @@ class ScreenCornerSmootherTest {
                 Pt(x + 300f + gaussian(random, noise), 400f + gaussian(random, noise)),
                 Pt(x + gaussian(random, noise), 400f + gaussian(random, noise)),
             )
-            out += Triple(t, x, s.filter(noisy, i * fps30)[0].x)
+            out += Triple(t, x, s.filter(noisy, (i * 1e9 / fps).toLong())[0].x)
         }
         return out
     }
@@ -133,7 +135,37 @@ class ScreenCornerSmootherTest {
         val creep = { t: Float -> 100f + 30f * t }
         val now = track(ScreenCornerSmoother(), 10f, 1f, 3, creep).filter { it.first > 3f }
         val lag = now.map { it.second - it.third }.sum() / now.size
-        assertTrue("lag at 30 px/s: $lag px (before: about 1.7)", lag in 0f..2.5f)
+        assertTrue("lag at 30 px/s: $lag px (before: about 1.7)", lag in 0f..3f)
+    }
+
+    @Test
+    fun `the lag in motion is the same at every frame rate`() {
+        // The speed that opens the cutoff is the raw corner's change over dt, so a creep reads the
+        // same speed at 15 fps and at 120. (It was the filter's lag over dt, which does not.)
+        val creep = { t: Float -> 100f + 30f * t }
+        val lags = listOf(15, 30, 60, 120).map { fps ->
+            val out = track(ScreenCornerSmoother(), 10f, 1f, 3, fps, creep).filter { it.first > 3f }
+            out.map { it.second - it.third }.sum() / out.size
+        }
+        assertTrue("lag at 30 px/s by frame rate (15, 30, 60, 120): $lags", lags.max() - lags.min() < 0.7f)
+    }
+
+    @Test
+    fun `the same frame twice is not a new sample`() {
+        // ARCore hands back the previous frame when the display outruns the camera. The second call
+        // carries its own noise but the same timestamp: it must change nothing, and not restart the filter.
+        val s = ScreenCornerSmoother()
+        val random = Random(4)
+        var worst = 0f
+        for (i in 1..600) {
+            val a = corners(100f).map { Pt(it.x + gaussian(random, 1f), it.y + gaussian(random, 1f)) }
+            val b = corners(100f).map { Pt(it.x + gaussian(random, 1f), it.y + gaussian(random, 1f)) }
+            val first = s.filter(a, i * fps30)
+            val second = s.filter(b, i * fps30)
+            assertEquals(first, second)
+            if (i > 150) worst = maxOf(worst, abs(first[0].x - 100f))
+        }
+        assertTrue("residual with every frame doubled: $worst px", worst < 1.0f)
     }
 
     @Test

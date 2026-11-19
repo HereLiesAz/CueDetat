@@ -48,6 +48,12 @@ class OrientationFilter(
         var started = false
     }
 
+    init {
+        require(minCutoffHz > 0f && maxCutoffHz >= minCutoffHz && derivativeCutoffHz > 0f && beta >= 0f) {
+            "cutoffs must be positive and ordered"
+        }
+    }
+
     private val yaw = Axis(wraps = true)
     private val pitch = Axis(wraps = false)
     private val roll = Axis(wraps = true)
@@ -64,14 +70,13 @@ class OrientationFilter(
             roll = step(roll, rawRoll, timestampNanos),
         )
 
-    /** Forget everything: the next sample starts the filter again. */
-    fun reset() {
-        for (axis in listOf(yaw, pitch, roll)) axis.started = false
-    }
-
     private fun step(axis: Axis, raw: Float, nanos: Long): Float {
+        // A reading that is not a number is no reading: keep what we have rather than lodge it forever.
+        if (!raw.isFinite()) return if (axis.started) axis.value else 0f
         val dt = (nanos - axis.lastNanos) / 1e9f
-        if (!axis.started || dt <= 0f || dt > RESTART_AFTER_SECONDS) {
+        // The same timestamp twice (or one out of order) is not a new sample: change nothing.
+        if (axis.started && dt <= 0f) return axis.value
+        if (!axis.started || dt > RESTART_AFTER_SECONDS) {
             axis.started = true
             axis.value = raw
             axis.previousRaw = raw
@@ -94,8 +99,9 @@ class OrientationFilter(
     private fun difference(axis: Axis, a: Float, b: Float): Float {
         var d = a - b
         if (axis.wraps) {
-            while (d > 180f) d -= 360f
-            while (d < -180f) d += 360f
+            d %= 360f
+            if (d > 180f) d -= 360f
+            if (d < -180f) d += 360f
         }
         return d
     }

@@ -17,7 +17,7 @@ import kotlin.math.hypot
  * **What changed from the per-coordinate filter.** The speed that opens the cutoff was estimated from
  * the noisy frame-to-frame difference, so at rest the estimate itself was a few tens of pixels a
  * second of pure noise, which opened the cutoff to about 1.4 Hz and let a third of the noise through
- * (0.37 px for 1 px in). Now:
+ * (0.36 px for 1 px in). Now:
  *  - One speed for the whole quad (the mean of the four corners'), and so one cutoff: the four
  *    corners are filtered alike and the table keeps its shape, where eight independent cutoffs
  *    could pull a corner ahead of its neighbours.
@@ -28,9 +28,12 @@ import kotlin.math.hypot
  *    The homography built from it is then equal frame to frame, and the pipeline downstream can see
  *    that nothing moved.
  *
- * Measured on a synthetic quad at 30 fps with 1 px of noise per coordinate: still, 0.21 px residual
- * against 0.37 before; onset of a 1000 px/s pan, 6 px worst lag against 12.5; steady lag at 1000 px/s,
- * 3 px against 6.4; a 30 px/s creep, 1.6 px against 1.7.
+ * Measured on a synthetic quad at 30 fps with 1 px of noise per coordinate (`tools/jitter_sweeps.py`),
+ * against the filter this replaced: still, 0.22 px residual against 0.36; onset of a 1000 px/s pan, 4 px
+ * worst lag against 12.5; steady lag at 1000 px/s, 2.7 px against 6.4; a 30 px/s creep, 2.1 px against
+ * 1.7 (the one place it is slightly slower). The lag in motion is the same at 15, 30, 60 and 120 fps;
+ * the residual at rest falls with the frame rate (0.33 at 15 fps, 0.14 at 120), as it must, because
+ * more samples of white noise are averaged in the same time.
  *
  * Pure Kotlin; no Android types, runs in plain JUnit. Not thread-safe: one owner (the GL thread).
  *
@@ -46,9 +49,9 @@ import kotlin.math.hypot
  */
 class ScreenCornerSmoother(
     private val minCutoffHz: Float = 0.4f,
-    private val beta: Float = 0.05f,
+    private val beta: Float = 0.1f,
     private val derivativeCutoffHz: Float = 1.5f,
-    private val noiseFloorPxPerSec: Float = 20f,
+    private val noiseFloorPxPerSec: Float = 12f,
     private val holdPx: Float = 0.15f,
     private val maxCutoffHz: Float = 60f,
     private val jumpPx: Float = 150f,
@@ -56,6 +59,7 @@ class ScreenCornerSmoother(
     private var lastNanos = 0L
     private var x = FloatArray(0)
     private var dx = FloatArray(0)
+    private var previousRaw = FloatArray(0)
     private var published: List<Pt> = emptyList()
 
     /** Forget the history; the next [filter] passes its input through. */
@@ -63,6 +67,7 @@ class ScreenCornerSmoother(
         lastNanos = 0L
         x = FloatArray(0)
         dx = FloatArray(0)
+        previousRaw = FloatArray(0)
         published = emptyList()
     }
 
@@ -70,13 +75,17 @@ class ScreenCornerSmoother(
     fun filter(corners: List<Pt>, nowNanos: Long): List<Pt> {
         val n = corners.size * 2
         val dt = (nowNanos - lastNanos) / 1e9f
-        val restart = x.size != n || lastNanos == 0L || dt <= 0f || dt > 0.5f ||
+        // The same frame again (ARCore hands one back when the display runs faster than the camera) is
+        // not a new sample: nothing moved, and restarting here would publish its raw noise every other call.
+        if (x.size == n && lastNanos != 0L && dt <= 0f) return published
+        val restart = x.size != n || lastNanos == 0L || dt > 0.5f ||
             corners.indices.any { i ->
                 abs(corners[i].x - x[i * 2]) > jumpPx || abs(corners[i].y - x[i * 2 + 1]) > jumpPx
             }
         lastNanos = nowNanos
         if (restart) {
             x = FloatArray(n) { corners[it / 2].let { p -> if (it % 2 == 0) p.x else p.y } }
+            previousRaw = x.copyOf()
             dx = FloatArray(n)
             published = corners
             return corners
@@ -85,7 +94,11 @@ class ScreenCornerSmoother(
         val dAlpha = alpha(derivativeCutoffHz, dt)
         for (i in 0 until n) {
             val value = if (i % 2 == 0) corners[i / 2].x else corners[i / 2].y
-            dx[i] += dAlpha * ((value - x[i]) / dt - dx[i])
+            // Speed is the frame-to-frame change of the *raw* corner. (It used to be the filter's lag
+            // over dt, which is a different number at every frame rate: the same creep read faster at
+            // 15 fps than at 120, and the noise floor meant something different on each.)
+            dx[i] += dAlpha * ((value - previousRaw[i]) / dt - dx[i])
+            previousRaw[i] = value
         }
 
         // One speed, and so one cutoff, for the whole quad.

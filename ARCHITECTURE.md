@@ -247,7 +247,9 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   `CoreShotAdvice.Signature`). Reason: the sensor filter, the AR corner filter and the table fit each smooth
   their own signal, but nothing decided whether a *tiny* change was worth the reduce, the matrix rebuild, the
   aim recompute and the redraw, so a phone on a table ran the whole pipeline on every sample. Each gate is a
-  pure class with its constant derived in its KDoc and tested against synthetic noise. The advisor compares
+  pure class with its constant derived in its KDoc and tested against synthetic noise, except the
+  equal-matrix drop in `MainViewModel.processEvent`, which is one line (it relies on
+  `android.graphics.Matrix.equals` comparing by value) and is not unit-tested. The advisor compares
   ball positions by distance against the last signature it acted on, not by rounding onto a grid, which flips
   its answer when a ball sits on a cell edge.
 
@@ -256,7 +258,11 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   filter at 16 and 50 Hz, and yaw never counted), and the table pull's share was per fit. A filter whose
   constants are per event changes character with the event rate; these take `dt` and are tested at two
   rates. Each constant's effect is stated in its KDoc and was chosen on a measured sweep (jitter at rest,
-  lag in motion), not by feel; no device was available, so the *feel* of all three is still unchecked.
+  lag in motion), not by feel (`tools/jitter_sweeps.py` reproduces the numbers); no device was available,
+  so the *feel* of all three is still unchecked. What is rate-invariant is the lag in motion; the residual
+  noise at rest falls with the frame rate, because more samples of white noise are averaged in the same time.
+  `ScreenCornerSmoother` estimates speed from the *raw* corner's change, not from the filter's lag over dt
+  (which read the same motion differently at every frame rate).
 
 ## Where things actually live (correcting known-stale doc claims)
 

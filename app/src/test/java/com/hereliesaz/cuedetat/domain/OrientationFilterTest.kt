@@ -139,14 +139,43 @@ class OrientationFilterTest {
     }
 
     @Test
-    fun `reset starts again from the next sample`() {
+    fun `the same timestamp twice is not a new sample`() {
         val filter = OrientationFilter()
-        filter.update(10f, 10f, 10f, 0L)
-        filter.reset()
-        val out = filter.update(-90f, 40f, 5f, 20_000_000L)
-        assertEquals(-90f, out.yaw, 0f)
-        assertEquals(40f, out.pitch, 0f)
-        assertEquals(5f, out.roll, 0f)
+        val random = Random(2)
+        var worst = 0f
+        for (i in 0 until 50 * 60) {
+            val nanos = (i * 1e9 / 50).toLong()
+            val first = filter.update(0f, 30f + gaussian(random, 0.05f), 0f, nanos).pitch
+            val again = filter.update(0f, 30f + gaussian(random, 0.05f), 0f, nanos).pitch
+            assertEquals(first, again, 0f)
+            if (i > 500) worst = maxOf(worst, abs(first - 30f))
+        }
+        assertTrue("residual with every sample doubled: $worst degrees", worst < 0.05f)
+    }
+
+    @Test
+    fun `a reading that is not a number is ignored, not kept`() {
+        val filter = OrientationFilter()
+        filter.update(10f, 20f, 30f, 0L)
+        val bad = filter.update(Float.NaN, Float.POSITIVE_INFINITY, Float.NaN, 20_000_000L)
+        assertEquals(10f, bad.yaw, 0f)
+        assertEquals(20f, bad.pitch, 0f)
+        assertEquals(30f, bad.roll, 0f)
+        // And the next good one carries on as if it had not happened.
+        val good = filter.update(10f, 20f, 30f, 40_000_000L)
+        assertEquals(20f, good.pitch, 1e-3f)
+    }
+
+    @Test
+    fun `cutoffs that would freeze the filter are refused`() {
+        for (build in listOf<() -> Unit>(
+            { OrientationFilter(minCutoffHz = 0f) },
+            { OrientationFilter(minCutoffHz = 2f, maxCutoffHz = 1f) },
+            { OrientationFilter(derivativeCutoffHz = 0f) },
+        )) {
+            val refused = try { build(); false } catch (e: IllegalArgumentException) { true }
+            assertTrue(refused)
+        }
     }
 
     /** Signed shortest-arc difference `a - b`, in degrees. */

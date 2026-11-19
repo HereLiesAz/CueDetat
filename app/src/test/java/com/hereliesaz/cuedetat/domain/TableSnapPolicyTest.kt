@@ -108,6 +108,36 @@ class TableSnapPolicyTest {
         assertTrue("settles in about four seconds: $onTime", onTime in 3f..6f)
     }
 
+    @Test
+    fun `a pose that is not a number is never the target`() {
+        val pull = TablePull()
+        assertNull(pull.step(offset(0f), Pose(Float.NaN, 0f, 0f, 1f), 0.95f, quiet, 1_000L))
+        assertNull(pull.step(offset(0f), Pose(0f, 0f, 0f, Float.POSITIVE_INFINITY), 0.95f, quiet, 1_300L))
+        assertNull(pull.step(offset(0f), Pose(0f, 0f, 0f, 0f), 0.95f, quiet, 1_600L))
+        // The next good fit is taken afresh, not blended with anything the bad ones left behind.
+        val p = pull.step(offset(0f), offset(20f), 0.95f, quiet, 1_900L)!!
+        assertEquals(3f, p.offsetX, 1e-3f)
+        // A current pose that is not a number is refused the same way.
+        assertNull(pull.step(Pose(Float.NaN, 0f, 0f, 1f), offset(20f), 0.95f, quiet, 2_200L))
+    }
+
+    @Test
+    fun `after a long gap the pull starts again from its enter threshold`() {
+        val pull = TablePull()
+        assertNotNull(pull.step(offset(0f), offset(10f), 0.95f, quiet, 1_000L)) // engaged
+        // Three seconds on, 1.0 px off: between exit and enter. Still engaged it would step; after a gap it must not.
+        assertNull(pull.step(offset(9f), offset(10f), 0.95f, quiet, 4_000L))
+    }
+
+    @Test
+    fun `a fit stamped at or before the last one is skipped, whatever the clock did`() {
+        val pull = TablePull()
+        assertNotNull(pull.step(offset(0f), offset(50f), 0.95f, quiet, 5_000L))
+        assertNull(pull.step(offset(7f), offset(50f), 0.95f, quiet, 4_000L)) // the clock stepped back
+        assertNull(pull.step(offset(7f), offset(50f), 0.95f, quiet, 5_000L)) // the same instant
+        assertNotNull(pull.step(offset(7f), offset(50f), 0.95f, quiet, 5_300L))
+    }
+
     private fun gaussian(random: Random, sigma: Float): Float {
         val u1 = random.nextDouble().coerceAtLeast(1e-12)
         return (sqrt(-2.0 * ln(u1)) * cos(2.0 * PI * random.nextDouble())).toFloat() * sigma
