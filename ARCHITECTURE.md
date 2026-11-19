@@ -221,6 +221,18 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   Combinations are legal only between two different balls of the shooter's own group; the 8 is never
   part of one.
 
+- **`ShotPlanner` plans banks, kicks and legal combinations in the core; its probability is one model
+  (`PrecisionModel`) shared with the direct-pot advisor** (`core/advisor/.../ShotPlanner.kt`,
+  `PrecisionModel.kt`). Reason: the app's advisor scored each kind with its own hand-tuned confidence
+  constant (`BANK_CONF = 0.55`, `KICK_CONF`, `COMBO_CONF`), which the rebuild had already called out as
+  numbers nothing was calibrated against. Here a chain of contacts multiplies the precision demanded of
+  the cue (distance over a ball diameter, and one over the cosine of the cut, at each), so a combination
+  falls out of the same arithmetic as a direct pot, and a cushion costs a stated factor
+  (`PrecisionModel.CUSHION_PRECISION`, an uncalibrated placeholder, as is the 0.6 degree aiming spread).
+  Banks and kicks use the pure mirror law on the cushion centre line, so they assume no english on the
+  rebound and a medium pace. Every shot's ghost ball must be wholly on the table, matching the
+  `BallBounds` invariant on the app side.
+
 ## Where things actually live (correcting known-stale doc claims)
 
 - ARCore session/depth capability: `feature_expert_ar/.../ArTableSession.kt`

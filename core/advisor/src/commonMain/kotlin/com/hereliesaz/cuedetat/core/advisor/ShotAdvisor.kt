@@ -12,9 +12,6 @@ import com.hereliesaz.cuedetat.core.units.Angle
 import com.hereliesaz.cuedetat.core.units.Length
 import com.hereliesaz.cuedetat.core.units.Speed
 import com.hereliesaz.cuedetat.core.units.degrees
-import kotlin.math.abs
-import kotlin.math.exp
-import kotlin.math.sqrt
 
 /**
  * Ranks the available shots.
@@ -103,7 +100,7 @@ class ShotAdvisor(
         )
     }
 
-    private fun evaluate(
+    internal fun evaluate(
         cueBall: Vec2,
         objectBall: Vec2,
         pocket: Pocket,
@@ -151,13 +148,8 @@ class ShotAdvisor(
     }
 
     /**
-     * Probability that a shot of this geometry is made.
-     *
-     * The *structure* is derived — the pocket's angular acceptance divided by
-     * the aiming error the geometry amplifies, run through a normal distribution
-     * — but the inputs [aimingSigma] and the thin-cut cap (`cos(cut) ≥ 0.08`,
-     * i.e. at most a 12.5× penalty, reached near 85°) are uncalibrated
-     * placeholders, so the output is a model probability, not a measured one.
+     * Probability that a direct pot of this geometry is made: [PrecisionModel] with one contact. See it
+     * for what is derived and what is an uncalibrated placeholder.
      */
     internal fun makeProbability(
         pocket: Pocket,
@@ -165,41 +157,13 @@ class ShotAdvisor(
         objectToPocket: Length,
         cueToObject: Length,
         cutAngle: Angle,
-    ): Double {
-        val effective = pocket.effectiveWidth(approach)
-        val clearance = effective.meters - ball.diameter.meters
-        if (clearance <= 0.0) return 0.0
-
-        // Angular spread of object-ball directions the pocket still accepts.
-        val acceptance = clearance / (2.0 * objectToPocket.meters)
-
-        // A lateral error `e` at the contact point swings the object ball by
-        // e/(2R). The cue ball's aim error becomes a lateral error proportional
-        // to how far it has to travel, so precision demand grows with distance.
-        val amplification = cueToObject.meters / (2.0 * ball.radius.meters)
-
-        // Thin cuts also need more precision, because the contact point sweeps
-        // faster across the object ball's face as the cut angle opens.
-        val thinCutPenalty = 1.0 / kotlin.math.cos(cutAngle.radians).coerceAtLeast(0.08)
-
-        val requiredPrecision = acceptance / (amplification * thinCutPenalty)
-        return normalCdfTwoSided(requiredPrecision / aimingSigma.radians)
-    }
-
-    /** `P(|Z| < z)` for a standard normal — the fraction of attempts that land. */
-    private fun normalCdfTwoSided(z: Double): Double {
-        if (z <= 0.0) return 0.0
-        return erf(z / sqrt(2.0)).coerceIn(0.0, 1.0)
-    }
-
-    /** Abramowitz & Stegun 7.1.26. Max absolute error 1.5e-7. */
-    private fun erf(x: Double): Double {
-        val sign = if (x < 0) -1.0 else 1.0
-        val a = abs(x)
-        val t = 1.0 / (1.0 + 0.3275911 * a)
-        val y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * exp(-a * a)
-        return sign * y
-    }
+    ): Double = PrecisionModel.makeProbability(
+        ball = ball,
+        aimingSigma = aimingSigma,
+        pocketEffectiveWidth = pocket.effectiveWidth(approach),
+        finalPathLength = objectToPocket,
+        legs = listOf(PrecisionModel.Leg(cueToObject, cutAngle)),
+    )
 
     /** Below this the advisor declines to recommend anything at all. Uncalibrated default. */
     var minimumProbability: Double = 0.10
