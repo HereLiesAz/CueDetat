@@ -146,14 +146,15 @@ fun stateReducer(
         is MainScreenEvent.CancelArSetup,
         is MainScreenEvent.TurnCameraOff,
         is MainScreenEvent.SetCameraMode,
-        is MainScreenEvent.ToggleTargetType, is MainScreenEvent.ToggleAdvisor,
+        is MainScreenEvent.ToggleTargetType, is MainScreenEvent.ToggleAdvisor, is MainScreenEvent.ResumeAutoAim,
         is MainScreenEvent.ToggleTopDownView, is MainScreenEvent.ClearTopDownView,
         is MainScreenEvent.SetTopDownBitmap,
         is MainScreenEvent.StartArTracking ->
             reduceToggleAction(currentState, action, reducerUtils)
 
+        // A new recommendation also becomes the aim while the advisor has it (see AutoAim).
         is MainScreenEvent.RecommendationComputed ->
-            currentState.copy(recommendedShot = action.shot)
+            com.hereliesaz.cuedetat.domain.advisor.AutoAim.apply(currentState.copy(recommendedShot = action.shot))
 
 
         // Events handled outside the reducer (MainViewModel intercepts) land here unchanged.

@@ -7,6 +7,7 @@ import android.graphics.Matrix
 import android.graphics.PointF
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.cuedetat.domain.MassePhysicsSimulator
+import com.hereliesaz.cuedetat.domain.advisor.AutoAim
 import com.hereliesaz.cuedetat.domain.SpinPhysicsCalculator
 import com.hereliesaz.cuedetat.ui.ZoomMapping
 import com.hereliesaz.cuedetat.view.renderer.util.SpinColorUtils
@@ -325,8 +326,12 @@ class UpdateStateUseCase @Inject constructor(
 
         val logicalShotLineAnchor = getLogicalShotLineAnchor(state) ?: return state
 
+        // The limit assumes shots run up the screen. A shot the advisor chose may run any way the
+        // cue ball and the pocket lie, so it is not held to it (see AutoAim.drives); a shot the
+        // user aims still is.
         val isTiltBeyondLimit =
-            !state.isBankingMode && logicalShotLineAnchor.y <= state.protractorUnit.ghostCueBallCenter.y
+            !state.isBankingMode && !AutoAim.drives(state) &&
+                logicalShotLineAnchor.y <= state.protractorUnit.ghostCueBallCenter.y
 
         val (isGeometricallyImpossible, tangentDirection) = calculateShotPossibilityAndTangent(
             shotAnchor = logicalShotLineAnchor,

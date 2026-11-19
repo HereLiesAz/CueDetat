@@ -63,12 +63,23 @@ and covers combination shots. Decisions taken with the owner:
   - [x] Rail toggle re-enabled (`SHOW_ADVISOR`), and the load no longer forces `isAdvisorEnabled = false`.
   - [x] The old app `ShotAdvisor`, `AdvisorInputAdapter`, `AdvisorInput` and `ShotAdvisorTest` are deleted
         (owner's call, to avoid confusion). `SpinPhysicsCalculator` stays: the spin path still uses it.
-- [ ] **4. Auto-aim**
-  - [ ] New routed event (`StateReducerRoutingTest` enforces routing): set target, aim, anchors; pause on manual
-        drag of the target or aim; a re-arm control.
-  - [ ] Advisor rejects shots whose ghost would sit off the table (so `BallBounds.confine` never has to move the
-        chosen aim). A combo targets ball A; the A -> B -> pocket leg is drawn from the recommendation.
-  - [ ] Review `isTiltBeyondLimit` (assumes up-screen shots).
+- [x] **4. Auto-aim** (`AutoAim`; first compiled by CI, like phase 3)
+  - [x] A new recommendation becomes the aim: target ball, ghost and aim angle (the equivalent angle nearest the
+        current one), `targetCvAnchor` cleared so `SnapReducer` cannot pull the target back. Applied only while
+        the advisor is on, not paused, not banking or massé, not choosing a ball, and not mid-gesture.
+  - [x] Manual override: dragging the target or rotating the aim (`GestureReducer`) sets `isAutoAimPaused`
+        (transient, so launches start armed). `ResumeAutoAim` (rail item "Auto-aim", shown only while paused)
+        re-applies the current recommendation at once; switching the advisor on starts armed. No new routed
+        event is unrouted (`StateReducerRoutingTest`).
+  - [x] Kicks do not aim the protractor (the cue goes via a cushion, so its straight line to the ghost is not the
+        shot); the gold overlay shows them. Banks and combos aim at the struck ball.
+  - [x] `isTiltBeyondLimit` is not applied to a shot the advisor chose (`AutoAim.drives`); a shot the user aims
+        is still held to it.
+  - [x] The planner already offers no shot whose ghost is off the table, so `BallBounds.confine` has nothing to
+        move in the chosen aim.
+  - [ ] Known gap: the planner's cue ball may be a *detected* one while the protractor's shot-line anchor is the
+        hand-placed one (or the bottom of the screen when there is none). Placing the cue ball from the plan is
+        not done; the overlay's gold path is always drawn from the planner's cue.
 - [ ] **5. Device validation.** Cannot be done in the authoring environment; CI proves compile and unit tests only.
       Aim quality, probabilities (uncalibrated), and performance on a real table are open until then.
 - [ ] **Later:** cue-leave and safeties on core once it has a post-contact cue path; massé ghost off-table.

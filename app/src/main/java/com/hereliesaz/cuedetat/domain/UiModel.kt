@@ -245,6 +245,12 @@ data class CueDetatState(
     @Transient val topDownBitmap: android.graphics.Bitmap? = null,
     val topDownTransitionProgress: Float = 0f,
     val isAdvisorEnabled: Boolean = false,
+    /**
+     * The user took the aim by hand (dragged the target ball or rotated the aim), so the advisor
+     * no longer moves it. Cleared by [MainScreenEvent.ResumeAutoAim] and by switching the advisor
+     * on. See [com.hereliesaz.cuedetat.domain.advisor.AutoAim]. Not saved: every launch starts armed.
+     */
+    @Transient val isAutoAimPaused: Boolean = false,
     @Transient val recommendedShot: com.hereliesaz.cuedetat.domain.advisor.RecommendedShot? = null,
     val wearableState: com.hereliesaz.cuedetat.data.WearableState = com.hereliesaz.cuedetat.data.WearableState(),
 ) {
@@ -295,7 +301,7 @@ data class CueDetatState(
         isWorldLocked, preResetState, postResetState, ballSelectionPhase, cueBallCvAnchor,
         targetCvAnchor, obstacleCvAnchors, latestVersionName, distanceUnit, targetBallDistance,
         lensWarpTps, targetType, isTopDownViewActive, topDownBitmap, topDownTransitionProgress,
-        isAdvisorEnabled, recommendedShot, wearableState,
+        isAdvisorEnabled, isAutoAimPaused, recommendedShot, wearableState,
     )
 
     override fun equals(other: Any?): Boolean {
@@ -480,6 +486,8 @@ sealed class MainScreenEvent {
 
     // Shot advisor
     object ToggleAdvisor : MainScreenEvent()
+    /** Hand the aim back to the advisor after a manual drag paused it. */
+    object ResumeAutoAim : MainScreenEvent()
     data class RecommendationComputed(val shot: com.hereliesaz.cuedetat.domain.advisor.RecommendedShot?) : MainScreenEvent()
 
     // Relocalisation events
