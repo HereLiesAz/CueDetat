@@ -22,7 +22,7 @@
 * **Table Color Calibration Overlay**:
   * A full-screen overlay that instructs the user to aim at the table felt and tap a crosshair to
     sample the color.
-* **Interactive Tutorial Overlay** (AzNavRail guidance framework, version 12.1 in `libs.versions.toml`):
+* **Interactive Tutorial Overlay** (AzNavRail guidance framework, version 12.4 in `libs.versions.toml`):
   * Implemented via AzNavRail 10.18's status-driven guidance framework — `azStatus`/`azEdge`/`azGoal`/
     `azGuidanceTarget` in `AzNavRailMenu`, with `TutorialGuidanceTargets.kt` mapping app state to the
     spotlighted in-camera elements (target/ghost/cue ball, aiming line, zoom slider). The framework
