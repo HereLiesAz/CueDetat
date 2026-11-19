@@ -45,3 +45,24 @@ In Expert Mode, certain state updates use a `MATRICES_ONLY` update type to avoid
 skipped. Skipping it leaves `@Transient` aiming fields (`tangentAimedPocketIndex`, `aimedPocketIndex`,
 etc.) stale, which causes the Expert Mode red aiming line to stop updating until a full recalculation
 is triggered. The `MATRICES_ONLY` path now correctly runs `updateAimingCalculations` first.
+
+## Balls Stay On The Table
+
+* With a visible table, the target ball, the cue ball and every obstacle ball are kept wholly on it:
+  a ball's centre may come no closer to a rail than the ball's own radius (`Table.clampBallCenter`).
+  A ball dragged past a rail slides along it and stops; it is never reset or removed for this.
+* **The ghost cue ball** is derived (target centre + 2r at the aim angle), so it is kept on the table
+  by moving the **aim**: to the nearest angle at which the ghost fits (`BallBounds.aimWithGhostOnTable`).
+  Aiming into a rail, or dragging the target towards one, makes the ghost slide along the rail and the
+  aim line follow; the ghost never leaves the table. The aim keeps its accumulated winding.
+  Not applied in banking mode (no ghost) or massé mode (the ghost is the massé simulation's, derived
+  after the reducers run, and is not covered).
+* Enforced in one place, `BallBounds.confine`, where state leaves `stateReducer` and where
+  `SnapReducer.reduce` returns, so every writer is covered: the three drag modes, tap-to-place,
+  following a detected ball, undo and reset.
+* With no visible table (infinite space) there are no bounds.
+* `isGeometricallyImpossible` is unrelated: it concerns the shot line, ghost and target, and does
+  not look at the table.
+* Table resize still resets a target or cue ball whose centre is outside, and removes such
+  obstacles (`ReducerUtils.snapViolatingBalls`); the confinement then slides any ball that is only
+  partly over a rail.

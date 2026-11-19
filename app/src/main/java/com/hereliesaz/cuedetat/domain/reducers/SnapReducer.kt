@@ -5,6 +5,7 @@ package com.hereliesaz.cuedetat.domain.reducers
 import com.hereliesaz.cuedetat.data.BallType
 import com.hereliesaz.cuedetat.data.VisionData
 import com.hereliesaz.cuedetat.domain.Assignment
+import com.hereliesaz.cuedetat.domain.BallBounds
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.TargetType
 import com.hereliesaz.cuedetat.view.state.SnapCandidate
@@ -177,12 +178,15 @@ class SnapReducer @Inject constructor() {
             }
         }
 
-        return currentState.copy(
-            snapCandidates = newCandidates,
-            onPlaneBall = newOnPlaneBall,
-            protractorUnit = newProtractorUnit,
-            cueBallCvAnchor = newCueBallAnchor,
-            targetCvAnchor = newTargetAnchor
+        // Following a detection must not carry a ball off the table; see BallBounds.
+        return BallBounds.confine(
+            currentState.copy(
+                snapCandidates = newCandidates,
+                onPlaneBall = newOnPlaneBall,
+                protractorUnit = newProtractorUnit,
+                cueBallCvAnchor = newCueBallAnchor,
+                targetCvAnchor = newTargetAnchor
+            )
         )
     }
 }

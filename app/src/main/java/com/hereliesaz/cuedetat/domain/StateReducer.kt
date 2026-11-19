@@ -161,5 +161,6 @@ fun stateReducer(
         else -> currentState
     }
 
-    return primaryResult
+    // The one place ball positions are checked against the table; see BallBounds.
+    return BallBounds.confine(primaryResult)
 }
