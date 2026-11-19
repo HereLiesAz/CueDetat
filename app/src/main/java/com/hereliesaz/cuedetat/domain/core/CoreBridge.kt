@@ -10,9 +10,7 @@ import com.hereliesaz.cuedetat.core.physics.Spin
 import com.hereliesaz.cuedetat.core.units.Angle
 import com.hereliesaz.cuedetat.core.units.Length
 import com.hereliesaz.cuedetat.core.units.Speed
-import com.hereliesaz.cuedetat.core.units.METERS_PER_INCH
 import com.hereliesaz.cuedetat.domain.CueDetatState
-import com.hereliesaz.cuedetat.domain.LOGICAL_BALL_RADIUS
 import com.hereliesaz.cuedetat.view.state.TableSize
 
 /**
@@ -35,7 +33,8 @@ import com.hereliesaz.cuedetat.view.state.TableSize
  * throw compensation, whether a pocket will actually accept the ball — is
  * answered by the core, in real units, and converted back at the boundary.
  *
- * The conversion is exact, not approximate: the old plane's scale is defined as
+ * The conversion is exact, not approximate (to the precision of the `Float` scale constant it is
+ * built from): the old plane's scale is defined as
  * `(LOGICAL_BALL_RADIUS * 2) / 2.25 inches`, so one logical unit is a fixed,
  * knowable length. That it *is* knowable is the whole point — the old code never
  * wrote it down anywhere, which is how spin constants ended up specified "per
@@ -43,35 +42,28 @@ import com.hereliesaz.cuedetat.view.state.TableSize
  */
 object CoreBridge {
 
-    /** Ball diameter the legacy plane was scaled around. */
-    private const val REFERENCE_BALL_DIAMETER_INCHES = 2.25
+    /** Logical units per inch. The one source is [TableFrame]. */
+    val LOGICAL_UNITS_PER_INCH: Double get() = TableFrame.LOGICAL_UNITS_PER_INCH
 
-    /** Logical units per inch, from the legacy plane's own definition. */
-    const val LOGICAL_UNITS_PER_INCH: Double =
-        (LOGICAL_BALL_RADIUS * 2.0) / REFERENCE_BALL_DIAMETER_INCHES
-
-    /** Logical units per metre. */
-    const val LOGICAL_UNITS_PER_METER: Double = LOGICAL_UNITS_PER_INCH / METERS_PER_INCH
+    /** Logical units per metre. The one source is [TableFrame]. */
+    val LOGICAL_UNITS_PER_METER: Double get() = TableFrame.LOGICAL_UNITS_PER_METER
 
     // ── Conversions ─────────────────────────────────────────────────────────
     //
-    // Handedness: the legacy logical plane is drawn with +y toward the bottom of the screen
-    // (the head spot sits at +logicalHeight/4), i.e. a left-handed frame seen from above.
-    // The core table frame is right-handed with z up, where positive angles are
-    // counter-clockwise from above. Points therefore cross with y NEGATED, so that a core
-    // CCW angle is CCW on screen and right english deflects the way the player sees it.
+    // The crossing, with its handedness, is [TableFrame]'s (and [com.hereliesaz.cuedetat.core.geometry.ScreenPlane]'s,
+    // which explains it and is tested): the legacy plane is portrait, long axis on logical y, with +y
+    // down the screen; the core's is long-axis-x and right-handed. A core counter-clockwise angle is
+    // counter-clockwise on screen, so right english deflects the way the player sees it.
 
-    fun Float.logicalToLength(): Length = Length(this / LOGICAL_UNITS_PER_METER)
+    fun Float.logicalToLength(): Length = TableFrame.toLength(this)
 
-    fun Length.toLogical(): Float = (meters * LOGICAL_UNITS_PER_METER).toFloat()
+    fun Length.toLogical(): Float = TableFrame.toLogical(this)
 
     /** A legacy logical point as a metric table-plane point. */
-    fun PointF.toTablePlane(): Vec2 =
-        Vec2(x / LOGICAL_UNITS_PER_METER, -y / LOGICAL_UNITS_PER_METER)
+    fun PointF.toTablePlane(): Vec2 = TableFrame.toCore(this)
 
     /** A metric table-plane point back in legacy logical coordinates. */
-    fun Vec2.toLogicalPoint(): PointF =
-        PointF((x * LOGICAL_UNITS_PER_METER).toFloat(), (-y * LOGICAL_UNITS_PER_METER).toFloat())
+    fun Vec2.toLogicalPoint(): PointF = TableFrame.toLogical(this)
 
     // ── Specs ───────────────────────────────────────────────────────────────
 
@@ -112,7 +104,7 @@ object CoreBridge {
      * contact can deliver); callers must check it. `cueBallDeparture` may be the
      * zero vector (a full-ball stun shot leaves the cue ball at rest) — do not
      * normalise it blindly. Angles in the result are core-frame: positive = CCW
-     * seen from above, which after the y-flip in [toTablePlane] is CCW on screen.
+     * seen from above, which through [TableFrame] is CCW on screen.
      */
     fun solveAim(
         state: CueDetatState,
@@ -139,7 +131,7 @@ object CoreBridge {
      * players most need: it says how far off the textbook ghost ball the real
      * aim is, and which way. Null when there is no cue ball or the cut is
      * impossible (an impossible shot has no meaningful throw). Sign: positive =
-     * CCW on screen (core frame, y-flipped at the boundary).
+     * CCW on screen (core frame, crossed through [TableFrame]).
      */
     fun throwAngleFor(state: CueDetatState, target: PointF): Angle? =
         solveAim(state, target)?.takeIf { it.isPossible }?.throwAngle

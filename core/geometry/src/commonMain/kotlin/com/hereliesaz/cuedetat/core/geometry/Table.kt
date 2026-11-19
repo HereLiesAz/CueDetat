@@ -265,6 +265,25 @@ class Table(val spec: TableSpec) {
         abs(point.x) <= hl && abs(point.y) <= hw
 
     /**
+     * Index into [pockets] of the pocket whose mouth centre is nearest [point]. For mapping a pocket
+     * known by position only, such as one a caller keeps at the nominal rail corner or just past a
+     * side rail, onto this table's pockets, whose mouth centres sit inside the corner and whose
+     * order is `(-,-)`, `(-,+)`, `(+,-)`, `(+,+)` then the side pockets at `-y` and `+y`.
+     */
+    fun nearestPocketIndex(point: Vec2): Int {
+        var best = 0
+        var bestDistance = Double.MAX_VALUE
+        for (index in pockets.indices) {
+            val distance = (pockets[index].mouthCenter - point).lengthSquared
+            if (distance < bestDistance) {
+                bestDistance = distance
+                best = index
+            }
+        }
+        return best
+    }
+
+    /**
      * True when a ball of [radius] centred at [point] is fully on the table and
      * clear of the cushions — the legal region for placing a ball.
      */
