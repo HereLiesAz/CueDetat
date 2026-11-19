@@ -97,7 +97,7 @@ Goal: less jitter on screen, and less wasted work behind it. Four PRs, each test
 JVM (no device here; every change to how the camera *feels* still needs a look on a phone). Findings were
 checked against the source on 11/19/2026.
 
-- [ ] **1. Quiet the churn** (low risk)
+- [x] **1. Quiet the churn** (low risk)
   - [x] `OrientationGate`: a sensor orientation within 0.03 degrees (about a pixel) of the one last applied is
         dropped before the reducers; drift still gets through as steps that small.
   - [x] `ArMatrixHold`: a table matrix that goes missing for up to 250 ms while the camera is *tracking* is held
@@ -108,14 +108,29 @@ checked against the source on 11/19/2026.
         against the last one acted on; the old key truncated to whole units and flipped on a cell edge.
   - [x] Corrected the stale `UpdateType.MATRICES_ONLY` comment. It also runs aiming, and that is **needed**: the
         shot line's anchor is a screen point mapped through the matrices. Not "redundant work" as first reported.
-- [ ] **2. Sensor filter**: time-based (not per-sample alpha), yaw counted when choosing how hard to smooth, no
-      listener re-registration at the speed switch; `SensorRepository`'s EMA is inline in a `callbackFlow`, so
-      extract a pure class first.
-- [ ] **3. AR corner filter** (`ScreenCornerSmoother`): one shared speed across the four corners, a faster
-      derivative cutoff, no 150 px restart pop; skip an output that moved under a fraction of a pixel.
-- [ ] **4. Non-AR fit loop**: filter the pose itself (the median-of-5 only smooths the quad; the applied pose is
-      raw), time-based, and give `TableSnapPolicy` and `VisionRepository.applyPoseUpdate` (two writers of
-      the same offset, rotation and zoom) one owner.
+- [x] **2. Sensor filter**: `OrientationFilter`, a One Euro filter per axis on time, not on samples: one filter at
+      16 and 50 Hz (lag at 5, 20, 60 deg/s identical to 0.1 deg), yaw has its own speed (a yaw-only turn at
+      20 deg/s lagged ~50 degrees after ten seconds; now under 1), rest noise 0.05 -> ~0.006 degrees, step
+      settles in ~60 ms, the rate switch follows its own speed estimate (noise reads under 1.1 deg/s against a
+      3 deg/s threshold). **Not done:** the listener is still unregistered and registered again at the rate
+      switch (a short gap in samples; the filter takes `dt` so it is harmless to the output, but it is not gone). Constants: min cutoff 0.1 Hz, beta 0.25, max 8 Hz; beta chosen on a sweep (lag at
+      5 deg/s halves from 1.3 to 0.6 degrees, rest noise unchanged).
+- [x] **3. AR corner filter** (`ScreenCornerSmoother`): one speed (so one cutoff) for the quad, a 20 px/s noise
+      floor so a still camera really gets the minimum cutoff, a 0.15 px hold on the published quad, and an
+      unchanged matrix is dropped before the reducers. **Correction to the survey:** it called the old onset
+      lag "over 100 px"; measured on a synthetic 30 fps quad it was 12.5 px at 1000 px/s. The real faults were
+      the speed estimate leaking its own noise (rest residual 0.36 px for 1 px in) and being the filter's lag
+      over dt, which reads the same motion differently at each frame rate (found by an independent review;
+      now the raw corner's change). Now 0.22 px at rest, 4 px onset lag, 2.7 px steady, 2.1 px on a slow creep
+      (was 1.7), the same lag at 15 to 120 fps. A repeated frame timestamp no longer restarts the filter. Not done: the 150 px
+      restart threshold (a snap to the raw position loses only the few pixels of lag).
+- [x] **4. Non-AR fit loop**: `TableSnapPolicy.TablePull` (replaces `pullStep`): the fit pose is averaged
+      before the table moves toward it, the pull starts at 1.5 px / 0.3 deg and stops at 0.5 px / 0.1 deg, and
+      both shares are taken from the time since the last fit (unchanged at the 300 ms reference). On a
+      synthetic 3 px noisy fit: same ~5.9 s to settle, 0.61 px of wander instead of 0.80, steps on 38% of fits
+      instead of 75% (each step is a full recompute). **Correction to the survey:** `applyPoseUpdate` (the
+      "second controller") lives in the saved-scan edge fallback of the AR frame path, not in the non-AR
+      loop the pull runs in, so the two do not fight in one mode; left alone.
 - [ ] Also found: in AR, `effectivePitchDegrees` is never refreshed (ball lift uses stale IMU pitch).
 - [ ] From the CV survey, not started: temporal tracking of detections (a ball missed for one frame vanishes,
       types flip per frame), cue selection (first CUE-typed ball wins, others dropped), stale `visionData` after

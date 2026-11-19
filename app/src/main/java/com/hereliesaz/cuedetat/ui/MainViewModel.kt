@@ -103,6 +103,9 @@ class MainViewModel @Inject constructor(
     val updateInfo: kotlinx.coroutines.flow.StateFlow<com.hereliesaz.cuedetat.update.UpdateInfo?> =
         _updateInfo.asStateFlow()
 
+    // Declared before any init block starts the event loop, which reaches it from another thread.
+    private val tablePull = com.hereliesaz.cuedetat.domain.TableSnapPolicy.TablePull()
+
     init {
         // Before anything else can fail: a debug log that starts late misses the failure.
         debugLogRecorder.resumeIfEnabled()
@@ -496,6 +499,10 @@ class MainViewModel @Inject constructor(
                 kotlin.math.abs(live.arMeasuredHeightM - event.heightAboveSurfaceM) < 0.01f
             ) return
         }
+        // The AR table matrix arrives every frame. Once the corner filter has settled it is the same
+        // matrix frame after frame (equal by value), and a reduce, a rebuild and a redraw for an
+        // unchanged table is all it would cost.
+        if (event is MainScreenEvent.ArTableMatrixUpdated && event.matrix == _uiState.value.arTableMatrix) return
         // The sensor filter's output moves a hair on every sample even on a table; only an
         // orientation that has moved enough to show is worth the reduce, the matrices and the redraw.
         if (event is MainScreenEvent.FullOrientationChanged &&
@@ -762,19 +769,21 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.PanView, is MainScreenEvent.ZoomSliderChanged, is MainScreenEvent.ZoomScaleChanged,
             is MainScreenEvent.TableRotationChanged, is MainScreenEvent.TableRotationApplied,
             is MainScreenEvent.TableScaleChanged, is MainScreenEvent.NudgeTableRange,
-            is MainScreenEvent.ScreenGestureStarted, is MainScreenEvent.LogicalGestureStarted ->
+            is MainScreenEvent.ScreenGestureStarted, is MainScreenEvent.LogicalGestureStarted -> {
                 lastUserTableAdjustMs = now
+                tablePull.release()
+            }
 
             is MainScreenEvent.TableFitUpdated -> {
                 // World-fixed preview cannot be pulled by a noisy frame-by-frame felt fit. Not just
                 // while the matrix exists: during a tracking loss it is null, and a pull then would
                 // change pan and zoom, which the AR session reads as the user's hand on the table.
                 if (com.hereliesaz.cuedetat.domain.ArProjectionPolicy.isWorldTracked(after.cameraMode, after.depthCapability)) return
-                val fit = event.fit ?: return
+                val fit = event.fit ?: run { tablePull.release(); return }
                 val current = poseOf(after)
-                com.hereliesaz.cuedetat.domain.TableSnapPolicy.pullStep(
+                tablePull.step(
                     current, fit.pose.let { com.hereliesaz.cuedetat.domain.TableSnapPolicy.Pose(it.offsetX, it.offsetY, it.rotationDeg, it.zoom) },
-                    fit.iou, now - lastUserTableAdjustMs,
+                    fit.iou, now - lastUserTableAdjustMs, now,
                 )?.let { onEvent(MainScreenEvent.ApplyTablePose(it.offsetX, it.offsetY, it.rotationDeg, it.zoom)) }
                 if (fit.iou >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.RECORD_MIN_IOU &&
                     now - lastPoseRecordMs >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.RECORD_INTERVAL_MS
