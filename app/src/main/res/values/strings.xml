@@ -187,6 +187,7 @@
     <string name="rail_spin">Spin</string>
     <string name="rail_masse">Massé</string>
     <string name="rail_advisor">Advisor</string>
+    <string name="rail_autoaim">Auto-aim</string>
     <string name="rail_aim">aim</string>
     <string name="rail_bank">bank</string>
     <string name="rail_add">add</string>

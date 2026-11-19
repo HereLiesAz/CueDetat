@@ -160,6 +160,7 @@ fun AzNavRailMenu(
     val rail_spinText = stringResource(R.string.rail_spin)
     val rail_masseText = stringResource(R.string.rail_masse)
     val rail_advisorText = stringResource(R.string.rail_advisor)
+    val rail_autoAimText = stringResource(R.string.rail_autoaim)
     val rail_aimText = stringResource(R.string.rail_aim)
     val rail_bankText = stringResource(R.string.rail_bank)
     val rail_addText = stringResource(R.string.rail_add)
@@ -446,8 +447,9 @@ fun AzNavRailMenu(
         if (uiState.experienceMode != ExperienceMode.BEGINNER) {
             azRailToggle(id = "spin", isChecked = uiState.isSpinControlVisible, toggleOnText = rail_spinText, toggleOffText = rail_spinText, fillColor = b4P, onClick = { onEvent(MainScreenEvent.ToggleSpinControl) })
             azRailToggle(id = "masse", isChecked = uiState.isMasseModeActive, toggleOnText = rail_masseText, toggleOffText = rail_masseText, fillColor = b5O, onClick = { onEvent(MainScreenEvent.ToggleMasseMode) })
-            // Advisor hidden for the foreseeable future.
             if (SHOW_ADVISOR) azRailToggle(id = "advisor", isChecked = uiState.isAdvisorEnabled, toggleOnText = rail_advisorText, toggleOffText = rail_advisorText, fillColor = b13O, onClick = { onEvent(MainScreenEvent.ToggleAdvisor) })
+            // Only while the user has taken the aim from the advisor: hands it back.
+            if (SHOW_ADVISOR && uiState.isAdvisorEnabled && uiState.isAutoAimPaused) azRailItemLowerCase(id = "autoaim", text = rail_autoAimText, fillColor = b13O, onClick = { onEvent(MainScreenEvent.ResumeAutoAim) })
         }
 
         if (uiState.experienceMode == ExperienceMode.EXPERT) {

@@ -258,6 +258,7 @@ class GestureReducer @Inject constructor() {
                 }
 
                 currentState.copy(
+                    isAutoAimPaused = true, // the user has taken the target; see AutoAim
                     protractorUnit = currentState.protractorUnit.copy(center = snappedCenter),
                     targetCvAnchor = newAnchor,
                     zoomSliderPosition = newZoomSlider,
@@ -358,6 +359,7 @@ class GestureReducer @Inject constructor() {
                         Math.toDegrees(currAngle.toDouble() - prevAngle.toDouble()).toFloat()
                     )
                     currentState.copy(
+                        isAutoAimPaused = true, // the user has taken the aim; see AutoAim
                         protractorUnit = currentState.protractorUnit.copy(rotationDegrees = currentState.protractorUnit.rotationDegrees + angleDelta),
                         magnifierSourceCenter = updatedMagnifierCenter,
                         valuesChangedSinceReset = true

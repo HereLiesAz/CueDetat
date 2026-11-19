@@ -233,6 +233,16 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   rebound and a medium pace. Every shot's ghost ball must be wholly on the table, matching the
   `BallBounds` invariant on the app side.
 
+- **The advisor aims the protractor, and the user can take the aim back** (`app/.../domain/advisor/AutoAim.kt`,
+  `CoreShotAdvice.kt`). Reason: choosing the ball and the pocket is the point of the advisor, and a
+  recommendation drawn beside an aim the user must then copy by hand is a second job. The advisor owns
+  the target ball and the aim while it is on; dragging the target or rotating the aim sets
+  `isAutoAimPaused` and it lets go, and a recommendation never moves a ball under a finger. A kick does
+  not aim the protractor: the cue goes off a cushion first, so the straight line the protractor draws to
+  the ghost would not be the shot. The tilt limit (`isTiltBeyondLimit`, which assumes shots run up the
+  screen) is not applied to a shot the advisor chose. The advisor's balls are the detected ones and the
+  hand-placed ones (all treated as the shooter's own); the protractor's target is its output, not an input.
+
 ## Where things actually live (correcting known-stale doc claims)
 
 - ARCore session/depth capability: `feature_expert_ar/.../ArTableSession.kt`
