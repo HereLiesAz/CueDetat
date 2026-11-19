@@ -67,6 +67,8 @@ class ArControllerImpl(context: Context) : ArController {
 
     override fun nudgeTableRange(factor: Float) = arTableSession.nudgeRange(factor)
 
+    override fun turnTableQuarter() = arTableSession.requestQuarterTurn()
+
     override fun lockTable(screenCorners: List<PointF>, logicalCorners: List<PointF>) {
         arTableSession.requestLock(
             screenCorners.map { TableFrameHomography.Pt(it.x, it.y) },

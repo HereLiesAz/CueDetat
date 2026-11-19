@@ -65,7 +65,7 @@ import javax.inject.Inject
 private val NOISY_EVENTS = setOf(
     "FullOrientationChanged", "ArTableMatrixUpdated", "ArCameraPoseUpdated", "CvDataUpdated", "TableFitUpdated",
     "RecommendationComputed", "SpinPathTick", "SetWarning", "LogicalDragApplied", "Drag", "PanView",
-    "ZoomScaleChanged", "ZoomSliderChanged", "TableRotationChanged", "TableScaleChanged", "DragSpinControl",
+    "ZoomScaleChanged", "ZoomSliderChanged", "TableRotationChanged", "TableScaleChanged", "TurnTableQuarter", "DragSpinControl",
     "ApplyTablePose", "UpdateArPose", "WearableStateUpdated",
 )
 
@@ -616,6 +616,7 @@ class MainViewModel @Inject constructor(
         }
         when (event) {
             is MainScreenEvent.NudgeTableRange -> arController.nudgeTableRange(event.factor)
+            is MainScreenEvent.TurnTableQuarter -> arController.turnTableQuarter()
             is MainScreenEvent.SaveCloudPlacement -> arController.saveCloudPlacement()
             is MainScreenEvent.RestoreCloudPlacement ->
                 arController.restoreCloudPlacement(_uiState.value.table.corners)
@@ -828,7 +829,7 @@ class MainViewModel @Inject constructor(
             // Any hand on the table (or the screen) holds the pull off.
             is MainScreenEvent.PanView, is MainScreenEvent.ZoomSliderChanged, is MainScreenEvent.ZoomScaleChanged,
             is MainScreenEvent.TableRotationChanged, is MainScreenEvent.TableRotationApplied,
-            is MainScreenEvent.TableScaleChanged, is MainScreenEvent.NudgeTableRange,
+            is MainScreenEvent.TableScaleChanged, is MainScreenEvent.NudgeTableRange, is MainScreenEvent.TurnTableQuarter,
             is MainScreenEvent.ScreenGestureStarted, is MainScreenEvent.LogicalGestureStarted -> {
                 lastUserTableAdjustMs = now
                 tablePull.release()
@@ -1004,7 +1005,8 @@ class MainViewModel @Inject constructor(
             // World-anchored table pose arrives ~30-60Hz from the ARCore GL thread. It must
             // recompute the matrices each frame so the overlay tracks as the user walks; routing it
             // to AIMING (the default) would silently freeze the table at its first pose.
-            is MainScreenEvent.ArTableMatrixUpdated, is MainScreenEvent.NudgeTableRange -> UpdateType.MATRICES_ONLY
+            is MainScreenEvent.ArTableMatrixUpdated, is MainScreenEvent.NudgeTableRange,
+            is MainScreenEvent.TurnTableQuarter -> UpdateType.MATRICES_ONLY
 
             is MainScreenEvent.SizeChanged, is MainScreenEvent.ZoomScaleChanged, is MainScreenEvent.ZoomSliderChanged,
             is MainScreenEvent.PanView, is MainScreenEvent.TableRotationChanged,

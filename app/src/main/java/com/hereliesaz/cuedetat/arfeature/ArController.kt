@@ -65,6 +65,12 @@ interface ArController {
     fun nudgeTableRange(factor: Float) {}
 
     /**
+     * Lay the unlocked AR table the other way, a quarter turn about its centre, so its sides meet
+     * the real edges across rather than along. Ignored while the table is locked.
+     */
+    fun turnTableQuarter() {}
+
+    /**
      * Anchor the virtual table in the AR world. [screenCorners] are where its corners sit on
      * screen now and [logicalCorners] the same corners in logical space, both TL, TR, BR, BL.
      * The result comes back as [MainScreenEvent.ArTableLockResult].

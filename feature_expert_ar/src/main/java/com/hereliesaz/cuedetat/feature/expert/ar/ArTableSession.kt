@@ -33,6 +33,7 @@ import com.hereliesaz.cuedetat.domain.TableOrientationGuess
 import com.hereliesaz.cuedetat.domain.TableOrientationLearner
 import com.hereliesaz.cuedetat.domain.TableReseedPolicy
 import com.hereliesaz.cuedetat.domain.TableFrameHomography
+import com.hereliesaz.cuedetat.domain.TablePivot
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Pt
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Vec3
 import java.util.concurrent.atomic.AtomicBoolean
@@ -413,6 +414,23 @@ class ArTableSession(
         lastUserChangeNanos = System.nanoTime()
         synchronized(nudgeLock) { pendingRangeNudge = (pendingRangeNudge * factor).coerceIn(0.05f, 20f) }
     }
+
+    /**
+     * "Turn 90°" from the UI thread: the table is laid the other way, to meet the real edges across
+     * rather than along. Taken once on the GL thread ([updatePreview]); locked tables are not turned.
+     */
+    @Volatile private var quarterTurnRequested = false
+
+    fun requestQuarterTurn() {
+        lastUserChangeNanos = System.nanoTime()
+        quarterTurnRequested = true
+    }
+
+    /** The size the preview was last drawn at: a change from the user is applied about a corner. */
+    private var lastAppliedScale = 1f
+
+    /** A size the felt measurement itself asked for (not the user): scaled about the centre, as before. */
+    private var autoScaleExpected: Float? = null
 
     private fun takeRangeNudge(): Float = synchronized(nudgeLock) {
         pendingRangeNudge.also { pendingRangeNudge = 1f }
@@ -817,7 +835,7 @@ class ArTableSession(
                     frame, fit.quad, fit.orientationConfidence, curRight, curAway, input, view, proj, vpW, vpH,
                 )
                 if (previewAnchor !== before) continueSuspicion()
-                ratio?.let { suggestedScale = it }
+                ratio?.let { suggestedScale = it; autoScaleExpected = it.coerceIn(0.6f, 1.6f) }
             }
             TableReseedPolicy.Verdict.NONE -> Unit
         }
@@ -1014,7 +1032,7 @@ class ArTableSession(
                 frame, fit.quad, fit.orientationConfidence, right, away, input, view, proj, vpW, vpH,
             )
             if (previewAnchor != null) {
-                ratio?.let { suggestedScale = it }
+                ratio?.let { suggestedScale = it; autoScaleExpected = it.coerceIn(0.6f, 1.6f) }
                 beginSuspicion()
                 return
             }
@@ -1089,6 +1107,15 @@ class ArTableSession(
         previewBadSinceNanos = 0L
         val previous = previousPreviewInput ?: input
         val pose = anchor.pose
+        if (quarterTurnRequested) {
+            quarterTurnRequested = false
+            // away becomes right, and right = (-away.z, away.x) stays true of the new pair.
+            val away = previewRight
+            previewAway = away
+            previewRight = Vec3(-away.z, 0f, away.x)
+            suspectUntilNanos = 0L // the user's choice, not to be reseeded away
+        }
+        applyScaleAboutPivot(pose, input, vpW, vpH)
         val center = Vec3(pose.tx() + previewOffset.x,
             pose.ty() + previewOffset.y, pose.tz() + previewOffset.z)
         val dx = input.panX - previous.panX
@@ -1121,6 +1148,31 @@ class ArTableSession(
         }
         if (rangeNudge != 1f) dollyPreview(frame, pose, 1f / rangeNudge)
         previousPreviewInput = input
+    }
+
+    /**
+     * A size change from the user keeps the table's most prominent corner where it is (see
+     * [TablePivot]); the far edges move to meet the real ones. A size the felt asked for is applied
+     * about the centre, which is where its measurement put it.
+     */
+    private fun applyScaleAboutPivot(pose: Pose, input: PreviewInput, vpW: Int, vpH: Int) {
+        val now = tableScale
+        val before = lastAppliedScale
+        lastAppliedScale = now
+        if (now == before || before <= 0f || now <= 0f) return
+        val auto = autoScaleExpected
+        if (auto != null && abs(auto - now) < 1e-3f) { autoScaleExpected = null; return }
+        val quad = lastScreenQuad ?: return
+        if (quad.size != 4) return
+        val center = Vec3(pose.tx() + previewOffset.x, pose.ty() + previewOffset.y, pose.tz() + previewOffset.z)
+        val world = TableFrameHomography.metricRectangleCorners(
+            input.corners, center, previewRight, previewAway,
+            TableFrameHomography.clockwiseToWorldYaw(input.rotationDegrees - previewInitialRotation),
+            before,
+        )
+        val pivot = world[TablePivot.choose(quad, vpW, vpH)]
+        val shift = TablePivot.centerShift(Vec3(pivot.x - center.x, 0f, pivot.z - center.z), now / before)
+        previewOffset = Vec3(previewOffset.x + shift.x, previewOffset.y, previewOffset.z + shift.z)
     }
 
     /**
@@ -1164,6 +1216,7 @@ class ArTableSession(
         previewAnchor = null
         previewOffset = Vec3(0f, 0f, 0f)
         previousPreviewInput = null
+        lastAppliedScale = tableScale
     }
 
     /**

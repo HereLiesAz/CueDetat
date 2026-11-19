@@ -86,6 +86,8 @@ class ArControllerFacade @Inject constructor(
 
     override fun nudgeTableRange(factor: Float) = delegate.nudgeTableRange(factor)
 
+    override fun turnTableQuarter() = delegate.turnTableQuarter()
+
     override fun lockTable(screenCorners: List<android.graphics.PointF>, logicalCorners: List<android.graphics.PointF>) =
         delegate.lockTable(screenCorners, logicalCorners)
 

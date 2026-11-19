@@ -131,6 +131,10 @@ checked against the source on 11/19/2026.
       instead of 75% (each step is a full recompute). **Correction to the survey:** `applyPoseUpdate` (the
       "second controller") lives in the saved-scan edge fallback of the AR frame path, not in the non-AR
       loop the pull runs in, so the two do not fight in one mode; left alone.
+- [x] **Turn 90° + resize from the corner** (owner, 11/19/2026). `TablePivot` (pure, 7 tests) +
+      `ArTableSession.applyScaleAboutPivot` / `requestQuarterTurn`, rail item "turn 90°", `TurnTableQuarter`
+      event. Unchecked on a device: whether the pivot feels right with one corner in view, and whether a
+      plain quarter turn is what users want over the felt's rival reading (not offered).
 - [x] **Initial orientation guess in AR** (owner, 11/19/2026: memory, felt and plane). `TableOrientationGuess` +
       `PlaneShape` (pure, tested: 13 tests run on the JVM through a scratch copy), wired in
       `ArTableSession.initializePreview` (memory via `ArController.setTableOrientationPrior`; the plane's

@@ -358,6 +358,8 @@ sealed class MainScreenEvent {
      * world tracking it replaces [ZoomSliderChanged], whose absolute value saturates.
      */
     data class NudgeTableRange(val factor: Float) : MainScreenEvent()
+    /** Rail "turn 90°": lay the unlocked AR table the other way (a quarter turn about its centre). */
+    object TurnTableQuarter : MainScreenEvent()
     data class PanView(val delta: PointF) : MainScreenEvent()
     data class MoveTableZ(val delta: Float) : MainScreenEvent()
     /** Absolute table height (the slider's thumb value); clamped like [MoveTableZ]. */
