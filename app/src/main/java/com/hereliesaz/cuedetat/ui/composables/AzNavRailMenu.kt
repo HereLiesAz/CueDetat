@@ -150,6 +150,7 @@ fun AzNavRailMenu(
     val rail_tutorialText = stringResource(R.string.rail_tutorial)
     val rail_unlockText = stringResource(R.string.rail_unlock)
     val rail_lockText = stringResource(R.string.rail_lock)
+    val rail_turn90Text = stringResource(R.string.rail_turn_90)
     val rail_save_24hText = stringResource(R.string.rail_save_24h)
     val rail_restoreText = stringResource(R.string.rail_restore)
     val rail_forget_savedText = stringResource(R.string.rail_forget_saved)
@@ -368,6 +369,13 @@ fun AzNavRailMenu(
                         )
                     }
                 )
+                // Lay the table the other way to meet the real edges across rather than along.
+                if (!uiState.isArTableLocked) {
+                    azRailItemLowerCase(
+                        id = "ar_turn_90", text = rail_turn90Text,
+                        fillColor = b10B, onClick = { onEvent(MainScreenEvent.TurnTableQuarter) },
+                    )
+                }
                 // Cloud hosting is never automatic: explicit confirmation is required.
                 if (uiState.isArTableLocked) {
                     azRailItemLowerCase(

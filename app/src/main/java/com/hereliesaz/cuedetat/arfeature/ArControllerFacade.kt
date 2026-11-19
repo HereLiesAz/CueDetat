@@ -66,6 +66,7 @@ class ArControllerFacade @Inject constructor(
                     lastLoadError = describe(t)
                 }.getOrNull()
             } ?: return@withLock false
+            impl.setTableOrientationPrior(orientationPrior)
             delegate = impl
             loaded = true
             true
@@ -85,10 +86,25 @@ class ArControllerFacade @Inject constructor(
 
     override fun nudgeTableRange(factor: Float) = delegate.nudgeTableRange(factor)
 
+    override fun turnTableQuarter() = delegate.turnTableQuarter()
+
     override fun lockTable(screenCorners: List<android.graphics.PointF>, logicalCorners: List<android.graphics.PointF>) =
         delegate.lockTable(screenCorners, logicalCorners)
 
     override fun unlockTable() = delegate.unlockTable()
+
+    // Kept here as well as passed on: set before the implementation loads, it is handed over when it does.
+    @Volatile private var orientationPrior:
+        ((yawDeg: Float, pitchDeg: Float) -> com.hereliesaz.cuedetat.domain.TableOrientationLearner.Prediction?)? = null
+
+    override fun setTableOrientationPrior(
+        prior: ((yawDeg: Float, pitchDeg: Float) -> com.hereliesaz.cuedetat.domain.TableOrientationLearner.Prediction?)?,
+    ) {
+        orientationPrior = prior
+        delegate.setTableOrientationPrior(prior)
+    }
+
+    override fun lockedTableHeadingDegrees(): Float? = delegate.lockedTableHeadingDegrees()
 
     override fun saveCloudPlacement() = delegate.saveCloudPlacement()
 

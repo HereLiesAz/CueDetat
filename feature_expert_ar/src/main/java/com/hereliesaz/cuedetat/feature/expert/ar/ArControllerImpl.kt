@@ -67,6 +67,8 @@ class ArControllerImpl(context: Context) : ArController {
 
     override fun nudgeTableRange(factor: Float) = arTableSession.nudgeRange(factor)
 
+    override fun turnTableQuarter() = arTableSession.requestQuarterTurn()
+
     override fun lockTable(screenCorners: List<PointF>, logicalCorners: List<PointF>) {
         arTableSession.requestLock(
             screenCorners.map { TableFrameHomography.Pt(it.x, it.y) },
@@ -76,6 +78,14 @@ class ArControllerImpl(context: Context) : ArController {
     }
 
     override fun unlockTable() = arTableSession.unlock()
+
+    override fun setTableOrientationPrior(
+        prior: ((yawDeg: Float, pitchDeg: Float) -> com.hereliesaz.cuedetat.domain.TableOrientationLearner.Prediction?)?,
+    ) {
+        arTableSession.orientationPrior = prior
+    }
+
+    override fun lockedTableHeadingDegrees(): Float? = arTableSession.lockedHeadingDegrees()
 
     override fun saveCloudPlacement() = arTableSession.requestSaveCloudPlacement()
 

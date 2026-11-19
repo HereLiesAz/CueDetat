@@ -120,6 +120,46 @@ is compiled by CI only. Core (`:core:*`) tests, the Python tests and the capture
   cue and the target to the same ball. Previously a tap also moved nothing unless a detection was
   near (it only set an anchor), and snapped to the nearest detection however far away.
 
+### Added — turn the AR table 90°, and resize it from the corner in view
+
+At a real table the part in view is usually a corner or two and the rails running from them. The
+overlay was resized about its middle (off in the felt), which pushed a corner you had just lined up
+away, and there was no quick way to lay it the other way across the edges.
+
+- **Rail "turn 90°"** (AR, unlocked): lays the table a quarter turn about its centre
+  (`ArTableSession.requestQuarterTurn`, taken once on the GL thread). It ends the suspect window, so
+  a felt fit does not reseed the choice away. Tap again to turn it back.
+- **Resize from the corner (`TablePivot`).** A size change from the user (pinch, or a stepper) now
+  holds the most prominent visible corner still: of the corners in view, the one with the longest
+  edges at it (the nearest, by perspective); with none in view, the one nearest the screen's middle.
+  The centre is moved by `(1 - ratio)` times that corner's offset so the corner does not move and the
+  far edges grow or shrink to meet the real ones. With two corners in view the size is then fixed by
+  where the far edges land. A size the felt measurement itself asks for is still applied about the
+  centre (that is where it measured it).
+- Not done: a *locked* table is not scaled about a corner (unlock first); the felt's rival reading
+  (the table seen 90° the other way) is not offered as the turn, the turn is a plain quarter turn.
+- Verified on the JVM (`TablePivotTest`, 7 tests, via a scratch copy): the pivot corner stays within
+  1e-4 m after scaling by 0.7, 1.3 and 1.6, at four headings, for each of the four corners, and the
+  opposite corner is `ratio` times as far from it. The ARCore wiring is compiled only by CI.
+
+### Added — an initial guess at the table's orientation in AR
+
+Before, the guess at which way the table lies was made only in the non-AR camera, and only from memory;
+in AR it was off (it was built for the phone-sensor model), so the AR preview began lying along the
+camera, and a table the app had never seen got no guess at all.
+
+- **`TableOrientationGuess`** weighs two candidates for the first placement of the AR preview:
+  **memory** (this table, this place, or the last table: the same prior the non-AR camera uses, which
+  knows which end is which) and **the tabletop plane** ARCore found (the long axis of its outline,
+  trusted only as far as the outline is table-shaped and table-sized, and never above 0.4). Agreeing
+  sources raise the confidence, a dissenter lowers it; a guess under 0.3 is not applied.
+- **The felt** still places and turns the table when it is sure (as before); the guess settles which
+  end is which for it, instead of the camera-facing default.
+- **A lock remembers the real heading.** The app's own rotation does not follow the AR table, so the
+  heading recorded at a lock is now measured from the anchor against the camera; memory in AR was
+  otherwise recording a number that meant nothing.
+- Not done: the non-AR camera's first-ever guess (no memory, no plane) is unchanged.
+
 ### Added — a crash report that needs no computer, and AR start-up guards
 
 A Galaxy A16 5G still force-closed when AR was switched on, and no stack trace could be had.

@@ -173,6 +173,7 @@
     <string name="rail_tutorial">Tutorial</string>
     <string name="rail_unlock">unlock</string>
     <string name="rail_lock">lock</string>
+    <string name="rail_turn_90">turn 90°</string>
     <string name="rail_save_24h">save 24h</string>
     <string name="rail_restore">restore</string>
     <string name="rail_forget_saved">forget saved</string>

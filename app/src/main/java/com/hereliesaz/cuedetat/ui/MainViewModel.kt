@@ -65,7 +65,7 @@ import javax.inject.Inject
 private val NOISY_EVENTS = setOf(
     "FullOrientationChanged", "ArTableMatrixUpdated", "ArCameraPoseUpdated", "CvDataUpdated", "TableFitUpdated",
     "RecommendationComputed", "SpinPathTick", "SetWarning", "LogicalDragApplied", "Drag", "PanView",
-    "ZoomScaleChanged", "ZoomSliderChanged", "TableRotationChanged", "TableScaleChanged", "DragSpinControl",
+    "ZoomScaleChanged", "ZoomSliderChanged", "TableRotationChanged", "TableScaleChanged", "TurnTableQuarter", "DragSpinControl",
     "ApplyTablePose", "UpdateArPose", "WearableStateUpdated",
 )
 
@@ -616,6 +616,7 @@ class MainViewModel @Inject constructor(
         }
         when (event) {
             is MainScreenEvent.NudgeTableRange -> arController.nudgeTableRange(event.factor)
+            is MainScreenEvent.TurnTableQuarter -> arController.turnTableQuarter()
             is MainScreenEvent.SaveCloudPlacement -> arController.saveCloudPlacement()
             is MainScreenEvent.RestoreCloudPlacement ->
                 arController.restoreCloudPlacement(_uiState.value.table.corners)
@@ -809,6 +810,8 @@ class MainViewModel @Inject constructor(
     init {
         // The fit asks for the remembered orientation at the phone's current heading.
         visionRepository.tablePrior = { yaw, pitch -> tablePrior(yaw, pitch)?.prediction }
+        // The AR preview's first placement asks memory the same question.
+        arController.setTableOrientationPrior { yaw, pitch -> tablePrior(yaw, pitch)?.prediction }
     }
 
     private fun tablePrior(yaw: Float, pitch: Float) = com.hereliesaz.cuedetat.domain.TablePosePrior.choose(
@@ -826,7 +829,7 @@ class MainViewModel @Inject constructor(
             // Any hand on the table (or the screen) holds the pull off.
             is MainScreenEvent.PanView, is MainScreenEvent.ZoomSliderChanged, is MainScreenEvent.ZoomScaleChanged,
             is MainScreenEvent.TableRotationChanged, is MainScreenEvent.TableRotationApplied,
-            is MainScreenEvent.TableScaleChanged, is MainScreenEvent.NudgeTableRange,
+            is MainScreenEvent.TableScaleChanged, is MainScreenEvent.NudgeTableRange, is MainScreenEvent.TurnTableQuarter,
             is MainScreenEvent.ScreenGestureStarted, is MainScreenEvent.LogicalGestureStarted -> {
                 lastUserTableAdjustMs = now
                 tablePull.release()
@@ -854,7 +857,12 @@ class MainViewModel @Inject constructor(
             }
 
             // The user placed the table: a scan's placement or a lock. These fix which end is which.
-            is MainScreenEvent.ArTableLockResult -> if (event.locked) recordPose(after, poseOf(after), anchor = true)
+            is MainScreenEvent.ArTableLockResult -> if (event.locked) {
+                // The app's own rotation does not follow the AR table; the lock knows which way it lies.
+                val pose = poseOf(after)
+                val heading = arController.lockedTableHeadingDegrees()
+                recordPose(after, if (heading != null) pose.copy(rotationDeg = heading) else pose, anchor = true)
+            }
             is MainScreenEvent.ApplyQuickAlign -> recordPose(after, poseOf(after), anchor = true)
 
             else -> Unit
@@ -997,7 +1005,8 @@ class MainViewModel @Inject constructor(
             // World-anchored table pose arrives ~30-60Hz from the ARCore GL thread. It must
             // recompute the matrices each frame so the overlay tracks as the user walks; routing it
             // to AIMING (the default) would silently freeze the table at its first pose.
-            is MainScreenEvent.ArTableMatrixUpdated, is MainScreenEvent.NudgeTableRange -> UpdateType.MATRICES_ONLY
+            is MainScreenEvent.ArTableMatrixUpdated, is MainScreenEvent.NudgeTableRange,
+            is MainScreenEvent.TurnTableQuarter -> UpdateType.MATRICES_ONLY
 
             is MainScreenEvent.SizeChanged, is MainScreenEvent.ZoomScaleChanged, is MainScreenEvent.ZoomSliderChanged,
             is MainScreenEvent.PanView, is MainScreenEvent.TableRotationChanged,
