@@ -809,6 +809,8 @@ class MainViewModel @Inject constructor(
     init {
         // The fit asks for the remembered orientation at the phone's current heading.
         visionRepository.tablePrior = { yaw, pitch -> tablePrior(yaw, pitch)?.prediction }
+        // The AR preview's first placement asks memory the same question.
+        arController.setTableOrientationPrior { yaw, pitch -> tablePrior(yaw, pitch)?.prediction }
     }
 
     private fun tablePrior(yaw: Float, pitch: Float) = com.hereliesaz.cuedetat.domain.TablePosePrior.choose(
@@ -854,7 +856,12 @@ class MainViewModel @Inject constructor(
             }
 
             // The user placed the table: a scan's placement or a lock. These fix which end is which.
-            is MainScreenEvent.ArTableLockResult -> if (event.locked) recordPose(after, poseOf(after), anchor = true)
+            is MainScreenEvent.ArTableLockResult -> if (event.locked) {
+                // The app's own rotation does not follow the AR table; the lock knows which way it lies.
+                val pose = poseOf(after)
+                val heading = arController.lockedTableHeadingDegrees()
+                recordPose(after, if (heading != null) pose.copy(rotationDeg = heading) else pose, anchor = true)
+            }
             is MainScreenEvent.ApplyQuickAlign -> recordPose(after, poseOf(after), anchor = true)
 
             else -> Unit

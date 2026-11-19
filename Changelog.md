@@ -120,6 +120,24 @@ is compiled by CI only. Core (`:core:*`) tests, the Python tests and the capture
   cue and the target to the same ball. Previously a tap also moved nothing unless a detection was
   near (it only set an anchor), and snapped to the nearest detection however far away.
 
+### Added — an initial guess at the table's orientation in AR
+
+Before, the guess at which way the table lies was made only in the non-AR camera, and only from memory;
+in AR it was off (it was built for the phone-sensor model), so the AR preview began lying along the
+camera, and a table the app had never seen got no guess at all.
+
+- **`TableOrientationGuess`** weighs two candidates for the first placement of the AR preview:
+  **memory** (this table, this place, or the last table: the same prior the non-AR camera uses, which
+  knows which end is which) and **the tabletop plane** ARCore found (the long axis of its outline,
+  trusted only as far as the outline is table-shaped and table-sized, and never above 0.4). Agreeing
+  sources raise the confidence, a dissenter lowers it; a guess under 0.3 is not applied.
+- **The felt** still places and turns the table when it is sure (as before); the guess settles which
+  end is which for it, instead of the camera-facing default.
+- **A lock remembers the real heading.** The app's own rotation does not follow the AR table, so the
+  heading recorded at a lock is now measured from the anchor against the camera; memory in AR was
+  otherwise recording a number that meant nothing.
+- Not done: the non-AR camera's first-ever guess (no memory, no plane) is unchanged.
+
 ### Added — a crash report that needs no computer, and AR start-up guards
 
 A Galaxy A16 5G still force-closed when AR was switched on, and no stack trace could be had.

@@ -77,6 +77,14 @@ class ArControllerImpl(context: Context) : ArController {
 
     override fun unlockTable() = arTableSession.unlock()
 
+    override fun setTableOrientationPrior(
+        prior: ((yawDeg: Float, pitchDeg: Float) -> com.hereliesaz.cuedetat.domain.TableOrientationLearner.Prediction?)?,
+    ) {
+        arTableSession.orientationPrior = prior
+    }
+
+    override fun lockedTableHeadingDegrees(): Float? = arTableSession.lockedHeadingDegrees()
+
     override fun saveCloudPlacement() = arTableSession.requestSaveCloudPlacement()
 
     override fun restoreCloudPlacement(logicalCorners: List<PointF>) =

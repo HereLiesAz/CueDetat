@@ -131,6 +131,14 @@ checked against the source on 11/19/2026.
       instead of 75% (each step is a full recompute). **Correction to the survey:** `applyPoseUpdate` (the
       "second controller") lives in the saved-scan edge fallback of the AR frame path, not in the non-AR
       loop the pull runs in, so the two do not fight in one mode; left alone.
+- [x] **Initial orientation guess in AR** (owner, 11/19/2026: memory, felt and plane). `TableOrientationGuess` +
+      `PlaneShape` (pure, tested: 13 tests run on the JVM through a scratch copy), wired in
+      `ArTableSession.initializePreview` (memory via `ArController.setTableOrientationPrior`; the plane's
+      outline via `planeCandidate`; the felt still decides when sure, and gets the guess as its "current
+      heading" to settle the end), and the lock now records the real heading (`lockedHeadingDegrees`).
+      Unchecked on a device: the sign of the plane's axis against the camera (tested only through
+      `headingOf`), whether ARCore's plane polygon is table-shaped in practice, and whether a
+      remembered AR heading predicts the next session.
 - [ ] **AR force-close on a Galaxy A16 5G, no trace available** (owner, 11/19/2026). ARCore lists the device (Depth API;
       from a summarised copy of the page). Audit found no definite cause; added `CrashReport` (stack trace,
       breadcrumbs, previous-exit record, shared from the rail menu) and error-boundary guards (scan analyzer,

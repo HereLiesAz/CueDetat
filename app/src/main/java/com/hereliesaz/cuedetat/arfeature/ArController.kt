@@ -74,6 +74,21 @@ interface ArController {
     /** Release the locked table. */
     fun unlockTable()
 
+    /**
+     * Where memory says the table lies, for the first placement of the AR preview: given the phone's
+     * heading and pitch (degrees), the remembered table rotation (clockwise from the way the camera
+     * faces) with how far to trust it, or null. Set once; the AR side reads it when it places the
+     * preview, so it need not be re-set when the phone turns.
+     */
+    fun setTableOrientationPrior(prior: ((yawDeg: Float, pitchDeg: Float) -> com.hereliesaz.cuedetat.domain.TableOrientationLearner.Prediction?)?) {}
+
+    /**
+     * The locked table's heading in clockwise degrees from the way the camera faces now, or null
+     * when the table is not locked or the camera has not been seen yet. What a lock should remember:
+     * the on-screen rotation the app keeps does not track the AR table.
+     */
+    fun lockedTableHeadingDegrees(): Float? = null
+
     /** Explicit, consent-confirmed cloud hosting; no automatic visual-map upload. */
     fun saveCloudPlacement() {}
 

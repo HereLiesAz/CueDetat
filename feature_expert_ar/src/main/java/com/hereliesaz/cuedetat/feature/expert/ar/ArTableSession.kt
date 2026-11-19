@@ -28,6 +28,9 @@ import com.hereliesaz.cuedetat.domain.ArTrackingMessages
 import com.hereliesaz.cuedetat.domain.FeltColorMatch
 import com.hereliesaz.cuedetat.domain.QuadOverlap
 import com.hereliesaz.cuedetat.domain.ScreenCornerSmoother
+import com.hereliesaz.cuedetat.domain.PlaneShape
+import com.hereliesaz.cuedetat.domain.TableOrientationGuess
+import com.hereliesaz.cuedetat.domain.TableOrientationLearner
 import com.hereliesaz.cuedetat.domain.TableReseedPolicy
 import com.hereliesaz.cuedetat.domain.TableFrameHomography
 import com.hereliesaz.cuedetat.domain.TableFrameHomography.Pt
@@ -125,6 +128,19 @@ class ArTableSession(
     private var previewAway = Vec3(0f, 0f, -1f)
     private var previewInitialRotation = 0f
     private var previousPreviewInput: PreviewInput? = null
+
+    /**
+     * Where memory says the table lies, given the phone's heading and pitch (set by the app; see
+     * `ArController.setTableOrientationPrior`). Read once, when the preview is first placed.
+     */
+    @Volatile var orientationPrior: ((yawDeg: Float, pitchDeg: Float) -> TableOrientationLearner.Prediction?)? = null
+
+    /** The phone's heading and pitch as of the last state push, for [orientationPrior]. */
+    @Volatile private var phoneYawDeg = 0f
+    @Volatile private var phonePitchDeg = 0f
+
+    /** The camera's (right, away) on the horizontal plane as of the last frame: what a heading is measured against. */
+    @Volatile private var cameraFacing: Pair<Vec3, Vec3>? = null
 
     // One locked world anchor, oriented so xAxis is table-right and -zAxis is
     // table-away. ARCore can refine its whole pose without changing the bed size.
@@ -576,6 +592,8 @@ class ArTableSession(
 
     /** Update editable table controls without ever re-anchoring on camera-pose updates. */
     fun updatePreviewInput(state: CueDetatState) {
+        phoneYawDeg = state.currentOrientation.yaw
+        phonePitchDeg = state.currentOrientation.pitch
         // Size applies to the locked table too, so it is taken before the preview early-out.
         if (tableScale != state.tableFitScale) lastUserChangeNanos = System.nanoTime()
         tableScale = state.tableFitScale
@@ -724,6 +742,7 @@ class ArTableSession(
         val proj = FloatArray(16)
         frame.camera.getViewMatrix(view, 0)
         frame.camera.getProjectionMatrix(proj, 0, 0.01f, 100f)
+        recordCameraFacing(frame)
 
         // Taken every frame so a nudge made while locked is dropped, not applied on Unlock.
         val rangeNudge = takeRangeNudge()
@@ -874,6 +893,87 @@ class ArTableSession(
         return ratio.takeIf { it in SCALE_FIT_MIN..SCALE_FIT_MAX }
     }
 
+    /** Keeps the camera's horizontal (right, away) for [lockedHeadingDegrees]. */
+    private fun recordCameraFacing(frame: Frame) {
+        val back = frame.camera.pose.zAxis
+        val length = hypot(back[0].toDouble(), back[2].toDouble()).toFloat()
+        if (length < 0.05f) return // looking straight up or down: no horizontal facing to speak of
+        val away = Vec3(-back[0] / length, 0f, -back[2] / length)
+        cameraFacing = Vec3(-away.z, 0f, away.x) to away
+    }
+
+    /**
+     * The first guess at the table's heading: what memory says, and what the shape of the tabletop
+     * plane under the screen centre says ([TableOrientationGuess] weighs them). Null when neither
+     * has anything worth having. Never throws: a guess is a convenience, not a requirement.
+     */
+    private fun guessHeading(
+        hits: List<HitResult>, input: PreviewInput, cameraRight: Vec3, cameraAway: Vec3,
+    ): TableOrientationGuess.Guess? = try {
+        val candidates = ArrayList<TableOrientationGuess.Candidate>(2)
+        orientationPrior?.invoke(phoneYawDeg, phonePitchDeg)?.let {
+            candidates += TableOrientationGuess.Candidate(
+                TableOrientationGuess.Source.MEMORY, it.rotationDeg, ambiguousEnds = false, confidence = it.confidence,
+            )
+        }
+        planeCandidate(hits, input, cameraRight, cameraAway)?.let { candidates += it }
+        TableOrientationGuess.choose(candidates)
+    } catch (e: Exception) {
+        android.util.Log.w("ArTableSession", "Table heading guess failed", e)
+        null
+    }
+
+    /**
+     * The long axis of the horizontal plane ARCore found where the screen centre points, as a heading
+     * against the camera, weighed by how table-like the plane's outline is ([PlaneShape.confidence]).
+     */
+    private fun planeCandidate(
+        hits: List<HitResult>, input: PreviewInput, cameraRight: Vec3, cameraAway: Vec3,
+    ): TableOrientationGuess.Candidate? {
+        val plane = hits.asSequence().map { it.trackable }
+            .filterIsInstance<Plane>()
+            .firstOrNull { it.type == Plane.Type.HORIZONTAL_UPWARD_FACING && it.trackingState == TrackingState.TRACKING }
+            ?: return null
+        val buffer = plane.polygon
+        val xz = FloatArray(buffer.remaining()).also { buffer.duplicate().get(it) }
+        val box = PlaneShape.boundingBox(xz) ?: return null
+        val unitsPerMeter = TableFrameHomography.LOGICAL_UNITS_PER_METER
+        val tableLong = (input.corners[3].y - input.corners[0].y) / unitsPerMeter
+        val tableShort = (input.corners[1].x - input.corners[0].x) / unitsPerMeter
+        val confidence = PlaneShape.confidence(box, tableLong, tableShort)
+        if (confidence < TableOrientationGuess.MIN_CONFIDENCE) return null
+
+        // The long side's direction in the plane's frame, taken into the world.
+        val a = Math.toRadians(box.angleDeg.toDouble())
+        val world = plane.centerPose.rotateVector(floatArrayOf(cos(a).toFloat(), 0f, sin(a).toFloat()))
+        val length = hypot(world[0].toDouble(), world[2].toDouble()).toFloat()
+        if (length < 0.2f) return null // the plane is tilted: its "horizontal" axis is not.
+        val axis = Vec3(world[0] / length, 0f, world[2] / length)
+        return TableOrientationGuess.Candidate(
+            TableOrientationGuess.Source.PLANE,
+            TableOrientationGuess.headingOf(axis, cameraRight, cameraAway),
+            ambiguousEnds = true,
+            confidence = confidence,
+        )
+    }
+
+    /**
+     * The locked table's heading: clockwise degrees from the way the camera faced at the last frame to
+     * the table's long axis. Null while the table is not locked or before the first frame. Callable from
+     * any thread; the anchor and the camera are read as the GL thread last left them.
+     */
+    fun lockedHeadingDegrees(): Float? {
+        val anchor = lockedTableAnchor ?: return null
+        val (cameraRight, cameraAway) = cameraFacing ?: return null
+        return try {
+            val z = anchor.pose.zAxis
+            val axis = Vec3(-z[0] * lockedAwaySign, 0f, -z[2] * lockedAwaySign)
+            TableOrientationGuess.headingOf(axis, cameraRight, cameraAway)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /**
      * Create one stationary world-space anchor. Depth/plane hits supply real metres; without
      * either the 1.8m forward / 0.45m below-camera starting point is explicitly an estimate.
@@ -887,8 +987,25 @@ class ArTableSession(
         val cameraBack = camera.zAxis
         val horizontal = hypot(cameraBack[0].toDouble(), cameraBack[2].toDouble()).toFloat()
         if (horizontal < 0.05f) return
-        val away = Vec3(-cameraBack[0] / horizontal, 0f, -cameraBack[2] / horizontal)
-        val right = Vec3(-away.z, 0f, away.x)
+        val cameraAway = Vec3(-cameraBack[0] / horizontal, 0f, -cameraBack[2] / horizontal)
+        val cameraRight = Vec3(-cameraAway.z, 0f, cameraAway.x)
+        val hits = frame.hitTest(vpW / 2f, vpH / 2f)
+
+        // The starting heading: not simply "along the camera", but memory's, and the tabletop plane's.
+        // The felt, when it is sure, still decides (below); this settles which end is which for it and
+        // is the answer when there is no felt fit yet.
+        val guess = guessHeading(hits, input, cameraRight, cameraAway)
+        val (right, away) = if (guess != null && guess.confidence >= TableOrientationGuess.APPLY_CONFIDENCE) {
+            TableFrameHomography.headingAfterYaw(
+                cameraRight, cameraAway, TableFrameHomography.clockwiseToWorldYaw(guess.headingDeg),
+            )
+        } else cameraRight to cameraAway
+        if (guess != null) {
+            android.util.Log.i("ArTableSession", "Initial table heading guess ${guess.headingDeg} deg from ${guess.sources} " +
+                "(confidence ${guess.confidence}, applied=${guess.confidence >= TableOrientationGuess.APPLY_CONFIDENCE})")
+            com.hereliesaz.cuedetat.data.CrashReport.breadcrumb("AR: heading guess ${guess.headingDeg.toInt()} deg ${guess.sources} conf ${"%.2f".format(guess.confidence)}")
+        }
+
         // A fit from just before (the table was lost, not first placed) puts it back on the felt.
         latestFit?.takeIf {
             System.nanoTime() - it.atNanos < FIT_FRESH_NANOS && it.quality >= INIT_FIT_QUALITY
@@ -902,7 +1019,6 @@ class ArTableSession(
                 return
             }
         }
-        val hits = frame.hitTest(vpW / 2f, vpH / 2f)
         val hit = hits.firstOrNull { supportsDepth && it.trackable is DepthPoint }
             ?: hits.firstOrNull { h ->
                 val p = h.trackable
@@ -912,8 +1028,9 @@ class ArTableSession(
         val origin = if (hit != null) {
             Vec3(hit.hitPose.tx(), hit.hitPose.ty(), hit.hitPose.tz())
         } else {
-            Vec3(camera.tx() + away.x * 1.8f, camera.ty() - 0.45f,
-                camera.tz() + away.z * 1.8f)
+            // Forward along the camera, not along the table: the guess turns the table, not where it is.
+            Vec3(camera.tx() + cameraAway.x * 1.8f, camera.ty() - 0.45f,
+                camera.tz() + cameraAway.z * 1.8f)
         }
         previewAnchor = try {
             s.createAnchor(Pose(floatArrayOf(origin.x, origin.y, origin.z),
