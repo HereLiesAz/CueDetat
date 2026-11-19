@@ -92,12 +92,13 @@ class DebugLogRecorder @Inject constructor(
     }
 
     /**
-     * A share-sheet intent carrying the log (current file plus rotated ones, oldest first, joined
-     * into one), or null when nothing has been recorded yet.
+     * A share-sheet intent carrying the crash report (if there is one) and the log (current file plus
+     * rotated ones, oldest first, joined into one), or null when nothing has been recorded yet.
      */
     @Synchronized
     fun shareIntent(): Intent? {
-        val parts = (ROTATE_COUNT downTo 1).map { File(dir, "$FILE.$it") } + logFile
+        // A crash report (CrashReport) goes first: it is what the log is being sent for.
+        val parts = listOf(CrashReport.file(context)) + (ROTATE_COUNT downTo 1).map { File(dir, "$FILE.$it") } + logFile
         val existing = parts.filter { it.exists() && it.length() > 0 }
         if (existing.isEmpty()) return null
         val out = File(dir, SHARE_FILE)

@@ -54,7 +54,15 @@ class TableScanViewModel(
     val pocketDetector: PocketDetector,
     private val arFrameProcessor: ArFrameProcessor,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    // An exception in a scan frame's background work is logged and that frame lost; without a handler
+    // it would be uncaught and end the process.
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main.immediate +
+            kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
+                android.util.Log.e("TableScanViewModel", "Table scan work failed", e)
+                com.hereliesaz.cuedetat.data.CrashReport.breadcrumb("table scan work failed: ${e.javaClass.simpleName}")
+            },
+    )
 
     private val _mlConfidence = MutableStateFlow(0f)
     val mlConfidence: StateFlow<Float> = _mlConfidence.asStateFlow()

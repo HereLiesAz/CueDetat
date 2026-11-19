@@ -15,6 +15,7 @@ import com.hereliesaz.cuedetat.data.TableScanRepository
 import com.hereliesaz.cuedetat.data.UserPreferencesRepository
 import com.hereliesaz.cuedetat.data.VisionAnalyzer
 import com.hereliesaz.cuedetat.data.VisionRepository
+import com.hereliesaz.cuedetat.data.CrashReport
 import com.hereliesaz.cuedetat.domain.ArCoreStatus
 import com.hereliesaz.cuedetat.domain.ArModuleState
 import com.hereliesaz.cuedetat.domain.ArTrackingMessages
@@ -60,6 +61,14 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.NonCancellable
 import javax.inject.Inject
 
+/** Events that arrive many times a second; they would fill a crash report's breadcrumbs with nothing. */
+private val NOISY_EVENTS = setOf(
+    "FullOrientationChanged", "ArTableMatrixUpdated", "ArCameraPoseUpdated", "CvDataUpdated", "TableFitUpdated",
+    "RecommendationComputed", "SpinPathTick", "SetWarning", "LogicalDragApplied", "Drag", "PanView",
+    "ZoomScaleChanged", "ZoomSliderChanged", "TableRotationChanged", "TableScaleChanged", "DragSpinControl",
+    "ApplyTablePose", "UpdateArPose", "WearableStateUpdated",
+)
+
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val reducerUtils: ReducerUtils,
@@ -95,8 +104,17 @@ class MainViewModel @Inject constructor(
 
     fun setDebugLogEnabled(on: Boolean) = debugLogRecorder.setEnabled(on)
 
-    /** Share-sheet intent for the recorded log, or null if nothing is recorded yet. */
+    /** Share-sheet intent for the crash report and the recorded log, or null if there is neither. */
     fun debugLogShareIntent(): android.content.Intent? = debugLogRecorder.shareIntent()
+
+    /** A crash was recorded (CrashReport) and has not been cleared: the menu offers to send it. */
+    private val _hasCrashReport = kotlinx.coroutines.flow.MutableStateFlow(CrashReport.exists(appContext))
+    val hasCrashReport: kotlinx.coroutines.flow.StateFlow<Boolean> = _hasCrashReport.asStateFlow()
+
+    fun clearCrashReport() {
+        CrashReport.clear(appContext)
+        _hasCrashReport.value = false
+    }
 
     /** Newer release from the same source as this install; UI offers the right store. */
     private val _updateInfo = kotlinx.coroutines.flow.MutableStateFlow<com.hereliesaz.cuedetat.update.UpdateInfo?>(null)
@@ -394,6 +412,7 @@ class MainViewModel @Inject constructor(
         if (_uiState.value.arModuleState == ArModuleState.READY) return
         if (arModuleLoadJob?.isActive == true) return
         arModuleLoadJob = viewModelScope.launch {
+            CrashReport.breadcrumb("AR: loading the module")
             onEvent(MainScreenEvent.ArModuleLoadStarted)
             // Don't use runCatching: it would swallow CancellationException and
             // (e.g. on Retry, which cancels this job) post a spurious
@@ -408,6 +427,7 @@ class MainViewModel @Inject constructor(
                 thrown = "${t.javaClass.simpleName}: ${t.message ?: "(no message)"}"
                 false
             }
+            CrashReport.breadcrumb("AR: module loaded=$loaded")
             if (loaded) {
                 detectArCapability(offerInstall = true)
                 onEvent(MainScreenEvent.ArModuleLoadSucceeded)
@@ -415,6 +435,25 @@ class MainViewModel @Inject constructor(
                 onEvent(MainScreenEvent.ArModuleLoadFailed(thrown ?: arController.lastLoadError))
             }
         }
+    }
+
+    /**
+     * Runs an ARCore query off the main thread and turns whatever it throws, including the
+     * `LinkageError`s a missing or half-installed ARCore raises (`UnsatisfiedLinkError`,
+     * `NoClassDefFoundError`), into [fallback]: the camera view and CV keep working without AR.
+     */
+    private suspend fun <T> guardedAr(what: String, fallback: T, block: () -> T): T = try {
+        withContext(Dispatchers.Default) { block() }
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        android.util.Log.e("ExpertAR", "$what failed", e)
+        CrashReport.breadcrumb("AR: $what failed: ${e.javaClass.simpleName}")
+        fallback
+    } catch (e: LinkageError) {
+        android.util.Log.e("ExpertAR", "$what failed", e)
+        CrashReport.breadcrumb("AR: $what failed: ${e.javaClass.simpleName}")
+        fallback
     }
 
     /** Whether Google Play has been asked to install ARCore since AR was last entered; once, not a loop. */
@@ -428,8 +467,13 @@ class MainViewModel @Inject constructor(
      * main thread.
      */
     private suspend fun detectArCapability(offerInstall: Boolean) {
-        val status = withContext(Dispatchers.Default) { arController.arCoreStatus() }
-        onEvent(MainScreenEvent.DepthCapabilityDetected(arController.probeCapability()))
+        CrashReport.breadcrumb("AR: checking what ARCore can do")
+        val status = guardedAr("arCoreStatus", ArCoreStatus.UNKNOWN) { arController.arCoreStatus() }
+        // The probe builds a throwaway ARCore Session: off the main thread, and a missing or broken
+        // ARCore (an Error from its classes) is "no capability", not a dead app.
+        val capability = guardedAr("probeCapability", DepthCapability.NONE) { arController.probeCapability() }
+        CrashReport.breadcrumb("AR: status=$status capability=$capability")
+        onEvent(MainScreenEvent.DepthCapabilityDetected(capability))
         when {
             status == ArCoreStatus.READY -> {
                 // Installed since the notice went up (we are back from Google Play).
@@ -469,20 +513,32 @@ class MainViewModel @Inject constructor(
      */
     private fun restoreSavedScanForAr() {
         viewModelScope.launch {
-            val savedModel = withContext(Dispatchers.IO) { tableScanRepository.load() } ?: return@launch
-            val now = System.currentTimeMillis()
-            if (now - SavedScanPlausibility.lastUsedAt(savedModel) !in 0..SavedScanPlausibility.MAX_AGE_MS) return@launch
-            val current = if (savedModel.scanLatitude != null && savedModel.scanLongitude != null) {
-                tableScanRepository.getCurrentLocation()
-            } else null
-            if (!SavedScanPlausibility.isPlausiblySameTable(savedModel, now, current)) return@launch
-            // The user may have finished a fresh scan or left AR while the location resolved.
-            val state = _uiState.value
-            if (state.cameraMode != CameraMode.AR_SETUP || state.tableScanModel != null) return@launch
-            onEvent(MainScreenEvent.LoadTableScan(savedModel))
-            onEvent(MainScreenEvent.SeedRelocaliser(null))
-            onEvent(MainScreenEvent.StartArTracking)
+            try {
+                restoreSavedScan()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A bad saved scan or a location failure must not take the app down: scan afresh.
+                android.util.Log.e("ExpertAR", "Restoring the saved table scan failed", e)
+                CrashReport.breadcrumb("AR: restoring the saved scan failed: ${e.javaClass.simpleName}")
+            }
         }
+    }
+
+    private suspend fun restoreSavedScan() {
+        val savedModel = withContext(Dispatchers.IO) { tableScanRepository.load() } ?: return
+        val now = System.currentTimeMillis()
+        if (now - SavedScanPlausibility.lastUsedAt(savedModel) !in 0..SavedScanPlausibility.MAX_AGE_MS) return
+        val current = if (savedModel.scanLatitude != null && savedModel.scanLongitude != null) {
+            tableScanRepository.getCurrentLocation()
+        } else null
+        if (!SavedScanPlausibility.isPlausiblySameTable(savedModel, now, current)) return
+        // The user may have finished a fresh scan or left AR while the location resolved.
+        val state = _uiState.value
+        if (state.cameraMode != CameraMode.AR_SETUP || state.tableScanModel != null) return
+        onEvent(MainScreenEvent.LoadTableScan(savedModel))
+        onEvent(MainScreenEvent.SeedRelocaliser(null))
+        onEvent(MainScreenEvent.StartArTracking)
     }
 
     private fun processEvent(rawEvent: MainScreenEvent) {
@@ -490,6 +546,8 @@ class MainViewModel @Inject constructor(
         val event = if (rawEvent is MainScreenEvent.SetWarning && rawEvent.warning == null &&
             persistentNotice != null
         ) MainScreenEvent.SetWarning(persistentNotice) else rawEvent
+        // What the app was doing, for a crash report (CrashReport); the per-frame events would drown it.
+        event::class.simpleName?.let { if (it !in NOISY_EVENTS) CrashReport.breadcrumb("event $it") }
         // ARCore sends the camera's pitch and height every frame, and they barely change: only a
         // real change is worth a reduce and an aim recompute.
         if (event is MainScreenEvent.ArCameraPoseUpdated) {

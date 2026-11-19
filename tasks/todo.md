@@ -131,6 +131,12 @@ checked against the source on 11/19/2026.
       instead of 75% (each step is a full recompute). **Correction to the survey:** `applyPoseUpdate` (the
       "second controller") lives in the saved-scan edge fallback of the AR frame path, not in the non-AR
       loop the pull runs in, so the two do not fight in one mode; left alone.
+- [ ] **AR force-close on a Galaxy A16 5G, no trace available** (owner, 11/19/2026). ARCore lists the device (Depth API;
+      from a summarised copy of the page). Audit found no definite cause; added `CrashReport` (stack trace,
+      breadcrumbs, previous-exit record, shared from the rail menu) and error-boundary guards (scan analyzer,
+      scan coroutines, capability probe off the main thread, saved-scan restore, GL `LinkageError`).
+      Open: the cause. Next step is the shared report. Also found, not fixed: CameraX may still hold the
+      camera when ARCore resumes (AR then fails with "could not start the camera", no retry until the next resume).
 - [ ] Also found: in AR, `effectivePitchDegrees` is never refreshed (ball lift uses stale IMU pitch).
 - [ ] From the CV survey, not started: temporal tracking of detections (a ball missed for one frame vanishes,
       types flip per frame), cue selection (first CUE-typed ball wins, others dropped), stale `visionData` after
