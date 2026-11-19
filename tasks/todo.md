@@ -38,14 +38,20 @@ and covers combination shots. Decisions taken with the owner:
   - [x] `core/advisor` `TableBall`, `BallGroup`, `GroupRules` (pottable, first contacts, legal combinations).
   - [x] App `TableFrame` (PointF adapter); `CoreBridge` delegates; one source for the scale.
   - [ ] CI green on the app side (`TableFrameTest`; `:app` cannot be built in the authoring environment).
-- [ ] **2. Core search**
-  - [ ] Banks and kicks: unfold off the rails; use `Cushion.rebound` for the rail's effect; handle pocket jaws
-        (`firstCushionHit` returns null there).
-  - [ ] Legal 2-ball combinations: `AimSolver` twice (cue -> A, then A's departure -> B -> pocket), `GroupRules`
-        for legality, obstruction on every leg.
-  - [ ] Candidate type with ball ids, pocket index, leg points; a probability model for banks, kicks, combos
-        (the existing one is direct-only and uncalibrated).
-  - [ ] Hand-worked test layouts for each shot type.
+- [x] **2. Core search** (`core/advisor`: `ShotPlanner`, `PrecisionModel`)
+  - [x] Banks and kicks, one cushion: mirror across the cushion's *centre line* (the ball's centre bounces),
+        pure mirror law. Not used yet: `Cushion.rebound` (pace and spin on the rail), two or more cushions.
+        Kicks only when the straight shot is not there; the cushion point is a fixed point with the throw-
+        corrected ghost (4 passes, 1 mm tolerance).
+  - [x] Legal 2-ball combinations: `AimSolver` twice (work back from the pocket: where the first ball meets
+        the second, then where the cue meets the first), `GroupRules.isLegalCombination`, obstruction on every
+        leg with moved balls excluded.
+  - [x] `ShotPlan` (kind, first and pocketed ball ids, pocket index, ghost, cue path, ball paths, cuts,
+        probability). The probability is one shared model: legs multiply the precision demanded, each cushion
+        halves it (placeholder). The direct case is unchanged (the old hand-computed test still passes).
+  - [x] No shot is offered whose ghost ball (or a striking ball's contact position) would be off the table.
+  - [x] Hand-worked layouts for each kind (`ShotPlannerTest`).
+  - [ ] Not done, deliberately: 3+ ball chains, safeties, position play, speed/spin choice.
 - [ ] **3. Wiring**
   - [ ] State -> core input: detected balls plus hand-placed ones (all "mine"), pockets (scanned ones synthesised),
         table spec; extend the driver key (table size, placed balls, scan pockets), not just detections.
