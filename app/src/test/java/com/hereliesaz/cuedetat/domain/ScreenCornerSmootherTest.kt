@@ -121,8 +121,8 @@ class ScreenCornerSmootherTest {
                 else -> 200f + 1000f * (t - 1.2f)
             }
         }
-        val now = track(ScreenCornerSmoother(), 4f, 0.3f, 2, pan).filter { it.first > 1f }
-        val before = track(legacy(), 4f, 0.3f, 2, pan).filter { it.first > 1f }
+        val now = track(ScreenCornerSmoother(), 4f, 0.3f, 2, truth = pan).filter { it.first > 1f }
+        val before = track(legacy(), 4f, 0.3f, 2, truth = pan).filter { it.first > 1f }
         val nowWorst = now.maxOf { it.second - it.third }
         val beforeWorst = before.maxOf { it.second - it.third }
         assertTrue("worst lag now $nowWorst px, before $beforeWorst px", nowWorst < 9f && nowWorst < beforeWorst)
@@ -133,7 +133,7 @@ class ScreenCornerSmootherTest {
     @Test
     fun `a slow deliberate creep is followed about as closely as before`() {
         val creep = { t: Float -> 100f + 30f * t }
-        val now = track(ScreenCornerSmoother(), 10f, 1f, 3, creep).filter { it.first > 3f }
+        val now = track(ScreenCornerSmoother(), 10f, 1f, 3, truth = creep).filter { it.first > 3f }
         val lag = now.map { it.second - it.third }.sum() / now.size
         assertTrue("lag at 30 px/s: $lag px (before: about 1.7)", lag in 0f..3f)
     }
