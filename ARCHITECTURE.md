@@ -243,6 +243,14 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   screen) is not applied to a shot the advisor chose. The advisor's balls are the detected ones and the
   hand-placed ones (all treated as the shooter's own); the protractor's target is its output, not an input.
 
+- **Jitter is cut at the gate, not only in the filters** (`OrientationGate`, `ArMatrixHold`, `BallFollow`,
+  `CoreShotAdvice.Signature`). Reason: the sensor filter, the AR corner filter and the table fit each smooth
+  their own signal, but nothing decided whether a *tiny* change was worth the reduce, the matrix rebuild, the
+  aim recompute and the redraw, so a phone on a table ran the whole pipeline on every sample. Each gate is a
+  pure class with its constant derived in its KDoc and tested against synthetic noise. The advisor compares
+  ball positions by distance against the last signature it acted on, not by rounding onto a grid, which flips
+  its answer when a ball sits on a cell edge.
+
 ## Where things actually live (correcting known-stale doc claims)
 
 - ARCore session/depth capability: `feature_expert_ar/.../ArTableSession.kt`

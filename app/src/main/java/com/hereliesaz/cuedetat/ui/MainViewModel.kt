@@ -204,14 +204,15 @@ class MainViewModel @Inject constructor(
 
         // Shot advisor driver: recompute the recommendation off-main whenever the advisor is
         // enabled and anything it reads changes (table size, group, detected and hand-placed
-        // balls). The key quantizes positions so sub-pixel CV jitter does not recompute; while the
-        // advisor is off it is the constant "off", so no per-emission String is built. The planner
-        // does not suspend, so collectLatest cannot cancel a computation already running; it only
-        // skips keys superseded before it starts.
+        // balls). Positions are compared with a tolerance (CoreShotAdvice.Signature) so CV jitter
+        // does not recompute or flip the shot; while the advisor is off the signature is a constant.
+        // The planner does not suspend, so collectLatest cannot cancel a computation already
+        // running; it only skips signatures superseded before it starts.
         viewModelScope.launch(Dispatchers.Default) {
             _uiState
-                .map { s -> if (!s.isAdvisorEnabled) "off" else CoreShotAdvice.key(s) }
-                .distinctUntilChanged()
+                .map { s -> if (!s.isAdvisorEnabled) CoreShotAdvice.OFF else CoreShotAdvice.signature(s) }
+                // Against the last signature acted on, so slow drift still adds up to a recompute.
+                .distinctUntilChanged { previous, next -> previous.sameAs(next) }
                 .collectLatest {
                     val st = _uiState.value
                     val shot = if (st.isAdvisorEnabled) CoreShotAdvice.recommend(st) else null
@@ -495,6 +496,13 @@ class MainViewModel @Inject constructor(
                 kotlin.math.abs(live.arMeasuredHeightM - event.heightAboveSurfaceM) < 0.01f
             ) return
         }
+        // The sensor filter's output moves a hair on every sample even on a table; only an
+        // orientation that has moved enough to show is worth the reduce, the matrices and the redraw.
+        if (event is MainScreenEvent.FullOrientationChanged &&
+            !com.hereliesaz.cuedetat.domain.OrientationGate.worthApplying(
+                _uiState.value.currentOrientation, event.orientation
+            )
+        ) return
         // Lock View: sensor-driven transforms are dropped before they reach the reducers.
         // Lock View freezes screen-space sensor-driven transforms by design.
         // It is distinct from AR table Lock (a physical world anchor).

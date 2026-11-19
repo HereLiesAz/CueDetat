@@ -5,6 +5,7 @@ package com.hereliesaz.cuedetat.domain.reducers
 import com.hereliesaz.cuedetat.data.BallType
 import com.hereliesaz.cuedetat.data.VisionData
 import com.hereliesaz.cuedetat.domain.Assignment
+import com.hereliesaz.cuedetat.domain.BallFollow
 import com.hereliesaz.cuedetat.domain.BallBounds
 import com.hereliesaz.cuedetat.domain.CueDetatState
 import com.hereliesaz.cuedetat.domain.TargetType
@@ -162,10 +163,12 @@ class SnapReducer @Inject constructor() {
                 (candidate.detectedPoint.y - anchor.y).toDouble()
             )
         }
-        anchors.forEachIndexed { row, (kind, _) ->
+        anchors.forEachIndexed { row, (kind, anchor) ->
             val col = follow[row]
             if (col < 0) return@forEachIndexed
-            val point = newCandidates[col].detectedPoint
+            // The ball follows the detection through BallFollow, which holds it still against
+            // pixel noise and follows a real move at once, so a ball on the table does not shiver.
+            val point = BallFollow.step(anchor, newCandidates[col].detectedPoint)
             when (kind) {
                 AnchorKind.CUE -> {
                     newCueBallAnchor = point
