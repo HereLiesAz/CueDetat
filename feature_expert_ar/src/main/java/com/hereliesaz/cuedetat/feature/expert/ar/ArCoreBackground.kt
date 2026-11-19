@@ -24,6 +24,7 @@ import com.google.ar.core.Frame
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.hereliesaz.cuedetat.domain.ArCoreStatus
+import com.hereliesaz.cuedetat.domain.ArMatrixHold
 import com.hereliesaz.cuedetat.domain.ArTrackingMessages
 import com.hereliesaz.cuedetat.domain.MainScreenEvent
 import javax.microedition.khronos.egl.EGLConfig
@@ -189,6 +190,9 @@ private class ArCoreRenderer(
     private var trackingLostSinceNanos = 0L
     private var lostNoticeShown = false
 
+    /** Bridges a frame or two where the table anchor has no matrix, so the table does not blink. */
+    private val matrixHold = ArMatrixHold<android.graphics.Matrix>()
+
     // Both surface callbacks run on the GL thread with nothing above them: an exception here (a
     // Session closed by a fast AR off/on, say) would end the process, not just this frame. Under
     // frameLock, as onDrawFrame is, so close() cannot interleave.
@@ -246,6 +250,8 @@ private class ArCoreRenderer(
             }
             val now = System.nanoTime()
             if (currentTracking != TrackingState.TRACKING) {
+                // A camera that has lost tracking leaves a stale projection: never hold it over.
+                matrixHold.reset()
                 if (trackingLostSinceNanos == 0L) trackingLostSinceNanos = now
                 // A glance away is not worth a message; a real loss says why and what to do.
                 if (!lostNoticeShown && now - trackingLostSinceNanos > LOST_NOTICE_AFTER_NANOS) {
@@ -281,7 +287,13 @@ private class ArCoreRenderer(
             if (currentTracking == TrackingState.TRACKING) {
                 // World-anchored table: serve any Lock tap, then fit the homography from the anchors.
                 val update = arTableSession.computeFrameUpdate(frame, surfaceWidth, surfaceHeight)
-                onEvent(MainScreenEvent.ArTableMatrixUpdated(matrix = update.matrix))
+                // The anchor can go untracked for a frame or two while the camera is fine; hold the
+                // last matrix across that instead of blinking the table off and on.
+                val shown = when (val decision = matrixHold.decide(update.matrix, now)) {
+                    is ArMatrixHold.Decision.Publish -> decision.matrix
+                    ArMatrixHold.Decision.Clear -> null
+                }
+                onEvent(MainScreenEvent.ArTableMatrixUpdated(matrix = shown))
                 update.lockResult?.let { onEvent(MainScreenEvent.ArTableLockResult(it)) }
                 update.lockLost?.let { onEvent(MainScreenEvent.ArTableLockLost(it)) }
                 update.suggestedScale?.let { onEvent(MainScreenEvent.SetTableFitScale(it)) }

@@ -84,20 +84,60 @@ internal object CoreShotAdvice {
     }
 
     /**
-     * Everything [recommend] reads, to a precision finer than a pixel of jitter matters: the driver
-     * recomputes only when this changes.
+     * What [recommend] reads, reduced to what can change its answer: the table and the group, whether
+     * detections are usable, and each ball's kind and place. The driver recomputes only when a new
+     * signature is not [Signature.sameAs] the last one it acted on.
+     *
+     * Positions are compared by distance with a tolerance, not rounded onto a grid: a grid flips its
+     * answer whenever a ball sits on a cell edge, and a jittery detection there recomputed (and
+     * changed the shot) every frame.
      */
-    fun key(state: CueDetatState): String = buildString {
-        append(state.table.size).append('|').append(state.targetType).append('|')
-            .append(state.hasInverseMatrix).append('|')
-        state.onPlaneBall?.center?.let { append('c').append(it.x.toInt()).append(',').append(it.y.toInt()).append(';') }
-        state.obstacleBalls.forEach { append('o').append(it.center.x.toInt()).append(',').append(it.center.y.toInt()).append(';') }
+    fun signature(state: CueDetatState): Signature {
+        val head = "${state.table.size}|${state.targetType}|${state.hasInverseMatrix}"
+        val balls = ArrayList<Signature.Ball>()
+        state.onPlaneBall?.center?.let { balls += Signature.Ball("cue", it.x, it.y) }
+        state.obstacleBalls.forEach { balls += Signature.Ball("placed", it.center.x, it.center.y) }
         if (state.hasInverseMatrix) {
-            state.visionData?.balls?.forEach {
-                append(it.type).append(it.position.x.toInt()).append(',').append(it.position.y.toInt()).append(';')
+            state.visionData?.balls?.forEach { balls += Signature.Ball("seen:${it.type}", it.position.x, it.position.y) }
+        }
+        return Signature(head, balls)
+    }
+
+    /** The signature while the advisor is off: equal only to itself. */
+    val OFF = Signature("off", emptyList())
+
+    class Signature(val head: String, val balls: List<Ball>) {
+
+        class Ball(val tag: String, val x: Float, val y: Float)
+
+        /**
+         * Same inputs for the planner's purposes: the same head, and every ball here has one of the
+         * same kind within [tolerance] logical units in [other], matched one to one, nearest first.
+         */
+        fun sameAs(other: Signature, tolerance: Float = MOVE_TOLERANCE): Boolean {
+            if (head != other.head || balls.size != other.balls.size) return false
+            val free = other.balls.toMutableList()
+            for (ball in balls) {
+                var best = -1
+                var bestDistance = Float.MAX_VALUE
+                for ((i, candidate) in free.withIndex()) {
+                    if (candidate.tag != ball.tag) continue
+                    val d = hypot(candidate.x - ball.x, candidate.y - ball.y)
+                    if (d <= tolerance && d < bestDistance) { best = i; bestDistance = d }
+                }
+                if (best < 0) return false
+                free.removeAt(best)
             }
+            return true
         }
     }
+
+    /**
+     * A ball moving less than this does not recompute the shot. Two logical units is about a tenth of
+     * an inch; at a thousand units to the pocket that is about a tenth of a degree of aim, well inside
+     * the 0.6 degree aiming spread the probabilities assume.
+     */
+    const val MOVE_TOLERANCE = 2.0f
 
     /** A plan as the HUD and the renderer know it, in logical coordinates. */
     fun toRecommendedShot(plan: ShotPlan): RecommendedShot {

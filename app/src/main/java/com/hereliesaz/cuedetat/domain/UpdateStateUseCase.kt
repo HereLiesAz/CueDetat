@@ -24,7 +24,7 @@ import kotlin.math.sqrt
 
 enum class UpdateType {
     FULL,
-    MATRICES_ONLY, // Recalculates projection matrices only — skips aiming geometry and spin paths
+    MATRICES_ONLY, // Recalculates projection matrices, then aiming (the shot line's anchor is a screen point mapped through them) and, in massé, spin
     AIMING,
     SPIN_ONLY
 }

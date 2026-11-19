@@ -90,3 +90,33 @@ and covers combination shots. Decisions taken with the owner:
 - Recompute cost grows with targets x pockets x all balls (combos) x rails (banks); not measured.
 - `CueDetatState.comparableFields()` is hand-maintained over ~120 fields (ARCHITECTURE invariant, unenforced):
   every new state field must be added to it.
+
+# Stabilise the camera and the table placement (owner, 11/19/2026)
+
+Goal: less jitter on screen, and less wasted work behind it. Four PRs, each tested with synthetic noise on the
+JVM (no device here; every change to how the camera *feels* still needs a look on a phone). Findings were
+checked against the source on 11/19/2026.
+
+- [ ] **1. Quiet the churn** (low risk)
+  - [x] `OrientationGate`: a sensor orientation within 0.03 degrees (about a pixel) of the one last applied is
+        dropped before the reducers; drift still gets through as steps that small.
+  - [x] `ArMatrixHold`: a table matrix that goes missing for up to 250 ms while the camera is *tracking* is held
+        instead of blinking the table off; a camera tracking loss still hides it at once and forgets the hold.
+  - [x] `BallFollow` in `SnapReducer`: an anchored ball ignores detection noise under 1 logical unit and follows
+        a real move with no lag.
+  - [x] Advisor driver compares `CoreShotAdvice.Signature`s with a 2-unit tolerance, one to one by ball kind,
+        against the last one acted on; the old key truncated to whole units and flipped on a cell edge.
+  - [x] Corrected the stale `UpdateType.MATRICES_ONLY` comment. It also runs aiming, and that is **needed**: the
+        shot line's anchor is a screen point mapped through the matrices. Not "redundant work" as first reported.
+- [ ] **2. Sensor filter**: time-based (not per-sample alpha), yaw counted when choosing how hard to smooth, no
+      listener re-registration at the speed switch; `SensorRepository`'s EMA is inline in a `callbackFlow`, so
+      extract a pure class first.
+- [ ] **3. AR corner filter** (`ScreenCornerSmoother`): one shared speed across the four corners, a faster
+      derivative cutoff, no 150 px restart pop; skip an output that moved under a fraction of a pixel.
+- [ ] **4. Non-AR fit loop**: filter the pose itself (the median-of-5 only smooths the quad; the applied pose is
+      raw), time-based, and give `TableSnapPolicy` and `VisionRepository.applyPoseUpdate` (two writers of
+      the same offset, rotation and zoom) one owner.
+- [ ] Also found: in AR, `effectivePitchDegrees` is never refreshed (ball lift uses stale IMU pitch).
+- [ ] From the CV survey, not started: temporal tracking of detections (a ball missed for one frame vanishes,
+      types flip per frame), cue selection (first CUE-typed ball wins, others dropped), stale `visionData` after
+      the camera goes off, `VisionAnalyzer` error handling.

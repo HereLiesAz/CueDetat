@@ -11,7 +11,7 @@ import com.hereliesaz.cuedetat.view.model.OnPlaneBall
 import com.hereliesaz.cuedetat.view.model.Table
 import com.hereliesaz.cuedetat.view.state.TableSize
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -111,12 +111,56 @@ class CoreShotAdviceTest {
     }
 
     @Test
-    fun `the key follows what the planner reads, and nothing finer than a unit`() {
+    fun `the signature follows what the planner reads, and nothing finer than the tolerance`() {
         val a = state.copy(onPlaneBall = ball(-200f, 0f), obstacleBalls = listOf(ball(0f, 0f)))
-        assertEquals(CoreShotAdvice.key(a), CoreShotAdvice.key(a.copy(obstacleBalls = listOf(ball(0.4f, 0.4f)))))
-        assertNotEquals(CoreShotAdvice.key(a), CoreShotAdvice.key(a.copy(obstacleBalls = listOf(ball(30f, 0f)))))
-        assertNotEquals(CoreShotAdvice.key(a), CoreShotAdvice.key(a.copy(table = Table(TableSize.NINE_FT, true))))
-        assertNotEquals(CoreShotAdvice.key(a), CoreShotAdvice.key(a.copy(targetType = TargetType.STRIPES)))
+        val sig = CoreShotAdvice.signature(a)
+        assertTrue(sig.sameAs(CoreShotAdvice.signature(a.copy(obstacleBalls = listOf(ball(0.4f, 0.4f))))))
+        assertTrue("1.5 units of jitter is not a change", sig.sameAs(CoreShotAdvice.signature(a.copy(obstacleBalls = listOf(ball(1.5f, 0f))))))
+        assertFalse("2.5 units is", sig.sameAs(CoreShotAdvice.signature(a.copy(obstacleBalls = listOf(ball(2.5f, 0f))))))
+        assertFalse(sig.sameAs(CoreShotAdvice.signature(a.copy(obstacleBalls = listOf(ball(30f, 0f))))))
+        assertFalse(sig.sameAs(CoreShotAdvice.signature(a.copy(table = Table(TableSize.NINE_FT, true)))))
+        assertFalse(sig.sameAs(CoreShotAdvice.signature(a.copy(targetType = TargetType.STRIPES))))
+        assertFalse("a ball more or fewer", sig.sameAs(CoreShotAdvice.signature(a.copy(obstacleBalls = emptyList()))))
+        assertFalse("off is not on", sig.sameAs(CoreShotAdvice.OFF))
+        assertTrue(CoreShotAdvice.OFF.sameAs(CoreShotAdvice.OFF))
+    }
+
+    @Test
+    fun `a ball on a whole-unit boundary no longer flips the signature`() {
+        // The old key truncated to whole units, so 99.99 and 100.01 were different answers.
+        val a = state.copy(onPlaneBall = ball(-200f, 0f), obstacleBalls = listOf(ball(99.99f, 0f)))
+        val b = a.copy(obstacleBalls = listOf(ball(100.01f, 0f)))
+        assertTrue(CoreShotAdvice.signature(a).sameAs(CoreShotAdvice.signature(b)))
+    }
+
+    @Test
+    fun `the order of the balls does not matter, their kinds do`() {
+        val two = state.copy(onPlaneBall = ball(-200f, 0f), obstacleBalls = listOf(ball(0f, 0f), ball(100f, 100f)))
+        val swapped = two.copy(obstacleBalls = listOf(ball(100f, 100f), ball(0f, 0f)))
+        assertTrue(CoreShotAdvice.signature(two).sameAs(CoreShotAdvice.signature(swapped)))
+
+        val detected = VisionData(balls = listOf(DetectedBall(pf(100f, 0f), BallType.SOLID), DetectedBall(pf(-100f, 0f), BallType.STRIPE)))
+        val flipped = VisionData(balls = listOf(DetectedBall(pf(100f, 0f), BallType.STRIPE), DetectedBall(pf(-100f, 0f), BallType.SOLID)))
+        val base = state.copy(onPlaneBall = ball(0f, 400f), hasInverseMatrix = true)
+        assertTrue(CoreShotAdvice.signature(base.copy(visionData = detected))
+            .sameAs(CoreShotAdvice.signature(base.copy(visionData = detected.copy(balls = detected.balls.reversed())))))
+        assertFalse("a ball that changes kind is a change",
+            CoreShotAdvice.signature(base.copy(visionData = detected)).sameAs(CoreShotAdvice.signature(base.copy(visionData = flipped))))
+    }
+
+    @Test
+    fun `against the last signature acted on, slow drift adds up to a recompute`() {
+        // The ball creeps 0.5 units a frame. Compared with the last signature acted on (as the
+        // driver's distinctUntilChanged does), it triggers every few frames and never lets the
+        // plan trail the ball by more than the tolerance.
+        var actedOn = CoreShotAdvice.signature(state.copy(onPlaneBall = ball(-200f, 0f), obstacleBalls = listOf(ball(0f, 0f))))
+        var recomputes = 0
+        for (i in 1..40) {
+            val sig = CoreShotAdvice.signature(state.copy(onPlaneBall = ball(-200f, 0f), obstacleBalls = listOf(ball(i * 0.5f, 0f))))
+            if (!sig.sameAs(actedOn)) { actedOn = sig; recomputes++ }
+        }
+        // 20 units of creep in steps of just over 2: ten recomputes, not forty.
+        assertTrue("recomputes: $recomputes", recomputes in 8..10)
     }
 
     @Test
