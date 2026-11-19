@@ -251,6 +251,13 @@ rule — if the reason no longer holds, the invariant is stale, not sacred.
   ball positions by distance against the last signature it acted on, not by rounding onto a grid, which flips
   its answer when a ball sits on a cell edge.
 
+- **Filters are functions of time, and tuned on synthetic signals** (`OrientationFilter`, `ScreenCornerSmoother`,
+  `TableSnapPolicy.TablePull`). Reason: the sensor filter's strength was a per-sample constant (a different
+  filter at 16 and 50 Hz, and yaw never counted), and the table pull's share was per fit. A filter whose
+  constants are per event changes character with the event rate; these take `dt` and are tested at two
+  rates. Each constant's effect is stated in its KDoc and was chosen on a measured sweep (jitter at rest,
+  lag in motion), not by feel; no device was available, so the *feel* of all three is still unchecked.
+
 ## Where things actually live (correcting known-stale doc claims)
 
 - ARCore session/depth capability: `feature_expert_ar/.../ArTableSession.kt`
