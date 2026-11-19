@@ -740,6 +740,7 @@ class MainViewModel @Inject constructor(
     // --- Table snap and pose memory (see TableSnapPolicy, TablePosePrior) --------------------
 
     private var lastUserTableAdjustMs = 0L
+    private val tablePull = com.hereliesaz.cuedetat.domain.TableSnapPolicy.TablePull()
     private var lastPoseRecordMs = 0L
     @Volatile private var cachedLocation: Pair<Double, Double>? = null
     @Volatile private var locationSamples: List<com.hereliesaz.cuedetat.domain.TablePoseSample>? = null
@@ -766,19 +767,21 @@ class MainViewModel @Inject constructor(
             is MainScreenEvent.PanView, is MainScreenEvent.ZoomSliderChanged, is MainScreenEvent.ZoomScaleChanged,
             is MainScreenEvent.TableRotationChanged, is MainScreenEvent.TableRotationApplied,
             is MainScreenEvent.TableScaleChanged, is MainScreenEvent.NudgeTableRange,
-            is MainScreenEvent.ScreenGestureStarted, is MainScreenEvent.LogicalGestureStarted ->
+            is MainScreenEvent.ScreenGestureStarted, is MainScreenEvent.LogicalGestureStarted -> {
                 lastUserTableAdjustMs = now
+                tablePull.release()
+            }
 
             is MainScreenEvent.TableFitUpdated -> {
                 // World-fixed preview cannot be pulled by a noisy frame-by-frame felt fit. Not just
                 // while the matrix exists: during a tracking loss it is null, and a pull then would
                 // change pan and zoom, which the AR session reads as the user's hand on the table.
                 if (com.hereliesaz.cuedetat.domain.ArProjectionPolicy.isWorldTracked(after.cameraMode, after.depthCapability)) return
-                val fit = event.fit ?: return
+                val fit = event.fit ?: run { tablePull.release(); return }
                 val current = poseOf(after)
-                com.hereliesaz.cuedetat.domain.TableSnapPolicy.pullStep(
+                tablePull.step(
                     current, fit.pose.let { com.hereliesaz.cuedetat.domain.TableSnapPolicy.Pose(it.offsetX, it.offsetY, it.rotationDeg, it.zoom) },
-                    fit.iou, now - lastUserTableAdjustMs,
+                    fit.iou, now - lastUserTableAdjustMs, now,
                 )?.let { onEvent(MainScreenEvent.ApplyTablePose(it.offsetX, it.offsetY, it.rotationDeg, it.zoom)) }
                 if (fit.iou >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.RECORD_MIN_IOU &&
                     now - lastPoseRecordMs >= com.hereliesaz.cuedetat.domain.TableSnapPolicy.RECORD_INTERVAL_MS
